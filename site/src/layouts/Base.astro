@@ -132,6 +132,12 @@ const socialImageUrl = new URL(image, siteUrl).href;
            crosses over, when they lean onto --text to keep its contrast (src/passage.ts). */
         --text-muted: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--muted-ink));
         --accent-text: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--accent-ink));
+        /* GitHub's star gold, for the header's star and count. GitHub's own (Primer's
+           base.color.yellow.2: #eac54f by day, #e3b341 by night) is 1.5:1 on this ground, so the
+           day value is that gold darkened until its text passes: 5.17:1 on --ground. The night
+           value is GitHub's own, 9.31:1 on the night ground. It leans like accent text. */
+        --github-star-ink: #8a5d00;
+        --github-star: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--github-star-ink));
         --deep: #241d18;
         --deep-surface: #302720;
         --deep-text: #f1e7da;
@@ -209,6 +215,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --border-strong: color-mix(in srgb, #e7f0f4 24%, #263a43);
         --accent: #70b2d7;
         --accent-ink: #86c2e0;
+        --github-star-ink: #e3b341;
         --on-accent: #0e171d;
         --on-text: #0e171d;
         --selection: #213843;
@@ -231,10 +238,12 @@ const socialImageUrl = new URL(image, siteUrl).href;
       @property --muted-ink { syntax: '<color>'; inherits: true; initial-value: #6e6155; }
       @property --accent { syntax: '<color>'; inherits: true; initial-value: #c97e62; }
       @property --accent-ink { syntax: '<color>'; inherits: true; initial-value: #8f4e37; }
+      @property --github-star-ink { syntax: '<color>'; inherits: true; initial-value: #8a5d00; }
       @property --on-accent { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
       @property --on-text { syntax: '<color>'; inherits: true; initial-value: #f8f2e9; }
       @property --text-muted { syntax: '<color>'; inherits: true; initial-value: #6e6155; }
       @property --accent-text { syntax: '<color>'; inherits: true; initial-value: #8f4e37; }
+      @property --github-star { syntax: '<color>'; inherits: true; initial-value: #8a5d00; }
       @property --passage-lean { syntax: '<number>'; inherits: true; initial-value: 0; }
       :root {
         /* Also a plain value, so muted and accent text keep their colours in a browser
@@ -247,13 +256,13 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root.passage-fading {
         transition-property:
           --ground, --surface, --surface-2, --tint, --border, --border-strong, --selection,
-          --text, --muted-ink, --accent, --accent-ink, --on-accent, --on-text;
+          --text, --muted-ink, --accent, --accent-ink, --on-accent, --on-text, --github-star-ink;
         transition-duration:
           var(--passage-ms), var(--passage-ms), var(--passage-ms), var(--passage-ms), var(--passage-ms),
-          var(--passage-ms), var(--passage-ms), 0s, 0s, 0s, 0s, 0s, 0s;
+          var(--passage-ms), var(--passage-ms), 0s, 0s, 0s, 0s, 0s, 0s, 0s;
         transition-delay:
           0s, 0s, 0s, 0s, 0s, 0s, 0s, var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at),
-          var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at);
+          var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at);
         transition-timing-function: var(--passage-ease);
         animation: passage-lean var(--passage-ms) linear;
       }
@@ -675,37 +684,50 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .primary-nav + .header-actions {
         margin-left: 0;
       }
-      /* GitHub with its star count (SiteHeader.astro): an outlined button at the header
-         button's size, the mark, "Star", and the count after a hairline. */
+      /* GitHub with its star count (SiteHeader.astro): a plain link, no border or fill. The
+         mark in ink, the star and the count in GitHub's star gold, at the header button's
+         height so the hit area is generous; hover underlines the count. */
       .github-link {
         min-height: 40px;
         display: inline-flex;
         align-items: center;
-        gap: 0.45rem;
-        padding: 0.45rem 0.8rem;
-        border: 1px solid var(--border-strong);
-        border-radius: 0.6rem;
+        gap: 0.5rem;
+        padding: 0 0.25rem;
+        border-radius: 0.5rem;
         color: var(--text);
-        font-size: 0.88rem;
+        font-size: 0.9rem;
         font-weight: 600;
         line-height: 1;
         text-decoration: none;
         white-space: nowrap;
-        transition: background-color 140ms ease-out;
       }
-      .github-link:hover {
-        background: var(--surface-2);
-      }
-      .github-link svg {
+      .github-mark {
         flex: none;
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
+      }
+      .github-stars {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        color: var(--github-star);
+      }
+      .github-star {
+        flex: none;
+        width: 15px;
+        height: 15px;
       }
       .github-count {
-        padding-left: 0.5rem;
-        border-left: 1px solid var(--border-strong);
-        color: var(--text-muted);
         font-variant-numeric: tabular-nums;
+        text-decoration: underline transparent 1.5px;
+        text-underline-offset: 0.25em;
+        transition: text-decoration-color 140ms ease-out;
+      }
+      .github-link:hover .github-count {
+        text-decoration-color: currentColor;
+      }
+      .header-actions > .github-link {
+        margin-right: 0.45rem;
       }
       .nav-menu-panel > .menu-github small {
         color: var(--text-muted);

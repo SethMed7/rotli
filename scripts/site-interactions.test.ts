@@ -171,6 +171,12 @@ describe("the privacy passage's crossfade", () => {
       main: text,
     },
     "accent text on the ground": { text: ["#8f4e37", "#86c2e0"], ground: ["#f8f2e9", "#0e171d"], main: text },
+    // The header's star count in GitHub's star gold (--github-star-ink).
+    "GitHub's star gold on the header": {
+      text: ["#8a5d00", "#e3b341"],
+      ground: ["#f8f2e9", "#0e171d"],
+      main: text,
+    },
   };
   const frames = (pair: PassagePair) =>
     Array.from({ length: passage.PASSAGE_MS + 1 }, (_, ms) => {
@@ -190,6 +196,17 @@ describe("the privacy passage's crossfade", () => {
       const dim = frames(pair).filter((ratio) => ratio < 4.5).length;
       expect({ name, quick: dim <= 100 }).toEqual({ name, quick: true });
     }
+  });
+
+  test("GitHub's star gold reads as text at rest, by day and by night", () => {
+    const css = readFileSync(site("layouts", "Base.astro"), "utf8");
+    const day = css.match(/--github-star-ink: (#[0-9a-f]{6});/g)!.map((rule) => rule.slice(-8, -1));
+    expect(day).toEqual(["#8a5d00", "#e3b341"]);
+    const ratio = (a: string, b: string) => passage.contrast(passage.rgb(a), passage.rgb(b));
+    expect(ratio("#8a5d00", "#f8f2e9")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("#e3b341", "#0e171d")).toBeGreaterThanOrEqual(4.5);
+    // GitHub's own day gold would not: that is why the day value is darkened.
+    expect(ratio("#eac54f", "#f8f2e9")).toBeLessThan(3);
   });
 
   test("a primary button and its label switch together, so the label never fades through it", () => {

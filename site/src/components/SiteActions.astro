@@ -3,11 +3,15 @@
 // offers the Mac app and Rotli Web and leads with the visitor's own system. The header's button
 // says the same (the owner, 2026-10-06). One that offers neither says so instead of linking to an
 // empty page. Direct DMG links live only on /download/. A page may pass a secondary button
-// after it (the hero's privacy promise); it sits in the same row, at the same size.
+// before it (slot "before": the hero's privacy promise, on the left; the owner, 2026-10-06);
+// it sits in the same row, at the same size. The order in the markup is the order everywhere:
+// left to right on a laptop, top to bottom when they stack, and for the keyboard and screen
+// readers alike.
 import { WAY_IN } from '../site';
 ---
 
 <div class="site-actions">
+  <slot name="before" />
   {
     WAY_IN.offered ? (
       <a class="button primary action-try" href={WAY_IN.href}>
@@ -19,5 +23,4 @@ import { WAY_IN } from '../site';
       </span>
     )
   }
-  <slot />
 </div>

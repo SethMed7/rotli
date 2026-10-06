@@ -97,7 +97,7 @@ whose art never touches its words from 320 to 1920.
   focus; tabbing away or an outside click closes). Without script the button
   is hidden and "Resources" is a plain link to `/resources/`. On the right sit
   GitHub with its star count (while the source is public; see "The GitHub
-  star count" below) and the way in, "Download free" (`WAY_IN` in
+  star count" below), a plain link left of the button, and the way in, "Download free" (`WAY_IN` in
   `src/site.ts`), the hero's own label and button scaled to the header (the
   owner, 2026-10-06: "the top right button should align with button on hero
   for consistency"). It opens `/download/`, which offers Rotli Web on systems
@@ -124,10 +124,14 @@ whose art never touches its words from 320 to 1920.
   alternate plain and warm):
   1. Hero (the product film; plain): two buttons side by side at one height,
      radius, and type size (the owner, 2026-10-06: "our privacy policy should
-     be more like a button matching the download"): "Download free"
-     (`SiteActions`, primary) and "Our privacy promise" (outlined, with a
-     lock, to `/privacy/#promise`, passed into `SiteActions`' slot). Below
-     520px they stack full width, the download first. "No account. Works
+     be more like a button matching the download"): "Our privacy promise"
+     (outlined, with a lock, to `/privacy/#promise`, passed into
+     `SiteActions`' `before` slot) on the left and "Download free"
+     (`SiteActions`, primary) on the right (the owner, the same day:
+     "Privacy promise goes on the left"). Below 520px they stack full width
+     in that same order: one order for sight, the keyboard, and screen
+     readers (no `order` or `column-reverse`), and the download still reads
+     as the main action by its fill. "No account. Works
      offline." stays one quiet line under them. The film sits across the boundary into the next
      band: behind its lower half the page ground eases into the warm one
      (`.below-fold`, one gradient between the two ground tokens), so there is
@@ -257,9 +261,21 @@ whose art never touches its words from 320 to 1920.
   and the full site asks. `SITE_GITHUB_STARS` overrides the request: a whole
   number is used as the count (the E2E build sets 1234), `off` shows none.
   Counts read short (5, 999, 1.2k, 12k, 123k, 1.3m). The link is a plain
-  `<a>` to `GITHUB_URL` with no script, frame, or image from GitHub; the mark
-  is Primer Octicons' `mark-github` (MIT), inline. Its visible words make its
-  name: "Star rotli on GitHub, 1.2k stars". The Docker build stage has the
+  `<a>` to `GITHUB_URL` with no script, frame, or image from GitHub, and no
+  border or fill (the owner, 2026-10-06: "don't put it in a card, just logo
+  and star count … in gold matching GitHub star color"): the GitHub mark in
+  ink, then a star and the count in `--github-star` (Base.astro). GitHub's own
+  star gold (Primer `base.color.yellow.2`, `#eac54f`) is 1.5:1 on the
+  header's ground, so the day value is that gold darkened to `#8a5d00`
+  (5.17:1 on `--ground`); in the privacy passage it is GitHub's dark-mode
+  star, `#e3b341` (9.31:1 on the night ground). It leans onto `--text`
+  around the passage's ink switch like accent text, and
+  `scripts/site-interactions.test.ts` measures it in every frame. Hover
+  underlines the count; focus shows the site's ring. The mark and the star
+  are Primer Octicons' `mark-github` and `star-fill` (MIT), inline. Its name
+  is "Star rotli on GitHub, 1.2k stars" (hidden words around the count). On a
+  phone (below 560px) it stays in Menu: beside the brand it would crowd the
+  bar at 320. The Docker build stage has the
   network (it already runs `bun ci`); `GITHUB_TOKEN` is deliberately not a
   build arg, since a build arg lands in an image layer.
   `scripts/site-github.test.ts` holds the request, the fallbacks, and the

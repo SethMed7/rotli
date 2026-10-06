@@ -24,23 +24,23 @@ test("the hero says what rotli is and costs, with two buttons, and no platform l
   // Where rotli runs is the download page's (and the FAQ's) to say (the owner, 2026-10-05).
   await expect(hero).not.toContainText("Windows");
   await expect(page.locator("#start")).not.toContainText("Windows");
-  // Two buttons, the way in first: "Download free" to the page that offers the Mac app and
-  // Rotli Web (no direct DMG), then the privacy promise, outlined, with its lock. The old
-  // one-line pointer is gone.
+  // Two buttons, the privacy promise first (the owner, 2026-10-06: "Privacy promise goes on the
+  // left"), outlined, with its lock; then "Download free" to the page that offers the Mac app and
+  // Rotli Web (no direct DMG). The old one-line pointer is gone.
   const actions = hero.locator(".site-actions a");
   await expect(actions).toHaveCount(2);
-  await expect(actions.nth(0)).toHaveText("Download free");
-  await expect(actions.nth(0)).toHaveAttribute("href", "/download/");
-  await expect(actions.nth(0)).toHaveClass(/\bprimary\b/);
-  await expect(actions.nth(1)).toHaveText("Our privacy promise");
-  await expect(actions.nth(1)).toHaveAttribute("href", "/privacy/#promise");
-  await expect(actions.nth(1)).toHaveClass(/\bsecondary\b/);
-  await expect(actions.nth(1).locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(actions.nth(0)).toHaveText("Our privacy promise");
+  await expect(actions.nth(0)).toHaveAttribute("href", "/privacy/#promise");
+  await expect(actions.nth(0)).toHaveClass(/\bsecondary\b/);
+  await expect(actions.nth(0).locator("svg")).toHaveAttribute("aria-hidden", "true");
+  await expect(actions.nth(1)).toHaveText("Download free");
+  await expect(actions.nth(1)).toHaveAttribute("href", "/download/");
+  await expect(actions.nth(1)).toHaveClass(/\bprimary\b/);
   await expect(page.locator("main a[href$='.dmg']")).toHaveCount(0);
   await expect(hero.locator(".hero-promise b, .promise-text")).toHaveCount(0);
 });
 
-test("the hero's two buttons share one size: side by side on a laptop, stacked full width on a phone", async ({
+test("the hero's two buttons share one size: the promise left of the download, stacked in that order on a phone", async ({
   page,
 }) => {
   for (const width of [320, 390, 768, 1440, 1920]) {
@@ -61,21 +61,23 @@ test("the hero's two buttons share one size: side by side on a laptop, stacked f
       }),
     );
     expect(look).toHaveLength(2);
-    const [primary, secondary] = look as [(typeof look)[0], (typeof look)[0]];
+    // The markup's order is the order seen: the promise, then the download.
+    const [secondary, primary] = look as [(typeof look)[0], (typeof look)[0]];
     expect(secondary.height, `height at ${width}`).toBe(primary.height);
     expect(secondary.radius).toBe(primary.radius);
     expect(secondary.size).toBe(primary.size);
     expect(secondary.weight).toBe(primary.weight);
     expect(primary.height).toBeGreaterThanOrEqual(44);
     if (width <= 520) {
-      // Stacked, the download first, each the column's full width.
-      expect(secondary.box.y).toBeGreaterThanOrEqual(primary.box.bottom);
+      // Stacked in the same order (one order for sight, keyboard, and screen readers), each the
+      // column's full width.
+      expect(primary.box.y).toBeGreaterThanOrEqual(secondary.box.bottom);
       expect(Math.abs(secondary.box.width - primary.box.width)).toBeLessThanOrEqual(1);
       const column = await page.locator(".hero-copy").evaluate((el) => el.getBoundingClientRect().width);
       expect(primary.box.width).toBeGreaterThanOrEqual(column - 1);
     } else {
       expect(Math.abs(secondary.box.y - primary.box.y)).toBeLessThanOrEqual(1);
-      expect(secondary.box.x).toBeGreaterThan(primary.box.x + primary.box.width);
+      expect(primary.box.x).toBeGreaterThan(secondary.box.x + secondary.box.width);
     }
     // Both, and the quiet line under them, inside the first window.
     expect(look.every((button) => button.box.bottom <= 900)).toBe(true);
@@ -140,18 +142,20 @@ test("GitHub with its star count sits up top, read at build time, never fetched 
     if (width > 560) {
       await expect(link).toBeVisible();
       await expect(link).toHaveAttribute("href", "https://github.com/SethMed7/rotli");
-      // Its visible words are its name: "Star", whose repository, and the count (this build's
-      // SITE_GITHUB_STARS=1234, formatted short).
+      // Its name says what it is and the count (this build's SITE_GITHUB_STARS=1234, formatted
+      // short); what shows is the mark, a star, and the count.
       await expect(link).toHaveAccessibleName("Star rotli on GitHub, 1.2k stars");
       await expect(link.locator(".github-count")).toHaveText("1.2k");
-      await expect(link.locator("svg")).toHaveAttribute("aria-hidden", "true");
-      // Beside the button, one height.
+      for (const glyph of await link.locator("svg").all())
+        await expect(glyph).toHaveAttribute("aria-hidden", "true");
+      await expect(link.locator(".github-star")).toBeVisible();
+      // Left of the button, with room between them, on its middle line.
       const [star, button] = await Promise.all([
         link.boundingBox(),
         page.locator(".header-download").boundingBox(),
       ]);
-      expect(star!.x + star!.width).toBeLessThanOrEqual(button!.x);
-      expect(Math.round(star!.height)).toBe(Math.round(button!.height));
+      expect(button!.x - (star!.x + star!.width)).toBeGreaterThanOrEqual(12);
+      expect(Math.abs(star!.y + star!.height / 2 - (button!.y + button!.height / 2))).toBeLessThanOrEqual(1);
     } else {
       await expect(link).toBeHidden();
     }
@@ -182,6 +186,56 @@ test("GitHub with its star count sits up top, read at build time, never fetched 
   // No script, frame, or image from GitHub: the count is text in the page.
   await expect(page.locator("script[src*='github'], iframe, img[src*='github']")).toHaveCount(0);
   expect(github).toEqual([]);
+});
+
+// WCAG 2 contrast between two computed rgb() colours.
+const contrastOf = (a: string, b: string) => {
+  const lum = (css: string) => {
+    const [r, g, b] = css
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map((n) => Number(n) / 255);
+    const c = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * c(r!) + 0.7152 * c(g!) + 0.0722 * c(b!);
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+};
+
+test("the GitHub link is plain: no box, the star and count in a gold that reads, a focus ring and a hover", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const link = page.locator(".site-header .github-link");
+  const look = await link.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { border: style.borderTopStyle, background: style.backgroundColor };
+  });
+  expect(look.border).toBe("none");
+  expect(look.background).toBe("rgba(0, 0, 0, 0)");
+  // The star and the count share one gold; the mark stays in ink.
+  const [count, star, mark, ground] = await Promise.all([
+    link.locator(".github-count").evaluate((el) => getComputedStyle(el).color),
+    link.locator(".github-star").evaluate((el) => getComputedStyle(el).color),
+    link.locator(".github-mark").evaluate((el) => getComputedStyle(el).color),
+    page.locator(".site-header-bar").evaluate((el) => getComputedStyle(el).backgroundColor),
+  ]);
+  expect(star).toBe(count);
+  expect(mark).not.toBe(count);
+  expect(contrastOf(count, ground)).toBeGreaterThanOrEqual(4.5);
+  // Hover underlines the count; the keyboard gets the ring.
+  const underline = () =>
+    link.locator(".github-count").evaluate((el) => getComputedStyle(el).textDecorationColor);
+  const resting = await underline();
+  await link.hover();
+  await expect.poll(underline).not.toBe(resting);
+  await page.mouse.move(0, 400);
+  await link.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(link).toBeFocused();
+  await expect(link).toHaveCSS("outline-style", "solid");
 });
 
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({

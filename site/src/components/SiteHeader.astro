@@ -6,9 +6,12 @@
 // leads with the visitor's system, so the label holds on Windows and Linux too.
 //
 // The star count is read once while the site is built (src/githubStars.ts); the visitor's
-// browser never calls GitHub. The link is a plain <a> whose visible text is its name ("Star",
-// then "rotli on GitHub" for assistive tech, then the count); without a count, "Star rotli on GitHub".
-// The mark is Primer Octicons' mark-github (MIT, github.com/primer/octicons), inline, unmodified.
+// browser never calls GitHub. The link is plain (the owner, 2026-10-06: "don't put it in a card,
+// just logo and star count"): the GitHub mark in ink, then a star and the count in GitHub's star
+// gold (--github-star, Base.astro), with no border or fill, left of the button. Its name is
+// "Star rotli on GitHub, 1.2k stars" (hidden words around the count); without a count, "Star
+// rotli on GitHub". The mark and the star are Primer Octicons' mark-github and star-fill
+// (MIT, github.com/primer/octicons), inline, unmodified.
 // Below 560px the star link and the button move into Menu. It stays pinned to
 // the top on a solid ground (flat: no blur, no shadow). Resources is a
 // disclosure dropdown (a button with aria-expanded); without script its label
@@ -91,17 +94,21 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
           <div class="header-actions">
             {github && (
               <a class="github-link" href={GITHUB_URL} rel="noopener">
-                <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+                <svg class="github-mark" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                 </svg>
-                <span class="github-star">Star</span>
-                <span class="visually-hidden"> rotli on GitHub{starText !== null ? ', ' : ''}</span>
-                {starText !== null && (
-                  <>
-                    <span class="github-count">{starText}</span>
-                    <span class="visually-hidden"> {starWord}</span>
-                  </>
-                )}
+                <span class="github-stars">
+                  <svg class="github-star" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+                    <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                  </svg>
+                  <span class="visually-hidden">Star rotli on GitHub{starText !== null ? ', ' : ''}</span>
+                  {starText !== null && (
+                    <>
+                      <span class="github-count">{starText}</span>
+                      <span class="visually-hidden"> {starWord}</span>
+                    </>
+                  )}
+                </span>
               </a>
             )}
             <a class="button primary header-download" href={WAY_IN.href} aria-current={current === 'download' ? 'page' : undefined}>{WAY_IN.label}</a>

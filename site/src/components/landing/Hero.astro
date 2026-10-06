@@ -1,9 +1,11 @@
 ---
 // The landing hero: one promise, what rotli is, and two buttons side by side at one size (the
 // owner, 2026-10-06: "our privacy policy should be more like a button matching the download"):
-// "Download free" (to /download/, which offers the Mac app and Rotli Web) and "Our privacy
-// promise", outlined with a lock, to /privacy/#promise. On a phone they stack full width, the
-// download first. "No account. Works offline." stays one quiet line under them. Where rotli runs
+// "Our privacy promise", outlined with a lock, to /privacy/#promise, on the left, and "Download
+// free" (to /download/, which offers the Mac app and Rotli Web) on the right (the owner, the
+// same day: "Privacy promise goes on the left"). On a phone they stack full width in the same
+// order, so what is seen first is what the keyboard and a screen reader reach first; the
+// download still reads as the main action by its fill. "No account. Works offline." stays one quiet line under them. Where rotli runs
 // is the download page's to say, not the hero's (the owner, 2026-10-05: less clutter). It fills the
 // first screen on a faint tile of note, folder, and checklist icons (the same
 // pattern as the link preview, public/social-card.svg) that fades out behind
@@ -43,7 +45,7 @@ import FilmPlayer from '../FilmPlayer.astro';
       AI is optional: it uses a model on your computer or the AI tools you already pay for.
     </p>
     <SiteActions>
-      <a class="button secondary hero-promise" href="/privacy/#promise">
+      <a slot="before" class="button secondary hero-promise" href="/privacy/#promise">
         <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="12" height="8.5" rx="2"></rect><path d="M7 9V6.5a3 3 0 0 1 6 0V9"></path></svg>
         Our privacy promise
       </a>
@@ -132,7 +134,7 @@ import FilmPlayer from '../FilmPlayer.astro';
     font-weight: 600;
   }
   /* The two buttons share one row and one size (.button); on a phone they stack, full width,
-     the download first. */
+     in the same order: the promise, then the download. */
   .hero-promise svg {
     flex: none;
   }

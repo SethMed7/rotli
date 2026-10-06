@@ -168,15 +168,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rotli Web in the meantime. The home page no longer repeats where rotli runs
   under its buttons, and the Mac download link lives only on the download
   page.
-- **rotli.co's header shows rotli's GitHub stars.** Beside "Download free",
-  a GitHub button shows the star count (in the menu on a phone). The count is
+- **rotli.co's header shows rotli's GitHub stars.** Left of "Download free",
+  a plain link shows the GitHub mark and a star with the count in GitHub's
+  star gold, with no box around it (in the menu on a phone). The count is
   read once when the site is built, so your browser never contacts GitHub to
   show it; if GitHub can't be reached then, the button shows without a
   number.
-- **rotli.co states its privacy promise.** Beside the download button, an
+- **rotli.co states its privacy promise.** Left of the download button, an
   "Our privacy promise" button of the same size, with a lock, opens the
-  promise at the top of the privacy page (on a phone the two stack, download
-  first): you
+  promise at the top of the privacy page (on a phone the two stack in the
+  same order): you
   choose which AI tools rotli uses and, note by note, what each one may read
   and change. A small table shows who may read and change a note you wrote
   (the model on your Mac, a connected AI tool, the Librarian) for an everyday,
