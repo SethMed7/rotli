@@ -119,7 +119,7 @@ describe("flushOnHide — a background save that fails says so", () => {
       (message) => reports.push(message),
     );
     expect(reports).toEqual([
-      "Couldn’t save a spreadsheet in the background — storage/rotli/a.xlsx: the file changed on disk",
+      "Couldn’t save a spreadsheet in the background: storage/rotli/a.xlsx: the file changed on disk",
     ]);
   });
 

@@ -68,7 +68,7 @@ export function composeImageText(typed: string, images: readonly { id: string }[
 /** What Rotli Web says when an image is offered to a chat: Rotli Helper
  * carries text only, by design (helper.rs refuses image turns). */
 export const WEB_IMAGES_NEED_THE_MAC_APP =
-  "Sending images in a chat needs the Mac app — Rotli Helper carries text only. Drop the image into a note instead.";
+  "Sending images in a chat needs the Mac app. Rotli Helper carries text only, so drop the image into a note instead.";
 
 /** The images a paste offers a chat: image files with no text riding along
  * (a rich copy from a web page keeps pasting as text, as in a note). */

@@ -146,7 +146,7 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
                   type="button"
                   className="ni-card"
                   onClick={entry.run}
-                  aria-label={`New ${entry.label}${entry.beta ? " — Beta" : ""} (press ${entry.digit})`}
+                  aria-label={`New ${entry.label}${entry.beta ? ", Beta" : ""} (press ${entry.digit})`}
                 >
                   <kbd className="ni-key">{entry.digit}</kbd>
                   {entry.glyph}

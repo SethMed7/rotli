@@ -128,7 +128,7 @@ test("Sheet and Document wear the one Beta mark where they are offered", async (
 
   const chooser = page.locator(".ni-surface");
   await expect(chooser).toBeVisible();
-  for (const name of ["New Sheet — Beta", "New Document — Beta"]) {
+  for (const name of ["New Sheet, Beta", "New Document, Beta"]) {
     const card = chooser.getByRole("button", { name });
     await expect(card).toBeEnabled();
     await expect(card.locator(".beta-badge")).toHaveText("Beta");

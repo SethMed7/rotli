@@ -218,7 +218,7 @@ export async function flushOnHide(
     await flush();
   } catch (error) {
     report(
-      `Couldn’t save a spreadsheet in the background — ${error instanceof Error ? error.message : String(error)}`,
+      `Couldn’t save a spreadsheet in the background: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

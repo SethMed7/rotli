@@ -86,15 +86,15 @@ export function parseChart(body: string): ChartParse {
   const options: Partial<Record<OptionKey, string>> = {};
   for (const line of lines.slice(0, blank)) {
     const match = /^\s*([A-Za-z]+)\s*:\s*(.*)$/.exec(line);
-    if (!match) return fail(`“${line.trim()}” isn’t an option — write it as key: value.`);
+    if (!match) return fail(`“${line.trim()}” isn’t an option. Write it as key: value.`);
     const key = match[1]!;
-    if (!isOptionKey(key)) return fail(`“${key}” isn’t a chart option — use type, title, or unit.`);
+    if (!isOptionKey(key)) return fail(`“${key}” isn’t a chart option. Use type, title, or unit.`);
     if (options[key] !== undefined) return fail(`“${key}” is given twice.`);
     options[key] = match[2]!.trim();
   }
   if (!options.type) return fail("A chart needs a type: bar, line, area, or pie.");
   if (!isChartType(options.type)) {
-    return fail(`“${options.type}” isn’t a chart type — use bar, line, area, or pie.`);
+    return fail(`“${options.type}” isn’t a chart type. Use bar, line, area, or pie.`);
   }
 
   const data = lines.slice(blank + 1).filter((line) => line.trim() !== "");

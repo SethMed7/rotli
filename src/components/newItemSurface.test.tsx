@@ -28,8 +28,8 @@ test("the stable chooser offers Sheet and Document as Beta and Mermaid diagram a
   expect(soon.length).toBe(1);
   expect(soon.every((button) => button.includes('aria-disabled="true"'))).toBe(true);
   expect(markup.includes("New Mermaid diagram — Coming soon")).toBe(true);
-  expect(markup.includes("New Sheet — Beta (press 5)")).toBe(true);
-  expect(markup.includes("New Document — Beta (press 4)")).toBe(true);
+  expect(markup.includes("New Sheet, Beta (press 5)")).toBe(true);
+  expect(markup.includes("New Document, Beta (press 4)")).toBe(true);
   expect(markup.includes("New Board (press 6)")).toBe(true);
   // one Beta mark per Beta card, none on Markdown, Board, or a coming-soon card
   expect(markup.match(/class="beta-badge"/g)?.length).toBe(2);
