@@ -40,9 +40,10 @@ The interactive pieces have two proofs, both run from the repository root:
 `bun test scripts/site-interactions.test.ts` (the rules without a browser: the
 privacy passage's trigger and the contrast of every frame of its crossfade, the
 theme studio's autoplay, the reading meter, the 404 game, the footer scene's
-play and the visitor's person) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
+play and the visitor's person; `scripts/site-motion.test.ts` holds the tour's
+scroll steps and the before and after's filing play) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
 site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
-The unit file runs inside `bun run verify`; the site's E2E lane is not yet
+The unit files run inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
 
@@ -54,9 +55,12 @@ each Overview card puts its picture beside its words on a tablet, and that
 the landing's smallest controls (the footnote marks, the 404's other ways in)
 answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
-holds the landing's order and grounds, the cards, the tour (mouse, keyboard,
-phone, no script), and the closing panel, whose art never touches its words
-from 320 to 1920.
+holds the landing's order and grounds, the cards, the before and after's
+play (once in view, held off screen, resting marked, Replay, one window at
+1440×900), the tour (each scroll step, click and keys to a step, the pin
+never holding the scroll or overlapping its list at 1024, 1440, and 1920,
+the phone sequence, no script, reduced motion), and the closing panel,
+whose art never touches its words from 320 to 1920.
 
 ## Production details
 
@@ -109,11 +113,13 @@ from 320 to 1920.
   `docs/design/landing-layout-2026-10-05.md` (each thing said once; grounds
   alternate plain and warm):
   1. Hero (the product film; plain).
-  2. Overview ("Write it down. rotli puts it away."; warm): three cards, each
-     a small picture of the app drawn in HTML on the site's tokens (a rendered
-     note, the fields the Librarian filled with an area pill and ticks, a chat
-     reply that names the notes it came from), with the app's quokka standing
-     on the panel, then a heading and one sentence. The pictures are one image
+  2. Overview ("Write it down. rotli puts it away."; warm): three columns,
+     each a small picture of the app drawn in HTML on the site's tokens (a
+     rendered note, the fields the Librarian filled with an area pill and
+     ticks, a chat reply that names the notes it came from), with the app's
+     quokka standing on the panel, then a heading and one sentence. The panel
+     sits straight on the band under its file name, with no outer card
+     around it (the owner, 2026-10-05: no card in a card). The pictures are one image
      each to assistive tech (`role="img"` and a label); no "sources" control is
      drawn because the app has none. Its lede carries the owner's item 2
      message, as does the FAQ.
@@ -125,23 +131,43 @@ from 320 to 1920.
      the one chapter whose headline has no lede: its figures are the lede.
   4. TwoKinds ("You write for yourself. AI reads differently."; warm): the
      same file as typed and as the Librarian files it, in two open columns on
-     the band with no card around either. The added frontmatter lines carry a
-     "+" and a tint, the body is marked unchanged, and `area` is a flat area,
-     as the memex contract requires.
-  5. Tour ("A closer look."; plain): a disclosure list with one part open at a
-     time. Each name is a `<button aria-expanded>` in an h3, with arrow keys,
-     Home, and End; pressing the open part leaves it open. The parts are Notes
-     and Markdown, Docs and Sheets (`DOCS_AND_SHEETS.status`), Chat with your
-     notes, Boards, the Librarian, and, only while `WEB_APP_ENABLED`, Rotli Web
-     and the Helper. That last part replaced the ways-in chapter (2026-10-05):
-     which browsers open the folder, why the others go through Rotli Helper,
-     the copyable install line, the Windows guide, and the "why Terminal" post.
-     From 960px, with script, the open part's preview fills a fixed-height
-     right column, so switching never moves the page. Narrower, and without
-     script, the preview sits inside the open part (without script every part
-     shows). Previews are `public/shots/` captures or drawings in the cards'
-     panel language. The tour never moves on its own. It ends on the one link
-     to `/features/`.
+     the band with no card around either, at a reading width so the whole
+     comparison fits one 1440×900 window. The added frontmatter lines carry a
+     "+" and a tint, the body is marked unchanged in ink (a tick and a rule,
+     not a second fill), and `area` is a flat area, as the memex contract
+     requires. It plays the filing once when it comes into view
+     (`src/filingTimeline.ts`; the owner, 2026-10-05): the note is typed, the
+     same words appear on the right, the added lines open above them one by
+     one like a live diff, and it rests marked. One frame loop, held off
+     screen and in a hidden tab; a quiet Replay (44px) plays it again. Both
+     bodies keep their full text at every moment, and the markup is the
+     finished state, so without script or under reduced motion nothing
+     moves.
+  5. Tour ("A closer look."; plain), stepped by the scroll (the owner,
+     2026-10-05, overriding the no-scroll-scrub preference for this section;
+     rules in `src/tourSteps.ts`). From 960px wide and 620px tall, with
+     script, the list and the preview are pinned under the header while a
+     runway of per-part anchors scrolls behind them; the part whose anchor
+     crosses the middle of the window is shown, with its sentence open under
+     its name, and the preview changes by a calm crossfade (out, then in; an
+     instant swap under reduced motion). It switches by step and never
+     scrubs, and the page scrolls natively throughout. Each name is a
+     `<button>` in an h3 (`aria-current` on the shown one, `aria-controls` its
+     preview) that scrolls to its step and holds that preview while the page
+     travels; arrow keys, Home, and End move between names. Narrower, shorter,
+     or without script, the parts are a plain sequence, each name and
+     sentence with its preview below, and a name scrolls to its part. The
+     parts are Notes and Markdown, Docs and Sheets (`DOCS_AND_SHEETS.status`),
+     Chat with your notes, Boards, the Librarian, and, only while
+     `WEB_APP_ENABLED`, Rotli Web and the Helper. That last part replaced the
+     ways-in chapter (2026-10-05): which browsers open the folder, why the
+     others go through Rotli Helper, the copyable install line, the Windows
+     guide, and the "why Terminal" post. Previews sit on the section ground
+     with no frame around them: `public/shots/` captures (render-note, board)
+     on their editor paper with one hairline, and drawings in the cards'
+     panel language where a capture isn't honest or readable at that size
+     (Docs and Sheets, the chat answer from `shots/chat.webp`, the
+     Librarian's filing). It ends on the one link to `/features/`.
   6. The dev-only Experiments.
   7. Personal (the theme studio; warm), with a faint island vignette from
      1180px up. Narrower, its left edge would reach into the lede, so it steps
@@ -178,7 +204,9 @@ from 320 to 1920.
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Scroll reveals (the drawn scenes included) fire once
-  and rest. Three things move on their own, each the owner's call: the theme
+  and rest; the before and after's filing play is one of those (once in view,
+  then at rest, Replay on request), and the tour changes only as the visitor
+  scrolls or picks a part. Three things move on their own, each the owner's call: the theme
   studio (2026-10-05, "Make it yours" below), the quokka scenery under the
   footer (2026-10-02), described below, which lives in its own band, below
   every word, and the 404 page's game, which moves only after the visitor
