@@ -1,8 +1,9 @@
 // Where notes live, as one decision (the owner, 2026-10-01: "you either start
-// fresh or connect a folder, that's it; after you pick it, no second stage").
-// Create picks an empty folder and makes the vault there; Open picks a folder
-// already holding notes and uses it in place, adding only Rotli's hidden
-// .rotli sidecar. Picking the folder is the confirmation.
+// fresh or connect a folder, that's it"; 2026-10-05: "always open native …
+// they can do it from there"). One button opens the macOS folder panel; an
+// empty folder (New Folder in the panel) becomes a fresh vault, a folder that
+// already holds notes is used in place with only a hidden .rotli sidecar.
+// Picking the folder is the confirmation.
 
 import { useEffect, useState } from "react";
 
@@ -13,12 +14,11 @@ import {
   corpusListConfig,
   type CorpusRefView,
 } from "../../lib/tauri";
-import { chooseFolder, initMemexAsCorpus } from "../../memex/service";
+import { chooseFolder, initMemexAsCorpus, pickVaultFolder } from "../../memex/service";
 import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
-import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
 import {
@@ -29,8 +29,6 @@ import {
   useSetupHandle,
 } from "./setupControls";
 
-type Intent = "create" | "open" | "current";
-
 /** The vault setup may offer to keep: the one this install has chosen. A
  * debug build only borrows production's vault, read-only, to boot; keeping
  * that would record nothing, so setup would ask again on the next launch. */
@@ -40,31 +38,19 @@ export function keepableVault(
   return config.developmentReadOnly ? null : config.corpus;
 }
 
-export function vaultChoiceLabel(intent: Intent): string {
-  if (intent === "create") return "Choose an empty folder";
-  if (intent === "open") return "Choose an existing folder";
-  return "Use this vault";
-}
-
 /** After opening a folder: carry on only when it really is the vault now. A
  * folder already open here is a no-op, which is fine for a vault this install
  * chose; a debug build only borrows production's vault read-only, so "opening"
  * it records nothing, and setup would end on the vault screen again. */
 export function openedOrWhy(opened: boolean, configured: boolean): string | null {
   if (opened || configured) return null;
-  return "That folder is already open here read-only, so Rotli can't keep it as this build's vault. Create a new vault, or pick another folder.";
+  return "That folder is already open here read-only, so Rotli can't keep it as this build's vault. Pick another folder.";
 }
 
-/** Why a picked folder can't be used for what was asked, or null. */
-export function folderMismatch(
-  intent: "create" | "open",
-  kind: "memex" | "markdown" | "empty",
-): string | null {
-  if (intent === "create" && kind !== "empty")
-    return "That folder already has files. Choose Open an existing folder to use it as it is.";
-  if (intent === "open" && kind === "empty")
-    return "That folder is empty. Choose Create a Rotli vault to start fresh there.";
-  return null;
+/** What a picked folder becomes: an empty one a fresh vault, anything else
+ * the vault it already is, used in place. */
+export function vaultPlan(kind: "memex" | "markdown" | "empty"): "create" | "open" {
+  return kind === "empty" ? "create" : "open";
 }
 
 export function VaultActivation({
@@ -74,7 +60,10 @@ export function VaultActivation({
   onBack,
   onBeforeSwitch,
   onSwitchFailed,
+  skipping = false,
 }: {
+  /** The person skipped setup: this screen is the one thing left. */
+  skipping?: boolean;
   onboarding?: boolean;
   allowCurrent?: boolean;
   onDone?: () => void | Promise<void>;
@@ -82,7 +71,6 @@ export function VaultActivation({
   onBeforeSwitch?: () => void | Promise<void>;
   onSwitchFailed?: () => void | Promise<void>;
 }) {
-  const [intent, setIntent] = useState<Intent>("create");
   // outside setup no Librarian screen follows, so a new vault asks here
   const [librarian, setLibrarian] = useState<"on" | "off">("on");
   const [busy, setBusy] = useState(false);
@@ -116,26 +104,13 @@ export function VaultActivation({
     setError(null);
     setBusy(true);
     try {
-      if (intent === "current") {
-        await onDone?.();
-        return;
-      }
-      const path = await requestVaultFolder({
-        title: intent === "create" ? "Create a Rotli vault" : "Open an existing folder",
-        description:
-          intent === "create"
-            ? "Choose an empty folder inside Home, or create one here. Rotli keeps ordinary local files there."
-            : "Choose the folder that already holds your notes. Rotli uses it in place and adds only a hidden .rotli folder.",
-        actionLabel: intent === "create" ? "Create vault here" : "Open this folder",
-        requireEmpty: intent === "create",
-      });
+      const path = await pickVaultFolder("Choose a folder for your notes");
       if (!path) return;
-      // a read-only look first: nothing is written to a folder that doesn't fit
-      const mismatch = folderMismatch(intent, (await corpusInspectFolder(path)).kind);
-      if (mismatch) throw new Error(mismatch);
+      // a read-only look first decides what the folder becomes
+      const plan = vaultPlan((await corpusInspectFolder(path)).kind);
       await onBeforeSwitch?.();
       await flushSettingsNow();
-      if (intent === "create") {
+      if (plan === "create") {
         // in setup, whether the Librarian works here is the next screen's question
         await initMemexAsCorpus(path, onboarding ? useUiStore.getState().brainEnabled : librarian === "on");
         await activateCreatedVault();
@@ -149,6 +124,17 @@ export function VaultActivation({
     } catch (cause) {
       await restoreVaultStep();
       setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Re-onboarding with a vault already chosen: keep it, no folder panel. */
+  const keepCurrent = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onDone?.();
     } finally {
       setBusy(false);
     }
@@ -177,38 +163,14 @@ export function VaultActivation({
           <div className="setup-content">
             <h1 id="vault-title">Where should your notes live?</h1>
             <p className="setup-lede">
-              Start fresh, or connect the Markdown folder you already use. Pick the folder and you&rsquo;re
-              in.
+              {skipping
+                ? "One thing before you start: pick a folder for your notes. "
+                : "Pick a folder for your notes. "}
+              Make a new one with New Folder and Rotli starts a fresh vault there, or pick the Markdown folder
+              you already use, like an Obsidian vault: it stays as it is, and Rotli adds only a hidden .rotli
+              folder.
             </p>
-            <SetupChoiceGroup
-              label="Vault choice"
-              value={intent}
-              onChange={setIntent}
-              options={[
-                {
-                  value: "create",
-                  title: "Create a Rotli vault",
-                  description:
-                    "Pick an empty folder, or make one. Rotli sets up its plain-file structure there.",
-                },
-                {
-                  value: "open",
-                  title: "Open an existing folder",
-                  description:
-                    "Pick an Obsidian, ZenNotes, or other Markdown folder. It stays as it is; Rotli adds only a hidden .rotli folder.",
-                },
-                ...(current
-                  ? [
-                      {
-                        value: "current" as const,
-                        title: `Keep ${current.absPath.split("/").pop() || "current vault"}`,
-                        description: `Explicitly continue with ${current.absPath}.`,
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-            {!onboarding && intent === "create" && (
+            {!onboarding && (
               <SetupChoiceGroup
                 label="Librarian choice"
                 value={librarian}
@@ -216,7 +178,7 @@ export function VaultActivation({
                 options={[
                   {
                     value: "on",
-                    title: "With the Librarian",
+                    title: "A new vault with the Librarian",
                     description: LIBRARIAN_ON_DESCRIPTION,
                   },
                   {
@@ -228,10 +190,6 @@ export function VaultActivation({
                 ]}
               />
             )}
-            <p className="setup-arrow-note">
-              <kbd>←</kbd>
-              <kbd>→</kbd> moves and selects
-            </p>
             {error && (
               <p className="setup-error" role="alert">
                 {error}
@@ -244,8 +202,18 @@ export function VaultActivation({
           <span className="setup-local-note">Local files remain the durable truth.</span>
           <div className="setup-actions">
             {onBack && <SetupBack disabled={busy} onClick={onBack} />}
+            {current && (
+              <button
+                type="button"
+                className="setup-button secondary"
+                disabled={busy}
+                onClick={() => void keepCurrent()}
+              >
+                Keep {current.absPath.split("/").pop() || "this vault"}
+              </button>
+            )}
             <SetupPrimary disabled={busy} onClick={primary}>
-              {busy ? "Working…" : vaultChoiceLabel(intent)}
+              {busy ? "Working…" : "Choose a folder"}
             </SetupPrimary>
           </div>
         </footer>

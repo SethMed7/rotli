@@ -91,6 +91,7 @@ import {
   activeInstance,
   isWritable,
 } from "../memex/config";
+import { pickVaultFolder } from "../memex/service";
 import {
   useChooseFolder,
   useConnectBrain,
@@ -127,7 +128,6 @@ import {
   type TimeFormat,
   useUiStore,
 } from "../state/ui";
-import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { AntigravitySetup } from "./antigravitySetup";
 import { type CharacterName, QuokkaMark } from "./character";
 import {
@@ -1407,22 +1407,12 @@ function LocationPane() {
   };
 
   const chooseVaultFolder = async () => {
-    const path = await requestVaultFolder({
-      title: "Choose your vault folder",
-      description: "Choose an existing folder to use in place. Empty folders can become a fresh vault.",
-      actionLabel: "Use this folder",
-      requireEmpty: false,
-    });
+    const path = await pickVaultFolder("Choose your vault folder");
     if (path) await chooseMut.mutateAsync(path);
   };
 
   const linkVaultFolder = async () => {
-    const path = await requestVaultFolder({
-      title: "Connect another vault",
-      description: "Choose an existing Rotli vault to add to the vault switcher.",
-      actionLabel: "Connect vault",
-      requireEmpty: false,
-    });
+    const path = await pickVaultFolder("Connect another vault");
     if (path) await connectBrainMut.mutateAsync(path);
   };
 

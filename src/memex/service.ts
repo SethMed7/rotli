@@ -18,6 +18,7 @@ import {
   corpusSwitchVault,
   memexDetect,
   memexListChats,
+  memexPickFolder,
   memexReadChat,
   memexReadContract,
   memexValidate,
@@ -72,6 +73,9 @@ export const detect = (): Promise<DetectedMemex[]> => memexDetect();
 /** "Choose folder…" — repoint the live corpus (smart: memex / move / plain).
  * False when the picker is cancelled. */
 export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFolder(path);
+
+/** Ask for a vault folder in the macOS panel: null when the person cancels. */
+export const pickVaultFolder = (title: string): Promise<string | null> => memexPickFolder(title);
 
 /** Switch to a vault already registered with Rotli. The backend resolves its
  * trusted path by id and rebinds the live default store. */

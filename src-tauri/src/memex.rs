@@ -1303,7 +1303,7 @@ fn safe_validation_report(root: &Path) -> ValidateReport {
 /// that was the beachball. It runs on a worker now (the dialog plugin marshals
 /// the panel itself to the main runloop).
 #[tauri::command]
-pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+pub async fn memex_pick_folder(app: tauri::AppHandle, title: Option<String>) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_dialog::DialogExt;
         let dialog_state = app.state::<crate::NativeDialogOpen>();
@@ -1311,7 +1311,10 @@ pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, 
         let mut picker = app
             .dialog()
             .file()
-            .set_title("Choose a Rotli vault")
+            .set_title(title.as_deref().unwrap_or("Choose a folder for your notes"))
+            // New Folder is how a fresh vault is made: every vault choice is
+            // this native panel (the owner, 2026-10-05)
+            .set_can_create_directories(true)
             .set_directory(crate::vault_location::picker_start(&app));
         if let Some(parent) = app.get_webview_window("main") {
             picker = picker.set_parent(&parent);

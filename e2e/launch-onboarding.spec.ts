@@ -20,13 +20,9 @@ const rawToggle = async (page: Page, mode: "Raw markdown" | "Beautified") => {
 
 async function onboard(page: Page) {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Launch Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   // the Librarian has its own screen. Every lane is offered with what this
   // Mac has for it; the twin has nothing, so it says so, and this Mac stays
   // chosen for the sidebar's Librarian to finish later
@@ -114,7 +110,7 @@ test("first-time setup opens in Rotli Light with a plain quokka, and a choice su
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
   await page.getByRole("button", { name: "Choose where notes live" }).click();
   await expect(page.getByText("2 of 4")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose a folder" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
@@ -131,12 +127,9 @@ test("after setup the music player is already there, quiet, and can be put away"
 
 test("skipping the tour points at Settings, and the note opens it", async ({ page }) => {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Hint Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
   await page
@@ -160,12 +153,9 @@ test("the Librarian screen asks whether first; Not now hides where it thinks and
   page,
 }) => {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Raw Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   // the vault step no longer asks; the Librarian screen does
   await expect(page.getByRole("radiogroup", { name: "Librarian choice" })).toHaveCount(0);
   const choice = page.getByRole("radiogroup", { name: "Librarian", exact: true });
@@ -200,12 +190,9 @@ test("the Librarian screen asks whether first; Not now hides where it thinks and
 
 test("the shortcuts screen says each can change, and a changed one can go back", async ({ page }) => {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Keys Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("4 of 4")).toBeVisible();
   await expect(page.getByText(/change them anytime in Settings → Keybindings/)).toBeVisible();
@@ -230,12 +217,9 @@ test("the guided tour follows setup, spotlights real controls, skips missing one
   page,
 }) => {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Tour Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -338,7 +322,7 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
   await expect(page.getByRole("radio", { name: /practice vault/i })).toHaveCount(0);
   await expect(page.getByText(/practice vault/i)).toHaveCount(0);
   await onboard(page);
@@ -393,4 +377,27 @@ test("checkboxes and list markers align with the H1 in every environment and a n
   await assertAligned("narrow");
   await expect(page.getByRole("checkbox", { name: "Not started", exact: true })).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath("playground-narrow.png") });
+});
+
+// Skip (the owner, 2026-10-05): "we can offer a skip; the only required thing
+// is a vault". From the first screen it goes to the vault and, once a folder
+// is picked, straight into the app; later screens skip the rest.
+test("Skip setup asks only for a folder, then opens the app", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Skip setup" }).click();
+  await expect(page.getByText("One thing before you start")).toBeVisible();
+  await page.getByRole("button", { name: "Choose a folder" }).click();
+  // no Librarian or shortcuts screen: the thank-you card and the app follow
+  await expect(page.getByText("3 of 4")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Thank you for trying Rotli" })).toBeVisible();
+});
+
+test("after the vault, Skip the rest finishes setup with the defaults", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  await page.getByRole("button", { name: "Choose a folder" }).click();
+  await expect(page.getByText("3 of 4")).toBeVisible();
+  await page.getByRole("button", { name: "Skip the rest" }).click();
+  await expect(page.getByText("4 of 4")).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Thank you for trying Rotli" })).toBeVisible();
 });

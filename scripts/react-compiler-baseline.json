@@ -74,9 +74,6 @@
     "EffectSetState": 1,
     "Suppression": 2
   },
-  "src/components/vaultFolderBrowserDialog.tsx": {
-    "EffectSetState": 1
-  },
   "src/editor/cmEditor.tsx": {
     "Suppression": 1
   },

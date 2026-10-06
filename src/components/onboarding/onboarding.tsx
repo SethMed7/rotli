@@ -280,11 +280,14 @@ export function Onboarding({
   step,
   onDone,
   onBack,
+  onSkip,
   resumed = false,
 }: {
   step: SetupScreen;
   onDone: () => void;
   onBack?: () => void;
+  /** Skip setup from here; only the vault is required (setupFlow.tsx). */
+  onSkip?: () => void;
   /** Back from a later screen: keep what was chosen, no intro, no reset. */
   resumed?: boolean;
 }) {
@@ -352,16 +355,18 @@ export function Onboarding({
         {showScrollCue && <SetupScrollCue />}
 
         <footer className="setup-footer">
-          {step === "you" ? (
+          {onSkip ? (
             <button
               type="button"
               className="setup-skip"
               onClick={() => {
-                skipToDefaults();
-                onDone();
+                // the first screen's choices fall back to the defaults; later
+                // screens keep what was picked and their own defaults
+                if (step === "you") skipToDefaults();
+                onSkip();
               }}
             >
-              Skip app setup
+              {step === "you" ? "Skip setup" : "Skip the rest"}
             </button>
           ) : (
             <span />

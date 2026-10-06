@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Choosing where your notes live opens the macOS folder panel.** Setup,
+  Settings, and the sidebar's Connect all use the Finder panel you know, with
+  one button, Choose a folder. Make a new folder there for a fresh vault, or
+  pick the Markdown folder you already use and Rotli works in it as it is.
+  Rotli's own folder browser is gone.
+- **Setup can be skipped; only a folder is needed.** Skip setup on the first
+  screen asks for a folder and opens the app. After the folder, Skip the rest
+  finishes setup with what you chose so far.
 - **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
   are still being finished, so the New chooser, the New… menu, Settings, the
   slash menu, and an open document or sheet say Beta.
