@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { resolveWikilink, buildWikilinkIndex } from "../editor/wikilink";
 import { onQuitFlush } from "../lib/quitFlush";
-import { corpusFileStat, corpusFileText, corpusWriteFileBytes } from "../lib/tauri";
+import { corpusFileStat, corpusFileText, corpusWriteFileBytes, isTauri } from "../lib/tauri";
 import { useNoteLinks, useSearchableNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { type CanvasDoc, parseCanvas, serializeCanvas } from "./model";
@@ -19,6 +19,37 @@ export type CanvasFileState =
   | { status: "ready"; doc: CanvasDoc; writable: boolean; saveError: string | null };
 
 const SAVE_AFTER_MS = 500;
+/** Bigger than any canvas a person draws; past it Rotli refuses rather than
+ * open half a file. */
+export const CANVAS_MAX_BYTES = 8_000_000;
+
+export interface CanvasFileIo {
+  native: () => boolean;
+  stat: typeof corpusFileStat;
+  text: typeof corpusFileText;
+}
+const liveIo: CanvasFileIo = { native: isTauri, stat: corpusFileStat, text: corpusFileText };
+
+/** Read and parse a canvas, failing closed: outside the Mac app the file
+ * adapter would answer "" and accept saves without writing, so it refuses
+ * instead of showing a blank canvas; the whole file is read (the adapter's
+ * default cap would cut it short), and one too large to read is refused. */
+export async function loadCanvasFile(
+  fileId: string,
+  io: CanvasFileIo = liveIo,
+): Promise<{ state: CanvasFileState; revision: string | null }> {
+  const refuse = (error: string) => ({ state: { status: "error", error } as const, revision: null });
+  if (!io.native()) return refuse("Canvases open in the Mac app for now.");
+  const stat = await io.stat(fileId);
+  if (!stat) return refuse("This canvas isn’t in the vault anymore.");
+  if (stat.len > CANVAS_MAX_BYTES) return refuse("This canvas is too large to open.");
+  const parsed = parseCanvas(await io.text(fileId, stat.len));
+  if (!parsed.ok) return refuse(parsed.error);
+  return {
+    state: { status: "ready", doc: parsed.doc, writable: stat.writable, saveError: null },
+    revision: stat.revision,
+  };
+}
 
 async function base64Of(text: string): Promise<string> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -63,16 +94,11 @@ export function useCanvasFile(fileId: string): {
     // a different file remounts the host (keyed by fileId), so the first
     // state is always "loading" — no reset here
     let cancelled = false;
-    Promise.all([corpusFileText(fileId), corpusFileStat(fileId)])
-      .then(([text, stat]) => {
+    loadCanvasFile(fileId)
+      .then((loaded) => {
         if (cancelled) return;
-        const parsed = parseCanvas(text);
-        revision.current = stat?.revision ?? null;
-        setState(
-          parsed.ok
-            ? { status: "ready", doc: parsed.doc, writable: stat?.writable === true, saveError: null }
-            : { status: "error", error: parsed.error },
-        );
+        revision.current = loaded.revision;
+        setState(loaded.state);
       })
       .catch((err: unknown) => {
         if (!cancelled)
