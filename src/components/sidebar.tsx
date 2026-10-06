@@ -17,7 +17,7 @@ import { isWebVault } from "../lib/browserVault";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
 import { type MemexInstance } from "../memex/config";
-import { initMemexAsCorpus } from "../memex/service";
+import { initMemexAsCorpus, pickVaultFolder } from "../memex/service";
 import {
   useChooseFolder,
   useConnectBrain,
@@ -41,7 +41,6 @@ import { useFocusedTab } from "../state/panes";
 import { flushSettingsNow } from "../state/persist";
 import { useSidebarLook } from "../state/sidebarLook";
 import { useUiStore } from "../state/ui";
-import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
@@ -124,12 +123,7 @@ export function Sidebar() {
       useWebVaultConnect.getState().show();
       return;
     }
-    const path = await requestVaultFolder({
-      title: "Connect vault",
-      description: "Choose an existing Rotli vault, or choose an empty folder to create one.",
-      actionLabel: "Connect vault",
-      requireEmpty: false,
-    });
+    const path = await pickVaultFolder("Connect a vault, or make a new folder for one");
     if (!path) return;
     const plan = connectPlan((await corpusInspectFolder(path)).kind);
     if (plan === "create") {

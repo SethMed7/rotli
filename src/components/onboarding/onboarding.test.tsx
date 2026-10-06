@@ -12,7 +12,9 @@ import { Onboarding } from "./onboarding";
 registerDefaultActions();
 
 const render = (step: "you" | "librarian" | "shortcuts") =>
-  renderToStaticMarkup(<Onboarding step={step} resumed onDone={() => {}} onBack={() => {}} />);
+  renderToStaticMarkup(
+    <Onboarding step={step} resumed onDone={() => {}} onBack={() => {}} onSkip={() => {}} />,
+  );
 
 test("the first screen is your name and a theme, and nothing dresses the quokka", () => {
   const html = render("you");
@@ -22,7 +24,7 @@ test("the first screen is your name and a theme, and nothing dresses the quokka"
   expect(html).not.toContain("Keep my quokka");
   expect(html).not.toContain('aria-label="Accessory"');
   expect(html).toContain(">Choose where notes live<");
-  expect(html).toContain(">Skip app setup<");
+  expect(html).toContain(">Skip setup<");
 });
 
 test("the Librarian has a screen of its own; chat models wait for Chat", () => {
@@ -37,7 +39,8 @@ test("the Librarian has a screen of its own; chat models wait for Chat", () => {
   expect(html).toContain('aria-label="Librarian model"');
   expect(html).toContain("Models for chat come the first time you open Chat");
   expect(html).not.toContain("Install a model");
-  expect(html).not.toContain(">Skip app setup<");
+  // only the vault is required: after it, every screen can skip the rest
+  expect(html).toContain(">Skip the rest<");
 });
 
 test("every shortcut says it can change, and where to change it later", () => {

@@ -16,12 +16,7 @@ import type {
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
-import {
-  type VaultBrowserView,
-  browserEmptyFolders,
-  browserVaultHome,
-  browserVaultPreview,
-} from "./vaultBrowserPreview";
+import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
   currentWebAiBridge,
@@ -1575,72 +1570,6 @@ export function corpusInspectFolder(path: string): Promise<VaultInspection> {
   return invoke<VaultInspection>("corpus_inspect_folder", { path });
 }
 
-export type { VaultBrowserView } from "./vaultBrowserPreview";
-
-/** Open Rotli's directory-only, Home-contained vault navigator. Rust owns the
- * session and returns no filenames or file contents. */
-export function vaultBrowserStart(requireEmpty: boolean): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserVaultPreview.view = { ...browserVaultHome, canSelect: false };
-    return Promise.resolve(browserVaultPreview.view);
-  }
-  return invoke<VaultBrowserView>("vault_browser_start", { requireEmpty });
-}
-
-export function vaultBrowserOpenChild(name: string): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserVaultPreview.view = {
-      absolutePath: `${browserVaultPreview.view.absolutePath}/${name}`,
-      displayPath: `${browserVaultPreview.view.displayPath}/${name}`,
-      homePath: browserVaultPreview.view.homePath,
-      directories: [],
-      canGoBack: true,
-      canSelect: true,
-      selectDisabledReason: null,
-    };
-    return Promise.resolve(browserVaultPreview.view);
-  }
-  return invoke<VaultBrowserView>("vault_browser_open_child", { name });
-}
-
-export function vaultBrowserGoBack(): Promise<VaultBrowserView> {
-  if (!isTauri()) return vaultBrowserStart(false);
-  return invoke<VaultBrowserView>("vault_browser_go_back");
-}
-
-export function vaultBrowserRefresh(): Promise<VaultBrowserView> {
-  if (!isTauri()) return Promise.resolve(browserVaultPreview.view);
-  return invoke<VaultBrowserView>("vault_browser_refresh");
-}
-
-export function vaultBrowserCreateFolder(name: string): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserEmptyFolders.add(`${browserVaultPreview.view.absolutePath}/${name}`);
-    return vaultBrowserOpenChild(name);
-  }
-  return invoke<VaultBrowserView>("vault_browser_create_folder", { name });
-}
-
-export function vaultBrowserSelect(): Promise<string> {
-  if (!isTauri()) return Promise.resolve(browserVaultPreview.view.absolutePath);
-  return invoke<string>("vault_browser_select");
-}
-
-export function vaultBrowserSelectChild(name: string): Promise<string> {
-  if (!isTauri()) return Promise.resolve(`${browserVaultPreview.view.absolutePath}/${name}`);
-  return invoke<string>("vault_browser_select_child", { name });
-}
-
-export async function vaultBrowserCancel(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("vault_browser_cancel");
-}
-
-export async function vaultBrowserReveal(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("vault_browser_reveal");
-}
-
 /** The whole Location config; migrates the four legacy files in on first read.
  * Browser preview gets a sane empty config so the UI still renders. */
 export function corpusListConfig(): Promise<CorpusConfigView> {
@@ -2026,8 +1955,13 @@ export function memexWriteNote(root: string, stem: string, contents: string): Pr
 export function memexValidate(root: string): Promise<MemexValidateReport> {
   return memexInvoke("memex_validate", { root });
 }
-export function memexPickFolder(): Promise<string | null> {
-  return memexInvoke("memex_pick_folder");
+/** The macOS folder panel, the one way a vault folder is chosen (the owner,
+ * 2026-10-05: "people know exactly what to do"); its New Folder makes a fresh
+ * vault. Rust authorizes the pick and refuses privileged roots. The browser
+ * twin picks a fresh empty folder so setup can be walked without a Mac. */
+export function memexPickFolder(title?: string): Promise<string | null> {
+  if (!isTauri()) return Promise.resolve(browserPickFolder());
+  return memexInvoke("memex_pick_folder", { title: title ?? null });
 }
 
 // ——— cross-webview events (the capture card and the main window are separate

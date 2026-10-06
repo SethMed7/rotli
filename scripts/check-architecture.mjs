@@ -341,7 +341,6 @@ const componentAdapterDebt = new Set([
   "src/components/tasksSurface.tsx",
   "src/components/titlebar.tsx",
   "src/components/useNoteMenu.ts",
-  "src/components/vaultFolderBrowserDialog.tsx",
 ]);
 // Cross-cutting idioms with ONE owner each: the OS colour scheme is read only
 // by the theme owner (everything else reads data-theme through state/theme.ts),

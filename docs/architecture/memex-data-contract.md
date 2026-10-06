@@ -878,7 +878,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
   an empty folder, links an existing vault as a switch target, and opens any
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
-  same as onboarding's "Open an existing folder". An open plain folder is still
+  same as picking a folder that already holds notes in setup. An open plain folder is still
   the switcher's current row and names its header.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.

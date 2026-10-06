@@ -15,6 +15,8 @@ answer before building.
 | 3 | Sheets scope | Chat's sheet artifacts go to production with the editor. CSV gets the Beta badge too: everything that runs on Univer is Beta. |
 | 4 | Chat images on Rotli Web | Keep Helper's refusal. Fix the web strip, chips, and the two web bugs, and say plainly that sending images needs the Mac app. |
 | 5 | Slash form | Per-type commands (Bar chart, Line chart…). There is no colon grammar (the default; not asked). |
+| 6 | Vault folder (feedback round) | Always the macOS folder panel ("people know exactly what to do"); creating a vault is New Folder in that panel; Rotli's in-app browser is removed. |
+| 7 | Skipping setup | Offer a skip on every screen; the only required thing is a vault. |
 
 ## Order
 
@@ -263,3 +265,6 @@ The browser twin can't prove these.
 - [ ] **Ask AI: a list item.** In a bullet, type `/ai` and Insert a two-line answer: the second line is indented under the bullet.
 - [ ] **Ask AI: the journal.** `rotli notes history ID` shows the insertion as an `inline` row.
 - [ ] **Setup: your Librarian pick stands.** With Gemini signed in, pick On this Mac on the Librarian screen, then go Back and return: it is still On this Mac.
+- [ ] **Setup: the folder panel.** On the vault screen, Choose a folder opens the macOS panel. New Folder there makes a fresh vault; picking an existing Markdown folder opens it in place. Picking Home itself is refused.
+- [ ] **Setup: Skip.** Skip setup on the first screen, pick a folder, and the app opens with no Librarian or shortcuts screen. On the Librarian screen, Skip the rest finishes setup.
+- [ ] **Settings and sidebar.** Settings → Location's folder choice and the sidebar vault menu's Connect both open the macOS panel.
