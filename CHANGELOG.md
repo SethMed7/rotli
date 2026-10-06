@@ -148,6 +148,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Helper's install line now live there instead of in a section of their own.
   The page ends on one panel, "Start with one note.", with the download, just
   above the quokka beach.
+- **rotli.co's closer look moves with your scroll, and the before-and-after
+  plays.** Scroll through "A closer look." and the list and its preview stay
+  put while each part takes its turn, or click a part to jump to it; on a
+  phone the parts simply follow one another. The previews sit on the page
+  with no frames around them. The before-and-after now shows the note being
+  typed, then the Librarian adding its lines above the same words, ending
+  with "Your words, unchanged" marked; Replay plays it again. It's smaller,
+  so it fits on one laptop screen. The three cards near the top lost their
+  outer frames too. Reduced motion keeps all of it still.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
