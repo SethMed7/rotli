@@ -150,3 +150,79 @@ Pick: **1**. It is a first step anyone can take, and the second line is the
 product's one promise. Option 3 leans on the hero's "Let AI do the filing", and
 option 2 is the owner's own example rather than a line for this page. The
 short line under it: "Free, with no account to make."
+
+## Revised 2026-10-06: why before what
+
+The owner's next note, verbatim:
+
+> "I want two things in hero 1. something to point to our privacy promise
+> 2. Download free. … Also work on the transition from the hero to below the
+> fold I feel it can be a bit smoother. Also this section - The AI you
+> already pay for is mostly waiting. - should go before "Write it down. rotli
+> puts it away." in my opinion and we could change the text to be more
+> numbers backed. Then play with the image to actually use company logos and
+> to make sure that this would work on mobile."
+
+### The order now
+
+| # | Section | Ground | Change |
+|---|---|---|---|
+| 1 | Hero + film | plain | "Download free" (to `/download/`), "No account. Works offline.", and a pointer with a lock to the privacy promise (`/privacy/#promise`) |
+| 2 | StatBand | warm | **Moved up from 3.** The reason comes before the product: four sourced figures, then rotli's one sentence. It takes the warm ground |
+| 3 | What rotli does: three cards | plain | Moved down one; now on plain so the grounds still alternate |
+| 4 | TwoKinds | warm | Unchanged |
+| 5 | A closer look | plain | Unchanged |
+| — | Experiments | plain | Dev only |
+| 6 | Personal | warm | Unchanged |
+| 7 | PrivacyBrief | night | Its button reads "Read our privacy promise" and opens `/privacy/#promise` |
+| 8 | FAQ | plain | Unchanged |
+| 9 | Closing banner | plain, framed | Its button follows the hero's: "Download free" |
+
+Grounds still alternate from the top: plain, warm, plain, warm, plain, warm,
+night, plain, then the framed banner.
+
+### The hand-off from the hero
+
+What made it abrupt at 1440: the hero's icon tile was cut by the hero's edge,
+the film's frame ended on an empty strip of plain ground, the warm band then
+began on a hard line, and the film itself was scroll-linked (half faded and
+offset on arrival, settling only as the visitor scrolled).
+
+The film now sits across the boundary. Behind its lower half the page ground
+eases into the StatBand's warm ground (one gradient between the two ground
+tokens, so the privacy passage recolours it like any band), and the band's top
+padding shrinks to 0.85 of a section, so the film's lower edge and the band's
+headline keep one section's rhythm. The icon tile fades out over the hero's
+last fifth. The film rises in once, last in the arrival sequence, and rests;
+nothing is tied to the scroll, and reduced motion shows the finished state.
+Other options considered: a soft shadow under the film (rejected: no light
+source, and the standards forbid unmotivated shadows), and keeping the strip
+but matching spacing (rejected: the hard line stays).
+
+### The figures
+
+Four, from the two surveys the post `the-ai-you-already-pay-for` audits, each
+with its population: 50.4% of people paying for ChatGPT hadn't used it in 30
+days, and 59.9% of subscribers had a paid subscription of any kind unused each
+month, 2.6 on average (Self Financial, March 2026); half of people who pay for
+AI don't use it daily (our arithmetic on Menlo's 50%), and the average AI user
+uses 3.0 general assistants, up from 2.2 (Menlo Ventures and Morning Consult,
+July 2026). Bango stays out of the band: it is context in the post, not
+evidence of idle plans. Footnotes are per source.
+
+### The bench
+
+The generic bots became the products' own marks on plain badges, each named:
+ChatGPT, Claude, Gemini, and Perplexity (one of the ten tools in the Self
+Financial survey). The marks are unmodified files with their sources in
+`site/public/logos/SOURCES.md`. Below a 520px scene the badges take the whole
+seat and the quokka steps down in front of the legs, so at 390 the marks are
+32px or more and the names read at about 11.5px.
+
+### The privacy promise
+
+At the top of `/privacy/`, replacing "The short version", so it is the first
+thing under the banner rather than a page of its own: a visitor arriving from
+the hero lands on the promise and has the full policy right below it. It
+restates the AI visibility matrix and the 2026-09-29 body-edit decision for a
+visitor, and it is now the page's one access table.

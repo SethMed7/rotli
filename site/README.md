@@ -94,7 +94,9 @@ whose art never touches its words from 320 to 1920.
   focus; tabbing away or an outside click closes). Without script the button
   is hidden and "Resources" is a plain link to `/resources/`. On the right sit
   the GitHub mark (icon only, while the source is public) and one "Try now"
-  button, which opens `/download/`. That page is not also a menu item. The
+  button, which opens `/download/` (shorter than the landing's "Download
+  free", and true on systems with no download yet, where Rotli Web is the way
+  in). That page is not also a menu item. The
   footer's link columns (Product · Learn · Open source, the last only while
   the source is public) and tagline default from the same file. Pages pass
   only `current` (a dropdown's label is marked current when any of its pages
@@ -113,8 +115,26 @@ whose art never touches its words from 320 to 1920.
   chapters from `src/components/landing/`, in the order set out in
   `docs/design/landing-layout-2026-10-05.md` (each thing said once; grounds
   alternate plain and warm):
-  1. Hero (the product film; plain).
-  2. Overview ("Write it down. rotli puts it away."; warm): three columns,
+  1. Hero (the product film; plain): "Download free" (`SiteActions`), "No
+     account. Works offline.", and one quiet line with a lock, "Our privacy
+     promise: you decide what any AI can see or change", to
+     `/privacy/#promise`. The film sits across the boundary into the next
+     band: behind its lower half the page ground eases into the warm one
+     (`.below-fold`, one gradient between the two ground tokens), so there is
+     no strip or hard line between them, and the band's top padding shrinks
+     to match. The film rises in once on arrival; nothing is scroll-linked.
+  2. StatBand (warm; the owner, 2026-10-06, moved it up so the reason comes
+     before the product): four sourced figures, footnoted per source (50.4%
+     and 59.9% with its 2.6 from Self Financial; "Half" and 3.0 from Menlo
+     Ventures and Morning Consult), each with its exact population, beside a
+     bench by the sea where four idle AI tools, two asleep, are each handed a
+     note by the quokka (see "The bench's AI tools" below). Never write
+     "wasted"; Bango stays in the post as context. The text column ends on
+     "Where these numbers come from", a link to the post
+     `the-ai-you-already-pay-for`, which sets out both surveys in full. It is
+     the one chapter whose headline has no lede: its figures are the lede.
+     Below 900px the figures stack above the scene.
+  3. Overview ("Write it down. rotli puts it away."; plain): three columns,
      each a small picture of the app drawn in HTML on the site's tokens (a
      rendered note, the fields the Librarian filled with an area pill and
      ticks, a chat reply that names the notes it came from), with the app's
@@ -124,12 +144,6 @@ whose art never touches its words from 320 to 1920.
      each to assistive tech (`role="img"` and a label); no "sources" control is
      drawn because the app has none. Its lede carries the owner's item 2
      message, as does the FAQ.
-  3. StatBand (plain): two sourced figures, footnoted, beside a bench by the
-     sea where four idle AI tools, two asleep, are each handed a note by the
-     quokka. Keep the sources and the "never wasted" wording. The text column
-     ends on "Where these numbers come from", a link to the post
-     `the-ai-you-already-pay-for`, which sets out both surveys in full. It is
-     the one chapter whose headline has no lede: its figures are the lede.
   4. TwoKinds ("You write for yourself. AI reads differently."; warm): the
      same file as typed and as the Librarian files it, in two open columns on
      the band with no card around either, at a reading width so the whole
@@ -174,7 +188,8 @@ whose art never touches its words from 320 to 1920.
      1180px up. Narrower, its left edge would reach into the lede, so it steps
      out.
   8. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
-     `Base.astro`, three facts, and a link to `/privacy/`. While it is the
+     `Base.astro`, three facts, and "Read our privacy promise", to
+     `/privacy/#promise`. While it is the
      focal passage the whole page steps into its night (see "The privacy
      passage").
   9. Faq (plain): two entries carry the owner's item 2 message. Notes are the
@@ -182,7 +197,7 @@ whose art never touches its words from 320 to 1920.
   10. Closing (plain, one framed panel on the warm colour). The two-tone
       headline "Start with one note." / "It stays in your folder." has its
       first line in full ink and the second muted. Under it are "Free, with
-      no account to make." and the hero's one way in, "Try now"
+      no account to make." and the hero's one way in, "Download free"
       (`SiteActions`). The writing
       quokka comes in from the right, cut off by the frame. Under 900px it
       steps below the words, never onto them. It asks for a first step rather
@@ -215,18 +230,32 @@ whose art never touches its words from 320 to 1920.
   screen, or in a hidden tab (one timeout, no frame loop), waits a full step on
   coming back, and swaps only to a capture that has decoded. Its own steps
   are not announced (`aria-live="off"`); the visitor's are.
-- **The bench's AI tools** (`landing/StatBand.astro`; the owner, 2026-10-05:
-  "so people know we are talking about gemini/antigravity, chatGPT, claude")
-  are ChatGPT, Claude, Gemini, and Grok: each bot wears its product's public
-  signature colour (the `--bot-*` tokens in `Base.astro`), a generic cue on its
-  head (a speech bubble, an asterisk, a four-point sparkle, a slanted antenna),
-  and its name in plain HTML under it, placed by the bot's centre in the
-  drawing so the names never touch at any width. Never trace or store a
-  product's logo artwork or wordmark here; the names are text, and the
-  colours are the only borrowed thing.
-- **`/privacy/`** is the full privacy policy in plain language: the short
-  version, where notes live, every network connection and when it happens, AI
-  and secure/locked notes (with the access table), Rotli Web and Rotli Helper,
+- **The bench's AI tools** (`landing/StatBand.astro`; the owner, 2026-10-05,
+  then 2026-10-06: "actually use company logos … make sure that this would
+  work on mobile") are ChatGPT, Claude, Gemini, and Perplexity (one of the ten
+  tools in the Self Financial survey). Each is its product's own mark on a
+  plain badge with its name under it. The marks are the unmodified files in
+  `public/logos/`, shown as images in the single colour they are published
+  in; `public/logos/SOURCES.md` records each one's source, licence, the
+  owner's usage terms, and a checksum. Never trace, redraw, recolour, rotate,
+  squash, or draw over a mark: the idle z's and the handed note sit beside
+  it, and a badge only moves by translation. "Product names and logos belong
+  to their owners." sits under the footnotes. The quokka, badges, and notes
+  are laid over the drawing in percentages of one 640 × 400 box; below a
+  520px scene the badges take the whole seat and the quokka stands in front
+  of the legs, so at 390 the marks are 32px or more.
+  `e2e/site/landing.spec.ts` holds the names, the marks, their sizes, and
+  that nothing overlaps from 320 to 1920.
+- **`/privacy/`** is the full privacy policy in plain language. It opens on
+  the privacy promise (`#promise`, the owner, 2026-10-06; the hero and the
+  landing's night band link there): a lead line, a matrix of who may read and
+  change a note you wrote (on-device model, connected AI, the Librarian) for
+  an everyday, a secure, and a locked note, which becomes one block per note
+  on a phone, then five points (secure, locked, "Let AI edit the text", the
+  Librarian, everything else). It restates `docs/design/ai-visibility-matrix.md`
+  and the 2026-09-29 body-edit decision word for word in meaning, and it is
+  the page's one access table. Then where notes live, every network connection
+  and when it happens, AI and your notes, Rotli Web and Rotli Helper,
   this website (no cookies, analytics, or third-party scripts; the two footer
   badges load from their own hosts), retention, and changes, each with the
   reason it works that way. `PRIVACY.md` at the repository root stays the
@@ -343,8 +372,9 @@ whose art never touches its words from 320 to 1920.
   once; reduced motion and no script show them at rest.
   `e2e/site/about.spec.ts` holds the order, the links, the dates against
   the changelog, and that words and pictures never overlap from 320 to 1920.
-- **`/download/`** is where every "Try now" goes (the header, the hero, the
-  closing panel; the 404's "Try rotli" and the About page's too). It has its
+- **`/download/`** is where every way in goes (the header's "Try now"; the
+  landing's "Download free" in the hero and the closing panel; the 404's "Try
+  rotli" and the About page's too). It has its
   own wide layout. The head sets the title, the lede, and the way in for the
   visitor's own system (`Base.astro` stamps `data-os`: mac, windows, linux,
   mobile, or other) beside the dock scene (`DownloadScene.astro`: a laptop on
@@ -375,7 +405,7 @@ whose art never touches its words from 320 to 1920.
   when the build offers Rotli Web.
 - **Where rotli runs** (the owner, 2026-10-05). The promise is a free
   workspace, not a Mac app. The landing page says what it is and what it
-  costs ("Free. No account. Works offline." under the hero's "Try now") and
+  costs (the hero's "Download free" and "No account. Works offline." under it) and
   never where it runs: that line was clutter (the owner's second call that
   day, "clean up some clutter on the website and improve readability").
   Availability is `/download/`'s, the FAQ's, the meta description's, and
@@ -526,9 +556,11 @@ whose art never touches its words from 320 to 1920.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
-- **The way in.** `SiteActions.astro` renders the one call to action, "Try
-  now", to `/download/`, in the hero and the closing panel (the header has its
-  own). The earlier pair (Open in browser and Download for Mac, reordered by
+- **The way in.** `SiteActions.astro` renders the one call to action,
+  "Download free" (the owner, 2026-10-06), to `/download/`, in the hero and
+  the closing panel; a build with Rotli Web but no Mac download says "Try now"
+  instead, so it never promises a download that isn't there. The header has
+  its own "Try now". The earlier pair (Open in browser and Download for Mac, reordered by
   platform) is gone: the download page makes that choice with the visitor's
   system in view, so the hero keeps one primary button and no second one. A
   deployment that offers neither the Mac download nor Rotli Web shows "Mac
@@ -626,7 +658,8 @@ whose art never touches its words from 320 to 1920.
   (only while `WEB_APP_ENABLED`): words, the copyable install line, and links,
   with no screenshot.
 - The hero is the promise (a private workspace for your notes), one way in
-  ("Try now"), what it costs, and the product film right under them
+  ("Download free"), what it costs, the pointer to the privacy promise, and
+  the product film right under them
   (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
@@ -716,8 +749,8 @@ whose art never touches its words from 320 to 1920.
   closing scene. `/privacy/` places its night through `WritingPage`'s
   `banner` slot (see "The article banner"); `/about/` places its scene through
   the `scene` slot and uses the centered layout (`center`).
-- The landing privacy band is brief and points to `/privacy/`: the promise and
-  three facts on the left, the night scene on the right.
+- The landing privacy band is brief and points to `/privacy/#promise`: the
+  promise and three facts on the left, the night scene on the right.
 - The coming-soon page keeps the same Rotli Light foundation and shows the real
   Playground capture. The introduction begins with the coming-soon label. Its
   one call to action is "Follow development on GitHub" when the source is
