@@ -12,7 +12,7 @@ interface Props {
   structuredData?: Record<string, unknown>[];
   /** The page's Markdown twin, declared for agents (src/agents.ts). */
   markdownPath?: string;
-  /** The wider page (--page-max-wide) for the header, the page, and the footer alike: the blog. */
+  /** The wider page (--page-max-wide) for the blog's content; the header and footer keep the standard width. */
   widePage?: boolean;
 }
 
@@ -115,9 +115,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-wordmark: 'Baloo 2', var(--font-body);
-        --page-max: 76rem;
+        --page-max-standard: 76rem;
+        --page-max: var(--page-max-standard);
         /* The blog's page (widePage): 96rem, growing to 104rem on the widest screens, so posts
-           and the index use the room a large window has. Header, page, and footer share it. */
+           and the index use the room a large window has. The header and footer keep the standard
+           width on every page (the owner, 2026-10-06), so nothing shifts between pages. */
         --page-max-wide: clamp(96rem, 65vw, 104rem);
         --copy-max: 68ch;
         --ground: #f8f2e9;
@@ -443,6 +445,10 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       body.page-wide {
         --page-max: var(--page-max-wide);
+      }
+      body.page-wide .site-header,
+      body.page-wide .site-footer-shell {
+        --page-max: var(--page-max-standard);
       }
       .wrap {
         width: min(100% - 2 * var(--gutter), var(--page-max));

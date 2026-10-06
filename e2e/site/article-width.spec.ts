@@ -74,8 +74,10 @@ for (const width of WIDTHS) {
     expect(Math.abs(g.copy.x - g.text.x)).toBeLessThan(1.5);
     expect(Math.abs(g.art.x - g.main.x)).toBeLessThan(1.5);
     expect(Math.abs(g.art.width - g.main.width)).toBeLessThan(1.5);
-    // Header, page, and footer share the one page width, so the brand stands over the picture.
-    expect(Math.abs(g.header.x - g.main.x)).toBeLessThan(1.5);
+    // The header keeps the site's standard width on every page (the owner, 2026-10-06): never
+    // wider than 76rem, centred, so nothing shifts between the landing and the blog.
+    expect(g.header.width).toBeLessThanOrEqual(76 * 16 + 1.5);
+    expect(Math.abs(g.header.x - (width - g.header.width) / 2)).toBeLessThan(2);
 
     // The rails fold in order: both beside the text from 1280px, the right side under the article
     // below that, and the left rail's Share under it below 901px (its tree is the disclosure).
