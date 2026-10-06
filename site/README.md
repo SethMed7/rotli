@@ -73,7 +73,7 @@ whose art never touches its words from 320 to 1920.
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
   | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
-  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog, Roadmap), About, 404 | yes | yes |
+  | `full`        | production · `rotli.co`       | landing, Features (a catalog and a page per feature), Privacy, Resources (Guides, Blog, Developers, Changelog, Roadmap), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -189,17 +189,7 @@ whose art never touches its words from 320 to 1920.
       than repeating the hero (the earlier invitation was cut for that). Right
       under it is the footer's quokka beach.
 
-  `/features/` has no closing panel. The landing page carries exactly one
-  video. **`/features/`** has
-  one display headline with the product film right under it (the hero's
-  `FilmPlayer`, the same real Rotli Web session: the real product leads, not
-  the illustrated story; visitors asked for it, 2026-10-05), then the chapters
-  in full (Features with every smaller habit, Folder, Personal). Every chapter
-  is one idea: the same section head (one h2 at `--step-h2` and a lede) and
-  one picture, with no second explanation of something another chapter or
-  page owns (Rotli Helper is explained by its guide; /features/ links there).
-  The chapters alternate plain and warm grounds. The landing page's dev-only
-  Experiments chapter is not repeated there. On narrow screens the theme
+  The landing page carries exactly one video. On narrow screens the theme
   studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
@@ -374,8 +364,8 @@ whose art never touches its words from 320 to 1920.
   development builds in the same release). The word comes from
   `DOCS_AND_SHEETS` in `src/site.ts` (`status` for a label, `inline` inside a
   sentence); never write "Beta" by hand, and say no more about them than that
-  they open and edit. The hero, the Overview, the Features page's formats,
-  the FAQ, and `llms.txt` use it.
+  they open and edit. The hero, the Overview, the feature catalog, the FAQ,
+  and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
   Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
@@ -642,21 +632,48 @@ whose art never touches its words from 320 to 1920.
     change.
   Re-capture rather than hand-edit them. `--capture-ground` in `Base.astro` is
   the editor paper those captures sit on.
-- **The features area** (`landing/Features.astro`, on `/features/` under the
-  product film) is organized as you meet the product:
-  RenderShowcase (the same note rendered and as raw Markdown, which already
-  shows tasks, results, switches, and choices; then only the two blocks the
-  pair cannot show, diagrams and tables/code/math, with their syntax) →
-  ChatFlow (a real reply; three steps: asks, keeps "Conversation notes" after
-  every reply, writes notes and files on the Mac; then "You decide what AI may
-  touch": notes you wrote are closed to AI edits until Let AI edit the text,
-  Lock, and Mark secure, beside the drawn note menu) → Formats (Documents on
-  Univer, Sheets coming soon, Boards on Excalidraw, with status chips from
-  `featurePolicy.ts`, and one line on where Assets live) → the Librarian and
-  the smaller habits → ConnectAI (each provider's own CLI in one terminal;
-  rotli never signs in, reads login files, or stores credentials; the install
-  lines mirror `src/ai/connectorGuides.ts`; one line links the Rotli Helper
-  guide while `WEB_APP_ENABLED`).
+- **`/features/` is a catalog** (the owner, 2026-10-05: "more like a
+  catalog, and you click on it to see more details"). `src/features.ts` is
+  its one source: every capability with its area, one sentence, status,
+  where it runs, icon, and its page's contents. The catalog, each
+  `/features/<id>/` page, the Markdown twin `/features/index.md`, and the
+  Features lines in `/llms.txt` all read `visibleFeatures()`, so they cannot
+  disagree, and the build's llms.txt guard proves every link. The page keeps
+  its headline (the link card in `src/og.ts` restates it) and a one-line
+  status legend; under it the tiles (`components/features/FeatureTile.astro`)
+  sit in six areas, Writing, Organizing, AI and chat, Files, Privacy and
+  control, and Rotli Web and agents, each headed by its quokka (the app's
+  filled art, `areaArt.ts`). A tile is one link with an icon in the tour's
+  language, the name, one sentence, the status chip (`StatusChip.astro`:
+  Shipped quiet, Beta tinted, Coming soon dashed), and where it runs; a
+  hairline above it, never a box. With script, a search box and area chips
+  (toggle buttons, `aria-pressed`) filter in place by toggling `hidden`, the
+  count is announced, an emptied area steps out, nothing matching says so
+  with "Show every feature", and the filter lives in the address
+  (`?area=ai&q=chat`) so Back from a feature returns to it. Without script
+  the tools stay hidden and the areas are jump links over the complete list.
+  Three columns, two under 1080px, one on a phone; nothing animates.
+  A feature's page (`FeatureDetail.astro`) has a breadcrumb back to the
+  catalog and its area, the name, status, and where it runs beside the
+  area's quokka, a picture (`FeatureArt.astro`: a `public/shots/` or
+  `public/themes/` capture at no more than its logical size, or a drawing in
+  the tour's panel language: tasks, a link and its preview, the Librarian's
+  filing, the note menu, the vault folder, a document, a workbook, the AI
+  tools' terminal lines from `src/ai/connectorGuides.ts`), then What it
+  does, How to use it (keys and commands as written), Limits, Read more, and
+  the rest of its area as compact tiles.
+  **Honesty** is a test, `scripts/site-features.test.ts`: a Shipped entry
+  quotes README.md or a released CHANGELOG.md section (never Unreleased);
+  Docs and Sheets take `DOCS_AND_SHEETS.status`; anything else names its
+  ROADMAP.md "In the work" item, and only the next release's items (`/chart`,
+  `/ai`, chat attachments) say Coming soon. "In development" entries show
+  only on the dev site (`showsExperiments`); the public catalog ends on a
+  link to `/roadmap/` instead. Rotli Web and the Helper appear only while
+  `WEB_APP_ENABLED`, and `runs` names Rotli Web only where a release says the
+  web has it; otherwise a feature reads "Mac app". There is no separate
+  "features doc" in Resources: the catalog is the one home for what rotli
+  can do. `e2e/site/features-catalog.spec.ts` holds the filters, deep links,
+  keys, the no-script list, and the phone column.
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
   `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
@@ -1083,7 +1100,7 @@ films (WebP, via `cwebp`).
   product film replaced it; its files stay, and no page plays it now.
 - **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) is no longer
   played by any page (2026-10-05): visitors asked for the real product over
-  the story, so `/features/` plays the product film instead. The files stay
+  the story, so the hero plays the product film instead. The files stay
   for now. Episode 7's opening card burns in the retired line "AI is invited
   in. It does not own the house." and episode 4 counts six theme families, so
   neither may be shown again without a new cut from the studio.

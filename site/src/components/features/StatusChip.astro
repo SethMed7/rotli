@@ -1,0 +1,52 @@
+---
+// A capability's status, as a data label (src/features.ts decides the word). Shipped is the
+// quiet default, so a page of shipped things doesn't shout it; Beta wears the tint; what is
+// not out yet is an outline, dashed for Coming soon.
+import type { Status } from '../../features';
+
+interface Props {
+  status: Status;
+}
+
+const { status } = Astro.props;
+const kind = status.toLowerCase().replace(/\s+/g, '-');
+---
+
+<span class:list={['status', kind]}>{status}</span>
+
+<style>
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.08rem 0.55rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .shipped {
+    padding-left: 0;
+  }
+  .shipped::before {
+    content: '';
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--olive);
+  }
+  .beta {
+    background: var(--tint);
+    color: var(--accent-text);
+  }
+  .coming-soon {
+    border-color: var(--border-strong);
+    border-style: dashed;
+  }
+  .in-development {
+    border-color: var(--border-strong);
+  }
+</style>

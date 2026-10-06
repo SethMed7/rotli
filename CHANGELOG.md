@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of turning it into plain text. Tab over several lines that include
   a code block indents the code but leaves its ``` lines in place, so the
   block stays a code block.
+- **rotli.co's Features page is a catalog.** Every part of rotli is a tile,
+  grouped as Writing, Organizing, AI and chat, Files, Privacy and control,
+  and Rotli Web and agents, each saying whether it has shipped, is in beta,
+  or is coming soon, and where it runs. Search it or pick an area; open a
+  tile for its own page: what it does, how to use it, its limits, and where
+  to read more. The pages can be linked to on their own, and the list works
+  without JavaScript.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the
