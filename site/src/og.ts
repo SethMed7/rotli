@@ -94,7 +94,7 @@ export const POST_ART: Record<string, PostArt> = {
   'the-ai-you-already-pay-for': {
     pose: 'knowledge_system',
     scene: 'bench',
-    around: 'between a bench of three idle AI helpers, two of them asleep, and a stack of coins',
+    around: 'between a bench of three idle AI helpers, two of them asleep, and a month on the calendar with nothing done',
   },
   'rotli-web-and-your-mac': {
     pose: 'stays_local',
