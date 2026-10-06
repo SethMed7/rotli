@@ -373,7 +373,15 @@ export class InMemoryNotesService implements NotesService {
   seedNote(
     folderId: string,
     body: string,
-    opts: { id?: string; pinned?: boolean; createdAt: number; updatedAt: number; origin?: string },
+    opts: {
+      id?: string;
+      pinned?: boolean;
+      createdAt: number;
+      updatedAt: number;
+      origin?: string;
+      /** The demo's stand-in for a Librarian-enriched `links:` line. */
+      suggestedLinks?: string[];
+    },
   ): Note {
     const note: Note = {
       id: opts.id ?? ulid(opts.createdAt),
@@ -385,6 +393,7 @@ export class InMemoryNotesService implements NotesService {
       createdAt: opts.createdAt,
       updatedAt: opts.updatedAt,
       pinned: opts.pinned ?? false,
+      ...(opts.suggestedLinks ? { suggestedLinks: opts.suggestedLinks } : {}),
       body,
       revision: this.nextRevision(),
     };

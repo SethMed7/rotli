@@ -10,6 +10,7 @@ export const SOURCE_DIRECTORY_OWNERS = {
   components: "React presentation and presentation-only feature clusters",
   documents: "editable document domain, workflows, codecs, engines, and composition",
   editor: "Markdown editor capability and its rendering/editing adapters",
+  graph: "the Graph view: link projection domain, layout-engine adapter, and composition",
   keys: "keybinding vocabulary, dispatch, chords, and keyboard interaction policy",
   lib: "cross-capability utilities and narrow host adapters; pure by default",
   memex: "portable vault contract plus frontend memex adapters and hooks",
@@ -36,6 +37,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   pinnedSites: "pinned sites: the title bar buttons and the panel",
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
+  graph: "the Graph view's canvas renderer composed by graphSurface",
   chatWindow: "the Chat window's shell: Chat pulled out of main into a window of its own",
   onboarding: "first-run, vault activation, and model setup presentation",
   settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
@@ -124,6 +126,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
  * folder. Every production service declares the capability that owns it; when
  * one capability is physically clustered later, this registry moves with it. */
 export const SERVICE_FILE_OWNERS = {
+  "webLinks.ts": "graph",
   "boardRename.ts": "boards",
   "boardStore.ts": "boards",
   "folderBoards.ts": "boards",

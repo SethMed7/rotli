@@ -20,6 +20,7 @@ import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { AI_KEYS } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
@@ -198,6 +199,18 @@ describe("parity.json ↔ TS constants", () => {
         outbound,
         overlaps: false,
       });
+    }
+  });
+
+  test("wikilinkTargets", () => {
+    for (const { body, targets } of entries.wikilinkTargets.value) {
+      expect({ body, targets: bodyLinkTargets(body) }).toEqual({ body, targets });
+    }
+  });
+
+  test("metadataLinkTargets", () => {
+    for (const { fields, targets } of entries.metadataLinkTargets.value) {
+      expect({ fields, targets: metadataLinkTargets(fields) }).toEqual({ fields, targets });
     }
   });
 

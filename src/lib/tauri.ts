@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
+import type { NoteLinks } from "../graph/model";
 import type {
   BrevePdfPalette,
   BreveConfig,
@@ -1369,6 +1370,12 @@ export interface TaskItem {
 export async function corpusTasks(): Promise<TaskItem[]> {
   if (!isTauri()) return [];
   return invoke<TaskItem[]>("corpus_tasks");
+}
+
+/** Every live note's raw outgoing wikilinks — the Graph view's projection. */
+export async function corpusLinks(): Promise<NoteLinks[]> {
+  if (!isTauri()) return [];
+  return invoke<NoteLinks[]>("corpus_links_list");
 }
 
 /** Check one task off — Rust re-validates the exact text before flipping. */

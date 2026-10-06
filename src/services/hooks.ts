@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
   corpusFileStat,
+  corpusLinks,
   corpusMoveFileToSink,
   corpusTasks,
   isTauri,
@@ -24,6 +25,7 @@ import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import { listWebLinks } from "./webLinks";
 import { listWebTasks } from "./webTasks";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
@@ -47,6 +49,7 @@ export const keys = {
   secureRepair: ["secure-repair"] as const,
   secureHints: ["secure-hints"] as const,
   tasks: ["tasks"] as const,
+  links: ["links"] as const,
 };
 
 /** The note universe's whole-corpus fetch rides a reserved folderId sentinel so
@@ -299,6 +302,8 @@ export async function invalidateNotes(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["note"] }),
     // a body edit can add/complete checkboxes — the Tasks projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
+    // …and add or drop a wikilink — the Graph's Links projection re-derives
+    queryClient.invalidateQueries({ queryKey: keys.links }),
   ]);
 }
 
@@ -408,6 +413,12 @@ export function useSecureHints() {
 export function useTasks() {
   // the Mac app projects tasks in Rust; the web has the same rules in TS
   return useQuery({ queryKey: keys.tasks, queryFn: isTauri() ? corpusTasks : listWebTasks });
+}
+
+/** The Links projection — every live note's raw wikilinks, for the Graph view.
+ * Same split as Tasks: Rust on the Mac, the TS twin on the web. */
+export function useNoteLinks() {
+  return useQuery({ queryKey: keys.links, queryFn: isTauri() ? corpusLinks : listWebLinks });
 }
 
 export async function invalidateJournal(): Promise<void> {

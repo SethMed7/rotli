@@ -9,6 +9,7 @@
 // are listed and moved here the way the Mac corpus lists them — id = path, no
 // frontmatter, never read to be indexed; their scene I/O is folderBoards.ts.
 
+import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { extOf, fileName, fileNameStem, userFileName } from "../lib/fileKind";
 import {
@@ -212,6 +213,7 @@ export class FolderNotesService implements NotesService {
       secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
+      suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),
       body,
       revision: `${stat.lastModified}:${stat.size}`,
     };

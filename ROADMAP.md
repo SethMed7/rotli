@@ -37,6 +37,13 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 2. Planned
 
+- **Canvas** · L — cards on an open plane, saved as JSON Canvas `.canvas`
+  files that Obsidian also opens. Type a card, or put just `[[a note]]` in one
+  to show that note; connect cards with lines and gather them into groups.
+  A note card shows the note and opens it in a tab; lines stay drawings and
+  never become links. A new canvas sits beside your notes. Excalidraw boards
+  stay as they are, for drawing (owner decisions 2026-10-06,
+  [design](docs/design/canvas-and-graph-2026-10-05.md)).
 - **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
   format bar at the bottom turns into a small Librarian chat, like the chat
   bubble on a website; one click opens the same conversation full size in
@@ -172,13 +179,10 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   links to, and stale tasks, delivered through Breve.
 - **Tags browser** · M — a place to see every tag and the notes under it. Tags
   already exist in note metadata.
-- **Freeform canvas** · XL — drop notes, sheets, PDFs, and images on one
-  board, connect them, group them into frames, and present the frames as
-  slides, like AFFiNE's Edgeless. Built inside Excalidraw. First slice (M–L, no
-  contract change): real-size images on boards, drops onto a board, frames +
-  Present. File cards and connectors need two
-  owner calls: whether a connector is a link, and what a card may show
-  ([evaluation](docs/design/canvas-tasks-logseq-eval-2026-09-23.md)).
+- **Edit a note inside its canvas card** · M–L — once the Canvas ships, write
+  in a note card on the canvas instead of opening the note in a tab, the way
+  Obsidian does. Needs one live editor per card that stays in step with the
+  same note open in a tab.
 - **Query fence** · M–L — a `query` code block that shows a live table of
   tasks or notes (`tag:`, `area:`, state, due), using the grammar
   `rotli notes query` already has. With **Export to .xlsx** (S–M) it gives a

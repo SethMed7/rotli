@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A graph of your notes.** Search "Graph" in ⌘K to see every note as a
+  dot and every `[[link]]` you wrote as a line, or right-click a note and
+  choose **Show in graph** for the notes around it, one or two steps out.
+  Hovering a note fades everything it isn't linked to, searching highlights
+  without moving anything, and the arrow keys and Enter reach every note.
+  Related notes the Librarian found draw as dashed lines, on by default;
+  **Librarian links** hides them, and Rotli remembers. A secure note shows
+  its title and never its text. Nothing is written into your notes.
 - **Ask AI from the note.** Type `/ai` (or `/ask`), say what you want ("a bar
   chart of these hours", "three sources on this", "a closing paragraph"), and
   the Librarian's model writes it for that spot. You read the answer first;

@@ -49,6 +49,7 @@ import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
+import { registerGraphActions } from "./graphActions";
 import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
 import { registerNavArrowActions } from "./navArrows";
@@ -443,6 +444,7 @@ export function registerDefaultActions(): void {
   registerNoteProtectionActions();
   registerAlignActions();
   registerLeaderActions();
+  registerGraphActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
   //   the configured item default in the workspace and a fresh private sibling

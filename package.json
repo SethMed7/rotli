@@ -114,6 +114,7 @@
     "@univerjs/preset-docs-hyper-link": "^0.25.1",
     "@univerjs/preset-sheets-core": "^0.25.1",
     "@univerjs/presets": "^0.25.1",
+    "d3-force": "3.0.0",
     "exceljs": "^4.4.0",
     "imapflow": "^1.7.1",
     "jsxgraph": "^1.13.1",
@@ -128,6 +129,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@tauri-apps/cli": "^2.11.4",
+    "@types/d3-force": "3.0.10",
     "@types/node": "^25.9.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

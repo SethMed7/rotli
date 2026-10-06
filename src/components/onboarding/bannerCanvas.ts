@@ -6,6 +6,7 @@
 // the quokka the app shows, accessory placement included, without a second
 // copy of that geometry. CSS masks can't cross into a canvas any other way.
 
+import { canvasColors } from "../../brand/tokenColors";
 import {
   BANNER_HEIGHT,
   BANNER_WIDTH,
@@ -116,21 +117,7 @@ export async function drawQuokka(
 /** Theme colors as the canvas can read them (rgb), resolved through a probe
  * so a token defined with color-mix() or another var() still works. */
 export function themeColors(): Record<"ground" | "accent" | "text" | "muted", string> {
-  const probe = document.createElement("span");
-  probe.style.display = "none";
-  document.body.append(probe);
-  const read = (token: string) => {
-    probe.style.color = `var(${token})`;
-    return getComputedStyle(probe).color;
-  };
-  const colors = {
-    ground: read("--ground"),
-    accent: read("--accent"),
-    text: read("--text"),
-    muted: read("--text-muted"),
-  };
-  probe.remove();
-  return colors;
+  return canvasColors();
 }
 
 function fontStack(token: string): string {

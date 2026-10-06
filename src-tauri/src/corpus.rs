@@ -8828,6 +8828,9 @@ pub mod file_rename;
 /// Leftover-alias cleanup (placeholders, typing trails) — a child module.
 #[path = "corpus_alias_cleanup.rs"]
 pub mod alias_cleanup;
+/// The Graph view's Links projection — a child module.
+#[path = "corpus_links.rs"]
+pub mod links;
 /// The Librarian rules' store side (secure keywords, the batch) — a child module.
 #[path = "corpus_rules.rs"]
 pub mod rules_store;

@@ -605,6 +605,64 @@
           }
         ]
       }
+    },
+    "wikilinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
+      "value": [
+        {
+          "body": "See [[Books]] and [[Philosophy|phil]].\n`[[not a link]]` but ![[Diagram]] is.\n```\n[[fenced]]\n```\nAgain [[Books]] and [[René Descartes#Life]].\n[[]] [[ ]]",
+          "targets": [
+            "Books",
+            "Philosophy|phil",
+            "Diagram",
+            "René Descartes#Life"
+          ]
+        },
+        {
+          "body": "[[a [[b]] c]] and [[unclosed",
+          "targets": []
+        },
+        {
+          "body": "  ```js\n[[inside]]\n  ```\n[[after]]",
+          "targets": [
+            "after"
+          ]
+        }
+      ]
+    },
+    "metadataLinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs metadata_link_targets ↔ src/graph/linkTargets.ts metadataLinkTargets (independent implementations, fixture-aligned: the Graph view's Librarian links)",
+      "value": [
+        {
+          "fields": "area: work\nlinks: [[Pricing]], [[Q3 plan|plan]]\ntags: [a]",
+          "targets": [
+            "Pricing",
+            "Q3 plan|plan"
+          ]
+        },
+        {
+          "fields": "links: []",
+          "targets": []
+        },
+        {
+          "fields": "summary: see [[Pricing]]",
+          "targets": []
+        },
+        {
+          "fields": " links: [[indented]]",
+          "targets": []
+        },
+        {
+          "fields": "links:[[A]] [[A]] `[[code]]`",
+          "targets": [
+            "A"
+          ]
+        },
+        {
+          "fields": "",
+          "targets": []
+        }
+      ]
     }
   }
 }

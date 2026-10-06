@@ -11,6 +11,7 @@ import { parseSidebarLook } from "../lib/sidebarLook";
 import { useAmbient } from "./ambient";
 import { appearanceLookSnapshot, parseAppearanceLook, useAppearanceLook } from "./appearanceLook";
 import { useFronts } from "./fronts";
+import { useGraphStore } from "./graph";
 import { parseHandToAiMode, useHandToAiMode } from "./handToAiMode";
 import { useHidden } from "./hidden";
 import { usePinnedSites } from "./pinnedSites";
@@ -34,6 +35,8 @@ export function hydrateAppExtras(appSettings: string): void {
   useSidebarLook.setState({ look: parseSidebarLook(data.sidebarLook) });
   useHandToAiMode.setState({ mode: parseHandToAiMode(data.handToAiMode) });
   useAppearanceLook.setState(parseAppearanceLook(data));
+  // on unless someone switched it off
+  useGraphStore.setState({ librarianLinks: data.graphLibrarianLinks !== false });
 }
 
 /** The extras' keys, for the app settings file. */
@@ -48,6 +51,7 @@ export function appExtrasSnapshot(): {
   themeCycle: unknown;
   themeCyclePicks: unknown;
   outlineImages: unknown;
+  graphLibrarianLinks: unknown;
 } {
   return {
     ambient: useAmbient.getState().prefs,
@@ -58,6 +62,7 @@ export function appExtrasSnapshot(): {
     sidebarLook: useSidebarLook.getState().look,
     handToAiMode: useHandToAiMode.getState().mode,
     ...appearanceLookSnapshot(),
+    graphLibrarianLinks: useGraphStore.getState().librarianLinks,
   };
 }
 
@@ -73,6 +78,8 @@ export function subscribeAppExtras(save: () => void): () => void {
     useAppearanceLook.subscribe(save),
     // only the pins themselves, not which panel is open
     usePinnedSites.subscribe((state, prev) => state.sites !== prev.sites && save()),
+    // only the Librarian switch, not the session's scope
+    useGraphStore.subscribe((state, prev) => state.librarianLinks !== prev.librarianLinks && save()),
   ];
   return () => stops.forEach((stop) => stop());
 }
