@@ -272,9 +272,27 @@ whose art never touches its words from 320 to 1920.
   way and jumps through the tree, re-measures when the article changes
   height, and hides when the whole article fits in the window. It is a
   position, not proof of reading: nothing is recorded or sent. Blog posts
-  and `/privacy/` carry the same meter (2026-10-05). Index lists
-  (`WritingList.astro`) are plain entries in columns with a hairline above
-  each, never boxes; an entry without a link is announced ("Coming soon").
+  and `/privacy/` carry the same meter (2026-10-05). The meter has a fixed
+  height, and everything under it clears header plus meter (`--pinned` in
+  `WritingPage.astro`): the sticky "On this page" tree sits 1.5rem below the
+  meter, and every heading and `[id]` in the article lands below it when
+  jumped to (`e2e/site/resource-reading.spec.ts` holds both on a guide, a
+  post, and `/privacy/`). The guides' index (`WritingList.astro`) is plain
+  entries in columns with a hairline above each, never boxes; an entry
+  without a link is announced ("Coming soon").
+- **The blog index** (`BlogIndex.astro`, the owner's 2026-10-05 "way more
+  polished") leads with the newest readable post: its thumbnail large beside
+  its title, summary, date, and reading time (stacked under 900px). The rest
+  follow in an open grid (three columns on a wide screen, two on a tablet,
+  one on a phone), readable posts first, then the announced ones, whose
+  picture carries a "Coming soon" label and which are not links. Every
+  picture is a real `<img>` at the thumbnails' one shape (1200 × 630, with a
+  600-wide copy in `srcset`), with its size and alt text; the feature loads
+  first and the grid lazily. No entry has a box: a framed picture with its
+  words under it. A post's own head shows the same picture beside its title
+  above 1080px, under its words below that (`WritingPage`'s `cover`).
+  `e2e/site/blog-index.spec.ts` holds the feature, every tile's picture at
+  one shape, the labels, and the cover at 1440, 768, and 390.
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
@@ -678,7 +696,20 @@ whose art never touches its words from 320 to 1920.
   area or touches the quokka or the lighthouse, or if the title and line colors
   fall under 4.5:1 on the solid warm ground (text over the pattern, sea, sand,
   or underline is not sampled; check the contact sheet), and
-  palette-compresses the PNGs (about 35 KB each). The same run writes the
+  palette-compresses the PNGs (about 35 KB each).
+- **Post thumbnails** (`public/thumbs/blog/<slug>.webp` and `<slug>-600.webp`,
+  about 10 to 30 KB each) come from the same run and the same definition as
+  the post's card: `POST_ART` in `src/og.ts` gives each post a quokka pose
+  and a scene (`scripts/brand-images/scenes.mjs`: the island by day with the
+  post's subject on either side of the quokka, drawn in the guides' scene
+  vocabulary). The thumbnail is the whole scene with no words; the link card
+  stands the same pose beside the scene's first prop under the post's title.
+  Every post gets one, coming-soon posts included, and titles are read from
+  frontmatter when the run renders, never stored with the art, so a retitled
+  post needs only a re-run. `postThumbnail(slug)` hands pages the image, its
+  `srcset`, size, and alt text (describing the scene), or nothing until it is
+  rendered; a new post without a `POST_ART` entry gets the writing quokka on
+  the plain beach. The same run writes the
   banners, profile pictures, and thumbnails described in `brand/README.md`, and
   a contact sheet of everything at `_review/brand-images/contact-sheet.png`
   (gitignored).

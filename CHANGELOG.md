@@ -142,6 +142,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   privacy page's opening on AI is plainer.
 - **The privacy page and blog posts show how far through you are,** with the
   same "N% through" bar as the guides, so every article reads the same way.
+- **rotli.co's blog shows a picture for every post.** Each post has its own
+  scene: the quokka on the island with what the post is about beside it (idle
+  AI helpers on a bench, a browser and Terminal, notes linked together, a
+  scribbled page and the same page filed). The blog page now leads with the
+  newest post, large, with its summary, date, and reading time, and shows the
+  rest in a grid; posts that are coming soon are labelled on their picture. A
+  post shows the same picture at the top, and its link preview uses the same
+  scene.
 - **Long commands fit their boxes on rotli.co.** The Rotli Helper install
   line wraps inside its box in the guide and the blog post instead of being
   cut off, and the privacy page's night scene sets its words beside the dome.
@@ -319,6 +327,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The theme studio's previous and next buttons on rotli.co sit on one row
   on phones** again, beside the theme's name.
+- **"On this page" on rotli.co's articles is no longer cut off.** The reading
+  bar under the header covered the top of the list beside guides, blog
+  posts, and the privacy page. The list now sits below the bar, and jumping
+  to a section lands it below the bar too.
 - **rotli.co fits phones and tablets better.** The changelog no longer
   scrolls sideways on a phone, the island behind "Make it yours" no longer
   sits under its words on a tablet, each home-page step puts its quokka

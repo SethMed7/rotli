@@ -80,3 +80,70 @@ for (const path of ["/privacy/", "/blog/rotli-web-and-your-mac/"]) {
     });
   }
 }
+
+// The page scrolls smoothly: wait until a jump has come to rest before measuring where it landed.
+async function settled(page: Page) {
+  await expect
+    .poll(async () => {
+      const before = await page.evaluate(() => window.scrollY);
+      await page.waitForTimeout(150);
+      return (await page.evaluate(() => window.scrollY)) === before;
+    })
+    .toBe(true);
+}
+
+// The sticky "On this page" tree and every jump target clear the pinned header and meter
+// (the owner's 2026-10-05 screenshot: the meter covered the tree's label). A guide, a post,
+// and /privacy/, with the tree's longest entries, at the start, mid-article, and after a jump.
+for (const path of ["/resources/rotli-helper/", "/blog/rotli-web-and-your-mac/", "/privacy/"]) {
+  test(`${path}: the tree's heading and its jump targets sit below the meter`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(path);
+    const meter = page.locator("[data-read-progress]");
+    const label = page.locator("[data-toc] > p");
+    await expect(label).toHaveText("On this page");
+    const meterBottom = async () => {
+      const box = (await meter.boundingBox())!;
+      return box.y + box.height;
+    };
+    const clears = async () => {
+      const box = (await label.boundingBox())!;
+      expect(box.y).toBeGreaterThanOrEqual((await meterBottom()) + 8);
+    };
+    await expect(meter).toBeVisible();
+    await clears();
+    await page.evaluate(() => {
+      const prose = document.querySelector<HTMLElement>("[data-prose]")!;
+      window.scrollTo(0, prose.getBoundingClientRect().top + window.scrollY + prose.offsetHeight / 2);
+    });
+    await settled(page);
+    await clears();
+    const links = page.locator("[data-toc] a");
+    for (const index of [1, (await links.count()) - 2]) {
+      const link = links.nth(index);
+      const id = decodeURIComponent((await link.getAttribute("href"))!.slice(1));
+      await link.click();
+      const target = page.locator(`[id="${id}"]`);
+      await settled(page);
+      const landed = (await target.boundingBox())!.y;
+      expect(landed).toBeLessThan(400);
+      expect(landed).toBeGreaterThanOrEqual(await meterBottom());
+      await clears();
+    }
+  });
+}
+
+test("on a phone, a jump from the compact tree lands below the meter", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/blog/rotli-web-and-your-mac/");
+  const compact = page.locator(".toc-compact");
+  await compact.locator("summary").click();
+  const link = compact.locator("a").nth(2);
+  const id = decodeURIComponent((await link.getAttribute("href"))!.slice(1));
+  await link.click();
+  const target = page.locator(`[id="${id}"]`);
+  await settled(page);
+  expect((await target.boundingBox())!.y).toBeLessThan(400);
+  const meter = (await page.locator("[data-read-progress]").boundingBox())!;
+  expect((await target.boundingBox())!.y).toBeGreaterThanOrEqual(meter.y + meter.height);
+});

@@ -4,6 +4,7 @@
 //
 //   site/public/og/<page>.png             1200×630  each page's link card (site/src/og.ts)
 //   site/public/og/blog/<slug>.png        1200×630  each published post's card, from its title
+//   site/public/thumbs/blog/<slug>.webp   1200×630  every post's thumbnail (and -600.webp): its scene, no words
 //   brand/assets/banners/*.png            X, LinkedIn, GitHub, YouTube
 //   brand/assets/pfp/*.png                1024×1024 face mark on four theme-family grounds
 //   brand/assets/thumbnails/*.png         1280×720  the title-slot template and one per post
@@ -24,8 +25,9 @@ import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
 
-import { OG_CARDS, POSES, postPose } from "../site/src/og.ts";
+import { OG_CARDS, POSES, postArt, postPose, thumbnailAlt, thumbnailPath } from "../site/src/og.ts";
 import { quokka } from "./brand-images/quokka.mjs";
+import { cardBeside, scene } from "./brand-images/scenes.mjs";
 import { banner, C, card, pfp, TEXT_PAIRS, textCss } from "./brand-images/templates.mjs";
 
 const root = join(import.meta.dir, "..");
@@ -141,6 +143,7 @@ async function render(path, svg, { width, height, group }) {
   const problems = await page.evaluate(fitAndCheck);
   if (problems.length > 0) throw new Error(`${path}:\n  ${problems.join("\n  ")}`);
   const raw = await page.screenshot({ clip: { x: 0, y: 0, width, height } });
+  if (path.endsWith(".webp")) return writeWebp(path, raw, { width, height, group });
   const png = await sharp(raw)
     .png({ palette: true, quality: 95, effort: 10, compressionLevel: 9 })
     .toBuffer();
@@ -149,6 +152,18 @@ async function render(path, svg, { width, height, group }) {
   await writeFile(out, png);
   rendered.push({ path, group, width, height, bytes: png.length });
   console.log(`${path}  ${width}×${height}  ${Math.round(png.length / 1024)} KB`);
+}
+
+// The site's thumbnails: webp at the rendered width and at half of it (`<name>-600.webp`), for srcset.
+async function writeWebp(path, raw, { width, height, group }) {
+  for (const size of [width, width / 2]) {
+    const out = size === width ? path : path.replace(/\.webp$/, `-${size}.webp`);
+    const webp = await sharp(raw).resize(size).webp({ quality: 80, effort: 6 }).toBuffer();
+    await mkdir(dirname(join(root, out)), { recursive: true });
+    await writeFile(join(root, out), webp);
+    console.log(`${out}  ${size}×${(size * height) / width}  ${Math.round(webp.length / 1024)} KB`);
+    if (size === width) rendered.push({ path: out, group, width, height, bytes: webp.length });
+  }
 }
 
 const thumbnail = async (title, poseName) =>
@@ -166,15 +181,16 @@ try {
   await browser.close();
 }
 
-async function publishedPosts() {
+/** Every post, with its title read from its frontmatter at render time. */
+async function allPosts() {
   const dir = join(root, "site/src/content/writing/posts");
   const posts = [];
   for (const file of (await readdir(dir)).filter((name) => name.endsWith(".md")).sort()) {
     const front = (await readFile(join(dir, file), "utf8")).match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
     const data = Bun.YAML.parse(front);
-    if ((data.status ?? "published") !== "published") continue;
     const date = new Date(data.date).toLocaleDateString("en-US", { dateStyle: "long", timeZone: "UTC" });
-    posts.push({ slug: file.replace(/\.md$/, ""), title: data.title, date });
+    const status = data.status ?? "published";
+    posts.push({ slug: file.replace(/\.md$/, ""), title: data.title, date, status });
   }
   return posts;
 }
@@ -194,7 +210,18 @@ async function buildAll() {
       group: "Link cards (site/public/og/)",
     });
   }
-  const posts = await publishedPosts();
+  const everyPost = await allPosts();
+  // Every post has a thumbnail, coming-soon ones too (the index marks those); only published
+  // posts have a page, so only they get a link card.
+  for (const post of everyPost) {
+    const art = postArt(post.slug);
+    await render(
+      `site/public${thumbnailPath(post.slug)}`,
+      scene({ kind: art.scene, art: await pose(art.pose), label: thumbnailAlt(post.slug) }),
+      { width: 1200, height: 630, group: "Post thumbnails (site/public/thumbs/blog/)" },
+    );
+  }
+  const posts = everyPost.filter((post) => post.status === "published");
   for (const post of posts) {
     const svg = card({
       w: 1200,
@@ -202,6 +229,7 @@ async function buildAll() {
       title: post.title,
       line: `rotli blog · ${post.date}`,
       art: await pose(postPose(post.slug)),
+      beside: cardBeside(postArt(post.slug).scene),
     });
     await render(`site/public/og/blog/${post.slug}.png`, svg, {
       width: 1200,
@@ -322,7 +350,8 @@ async function contactSheet() {
   for (const [group, items] of groups) {
     const tiles = [];
     for (const item of items) {
-      const uri = `data:image/png;base64,${(await readFile(join(root, item.path))).toString("base64")}`;
+      const mime = item.path.endsWith(".webp") ? "image/webp" : "image/png";
+      const uri = `data:${mime};base64,${(await readFile(join(root, item.path))).toString("base64")}`;
       const width = Math.min(
         item.width,
         item.width > 2000 ? 1100 : item.height < 300 ? 1128 : item.width === 1024 ? 260 : 560,

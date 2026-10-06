@@ -15,6 +15,7 @@
 // :global() in .prose.
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
+import type { Thumbnail } from '../og';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
@@ -41,6 +42,8 @@ interface Props {
   center?: boolean;
   /** Pin a reading meter under the header (resource articles, blog posts, /privacy/). */
   progress?: boolean;
+  /** A picture beside the head (a blog post's thumbnail, src/og.ts); under it on narrow screens. */
+  cover?: Thumbnail;
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
@@ -62,6 +65,7 @@ const {
   wide = false,
   center = false,
   progress = false,
+  cover,
   structuredData,
   markdownPath,
   image,
@@ -81,33 +85,50 @@ const hasToc = toc.length > 1;
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
-  <main id="content" class:list={['wrap writing', { center }]}>
-    <header class="writing-head">
+  <main id="content" class:list={['wrap writing', { center, 'has-progress': progress }]}>
+    <header class:list={['writing-head', { 'has-cover': cover }]}>
+      <div class="head-copy">
+        {
+          crumbs.length > 0 && (
+            <nav class="crumbs" aria-label="Breadcrumb">
+              {crumbs.map((crumb) => (
+                <>
+                  <a href={crumb.href}>{crumb.label}</a>
+                  <span aria-hidden="true">/</span>
+                </>
+              ))}
+            </nav>
+          )
+        }
+        {kicker && <p class="kicker">{kicker}</p>}
+        <h1>{heading}</h1>
+        {lede && <p class="lede">{lede}</p>}
+        {
+          meta.length > 0 && (
+            <p class="meta">
+              {meta.map((part, index) => (
+                <>
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  <span>{part}</span>
+                </>
+              ))}
+            </p>
+          )
+        }
+      </div>
       {
-        crumbs.length > 0 && (
-          <nav class="crumbs" aria-label="Breadcrumb">
-            {crumbs.map((crumb) => (
-              <>
-                <a href={crumb.href}>{crumb.label}</a>
-                <span aria-hidden="true">/</span>
-              </>
-            ))}
-          </nav>
-        )
-      }
-      {kicker && <p class="kicker">{kicker}</p>}
-      <h1>{heading}</h1>
-      {lede && <p class="lede">{lede}</p>}
-      {
-        meta.length > 0 && (
-          <p class="meta">
-            {meta.map((part, index) => (
-              <>
-                {index > 0 && <span aria-hidden="true">·</span>}
-                <span>{part}</span>
-              </>
-            ))}
-          </p>
+        cover && (
+          <img
+            class="cover"
+            src={cover.src}
+            srcset={cover.srcset}
+            sizes="(min-width: 1080px) 26rem, (min-width: 640px) 36rem, calc(100vw - 2.5rem)"
+            width={cover.width}
+            height={cover.height}
+            alt={cover.alt}
+            fetchpriority="high"
+            decoding="async"
+          />
         )
       }
     </header>
@@ -195,7 +216,9 @@ const hasToc = toc.length > 1;
     const update = () => {
       frame = 0;
       const header = document.querySelector('.site-header-bar')?.getBoundingClientRect().bottom ?? 0;
-      const line = header + window.innerHeight * 0.2;
+      // The meter covers the top of the reading area while it is pinned, so it counts as header.
+      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
+      const line = top + window.innerHeight * 0.2;
       let active = -1;
       targets.forEach((target, index) => {
         if (target.getBoundingClientRect().top <= line) active = index;
@@ -204,8 +227,6 @@ const hasToc = toc.length > 1;
         if (index === active) link.setAttribute('aria-current', 'location');
         else link.removeAttribute('aria-current');
       });
-      // The meter covers the top of the reading area while it is pinned, so it counts as header.
-      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
       const box = prose.getBoundingClientRect();
       const reading = readingProgress({ top: box.top, height: box.height }, window.innerHeight, top);
       if (rail) rail.style.transform = `scaleY(${reading.fraction})`;
@@ -235,12 +256,49 @@ const hasToc = toc.length > 1;
 </script>
 
 <style>
+  /* What is pinned over the top of an article: the header, and on pages with a reading meter
+     the meter under it (its height is fixed so everything below can clear it). The tree and
+     every jump target sit below that, with the same breathing room. */
   .writing {
+    --meter-height: 0px;
+    --pinned: calc(var(--header-height) + 1px + var(--meter-height));
     padding-block: clamp(3rem, 7vw, 5rem) var(--section-space);
   }
+  .writing.has-progress {
+    --meter-height: 2.5rem;
+  }
+  .writing :global([id]) {
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
+  }
   /* The rule under the head spans the page; the words keep a reading width. */
-  .writing-head > * {
+  .head-copy {
     max-width: 48rem;
+  }
+  /* A post's picture sits beside its words, level with the title block's middle; on narrower
+     screens it follows the words at a moderate size. */
+  .writing-head.has-cover {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4rem);
+  }
+  .cover {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  @media (max-width: 1080px) {
+    .writing-head.has-cover {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2rem;
+    }
+    .cover {
+      max-width: 36rem;
+    }
   }
   .writing-head {
     padding-bottom: clamp(2rem, 4vw, 3rem);
@@ -309,8 +367,9 @@ const hasToc = toc.length > 1;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 1rem;
+    box-sizing: border-box;
+    height: var(--meter-height);
     margin: calc(-1 * clamp(1.25rem, 3vw, 2rem)) 0 clamp(1.25rem, 3vw, 2rem);
-    padding: 0.6rem 0;
     background: var(--ground);
   }
   .read-progress[hidden] {
@@ -359,9 +418,9 @@ const hasToc = toc.length > 1;
   }
   .toc {
     position: sticky;
-    top: calc(var(--header-height) + 2rem);
+    top: calc(var(--pinned) + 1.5rem);
     align-self: start;
-    max-height: calc(100dvh - var(--header-height) - 4rem);
+    max-height: calc(100dvh - var(--pinned) - 3rem);
     overflow-y: auto;
     font-size: 0.9rem;
   }
@@ -516,7 +575,7 @@ const hasToc = toc.length > 1;
     font-size: 1.45rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    scroll-margin-top: calc(var(--header-height) + 1.5rem);
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
   .prose :global(h3) {
     margin: 2rem 0 0.6rem;
