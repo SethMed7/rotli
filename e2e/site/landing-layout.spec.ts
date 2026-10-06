@@ -35,8 +35,8 @@ test("the sections run in order, alternating plain and warm grounds", async ({ p
     .evaluateAll((sections) => sections.map((s) => s.id || s.classList[0]));
   expect(ids).toEqual([
     "hero",
-    "features",
     "waiting",
+    "features",
     "two-kinds",
     "tour",
     "personal",
