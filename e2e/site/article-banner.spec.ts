@@ -26,20 +26,20 @@ function contrastOf(fg: string, bg: string): number {
   const lum = (value: string) => {
     const { rgb, alpha } = parse(value);
     if (alpha !== 1) throw new Error(`${value} is not opaque, so its contrast means nothing`);
-    const [r, g, b] = rgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    const [r = 0, g = 0, b = 0] = rgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   };
-  const [hi, lo] = [lum(fg), lum(bg)].sort((a, b) => b - a);
-  return (hi + 0.05) / (lo + 0.05);
+  const [a, b] = [lum(fg), lum(bg)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 const colours = (page: Page, text: string, ground: string) =>
   page.evaluate(
-    ([textSel, groundSel]) => ({
+    ({ textSel, groundSel }) => ({
       fg: getComputedStyle(document.querySelector(textSel)!).color,
       bg: getComputedStyle(document.querySelector(groundSel)!).backgroundColor,
     }),
-    [text, ground],
+    { textSel: text, groundSel: ground },
   );
 
 async function box(page: Page, selector: string) {
@@ -118,8 +118,8 @@ for (const path of [POST, "/blog/the-ai-you-already-pay-for/", "/privacy/"]) {
     const banner = await box(page, "[data-article-banner]");
     expect(Math.abs(banner.y - (header.y + header.height))).toBeLessThan(2);
     const covered = await page.evaluate(
-      ([x, y]) => !document.elementFromPoint(x, y)?.closest("[data-article-banner]"),
-      [720, banner.y + banner.height / 2],
+      ({ x, y }) => !document.elementFromPoint(x, y)?.closest("[data-article-banner]"),
+      { x: 720, y: banner.y + banner.height / 2 },
     );
     expect(covered).toBe(true);
     const meter = await box(page, "[data-read-progress]");
