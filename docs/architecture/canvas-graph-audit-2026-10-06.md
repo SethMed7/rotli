@@ -14,6 +14,42 @@ Sources:
 Every item below was confirmed in code unless it says otherwise. The joined
 branch passes typecheck, 2,951 unit tests, and every structural check.
 
+## Status (2026-10-06, end of day)
+
+Every P0 and P1 below is fixed on `work/canvas-graph-round`. Each fix has a
+test, and the bugs a user could hit were first reproduced against the old
+code.
+
+| Fix | Commit |
+|---|---|
+| Canvas saves: one write at a time, retried, quit fails loudly; read-only takes no edits; typed text survives a drag; a vanished web file is refused (P0 2, 3, 5) | `9d0e0bea` |
+| Secure note cards fail closed; one secure rule on the Mac and the web; no fetch loop; `[[a board]]` never becomes a note card (P0 1, P1) | `b9e0fca6` |
+| Canvas out of production builds in Rust and TS; a canvas never wins a title over a note (P0 6) | `163fc465` |
+| The Graph settles after a drag; order-free layout key; links refresh after edits; shortcuts pass through; sparse labels; line alpha; label culling; focus follows (P0 4, P1) | `dfa4defc` |
+| CommonMark code spans and fences in the link parser, TS and Rust, plus parity cases (P1) | `793c102c` |
+| Other apps' fields and positions survive; group order; file cards; cancelled gestures; one create-home rule (P1) | `5bf5495a` |
+| Canvas keyboard: Enter, C then an arrow, G, ⇧⌥ arrows, all remappable (P1) | `83c9a2a9` |
+| Skip setup with a vault already chosen finishes; the prompt takes focus (P1) | `07248c7c` |
+| The last trailing hover labels open leftward (P1) | `34aefccf` |
+
+Big vaults: a reduced-motion layout of more than 400 notes runs at most
+60 synchronous ticks, and rebuilds start warm. A worker-thread layout is
+not done.
+
+Still open, all P2:
+
+- Graph:
+  - display-scale and accent repaint;
+  - `neighborhood()` on hub notes;
+  - the "Untitled" first frame;
+  - the default-vault-only Links projection on the Mac;
+  - "Show in graph" for archived notes.
+- Canvas:
+  - a note card's body goes stale after an edit elsewhere;
+  - bad UTF-8 is mangled on save on the Mac;
+  - `nodes: null` is rewritten as `[]`;
+  - a colon in a web folder name.
+
 ## P0 — fix before anything merges
 
 These break a product law (secure notes fail closed, user files are the

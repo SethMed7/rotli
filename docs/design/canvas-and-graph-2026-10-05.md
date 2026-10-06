@@ -159,10 +159,11 @@ nothing new is downloaded.
   check that both link readers agree.
 - `e2e/graph-view.spec.ts` drives real controls in the **browser-twin**
   Playwright lane: the ⌘K pick, the row menu, the scope chips, the keyboard
-  on the canvas, and opening a note. The Rotli Web lane (`e2e/web/`) has no
-  graph spec yet.
-- The Rust command itself has only run under `cargo test`, never in the live
-  Mac app.
+  on the canvas, the Librarian switch, and opening a note.
+- `e2e/web/rotli-web-graph.spec.ts` runs the same flow on Rotli Web against
+  a real folder vault.
+- The Rust command passed a native check in an isolated Mac build
+  (2026-10-06), recorded in the round's PR.
 - The demo corpus gained four lines of `[[links]]`, so the browser twin has a
   graph to show. Each sits on a new last line, so existing text is unchanged.
 
@@ -299,15 +300,21 @@ spike.
 
 ### Where `.canvas` files live
 
-- **Mac app:** `.canvas` already lists as a file (`NoteKind::File`).
-  - Saves go through `corpus_write_file_bytes` with a revision check, so they
-    work in writable lanes (`wiki/`, a plain vault folder).
-  - In a memex, `storage/` is read-only except the Excalidraw and office
-    lanes. A `.canvas` lane there needs a Rust policy change plus a
-    `parity.json` constant (question 5).
-- **Rotli Web:** `folderNotes.ts` lists only `.md` and `.excalidraw`, so a
-  `.canvas` file is invisible on the web until it does. This is required
-  before Canvas leaves development builds.
+- **Beside notes** (decision 5).
+  - A new canvas lands in the folder you're in: under `wiki/` in a memex,
+    otherwise the capture folder.
+  - The rule lives in `corpus_files.rs` `create_canvas` and its web twin,
+    `folderCanvases.canvasHome`.
+- **Mac app:**
+  - A `.canvas` lists as a file (`NoteKind::File`), titled without its
+    extension, in development builds.
+  - Saves go through `corpus_write_file_bytes` with a revision check, one
+    write at a time (`jsonCanvas/canvasSaver.ts`).
+- **Rotli Web:**
+  - `folderNotes.ts` lists a `.canvas` by its path, like a board, where the
+    build opens canvases.
+  - `services/folderCanvases.ts` reads it, saves it with a revision check,
+    and creates it.
 
 ### Naming
 

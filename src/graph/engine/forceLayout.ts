@@ -69,9 +69,12 @@ export function createLayout(
     simulation.on("tick", options.onTick);
   } else {
     simulation.stop();
-    const steps = Math.ceil(
+    // one synchronous pass, bounded so a big vault can't stall the window:
+    // past a few hundred notes it settles roughly rather than exactly
+    const toRest = Math.ceil(
       Math.log(simulation.alphaMin() / simulation.alpha()) / Math.log(1 - simulation.alphaDecay()),
     );
+    const steps = items.length > 400 ? Math.min(toRest, 60) : toRest;
     simulation.tick(steps);
     options.onTick();
   }
