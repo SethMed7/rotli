@@ -54,7 +54,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
         <img
           src={cover.src}
           srcset={cover.srcset}
-          sizes="(min-width: 1300px) 76rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
+          sizes="(min-width: 2400px) 104rem, (min-width: 1616px) 96rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
           width={cover.width}
           height={cover.height}
           alt={cover.alt}
@@ -93,17 +93,18 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
 </header>
 
 <style>
-  /* One column on a phone and a tablet; from 901px the article's tracks (WritingPage). */
+  /* On the article's named tracks (WritingPage --article-tracks) at every width: the picture
+     across all of them, the words from the reading column's edge, "Blog /" in the left rail from
+     901px and on the text's edge below that. */
   .cover-head {
     display: grid;
-    grid-template-areas: 'crumbs' 'art' 'copy';
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: var(--article-tracks);
     margin-bottom: clamp(2rem, 4vw, 3rem);
     padding-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
     border-bottom: 1px solid var(--border-strong);
   }
   .crumbs {
-    grid-area: crumbs;
+    grid-column: text;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -129,7 +130,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   /* The picture: the columns' full width, rounded with a hairline, short enough that the title
      is in the first window; its quokka and props (the scene's right half) stay in view. */
   .cover-art {
-    grid-area: art;
+    grid-column: 1 / -1;
     display: block;
     overflow: hidden;
     margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
@@ -140,13 +141,15 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   .cover-art img {
     display: block;
     width: 100%;
-    height: clamp(13rem, min(32vw, 46svh), 26rem);
+    /* Its height follows its width (cqi: the article's width), about 3.2 to 1 (the art is 2.4 to 1),
+       so a wider page crops no more of the quokka; the window's height caps it. */
+    height: clamp(13rem, min(31cqi, 46svh), 33rem);
     object-fit: cover;
     /* Most of the crop comes off the sky, a little off the sand: the quokka keeps its ears. */
     object-position: 100% 88%;
   }
   .head-copy {
-    grid-area: copy;
+    grid-column: text-start / -1;
     min-width: 0;
   }
   .kicker {
@@ -164,7 +167,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     text-wrap: balance;
   }
   .lede {
-    max-width: 38rem;
+    max-width: var(--measure);
     margin: 1rem 0 0;
     color: var(--text-muted);
     font-size: var(--step-lede);
@@ -219,28 +222,17 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     font-weight: 500;
     line-height: 1.4;
   }
-  /* From 901px: the picture across the columns, "Blog /" in the left rail's column, the words in
-     the reading column, on the same tracks as the article below. */
+  /* From 901px "Blog /" sits in the left rail's column, level with the title. From 1280px the
+     title may run on over the right side's column; the summary keeps the measure. */
   @media (min-width: 901px) {
-    .cover-head {
-      grid-template-areas: 'art art' 'crumbs copy';
-      grid-template-columns: var(--col-left) minmax(0, 1fr);
-      column-gap: var(--col-gap);
-    }
     .crumbs {
+      grid-column: rail;
+      grid-row: 2;
       margin: 0.55rem 0 0;
       align-self: start;
     }
-  }
-  @media (min-width: 1280px) {
-    .cover-head {
-      grid-template-areas: 'art art art' 'crumbs copy copy';
-      grid-template-columns: var(--col-left) minmax(0, 42rem) var(--col-right);
-      justify-content: space-between;
-    }
-    /* The title may run on over the right rail's column; the summary keeps the reading width. */
-    .lede {
-      max-width: 42rem;
+    .head-copy {
+      grid-row: 2;
     }
   }
   /* Narrow screens: the "On this page" disclosure's own rules close the head. */

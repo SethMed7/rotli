@@ -3,14 +3,32 @@
    scoped styles; every rule is held under .is-article so other pages are untouched. Tokens only.
    Measured in the article specs: about 70 characters a line, every text pair at 4.5:1 or more. */
 
-/* The column: 18px type, generous leading, about 70 characters of running text a line (at least
-   62ch, the width of 62 zeros, measured beside both rails in e2e/site/article-aside.spec.ts). */
+/* The column: 18px type (easing to 20px on the widest screens, --prose-size in WritingPage),
+   generous leading. .prose fills the grid's middle track; the words keep the measure, about 68
+   characters a line (60 to 80 at every width, e2e/site/article-width.spec.ts), centred in it,
+   and figures, tables, and code break out to the middle's full width, never into a rail. */
 .writing.is-article .prose {
-  max-width: 42rem;
-  font-size: 1.125rem;
+  font-size: var(--prose-size);
   line-height: 1.72;
   /* A bare address in a citation breaks inside a 320px column instead of widening the page. */
   overflow-wrap: break-word;
+}
+/* Every block of the post keeps the measure, centred in the middle track. `:nth-child(n)` matches
+   every child; it is there for its weight, so this outranks the margin shorthands below (0,4,0
+   against 0,3,1) and nothing loses its centring. */
+.writing.is-article .prose {
+  container: article-prose / inline-size;
+}
+.writing.is-article .prose > :nth-child(n) {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures, tables, and code break out to the middle's full width, but only where that is at least
+   about 2rem past the words on each side; a sliver wider than the text would read as a mistake. */
+@container article-prose (min-width: 48.5rem) {
+  .writing.is-article .prose > :is(.figure, table, pre) {
+    max-width: none;
+  }
 }
 .writing.is-article .prose h2 {
   margin: 3.4rem 0 0.9rem;
@@ -121,7 +139,7 @@
    A figure sits a little apart from the text: its title, the chart or the diagram, a caption
    that cites the source, and for charts the numbers as a table behind a disclosure. */
 .writing.is-article .prose .figure {
-  margin: 2.4rem 0 2.6rem;
+  margin-block: 2.4rem 2.6rem;
   padding: 1.4rem 0 0;
   border-top: 1px solid var(--border-strong);
 }

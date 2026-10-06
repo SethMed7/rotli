@@ -56,6 +56,8 @@ interface Props {
   toc?: (Omit<TocItem, 'depth'> & { depth?: number })[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
+  /** The blog's wider page (Base `widePage`) for the header, the page, and the footer; a post (`article`) always has it. */
+  widePage?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
   /** Pin a reading meter under the header (blog posts, /privacy/). */
@@ -95,6 +97,7 @@ const {
   meta = [],
   toc = [],
   wide = false,
+  widePage = false,
   center = false,
   progress = false,
   banner,
@@ -120,6 +123,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   markdownPath={markdownPath}
   image={image}
   imageAlt={imageAlt}
+  widePage={widePage || article !== undefined}
 >
   <SiteHeader current={section} />
   {
@@ -588,32 +592,75 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   .read-progress.slim {
     display: none;
   }
-  /* The article's columns: the left rail, the reading column (42rem, blog/article.css), and from
-     1280px the right side (blog/ArticleAside.astro). The cover (blog/ArticleCover.astro) lays its
-     words on the same tracks, so the head lines up with the text and the rails below it. */
+  /* The article's grid (the owner, 2026-10-06: "for blogs let's use more width ... and let's
+     consider responsiveness"). The page is the blog's wider one (Base `widePage`), and the tracks
+     are named so the cover (blog/ArticleCover.astro) and the body share them exactly:
+       [rail] the left rail · a gap · [main] the middle, holding [text] the reading column centred
+       in it · a gap · [side] the right side, from 1280px.
+     The reading column is a measure, not a share of the page: --prose-size (18px, easing to 20px
+     on the widest screens) times 39.5, about 68 characters of the column's own type. The middle
+     is whatever the rails leave, so figures, tables, and code break out of the text to its full
+     width while words keep the measure. The rails and gaps are fluid in the page's own width
+     (cqi: main is the container), growing from a 10rem rail on a tablet to 16rem and 18rem on a
+     wide screen, so the column never drops below 60 characters beside them. A figure breaks out
+     only where the middle is wide enough for it to read as deliberate (blog/article.css). Below 901px it is one
+     column (the rail's Share and the right side follow the article, on the text's edges). */
   .writing.is-article {
-    --col-left: 13rem;
-    --col-right: 14.5rem;
-    --col-gap: clamp(2.5rem, 5vw, 4rem);
+    container-type: inline-size;
+    --prose-size: clamp(1.125rem, 0.964rem + 0.179vw, 1.25rem);
+    --measure: calc(var(--prose-size) * 39.5);
+    /* The left rail: 10rem at 901px, 13rem by a 1280px window, held there to 1440px (so the
+       middle there is wide enough for figures to break out), then 16rem by about 1620px. */
+    --col-left: clamp(10rem, max(min(13rem, 3.3rem + 12.94cqi), 27.27cqi - 10.18rem), 16rem);
+    /* The right side: 14.5rem to a 1440px window, then 18rem by about 1620px. */
+    --col-right: clamp(14.5rem, 31.82cqi - 12.55rem, 18rem);
+    --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 4rem);
+    --article-tracks: [main-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr)
+      [main-end];
   }
-  .writing-body.has-rail {
-    grid-template-columns: var(--col-left) minmax(0, 1fr);
-    column-gap: var(--col-gap);
-  }
-  /* Below 1280px the right side follows the article, in the reading column. */
-  .writing-body.has-rail > :global([data-article-more]) {
-    grid-column: 2;
+  @media (min-width: 901px) {
+    .writing.is-article {
+      --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
+        [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+    }
   }
   @media (min-width: 1280px) {
     .writing.is-article {
-      --col-gap: 2.75rem;
+      --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
+        [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end] var(--col-gap) [side-start]
+        var(--col-right) [side-end];
     }
-    .writing-body.has-rail {
-      grid-template-columns: var(--col-left) minmax(0, 42rem) var(--col-right);
-      justify-content: space-between;
+  }
+  .writing-body.has-rail {
+    grid-template-columns: var(--article-tracks);
+    gap: 0;
+  }
+  .writing-body.has-rail > .toc-compact {
+    grid-column: text;
+  }
+  .writing-body.has-rail > .prose {
+    grid-column: main;
+  }
+  .writing-body.has-rail > :global(.rail),
+  .writing-body.has-rail > :global([data-article-more]) {
+    grid-column: text;
+  }
+  @media (min-width: 901px) {
+    .writing-body.has-rail > :global(.rail) {
+      grid-column: rail;
+      grid-row: 1;
     }
+    .writing-body.has-rail > .prose {
+      grid-row: 1;
+    }
+    /* Below 1280px the right side follows the article, on the text's edges. */
     .writing-body.has-rail > :global([data-article-more]) {
-      grid-column: 3;
+      grid-row: 2;
+    }
+  }
+  @media (min-width: 1280px) {
+    .writing-body.has-rail > :global([data-article-more]) {
+      grid-column: side;
       grid-row: 1;
     }
   }
@@ -640,15 +687,10 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     .read-progress.slim .read-label {
       display: none;
     }
-    .writing-body.has-rail {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0;
-    }
     .writing-body.has-rail > :global(.rail) {
       order: 2;
     }
     .writing-body.has-rail > :global([data-article-more]) {
-      grid-column: auto;
       order: 3;
     }
   }
