@@ -71,11 +71,16 @@ const also = site.showsFullSite
       <canvas aria-hidden="true"></canvas>
       <p class="runner-score" aria-hidden="true">
         <span><span data-score>0</span> m</span>
+        <span class="runner-level">Level <span data-level>1</span></span>
         <span class="runner-best">Best <span data-best>0</span> m</span>
       </p>
       <div class="runner-overlay" data-overlay>
         <h2 id="runner-title" data-overlay-title>Help the quokka home</h2>
-        <p id="runner-help" data-overlay-note>Jump the rocks, bushes, and sandcastles. Space, ↑, or tap to jump.</p>
+        <p data-overlay-note hidden></p>
+        <p class="runner-hint" id="runner-help">
+          <span class="for-keys">Space or ↑ to jump, ↓ to duck.</span>
+          <span class="for-touch">Tap to jump. Swipe down to duck.</span>
+        </p>
         <button class="button primary" type="button" data-play>Play</button>
       </div>
       <p class="visually-hidden" aria-live="polite" data-announce></p>
@@ -101,11 +106,13 @@ const also = site.showsFullSite
       grid-template-rows: 1fr auto;
       min-height: 100svh;
     }
-    /* The game takes the scenery's place when script runs; without it, the scenery stays. */
+    /* The game takes the scenery's place when script runs; without it, the scenery stays.
+       Tall enough for a jump and what flies over it (the owner, 2026-10-05: "make the game
+       taller"), and never so tall on a phone that the world shrinks to a few steps wide. */
     .runner {
       display: none;
       position: relative;
-      height: clamp(240px, 36vh, 320px);
+      height: min(clamp(300px, 50svh, 460px), 86vw);
       border-top: 1px solid var(--border);
       outline: none;
     }
@@ -126,6 +133,41 @@ const also = site.showsFullSite
       touch-action: manipulation;
       cursor: pointer;
     }
+    /* During a run a swipe on the stage is the game's (a swipe down ducks), not a scroll. */
+    .runner[data-state='running'] canvas {
+      touch-action: none;
+    }
+    /* The score, the level, and the best run show only during a run: before one there is
+       nothing to count, and after one the overlay says it. */
+    .runner:not([data-state='running']):not([data-state='paused']) .runner-score {
+      visibility: hidden;
+    }
+    .runner:not([data-has-best='true']) .runner-best {
+      display: none;
+    }
+    .runner-level {
+      color: var(--text-muted);
+      font-weight: 500;
+      transition: color 300ms ease-out;
+    }
+    .runner-level:global(.is-up) {
+      color: var(--accent-text);
+    }
+    .runner-overlay .runner-hint {
+      color: var(--text-muted);
+    }
+    .runner-hint .for-touch,
+    .runner[data-state='over'] .runner-hint {
+      display: none;
+    }
+    @media (pointer: coarse) {
+      .runner-hint .for-touch {
+        display: inline;
+      }
+      .runner-hint .for-keys {
+        display: none;
+      }
+    }
     .runner-score {
       position: absolute;
       top: 0.75rem;
@@ -145,7 +187,7 @@ const also = site.showsFullSite
     /* Start, pause, and the result sit on the sky, above the sand line, never on the quokka. */
     .runner-overlay {
       position: absolute;
-      inset: 0 0 40% 0;
+      inset: 0 0 46% 0;
       display: grid;
       align-content: center;
       justify-items: center;

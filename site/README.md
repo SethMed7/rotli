@@ -37,12 +37,13 @@ bun run preview  # serve the built dist/ locally
 ```
 
 The interactive pieces have two proofs, both run from the repository root:
-`bun test scripts/site-interactions.test.ts` (the rules without a browser: the
-privacy passage's trigger and the contrast of every frame of its crossfade, the
-theme studio's autoplay, the reading meter, the 404 game, the footer scene's
-play and the visitor's person) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
-site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
-The unit file runs inside `bun run verify`; the site's E2E lane is not yet
+the rules without a browser, `bun test scripts/site-interactions.test.ts`
+(the privacy passage's trigger and the contrast of every frame of its
+crossfade, the theme studio's autoplay, the reading meter, the footer scene's
+play and the visitor's person) and `bun test scripts/site-runner.test.ts` (the
+404 game), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
+the site, serves it with `astro preview` on port 4392, and drives
+`e2e/site/`). The unit files run inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
 
@@ -294,24 +295,43 @@ from 320 to 1920.
   Sentences about what the Mac app does today (the on-device model, the
   Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
-- **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
-  note wandered off." in the middle of the window, one "Take me home" button
-  with a quiet line of other ways in, and along the bottom edge a small game
-  on the footer's beach (`src/runner/`: `game.ts` is the game without a
-  screen, `stage.ts` draws it on a canvas). The quokka (the walking pose)
-  runs, Space, ↑, W, a click, or a tap jumps (letting go early makes a short
-  hop), and rocks, bushes, logs, and sandcastles come at a speed that grows;
-  the score is metres, and a fall shows the distance and "Play again". It
+- **The 404 page** (`src/pages/404.astro`) has no header or footer, and few
+  words (the owner, 2026-10-05: "simplify the text, remove the mac"): "This
+  note wandered off." in the middle of the window, one "Take me home" button,
+  and a quiet "Try rotli · Resources" (to `/download/` and `/resources/`; no
+  Mac-specific link). A line under the headline appears only for `/app`
+  (Rotli Web is not switched on here) and `/helper` (a link to the Helper
+  guide), chosen in the browser from the path. Along the bottom edge is a
+  small game on the footer's beach (`src/runner/`: `game.ts` is the game
+  without a screen, `stage.ts` draws it on a canvas). The quokka (the walking
+  pose) runs; Space, ↑, W, a click, or a tap jumps (letting go early makes a
+  short hop); ↓ or S, a press on the sand (the stage's lower third), or a
+  swipe down ducks while held: it slides low along the sand, or tucks and
+  drops fast in the air. Rocks, bushes, logs, and sandcastles come along the
+  sand; after the first 30 m gulls and low branches come over it, reaching
+  past the top of any jump, so they can only be ducked under. Generation
+  always leaves a whole jump's length plus the quokka and a moment to react
+  between one thing and the next, so a run never asks for a jump and a duck
+  at once (`scripts/site-runner.test.ts` proves it with a seeded player that
+  survives every run to the top speed). It gets faster a level at a time: a
+  new level every 75 m, each 38 units a second quicker, up to level 10; the
+  level shows beside the score and lights up for a moment when it goes up.
+  The stage is taller than before (`min(clamp(300px, 50svh, 460px), 86vw)`,
+  300 world units of mostly sky), and still fits a laptop's window under the
+  words. The score is metres; it shows (with the level and the best run)
+  only during a run, and a fall shows the distance and "Play again". It
   never starts by itself: Play starts a run and moves focus to the stage,
-  which alone reads the keys, so Space on "Take me home" or any other
-  control is never taken. Escape or P pauses; so does leaving the stage (a
-  Tab, a click elsewhere), hiding the tab, or scrolling it out of view. The
-  frame loop runs only during a run. Reduced motion keeps the game playable
-  (the visitor chose to start it) but stills the decorative layers (drifting
-  clouds, the run's bob, kicked-up sand). The best run lasts as long as the
-  page: no score is stored. Without script the footer's quokka scenery stands
-  there instead. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser.
+  which alone reads the keys, so Space or ↓ on "Take me home" or anywhere else
+  is never taken; during a run a swipe on the stage is the game's, not a
+  scroll. Escape or P pauses; so does leaving the stage (a Tab, a click
+  elsewhere), hiding the tab, or scrolling it out of view, and a pause lets go
+  of a duck. Paused or over, the sky behind the overlay is washed back so
+  nothing passing behind it crosses its words. The frame loop runs only
+  during a run. Reduced motion keeps the game playable (the visitor chose to
+  start it) but stills the decorative layers (drifting clouds, the run's bob,
+  kicked-up sand, the gull's wings). The best run lasts as long as the page:
+  no score is stored. Without script the footer's quokka scenery stands there
+  instead.
 - **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
   footer, `/subscribed/`, and the 404 without script) is a strip of Rottnest
   by day in the film's palette (sea, the far lighthouse, scrub on the dunes,

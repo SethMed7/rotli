@@ -99,6 +99,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs along the beach: jump the rocks, bushes, logs, and sandcastles with
   Space, ↑, or a tap, and see how far you get. It pauses when you leave it,
   and "Take me home" works the whole time. Your best run is not saved.
+- **The game on rotli.co's page-not-found screen has more to it.** The
+  quokka can duck now: hold ↓ or S (or swipe down on a phone) to slide under
+  the gulls and low branches that start coming along after the first few
+  metres. The run gets faster a level at a time, and the level shows beside
+  the score. The game is taller, and the page around it says less: the
+  headline, "Take me home", and "Try rotli · Resources".
 - **rotli.co says "Try now" and keeps where it runs on the download page.**
   The header, the home page's top, and its closing panel each have one
   "Try now" button. It opens the download page, which offers the Mac app and
