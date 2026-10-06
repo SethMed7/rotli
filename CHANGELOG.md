@@ -324,8 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   banner stays on the privacy page only. On a wide screen a rail beside the
   text holds the post's title, its sections as a tree, how far through you
   are as a percent, and Share: X, LinkedIn, Email, Copy link, and Copy
-  Markdown (the post's own Markdown). J and K jump between sections, except
-  while you type. The text is larger, about 70 characters a line, with
+  Markdown (the post's own Markdown). The text is larger, about 70 characters a line, with
   clearer headings, quotes, and a numbered sources list.
 - **Blog posts on rotli.co have charts and diagrams.** The post on unused AI
   plans shows the Self Financial 30-day figures and Menlo's daily-use

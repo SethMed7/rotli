@@ -391,20 +391,19 @@ whose art never touches its words from 320 to 1920.
   (`blog/ArticleRail.astro`) holds the title, "On this page" as a tree (`###`
   headings under their `##`, `tocTree` in `src/blog.ts`), the reading meter as
   a bar and a percent (the same `src/reading.ts` measure; no meter is pinned
-  over the text), a hint for J and K, and Share: X, LinkedIn, and Email as
+  over the text), and Share: X, LinkedIn, and Email as
   plain links carrying the canonical address and title (no third-party
   script, image, or request), and Copy link and Copy Markdown (fetches the
   post's same-origin twin, `connect-src 'self'`), which appear only where the
-  clipboard can be written. J and K jump to the next and previous section; they
-  never act in a field or menu, with a modifier, or on a handled key, and the
-  arrow keys keep scrolling. Under 900px the tree is the "On this page"
+  clipboard can be written. There are no J/K section jumps (removed 2026-10-06 at
+  the owner's request); the page scrolls with the browser's own keys. Under 900px the tree is the "On this page"
   disclosure, the meter a 3px bar under the header (only its fill shows), and
   Share follows the article. The reading column (`blog/article.css`, global
   under `.writing.is-article`) is 18px at about 70 characters a line (40rem),
   with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources` then
   a list) and footnotes, and the figures' styles. `e2e/site/article-banner.spec.ts`
   holds the cover and the card's measured contrast; `article-rail.spec.ts` the
-  rail, Share, the copy buttons, the keys, jumps, and the narrow layout.
+  rail, Share, the copy buttons, that J and K do nothing, jumps, and the narrow layout.
 - **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
   "almost takes over the top and you scroll in"; blog posts left it for their
   cover on 2026-10-06): `/privacy/` opens on a full-width picture under the header, `clamp(20rem, 100svh −

@@ -1,7 +1,7 @@
 // A blog post's left rail (blog/ArticleRail.astro): in view beside the text on a wide screen
-// with the title, the "On this page" tree, the reading meter as a percent, the J/K hint, and
-// Share (plain links, Copy link, Copy Markdown from the post's twin); J and K move between
-// sections and never act while typing; jumps land below the header; and on a phone the tree is
+// with the title, the "On this page" tree, the reading meter as a percent, and Share (plain
+// links, Copy link, Copy Markdown from the post's twin); J and K do nothing (the owner,
+// 2026-10-06); jumps land below the header; and on a phone the tree is
 // the disclosure, the meter a slim bar under the header, and Share follows the article.
 import { expect, test, type Page } from "@playwright/test";
 
@@ -55,7 +55,6 @@ for (const viewport of [
     const meter = page.locator('[data-read-progress="rail"]');
     await expect(meter).toBeVisible();
     await expect(meter.locator("[data-read-percent]")).toHaveText("0%");
-    await expect(aside.locator("[data-section-keys-hint]")).toBeVisible();
 
     // Mid-article: the rail is still in view under the header, whole (nothing clipped), and the
     // percent has moved.
@@ -150,45 +149,24 @@ test("without script, Share keeps its links and hides the copy buttons", async (
   const share = page.locator("[data-share]");
   await expect(share.getByRole("link", { name: "X" })).toBeVisible();
   await expect(share.getByRole("button", { name: "Copy Markdown" })).toBeHidden();
-  await expect(page.locator("[data-section-keys-hint]")).toBeHidden();
   await context.close();
 });
 
-test("J and K move between sections, and never act while typing or with a modifier", async ({ page }) => {
+test("J and K are plain keys: no section jumps, no hint", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(POST);
-  const headings = page.locator("[data-prose] h2");
-  const top = async (index: number) => (await headings.nth(index).boundingBox())!.y;
-  const header = await headerBottom(page);
-
-  await page.keyboard.press("j");
+  await expect(page.locator("kbd")).toHaveCount(0);
+  await expect(page.getByText(/to move between sections/)).toHaveCount(0);
+  await page.evaluate(() => {
+    document.documentElement.style.scrollBehavior = "auto";
+    window.scrollTo(0, 600);
+  });
   await settled(page);
-  expect(Math.abs((await top(0)) - header - 24)).toBeLessThan(6);
-  await page.keyboard.press("j");
-  await settled(page);
-  expect(Math.abs((await top(1)) - header - 24)).toBeLessThan(6);
-  await page.keyboard.press("k");
-  await settled(page);
-  expect(Math.abs((await top(0)) - header - 24)).toBeLessThan(6);
-
-  // Typing a "j" in a field types it; the page does not move.
-  const field = page.getByRole("textbox").first();
-  await field.focus();
   const before = await page.evaluate(() => window.scrollY);
-  await page.keyboard.type("jkjk");
-  await expect(field).toHaveValue("jkjk");
-  await page.waitForTimeout(200);
+  for (const key of ["j", "j", "k", "J", "K"]) await page.keyboard.press(key);
+  await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
-  // A modifier passes the key through to the browser.
-  await field.blur();
-  await page.keyboard.press("Control+j");
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => window.scrollY)).toBe(before);
-  // The arrow keys still scroll the page as they always do.
-  await page.evaluate(() => window.scrollTo(0, 1000));
-  await page.keyboard.press("ArrowDown");
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
 });
 
 test("a jump from the rail's tree lands below the header", async ({ page }) => {
