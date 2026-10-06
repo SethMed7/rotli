@@ -390,8 +390,10 @@ test("Skip setup opens the app to one prompt for a folder, then the app", async 
   // not a setup step: no step count, no Back, one action
   await expect(page.locator(".setup-progress")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Back/ })).toHaveCount(0);
-  await expect(prompt.getByRole("button")).toHaveText(["Choose a folder"]);
-  await prompt.getByRole("button", { name: "Choose a folder" }).click();
+  await expect(prompt.getByRole("button")).toHaveCount(1);
+  // the prompt takes focus, so the keyboard and VoiceOver land on its action
+  await expect(prompt.getByRole("button", { name: /Choose a folder/ })).toBeFocused();
+  await prompt.getByRole("button", { name: /Choose a folder/ }).click();
   // no Librarian or shortcuts screen: the thank-you card and the app follow
   await expect(page.getByText("3 of 4")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Thank you for trying Rotli" })).toBeVisible();

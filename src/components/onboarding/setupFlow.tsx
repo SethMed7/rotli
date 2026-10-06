@@ -4,7 +4,7 @@
 // when the app has no vault. The screens themselves are onboarding.tsx and
 // vaultActivation.tsx, split off the entry chunk (perf audit 2026-07-30, #18).
 
-import { lazy, type ReactNode, Suspense, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 
 import { finishFirstRun } from "../../services/firstRun";
 import { flushSettingsNow } from "../../state/persist";
@@ -40,6 +40,13 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     useUiStore.getState().setOnboardingPhase(next);
     flushQuietly();
   };
+  // skipped, and a vault is already chosen (the folder was picked but the
+  // app quit before setup finished): there is nothing left to ask
+  const skippedWithVault =
+    onboardingActive && phase === "skipped" && !vaultPending && skipLeadsTo(vaultStatus) === "app";
+  useEffect(() => {
+    if (skippedWithVault) finishFirstRun(APP_VERSION);
+  }, [skippedWithVault]);
 
   const screen = (node: ReactNode) => (
     <div className="app-window">
@@ -64,6 +71,7 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     );
   }
 
+  if (skippedWithVault) return null;
   if (onboardingActive && phase === "skipped") {
     return screen(
       <VaultNeeded

@@ -1350,3 +1350,17 @@
   line-height: 1.5;
   color: var(--text-muted);
 }
+.vault-needed-card .rename-btn.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.vault-needed-kbd {
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.vault-needed-card .rename-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}

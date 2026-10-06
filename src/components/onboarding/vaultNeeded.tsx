@@ -6,6 +6,10 @@
 // notes to show yet, so the backdrop is the empty pane's scene, never a
 // workspace whose every list would fail.
 
+import { useEffect, useRef } from "react";
+
+import { formatChord } from "../../keys/chords";
+import { currentChord } from "../../keys/registry";
 import { useUiStore } from "../../state/ui";
 import { PaneScene } from "../paneEmptyState";
 import { useSetupHandle } from "./setupControls";
@@ -30,6 +34,11 @@ export function VaultNeeded({
   const primary = () => void choose();
   // ⌘↩ chooses; there is no Back from a skip
   useSetupHandle(primary);
+  const chord = currentChord("setup.continue");
+  // the Skip button that had focus is gone: the prompt takes it, so the
+  // keyboard and VoiceOver land on its one action
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => button.current?.focus(), []);
 
   return (
     <div className="vault-needed">
@@ -57,8 +66,15 @@ export function VaultNeeded({
             </p>
           )}
           <div className="rename-actions">
-            <button type="button" className="rename-btn primary" disabled={busy} onClick={primary}>
+            <button
+              ref={button}
+              type="button"
+              className="rename-btn primary"
+              disabled={busy}
+              onClick={primary}
+            >
               {chooseLabel}
+              {chord && <kbd className="vault-needed-kbd">{formatChord(chord)}</kbd>}
             </button>
           </div>
         </div>
