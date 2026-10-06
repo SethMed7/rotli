@@ -194,7 +194,7 @@ const platforms: { name: string; detail: string; status: Status; action?: Action
   }
   .all li {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 8rem 16rem;
+    grid-template-columns: minmax(0, 1fr) 8rem minmax(11rem, auto);
     gap: 0.5rem 2rem;
     align-items: center;
     margin: 0;
@@ -222,6 +222,7 @@ const platforms: { name: string; detail: string; status: Status; action?: Action
     color: var(--text-muted);
     font-size: 0.82rem;
     font-weight: 600;
+    white-space: nowrap;
   }
   .status.available {
     border-color: var(--accent-text);
@@ -235,6 +236,7 @@ const platforms: { name: string; detail: string; status: Status; action?: Action
     color: var(--accent-text);
     font-weight: 600;
     text-decoration: none;
+    white-space: nowrap;
   }
   .action a:hover {
     text-decoration: underline;
@@ -246,7 +248,14 @@ const platforms: { name: string; detail: string; status: Status; action?: Action
   }
   @media (max-width: 700px) {
     .all li {
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .action {
+      justify-self: end;
+      text-align: right;
+    }
+    .action a {
+      white-space: normal;
     }
     .all li > div {
       grid-column: 1 / -1;
