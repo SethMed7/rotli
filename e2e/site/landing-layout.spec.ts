@@ -1,48 +1,35 @@
 // The landing's layout of 2026-10-05 (docs/design/landing-layout-2026-10-05.md): the section
 // order and its grounds, the Overview's three steps (write in your view, the Librarian files it
-// in the vault, ask) with their drawn pictures and the LLM wiki aside, the before and after's
-// filing play (the File step's picture: it plays once in view, holds off screen, rests marked,
-// and replays), the tour
-// (pinned beside its list and stepped by the scroll on wide screens, a click or a key moving to
-// a part's step, a plain sequence on phones and without script), and the closing banner, whose
-// art never sits on its words. This suite's build has WEB_APP_ENABLED off, so the tour has five
-// parts; each check holds with the sixth part too. The banner's one way in is "Download free",
-// to /download/.
+// in the vault, ask) with their drawn pictures, the LLM wiki aside, and the one link to
+// /features/, the before and after's filing play (the File step's picture: it plays once in
+// view, holds off screen, rests marked, and replays), and the closing banner, whose art never
+// sits on its words. The "A closer look." tour was removed on 2026-10-06; Rotli Web and the
+// Helper are answered in the FAQ while WEB_APP_ENABLED, which this suite's build leaves off, so
+// that check is conditional. The banner's one way in is "Download free", to /download/.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 type Box = { x: number; y: number; width: number; height: number };
 const box = async (locator: Locator): Promise<Box> => (await locator.boundingBox())!;
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-const tourButtons = (page: Page) => page.locator(".tour-name button");
 const HEADER = 68;
-// The scroll position that puts a step's anchor middle on the line across the window: the
-// same rule the page uses (site/src/tourSteps.ts), read from the live layout.
-const stepY = (page: Page, i: number) =>
-  page
-    .locator(".tour-anchor")
-    .nth(i)
-    .evaluate((anchor) => {
-      const box = anchor.getBoundingClientRect();
-      return Math.round(box.top + scrollY + box.height / 2 - innerHeight / 2);
-    });
 const scrollToY = (page: Page, y: number) =>
   page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
-const shownStep = (page: Page) => page.locator('.tour-name button[aria-current="true"]');
 
 test("the sections run in order, alternating plain and warm grounds", async ({ page }) => {
   await page.goto("/");
   const ids = await page
     .locator("main > section")
     .evaluateAll((sections) => sections.map((s) => s.id || s.classList[0]));
-  // TwoKinds merged into the Overview (2026-10-06), so the tour took the warm ground and the
-  // theme studio the plain one: the grounds still alternate up to the privacy night.
-  expect(ids).toEqual(["hero", "waiting", "features", "tour", "personal", "privacy", "faq", "start"]);
+  // TwoKinds merged into the Overview and the tour was removed (both 2026-10-06), so the theme
+  // studio is warm again: the grounds alternate up to the privacy night.
+  expect(ids).toEqual(["hero", "waiting", "features", "personal", "privacy", "faq", "start"]);
   await expect(page.locator("#two-kinds")).toHaveCount(0);
+  await expect(page.locator("#tour")).toHaveCount(0);
   const warm = await page
     .locator("main > section")
     .evaluateAll((sections) => sections.map((s) => s.classList.contains("band-warm")));
-  expect(warm).toEqual([false, true, false, true, false, false, false, false]);
+  expect(warm).toEqual([false, true, false, true, false, false, false]);
 });
 
 test("one story in three steps: write in your view, the Librarian files it, ask", async ({ page }) => {
@@ -125,157 +112,38 @@ test("what is an LLM wiki: two sentences beside the story, linked to the term's 
   );
 });
 
-test("the tour follows the scroll: each step pins its part beside the list", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test("the story ends on the one link to every feature, and the FAQ points to Rotli Web", async ({ page }) => {
   await page.goto("/");
-  const body = page.locator(".tour-body");
-  await expect(body).toHaveClass(/is-pinned/);
-  const buttons = tourButtons(page);
-  const count = await buttons.count();
-  expect([5, 6]).toContain(count);
-  await expect(page.locator(".tour-anchor")).toHaveCount(count);
-
-  let pinTop: number | null = null;
-  for (let i = 0; i < count; i++) {
-    await scrollToY(page, await stepY(page, i));
-    await expect(buttons.nth(i)).toHaveAttribute("aria-current", "true");
-    await expect(shownStep(page)).toHaveCount(1);
-    const id = await buttons.nth(i).getAttribute("aria-controls");
-    const preview = page.locator(`#${id}`);
-    await expect(preview).toBeVisible();
-    // Every other preview is hidden, so its links leave the tab order.
-    await expect(page.locator(".tour-preview:visible")).toHaveCount(1);
-    // The pin holds still under the header, and the preview sits right of the list.
-    const pin = await box(page.locator(".tour-pin"));
-    expect(pin.y).toBeGreaterThanOrEqual(HEADER - 1);
-    expect(pin.y + pin.height).toBeLessThanOrEqual(901);
-    if (pinTop === null) pinTop = pin.y;
-    expect(Math.abs(pin.y - pinTop)).toBeLessThan(2);
-    const shown = await box(preview);
-    const step = await box(page.locator(".tour-step").nth(i));
-    expect(shown.x).toBeGreaterThan(step.x + step.width);
-    expect(overlaps(shown, step)).toBe(false);
+  // The tour's "See every feature" moved to the end of the Overview (2026-10-06).
+  const more = page.locator("#features .overview-more a");
+  await expect(more).toHaveText("See every feature");
+  await expect(more).toHaveAttribute("href", "/features/");
+  const llmWiki = await box(page.locator("#features .llm-wiki"));
+  expect((await box(more)).y).toBeGreaterThan(llmWiki.y + llmWiki.height);
+  // Rotli Web and the Helper: one FAQ answer with its two links, only while WEB_APP_ENABLED.
+  const browser = page.locator(".faq-list details", { hasText: "Can I use rotli in my browser?" });
+  if ((await browser.count()) > 0) {
+    await browser.locator("summary").click();
+    await expect(browser).toContainText("your notes stay in a folder on your computer");
+    await expect(browser.getByRole("link", { name: /What is Rotli Helper/ })).toHaveAttribute(
+      "href",
+      "/resources/rotli-helper/",
+    );
+    await expect(browser.getByRole("link", { name: /Why it goes through Terminal/ })).toHaveAttribute(
+      "href",
+      "/blog/rotli-web-and-your-mac/",
+    );
   }
 });
 
-test("a part's name moves the page to its step, and the preview doesn't flicker on the way", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
-  const buttons = tourButtons(page);
-  const count = await buttons.count();
-  await scrollToY(page, await stepY(page, 0));
-  await expect(buttons.first()).toHaveAttribute("aria-current", "true");
-
-  const last = count - 1;
-  const target = await stepY(page, last);
-  await buttons.nth(last).click();
-  // Shown at once, and held while the page scrolls past the parts between.
-  await expect(buttons.nth(last)).toHaveAttribute("aria-current", "true");
-  const seen = new Set<string>();
-  for (let n = 0; n < 8; n++) {
-    seen.add((await page.locator(".tour-body").getAttribute("data-step")) ?? "");
-    await page.waitForTimeout(60);
-  }
-  expect([...seen]).toEqual([String(last)]);
-  await expect.poll(() => page.evaluate(() => Math.round(scrollY))).toBe(target);
-
-  await buttons.nth(1).click();
-  await expect(buttons.nth(1)).toHaveAttribute("aria-current", "true");
-  await expect.poll(() => page.evaluate(() => Math.round(scrollY))).toBe(await stepY(page, 1));
-  await expect(page.locator(".tour-body")).toHaveAttribute("data-step", "1");
-});
-
-test("the tour answers the keyboard: arrows, Home, and End move, Enter and Space go", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
-  const buttons = tourButtons(page);
-  const count = await buttons.count();
-  await scrollToY(page, await stepY(page, 0));
-  await buttons.first().focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(buttons.nth(1)).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(buttons.nth(1)).toHaveAttribute("aria-current", "true");
-  await expect(buttons.first()).not.toHaveAttribute("aria-current", "true");
-  await page.keyboard.press("End");
-  await expect(buttons.nth(count - 1)).toBeFocused();
-  await page.keyboard.press(" ");
-  await expect(buttons.nth(count - 1)).toHaveAttribute("aria-current", "true");
-  await page.keyboard.press("ArrowDown");
-  await expect(buttons.first()).toBeFocused();
-  await page.keyboard.press("ArrowUp");
-  await expect(buttons.nth(count - 1)).toBeFocused();
-  await page.keyboard.press("Home");
-  await expect(buttons.first()).toBeFocused();
-  // Each name controls its preview.
-  const id = await buttons.nth(count - 1).getAttribute("aria-controls");
-  await expect(page.locator(`#${id}`)).toHaveClass(/tour-preview/);
-});
-
-for (const [width, height] of [
-  [1024, 768],
-  [1440, 900],
-  [1920, 1080],
-] as const) {
-  test(`the pinned tour never holds the scroll and nothing overlaps at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height });
-    await page.goto("/");
-    await expect(page.locator(".tour-body")).toHaveClass(/is-pinned/);
-    const start = (await stepY(page, 0)) - height;
-    const end = (await stepY(page, (await tourButtons(page).count()) - 1)) + height;
-    let before = -1;
-    for (let y = start; y <= end; y += 160) {
-      await scrollToY(page, y);
-      const now = await page.evaluate(() => scrollY);
-      expect(now).toBeGreaterThan(before); // the page always moves on
-      before = now;
-      const active = page.locator(".tour-step.is-active");
-      const preview = await box(active.locator(".tour-preview"));
-      const words = await box(active.locator(".tour-name"));
-      expect(overlaps(preview, words)).toBe(false);
-      for (const name of await page.locator(".tour-name").all())
-        expect(overlaps(preview, await box(name))).toBe(false);
-    }
-  });
-}
-
-test("on a phone the tour is a plain sequence, each part's preview under its words", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  await expect(page.locator(".tour-body")).not.toHaveClass(/is-pinned/);
-  await expect(page.locator(".tour-anchor").first()).toBeHidden();
-  await expect(shownStep(page)).toHaveCount(0);
-  const steps = page.locator(".tour-step");
-  const count = await steps.count();
-  for (let i = 0; i < count; i++) {
-    const step = steps.nth(i);
-    const name = await box(step.locator(".tour-name"));
-    const line = await box(step.locator(".tour-line"));
-    const preview = await box(step.locator(".tour-preview"));
-    await expect(step.locator(".tour-preview")).toBeVisible();
-    expect(line.y).toBeGreaterThanOrEqual(name.y + name.height - 1);
-    expect(preview.y).toBeGreaterThanOrEqual(line.y + line.height - 1);
-    expect(preview.x + preview.width).toBeLessThanOrEqual(391);
-    if (i + 1 < count) expect((await box(steps.nth(i + 1))).y).toBeGreaterThan(preview.y + preview.height);
-  }
-  // A name still moves to its part.
-  await tourButtons(page).nth(3).click();
-  await expect.poll(async () => Math.round((await box(steps.nth(3))).y)).toBeLessThanOrEqual(HEADER + 40);
-  await expect(page.locator(".tour-more a")).toHaveAttribute("href", "/features/");
-});
-
-test("without script every part of the tour shows, in order", async ({ browser }) => {
+test("without script the before and after is its finished state", async ({ browser }) => {
   const context = await browser.newContext({
     javaScriptEnabled: false,
     viewport: { width: 1440, height: 900 },
   });
   const page = await context.newPage();
   await page.goto("/");
-  for (const preview of await page.locator(".tour-preview").all()) await expect(preview).toBeVisible();
-  await expect(page.locator(".tour-anchor").first()).toBeHidden();
-  // The before and after is its finished state: the words marked, no replay to offer.
+  // The words marked, no replay to offer.
   await expect(page.locator(".pair .replay")).toBeHidden();
   await expect(page.locator(".pair .kept-mark")).toBeVisible();
   await context.close();
@@ -358,7 +226,7 @@ test("the closing banner: two lines, one short line, the way in, and art clear o
   }
 });
 
-test("under reduced motion the cards, tour, before and after, and banner rest in their finished state", async ({
+test("under reduced motion the before and after and the banner rest in their finished state", async ({
   browser,
 }) => {
   const context = await browser.newContext({
@@ -378,17 +246,6 @@ test("under reduced motion the cards, tour, before and after, and banner rest in
   await expect(pair.locator(".replay")).toBeHidden();
   await expect(pair.locator(".kept .check")).toHaveCSS("opacity", "1");
 
-  // The tour still steps with the scroll, but swaps its preview at once: no crossfade.
-  await expect(page.locator(".tour-body")).toHaveClass(/is-pinned/);
-  await scrollToY(page, await stepY(page, 1));
-  await expect(tourButtons(page).nth(1)).toHaveAttribute("aria-current", "true");
-  const preview = page.locator(".tour-step.is-active .tour-preview");
-  // Base.astro's reduced-motion rule leaves every transition at a hair above zero.
-  const duration = await preview.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
-  expect(duration).toBeLessThan(0.01);
-  await expect(preview).toHaveCSS("opacity", "1");
-  await tourButtons(page).nth(2).click();
-  await expect(tourButtons(page).nth(2)).toHaveAttribute("aria-current", "true");
   const running = await page.evaluate(
     () =>
       document.getAnimations().filter((a) => a.playState === "running" && a instanceof CSSAnimation).length,

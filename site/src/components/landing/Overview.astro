@@ -17,7 +17,9 @@
 // ("Metadata ownership"); the AI searches locally and reads only selected notes, never the
 // whole vault ("Master memory retrieval"); secure notes never reach a remote model
 // (docs/design/ai-visibility-matrix.md).
-// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source.
+// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source,
+// then the landing's one link to the full catalog, /features/ (it closed the "A closer look."
+// tour until that was removed, the owner, 2026-10-06).
 import AskIndex from './AskIndex.astro';
 import Filing from './Filing.astro';
 import ViewAndVault from './ViewAndVault.astro';
@@ -86,6 +88,10 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
         <a href="/resources/getting-started/">Getting started with your vault</a>
       </p>
     </aside>
+
+    <p class="overview-more" data-reveal>
+      <a class="button secondary" href="/features/">See every feature</a>
+    </p>
   </div>
 </section>
 
@@ -166,6 +172,10 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
   }
   .llm-wiki a[href^='/']::after {
     content: ' →';
+  }
+
+  .overview-more {
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
   }
 
   /* The quokkas hop onto their pictures once, as each step comes in. */

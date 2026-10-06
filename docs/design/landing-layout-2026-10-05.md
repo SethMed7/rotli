@@ -411,3 +411,51 @@ two sections were re-grounded rather than reordered:
 | 8 | Closing banner | plain, framed |
 
 Only the dev site, with Experiments, shows two plain grounds in a row.
+
+## Revised 2026-10-06 (night): the tour is removed
+
+The owner: "Maybe remove this part 'A closer look. Pick a part of the
+workspace to see what it does.' It may be redundant, especially with features
+and the part above it, so I don't think it is necessary, and it is not as
+polished." The story section above it already shows notes, the Librarian, and
+chat, and `/features/` shows every part with its own picture, so the tour
+(`Tour.astro`, its scroll rules `site/src/tourSteps.ts`, their unit tests and
+specs) is gone. This supersedes "Everywhere folds into the tour", "The tour
+follows the scroll", and the tour row of every table above. The `public/shots/`
+captures it showed stay: the feature pages and About use them.
+
+Two things only the tour carried on the landing moved:
+
+- **"See every feature"**, the landing's one link to `/features/`, now ends
+  the Overview, under the LLM wiki aside, as the same secondary button.
+- **Rotli Web and the Helper** are one FAQ answer, "Can I use rotli in my
+  browser?", only while `WEB_APP_ENABLED`, placed just before "What about
+  Windows and Linux?" (whose answer sends people to Rotli Web). It says the
+  same editor runs in the browser while the notes stay in a folder on your
+  computer; Chrome, Edge, and Arc open the folder directly; Firefox, Zen,
+  Brave, and chat in any browser need Rotli Helper; Safari and phones aren't
+  supported yet. A line under it links the Helper guide
+  (`/resources/rotli-helper/`) and the "why Terminal" post
+  (`/blog/rotli-web-and-your-mac/`). The answer stays one plain string,
+  because it is also the FAQPage JSON-LD; the links are a separate, optional
+  `links` field rendered on its own line. The install line itself lives in
+  the guide, the post, and Rotli Web's setup screen.
+
+### Grounds after the removal
+
+Removing a section flips the grounds below it again, so the theme studio is
+warm once more, as it was before the merge, and its arrows' hover goes back
+to the plain `--ground`, which reads against the band:
+
+| # | Section | Ground |
+|---|---|---|
+| 1 | Hero + film | plain |
+| 2 | StatBand | warm |
+| 3 | Overview: the three steps, then "See every feature" | plain |
+| — | Experiments | plain, dev only |
+| 4 | Personal | **warm** (was plain) |
+| 5 | PrivacyBrief | night |
+| 6 | FAQ | plain |
+| 7 | Closing banner | plain, framed |
+
+Only the dev site, with Experiments, shows two plain grounds in a row.

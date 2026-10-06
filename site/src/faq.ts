@@ -2,9 +2,11 @@
 // a claim made elsewhere on the site; nothing here may promise more. The
 // landing FAQ renders these, and the same list is the page's FAQPage JSON-LD
 // (src/agents.ts), so what a search engine quotes is what a visitor reads.
+// An answer stays plain text; where a visitor needs to go further, `links`
+// follow it on the page as a separate line (never part of the JSON-LD text).
 import { DOCS_AND_SHEETS, site } from './site';
 
-export const questions: { q: string; a: string }[] = [
+export const questions: { q: string; a: string; links?: { href: string; label: string }[] }[] = [
   {
     q: 'Is rotli free?',
     a: site.sourcePublic
@@ -35,6 +37,20 @@ export const questions: { q: string; a: string }[] = [
     q: 'Can I leave?',
     a: 'Your notes never left. The folder opens in any Markdown editor, and deleting rotli leaves every file where it was.',
   },
+  // Rotli Web and the Helper, in brief (the tour's last part said this until it was removed,
+  // 2026-10-06). The facts are content/writing/resources/rotli-helper.md's and PLATFORMS'.
+  ...(site.webAppEnabled
+    ? [
+        {
+          q: 'Can I use rotli in my browser?',
+          a: 'Yes. Rotli Web is the same editor in your browser, and your notes stay in a folder on your computer. Chrome, Edge, and Arc open that folder directly. Firefox, Zen, and Brave, and chat in any browser, need Rotli Helper, a small program on your computer. Safari and phones aren’t supported yet.',
+          links: [
+            { href: '/resources/rotli-helper/', label: 'What is Rotli Helper?' },
+            { href: '/blog/rotli-web-and-your-mac/', label: 'Why it goes through Terminal' },
+          ],
+        },
+      ]
+    : []),
   {
     q: 'What about Windows and Linux?',
     a: site.webAppEnabled

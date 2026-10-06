@@ -41,7 +41,7 @@ the rules without a browser, `bun test scripts/site-interactions.test.ts`
 (the privacy passage's trigger and the contrast of every frame of its
 crossfade, the theme studio's autoplay, the reading meter, the footer scene's
 play and the visitor's person), `bun test scripts/site-motion.test.ts` (the
-tour's scroll steps and the before and after's filing play) and
+before and after's filing play) and
 `bun test scripts/site-runner.test.ts` (the 404 game), `bun test scripts/site-writing.test.ts`
 (post figures, the blog's arrangement, "New", and the article tree), `bun test scripts/site-github.test.ts`
 (the header's star count), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
@@ -61,12 +61,12 @@ answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
 holds the landing's order and grounds, the Overview's three steps (the view and
 vault picture's dotted line level with both marked rows from 320 to 1920, the
-LLM wiki source link), the before and after's
+LLM wiki source link, the closing "See every feature" link), the before and after's
 play (once in view, held off screen, resting marked, Replay, one window at
-1440×900), the tour (each scroll step, click and keys to a step, the pin
-never holding the scroll or overlapping its list at 1024, 1440, and 1920,
-the phone sequence, no script, reduced motion), and the closing panel,
-whose art never touches its words from 320 to 1920.
+1440×900, no script, reduced motion), the FAQ's Rotli Web answer when it is
+there, and the closing panel, whose art never touches its words from 320 to
+1920. `scripts/site-agents.test.ts` proves that answer under both values of
+`WEB_APP_ENABLED`, since the E2E build leaves it off.
 
 ## Production details
 
@@ -193,49 +193,36 @@ whose art never touches its words from 320 to 1920.
      sentences, Andrej Karpathy's "LLM Wiki" gist (2026-04-04) as the term's
      source, and Getting started as rotli's own page. It is an aside, not an
      FAQ entry, because FAQ answers are plain strings (they are also the
-     FAQPage JSON-LD) and this one needs its source linked. The
+     FAQPage JSON-LD) and this one needs its source linked inside the
+     sentence. The section ends on the landing's one link to `/features/`,
+     "See every feature" (a secondary button; it closed the tour until that
+     was removed, 2026-10-06). The
      "more than notes" message the old lede carried stays in the hero lede
      and the FAQ.
-  4. Tour ("A closer look."; warm since 2026-10-06, when TwoKinds merged
-     into the Overview), stepped by the scroll (the owner,
-     2026-10-05, overriding the no-scroll-scrub preference for this section;
-     rules in `src/tourSteps.ts`). From 960px wide and 620px tall, with
-     script, the list and the preview are pinned under the header while a
-     runway of per-part anchors scrolls behind them; the part whose anchor
-     crosses the middle of the window is shown, with its sentence open under
-     its name, and the preview changes by a calm crossfade (out, then in; an
-     instant swap under reduced motion). It switches by step and never
-     scrubs, and the page scrolls natively throughout. Each name is a
-     `<button>` in an h3 (`aria-current` on the shown one, `aria-controls` its
-     preview) that scrolls to its step and holds that preview while the page
-     travels; arrow keys, Home, and End move between names. Narrower, shorter,
-     or without script, the parts are a plain sequence, each name and
-     sentence with its preview below, and a name scrolls to its part. The
-     parts are Notes and Markdown, Docs and Sheets (`DOCS_AND_SHEETS.status`),
-     Chat with your notes, Boards, the Librarian, and, only while
-     `WEB_APP_ENABLED`, Rotli Web and the Helper. That last part replaced the
-     ways-in chapter (2026-10-05): which browsers open the folder, why the
-     others go through Rotli Helper, the copyable install line, the Windows
-     guide, and the "why Terminal" post. Previews sit on the section ground
-     with no frame around them: `public/shots/` captures (render-note, board)
-     on their editor paper with one hairline, and drawings in the cards'
-     panel language where a capture isn't honest or readable at that size
-     (Docs and Sheets, the chat answer from `shots/chat.webp`, the
-     Librarian's filing). It ends on the one link to `/features/`.
-  5. The dev-only Experiments (plain; between the warm tour and the plain
-     theme studio, so only the dev site shows two plain grounds in a row).
-  6. Personal (the theme studio; plain since 2026-10-06; its arrows' hover
-     takes the warm surface), with a faint island vignette from
+  4. The dev-only Experiments (plain; between the plain Overview and the
+     warm theme studio, so only the dev site shows two plain grounds in a
+     row).
+  5. Personal (the theme studio; warm, as before 2026-10-06, once the tour
+     above it was removed; its arrows' hover takes the plain `--ground`,
+     which reads against the band), with a faint island vignette from
      1180px up. Narrower, its left edge would reach into the lede, so it steps
      out.
-  7. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
+  6. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
      `Base.astro`, three facts, and "Read our privacy promise", to
      `/privacy/#promise`. While it is the
      focal passage the whole page steps into its night (see "The privacy
      passage").
-  8. Faq (plain): two entries carry the owner's item 2 message. Notes are the
-     foundation of a workspace, and rotli charges nothing for AI.
-  9. Closing (plain, one framed panel on the warm colour). The two-tone
+  7. Faq (plain): two entries carry the owner's item 2 message. Notes are the
+     foundation of a workspace, and rotli charges nothing for AI. While
+     `WEB_APP_ENABLED`, "Can I use rotli in my browser?" is the landing's one
+     word on Rotli Web and the Helper (since the tour's last part went,
+     2026-10-06): which browsers open the folder, that Firefox, Zen, Brave,
+     and chat go through Rotli Helper, and that Safari and phones aren't
+     supported yet, then a line of links to the Helper guide and the "why
+     Terminal" post. An answer stays one plain string (it is also the FAQPage
+     JSON-LD); an entry's optional `links` render as their own line under
+     it.
+  8. Closing (plain, one framed panel on the warm colour). The two-tone
       headline "Start with one note." / "It stays in your folder." has its
       first line in full ink and the second muted. Under it are "Free, with
       no account to make." and the hero's one way in, "Download free"
@@ -253,8 +240,7 @@ whose art never touches its words from 320 to 1920.
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Scroll reveals (the drawn scenes included) fire once
   and rest; the before and after's filing play is one of those (once in view,
-  then at rest, Replay on request), and the tour changes only as the visitor
-  scrolls or picks a part. Three things move on their own, each the owner's call: the theme
+  then at rest, Replay on request). Three things move on their own, each the owner's call: the theme
   studio (2026-10-05, "Make it yours" below), the quokka scenery under the
   footer (2026-10-02), described below, which lives in its own band, below
   every word, and the 404 page's game, which moves only after the visitor
@@ -531,7 +517,7 @@ whose art never touches its words from 320 to 1920.
   development builds in the same release). The word comes from
   `DOCS_AND_SHEETS` in `src/site.ts` (`status` for a label, `inline` inside a
   sentence); never write "Beta" by hand, and say no more about them than that
-  they open and edit. The hero, the tour, the feature catalog, the FAQ,
+  they open and edit. The hero, the feature catalog, the FAQ,
   and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
   Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
@@ -769,9 +755,10 @@ whose art never touches its words from 320 to 1920.
 - `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
-- Rotli Web and Rotli Helper are the tour's last part on the landing page
-  (only while `WEB_APP_ENABLED`): words, the copyable install line, and links,
-  with no screenshot.
+- Rotli Web and Rotli Helper are one FAQ answer on the landing page (only
+  while `WEB_APP_ENABLED`), linking the Helper guide and the "why Terminal"
+  post; the install line lives in the guide and the post (`/download/` links
+  the guide), and Rotli Web's own setup screen gives it.
 - The hero is the promise (a private workspace for your notes), one way in
   ("Download free"), what it costs, the pointer to the privacy promise, and
   the product film right under them
@@ -780,9 +767,7 @@ whose art never touches its words from 320 to 1920.
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)
   draws itself under "the filing." Besides the film, the landing page shows
-  captures in two places: the theme studio, and the tour's previews
-  (`public/shots/render-note`, `board`; the tour draws the `chat` capture's
-  answer instead, because its text falls to about 10px there). `public/rotli-app-warm-light@3x.png` (the social
+  captures in one place: the theme studio. `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
@@ -816,8 +801,8 @@ whose art never touches its words from 320 to 1920.
   status legend; under it the tiles (`components/features/FeatureTile.astro`)
   sit in six areas, Writing, Organizing, AI and chat, Files, Privacy and
   control, and Rotli Web and agents, each headed by its quokka (the app's
-  filled art, `areaArt.ts`). A tile is one link with an icon in the tour's
-  language, the name, one sentence, the status chip (`StatusChip.astro`:
+  filled art, `areaArt.ts`). A tile is one link with an icon (a stroke
+  drawing in a hairline square), the name, one sentence, the status chip (`StatusChip.astro`:
   Shipped quiet, Beta tinted, Coming soon dashed), and where it runs; a
   hairline above it, never a box. With script, a search box and area chips
   (toggle buttons, `aria-pressed`) filter in place by toggling `hidden`, the
@@ -830,7 +815,8 @@ whose art never touches its words from 320 to 1920.
   catalog and its area, the name, status, and where it runs beside the
   area's quokka, a picture (`FeatureArt.astro`: a `public/shots/` or
   `public/themes/` capture at no more than its logical size, or a drawing in
-  the tour's panel language: tasks, a link and its preview, the Librarian's
+  one panel language (a surface, a hairline, a file name on top): tasks, a
+  link and its preview, the Librarian's
   filing, the note menu, the vault folder, a document, a workbook, the AI
   tools' terminal lines from `src/ai/connectorGuides.ts`), then What it
   does, How to use it (keys and commands as written), Limits, Read more, and

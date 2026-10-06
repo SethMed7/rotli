@@ -238,15 +238,17 @@ test("the GitHub link is plain: no box, the star and count in a gold that reads,
   await expect(link).toHaveCSS("outline-style", "solid");
 });
 
-test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({
+test("Rotli Web is a question, not a chapter, and the page closes on one banner after the questions", async ({
   page,
 }) => {
   await page.goto("/");
-  // The ways-in chapter folded into the tour (2026-10-05); its item renders only while
-  // WEB_APP_ENABLED, and this suite's build may leave it off.
+  // The ways-in chapter folded into the tour (2026-10-05), and the tour was removed
+  // (2026-10-06): Rotli Web and the Helper are now one FAQ answer, only while WEB_APP_ENABLED,
+  // and this suite's build may leave it off.
   await expect(page.locator("#web-title")).toHaveCount(0);
-  const web = page.locator("#tour-button-web");
-  if ((await web.count()) > 0) await expect(web).toContainText("Rotli Web and the Helper");
+  await expect(page.locator("#tour")).toHaveCount(0);
+  const web = page.locator(".faq-list summary", { hasText: "Can I use rotli in my browser?" });
+  expect(await web.count()).toBeLessThanOrEqual(1);
   await expect(page.locator("#final-title")).toHaveCount(0);
   const sections = page.locator("main > section");
   await expect(sections.last()).toHaveId("start");

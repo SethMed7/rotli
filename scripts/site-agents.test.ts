@@ -105,3 +105,45 @@ describe("llms.txt", () => {
     expect(twin).toContain("https://rotli.co/roadmap/");
   });
 });
+
+// The landing FAQ is also the FAQPage JSON-LD (agents.ts maps each { q, a }). Rotli Web and the
+// Helper are answered there only while WEB_APP_ENABLED (since the tour that held them was
+// removed, 2026-10-06), and the env is read once per process, so each build runs in its own.
+describe("the FAQ's Rotli Web answer", () => {
+  const siteRoot = join(import.meta.dir, "..", "site");
+  type Question = { q: string; a: string; links?: { href: string; label: string }[] };
+  const questionsWith = (web: boolean): Question[] => {
+    const run = Bun.spawnSync(
+      [
+        "bun",
+        "-e",
+        'const { questions } = await import("./src/faq.ts"); console.log(JSON.stringify(questions));',
+      ],
+      { cwd: siteRoot, env: { ...process.env, WEB_APP_ENABLED: web ? "true" : "" } },
+    );
+    expect(run.exitCode).toBe(0);
+    return JSON.parse(run.stdout.toString()) as Question[];
+  };
+
+  test("with Rotli Web on, one answer says it and links the Helper guide and the Terminal post", () => {
+    const browser = questionsWith(true).filter((item) => item.q === "Can I use rotli in my browser?");
+    expect(browser).toHaveLength(1);
+    const [entry] = browser;
+    expect(entry!.a).toContain("your notes stay in a folder on your computer");
+    expect(entry!.a).toContain("Rotli Helper");
+    expect(entry!.a).toContain("Safari and phones aren’t supported yet");
+    // The answer stays plain text (it is the JSON-LD); the links are their own line.
+    expect(entry!.a).not.toContain("/");
+    expect(entry!.links?.map((link) => link.href)).toEqual([
+      "/resources/rotli-helper/",
+      "/blog/rotli-web-and-your-mac/",
+    ]);
+    const content = join(siteRoot, "src", "content", "writing");
+    expect(readFileSync(join(content, "resources", "rotli-helper.md"), "utf8")).toContain("Rotli Helper");
+    expect(readFileSync(join(content, "posts", "rotli-web-and-your-mac.md"), "utf8")).toContain("Terminal");
+  });
+
+  test("with Rotli Web off, the question isn't asked", () => {
+    expect(questionsWith(false).some((item) => item.q.includes("browser"))).toBe(false);
+  });
+});
