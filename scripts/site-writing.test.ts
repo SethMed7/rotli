@@ -56,7 +56,27 @@ let blog: {
     items: { slug: string; text: string; depth: number }[],
   ): { slug: string; text: string; children: { slug: string; text: string }[] }[];
   railTitle(title: string): string;
+  morePosts<T>(current: T, published: T[], upcoming: T[], count?: number): { item: T; soon: boolean }[];
+  MORE_POSTS: number;
 };
+interface Promo {
+  id: string;
+  label: string;
+  title: string;
+  text: string;
+  href: string;
+  pose: string;
+  external?: boolean;
+  needs?: "downloads" | "webApp";
+}
+let promos: {
+  PROMOS: Promo[];
+  PROMO_LABEL: string;
+  RAIL_PROMOS: number;
+  availablePromos(promos?: Promo[], offers?: { downloads: boolean; webApp: boolean }): Promo[];
+  promosFor(index: number, count?: number, promos?: Promo[]): Promo[];
+};
+let poses: Record<string, string>;
 interface Source {
   number: number;
   publisher: string;
@@ -69,6 +89,8 @@ beforeAll(async () => {
   figures = (await import(siteSrc("figures.ts"))) as typeof figures;
   blog = (await import(siteSrc("blog.ts"))) as typeof blog;
   sources = (await import(siteSrc("sources.ts"))) as typeof sources;
+  promos = (await import(siteSrc("promos.ts"))) as typeof promos;
+  poses = ((await import(siteSrc("og.ts"))) as { POSES: Record<string, string> }).POSES;
 });
 
 const BAR = `kind: bar
@@ -400,5 +422,70 @@ describe("a post's sources", () => {
       { number: 1, publisher: "Ministry", title: "a report with no address, 2025." },
       { number: 2, publisher: "Lab", title: "Findings", url: "https://lab.example/findings" },
     ]);
+  });
+});
+
+describe("more posts beside a post", () => {
+  const published = ["a", "b", "c", "d", "e"];
+  test("the newest other published posts, never the post itself", () => {
+    expect(blog.MORE_POSTS).toBe(3);
+    expect(blog.morePosts("b", published, ["soon"])).toEqual([
+      { item: "a", soon: false },
+      { item: "c", soon: false },
+      { item: "d", soon: false },
+    ]);
+  });
+  test("announced posts fill in only when there are too few published ones", () => {
+    expect(blog.morePosts("a", ["a", "b"], ["s1", "s2", "s3"])).toEqual([
+      { item: "b", soon: false },
+      { item: "s1", soon: true },
+      { item: "s2", soon: true },
+    ]);
+    expect(blog.morePosts("a", ["a"], [])).toEqual([]);
+  });
+});
+
+// rotli's own spots (site/src/promos.ts): house promotions only, every one a first-party or
+// rotli-owned link with local art, so a post loads nothing from anyone else.
+describe("the From rotli spots", () => {
+  test("each entry is complete, labelled as rotli's, and pictured with the site's own art", () => {
+    const ids = new Set<string>();
+    for (const promo of promos.PROMOS) {
+      expect(ids.has(promo.id)).toBe(false);
+      ids.add(promo.id);
+      expect(promo.label).toBe(promos.PROMO_LABEL);
+      expect(promos.PROMO_LABEL).toBe("From rotli");
+      expect(promo.title.length).toBeGreaterThan(3);
+      expect(promo.text.length).toBeGreaterThan(10);
+      expect(promo.text.length).toBeLessThanOrEqual(90);
+      expect(Object.keys(poses)).toContain(promo.pose);
+      // On this site, or (marked external) on rotli's own studio; never anyone else's.
+      if (promo.external) expect(new URL(promo.href).hostname).toMatch(/(^|\.)rotli\.co$/);
+      else expect(promo.href).toMatch(/^[/#]/);
+      expect(JSON.stringify(promo)).not.toMatch(/sponsor/i);
+    }
+    expect([...ids]).toEqual(expect.arrayContaining(["download", "roadmap", "newsletter", "web"]));
+  });
+
+  test("a build offers only what it has: no Download without downloads, no Rotli Web without it", () => {
+    const ids = (offers: { downloads: boolean; webApp: boolean }) =>
+      promos.availablePromos(promos.PROMOS, offers).map((promo) => promo.id);
+    expect(ids({ downloads: false, webApp: false })).not.toContain("download");
+    expect(ids({ downloads: false, webApp: false })).not.toContain("web");
+    expect(ids({ downloads: true, webApp: true })).toEqual(promos.PROMOS.map((promo) => promo.id));
+  });
+
+  test("posts rotate through the spots, two at a time, so every spot is shown across the blog", () => {
+    const list = promos.PROMOS;
+    expect(promos.RAIL_PROMOS).toBe(2);
+    expect(promos.promosFor(0, 2, list).map((p) => p.id)).toEqual([list[0]!.id, list[1]!.id]);
+    expect(promos.promosFor(1, 2, list).map((p) => p.id)).toEqual([list[2]!.id, list[3]!.id]);
+    const shown = new Set<string>();
+    for (let index = 0; index < Math.ceil(list.length / 2); index++) {
+      for (const promo of promos.promosFor(index, 2, list)) shown.add(promo.id);
+    }
+    expect(shown.size).toBe(list.length);
+    expect(promos.promosFor(3, 2, [])).toEqual([]);
+    expect(promos.promosFor(0, 2, [list[0]!])).toHaveLength(1);
   });
 });

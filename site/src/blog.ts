@@ -88,3 +88,22 @@ export function railTitle(title: string): string {
   const match = title.match(/^(.+?[.!?])\s+\S/);
   return match ? match[1]! : title;
 }
+
+/** How many other posts a post suggests (its right rail, or "More from rotli" under it). */
+export const MORE_POSTS = 3;
+
+/**
+ * The other posts a post suggests: the newest published ones that are not this one, and only when
+ * there are fewer than `count` of those, announced (coming-soon) posts to fill the rest, marked
+ * `soon` so the page labels them and never links them.
+ */
+export function morePosts<T>(
+  current: T,
+  published: readonly T[],
+  upcoming: readonly T[],
+  count = MORE_POSTS,
+): { item: T; soon: boolean }[] {
+  const others = published.filter((post) => post !== current).map((item) => ({ item, soon: false }));
+  const fill = upcoming.slice(0, Math.max(0, count - others.length)).map((item) => ({ item, soon: true }));
+  return [...others, ...fill].slice(0, count);
+}

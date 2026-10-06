@@ -29,8 +29,10 @@ import type { TocItem } from '../blog';
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
 import type { Banner } from '../og';
+import type { Promo } from '../promos';
 import type { Source } from '../sources';
 import { site } from '../site';
+import ArticleAside, { type MorePost } from './blog/ArticleAside.astro';
 import ArticleCover from './blog/ArticleCover.astro';
 import ArticleRail from './blog/ArticleRail.astro';
 import SiteFooter from './SiteFooter.astro';
@@ -70,6 +72,9 @@ interface Props {
     markdown: string;
     /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
     sources: Source[];
+    /** Other posts and rotli's own spots, beside the post on wide screens and after it below. */
+    more: MorePost[];
+    promos: Promo[];
   };
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
@@ -273,6 +278,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
       <div class="prose" data-prose>
         <slot />
       </div>
+      {article && <ArticleAside posts={article.more} promos={article.promos} />}
     </div>
     <slot name="after" />
   </main>
@@ -582,9 +588,34 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   .read-progress.slim {
     display: none;
   }
+  /* The article's columns: the left rail, the reading column (42rem, blog/article.css), and from
+     1280px the right side (blog/ArticleAside.astro). The cover (blog/ArticleCover.astro) lays its
+     words on the same tracks, so the head lines up with the text and the rails below it. */
+  .writing.is-article {
+    --col-left: 13rem;
+    --col-right: 14.5rem;
+    --col-gap: clamp(2.5rem, 5vw, 4rem);
+  }
   .writing-body.has-rail {
-    grid-template-columns: 15rem minmax(0, 1fr);
-    gap: clamp(2.5rem, 6vw, 6rem);
+    grid-template-columns: var(--col-left) minmax(0, 1fr);
+    column-gap: var(--col-gap);
+  }
+  /* Below 1280px the right side follows the article, in the reading column. */
+  .writing-body.has-rail > :global([data-article-more]) {
+    grid-column: 2;
+  }
+  @media (min-width: 1280px) {
+    .writing.is-article {
+      --col-gap: 2.75rem;
+    }
+    .writing-body.has-rail {
+      grid-template-columns: var(--col-left) minmax(0, 42rem) var(--col-right);
+      justify-content: space-between;
+    }
+    .writing-body.has-rail > :global([data-article-more]) {
+      grid-column: 3;
+      grid-row: 1;
+    }
   }
   @media (max-width: 900px) {
     .writing.is-article.has-progress {
@@ -615,6 +646,10 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     }
     .writing-body.has-rail > :global(.rail) {
       order: 2;
+    }
+    .writing-body.has-rail > :global([data-article-more]) {
+      grid-column: auto;
+      order: 3;
     }
   }
   .toc-compact li.sub {

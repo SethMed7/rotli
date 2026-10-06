@@ -49,7 +49,7 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
       <div class="footer-lead">
         <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
         <p>{tagline}</p>
-        <form class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
+        <form id="newsletter" class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
           <h2 id="subscribe-title">Hear when it’s ready.</h2>
           <p class="subscribe-note" id="subscribe-note">Notes from the workshop, now and then. Unsubscribe anytime.</p>
           <div class="subscribe-row">

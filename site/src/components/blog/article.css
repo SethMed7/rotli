@@ -3,11 +3,14 @@
    scoped styles; every rule is held under .is-article so other pages are untouched. Tokens only.
    Measured in the article specs: about 70 characters a line, every text pair at 4.5:1 or more. */
 
-/* The column: 18px type, generous leading, about 70 characters a line. */
+/* The column: 18px type, generous leading, about 70 characters of running text a line (at least
+   62ch, the width of 62 zeros, measured beside both rails in e2e/site/article-aside.spec.ts). */
 .writing.is-article .prose {
-  max-width: 40rem;
+  max-width: 42rem;
   font-size: 1.125rem;
   line-height: 1.72;
+  /* A bare address in a citation breaks inside a 320px column instead of widening the page. */
+  overflow-wrap: break-word;
 }
 .writing.is-article .prose h2 {
   margin: 3.4rem 0 0.9rem;
