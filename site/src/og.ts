@@ -200,7 +200,7 @@ export function bannerPath(slug: string, variant: 'wide' | 'half' | 'mobile' = '
 /** A post's banner, or undefined until `bun run build:brand-images` has rendered it. */
 export function postBanner(slug: string): Banner | undefined {
   const src = bannerPath(slug);
-  if (!hasPublicFile(src) || !hasPublicFile(bannerPath(slug, 'mobile'))) return undefined;
+  if (![src, bannerPath(slug, 'half'), bannerPath(slug, 'mobile')].every(hasPublicFile)) return undefined;
   return {
     src,
     srcset: `${bannerPath(slug, 'half')} 1200w, ${src} 2400w`,
