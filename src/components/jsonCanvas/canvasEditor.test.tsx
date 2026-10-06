@@ -108,3 +108,21 @@ test("a preset colour paints through a theme token; another app's hex rides alon
   // a value that isn't a colour never reaches the style or the attribute
   expect(markup).not.toContain("x:y");
 });
+
+test("an image or PDF card from another app is a file card, never a missing note", () => {
+  const markup = renderToStaticMarkup(
+    <CanvasEditor
+      doc={{
+        nodes: [{ id: "i", type: "file", file: "attachments/Map.png", x: 0, y: 0, width: 200, height: 120 }],
+        edges: [],
+      }}
+      onChange={() => {}}
+      noteFor={() => null}
+      resolveLink={() => null}
+      onOpenNote={() => {}}
+    />,
+  );
+  expect(markup).toContain('aria-label="File card: Map.png"');
+  expect(markup).toContain("A file in your vault.");
+  expect(markup).not.toContain("isn’t in the vault anymore");
+});

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { CANVAS_REFUSAL, colorName, fileTitle, parseCanvas, serializeCanvas } from "./model";
+import { moveNodes, resizeNode } from "./workflow";
 
 // the shape Obsidian writes (tabs, one item per line), with every node type,
 // an unknown type, an extra field, a hex color, and a top-level key from
@@ -25,7 +26,7 @@ test("a canvas Obsidian wrote round-trips byte for byte, unknown parts included"
   expect(serializeCanvas(parsed.doc)).toBe(OBSIDIAN);
 });
 
-test("an empty file is an empty canvas, and positions save as whole pixels", () => {
+test("an empty file is an empty canvas; another app's fractional positions survive, Rotli's moves round", () => {
   const empty = parseCanvas("  \n");
   expect(empty).toEqual({ ok: true, doc: { nodes: [], edges: [] } });
   expect(serializeCanvas({ nodes: [], edges: [] })).toBe('{\n\t"nodes":[],\n\t"edges":[]\n}');
@@ -33,7 +34,33 @@ test("an empty file is an empty canvas, and positions save as whole pixels", () 
     nodes: [{ id: "t", type: "text" as const, text: "", x: 1.6, y: -2.4, width: 99.5, height: 50 }],
     edges: [],
   };
-  expect(serializeCanvas(doc)).toContain('"x":2,"y":-2,"width":100,"height":50');
+  // untouched, written as read
+  expect(serializeCanvas(doc)).toContain('"x":1.6,"y":-2.4,"width":99.5,"height":50');
+  // what Rotli moves or sizes becomes whole pixels
+  expect(moveNodes(doc, ["t"], 0.3, 0).nodes[0]).toMatchObject({ x: 2, y: -2 });
+  expect(resizeNode(doc, "t", 200.4, 80.6).nodes[0]).toMatchObject({ width: 200, height: 81 });
+});
+
+test("a known field holding something Rotli can't use rides through, never dropped", () => {
+  const text = JSON.stringify({
+    nodes: [
+      { id: "a", type: "text", text: "", x: 0, y: 0, width: 1, height: 1 },
+      { id: "f", type: "file", file: "a.md", subpath: "", x: 0, y: 0, width: 1, height: 1 },
+      { id: "g", type: "group", backgroundStyle: "stretch", x: 0, y: 0, width: 1, height: 1 },
+    ],
+    edges: [{ id: "e", fromNode: "a", toNode: "f", fromSide: "diagonal", toEnd: "dot", label: 7 }],
+  });
+  const parsed = parseCanvas(text);
+  if (!parsed.ok) throw new Error(parsed.error);
+  const saved = serializeCanvas(parsed.doc);
+  for (const kept of [
+    '"subpath":""',
+    '"backgroundStyle":"stretch"',
+    '"fromSide":"diagonal"',
+    '"toEnd":"dot"',
+    '"label":7',
+  ])
+    expect(saved).toContain(kept);
 });
 
 test("a broken canvas is refused with a reason instead of opening half-read", () => {

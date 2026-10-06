@@ -20,6 +20,10 @@ export type CanvasEditing = { id: string; field: "text" | "label" } | null;
 
 const SIDES: readonly CanvasSide[] = ["top", "right", "bottom", "left"];
 
+/** A card naming a Markdown note; any other file (an image, a PDF another
+ * app put on the canvas) is a file card, never a "missing note". */
+export const isNoteFile = (path: string): boolean => path.toLowerCase().endsWith(".md");
+
 export function cardLabel(node: CanvasNode, note: CanvasNoteView | null): string {
   const color = colorName(node.color);
   const tint = color ? `, ${color}` : "";
@@ -27,6 +31,7 @@ export function cardLabel(node: CanvasNode, note: CanvasNoteView | null): string
     case "text":
       return `Text card${tint}: ${node.text.split("\n")[0]?.replace(/^#+\s*/, "") || "empty"}`;
     case "file":
+      if (!isNoteFile(node.file)) return `File card${tint}: ${fileTitle(node.file)}`;
       return `Note card${tint}: ${note?.title ?? `${fileTitle(node.file)} (missing)`}`;
     case "link":
       return `Link card${tint}: ${node.url}`;
@@ -146,7 +151,13 @@ export function Card({
             <MarkdownPeek body={node.text} className="pv-note jc-md" />
           </div>
         ))}
-      {node.type === "file" && (
+      {node.type === "file" && !isNoteFile(node.file) && (
+        <div className="jc-body">
+          <p className="jc-note-title">{fileTitle(node.file)}</p>
+          <p className="jc-quiet">A file in your vault. Double-click to open it.</p>
+        </div>
+      )}
+      {node.type === "file" && isNoteFile(node.file) && (
         <div className="jc-body">
           <p className="jc-note-title">{note?.title ?? fileTitle(node.file)}</p>
           {note === null ? (

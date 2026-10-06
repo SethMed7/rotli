@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { useCanvasNotes } from "../../jsonCanvas/canvasNotes";
 import { useCanvasFile } from "../../jsonCanvas/composition";
 import { usePanesStore } from "../../state/panes";
+import { isNoteFile } from "./canvasCard";
 import { CanvasEditor } from "./canvasEditor";
 
 export function CanvasFileEditor({ fileId }: { fileId: string }) {
@@ -42,6 +43,8 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
         onOpenNote={(path) => {
           const id = noteIdAt(path);
           if (id) usePanesStore.getState().openNote(id, { newTab: true });
+          // a file card (an image, a PDF) opens the file itself
+          else if (!isNoteFile(path)) usePanesStore.getState().openFile(path, { newTab: true });
         }}
       />
     </div>

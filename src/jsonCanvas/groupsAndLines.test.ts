@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import type { CanvasDoc } from "./model";
-import { applyEdit, edgeMidpoint, groupAround, growGroupAround, setLabel } from "./workflow";
+import { applyEdit, bringToFront, edgeMidpoint, groupAround, growGroupAround, setLabel } from "./workflow";
 
 const two: CanvasDoc = {
   nodes: [
@@ -62,4 +62,13 @@ test("finishing an edit: a lone [[link]] becomes its note's card, an emptied car
     nodes: [{ ...two.nodes[0]!, text: "same" } as (typeof two.nodes)[number], two.nodes[1]!],
   };
   expect(applyEdit(same, "a", "text", "same", resolve)).toBe(same);
+});
+
+test("lifting a group lifts the cards inside it above it, so they stay reachable", () => {
+  const grouped = groupAround(two, ["a"], () => "g").doc;
+  // the group sits first (lowest); lifting it must not bury its own card
+  const lifted = bringToFront(grouped, ["g"]);
+  const order = lifted.nodes.map((node) => node.id);
+  expect(order.indexOf("g")).toBeLessThan(order.indexOf("a"));
+  expect(order.at(-1)).toBe("a");
 });

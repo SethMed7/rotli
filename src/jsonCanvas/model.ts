@@ -78,14 +78,6 @@ export type ParseResult = { ok: true; doc: CanvasDoc } | { ok: false; error: str
 
 const SIDES = new Set<string>(["top", "right", "bottom", "left"]);
 const ENDS = new Set<string>(["none", "arrow"]);
-const NODE_KEYS = ["id", "type", "x", "y", "width", "height", "color"];
-const TYPE_KEYS: Record<string, string[]> = {
-  text: ["text"],
-  file: ["file", "subpath"],
-  link: ["url"],
-  group: ["label", "background", "backgroundStyle"],
-};
-const EDGE_KEYS = ["id", "fromNode", "toNode", "fromSide", "toSide", "fromEnd", "toEnd", "color", "label"];
 
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
@@ -95,6 +87,15 @@ const finite = (value: unknown): value is number => typeof value === "number" &&
 function rest(source: Json, known: readonly string[]): Record<string, unknown> | undefined {
   const extra = Object.fromEntries(Object.entries(source).filter(([key]) => !known.includes(key)));
   return Object.keys(extra).length > 0 ? extra : undefined;
+}
+
+/** Every field Rotli didn't take as a valid value rides through untouched —
+ * an unknown key, or a known key holding something Rotli can't use
+ * (`fromSide: "diagonal"`, an empty `subpath`). Nothing is dropped. */
+function leftovers(source: Json, taken: object): Record<string, unknown> | undefined {
+  const used = new Set(Object.keys(taken).filter((key) => (taken as Json)[key] !== undefined));
+  used.add("type");
+  return rest(source, [...used]);
 }
 
 function optionalString(source: Json, key: string): string | undefined {
@@ -110,9 +111,10 @@ function parseNode(raw: unknown, at: number): CanvasNode | string {
   if (!finite(x) || !finite(y) || !finite(width) || !finite(height))
     return `node ${id} has no position or size`;
   const base = { id, x, y, width, height, ...(typeof raw.color === "string" ? { color: raw.color } : {}) };
-  const typeKeys = TYPE_KEYS[type];
-  const extra = rest(raw, [...NODE_KEYS, ...(typeKeys ?? [])]);
-  const withExtra = <T extends CanvasNode>(node: T): T => (extra ? { ...node, extra } : node);
+  const withExtra = <T extends CanvasNode>(node: T): T => {
+    const extra = leftovers(raw, node);
+    return extra ? { ...node, extra } : node;
+  };
   switch (type) {
     case "text":
       if (typeof raw.text !== "string") return `text node ${id} has no text`;
@@ -162,7 +164,7 @@ function parseEdge(raw: unknown, at: number): CanvasEdge | string {
   end("toEnd");
   if (typeof raw.color === "string") edge.color = raw.color;
   if (typeof raw.label === "string") edge.label = raw.label;
-  const extra = rest(raw, EDGE_KEYS);
+  const extra = leftovers(raw, edge);
   return extra ? { ...edge, extra } : edge;
 }
 
@@ -223,11 +225,12 @@ function nodeJson(node: CanvasNode): Json {
     if (known.background !== undefined) out.background = known.background;
     if (known.backgroundStyle !== undefined) out.backgroundStyle = known.backgroundStyle;
   }
-  // the spec says integer pixels
-  out.x = Math.round(known.x);
-  out.y = Math.round(known.y);
-  out.width = Math.round(known.width);
-  out.height = Math.round(known.height);
+  // written as read: only what Rotli moves or sizes is rounded (workflow.ts),
+  // so another app's fractional positions survive a save
+  out.x = known.x;
+  out.y = known.y;
+  out.width = known.width;
+  out.height = known.height;
   if (known.color !== undefined) out.color = known.color;
   return { ...out, ...extra };
 }

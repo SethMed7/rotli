@@ -18,6 +18,10 @@ export const CARD = { width: 260, height: 140 } as const;
 export const NOTE_CARD = { width: 320, height: 220 } as const;
 export const MIN_CARD = { width: 120, height: 60 } as const;
 
+/** JSON Canvas positions are whole pixels: everything Rotli places or moves
+ * is rounded here, and nothing else is (a file's own values ride through). */
+const px = Math.round;
+
 /** A 16-hex id like Obsidian's. Injected in tests. */
 export type MakeId = () => string;
 export const randomId: MakeId = () =>
@@ -38,8 +42,8 @@ export function addText(doc: CanvasDoc, x: number, y: number, text: string, make
     id: freshId(doc, makeId),
     type: "text",
     text,
-    x: x - CARD.width / 2,
-    y: y - CARD.height / 2,
+    x: px(x - CARD.width / 2),
+    y: px(y - CARD.height / 2),
     ...CARD,
   };
   return { doc: { ...doc, nodes: [...doc.nodes, node] }, id: node.id };
@@ -52,8 +56,8 @@ export function addFile(doc: CanvasDoc, x: number, y: number, file: string, make
     id: freshId(doc, makeId),
     type: "file",
     file,
-    x: x - NOTE_CARD.width / 2,
-    y: y - NOTE_CARD.height / 2,
+    x: px(x - NOTE_CARD.width / 2),
+    y: px(y - NOTE_CARD.height / 2),
     ...NOTE_CARD,
   };
   return { doc: { ...doc, nodes: [...doc.nodes, node] }, id: node.id };
@@ -75,7 +79,7 @@ export function moveNodes(doc: CanvasDoc, ids: readonly string[], dx: number, dy
   return {
     ...doc,
     nodes: doc.nodes.map((node) =>
-      moving.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node,
+      moving.has(node.id) ? { ...node, x: px(node.x + dx), y: px(node.y + dy) } : node,
     ),
   };
 }
@@ -85,7 +89,11 @@ export function resizeNode(doc: CanvasDoc, id: string, width: number, height: nu
     ...doc,
     nodes: doc.nodes.map((node) =>
       node.id === id
-        ? { ...node, width: Math.max(MIN_CARD.width, width), height: Math.max(MIN_CARD.height, height) }
+        ? {
+            ...node,
+            width: px(Math.max(MIN_CARD.width, width)),
+            height: px(Math.max(MIN_CARD.height, height)),
+          }
         : node,
     ),
   };
@@ -142,6 +150,12 @@ export function removeItems(doc: CanvasDoc, ids: readonly string[]): CanvasDoc {
 /** Raise cards to the top of the z-order (selection lifts what you touch). */
 export function bringToFront(doc: CanvasDoc, ids: readonly string[]): CanvasDoc {
   const lift = new Set(ids);
+  // a group lifts the cards inside it too, so they stay above it — a group
+  // on top would swallow every click meant for its own cards
+  for (const group of doc.nodes) {
+    if (group.type !== "group" || !lift.has(group.id)) continue;
+    for (const node of doc.nodes) if (node.id !== group.id && inside(node, group)) lift.add(node.id);
+  }
   const groupsFirst = (a: CanvasNode, b: CanvasNode) =>
     Number(b.type === "group") - Number(a.type === "group");
   const lifted = doc.nodes.filter((node) => lift.has(node.id)).sort(groupsFirst);
@@ -159,10 +173,10 @@ export function groupAround(doc: CanvasDoc, ids: readonly string[], makeId = ran
   const group: GroupNode = {
     id: freshId(doc, makeId),
     type: "group",
-    x: box.x - pad,
-    y: box.y - pad,
-    width: box.width + pad * 2,
-    height: box.height + pad * 2,
+    x: px(box.x - pad),
+    y: px(box.y - pad),
+    width: px(box.width + pad * 2),
+    height: px(box.height + pad * 2),
   };
   return { doc: { ...doc, nodes: [group, ...doc.nodes] }, id: group.id };
 }
@@ -204,7 +218,7 @@ export function growGroupAround(doc: CanvasDoc, groupId: string, cardId: string)
       const top = Math.min(node.y, card.y - pad);
       const right = Math.max(node.x + node.width, card.x + card.width + pad);
       const bottom = Math.max(node.y + node.height, card.y + card.height + pad);
-      return { ...node, x: left, y: top, width: right - left, height: bottom - top };
+      return { ...node, x: px(left), y: px(top), width: px(right - left), height: px(bottom - top) };
     }),
   };
 }

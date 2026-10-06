@@ -133,14 +133,20 @@ impl CorpusStore {
     pub fn create_canvas(&mut self, folder: &str, name: &str) -> Result<String, String> {
         crate::feature_policy::require_canvas()?;
         self.mutation_allowed()?;
-        let stem = name.trim();
+        // a typed "/" never makes a folder: it reads as "-" (Rotli Web's rule)
+        let stem = name.trim().replace(['/', '\\'], "-");
+        let stem = stem.trim();
         if stem.is_empty() {
             return Err("a canvas needs a name".into());
         }
         let file = format!("{stem}.canvas");
         validate_component(&file)?;
+        // beside notes: in a memex that means under wiki/, else the capture
+        // folder (folderCanvases.canvasHome, the web twin). A plain Rotli
+        // vault has an Inbox for the root's share; a plain folder on the web
+        // has none, so there a root canvas stays at the root.
         let folder = match self.layout {
-            Layout::Memex if !matches!(surfaced(self.layout, folder), Surface::NoteRW) => "wiki/_inbox",
+            Layout::Memex if !(folder == "wiki" || folder.starts_with("wiki/")) => "wiki/_inbox",
             Layout::LegacyRotli if folder.is_empty() => "Inbox",
             _ => folder,
         };
@@ -196,7 +202,10 @@ mod tests {
             "wiki/_inbox/Loose.canvas"
         );
         assert!(store.create_canvas("wiki", "  ").is_err());
-        assert!(store.create_canvas("wiki", "a/b").is_err());
+        // a typed "/" reads as "-", on the Mac as on the web
+        assert_eq!(store.create_canvas("wiki", "Q3/plan").unwrap(), "wiki/Q3-plan.canvas");
+        // only wiki/ holds a canvas in a memex; a chat folder doesn't
+        assert_eq!(store.create_canvas("chats", "Stray").unwrap(), "wiki/_inbox/Stray.canvas");
 
         // listed as a file titled without its extension
         let listed = store.list().unwrap();

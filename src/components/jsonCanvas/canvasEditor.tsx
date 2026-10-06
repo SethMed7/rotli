@@ -262,6 +262,8 @@ export function CanvasEditor({
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current) return;
+    // the button came up somewhere this plane never heard about
+    if (event.buttons === 0) return cancelGesture();
     if (current.kind === "pan") {
       setView({
         ...current.view,
@@ -289,6 +291,14 @@ export function CanvasEditor({
       const [x, y] = world(event.clientX, event.clientY);
       setPointer({ x, y });
     }
+  };
+
+  /** A gesture that ends any way but a release (a cancelled pointer, a lost
+   * capture) leaves nothing following a pointer no one is pressing. */
+  const cancelGesture = () => {
+    drag.current = null;
+    setConnectFrom(null);
+    setPointer(null);
   };
 
   const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -430,6 +440,11 @@ export function CanvasEditor({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={cancelGesture}
+      onLostPointerCapture={(event) => {
+        // the release itself loses capture too; only an orphaned gesture is cancelled
+        if (event.buttons !== 0) cancelGesture();
+      }}
       onDoubleClick={onDoubleClick}
       onKeyDown={onKeyDown}
     >
