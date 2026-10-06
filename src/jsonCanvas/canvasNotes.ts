@@ -2,14 +2,27 @@
 // note a card's path names (title, body, secure) and what `[[target]]`
 // resolves to — the editor's own resolver.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
+import { looksSecret } from "../ai/guard";
 import { buildWikilinkIndex, resolveWikilink } from "../editor/wikilink";
 import { inSecureFolder } from "../security/secureNotes";
-import { useNoteLinks, useSearchableNotes } from "../services/hooks";
+import { keys, useNoteLinks, useSearchableNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
-import type { NoteSummary } from "../types";
+import type { Note, NoteSummary } from "../types";
 import { noteAtPath, notePath } from "./notePaths";
+
+/** What a note card shows of its note. */
+export interface CanvasNoteView {
+  title: string;
+  /** null while the body loads. */
+  body: string | null;
+  /** Title shows, text never does — a screen may be shared. */
+  secure: boolean;
+  /** The note is there but couldn't be read just now. */
+  failed?: boolean;
+}
 
 /** What a note card may show of its note. "unknown" until the Links
  * projection has answered — nothing is fetched or shown meanwhile — and
@@ -29,62 +42,62 @@ export function cardAccess(
   return secureById.get(note.id) === false ? "open" : "secure";
 }
 
+/** One note card's read of its note: whether the note is there, its body,
+ * and whether that body may show. Bodies are judged as they are now — a
+ * body that has since gained a secret closes the card even before the Links
+ * projection catches up (ROTLI review, PR 173). */
+export function cardView(
+  note: Pick<NoteSummary, "title">,
+  access: CardAccess,
+  read: { status: "pending" | "error" | "success"; data: Note | null | undefined } | undefined,
+): CanvasNoteView | "gone" {
+  if (access !== "open") return { title: note.title, body: null, secure: access === "secure" };
+  if (read?.status === "error") return { title: note.title, body: null, secure: false, failed: true };
+  if (read?.status !== "success") return { title: note.title, body: null, secure: false };
+  if (!read.data) return "gone";
+  const secure = read.data.secure === true || looksSecret(read.data.body);
+  return { title: note.title, body: secure ? null : read.data.body, secure };
+}
+
 /** Note cards' view of the vault: a path's note (title, body, secure), and
  * what `[[target]]` resolves to — the editor's own resolver. Only Markdown
  * notes become note cards. */
 export function useCanvasNotes(paths: readonly string[]) {
   const { notes } = useSearchableNotes();
   const links = useNoteLinks();
-  // a fetched body, or null when the note couldn't be read (never refetched)
-  const [bodies, setBodies] = useState<ReadonlyMap<string, string | null>>(new Map());
   const index = useMemo(() => buildWikilinkIndex(notes), [notes]);
   const projection = links.isSuccess ? "success" : links.isError ? "error" : "pending";
   const secureById = useMemo(
     () => new Map((links.data ?? []).map((row) => [row.noteId, row.secure] as const)),
     [links.data],
   );
-  const wanted = useMemo(
+  // only notes the projection says are open are read at all; their bodies
+  // come through the note cache every save writes, so a card follows edits
+  // made elsewhere, and a failed read is tried again when the canvas reopens
+  const openIds = useMemo(
     () =>
       paths
         .map((path) => noteAtPath(notes, path))
-        .filter((note) => note !== null && (note.kind ?? "note") === "note"),
-    [paths, notes],
+        .filter(
+          (note): note is NoteSummary =>
+            note !== null &&
+            (note.kind ?? "note") === "note" &&
+            cardAccess(note, projection, secureById) === "open",
+        )
+        .map((note) => note.id),
+    [paths, notes, projection, secureById],
   );
+  const reads = useQueries({
+    queries: openIds.map((id) => ({ queryKey: keys.note(id), queryFn: () => notesService.getNote(id) })),
+  });
+  const readById = new Map(openIds.map((id, at) => [id, reads[at]] as const));
 
-  useEffect(() => {
-    let cancelled = false;
-    const missing = wanted.filter(
-      (note) => note !== null && !bodies.has(note.id) && cardAccess(note, projection, secureById) === "open",
-    );
-    if (missing.length === 0) return;
-    void Promise.all(missing.map((note) => notesService.getNote(note!.id).catch(() => null))).then(
-      (loaded) => {
-        if (cancelled) return;
-        setBodies((current) => {
-          const next = new Map(current);
-          missing.forEach((note, at) => next.set(note!.id, loaded[at]?.body ?? null));
-          return next;
-        });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [wanted, bodies, projection, secureById]);
-
-  const noteFor = useCallback(
-    (path: string) => {
-      const note = noteAtPath(notes, path);
-      if (!note || (note.kind ?? "note") !== "note" || bodies.get(note.id) === null) return null;
-      const access = cardAccess(note, projection, secureById);
-      return {
-        title: note.title,
-        body: access === "open" ? (bodies.get(note.id) ?? null) : null,
-        secure: access === "secure",
-      };
-    },
-    [notes, bodies, projection, secureById],
-  );
+  const noteFor = (path: string): CanvasNoteView | null => {
+    const note = noteAtPath(notes, path);
+    if (!note || (note.kind ?? "note") !== "note") return null;
+    const view = cardView(note, cardAccess(note, projection, secureById), readById.get(note.id));
+    return view === "gone" ? null : view;
+  };
   const resolveLink = useCallback(
     (target: string) => {
       const id = resolveWikilink(target, index);

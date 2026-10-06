@@ -46,3 +46,16 @@ test("a build without canvases leaves .canvas files out of the folder's lists", 
   const listed = await new FolderNotesService(dir).listAll();
   expect(listed.map((note) => note.id)).toEqual(["Note.md"]);
 });
+
+test("two panes saving one canvas at once: only one lands, the other conflicts", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.mkdir("Plans");
+  const id = await new FolderCanvasStore(dir).create("Plans", "Race");
+  const loaded = (await new FolderCanvasStore(dir).stat(id))!.revision;
+  const saves = await Promise.allSettled([
+    new FolderCanvasStore(dir).write(id, '{"nodes":[],"edges":[],"pane":"left"}', loaded),
+    new FolderCanvasStore(dir).write(id, '{"nodes":[],"edges":[],"pane":"right-hand"}', loaded),
+  ]);
+  expect(saves.map((save) => save.status)).toEqual(["fulfilled", "rejected"]);
+  expect(await dir.readText(id)).toBe('{"nodes":[],"edges":[],"pane":"left"}');
+});

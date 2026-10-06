@@ -4,16 +4,9 @@
 
 import type { CSSProperties } from "react";
 
+import type { CanvasNoteView } from "../../jsonCanvas/canvasNotes";
 import { type CanvasNode, type CanvasSide, colorName, fileTitle } from "../../jsonCanvas/model";
 import { MarkdownPeek } from "../markdownPeek";
-
-export interface CanvasNoteView {
-  title: string;
-  /** null while the body loads. */
-  body: string | null;
-  /** Title shows, text never does — a screen may be shared. */
-  secure: boolean;
-}
 
 /** What is being typed into: a text card's text, or a group's or line's name. */
 export type CanvasEditing = { id: string; field: "text" | "label" } | null;
@@ -164,6 +157,8 @@ export function Card({
             <p className="jc-quiet">This note isn’t in the vault anymore. The card keeps its place.</p>
           ) : note.secure ? (
             <p className="jc-quiet">Secure note. Open it to read.</p>
+          ) : note.failed ? (
+            <p className="jc-quiet">Rotli couldn’t read this note just now. Double-click to open it.</p>
           ) : note.body === null ? (
             <p className="jc-quiet">Loading…</p>
           ) : (

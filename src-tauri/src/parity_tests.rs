@@ -427,6 +427,19 @@ fn empty_canvas_file_agrees() {
 }
 
 #[test]
+fn canvas_home_fixtures_agree() {
+    for case in entry("canvasHome").as_array().expect("canvasHome is an array") {
+        let folder = case["folder"].as_str().expect("folder is a string");
+        let memex = case["memex"].as_bool().expect("memex is a bool");
+        assert_eq!(
+            crate::corpus::files::canvas_home(memex, folder),
+            case["home"].as_str().expect("home is a string"),
+            "canvas_home({memex}, {folder:?})"
+        );
+    }
+}
+
+#[test]
 fn metadata_link_targets_fixtures_agree() {
     for case in entry("metadataLinkTargets")
         .as_array()

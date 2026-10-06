@@ -141,16 +141,20 @@ impl CorpusStore {
         }
         let file = format!("{stem}.canvas");
         validate_component(&file)?;
-        // beside notes: in a memex that means under wiki/, else the capture
-        // folder (folderCanvases.canvasHome, the web twin). A plain Rotli
-        // vault has an Inbox for the root's share; a plain folder on the web
-        // has none, so there a root canvas stays at the root.
-        let folder = match self.layout {
-            Layout::Memex if !(folder == "wiki" || folder.starts_with("wiki/")) => "wiki/_inbox",
-            Layout::LegacyRotli if folder.is_empty() => "Inbox",
-            _ => folder,
-        };
+        let folder = canvas_home(self.layout == Layout::Memex, folder);
         self.new_file_bytes(folder, &file, EMPTY_CANVAS.as_bytes())
+    }
+}
+
+/// Where a new canvas is written — the one rule the web twin shares
+/// (folderCanvases.canvasHome; parity entry `canvasHome`): in a memex, under
+/// wiki/ or else the capture folder; in a plain vault, the folder it was made
+/// in, the root included — where a note made there lands.
+pub(crate) fn canvas_home(memex: bool, folder: &str) -> &str {
+    if memex && !(folder == "wiki" || folder.starts_with("wiki/")) {
+        "wiki/_inbox"
+    } else {
+        folder
     }
 }
 

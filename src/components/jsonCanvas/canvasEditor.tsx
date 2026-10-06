@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { type Direction, type View, fitView, nextInDirection, toGraph, zoomAt } from "../../graph/viewport";
+import type { CanvasNoteView } from "../../jsonCanvas/canvasNotes";
 import { type CanvasDoc, type CanvasNode, fileTitle } from "../../jsonCanvas/model";
 import {
   addFile,
@@ -26,15 +27,16 @@ import {
   groupAround,
   growGroupAround,
   moveNodes,
+  nudgeFor,
   removeItems,
   resizeNode,
 } from "../../jsonCanvas/workflow";
 import { setActiveCanvas } from "../../lib/canvasCommands";
 import { registerCanvasDrop } from "../../lib/canvasDrop";
-import { Card, type CanvasEditing, type CanvasNoteView } from "./canvasCard";
+import { Card, type CanvasEditing } from "./canvasCard";
 import { EdgeHandles, EdgeLines } from "./canvasEdges";
 
-export type { CanvasNoteView } from "./canvasCard";
+export type { CanvasNoteView } from "../../jsonCanvas/canvasNotes";
 export { edgePath } from "./canvasEdges";
 
 export interface CanvasEditorProps {
@@ -429,15 +431,7 @@ export function CanvasEditor({
       return;
     }
     const ids = [...selected];
-    const step = event.shiftKey ? 50 : 10;
-    const nudge: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
-    };
-    // ⌥ arrows are the resize keys (keys/canvasActions.ts), never a nudge
-    const delta = event.altKey ? undefined : nudge[event.key];
+    const delta = nudgeFor(event);
     if (delta && ids.length > 0) {
       event.preventDefault();
       onChange(moveNodes(doc, ids, delta[0], delta[1]));

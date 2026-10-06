@@ -52,6 +52,17 @@ export async function loadCanvasFile(
   };
 }
 
+/** A canvas tab closing saves now. A save that fails stays registered for
+ * quit, which retries it and stops if it still can't land — closing a tab
+ * never drops an edit quietly. */
+export function closeCanvasSaver(saver: CanvasSaver | null, unregister: () => void): Promise<void> {
+  if (!saver) {
+    unregister();
+    return Promise.resolve();
+  }
+  return saver.flush().then(unregister, () => {});
+}
+
 export function useCanvasFile(fileId: string): {
   state: CanvasFileState;
   change: (doc: CanvasDoc) => void;
@@ -71,7 +82,7 @@ export function useCanvasFile(fileId: string): {
         if (io && loaded.revision !== null) {
           const ready = (patch: Partial<Extract<CanvasFileState, { status: "ready" }>>) =>
             setState((current) => (current.status === "ready" ? { ...current, ...patch } : current));
-          saver.current = createCanvasSaver({
+          const created = createCanvasSaver({
             revision: loaded.revision,
             delayMs: SAVE_AFTER_MS,
             write: (text, revision) => io.write(fileId, text, revision),
@@ -80,8 +91,9 @@ export function useCanvasFile(fileId: string): {
             onError: (message, conflicted) =>
               ready(conflicted ? { saveError: message, writable: false } : { saveError: message }),
           });
+          saver.current = created;
           // quit waits for the save and stops if it fails
-          unregister = onQuitFlush(() => saver.current?.flush());
+          unregister = onQuitFlush(() => created.flush());
         }
         setState(loaded.state);
       })
@@ -91,9 +103,7 @@ export function useCanvasFile(fileId: string): {
       });
     return () => {
       cancelled = true;
-      unregister();
-      // a failure on close is already on screen through onError
-      void saver.current?.flush().catch(() => {});
+      void closeCanvasSaver(saver.current, unregister);
       saver.current = null;
     };
   }, [fileId]);

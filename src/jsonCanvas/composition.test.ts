@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test";
 
+import { onQuitFlush, runQuitFlushers } from "../lib/quitFlush";
 import type { CanvasFileIo } from "../services/canvasFiles";
-import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, loadCanvasFile } from "./composition";
+import { createCanvasSaver } from "./canvasSaver";
+import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, closeCanvasSaver, loadCanvasFile } from "./composition";
 import { CANVAS_REFUSAL } from "./model";
 
 const stat = (len: number) => ({ len, revision: "r1", writable: true });
@@ -47,4 +49,53 @@ test("it fails closed: no fake blank canvas with nowhere to keep it, no half a f
   expect(await refused(io({ read: async () => null }))).toBe(CANVAS_LOAD_REFUSAL.gone);
   // a parse failure surfaces the parser's own reason
   expect(await refused(io({ read: async () => "[1," }))).toBe(CANVAS_REFUSAL.notJson);
+});
+
+test("closing a canvas whose save fails keeps the edit for quit, which retries it", async () => {
+  let disk = "";
+  let failing = true;
+  const saver = createCanvasSaver({
+    revision: "r1",
+    delayMs: 500,
+    schedule: () => null,
+    cancel: () => {},
+    write: async (text) => {
+      if (failing) throw new Error("disk full");
+      disk = text;
+      return "r2";
+    },
+    onSaved: () => {},
+    onError: () => {},
+  });
+  const unregister = onQuitFlush(() => saver.flush());
+  saver.queue({ nodes: [], edges: [] });
+  await closeCanvasSaver(saver, unregister);
+  // the tab is gone, but quit still holds the edit and refuses to lose it
+  await expect(runQuitFlushers()).rejects.toThrow("disk full");
+  failing = false;
+  await runQuitFlushers();
+  expect(JSON.parse(disk)).toEqual({ nodes: [], edges: [] });
+  unregister();
+});
+
+test("closing a canvas that saved lets go of quit", async () => {
+  let calls = 0;
+  const saver = createCanvasSaver({
+    revision: "r1",
+    delayMs: 500,
+    schedule: () => null,
+    cancel: () => {},
+    write: async () => {
+      calls += 1;
+      return `r${calls + 1}`;
+    },
+    onSaved: () => {},
+    onError: () => {},
+  });
+  let registered = true;
+  saver.queue({ nodes: [], edges: [] });
+  await closeCanvasSaver(saver, () => {
+    registered = false;
+  });
+  expect([calls, registered]).toEqual([1, false]);
 });

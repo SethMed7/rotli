@@ -28,6 +28,7 @@ import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
+import { canvasHome } from "../services/folderCanvases";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
@@ -211,6 +212,12 @@ describe("parity.json ↔ TS constants", () => {
 
   test("emptyCanvasFile", () => {
     expect(EMPTY_CANVAS_FILE).toBe(entries.emptyCanvasFile.value);
+  });
+
+  test("canvasHome", () => {
+    for (const { folder, memex, home } of entries.canvasHome.value) {
+      expect({ folder, memex, home: canvasHome(folder, memex) }).toEqual({ folder, memex, home });
+    }
   });
 
   test("metadataLinkTargets", () => {

@@ -269,3 +269,24 @@ export function bounds(doc: CanvasDoc): { x: number; y: number; width: number; h
   const bottom = Math.max(...doc.nodes.map((node) => node.y + node.height));
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
+
+/** How far an arrow key moves the selected cards: 10, or 50 with ⇧. ⌥ arrows
+ * are the resize keys (keys/canvasActions.ts) and ⌘ or ⌃ arrows belong to
+ * the app (tabs, panes), so those chords never nudge. */
+export function nudgeFor(event: {
+  key: string;
+  shiftKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}): [number, number] | null {
+  if (event.altKey || event.metaKey || event.ctrlKey) return null;
+  const step = event.shiftKey ? 50 : 10;
+  const nudge: Record<string, [number, number]> = {
+    ArrowLeft: [-step, 0],
+    ArrowRight: [step, 0],
+    ArrowUp: [0, -step],
+    ArrowDown: [0, step],
+  };
+  return nudge[event.key] ?? null;
+}

@@ -32,6 +32,24 @@ code.
 | Skip setup with a vault already chosen finishes; the prompt takes focus (P1) | `07248c7c` |
 | The last trailing hover labels open leftward (P1) | `34aefccf` |
 
+The owner's review of #173 found one more hold and five more fixes, all
+done in one follow-up commit:
+
+- **Hold.** A note that gains a secret while it's on an open canvas closes
+  its card at once:
+  - Cards read bodies through the note cache every save writes, and judge
+    each body with the secret detector.
+  - A save that makes a note secure, or no longer secure, refetches Links
+    for an open Graph or canvas.
+- **Fixes:**
+  - ⌘ and ⌃ arrows pass through a canvas.
+  - A tab closed while its save failed keeps the edit for quit to retry.
+  - The Mac and the web share one canvas-home rule, with a parity entry
+    `canvasHome`.
+  - A failed note read says so and is retried when the canvas reopens.
+  - Rotli Web runs a canvas's revision check and write under one lock per
+    file.
+
 Big vaults: a reduced-motion layout of more than 400 notes runs at most
 60 synchronous ticks, and rebuilds start warm. A worker-thread layout is
 not done.
@@ -45,7 +63,6 @@ Still open, all P2:
   - the default-vault-only Links projection on the Mac;
   - "Show in graph" for archived notes.
 - Canvas:
-  - a note card's body goes stale after an edit elsewhere;
   - bad UTF-8 is mangled on save on the Mac;
   - `nodes: null` is rewritten as `[]`;
   - a colon in a web folder name.

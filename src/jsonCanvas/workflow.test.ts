@@ -12,6 +12,7 @@ import {
   connect,
   facingSide,
   moveNodes,
+  nudgeFor,
   removeItems,
   resizeNode,
   setText,
@@ -88,4 +89,22 @@ test("touching a card lifts it, groups staying beneath; bounds cover every card"
   expect(bringToFront(doc, ["missing"])).toBe(doc);
   expect(bounds(doc)).toEqual({ x: -10, y: 0, width: 310, height: 400 });
   expect(bounds({ nodes: [], edges: [] })).toBeNull();
+});
+
+test("only a bare or ⇧ arrow nudges; ⌥, ⌘, and ⌃ arrows are other commands", () => {
+  const key = (mods: Partial<KeyboardEvent> = {}) => ({
+    key: "ArrowRight",
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    ctrlKey: false,
+    ...mods,
+  });
+  expect(nudgeFor(key())).toEqual([10, 0]);
+  expect(nudgeFor(key({ shiftKey: true }))).toEqual([50, 0]);
+  // resize, the app's tab and pane keys
+  expect(nudgeFor(key({ altKey: true }))).toBeNull();
+  expect(nudgeFor(key({ metaKey: true }))).toBeNull();
+  expect(nudgeFor(key({ ctrlKey: true }))).toBeNull();
+  expect(nudgeFor(key({ key: "a" }))).toBeNull();
 });
