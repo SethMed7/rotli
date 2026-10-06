@@ -68,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the Mac are blog posts marked Guide, each with its own picture, and the
   blog can show just the guides. Old guide links still work: they go
   straight to the new address. The Resources menu lists the Blog,
-  Developers, the Changelog, and the Roadmap.
+  Developers, the Changelog, the Roadmap, and Rotli Studio, the site with
+  rotli's wallpapers and films.
 - **Choosing where your notes live opens the macOS folder panel.** Setup,
   Settings, and the sidebar's Connect all use the Finder panel you know, with
   one button, Choose a folder. Make a new folder there for a fresh vault, or

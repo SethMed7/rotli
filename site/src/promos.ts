@@ -8,7 +8,7 @@
 // Pure data and a pure picker, without Astro or image imports, so the root tests can read it
 // (scripts/site-writing.test.ts). The component resolves `pose` to its picture.
 import type { Pose } from './og';
-import { WEB_APP_PATH, site } from './site';
+import { STUDIO_URL, WEB_APP_PATH, site } from './site';
 
 export interface Promo {
   /** Stable, for tests and `data-promo`. */
@@ -21,7 +21,7 @@ export interface Promo {
   href: string;
   /** The quokka beside it: a pose in src/assets/characters/filled/cocoa/ (src/og.ts POSES). */
   pose: Pose;
-  /** Leaves rotli.co (opens in a new tab). */
+  /** Another rotli site (studio.rotli.co): an outward arrow, the same tab, like the footer's link. */
   external?: boolean;
   /** Shown only in builds that offer it: the Mac download, or Rotli Web. */
   needs?: 'downloads' | 'webApp';
@@ -65,6 +65,15 @@ export const PROMOS: readonly Promo[] = [
     href: WEB_APP_PATH,
     pose: 'ai_chat',
     needs: 'webApp',
+  },
+  {
+    id: 'studio',
+    label: PROMO_LABEL,
+    title: 'Rotli Studio',
+    text: 'Wallpapers and films from the quokka’s island.',
+    href: STUDIO_URL,
+    pose: 'excalidraw_board',
+    external: true,
   },
 ];
 

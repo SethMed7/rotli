@@ -6,7 +6,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
-const POSTS = [POST, "/blog/rotli-web-and-your-mac/"];
+const POSTS = [
+  POST,
+  "/blog/rotli-web-and-your-mac/",
+  "/blog/why-local/",
+  "/blog/web-and-mac/",
+  "/blog/rotli-helper/",
+  "/blog/ai-and-your-notes/",
+  "/blog/getting-started/",
+];
 
 const more = (page: Page) => page.locator("[data-article-more]");
 
@@ -130,7 +138,7 @@ test("across the blog, every spot this build offers is shown on some post", asyn
       seen.add(id);
   }
   // This lane builds with downloads and without Rotli Web (playwright.site.config.ts).
-  expect([...seen].sort()).toEqual(expect.arrayContaining(["download", "newsletter", "roadmap"]));
+  expect([...seen].sort()).toEqual(["download", "newsletter", "roadmap", "studio"]);
   expect(seen.has("web")).toBe(false);
 });
 
@@ -194,3 +202,28 @@ for (const width of [320, 390, 768, 1024, 1280, 1440, 1920]) {
     }
   });
 }
+
+test("the Rotli Studio spot links to the studio with a local picture and an outward arrow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const path of POSTS) {
+    await page.goto(path);
+    const spot = more(page).locator('[data-promo="studio"]');
+    if ((await spot.count()) === 0) continue;
+    await expect(spot).toBeVisible();
+    const link = spot.locator("a");
+    await expect(link).toHaveAttribute("href", "https://studio.rotli.co/");
+    await expect(link).toHaveAttribute("rel", "noopener");
+    await expect(link).toContainText("Rotli Studio");
+    await expect(link.locator(".external-mark")).toHaveText("↗");
+    await expect(spot.locator(".promo-label")).toHaveText("From rotli");
+    const img = spot.locator("img");
+    expect(new URL((await img.getAttribute("src"))!, page.url()).origin).toBe(new URL(page.url()).origin);
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    return;
+  }
+  throw new Error("no post shows the Rotli Studio spot");
+});

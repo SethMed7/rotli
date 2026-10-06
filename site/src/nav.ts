@@ -19,11 +19,14 @@ export type NavSection =
   | 'developers'
   | 'changelog'
   | 'roadmap'
+  | 'studio'
   | 'about';
 
 export interface SiteLink {
   href: string;
   label: string;
+  /** Another site (rotli's own studio): drawn with an outward arrow, opened in the same tab. */
+  external?: boolean;
 }
 
 export interface NavLink extends SiteLink {
@@ -55,7 +58,8 @@ export function navEntryHolds(entry: NavEntry, current: NavSection | undefined):
 /**
  * The Resources dropdown, and the /resources/ page that lists the same entries for anyone without
  * script: Blog (the one writing section; the guides are posts tagged Guide since 2026-10-06),
- * Developers, Changelog, and Roadmap. Blog appears only once a post can be read, so nothing leads
+ * Developers, Changelog, Roadmap, and Rotli Studio (studio.rotli.co, its own site, marked
+ * `external`). Blog appears only once a post can be read, so nothing leads
  * to an index of nothing but "coming soon". The developer reference (MCP and the CLI) is a
  * development-build feature: the launch site labels it coming soon (src/site.ts
  * `showsExperiments`).
@@ -90,6 +94,13 @@ export function resourceItems(options: { hasPosts: boolean }): NavItem[] {
       href: '/roadmap/',
       label: 'Roadmap',
       description: 'What’s next, and your vote on it',
+    },
+    {
+      section: 'studio',
+      href: STUDIO_URL,
+      label: 'Rotli Studio',
+      description: 'Wallpapers and films from the quokka’s island',
+      external: true,
     },
   ];
 }
@@ -134,7 +145,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
         { href: '/roadmap/', label: 'Roadmap' },
         { href: '/about/', label: 'About' },
         // The open motion studio; not gated on the source flag, it is its own site.
-        { href: STUDIO_URL, label: 'Rotli Studio' },
+        { href: STUDIO_URL, label: 'Rotli Studio', external: true },
         { href: '/privacy/', label: 'Privacy' },
       ],
     },

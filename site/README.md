@@ -92,8 +92,10 @@ whose art never touches its words from 320 to 1920.
   one-line description: Blog (`/blog/`, the one writing section, guides
   included since 2026-10-06; listed only once a post can be read, so an index
   of nothing but "coming soon" is never linked), Developers (`/resources/developers/`, marked "Coming soon" outside
-  the dev site), Changelog (`/changelog/`), and Roadmap (`/roadmap/`, see "The
-  roadmap: votes and requests" below). The dropdown is a disclosure:
+  the dev site), Changelog (`/changelog/`), Roadmap (`/roadmap/`, see "The
+  roadmap: votes and requests" below), and Rotli Studio (studio.rotli.co, the
+  motion studio's own site: an `external` entry drawn with a muted ↗ and
+  opened in the same tab, exactly like the footer's link to it). The dropdown is a disclosure:
   a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
@@ -443,8 +445,9 @@ whose art never touches its words from 320 to 1920.
     `src/assets/characters/filled/cocoa/`, the site's own art), `external`,
     and `needs` (`downloads` or `webApp`, so a build never offers what it
     doesn't have). They are rotli's own promotions only: Download, the
-    roadmap, the newsletter (`#newsletter`, the footer's sign-up), and Rotli
-    Web. Posts rotate through them two at a time by their place in the blog
+    roadmap, the newsletter (`#newsletter`, the footer's sign-up), Rotli
+    Web, and Rotli Studio (studio.rotli.co, rotli's own site, with the ↗ the
+    menu and footer use). Posts rotate through them two at a time by their place in the blog
     (`promosFor`), so every spot is seen. They are plain links with local
     pictures: no script, frame, pixel, or remote image, so the CSP and the
     privacy page stay true. A real advertiser or ad network would need a CSP

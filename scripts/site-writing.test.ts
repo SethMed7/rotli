@@ -485,7 +485,10 @@ describe("the From rotli spots", () => {
       else expect(promo.href).toMatch(/^[/#]/);
       expect(JSON.stringify(promo)).not.toMatch(/sponsor/i);
     }
-    expect([...ids]).toEqual(expect.arrayContaining(["download", "roadmap", "newsletter", "web"]));
+    expect([...ids]).toEqual(expect.arrayContaining(["download", "roadmap", "newsletter", "web", "studio"]));
+    const studio = promos.PROMOS.find((promo) => promo.id === "studio")!;
+    expect(studio.href).toBe("https://studio.rotli.co/");
+    expect(studio.external).toBe(true);
   });
 
   test("a build offers only what it has: no Download without downloads, no Rotli Web without it", () => {

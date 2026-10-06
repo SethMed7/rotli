@@ -72,9 +72,14 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
                     <ul>
                       {link.items.map((item) => (
                         <li>
-                          <a href={item.href} aria-current={item.section === current ? 'page' : undefined}>
+                          <a
+                            href={item.href}
+                            aria-current={item.section === current ? 'page' : undefined}
+                            rel={item.external ? 'noopener' : undefined}
+                          >
                             <b>
                               {item.label}
+                              {item.external && <span class="external-mark" aria-hidden="true">↗</span>}
                               {item.status && <small>{item.status}</small>}
                             </b>
                             <span>{item.description}</span>
@@ -120,8 +125,13 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
                     <div class="nav-menu-group" role="group" aria-labelledby={`menu-${link.section}`}>
                       <p class="nav-menu-label" id={`menu-${link.section}`}>{link.label}</p>
                       {link.items.map((item) => (
-                        <a href={item.href} aria-current={item.section === current ? 'page' : undefined}>
+                        <a
+                          href={item.href}
+                          aria-current={item.section === current ? 'page' : undefined}
+                          rel={item.external ? 'noopener' : undefined}
+                        >
                           {item.label}
+                          {item.external && <span class="external-mark" aria-hidden="true">↗</span>}
                           {item.status && <small>{item.status}</small>}
                         </a>
                       ))}

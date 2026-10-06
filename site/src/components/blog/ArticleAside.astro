@@ -100,11 +100,7 @@ const poseImage = (pose: Promo['pose']) => {
             const image = poseImage(promo.pose);
             return (
               <li data-promo={promo.id}>
-                <a
-                  class="plain-link promo"
-                  href={promo.href}
-                  {...(promo.external ? { target: '_blank', rel: 'noopener' } : {})}
-                >
+                <a class="plain-link promo" href={promo.href} rel={promo.external ? 'noopener' : undefined}>
                   <img
                     class="promo-art"
                     src={image.src}
@@ -119,10 +115,9 @@ const poseImage = (pose: Promo['pose']) => {
                     <span class="promo-title">
                       {promo.title}
                       {promo.external && (
-                        <>
-                          <span aria-hidden="true"> ↗</span>
-                          <span class="visually-hidden"> (opens in a new tab)</span>
-                        </>
+                        <span class="external-mark" aria-hidden="true">
+                          ↗
+                        </span>
                       )}
                     </span>
                     <span class="promo-text">{promo.text}</span>

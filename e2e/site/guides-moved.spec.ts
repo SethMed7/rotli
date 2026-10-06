@@ -26,7 +26,7 @@ for (const [slug, title] of Object.entries(GUIDES)) {
   });
 }
 
-test("the Resources menu and page list the blog, developers, changelog, and roadmap, and no Guides", async ({
+test("the Resources menu and page list the blog, developers, changelog, roadmap, and studio, and no Guides", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -36,7 +36,7 @@ test("the Resources menu and page list the blog, developers, changelog, and road
   const panel = page.locator("#nav-resources");
   await expect(panel).toBeVisible();
   await expect(panel.getByRole("link", { name: /^Guides/ })).toHaveCount(0);
-  for (const name of [/^Blog/, /^Developers/, /^Changelog/, /^Roadmap/]) {
+  for (const name of [/^Blog/, /^Developers/, /^Changelog/, /^Roadmap/, /^Rotli Studio/]) {
     await expect(panel.getByRole("link", { name })).toHaveCount(1);
   }
   await page.goto("/resources/");
@@ -71,4 +71,33 @@ test("no page links to an old guide address", async ({ page }) => {
       );
     expect(old, path).toEqual([]);
   }
+});
+
+test("Rotli Studio is in the Resources menu, the Menu, the page, and the footer, marked as another site", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.locator(".nav-dropdown-toggle", { hasText: "Resources" }).click();
+  const item = page.locator("#nav-resources").getByRole("link", { name: /^Rotli Studio/ });
+  await expect(item).toBeVisible();
+  await expect(item).toHaveAttribute("href", "https://studio.rotli.co/");
+  await expect(item).toHaveAttribute("rel", "noopener");
+  await expect(item.locator(".external-mark")).toHaveText("↗");
+  // The footer's link says the same thing the same way.
+  const footer = page.locator(".footer-groups").getByRole("link", { name: /^Rotli Studio/ });
+  await expect(footer).toHaveAttribute("href", "https://studio.rotli.co/");
+  await expect(footer.locator(".external-mark")).toHaveText("↗");
+  // The narrow Menu.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator(".nav-menu summary").click();
+  await expect(page.locator(".nav-menu-panel").getByRole("link", { name: /^Rotli Studio/ })).toHaveAttribute(
+    "href",
+    "https://studio.rotli.co/",
+  );
+  // The /resources/ page, which lists the menu.
+  await page.goto("/resources/");
+  const entry = page.locator("main .writing-list a[href='https://studio.rotli.co/']");
+  await expect(entry).toContainText("Rotli Studio");
+  await expect(entry).toContainText("Visit");
 });

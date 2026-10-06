@@ -7,6 +7,8 @@ interface Item {
   title: string;
   description: string;
   meta?: string;
+  /** Another site (rotli's studio): an outward arrow, and "Visit" instead of "Read". */
+  external?: boolean;
 }
 
 interface Props {
@@ -25,11 +27,14 @@ const { items, empty } = Astro.props;
       {items.map((item) => (
         <li class="writing-item">
           {item.href ? (
-            <a class="plain-link entry" href={item.href}>
-              <strong>{item.title}</strong>
+            <a class="plain-link entry" href={item.href} rel={item.external ? 'noopener' : undefined}>
+              <strong>
+                {item.title}
+                {item.external && <span class="external-mark" aria-hidden="true">↗</span>}
+              </strong>
               <span>{item.description}</span>
               {item.meta && <small>{item.meta}</small>}
-              <em aria-hidden="true">Read <b>→</b></em>
+              <em aria-hidden="true">{item.external ? 'Visit' : 'Read'} <b>→</b></em>
             </a>
           ) : (
             <div class="entry upcoming">
