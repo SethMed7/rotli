@@ -51,16 +51,18 @@ for (const viewport of [
     await expect(featureImg).toHaveAttribute("loading", "eager");
     await expectThumbnail(featureImg);
 
-    // The featured post is the newest one (no post is marked `featured` today).
+    // The featured post is one of the published posts (the newest, unless one is marked
+    // `featured`), and the row under it holds the next ones, newest first, never it again.
     const rows = await listRows(page);
     expect(rows.length).toBeGreaterThan(1);
-    await expect(feature).toHaveAttribute("href", rows[0]![1]);
-    // The row under it: the next posts, up to three, never the featured one again.
+    const featuredHref = await feature.getAttribute("href");
+    const hrefs = rows.map(([, href]) => href);
+    expect(hrefs).toContain(featuredHref);
     const secondary = page.locator("[data-secondary] li a");
     const secondaryHrefs = await secondary.evaluateAll((links) =>
       links.map((link) => link.getAttribute("href")),
     );
-    expect(secondaryHrefs).toEqual(rows.slice(1, 4).map(([, href]) => href));
+    expect(secondaryHrefs).toEqual(hrefs.filter((href) => href !== featuredHref).slice(0, 3));
     for (const img of await page.locator("[data-secondary] img").all()) await expectThumbnail(img);
 
     // The section order on the page.
