@@ -50,7 +50,9 @@ test("a note card shows the note; a secure one shows only its title; a missing o
   expect(markup).toContain("This note isn’t in the vault anymore.");
   // no toolbar at rest: the only text outside cards is the edge label
   expect(markup).not.toContain("jc-empty");
-  expect(markup).toContain(">cites<");
+  // a named line shows its name on its handle, and says what it joins
+  expect(markup).toContain(">cites</button>");
+  expect(markup).toContain('aria-label="Line from Idea to Books, cites"');
 });
 
 test("an empty canvas says how to begin, and lines curve out of the sides they name", () => {

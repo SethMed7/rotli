@@ -3,7 +3,7 @@
 // the editor saves whatever comes back. No note is ever touched — a note card
 // only names the note's path.
 
-import type { CanvasDoc, CanvasEdge, CanvasNode, CanvasSide, FileNode, TextNode } from "./model";
+import type { CanvasDoc, CanvasEdge, CanvasNode, CanvasSide, FileNode, GroupNode, TextNode } from "./model";
 
 export const CARD = { width: 260, height: 140 } as const;
 export const NOTE_CARD = { width: 320, height: 220 } as const;
@@ -138,6 +138,65 @@ export function bringToFront(doc: CanvasDoc, ids: readonly string[]): CanvasDoc 
   const lifted = doc.nodes.filter((node) => lift.has(node.id)).sort(groupsFirst);
   if (lifted.length === 0) return doc;
   return { ...doc, nodes: [...doc.nodes.filter((node) => !lift.has(node.id)), ...lifted] };
+}
+
+/** Gather cards into a new group drawn around them (beneath everything, as
+ * groups sit), with room for its label above. Nothing to gather, no group. */
+export function groupAround(doc: CanvasDoc, ids: readonly string[], makeId = randomId) {
+  const members = doc.nodes.filter((node) => ids.includes(node.id));
+  const box = bounds({ nodes: members, edges: [] });
+  if (!box) return { doc, id: null };
+  const pad = 32;
+  const group: GroupNode = {
+    id: freshId(doc, makeId),
+    type: "group",
+    x: box.x - pad,
+    y: box.y - pad,
+    width: box.width + pad * 2,
+    height: box.height + pad * 2,
+  };
+  return { doc: { ...doc, nodes: [group, ...doc.nodes] }, id: group.id };
+}
+
+/** Grow a group just enough to hold a card written on its floor. */
+export function growGroupAround(doc: CanvasDoc, groupId: string, cardId: string): CanvasDoc {
+  const card = doc.nodes.find((node) => node.id === cardId);
+  if (!card) return doc;
+  const pad = 16;
+  return {
+    ...doc,
+    nodes: doc.nodes.map((node) => {
+      if (node.id !== groupId || node.type !== "group") return node;
+      const left = Math.min(node.x, card.x - pad);
+      const top = Math.min(node.y, card.y - pad);
+      const right = Math.max(node.x + node.width, card.x + card.width + pad);
+      const bottom = Math.max(node.y + node.height, card.y + card.height + pad);
+      return { ...node, x: left, y: top, width: right - left, height: bottom - top };
+    }),
+  };
+}
+
+/** Name a group or a line; an empty name removes it from the file. */
+export function setLabel(doc: CanvasDoc, id: string, label: string): CanvasDoc {
+  const named = <T extends { label?: string }>(item: T): T => {
+    const { label: _old, ...rest } = item;
+    return (label.trim() ? { ...rest, label: label.trim() } : rest) as T;
+  };
+  return {
+    ...doc,
+    nodes: doc.nodes.map((node) => (node.id === id && node.type === "group" ? named(node) : node)),
+    edges: doc.edges.map((edge) => (edge.id === id ? named(edge) : edge)),
+  };
+}
+
+/** The middle of a line, where its label and its handle sit. */
+export function edgeMidpoint(doc: CanvasDoc, edge: CanvasEdge): { x: number; y: number } | null {
+  const from = doc.nodes.find((node) => node.id === edge.fromNode);
+  const to = doc.nodes.find((node) => node.id === edge.toNode);
+  if (!from || !to) return null;
+  const a = anchor(from, edge.fromSide ?? "right");
+  const b = anchor(to, edge.toSide ?? "left");
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
 /** Where a line meets a card's side (its midpoint). */

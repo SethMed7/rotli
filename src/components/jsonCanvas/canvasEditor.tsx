@@ -1,47 +1,41 @@
-// The Canvas editor (spike, 2026-10-05): cards on an open plane, the JSON
-// Canvas file as its only truth. Calm by construction — no toolbar, no zoom
-// widget, no minimap. A card's connect dots show only on hover or focus; a
-// selected card shows nothing more than an outline.
+// The Canvas editor (2026-10-05): cards on an open plane, the JSON Canvas
+// file as its only truth. Calm by construction — no toolbar, no zoom widget,
+// no minimap. A card's connect dots show only on hover or focus; a selected
+// card shows nothing more than an outline; a line's handle is a quiet dot
+// until you point at it.
 //
-// Pointer: double-click empty space writes a card · drag a card to move it ·
-// drag its corner to resize · drag a side dot onto another card to connect ·
-// drag empty space to pan · pinch or ⌘-scroll to zoom. A card holding just
+// Pointer: double-click empty space writes a card (inside a group, too) ·
+// drag a card to move it · drag its corner to resize · drag a side dot onto
+// another card to connect · click a line's middle to pick the line · drag
+// empty space to pan · pinch or ⌘-scroll to zoom. A card holding just
 // [[a note]] becomes that note's card when you finish typing.
-// Keyboard: Tab reaches each card · Enter edits a text card or opens a note ·
-// arrows nudge (⇧ for more) · Delete removes · Esc deselects · 0 fits.
+// Keyboard: Tab reaches each card and each line · Enter edits a text card,
+// opens a note, or names a group or line · G gathers the selected cards into
+// a group · arrows nudge (⇧ for more) · Delete removes · Esc deselects · 0 fits.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { type View, fitView, toGraph, zoomAt } from "../../graph/viewport";
-import {
-  type CanvasDoc,
-  type CanvasEdge,
-  type CanvasNode,
-  type CanvasSide,
-  colorName,
-  fileTitle,
-} from "../../jsonCanvas/model";
+import { type CanvasDoc, type CanvasNode, fileTitle } from "../../jsonCanvas/model";
 import { lonelyWikilink } from "../../jsonCanvas/notePaths";
 import {
   NOTE_CARD,
   addText,
-  anchor,
   bringToFront,
   connect,
+  groupAround,
+  growGroupAround,
   moveNodes,
   removeItems,
   resizeNode,
+  setLabel,
   setText,
 } from "../../jsonCanvas/workflow";
-import { MarkdownPeek } from "../markdownPeek";
+import { Card, type CanvasEditing, type CanvasNoteView } from "./canvasCard";
+import { EdgeHandles, EdgeLines } from "./canvasEdges";
 
-export interface CanvasNoteView {
-  title: string;
-  /** null while the body loads. */
-  body: string | null;
-  /** Title shows, text never does — a screen may be shared. */
-  secure: boolean;
-}
+export type { CanvasNoteView } from "./canvasCard";
+export { edgePath } from "./canvasEdges";
 
 export interface CanvasEditorProps {
   doc: CanvasDoc;
@@ -59,53 +53,13 @@ type Drag =
   | { kind: "resize"; sx: number; sy: number; id: string; width: number; height: number; origin: CanvasDoc }
   | { kind: "connect"; from: string };
 
-const SIDES: readonly CanvasSide[] = ["top", "right", "bottom", "left"];
-const NORMAL: Record<CanvasSide, [number, number]> = {
-  top: [0, -1],
-  right: [1, 0],
-  bottom: [0, 1],
-  left: [-1, 0],
-};
-
-/** A gentle curve between two card sides, leaving each along its normal. */
-export function edgePath(doc: CanvasDoc, edge: CanvasEdge): string | null {
-  const from = doc.nodes.find((node) => node.id === edge.fromNode);
-  const to = doc.nodes.find((node) => node.id === edge.toNode);
-  if (!from || !to) return null;
-  const fromSide = edge.fromSide ?? "right";
-  const toSide = edge.toSide ?? "left";
-  const a = anchor(from, fromSide);
-  const b = anchor(to, toSide);
-  const reach = Math.min(140, Math.hypot(b.x - a.x, b.y - a.y) * 0.4);
-  const [ax, ay] = NORMAL[fromSide];
-  const [bx, by] = NORMAL[toSide];
-  const at = (value: number) => Math.round(value);
-  return `M ${at(a.x)} ${at(a.y)} C ${at(a.x + ax * reach)} ${at(a.y + ay * reach)}, ${at(b.x + bx * reach)} ${at(b.y + by * reach)}, ${at(b.x)} ${at(b.y)}`;
-}
-
-function cardLabel(node: CanvasNode, note: CanvasNoteView | null): string {
-  const color = colorName(node.color);
-  const tint = color ? `, ${color}` : "";
-  switch (node.type) {
-    case "text":
-      return `Text card${tint}: ${node.text.split("\n")[0]?.replace(/^#+\s*/, "") || "empty"}`;
-    case "file":
-      return `Note card${tint}: ${note?.title ?? `${fileTitle(node.file)} (missing)`}`;
-    case "link":
-      return `Link card${tint}: ${node.url}`;
-    case "group":
-      return `Group${tint}: ${node.label ?? "untitled"}`;
-    case "unknown":
-      return `Card from another app (${node.rawType})`;
-  }
-}
-
 export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }: CanvasEditorProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [editing, setEditing] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
+  const [editing, setEditing] = useState<CanvasEditing>(null);
   const [draft, setDraft] = useState("");
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   // the card a line is being drawn from (state, so the draft line renders)
@@ -135,7 +89,7 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
     const element = viewportRef.current;
     if (!element) return;
     const onWheel = (event: WheelEvent) => {
-      if ((event.target as HTMLElement).closest("textarea")) return;
+      if ((event.target as HTMLElement).closest("textarea, input")) return;
       event.preventDefault();
       const rect = element.getBoundingClientRect();
       setView((current) =>
@@ -161,10 +115,23 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
     return toGraph(view, rect.width, rect.height, clientX - rect.left, clientY - rect.top);
   };
 
+  const pickCards = (ids: ReadonlySet<string>) => {
+    setSelected(ids);
+    if (ids.size > 0) setSelectedEdge(null);
+  };
+  const pickEdge = (id: string | null) => {
+    setSelectedEdge(id);
+    if (id) setSelected(new Set());
+  };
+
   const commitEdit = () => {
     if (editing === null) return;
-    const id = editing;
+    const { id, field } = editing;
     setEditing(null);
+    if (field === "label") {
+      onChange(setLabel(doc, id, draft));
+      return;
+    }
     const node = doc.nodes.find((each) => each.id === id);
     if (!node || node.type !== "text") return;
     const target = lonelyWikilink(draft);
@@ -180,24 +147,49 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
       onChange(setText(doc, id, draft));
     }
   };
+  const cancelEdit = () => setEditing(null);
 
   const startEdit = (node: CanvasNode) => {
-    if (node.type !== "text") return;
-    setSelected(new Set([node.id]));
-    setDraft(node.text);
-    setEditing(node.id);
+    if (node.type === "text") {
+      pickCards(new Set([node.id]));
+      setDraft(node.text);
+      setEditing({ id: node.id, field: "text" });
+    } else if (node.type === "group") {
+      pickCards(new Set([node.id]));
+      setDraft(node.label ?? "");
+      setEditing({ id: node.id, field: "label" });
+    }
+  };
+  const startEdgeEdit = (id: string) => {
+    pickEdge(id);
+    setDraft(doc.edges.find((edge) => edge.id === id)?.label ?? "");
+    setEditing({ id, field: "label" });
+  };
+
+  const writeCardAt = (clientX: number, clientY: number, groupId?: string) => {
+    const [x, y] = world(clientX, clientY);
+    const added = addText(doc, x, y, "");
+    // a card written on a group's floor stays inside it
+    onChange(groupId ? growGroupAround(added.doc, groupId, added.id) : added.doc);
+    pickCards(new Set([added.id]));
+    setDraft("");
+    setEditing({ id: added.id, field: "text" });
   };
 
   // ——— pointer on the plane
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (target.closest("textarea")) return;
+    if (target.closest("textarea, input")) return;
+    const edgeId = target.closest<HTMLElement>("[data-edge-id]")?.dataset.edgeId;
+    if (editing !== null) commitEdit();
+    if (edgeId) {
+      pickEdge(edgeId);
+      return;
+    }
     const handle = target.closest<HTMLElement>("[data-handle]");
-    const cardElement = target.closest<HTMLElement>("[data-card-id]");
-    const id = cardElement?.dataset.cardId;
+    const id = target.closest<HTMLElement>("[data-card-id]")?.dataset.cardId;
     viewportRef.current?.setPointerCapture(event.pointerId);
-    if (editing !== null && id !== editing) commitEdit();
     if (handle && id) {
       if (handle.dataset.handle === "resize") {
         const node = doc.nodes.find((each) => each.id === id);
@@ -221,7 +213,7 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
     }
     if (id) {
       const next = event.shiftKey ? toggled(selected, id) : selected.has(id) ? selected : new Set([id]);
-      setSelected(next);
+      pickCards(next);
       drag.current = {
         kind: "move",
         sx: event.clientX,
@@ -232,7 +224,10 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
       };
       return;
     }
-    if (!event.shiftKey) setSelected(new Set());
+    if (!event.shiftKey) {
+      setSelected(new Set());
+      setSelectedEdge(null);
+    }
     drag.current = { kind: "pan", sx: event.clientX, sy: event.clientY, view };
   };
 
@@ -282,30 +277,47 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
+    // the first click's drag captured the pointer on the plane, so ask what is
+    // really under it rather than trusting the event's target
+    const target = (document.elementFromPoint(event.clientX, event.clientY) ?? event.target) as HTMLElement;
+    if (target.closest("textarea, input")) return;
+    const edgeId = target.closest<HTMLElement>("[data-edge-id]")?.dataset.edgeId;
+    if (edgeId) return startEdgeEdit(edgeId);
     const cardElement = target.closest<HTMLElement>("[data-card-id]");
-    if (cardElement) {
-      const node = doc.nodes.find((each) => each.id === cardElement.dataset.cardId);
-      if (node?.type === "text") startEdit(node);
-      else if (node?.type === "file") onOpenNote(node.file);
-      return;
-    }
-    const [x, y] = world(event.clientX, event.clientY);
-    const added = addText(doc, x, y, "");
-    onChange(added.doc);
-    setSelected(new Set([added.id]));
-    setDraft("");
-    setEditing(added.id);
+    const node = cardElement ? doc.nodes.find((each) => each.id === cardElement.dataset.cardId) : undefined;
+    if (node?.type === "text") return startEdit(node);
+    if (node?.type === "file") return onOpenNote(node.file);
+    if (node?.type === "group" && target.closest("[data-group-label]")) return startEdit(node);
+    // empty space, or the open floor of a group: write a card there
+    if (!node || node.type === "group") writeCardAt(event.clientX, event.clientY, node?.id);
   };
 
   // ——— keyboard
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("textarea")) {
+    const target = event.target as HTMLElement;
+    if (target.closest("input")) return; // the name field keeps its own keys
+    if (target.closest("textarea")) {
       if (event.key === "Escape" || (event.key === "Enter" && (event.metaKey || event.ctrlKey))) {
         event.preventDefault();
         event.stopPropagation();
         commitEdit();
-        (event.target as HTMLElement).closest<HTMLElement>("[data-card-id]")?.focus();
+        target.closest<HTMLElement>("[data-card-id]")?.focus();
+      }
+      return;
+    }
+    if (selectedEdge) {
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        onChange(removeItems(doc, [selectedEdge]));
+        setSelectedEdge(null);
+        viewportRef.current?.focus();
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        startEdgeEdit(selectedEdge);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        setSelectedEdge(null);
+        viewportRef.current?.focus();
       }
       return;
     }
@@ -327,13 +339,21 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
       setSelected(new Set());
     } else if (event.key === "Enter" && ids.length === 1) {
       const node = doc.nodes.find((each) => each.id === ids[0]);
-      if (node?.type === "text") {
-        event.preventDefault();
-        startEdit(node);
-      } else if (node?.type === "file") {
+      if (node?.type === "file") {
         event.preventDefault();
         onOpenNote(node.file);
+      } else if (node) {
+        event.preventDefault();
+        startEdit(node);
       }
+    } else if (event.key.toLowerCase() === "g" && !event.metaKey && !event.ctrlKey && ids.length > 0) {
+      event.preventDefault();
+      const grouped = groupAround(doc, ids);
+      if (grouped.id === null) return;
+      onChange(grouped.doc);
+      pickCards(new Set([grouped.id]));
+      setDraft("");
+      setEditing({ id: grouped.id, field: "label" });
     } else if (event.key === "Escape" && ids.length > 0) {
       event.preventDefault();
       setSelected(new Set());
@@ -345,7 +365,14 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
 
   const transform = `translate(${size.width / 2 + view.x}px, ${size.height / 2 + view.y}px) scale(${view.k})`;
   const connecting = connectFrom ? doc.nodes.find((node) => node.id === connectFrom) : undefined;
-  const edges = useMemo(() => doc.edges.map((edge) => ({ edge, path: edgePath(doc, edge) })), [doc]);
+  const titleOf = (id: string) => {
+    const node = doc.nodes.find((each) => each.id === id);
+    if (!node) return "a missing card";
+    if (node.type === "file") return noteFor(node.file)?.title ?? fileTitle(node.file);
+    if (node.type === "text") return node.text.split("\n")[0]?.replace(/^#+\s*/, "") || "an empty card";
+    if (node.type === "group") return node.label ?? "a group";
+    return "a card";
+  };
 
   return (
     <div
@@ -354,7 +381,7 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
       tabIndex={0}
       role="application"
       aria-roledescription="canvas"
-      aria-label={`Canvas with ${doc.nodes.length} cards and ${doc.edges.length} lines. Double-click to write a card; Tab moves between cards.`}
+      aria-label={`Canvas with ${doc.nodes.length} cards and ${doc.edges.length} lines. Double-click to write a card; Tab moves between cards and lines; G groups the selected cards.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -362,76 +389,44 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
       onKeyDown={onKeyDown}
     >
       <div className="jc-world" style={{ transform }}>
-        <svg className="jc-edges" aria-hidden="true">
-          <defs>
-            <marker
-              id="jc-arrow"
-              viewBox="0 0 10 10"
-              refX="9"
-              refY="5"
-              markerWidth="7"
-              markerHeight="7"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 0 L 10 5 L 0 10 z" className="jc-arrowhead" />
-            </marker>
-          </defs>
-          {edges.map(({ edge, path }) =>
-            path === null ? null : (
-              <g
-                key={edge.id}
-                className={
-                  selected.has(edge.fromNode) || selected.has(edge.toNode) ? "jc-edge is-near" : "jc-edge"
-                }
-              >
-                <path
-                  d={path}
-                  markerEnd={edge.toEnd === "none" ? undefined : "url(#jc-arrow)"}
-                  markerStart={edge.fromEnd === "arrow" ? "url(#jc-arrow)" : undefined}
-                />
-              </g>
-            ),
-          )}
-          {connecting && pointer && (
-            <line
-              className="jc-edge-draft"
-              x1={connecting.x + connecting.width / 2}
-              y1={connecting.y + connecting.height / 2}
-              x2={pointer.x}
-              y2={pointer.y}
-            />
-          )}
-        </svg>
+        <EdgeLines
+          doc={doc}
+          near={selected}
+          selectedEdge={selectedEdge}
+          draftFrom={
+            connecting
+              ? { x: connecting.x + connecting.width / 2, y: connecting.y + connecting.height / 2 }
+              : null
+          }
+          pointer={pointer}
+        />
         {doc.nodes.map((node) => (
           <Card
             key={node.id}
             node={node}
             note={node.type === "file" ? noteFor(node.file) : null}
             selected={selected.has(node.id)}
-            editing={editing === node.id}
+            editing={editing?.id === node.id ? editing.field : null}
             draft={draft}
             onDraft={setDraft}
             onCommit={commitEdit}
-            onFocus={() => setSelected((current) => (current.has(node.id) ? current : new Set([node.id])))}
+            onCancel={cancelEdit}
+            onFocus={() => pickCards(selected.has(node.id) ? selected : new Set([node.id]))}
           />
         ))}
-        {doc.edges.map((edge) => {
-          if (!edge.label) return null;
-          const from = doc.nodes.find((node) => node.id === edge.fromNode);
-          const to = doc.nodes.find((node) => node.id === edge.toNode);
-          if (!from || !to) return null;
-          const a = anchor(from, edge.fromSide ?? "right");
-          const b = anchor(to, edge.toSide ?? "left");
-          return (
-            <span
-              key={`${edge.id}-label`}
-              className="jc-edge-label"
-              style={{ left: (a.x + b.x) / 2, top: (a.y + b.y) / 2 }}
-            >
-              {edge.label}
-            </span>
-          );
-        })}
+        <EdgeHandles
+          doc={doc}
+          titleOf={titleOf}
+          selectedEdge={selectedEdge}
+          editingEdge={
+            editing?.field === "label" && !doc.nodes.some((n) => n.id === editing.id) ? editing.id : null
+          }
+          draft={draft}
+          onDraft={setDraft}
+          onCommit={commitEdit}
+          onCancel={cancelEdit}
+          onSelect={pickEdge}
+        />
       </div>
       {doc.nodes.length === 0 && (
         <p className="jc-empty">
@@ -459,86 +454,5 @@ function fitDoc(doc: CanvasDoc, width: number, height: number): View {
     width,
     height,
     64,
-  );
-}
-
-function Card({
-  node,
-  note,
-  selected,
-  editing,
-  draft,
-  onDraft,
-  onCommit,
-  onFocus,
-}: {
-  node: CanvasNode;
-  note: CanvasNoteView | null;
-  selected: boolean;
-  editing: boolean;
-  draft: string;
-  onDraft: (text: string) => void;
-  onCommit: () => void;
-  onFocus: () => void;
-}) {
-  const style = { left: node.x, top: node.y, width: node.width, height: node.height };
-  const className = `jc-card jc-${node.type}${selected ? " is-selected" : ""}${node.color ? " has-color" : ""}`;
-  return (
-    <div
-      className={className}
-      style={style}
-      data-card-id={node.id}
-      tabIndex={0}
-      role="group"
-      aria-roledescription="card"
-      aria-label={cardLabel(node, note)}
-      onFocus={(event) => event.target === event.currentTarget && onFocus()}
-    >
-      {node.type === "group" && <span className="jc-group-label">{node.label ?? ""}</span>}
-      {node.type === "text" &&
-        (editing ? (
-          <textarea
-            className="jc-text-edit"
-            value={draft}
-            autoFocus
-            aria-label="Card text"
-            onChange={(event) => onDraft(event.target.value)}
-            onBlur={onCommit}
-          />
-        ) : (
-          <div className="jc-body">
-            <MarkdownPeek body={node.text} className="pv-note jc-md" />
-          </div>
-        ))}
-      {node.type === "file" && (
-        <div className="jc-body">
-          <p className="jc-note-title">{note?.title ?? fileTitle(node.file)}</p>
-          {note === null ? (
-            <p className="jc-quiet">This note isn’t in the vault anymore. The card keeps its place.</p>
-          ) : note.secure ? (
-            <p className="jc-quiet">Secure note. Open it to read.</p>
-          ) : note.body === null ? (
-            <p className="jc-quiet">Loading…</p>
-          ) : (
-            <MarkdownPeek body={note.body.replace(/^#\s.*\n+/, "")} className="pv-note jc-md" />
-          )}
-        </div>
-      )}
-      {node.type === "link" && (
-        <div className="jc-body">
-          <p className="jc-note-title">{node.url}</p>
-        </div>
-      )}
-      {node.type === "unknown" && (
-        <div className="jc-body">
-          <p className="jc-quiet">Made in another app. Rotli keeps it as it is.</p>
-        </div>
-      )}
-      {node.type !== "group" &&
-        SIDES.map((side) => (
-          <span key={side} className={`jc-dot jc-dot-${side}`} data-handle="connect" aria-hidden="true" />
-        ))}
-      <span className="jc-resize" data-handle="resize" aria-hidden="true" />
-    </div>
   );
 }
