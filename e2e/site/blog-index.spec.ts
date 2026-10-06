@@ -21,11 +21,11 @@ async function expectThumbnail(img: Locator) {
 }
 
 /** The list's rows as [date, href], top to bottom. */
-const listRows = (page: Page) =>
+const listRows = (page: Page): Promise<[string, string][]> =>
   page
     .locator("[data-post-list] > li")
     .evaluateAll((rows) =>
-      rows.map((row) => [
+      rows.map((row): [string, string] => [
         row.querySelector("time")!.getAttribute("datetime")!,
         row.querySelector("a")!.getAttribute("href")!,
       ]),
