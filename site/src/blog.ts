@@ -23,7 +23,7 @@ export function isNew(date: Date, now: Date, days = NEW_FOR_DAYS): boolean {
 }
 
 /** How many posts sit in the row under the featured story. */
-export const SECONDARY = 3;
+export const SECONDARY = 4;
 
 export interface Arranged<T> {
   featured: T | undefined;

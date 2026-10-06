@@ -289,9 +289,9 @@ describe("the blog index", () => {
     expect(marked.secondary.map((each) => each.slug)).toEqual(["c", "a"]);
   });
 
-  test("the row under the feature holds at most three", () => {
+  test("the row under the feature holds at most four", () => {
     const many = ["01", "02", "03", "04", "05", "06"].map((d) => post(d, `2026-09-${d}`));
-    expect(blog.arrangeBlog(many).secondary).toHaveLength(3);
+    expect(blog.arrangeBlog(many).secondary).toHaveLength(4);
     expect(blog.arrangeBlog([]).featured).toBeUndefined();
   });
 

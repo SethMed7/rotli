@@ -3,13 +3,16 @@
 // what is new/big"), in rotli's warm look:
 //   1. the featured story: the newest post, or the one marked `featured`, its picture large
 //      beside its title, summary, date, and topics;
-//   2. the next posts (up to three, src/blog.ts) in a row of smaller pictures;
+//   2. the next posts (up to four, src/blog.ts) in a row of smaller pictures;
 //   3. "All posts": one dated row per post (date, topic, title, a one-line summary) between
 //      hairlines, never boxes, with topic filters that need script and appear only with it,
 //      so without script the whole list shows;
 //   4. "Coming soon": announced posts, quieter and apart, never links.
 // A post from the last 14 days, as of the build, wears "New" (src/blog.ts `isNew`). Pictures are
 // the posts' thumbnails (src/og.ts), one 1200 × 630 shape with real sizes, so nothing shifts.
+// The blog has the site's wider page (Base `widePage`), and the index lays itself out by its own
+// width (a container), not the window's: the feature beside its words from 52rem, the row as many
+// columns as fit (up to four, never more than it has posts), the list's words at a reading measure.
 import type { Thumbnail } from '../../og';
 import { topicKey, topicsOf } from '../../blog';
 
@@ -64,7 +67,7 @@ const shortDate = (post: BlogPost) =>
               <img
                 src={featured.thumbnail.src}
                 srcset={featured.thumbnail.srcset}
-                sizes="(min-width: 1100px) 44rem, calc(100vw - 2.5rem)"
+                sizes="(min-width: 1616px) 58rem, (min-width: 900px) 60vw, calc(100vw - 2.5rem)"
                 width={featured.thumbnail.width}
                 height={featured.thumbnail.height}
                 alt={featured.thumbnail.alt}
@@ -112,7 +115,7 @@ const shortDate = (post: BlogPost) =>
                     <img
                       src={post.thumbnail.src}
                       srcset={post.thumbnail.srcset}
-                      sizes="(min-width: 1100px) 24rem, (min-width: 700px) 45vw, calc(100vw - 2.5rem)"
+                      sizes="(min-width: 1100px) 28rem, (min-width: 700px) 45vw, calc(100vw - 2.5rem)"
                       width={post.thumbnail.width}
                       height={post.thumbnail.height}
                       alt={post.thumbnail.alt}
@@ -254,6 +257,9 @@ const shortDate = (post: BlogPost) =>
 </script>
 
 <style>
+  .blog-index {
+    container: blog-index / inline-size;
+  }
   /* One picture grammar: the scene at its own 1200 × 630 shape, a rounded frame with a hairline. */
   .frame {
     position: relative;
@@ -315,16 +321,18 @@ const shortDate = (post: BlogPost) =>
     line-height: 1.4;
   }
 
-  /* 1. The featured story: the picture large, the words beside its middle. */
+  /* 1. The featured story: the picture large (about five eighths of the page), the words beside
+     its middle at a reading measure. */
   .feature {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
     align-items: center;
-    gap: clamp(1.5rem, 4vw, 3.5rem);
+    gap: clamp(1.5rem, 4cqi, 4rem);
     color: var(--text);
     text-decoration: none;
   }
   .feature-copy {
+    max-width: 34rem;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -332,7 +340,7 @@ const shortDate = (post: BlogPost) =>
   }
   .blog-index .feature h2 {
     margin: 0;
-    font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+    font-size: clamp(1.8rem, 2.9cqi, 3rem);
     font-weight: 600;
     line-height: 1.08;
     letter-spacing: -0.035em;
@@ -365,13 +373,29 @@ const shortDate = (post: BlogPost) =>
   .secondary {
     margin-top: clamp(2.5rem, 5vw, 4rem);
   }
+  /* As many columns as fit at 16rem or more, at most four, and never more columns than posts, so
+     the row fills its width at every count and every width (no breakpoints). */
   .row {
+    --row-gap: clamp(1.5rem, 2.5cqi, 2.5rem);
+    --row-most: 4;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: clamp(1.5rem, 3vw, 2.25rem);
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(min(100%, max(16rem, (100% - (var(--row-most) - 1) * var(--row-gap)) / var(--row-most))), 1fr)
+    );
+    gap: var(--row-gap);
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .row:has(> li:nth-child(3):last-child) {
+    --row-most: 3;
+  }
+  /* Two posts, or a lone one on a narrow page (a wide one lays it on its side, below): half the
+     width each, so a lone post never grows as large as the feature. */
+  .row:has(> li:nth-child(2):last-child),
+  .row:has(> li:only-child) {
+    --row-most: 2;
   }
   .row li {
     margin: 0;
@@ -403,14 +427,14 @@ const shortDate = (post: BlogPost) =>
   }
 
   /* A lone post in the row lies on its side, its picture beside its words, so the row is not
-     two empty columns. */
-  @media (min-width: 900px) {
+     empty columns. */
+  @container blog-index (min-width: 52rem) {
     .row:has(> li:only-child) {
       grid-template-columns: minmax(0, 1fr);
     }
     .row > li:only-child .tile {
       display: grid;
-      grid-template-columns: minmax(0, 22rem) minmax(0, 32rem);
+      grid-template-columns: minmax(0, 28rem) minmax(0, 34rem);
       grid-template-rows: auto auto 1fr;
       align-content: start;
       gap: 0.6rem clamp(1.5rem, 3vw, 2.5rem);
@@ -508,8 +532,10 @@ const shortDate = (post: BlogPost) =>
     font-size: 0.9rem;
     font-weight: 600;
   }
+  /* The words keep a reading measure; the row's hairline still runs the page's width. */
   .list-copy {
     display: block;
+    max-width: 46rem;
   }
   .list-title {
     color: var(--text);
@@ -547,7 +573,8 @@ const shortDate = (post: BlogPost) =>
   /* 4. Coming soon: quieter, apart, and not links. */
   .soon {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    /* At most three across, so the announced posts fill the page's width on a wide screen. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, max(20rem, (100% - 4rem) / 3)), 1fr));
     gap: 1.5rem 2rem;
     margin: 1.5rem 0 0;
     padding: 0;
@@ -581,20 +608,12 @@ const shortDate = (post: BlogPost) =>
     color: var(--text-muted);
   }
 
-  @media (max-width: 1100px) {
-    .row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-  @media (max-width: 900px) {
+  @container blog-index (width < 52rem) {
     .feature {
       grid-template-columns: minmax(0, 1fr);
     }
   }
-  @media (max-width: 700px) {
-    .row {
-      grid-template-columns: minmax(0, 1fr);
-    }
+  @container blog-index (width < 40rem) {
     .list li {
       grid-template-columns: auto minmax(0, 1fr);
       gap: 0.35rem 0.9rem;
