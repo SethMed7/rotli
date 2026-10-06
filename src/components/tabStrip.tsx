@@ -34,6 +34,7 @@ import {
 } from "../documents/draftComposition";
 import { newItemInTab } from "../keys/actions";
 import { tabHotkeyAction } from "../keys/tabHotkeys";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { fileName, fileNameStem, isCanvasPath } from "../lib/fileKind";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import {
@@ -89,8 +90,9 @@ function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string,
     case "chat":
       return tab.chatSlug ? (chatTitles.get(tab.chatSlug) ?? tab.chatSlug.replace(/-/g, " ")) : "New chat";
     case "file":
-      // a canvas is named like a board, without its extension
-      return isCanvasPath(tab.fileId)
+      // a canvas is named like a board, without its extension, where this
+      // build opens canvases
+      return LAUNCH_FEATURES.jsonCanvas && isCanvasPath(tab.fileId)
         ? fileName(tab.fileId).slice(0, -".canvas".length)
         : fileName(tab.fileId);
     case "activity":

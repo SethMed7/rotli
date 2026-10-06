@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 
 import { DOCUMENT_EXTS, WORD_EXTS } from "../documents/kinds";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { IMAGE_EXTS, extOf, isCanvasPath } from "../lib/fileKind";
 import {
   DocumentGlyph,
@@ -31,8 +32,9 @@ export function CanvasGlyph(props: GlyphProps) {
 }
 
 /** The row glyph for a note/board/file, by kind + filename extension: the REAL
- * format mark for files (svg/pdf/raster image) and the Excalidraw logo for
- * canvases; notes and unknown files stay the generic document. */
+ * format mark for files (svg/pdf/raster image), the Excalidraw logo for
+ * boards, two joined cards for a JSON Canvas where this build opens them;
+ * notes and unknown files stay the generic document. */
 export function glyphForNote(
   note: {
     kind?: "note" | "board" | "file" | undefined;
@@ -44,7 +46,8 @@ export function glyphForNote(
   if (note.kind === "board") return <ExcalidrawGlyph {...props} />;
   // a listed canvas is titled without its extension, so its id says what it
   // is; a tab knows only the file name, which still carries it
-  if (note.kind === "file" && isCanvasPath(note.id ?? note.title ?? "")) return <CanvasGlyph {...props} />;
+  if (note.kind === "file" && LAUNCH_FEATURES.jsonCanvas && isCanvasPath(note.id ?? note.title ?? ""))
+    return <CanvasGlyph {...props} />;
   if (note.kind === "file") {
     const ext = extOf(note.title ?? "");
     if (ext === "svg") return <SvgFormatGlyph {...props} />;

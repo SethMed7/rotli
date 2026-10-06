@@ -15,10 +15,12 @@ use super::*;
 /// lives beside notes and moves to Archive/Trash like one (owner decisions
 /// 2026-10-06).
 pub(crate) fn is_canvas_path(rel: &str) -> bool {
-    Path::new(rel)
-        .extension()
-        .and_then(|value| value.to_str())
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("canvas"))
+    // in the public binary a .canvas is an ordinary file
+    crate::feature_policy::canvas_enabled()
+        && Path::new(rel)
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("canvas"))
 }
 
 /// What a new canvas file holds: an empty JSON Canvas, written the way
@@ -129,6 +131,7 @@ impl CorpusStore {
     /// (a memex's hidden root Inbox, Storage, a reference lane) lands it where
     /// a new note would: the capture folder.
     pub fn create_canvas(&mut self, folder: &str, name: &str) -> Result<String, String> {
+        crate::feature_policy::require_canvas()?;
         self.mutation_allowed()?;
         let stem = name.trim();
         if stem.is_empty() {
@@ -164,6 +167,13 @@ mod tests {
 
     #[test]
     fn a_canvas_is_born_beside_notes_named_like_a_board_and_moves_like_a_note() {
+        if !crate::feature_policy::canvas_enabled() {
+            // the public binary refuses, and a .canvas is an ordinary file
+            let (_dir, mut store) = super::super::tests::bare();
+            assert!(store.create_canvas("", "Plan").is_err());
+            assert!(!is_canvas_path("Plan.canvas"));
+            return;
+        }
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
         super::super::tests::seed_memex(&root);

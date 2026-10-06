@@ -33,10 +33,12 @@ export function buildWikilinkIndex(notes: readonly NoteSummary[]): WikilinkIndex
   return { byId, byTitle, byAlias };
 }
 
-/** How many notes share each trimmed title — drives id-vs-title insert choice. */
+/** How many notes share each trimmed title — drives id-vs-title insert choice.
+ * A file (a canvas) never counts: it never wins a title over a note. */
 export function buildTitleCounts(notes: readonly NoteSummary[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const n of notes) {
+    if (n.kind === "file") continue;
     const t = linkKey(n.title);
     counts.set(t, (counts.get(t) ?? 0) + 1);
   }
@@ -45,6 +47,8 @@ export function buildTitleCounts(notes: readonly NoteSummary[]): Map<string, num
 
 /** What to write inside [[…]] — title unless duplicated, then the wire id. */
 export function wikilinkLabel(note: NoteSummary, titleCounts: Map<string, number>): string {
+  // a canvas sharing a note's title is written by its id: its title means the note
+  if (note.kind === "file") return (titleCounts.get(linkKey(note.title)) ?? 0) > 0 ? note.id : note.title;
   const count = titleCounts.get(linkKey(note.title)) ?? 1;
   return count > 1 ? note.id : note.title;
 }
@@ -76,7 +80,11 @@ export function resolveWikilink(target: string, index: WikilinkIndex): string | 
     const candidates = [...(index.byTitle.get(key) ?? []), ...(index.byAlias.get(key) ?? [])].filter(
       (note, position, notes) => notes.findIndex((candidate) => candidate.id === note.id) === position,
     );
-    return candidates.length === 1 ? candidates[0]!.id : null;
+    if (candidates.length === 1) return candidates[0]!.id;
+    // a file (a canvas) never wins a title over a note: `Plan.canvas` beside
+    // `Plan.md` must not break every [[Plan]] (audit 2026-10-06)
+    const notes = candidates.filter((note) => note.kind !== "file");
+    return notes.length === 1 && candidates.length > notes.length ? notes[0]!.id : null;
   };
   const direct = lookup(t);
   if (direct) return direct;

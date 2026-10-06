@@ -9379,7 +9379,7 @@ mod tests {
     }
 
     /// Corpus that skips first-run seeding (root pre-created, non-empty).
-    fn bare() -> (TempDir, CorpusStore) {
+    pub(super) fn bare() -> (TempDir, CorpusStore) {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("corpus");
         fs::create_dir_all(&root).unwrap();

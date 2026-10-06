@@ -26,6 +26,22 @@ const aliasedNote = (id: string, title: string, aliases: string[]): NoteSummary 
 });
 
 describe("wikilink", () => {
+  test("a canvas never wins a title over a note, and is written by id when they share one", () => {
+    const plan = note("wiki/Plan.md", "Plan");
+    const canvas: NoteSummary = { ...note("wiki/Plan.canvas", "Plan"), kind: "file" };
+    const board: NoteSummary = { ...note("wiki/Plan.excalidraw", "Plan"), kind: "board" };
+    // Plan.canvas beside Plan.md keeps every [[Plan]] working
+    expect(resolveWikilink("Plan", buildWikilinkIndex([plan, canvas]))).toBe("wiki/Plan.md");
+    // a board still makes the title ambiguous, as before
+    expect(resolveWikilink("Plan", buildWikilinkIndex([plan, board]))).toBeNull();
+    // a canvas alone keeps its title
+    expect(resolveWikilink("Plan", buildWikilinkIndex([canvas]))).toBe("wiki/Plan.canvas");
+    const counts = buildTitleCounts([plan, canvas]);
+    expect(wikilinkLabel(plan, counts)).toBe("Plan");
+    expect(wikilinkLabel(canvas, counts)).toBe("wiki/Plan.canvas");
+    expect(wikilinkLabel(canvas, buildTitleCounts([canvas]))).toBe("Plan");
+  });
+
   test("wikilinkLabel uses title when unique", () => {
     const notes = [note("a", "Alpha"), note("b", "Beta")];
     expect(wikilinkLabel(notes[0]!, buildTitleCounts(notes))).toBe("Alpha");
