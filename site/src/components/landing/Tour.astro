@@ -1,19 +1,23 @@
 ---
-// A closer look: the deeper tour (the owner's reference, 2026-10-05: a list of parts on the
-// left, a large preview of the open one on the right). It is a disclosure list: each part's
-// name is a real <button aria-expanded> in a heading, exactly one part is open, and opening
-// another closes the one before; pressing the open one again leaves it open. Arrow keys,
-// Home, and End move between the names. On wide screens the open part's preview fills the
-// right column; on narrow screens, and without script, the preview sits inside the open part.
-// It never moves on its own: the page's three self-moving things (the theme studio, the
-// footer quokkas, the 404 game) are each the owner's call, and an accordion that changes while
-// someone reads it moves their text.
+// A closer look: the deeper tour, driven by the scroll (the owner, 2026-10-05: "make this work
+// with the scroll. I also don't like the cards in cards or the animations"). This overrides the
+// earlier no-scroll-scrub preference for this one section, and it still never scrubs: it
+// switches by step. On wide screens, with script, the list of parts and the preview are pinned
+// under the header while a tall runway of per-part anchors scrolls behind them; the part whose
+// anchor crosses the middle of the window is the one shown (the rules: src/tourSteps.ts). The
+// preview changes by a calm crossfade, and under reduced motion it simply swaps. Each part's
+// name is a real <button> in a heading that scrolls the page to that part's step; arrow keys,
+// Home, and End move between the names. The page scrolls natively all the way through: nothing
+// holds the wheel.
 //
-// Previews are real captures from public/shots/ (synthetic vaults; site/README.md says how
-// each was made) or small drawings in the app's language where no capture exists (Docs and
-// Sheets, the Librarian's filing, using describeAppliedAction's words "Filed in" and
-// "Tagged:"). The last part, Rotli Web and the Helper, replaces the ways-in chapter: its facts
-// are held to docs/architecture/web-vault-connection.md and
+// Each part is one block in reading order (its name, one sentence, its preview), so on phones,
+// on short windows, and without script the tour is a plain sequence with every preview under
+// its words. Previews sit straight on the section ground with no frame around them: a real
+// capture from public/shots/ (synthetic vaults; site/README.md says how each was made) on its
+// own editor paper with one hairline, or a small drawing in the app's language where no
+// capture is honest yet (Docs and Sheets; the Librarian's filing, in describeAppliedAction's
+// words "Filed in" and "Tagged:"). The last part, Rotli Web and the Helper, replaces the
+// ways-in chapter: its facts are held to docs/architecture/web-vault-connection.md and
 // content/writing/resources/rotli-helper.md, and the command is the one Rotli Web's own setup
 // screen gives. It renders only while WEB_APP_ENABLED, as that chapter did.
 import { DOCS_AND_SHEETS, WEB_APP_PATH, site } from '../../site';
@@ -83,8 +87,16 @@ const sheet = [
   ['4', 'Launch ads', '2,000', 'Dana'],
   ['5', 'Total', '3,600', ''],
 ];
+// The chat capture's own answer (public/shots/chat.webp), drawn so it stays readable at the
+// tour's size: the capture's text falls to about 10px there.
+const answer = [
+  { label: 'Shipped:', item: 'Mac beta' },
+  { label: 'In progress:', item: 'Update pricing page' },
+  { label: 'Still to do:', item: 'Record the demo (owner: Maya)' },
+];
 const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open https://rotli.co/app/';
 ---
+
 
 <section class="section tour" id="tour" aria-labelledby="tour-title">
   <div class="wrap">
@@ -94,42 +106,48 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     </header>
 
     <div class="tour-body" data-tour>
-      {
-        items.map((item, i) => (
-          <div class="tour-item" data-tour-item={item.id}>
-            <h3 class="tour-name">
-              <button
-                type="button"
-                id={`tour-button-${item.id}`}
-                aria-expanded={i === 0 ? 'true' : 'false'}
-                aria-controls={`tour-panel-${item.id}`}
-              >
-                <svg class="tour-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d={item.icon} />
-                </svg>
-                <span class="tour-title">{item.title}</span>
-                {item.status && <span class="status">{item.status}</span>}
-                <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <path d="m9 6 6 6-6 6" />
-                </svg>
-              </button>
-            </h3>
-            <div class="tour-panel" id={`tour-panel-${item.id}`} role="region" aria-labelledby={`tour-button-${item.id}`} hidden={i !== 0}>
-              <p class="tour-line">{item.line}</p>
-              <div class:list={['tour-preview', `preview-${item.id}`]}>
+      <div class="tour-pin">
+        {
+          items.map((item, i) => (
+            <div class:list={['tour-step', { 'is-active': i === 0 }]} id={`tour-step-${item.id}`} data-tour-step={item.id}>
+              <h3 class="tour-name">
+                <button type="button" id={`tour-button-${item.id}`} aria-controls={`tour-preview-${item.id}`}>
+                  <svg class="tour-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d={item.icon} />
+                  </svg>
+                  <span class="tour-title">{item.title}</span>
+                  {item.status && <span class="status">{item.status}</span>}
+                </button>
+              </h3>
+              <div class="tour-line-wrap">
+                <p class="tour-line">{item.line}</p>
+              </div>
+              <div class:list={['tour-preview', `preview-${item.id}`]} id={`tour-preview-${item.id}`}>
                 {item.id === 'notes' && (
-                  <img src="/shots/render-note.webp" width="1512" height="1226" alt="A note called Launch week with tasks in three states, result buttons, a switch, a single choice, and a checklist panel" loading="lazy" decoding="async" />
+                  <img class="shot" src="/shots/render-note.webp" width="1512" height="1226" alt="A note called Launch week with tasks in three states, result buttons, a switch, a single choice, and a checklist panel" loading="lazy" decoding="async" />
                 )}
                 {item.id === 'chat' && (
-                  <img src="/shots/chat.webp" width="1800" height="850" alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes" loading="lazy" decoding="async" />
+                  <div class="mock chat" role="img" aria-label="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes">
+                    <p class="mock-head">chats/q4-check-in.md</p>
+                    <div class="chat-body">
+                      <p class="ask">What did I already ship, and what’s next on my Q4 launch plan?</p>
+                      {answer.map((part) => (
+                        <div class="answer">
+                          <p class="answer-h">{part.label}</p>
+                          <p class="answer-item">{part.item}</p>
+                        </div>
+                      ))}
+                      <p class="meta">11:41 AM</p>
+                    </div>
+                  </div>
                 )}
                 {item.id === 'boards' && (
-                  <img src="/shots/board.webp" width="1500" height="470" alt="An Excalidraw board in rotli titled Launch map, with Capture, Note, and Library boxes joined by arrows" loading="lazy" decoding="async" />
+                  <img class="shot" src="/shots/board.webp" width="1500" height="470" alt="An Excalidraw board in rotli titled Launch map, with Capture, Note, and Library boxes joined by arrows" loading="lazy" decoding="async" />
                 )}
                 {item.id === 'docs' && (
                   <div class="mock-pair" role="img" aria-label="A Word document called Launch brief beside an Excel workbook called Q4 budget, both open in rotli">
                     <div class="mock doc">
-                      <div class="mock-head"><span>launch-brief.docx</span></div>
+                      <p class="mock-head">launch-brief.docx</p>
                       <div class="doc-page">
                         <p class="doc-h">Launch brief</p>
                         <p>The Mac beta is out. Next is the demo video, then the pricing page.</p>
@@ -138,13 +156,13 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
                       </div>
                     </div>
                     <div class="mock sheet">
-                      <div class="mock-head"><span>q4-budget.xlsx</span></div>
+                      <p class="mock-head">q4-budget.xlsx</p>
                       <p class="formula"><b>fx</b> =SUM(B2:B4)</p>
                       <table>
                         <tbody>
                           {sheet.map((row, r) => (
-                            <tr class:list={{ 'sheet-letters': r === 0, total: r === sheet.length - 1 }}>
-                              {row.map((cell, c) => (c === 0 || r === 0 ? <th>{cell}</th> : <td class:list={{ num: c === 2 && r > 1 }}>{cell}</td>))}
+                            <tr class:list={{ total: r === sheet.length - 1 }}>
+                              {row.map((cell, c) => (c === 0 || r === 0 ? <th>{cell}</th> : <td class:list={{ num: c === 2 && r > 1, picked: c === 2 && r === sheet.length - 1 }}>{cell}</td>))}
                             </tr>
                           ))}
                         </tbody>
@@ -154,7 +172,7 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
                 )}
                 {item.id === 'librarian' && (
                   <div class="mock filing" role="img" aria-label="Three new notes, each filed by the Librarian into a Library area and tagged">
-                    <div class="mock-head"><span>Library</span></div>
+                    <p class="mock-head">Library</p>
                     <ol>
                       {filings.map((filing) => (
                         <li>
@@ -194,9 +212,12 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
                 )}
               </div>
             </div>
-          </div>
-        ))
-      }
+          ))
+        }
+      </div>
+      <div class="tour-runway" aria-hidden="true">
+        {items.map((item) => <span class="tour-anchor" data-tour-anchor={item.id}></span>)}
+      </div>
     </div>
 
     <p class="tour-more">
@@ -206,37 +227,92 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
 </section>
 
 <script>
-  // One part open at a time. Opening a part closes the others; the open part stays open when
-  // pressed again, so the preview is never empty. Arrow keys, Home, and End move focus.
+  import { INTENT_MS, LINE_SHARE, choose, createFollow, follow, settle, stepAt, stepScrollY } from '../../tourSteps';
+
+  // Pinned only where the list and the preview both fit under the header; anywhere else (and
+  // without script) the parts read as a plain sequence. The class is the one switch the styles
+  // follow, so the script and the styles can't disagree, and a window resized across the line
+  // switches live.
+  const PINNED = '(min-width: 960px) and (min-height: 620px)';
   const tour = document.querySelector<HTMLElement>('[data-tour]');
-  const buttons = tour ? [...tour.querySelectorAll<HTMLButtonElement>('.tour-name button')] : [];
-  const panelOf = (button: HTMLButtonElement) => document.getElementById(button.getAttribute('aria-controls') ?? '');
-  const open = (target: HTMLButtonElement) => {
-    for (const button of buttons) {
-      const isTarget = button === target;
-      button.setAttribute('aria-expanded', String(isTarget));
-      const panel = panelOf(button);
-      if (panel) panel.hidden = !isTarget;
-    }
-  };
-  buttons.forEach((button, i) => {
-    button.addEventListener('click', () => open(button));
-    button.addEventListener('keydown', (event) => {
-      const next =
-        event.key === 'ArrowDown'
-          ? buttons[(i + 1) % buttons.length]
-          : event.key === 'ArrowUp'
-            ? buttons[(i - 1 + buttons.length) % buttons.length]
-            : event.key === 'Home'
-              ? buttons[0]
-              : event.key === 'End'
-                ? buttons[buttons.length - 1]
-                : null;
-      if (!next) return;
-      event.preventDefault();
-      next.focus();
+  if (tour) {
+    const steps = [...tour.querySelectorAll<HTMLElement>('[data-tour-step]')];
+    const buttons = steps.map((step) => step.querySelector<HTMLButtonElement>('.tour-name button')!);
+    const anchors = [...tour.querySelectorAll<HTMLElement>('[data-tour-anchor]')];
+    const pinned = matchMedia(PINNED);
+    const calm = matchMedia('(prefers-reduced-motion: reduce)');
+    let state = createFollow();
+    let intentTimer: number | undefined;
+
+    const line = () => window.innerHeight * LINE_SHARE;
+    const current = () => stepAt(anchors.map((a) => a.getBoundingClientRect()), line());
+    const render = () => {
+      const on = pinned.matches;
+      tour.dataset.step = String(state.shown);
+      steps.forEach((step, i) => step.classList.toggle('is-active', i === state.shown));
+      buttons.forEach((button, i) => {
+        if (on && i === state.shown) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+      });
+    };
+    const update = (next: typeof state) => {
+      if (next.shown === state.shown && next.intent === state.intent) return;
+      state = next;
+      render();
+    };
+    const release = () => {
+      clearTimeout(intentTimer);
+      if (state.intent !== null) update(settle(current()));
+    };
+
+    // The anchors only tell the page when the line crosses one; the rule above picks the part.
+    const watch = new IntersectionObserver(() => update(follow(state, current())), {
+      rootMargin: '-49% 0px -49% 0px',
     });
-  });
+    window.addEventListener('scrollend', release);
+
+    const apply = () => {
+      tour.classList.toggle('is-pinned', pinned.matches);
+      anchors.forEach((anchor) => (pinned.matches ? watch.observe(anchor) : watch.unobserve(anchor)));
+      if (pinned.matches) state = settle(current());
+      render();
+    };
+    pinned.addEventListener('change', apply);
+    apply();
+
+    // A name moves the page to its step: the pinned part's place on the runway, or, in the
+    // plain sequence, the part itself.
+    buttons.forEach((button, i) => {
+      button.addEventListener('click', () => {
+        const behavior: ScrollBehavior = calm.matches ? 'instant' : 'smooth';
+        if (!pinned.matches) {
+          steps[i].scrollIntoView({ behavior, block: 'start' });
+          return;
+        }
+        const box = anchors[i].getBoundingClientRect();
+        const top = stepScrollY({ top: box.top + window.scrollY, bottom: box.bottom + window.scrollY }, line());
+        update(choose(i));
+        clearTimeout(intentTimer);
+        intentTimer = window.setTimeout(release, INTENT_MS);
+        window.scrollTo({ top, behavior });
+      });
+      button.addEventListener('keydown', (event) => {
+        const next =
+          event.key === 'ArrowDown'
+            ? buttons[(i + 1) % buttons.length]
+            : event.key === 'ArrowUp'
+              ? buttons[(i - 1 + buttons.length) % buttons.length]
+              : event.key === 'Home'
+                ? buttons[0]
+                : event.key === 'End'
+                  ? buttons[buttons.length - 1]
+                  : null;
+        if (!next) return;
+        event.preventDefault();
+        next.focus({ preventScroll: true });
+      });
+    });
+  }
 
   // The Helper's install line: the Copy button stays hidden until script runs, so without it
   // the command is still plain, selectable text.
@@ -259,12 +335,11 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
 </script>
 
 <style>
-  /* The list: one hairline between parts, the open one's name in full ink. */
-  .tour-item {
-    border-top: 1px solid var(--border-strong);
-  }
-  .tour-item:last-child {
-    border-bottom: 1px solid var(--border-strong);
+  /* The parts, as a plain sequence (phones, short windows, no script): each part's name, its
+     sentence, and its preview under them, one after another. */
+  .tour-pin {
+    display: grid;
+    gap: clamp(2.75rem, 7vw, 4rem);
   }
   .tour-name {
     margin: 0;
@@ -275,26 +350,23 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     align-items: center;
     gap: 0.9rem;
     width: 100%;
-    min-height: 64px;
-    padding: 0.7rem 0.25rem;
+    min-height: 56px;
+    padding: 0.5rem 0.25rem;
     border: 0;
+    border-radius: 0.5rem;
     background: none;
-    color: var(--text-muted);
+    color: var(--text);
     font: inherit;
-    font-size: 1.15rem;
+    font-size: var(--step-h3);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
     text-align: left;
     cursor: pointer;
-  }
-  .tour-name button:hover,
-  .tour-name button[aria-expanded='true'] {
-    color: var(--text);
   }
   .tour-name button:focus-visible {
     outline: 2px solid var(--accent-text);
     outline-offset: -2px;
-    border-radius: 0.4rem;
   }
   .tour-icon {
     flex: none;
@@ -303,11 +375,6 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     padding: 8px;
     border: 1px solid var(--border-strong);
     border-radius: 0.6rem;
-  }
-  [aria-expanded='true'] .tour-icon {
-    border-color: var(--accent);
-    background: var(--tint);
-    color: var(--accent-text);
   }
   .tour-title {
     min-width: 0;
@@ -322,46 +389,22 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     font-weight: 600;
     letter-spacing: 0;
   }
-  .chevron {
-    flex: none;
-    width: 20px;
-    height: 20px;
-    margin-left: auto;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .chevron {
-      transition: transform 160ms ease-out;
-    }
-  }
-  [aria-expanded='true'] .chevron {
-    transform: rotate(90deg);
-  }
-  .tour-panel[hidden] {
-    display: none;
-  }
-  /* Without script nothing could open a part, so every part shows, stacked. */
-  :global(html:not(.js)) .tour-panel[hidden] {
-    display: block;
-  }
   .tour-line {
     max-width: 34rem;
     margin: 0;
-    padding: 0 0.25rem 1.25rem calc(40px + 1.15rem);
+    padding: 0.35rem 0.25rem 0 calc(40px + 1.15rem);
     color: var(--text-muted);
     line-height: 1.55;
   }
 
-  /* The preview: a warm frame; captures sit on their own editor paper. */
+  /* The preview: the capture or drawing itself on the section ground. No frame around it. */
   .tour-preview {
+    container-type: inline-size;
     display: flex;
-    align-items: center;
     justify-content: center;
-    margin: 0 0 1.5rem;
-    padding: clamp(1rem, 3vw, 2rem);
-    border-radius: var(--radius-frame);
-    background: var(--surface-2);
+    margin-top: 1.5rem;
   }
-  .tour-preview img {
+  .shot {
     display: block;
     max-width: 100%;
     height: auto;
@@ -370,7 +413,7 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     background: var(--capture-ground);
   }
 
-  /* Drawn previews share one panel language with the cards above. */
+  /* Drawn previews share one panel language with the cards above: a surface and a hairline. */
   .mock {
     min-width: 0;
     border: 1px solid var(--border-strong);
@@ -380,39 +423,51 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     line-height: 1.45;
   }
   .mock-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    margin: 0;
     padding: 0.6rem 0.9rem;
-    border-bottom: 1px solid var(--border);
-    font-weight: 600;
-  }
-  .mock-head > span:first-child {
-    min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
     white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .filing .mock-head {
+    color: var(--text);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 600;
   }
   .mock-pair {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
     gap: 1rem;
     align-items: start;
     width: 100%;
+    max-width: 44rem;
+  }
+  @container (max-width: 34rem) {
+    .mock-pair {
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 26rem;
+    }
+  }
+  .doc {
+    background: var(--capture-ground);
   }
   .doc-page {
-    padding: 0.9rem 1rem 1.1rem;
+    padding: 1rem 1.1rem 1.2rem;
   }
   .doc-page p {
     margin: 0 0 0.55rem;
   }
   .doc-h {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 600;
   }
   .doc-page .doc-h2 {
-    margin-top: 0.85rem;
+    margin-top: 0.9rem;
     font-weight: 600;
   }
   .formula {
@@ -427,9 +482,13 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     color: var(--text-muted);
     font-style: italic;
   }
+  .sheet {
+    overflow: hidden;
+  }
   table {
     width: 100%;
     border-collapse: collapse;
+    background: var(--capture-ground);
     font-size: 0.82rem;
   }
   th,
@@ -463,9 +522,14 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
   .total td {
     font-weight: 600;
   }
+  /* The cell the formula bar is showing. */
+  td.picked {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
   .filing {
     width: 100%;
-    max-width: 34rem;
+    max-width: 30rem;
   }
   .filing ol {
     margin: 0;
@@ -475,7 +539,7 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
   .filing li {
     display: grid;
     gap: 0.35rem;
-    padding: 0.75rem 0;
+    padding: 0.8rem 0;
   }
   .filing li + li {
     border-top: 1px solid var(--border);
@@ -509,15 +573,56 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     font-size: 0.8rem;
   }
 
-  /* Rotli Web and the Helper: words, the install line, and where to go next. */
-  .preview-web {
-    align-items: stretch;
+  /* Chat: a question and an answer that lists from the notes, on the editor's paper. */
+  .chat {
+    width: 100%;
+    max-width: 34rem;
+    background: var(--capture-ground);
   }
+  .chat-body {
+    display: grid;
+    gap: 0.7rem;
+    padding: 1rem 1.1rem 0.9rem;
+  }
+  .chat-body p {
+    margin: 0;
+  }
+  .ask {
+    justify-self: end;
+    max-width: 85%;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.8rem;
+    background: var(--tint);
+  }
+  .answer {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .answer-h {
+    font-weight: 600;
+  }
+  .answer-item {
+    padding-left: 1rem;
+    text-indent: -0.7rem;
+  }
+  .answer-item::before {
+    content: '•';
+    display: inline-block;
+    width: 0.7rem;
+    text-indent: 0;
+  }
+  .meta {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  /* Rotli Web and the Helper: words, the install line, and where to go next. */
   .web {
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-width: 0;
+    max-width: 38rem;
   }
   .web p {
     margin: 0;
@@ -604,40 +709,133 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
   }
 
-  /* Wide screens, with script: the list on the left, the open part's preview filling the right
-     column at one fixed height, so switching parts never moves the page. */
-  @media (min-width: 960px) {
-    :global(.js) .tour-body {
-      --tour-gap: clamp(2rem, 4vw, 4rem);
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      align-content: start;
-      column-gap: var(--tour-gap);
-      min-height: 34rem;
+  .tour-runway {
+    display: none;
+  }
+
+  /* Pinned (wide and tall enough, with script; the script sets .is-pinned). The list and the
+     preview hold still, centred in the window under the header, while the runway scrolls
+     behind them: one cell holds both, so the pin travels exactly the runway's length and lets
+     go. The runway is a lead, one step per part, and a tail, sized so the line across the
+     middle of the window sweeps the anchors exactly while the pin holds: the pin sticks at
+     --pin-top, so the line sits (--pin-h - header) / 2 into it. */
+  .tour-body.is-pinned {
+    --tour-gap: clamp(2rem, 4vw, 4rem);
+    --tour-step: clamp(240px, 38svh, 400px);
+    --pin-h: min(100svh - var(--header-height), 46rem);
+    --pin-top: calc(var(--header-height) + (100svh - var(--header-height) - var(--pin-h)) / 2);
+    --pin-pad: clamp(1.25rem, 4svh, 2.5rem);
+    display: grid;
+  }
+  .is-pinned > .tour-pin,
+  .is-pinned > .tour-runway {
+    grid-area: 1 / 1;
+  }
+  .is-pinned > .tour-pin {
+    position: sticky;
+    top: var(--pin-top);
+    z-index: 1;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    height: var(--pin-h);
+    padding-block: var(--pin-pad);
+  }
+  .is-pinned > .tour-runway {
+    display: block;
+    padding-block: calc((var(--pin-h) - var(--header-height)) / 2) calc((var(--pin-h) + var(--header-height)) / 2);
+    pointer-events: none;
+  }
+  .tour-anchor {
+    display: block;
+    height: var(--tour-step);
+  }
+  .is-pinned .tour-step {
+    width: calc((100% - var(--tour-gap)) * 5 / 12);
+    border-top: 1px solid var(--border-strong);
+  }
+  .is-pinned .tour-step:last-child {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .is-pinned .tour-name button {
+    min-height: 60px;
+    padding-block: 0.6rem;
+    color: var(--text-muted);
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+  }
+  .is-pinned .tour-name button:hover,
+  .is-pinned .is-active .tour-name button {
+    color: var(--text);
+  }
+  .is-pinned .is-active .tour-icon {
+    border-color: var(--accent);
+    background: var(--tint);
+    color: var(--accent-text);
+  }
+  /* Only the shown part's sentence is open under its name. */
+  .is-pinned .tour-line-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+  }
+  .is-pinned .is-active .tour-line-wrap {
+    grid-template-rows: 1fr;
+  }
+  .is-pinned .tour-line {
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+  }
+  /* The open sentence keeps three lines' room, so the list doesn't shift as parts change. */
+  .is-pinned .is-active .tour-line {
+    min-height: calc(3 * 1.55em + 1.1rem);
+    padding-bottom: 1.1rem;
+  }
+  /* Every preview fills the same place on the right; the shown one is the only one visible, so
+     the hidden ones' links leave the tab order. */
+  .is-pinned .tour-preview {
+    position: absolute;
+    top: var(--pin-pad);
+    right: 0;
+    bottom: var(--pin-pad);
+    align-items: center;
+    width: calc((100% - var(--tour-gap)) * 7 / 12);
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+  }
+  .is-pinned .is-active .tour-preview {
+    opacity: 1;
+    visibility: visible;
+  }
+  .is-pinned .shot {
+    width: auto;
+    max-height: 100%;
+    min-height: 0;
+    object-fit: contain;
+  }
+  /* The crossfade: the outgoing preview fades first and the incoming one follows, so two
+     pictures never sit on top of each other at half strength. Reduced motion swaps at once. */
+  @media (prefers-reduced-motion: no-preference) {
+    .is-pinned .tour-preview {
+      transition:
+        opacity 200ms ease-out,
+        visibility 0s linear 200ms;
     }
-    :global(.js) .tour-item {
-      grid-column: 1;
+    .is-pinned .is-active .tour-preview {
+      transition:
+        opacity 320ms ease-out 160ms,
+        visibility 0s;
     }
-    :global(.js) .tour-preview {
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: calc((100% - var(--tour-gap)) * 7 / 12);
-      margin: 0;
-    }
-    :global(.js) .tour-preview img {
-      width: auto;
-      max-height: 100%;
+    .is-pinned .tour-line-wrap {
+      transition: grid-template-rows 280ms ease;
     }
   }
   @media (max-width: 620px) {
     .tour-line {
       padding-left: 0.25rem;
-    }
-    .mock-pair {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>
