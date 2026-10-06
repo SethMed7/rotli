@@ -309,6 +309,26 @@ there, and the closing panel, whose art never touches its words from 320 to
   `PRIVACY.md` whenever a data class, destination, retention rule, or control
   changes. Features that are off in released builds (Breve, remote agents)
   are described as off, not as available.
+  It reads like a blog post (the owner, 2026-10-06: "Privacy page design
+  should match blog styles"): `WritingPage`'s `article` layout, so the head,
+  the rail, the reading column, and the end are a post's (see "The blog
+  post" below). The head is "Privacy", the lede, and "Updated …" (no author,
+  no topics) beside the film's night (`SecureScene.astro` through the
+  `cover` slot, see "The privacy head" below). The rail has the tree from its
+  `##` headings, the meter as a percent, no Sources, and Share as **Copy
+  link** alone (a policy is pointed to, not posted, and it has no Markdown
+  twin; the whole Share block waits for script and a clipboard, so it is
+  never an empty label). The promise's matrix breaks out of the words like a
+  post's table where the middle has room (the same `article-prose`
+  container query, 48.5rem), and the section companions float on the
+  column's right edge, not the middle track's. "More from rotli" closes it:
+  the published posts tagged **Privacy** (`morePostCard` in `src/writing.ts`,
+  shared with the blog) and the Download and Rotli Web spots, each only in
+  builds that offer it. `e2e/site/privacy-page.spec.ts` holds the head from
+  320 to 2560, the rail, the phone's disclosure, slim bar, and Copy link,
+  the end, `#promise` landing just under the header from 320 to 1920, and no
+  sideways scroll from 320 to 2560; `privacy-promise.spec.ts` the matrix,
+  one block per note on a phone, from 320 to 2560.
 - **Subpages** (`WritingPage.astro`) sit on the site grid: breadcrumb, title,
   lede, and an optional metadata line (`meta`: a date, "Updated …", a reading
   time) line up with the header's brand, and a full-width rule divides the
@@ -316,20 +336,20 @@ there, and the closing panel, whose art never touches its words from 320 to
   "On this page" tree beside a reading column of about 70 characters, the
   section in view highlighted and a slim rail filling as you read (one
   bundled script; without it the tree is plain links). Below 900px the tree
-  becomes an "On this page" disclosure above the text. `/privacy/` uses it
-  (its tree from its `##` headings) and passes `progress` for the reading
-  meter; blog posts pass `article` instead (see "The blog post" below), so
-  every article on the site reads the same way (the owner's item 16: the flow
+  becomes an "On this page" disclosure above the text (Developers uses it).
+  Blog posts and `/privacy/` pass `article` instead (see "The blog post"
+  below), so every article on the site reads the same way (the owner's item 16: the flow
   of the claude.dev mods post, with the footer's strolling quokka as its
   walking character).
 - **The reading meter** (`progress`): a bar and "N% through" pinned under the
-  header on `/privacy/` at every width, measured over the article alone
+  header at every width, measured over the article alone
   (`src/reading.ts`, the same measure that fills the tree's rail), so the end
   of the article reads 100% and the footer never counts. It follows scrolling
   either way and jumps through the tree, re-measures when the article changes
   height, and hides when the whole article fits in the window. It is a
   position, not proof of reading: nothing is recorded or sent. Blog posts
-  carry the same measure in their rail and, under 900px, as a slim bar. The
+  and `/privacy/` (`article`) carry the same measure in their rail and,
+  under 900px, as a slim bar. The
   meter has a fixed height, and everything under it clears header plus meter
   (`--pinned` in `WritingPage.astro`): the sticky "On this page" tree sits
   1.5rem below the meter, and every heading and `[id]` lands below it when
@@ -416,7 +436,7 @@ there, and the closing panel, whose art never touches its words from 320 to
     screen it is further right than the page's centre (the owner: "move blog
     content more right"). Below 901px the rail folds (its tree the
     disclosure, its meter the slim bar, its Share after the article).
-    `/privacy/` keeps its own tree layout, not `article`.
+    `/privacy/` uses the same layout (see "The privacy head" below).
   - **What breaks out.** Every block of the post keeps the measure, centred
     in the middle; figures, tables, and code blocks may break out, but only
     when the middle is at least 48.5rem (a container query on the prose), so
@@ -531,31 +551,23 @@ there, and the closing panel, whose art never touches its words from 320 to
     both 76rem, a live resize matching a fresh load); `scripts/site-writing.test.ts`
     holds `sourcesOf` against the published post, `railTitle`, `morePosts`,
     and the promos' data and rotation.
-- **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
-  "almost takes over the top and you scroll in"; blog posts left it for their
-  cover on 2026-10-06): `/privacy/` opens on a full-width picture under the header, `clamp(20rem, 100svh −
-  header − 12rem, 54rem)` tall, pinned (`position: sticky`) while the sheet
-  below it, the article and the footer on `--ground` (`display: flow-root`,
-  so the head's pull upward never collapses through it), scrolls up over it.
-  The head is a panel on `--ground` (36rem, rounded top) that rises 7rem over
-  the banner's lower left; under a banner the date and reading time follow
-  the title, before the lede, so all three are in the first window. The text
-  is never on the art: the scenes keep their quokka and props clear of that
-  corner at every banner shape (`object-position: 100% 100%`, the wide
-  scenes' layout rule in `scripts/brand-images/scenes.mjs`). Under 900px the
-  banner is the phone crop at its own shape (at most 55svh) and the panel
-  overlaps only 1.5rem, full width. A page may pass `banner` (a `Banner`
-  from `src/og.ts`, a `<picture>`: 2400 and 1200 wide, the phone crop under
-  900px); `/privacy/` passes its night through the `banner` slot: the caption on its own night
-  ground beside the dome, the dome standing on the panel's line and clipped to
-  its column so the drifting clouds never cross the words. A CSS scroll
-  timeline scales the art 6% over the first 80svh of scroll (longhands only:
-  the minifier folds `animation-timeline` into the `animation` shorthand,
-  which drops it), never under reduced motion or without support. The meter
-  and the tree are unchanged. `e2e/site/article-banner.spec.ts` holds it at
-  1920, 1440, 1280, 768, and 390: the title and date in the first window,
-  their contrast measured on the panel's opaque ground, the rise, and the
-  meter and tree after it. About keeps its own layout.
+- **The privacy head** (`blog/ArticleCover.astro` with `drawn`, through
+  `WritingPage`'s `cover` slot; the owner, 2026-10-06). `/privacy/` once opened
+  on a full-width banner pinned under the header with the head as a panel
+  rising over it; that banner (`WritingPage`'s `banner` prop and slot) is gone,
+  and the page opens like a post: the words on the header's left edge and the
+  night in the post picture's place and frame (rounded, a hairline,
+  `overflow: hidden`), side by side from 1000px and stacked below it, the
+  night first. The night is `.band-night` (Ocean Dark tokens and stars): the
+  caption ("Secure notes stay home. …") on its own `--deep` ground at the
+  top, so the stars never sit under it (8.6:1, the inked phrase 15.7:1), and
+  the dome standing on the frame's floor below it, at most
+  `min(20rem, 42svh)` tall; the remote-AI clouds drift into the sky between
+  them and the frame clips them. The night and the caption are still, like a
+  post's picture; only the scene plays, once (its own `[data-reveal]`).
+  ArticleCover's other options for it: no `author` (the meta line stands
+  alone, no mark), no `tags`; ArticleRail's `noun: 'page'` ("About this
+  page", "Position in this page") and `share.mode: 'link'`.
 - **Writing.** Blog posts, the guides among them (tagged Guide), are Markdown
   in one content collection, `src/content/writing/posts/` (schema:
   `src/content.config.ts`; posts may add `tags`, up to four short topics shown
@@ -978,14 +990,14 @@ there, and the closing panel, whose art never touches its words from 320 to
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
   stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
-  through `.band-night` (the landing privacy band and the night frame on
-  `/privacy/`); `IslandScene.astro` is the island by
+  through `.band-night` (the landing privacy band and the night beside the
+  title on `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
   the `/about/` story, captioned with where the name comes from); the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
   closing scene. `/privacy/` places its night through `WritingPage`'s
-  `banner` slot (see "The article banner"); `/about/` places its scene through
+  `cover` slot (see "The privacy head"); `/about/` places its scene through
   the `scene` slot and uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/#promise`: the
   promise and three facts on the left, the night scene on the right.
