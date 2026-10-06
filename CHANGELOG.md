@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edit the text", but never on a locked note or one where you turned AI
   editing off, and a secure note never goes to a connected model. ⌘Z takes it
   back. Mac app only.
-- **Charts in your notes.** Type `/chart` and pick **Bar**, **Line**,
-  **Area**, or **Pie chart**: Rotli drops in a small example and opens a form
+- **Charts in your notes.** Type `/chart` and pick one of ten kinds (bar,
+  horizontal bar, stacked bar, line, area, pie, donut, scatter, radar, or
+  heatmap): Rotli drops in a small example and opens a form
   where you set the type, title, unit, and rows. The chart lives in the note
   as plain text you can read and edit by hand (a `chart` block of options and
   comma-separated rows), so the file stays portable. If Rotli can't read a

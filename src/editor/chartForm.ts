@@ -5,15 +5,13 @@
 // hands it to the host, which replaces only the fence body.
 
 import {
+  CHART_KINDS,
   CHART_LIMITS,
-  CHART_TYPES,
   type ChartSpec,
   type ChartType,
   parseChart,
   serializeChart,
 } from "./chartSpec";
-
-const TYPE_LABELS: Record<ChartType, string> = { bar: "Bar", line: "Line", area: "Area", pie: "Pie" };
 
 export interface ChartFormActions {
   /** Write the spec; returns why it couldn't, or null when written. */
@@ -103,8 +101,8 @@ export function mountChartForm(host: HTMLElement, spec: ChartSpec, actions: Char
     const head = el("div", "chart-form-head");
     const type = el("select", "chart-form-select");
     type.setAttribute("aria-label", "Chart type");
-    for (const value of CHART_TYPES) {
-      const option = el("option", undefined, TYPE_LABELS[value]);
+    for (const { type: value, label } of CHART_KINDS) {
+      const option = el("option", undefined, label);
       option.value = value;
       option.selected = value === draft.type;
       type.append(option);

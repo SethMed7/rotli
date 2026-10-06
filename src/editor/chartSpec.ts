@@ -4,8 +4,26 @@
 // (chartRender.ts), and anything this file can't read fails closed with a
 // reason so the source is shown and never rewritten.
 
-export const CHART_TYPES = ["bar", "line", "area", "pie"] as const;
-export type ChartType = (typeof CHART_TYPES)[number];
+/** The chart kinds a fence may name, in the order `/chart` offers them (the
+ * owner, 2026-10-05: "the top 10 people use"). Each is one TanStack mark set
+ * in chartRender.ts; one label and one hint per kind serve the picker and the
+ * Edit form alike. */
+export const CHART_KINDS = [
+  { type: "bar", label: "Bar", hint: "Compare values side by side" },
+  { type: "horizontal-bar", label: "Horizontal bar", hint: "Rank long labels" },
+  { type: "stacked-bar", label: "Stacked bar", hint: "Parts adding up per label" },
+  { type: "line", label: "Line", hint: "A trend across steps" },
+  { type: "area", label: "Area", hint: "A trend with its volume" },
+  { type: "pie", label: "Pie", hint: "Parts of a whole" },
+  { type: "donut", label: "Donut", hint: "Parts of a whole, with room to breathe" },
+  { type: "scatter", label: "Scatter", hint: "How two numbers relate" },
+  { type: "radar", label: "Radar", hint: "Profiles across several measures" },
+  { type: "heatmap", label: "Heatmap", hint: "A grid of values, shaded" },
+] as const;
+export type ChartType = (typeof CHART_KINDS)[number]["type"];
+export const CHART_TYPES: readonly ChartType[] = CHART_KINDS.map((kind) => kind.type);
+
+const TYPE_LIST = "bar, horizontal-bar, stacked-bar, line, area, pie, donut, scatter, radar, or heatmap";
 
 export const CHART_LIMITS = { series: 8, rows: 200 } as const;
 
@@ -92,9 +110,9 @@ export function parseChart(body: string): ChartParse {
     if (options[key] !== undefined) return fail(`“${key}” is given twice.`);
     options[key] = match[2]!.trim();
   }
-  if (!options.type) return fail("A chart needs a type: bar, line, area, or pie.");
+  if (!options.type) return fail(`A chart needs a type: ${TYPE_LIST}.`);
   if (!isChartType(options.type)) {
-    return fail(`“${options.type}” isn’t a chart type. Use bar, line, area, or pie.`);
+    return fail(`“${options.type}” isn’t a chart type. Use ${TYPE_LIST}.`);
   }
 
   const data = lines.slice(blank + 1).filter((line) => line.trim() !== "");
@@ -126,11 +144,17 @@ export function parseChart(body: string): ChartParse {
     rows.push({ label: fields[0] ?? "", values });
   }
 
-  if (options.type === "pie") {
+  if (options.type === "pie" || options.type === "donut") {
     const slices = rows.map((row) => row.values[0] ?? 0);
     if (slices.some((value) => value < 0)) return fail("A pie can’t have negative values.");
     if (!slices.some((value) => value > 0)) return fail("A pie needs a value above zero.");
   }
+  if (options.type === "scatter") {
+    // the label column is the x axis: every label must be a number
+    const notNumber = rows.find((row) => !NUMBER.test(row.label));
+    if (notNumber) return fail(`A scatter’s first column is numbers; “${notNumber.label}” isn’t one.`);
+  }
+  if (options.type === "radar" && rows.length < 3) return fail("A radar needs at least three rows.");
 
   const spec: ChartSpec = { type: options.type, columns: header, rows };
   if (options.title) spec.title = options.title;
@@ -153,49 +177,78 @@ export function serializeChart(spec: ChartSpec): string {
   return [...options, "", spec.columns.map(field).join(", "), ...rows].join("\n");
 }
 
+const row = (label: string, ...values: number[]): ChartRow => ({ label, values });
+
 const STARTERS: Record<ChartType, ChartSpec> = {
   bar: {
     type: "bar",
     title: "Hours this week",
     unit: "h",
     columns: ["Day", "Writing", "Reading"],
-    rows: [
-      { label: "Mon", values: [4, 1] },
-      { label: "Tue", values: [6, 2] },
-      { label: "Wed", values: [3, 2] },
-    ],
+    rows: [row("Mon", 4, 1), row("Tue", 6, 2), row("Wed", 3, 2)],
+  },
+  "horizontal-bar": {
+    type: "horizontal-bar",
+    title: "Notes by area",
+    columns: ["Area", "Notes"],
+    rows: [row("Projects", 42), row("Reading list", 27), row("Meeting notes", 19), row("Journal", 11)],
+  },
+  "stacked-bar": {
+    type: "stacked-bar",
+    title: "Tasks by week",
+    columns: ["Week", "Done", "Open"],
+    rows: [row("W1", 8, 4), row("W2", 11, 3), row("W3", 9, 6)],
   },
   line: {
     type: "line",
     title: "Words written",
     columns: ["Week", "Words"],
-    rows: [
-      { label: "W1", values: [1200] },
-      { label: "W2", values: [1800] },
-      { label: "W3", values: [1500] },
-      { label: "W4", values: [2400] },
-    ],
+    rows: [row("W1", 1200), row("W2", 1800), row("W3", 1500), row("W4", 2400)],
   },
   area: {
     type: "area",
     title: "Notes filed",
     columns: ["Month", "Notes"],
-    rows: [
-      { label: "Jul", values: [12] },
-      { label: "Aug", values: [20] },
-      { label: "Sep", values: [31] },
-    ],
+    rows: [row("Jul", 12), row("Aug", 20), row("Sep", 31)],
   },
   pie: {
     type: "pie",
     title: "Where the time went",
     unit: "h",
     columns: ["Task", "Hours"],
+    rows: [row("Writing", 6), row("Reading", 3), row("Email", 1)],
+  },
+  donut: {
+    type: "donut",
+    title: "Budget",
+    unit: "$",
+    columns: ["Category", "Spent"],
+    rows: [row("Rent", 1200), row("Food", 450), row("Travel", 300), row("Other", 150)],
+  },
+  scatter: {
+    type: "scatter",
+    title: "Sleep and focus",
+    columns: ["Hours slept", "Focus"],
+    rows: [row("5", 4), row("6", 5), row("7", 7), row("8", 8), row("9", 7)],
+  },
+  radar: {
+    type: "radar",
+    title: "Skills",
+    columns: ["Skill", "Me", "Goal"],
     rows: [
-      { label: "Writing", values: [6] },
-      { label: "Reading", values: [3] },
-      { label: "Email", values: [1] },
+      row("Writing", 7, 9),
+      row("Research", 6, 8),
+      row("Design", 4, 6),
+      row("Code", 8, 8),
+      row("Speaking", 5, 7),
     ],
+  },
+  heatmap: {
+    type: "heatmap",
+    title: "Writing by day",
+    unit: "min",
+    columns: ["Day", "Morning", "Afternoon", "Evening"],
+    rows: [row("Mon", 30, 10, 45), row("Tue", 20, 0, 60), row("Wed", 40, 15, 20)],
   },
 };
 

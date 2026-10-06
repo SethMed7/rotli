@@ -17,6 +17,7 @@ answer before building.
 | 5 | Slash form | Per-type commands (Bar chart, Line chart…). There is no colon grammar (the default; not asked). |
 | 6 | Vault folder (feedback round) | Always the macOS folder panel ("people know exactly what to do"); creating a vault is New Folder in that panel; Rotli's in-app browser is removed. |
 | 7 | Skipping setup | Offer a skip on every screen; the only required thing is a vault. |
+| 8 | Chart command | One `/chart` that opens a picker of ten kinds (bar, horizontal bar, stacked bar, line, area, pie, donut, scatter, radar, heatmap), not one slash command per kind. |
 
 ## Order
 

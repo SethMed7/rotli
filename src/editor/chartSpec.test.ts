@@ -46,7 +46,10 @@ describe("parseChart — the SYNTAX.md chart fence", () => {
 
   const refusals: [string, string, RegExp][] = [
     ["no type", "title: T\n\nX, Y\na, 1", /needs a type/],
-    ["an unknown type", "type: radar\n\nX, Y\na, 1", /“radar” isn’t a chart type/],
+    ["an unknown type", "type: gauge\n\nX, Y\na, 1", /“gauge” isn’t a chart type/],
+    ["a negative donut slice", "type: donut\n\nX, Y\na, -1\nb, 2", /pie can’t have negative/],
+    ["a scatter label that isn't a number", "type: scatter\n\nX, Y\n5, 1\nsix, 2", /“six” isn’t one/],
+    ["a radar with two spokes", "type: radar\n\nX, Y\na, 1\nb, 2", /at least three rows/],
     ["an unknown option", "type: bar\ncolor: red\n\nX, Y\na, 1", /“color” isn’t a chart option/],
     ["an uppercase option", "Type: bar\n\nX, Y\na, 1", /“Type” isn’t a chart option/],
     ["an option twice", "type: bar\ntype: line\n\nX, Y\na, 1", /“type” is given twice/],

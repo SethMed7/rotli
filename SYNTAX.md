@@ -315,24 +315,30 @@ imports.
   ```
   ````
 
-  `type` is required and is one of `bar`, `line`, `area`, or `pie`. `title`
+  `type` is required and is one of `bar`, `horizontal-bar`, `stacked-bar`,
+  `line`, `area`, `pie`, `donut`, `scatter`, `radar`, or `heatmap`. `title`
   and `unit` (a suffix for values, such as `h`, `%`, or `kg`) are optional.
   Option names are lowercase. A field holding a comma is quoted as in CSV
   (`"Smith, J."`), a value may be negative or a decimal written with a point
   (`-2.5`), and an empty field is a missing value: a gap in a line, no bar.
-  A pie draws only the first series; its values must not be negative, and at
-  least one must be above zero. A chart holds up to 8 series and 200 rows.
+  A pie or donut draws only the first series; its values must not be
+  negative, and at least one must be above zero. A scatter's first column is
+  its x axis, so every label there is a number. A radar needs at least three
+  rows (its spokes). A heatmap puts rows down and series across, each cell
+  shaded by its value. A chart holds up to 8 series and 200 rows.
   Rotli fails closed. An unknown type or option, a value that isn't a number,
   a row with more fields than the header, a missing header, a chart with no
   data rows, or one past the limits shows the source as code with the reason,
-  and the source is never rewritten. **Bar chart**, **Line chart**, **Area
-  chart**, and **Pie chart** (typing `/chart` finds all four) insert a starter
-  chart and open its editor. The rendered chart's **Edit** opens a small form
+  and the source is never rewritten. **Chart** (`/chart`; typing a kind's name,
+  such as `/radar`, finds it too) opens a list of the ten kinds; choosing one
+  (arrows and Enter, a click, or its number) inserts that kind's starter chart
+  and opens its editor. The rendered chart's **Edit** opens a small form
   (type, title, unit, and a grid of the rows) whose **Apply** replaces only
   the fence's body and rewrites it in this form, one space after each comma.
   Series take the theme's chart colors in order; several series stand side by
-  side in a bar chart, draw one line each in a line chart, and stack in an
-  area chart. A repeated label stays its own bar or slice, counted on the axis
+  side in a bar or horizontal bar chart, stack in a stacked bar or area chart,
+  and draw one line, outline, or set of dots each in a line, radar, or
+  scatter chart. A repeated label stays its own bar or slice, counted on the axis
   (`Mon (2)`). Other Markdown readers show the fence as a code block holding
   the same data.
 

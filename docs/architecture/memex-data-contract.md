@@ -235,8 +235,8 @@ second user-visible product or storage location.
   user-owned `.excalidraw` file in the active creation context and leaves the
   Mermaid fence unchanged.
 - A Markdown `chart` fence owns its chart as plain text (SYNTAX.md): options,
-  a blank line, then comma-separated rows. **Bar / Line / Area / Pie chart**
-  insert a starter and open its Edit form. Apply replaces only the fence body,
+  a blank line, then comma-separated rows. `/chart` opens a list of ten kinds;
+  the chosen kind's starter lands and opens its Edit form. Apply replaces only the fence body,
   in the canonical form, after the same stale-source guard as Mermaid. A chart
   Rotli can't read fails closed with its reason and its source and is never
   rewritten. The renderer (TanStack Charts) sits behind one adapter

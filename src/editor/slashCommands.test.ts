@@ -43,10 +43,7 @@ describe("slash command catalog", () => {
       "Inline code",
       "Math",
       "Mermaid",
-      "Bar chart",
-      "Line chart",
-      "Area chart",
-      "Pie chart",
+      "Chart",
       "Attach image",
       "Ask AI",
       "Generate image",
@@ -165,17 +162,14 @@ describe("slash command catalog", () => {
     expect(filterSlashItems("ask ai", { sheets: true }).map((item) => item.label)).toEqual(["Ask AI"]);
   });
 
-  test("the best match leads: /ai and /ask land on Ask AI, /bar on Bar chart", () => {
+  test("the best match leads: /ai and /ask land on Ask AI, /chart on Chart", () => {
     // Mermaid holds "ai" mid-word and Checklist's keyword "tasks" holds "ask";
     // a word of the label starting with the query outranks both
     expect(filterSlashItems("ai", { sheets: true })[0]?.label).toBe("Ask AI");
     expect(filterSlashItems("ask", { sheets: true })[0]?.label).toBe("Ask AI");
-    expect(filterSlashItems("bar", { sheets: true })[0]?.label).toBe("Bar chart");
-    expect(
-      filterSlashItems("chart", { sheets: true })
-        .map((item) => item.label)
-        .slice(0, 4),
-    ).toEqual(["Bar chart", "Line chart", "Area chart", "Pie chart"]);
+    expect(filterSlashItems("chart", { sheets: true })[0]?.label).toBe("Chart");
+    // a kind's name finds the one Chart command, which then asks which kind
+    expect(filterSlashItems("radar", { sheets: true }).map((item) => item.label)).toEqual(["Chart"]);
   });
 });
 
