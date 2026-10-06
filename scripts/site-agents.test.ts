@@ -192,11 +192,11 @@ describe("the FAQ's Rotli Web answer", () => {
     // The answer stays plain text (it is the JSON-LD); the links are their own line.
     expect(entry!.a).not.toContain("/");
     expect(entry!.links?.map((link) => link.href)).toEqual([
-      "/resources/rotli-helper/",
+      "/blog/rotli-helper/",
       "/blog/rotli-web-and-your-mac/",
     ]);
     const content = join(siteRoot, "src", "content", "writing");
-    expect(readFileSync(join(content, "resources", "rotli-helper.md"), "utf8")).toContain("Rotli Helper");
+    expect(readFileSync(join(content, "posts", "rotli-helper.md"), "utf8")).toContain("Rotli Helper");
     expect(readFileSync(join(content, "posts", "rotli-web-and-your-mac.md"), "utf8")).toContain("Terminal");
   });
 

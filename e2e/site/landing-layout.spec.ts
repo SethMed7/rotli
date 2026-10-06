@@ -127,7 +127,7 @@ test("the story ends on the one link to every feature, and the FAQ points to Rot
     await expect(browser).toContainText("your notes stay in a folder on your computer");
     await expect(browser.getByRole("link", { name: /What is Rotli Helper/ })).toHaveAttribute(
       "href",
-      "/resources/rotli-helper/",
+      "/blog/rotli-helper/",
     );
     await expect(browser.getByRole("link", { name: /Why it goes through Terminal/ })).toHaveAttribute(
       "href",

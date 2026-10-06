@@ -435,7 +435,7 @@ Two things only the tour carried on the landing moved:
   computer; Chrome, Edge, and Arc open the folder directly; Firefox, Zen,
   Brave, and chat in any browser need Rotli Helper; Safari and phones aren't
   supported yet. A line under it links the Helper guide
-  (`/resources/rotli-helper/`) and the "why Terminal" post
+  (`/blog/rotli-helper/`, the guide moved into the blog) and the "why Terminal" post
   (`/blog/rotli-web-and-your-mac/`). The answer stays one plain string,
   because it is also the FAQPage JSON-LD; the links are a separate, optional
   `links` field rendered on its own line. The install line itself lives in

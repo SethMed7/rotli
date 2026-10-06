@@ -38,14 +38,14 @@ export const questions: { q: string; a: string; links?: { href: string; label: s
     a: 'Your notes never left. The folder opens in any Markdown editor, and deleting rotli leaves every file where it was.',
   },
   // Rotli Web and the Helper, in brief (the tour's last part said this until it was removed,
-  // 2026-10-06). The facts are content/writing/resources/rotli-helper.md's and PLATFORMS'.
+  // 2026-10-06). The facts are content/writing/posts/rotli-helper.md's and PLATFORMS'.
   ...(site.webAppEnabled
     ? [
         {
           q: 'Can I use rotli in my browser?',
           a: 'Yes. Rotli Web is the same editor in your browser, and your notes stay in a folder on your computer. Chrome, Edge, and Arc open that folder directly. Firefox, Zen, and Brave, and chat in any browser, need Rotli Helper, a small program on your computer. Safari and phones aren’t supported yet.',
           links: [
-            { href: '/resources/rotli-helper/', label: 'What is Rotli Helper?' },
+            { href: '/blog/rotli-helper/', label: 'What is Rotli Helper?' },
             { href: '/blog/rotli-web-and-your-mac/', label: 'Why it goes through Terminal' },
           ],
         },
