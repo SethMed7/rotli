@@ -1,4 +1,4 @@
-// The site's films. The landing hero and /features/ play the product film
+// The site's films. The landing hero plays the product film
 // (public/media/hero/): a real Rotli Web session on synthetic notes, recorded by
 // `bun run capture:hero`, silent, its captions in a band under the picture. The
 // studio's illustrated films (public/media/story/, encoded for the web from
