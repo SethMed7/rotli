@@ -42,7 +42,8 @@ the rules without a browser, `bun test scripts/site-interactions.test.ts`
 crossfade, the theme studio's autoplay, the reading meter, the footer scene's
 play and the visitor's person), `bun test scripts/site-motion.test.ts` (the
 tour's scroll steps and the before and after's filing play) and
-`bun test scripts/site-runner.test.ts` (the 404 game), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
+`bun test scripts/site-runner.test.ts` (the 404 game), `bun test scripts/site-writing.test.ts`
+(post figures, the blog's arrangement, "New", and the article tree), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
 the site, serves it with `astro preview` on port 4392, and drives
 `e2e/site/`). The unit files run inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
@@ -270,10 +271,10 @@ whose art never touches its words from 320 to 1920.
   "On this page" tree beside a reading column of about 70 characters, the
   section in view highlighted and a slim rail filling as you read (one
   bundled script; without it the tree is plain links). Below 900px the tree
-  becomes an "On this page" disclosure above the text. Privacy, resource
-  articles, and blog posts use it (articles and posts build it from their
-  `##` headings), and all three pass `progress` for the reading meter below,
-  so every article on the site reads the same way (the owner's item 16:
+  becomes an "On this page" disclosure above the text. Privacy and resource
+  articles use it (articles build it from their `##` headings) and pass
+  `progress` for the reading meter below; blog posts pass `article` instead
+  (see "The blog post" below), so every article on the site reads the same way (the owner's item 16:
   the flow of the claude.dev mods post, with the footer's strolling quokka as
   its walking character). Resource articles end with "More guides".
 - **Resource articles** open on their own scene (`ResourceScene.astro`, the
@@ -290,8 +291,8 @@ whose art never touches its words from 320 to 1920.
   and the related links and footer never count. It follows scrolling either
   way and jumps through the tree, re-measures when the article changes
   height, and hides when the whole article fits in the window. It is a
-  position, not proof of reading: nothing is recorded or sent. Blog posts
-  and `/privacy/` carry the same meter (2026-10-05). The meter has a fixed
+  position, not proof of reading: nothing is recorded or sent. `/privacy/`
+  carries the same meter (2026-10-05); blog posts carry it in their rail. The meter has a fixed
   height, and everything under it clears header plus meter (`--pinned` in
   `WritingPage.astro`): the sticky "On this page" tree sits 1.5rem below the
   meter, and every heading and `[id]` in the article lands below it when
@@ -299,21 +300,58 @@ whose art never touches its words from 320 to 1920.
   post, and `/privacy/`). The guides' index (`WritingList.astro`) is plain
   entries in columns with a hairline above each, never boxes; an entry
   without a link is announced ("Coming soon").
-- **The blog index** (`BlogIndex.astro`, the owner's 2026-10-05 "way more
-  polished") leads with the newest readable post: its thumbnail large beside
-  its title, summary, date, and reading time (stacked under 900px). The rest
-  follow in an open grid (three columns on a wide screen, two on a tablet,
-  one on a phone), readable posts first, then the announced ones, whose
-  picture carries a "Coming soon" label and which are not links. Every
-  picture is a real `<img>` at the thumbnails' one shape (1200 × 630, with a
-  600-wide copy in `srcset`), with its size and alt text; the feature loads
-  first and the grid lazily. No entry has a box: a framed picture with its
-  words under it. `e2e/site/blog-index.spec.ts` holds the feature, every
-  tile's picture at one shape, and the labels at 1440, 768, and 390, and that
-  a post opens on the same scene composed wide.
+- **The blog index** (`components/blog/BlogIndex.astro`, after
+  anthropic.com/news, the owner's 2026-10-06 "better layout and clarity,
+  especially for what is new/big"; `src/blog.ts` arranges it): one featured
+  story, the newest published post or the newest marked `featured: true` in
+  its frontmatter, its thumbnail large beside its date, reading time, title,
+  summary, and topics (stacked under 900px); then the next posts, up to three,
+  in a row of smaller pictures (a lone one lies on its side on a wide
+  screen); then "All posts", every published post newest first, one row each
+  (date, its first tag as the topic, title, one-line summary) between
+  hairlines, never boxes. Topic filters over the list are buttons with
+  `aria-pressed` that appear only with script (without it the whole list
+  shows); a choice narrows the rows, says how many in a status line, and is
+  kept in the address as `?topic=`. Announced (`coming-soon`) posts sit apart
+  under "Coming soon", smaller, never links, and never in the featured area.
+  A post wears "New" for 14 days after its date, computed when the site is
+  built (`isNew`), so it ages out on the next deploy. Every picture is a real
+  `<img>` at the thumbnails' one shape (1200 × 630, with a 600-wide copy in
+  `srcset`), with its size and alt text; the feature loads first and the rest
+  lazily. `e2e/site/blog-index.spec.ts` holds the order, the pictures, the
+  list's order and rules, the filters with and without script, and "New" at
+  1920, 1440, 768, and 390.
+- **The blog post** (`WritingPage`'s `article`, the owner's 2026-10-06 "fix the
+  top of blogs" with Untitled UI's blog and claude.dev's posts as references):
+  the post's banner art (`postBanner(slug)`) contained at the page's width,
+  rounded, with a hairline, `clamp(15rem, min(38vw, 50svh), 30rem)` tall and
+  still (nothing pinned, nothing scales), and a card over its lower left
+  (`blog/ArticleCover.astro`: `--surface`, `--border-strong`, flat; at most
+  42rem and 58% of the picture, so the scene's quokka and props stay clear)
+  holding the author (the face mark as avatar), date, reading time, title,
+  summary, and the post's `tags`. Below 1100px the picture comes first and the
+  head follows on the page's ground without a frame; below 700px the picture
+  is the phone crop. Beside the text on wide screens a sticky rail
+  (`blog/ArticleRail.astro`) holds the title, "On this page" as a tree (`###`
+  headings under their `##`, `tocTree` in `src/blog.ts`), the reading meter as
+  a bar and a percent (the same `src/reading.ts` measure; no meter is pinned
+  over the text), a hint for J and K, and Share: X, LinkedIn, and Email as
+  plain links carrying the canonical address and title (no third-party
+  script, image, or request), and Copy link and Copy Markdown (fetches the
+  post's same-origin twin, `connect-src 'self'`), which appear only where the
+  clipboard can be written. J and K jump to the next and previous section; they
+  never act in a field or menu, with a modifier, or on a handled key, and the
+  arrow keys keep scrolling. Under 900px the tree is the "On this page"
+  disclosure, the meter a 3px bar under the header (only its fill shows), and
+  Share follows the article. The reading column (`blog/article.css`, global
+  under `.writing.is-article`) is 18px at about 70 characters a line (40rem),
+  with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources` then
+  a list) and footnotes, and the figures' styles. `e2e/site/article-banner.spec.ts`
+  holds the cover and the card's measured contrast; `article-rail.spec.ts` the
+  rail, Share, the copy buttons, the keys, jumps, and the narrow layout.
 - **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
-  "almost takes over the top and you scroll in"): a blog post and `/privacy/`
-  open on a full-width picture under the header, `clamp(20rem, 100svh −
+  "almost takes over the top and you scroll in"; blog posts left it for their
+  cover on 2026-10-06): `/privacy/` opens on a full-width picture under the header, `clamp(20rem, 100svh −
   header − 12rem, 54rem)` tall, pinned (`position: sticky`) while the sheet
   below it, the article and the footer on `--ground` (`display: flow-root`,
   so the head's pull upward never collapses through it), scrolls up over it.
@@ -324,9 +362,9 @@ whose art never touches its words from 320 to 1920.
   corner at every banner shape (`object-position: 100% 100%`, the wide
   scenes' layout rule in `scripts/brand-images/scenes.mjs`). Under 900px the
   banner is the phone crop at its own shape (at most 55svh) and the panel
-  overlaps only 1.5rem, full width. Posts pass `postBanner(slug)` (a
-  `<picture>`: 2400 and 1200 wide, the phone crop under 900px); `/privacy/`
-  passes its night through the `banner` slot: the caption on its own night
+  overlaps only 1.5rem, full width. A page may pass `banner` (a `Banner`
+  from `src/og.ts`, a `<picture>`: 2400 and 1200 wide, the phone crop under
+  900px); `/privacy/` passes its night through the `banner` slot: the caption on its own night
   ground beside the dome, the dome standing on the panel's line and clipped to
   its column so the drifting clouds never cross the words. A CSS scroll
   timeline scales the art 6% over the first 80svh of scroll (longhands only:
@@ -334,12 +372,13 @@ whose art never touches its words from 320 to 1920.
   which drops it), never under reduced motion or without support. The meter
   and the tree are unchanged. `e2e/site/article-banner.spec.ts` holds it at
   1920, 1440, 1280, 768, and 390: the title and date in the first window,
-  their contrast measured on the panel's opaque ground, the rise, the meter
-  and tree after it, and the still art under reduced motion. Guides keep their
+  their contrast measured on the panel's opaque ground, the rise, and the
+  meter and tree after it. Guides keep their
   `scene` and can opt in by passing a banner; About keeps its own layout.
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
-  (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
+  (schema: `src/content.config.ts`; posts may add `tags`, up to four short
+  topics shown on their card and filtering /blog/, and `featured: true`). `src/writing.ts` decides what a build
   publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
   entries only on the dev site. `status: coming-soon` announces a piece: it is
   listed on its index with a "Coming soon" label and no link, and has no
@@ -349,6 +388,23 @@ whose art never touches its words from 320 to 1920.
   blocks wrap long lines at their spaces inside the box (the Helper's install
   line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
+- **Figures in posts** (`src/figures.ts`): a ```` ```figure ```` fence is a chart
+  or a diagram drawn at build time, so a page carries no chart library, no
+  script, and no inline style. `kind: bar` is an SVG whose bars are sized by
+  percentage attributes (it reflows with the column and its text never
+  shrinks), named by its visible title (`aria-labelledby`) and described by
+  its values (`<desc>`), with a caption citing its `source:` and the numbers as
+  a table behind "The numbers as a table". `kind: flow` is an ordered list of
+  steps, a step's `- ` lines its alternatives. Values are copied exactly as
+  written; colours come from classes on the tokens (SVG attributes cannot
+  read `var()`). The Markdown twin gets each figure as a Markdown table or
+  numbered list (`figuresToMarkdown` in `writingMarkdown`). A spec that does
+  not parse fails the build. Astro 7's Sätteri processor takes the plugin
+  through an integration in `astro.config.mjs` (`figures()`), not a new
+  dependency. The fence's grammar is at the top of `src/figures.ts`;
+  `scripts/site-writing.test.ts` holds the parser and the published posts'
+  figures against their own text, and `e2e/site/article-figures.spec.ts` the
+  names, tables, and phone fit.
 - **`/about/`** (the owner's item 18 and his 2026-10-05 "use more width and
   redo it now that our message is better") is the maker's first-person story
   on its own wide layout, not `WritingPage`'s reading column: a head with the

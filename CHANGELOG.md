@@ -215,13 +215,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rest in a grid; posts that are coming soon are labelled on their picture. A
   post shows the same picture at the top, and its link preview uses the same
   scene.
-- **Blog posts and the privacy page open on a full-width banner.** The
-  post's scene, or the privacy page's night, fills most of the first screen
-  under the header, and the page rises over it as you scroll, with the title,
-  date, and reading time on a panel at the bottom left so they're always easy
-  to read. Phones get a shorter picture with the title just below it. The
-  banner settles slightly as you scroll and stays still if you've asked for
-  reduced motion.
+- **The privacy page opens on a full-width banner.** The night fills most of
+  the first screen under the header, and the page rises over it as you
+  scroll, with the title, date, and reading time on a panel at the bottom
+  left so they're always easy to read.
 - **The blog's pictures are redrawn.** The quokka is larger and crisper, at
   the same size in every picture, and what it holds (a notepad, a shield, a
   laptop, a folder of notes, a drawing board) is drawn like the things around
@@ -310,6 +307,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A new install lives in the Dock** and stays open like any app. Testers
   lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
   Settings → General.
+- **Blog posts on rotli.co open on a picture with a card, beside a reading
+  rail.** The post's scene sits inside the page, rounded and still, with a
+  card over its corner for the author, date, reading time, title, summary,
+  and topics (on a phone, the picture and then the title). The full-width
+  banner stays on the privacy page only. On a wide screen a rail beside the
+  text holds the post's title, its sections as a tree, how far through you
+  are as a percent, and Share: X, LinkedIn, Email, Copy link, and Copy
+  Markdown (the post's own Markdown). J and K jump between sections, except
+  while you type. The text is larger, about 70 characters a line, with
+  clearer headings, quotes, and a numbered sources list.
+- **Blog posts on rotli.co have charts and diagrams.** The post on unused AI
+  plans shows the Self Financial 30-day figures and Menlo's daily-use
+  comparison as bar charts, each with its source and a table of the numbers,
+  and a diagram of how the Librarian files a note with your plan or a model
+  on your Mac. The Rotli Web post shows how the browser reaches your folder.
+  They're drawn when the site is built, so the page loads no chart code.
+- **rotli.co's blog page shows what's new.** The newest post leads, large,
+  with its topics; the next ones follow in a row; then every post in a dated
+  list you can narrow by topic. Posts from the last two weeks say "New", and
+  posts that are coming soon wait in their own section.
 
 ### Added
 

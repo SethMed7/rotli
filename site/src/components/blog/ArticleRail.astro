@@ -1,0 +1,416 @@
+---
+// A blog post's left rail (WritingPage `article`), after the claude.dev posts the owner pointed
+// to, in the site's own type and tokens: the post's title, "On this page" as a tree (h3 entries
+// branch off their h2), how far through the post the window is (a bar and a percent, measured by
+// src/reading.ts like every meter on the site), a hint for the J and K keys, and Share. It stays
+// in view beside the text on wide screens. Below 900px only Share remains, after the article:
+// the tree becomes WritingPage's "On this page" disclosure and the meter a slim bar under the
+// header.
+//
+// Share is plain links (X, LinkedIn, an email) that carry the page's address and title and load
+// nothing from those sites, plus two buttons that need script and appear only with it: Copy link
+// and Copy Markdown, which copies the post's own Markdown twin (/blog/<slug>/index.md, the same
+// origin, so the CSP's `connect-src 'self'` allows it). J and K move to the next and previous
+// section; they never act while typing in a field, with a modifier held, or on a key the page
+// already handled.
+import { tocTree, type TocItem } from '../../blog';
+// The reading column and the figures (global, under .is-article): loaded only on pages with a rail.
+import './article.css';
+
+interface Props {
+  title: string;
+  toc: TocItem[];
+  share: {
+    url: string;
+    title: string;
+    /** The summary, for the email's body. */
+    text: string;
+    /** The post's Markdown twin, for Copy Markdown. */
+    markdown: string;
+  };
+}
+
+const { title, toc, share } = Astro.props;
+const tree = tocTree(toc);
+const enc = encodeURIComponent;
+const shareLinks = [
+  { label: 'X', href: `https://x.com/intent/post?text=${enc(share.title)}&url=${enc(share.url)}`, external: true },
+  { label: 'LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${enc(share.url)}`, external: true },
+  {
+    label: 'Email',
+    href: `mailto:?subject=${enc(share.title)}&body=${enc(`${share.text}\n\n${share.url}`)}`,
+    external: false,
+  },
+];
+---
+
+<aside class="rail" aria-label="About this post" data-article-rail>
+  <p class="rail-title">{title}</p>
+  {
+    tree.length > 1 && (
+      <nav class="rail-toc" aria-label="On this page" data-toc>
+        <p class="rail-label">On this page</p>
+        <ul class="tree">
+          {tree.map((item) => (
+            <li>
+              <a href={`#${item.slug}`}>{item.text}</a>
+              {item.children.length > 0 && (
+                <ul>
+                  {item.children.map((child) => (
+                    <li>
+                      <a href={`#${child.slug}`}>{child.text}</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      </nav>
+    )
+  }
+  <div
+    class="rail-progress"
+    data-read-progress="rail"
+    role="progressbar"
+    aria-label="Position in this post"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    aria-valuenow="0"
+    hidden
+  >
+    <span class="read-track" aria-hidden="true"><span class="read-fill" data-read-fill></span></span>
+    <span class="read-label" aria-hidden="true" data-read-percent>0%</span>
+  </div>
+  <p class="rail-hint" data-section-keys-hint hidden>
+    <kbd>J</kbd> <kbd>K</kbd> to move between sections
+  </p>
+  <div class="rail-share" data-share>
+    <p class="rail-label" id="share-label">Share</p>
+    <ul aria-labelledby="share-label">
+      {
+        shareLinks.map((link) => (
+          <li>
+            <a
+              href={link.href}
+              data-share-link={link.label.toLowerCase()}
+              {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+      <li hidden data-copy-item>
+        <button type="button" data-copy="link" data-copy-value={share.url}>Copy link</button>
+      </li>
+      <li hidden data-copy-item>
+        <button type="button" data-copy="markdown" data-copy-src={share.markdown}>Copy Markdown</button>
+      </li>
+    </ul>
+    <p class="share-status" role="status" data-share-status></p>
+  </div>
+</aside>
+
+<script>
+  // Copy link and Copy Markdown: shown only where the clipboard can be written. Markdown is
+  // fetched from this site (the post's twin) and handed to the clipboard as a promise where the
+  // browser takes one (Safari needs the write to start inside the click), else written once read.
+  const status = document.querySelector<HTMLElement>('[data-share-status]');
+  let clearStatus = 0;
+  const say = (message: string) => {
+    if (!status) return;
+    status.textContent = message;
+    window.clearTimeout(clearStatus);
+    clearStatus = window.setTimeout(() => (status.textContent = ''), 4000);
+  };
+  const markdownOf = async (src: string) => {
+    const response = await fetch(src, { headers: { Accept: 'text/markdown' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.text();
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    document.querySelectorAll<HTMLElement>('[data-copy-item]').forEach((item) => (item.hidden = false));
+    document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          if (button.dataset.copy === 'link') {
+            await navigator.clipboard.writeText(button.dataset.copyValue ?? location.href);
+            say('Link copied');
+            return;
+          }
+          const src = button.dataset.copySrc ?? '';
+          if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+            const blob = markdownOf(src).then((text) => new Blob([text], { type: 'text/plain' }));
+            await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+          } else {
+            await navigator.clipboard.writeText(await markdownOf(src));
+          }
+          say('Markdown copied');
+        } catch {
+          say('Couldn’t copy. Try again, or open the Markdown from the page’s address with index.md.');
+        }
+      });
+    });
+  }
+
+  // J and K: the next and the previous section heading the tree lists. Never while typing, with
+  // a modifier, inside a menu or a control that uses keys, or for a key already handled.
+  const rail = document.querySelector<HTMLElement>('[data-article-rail]');
+  const headings = [...(rail?.querySelectorAll<HTMLAnchorElement>('[data-toc] a[href^="#"]') ?? [])]
+    .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
+    .filter((heading): heading is HTMLElement => heading !== null);
+  const typing = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"], [role="menu"], [role="listbox"]') !== null);
+  if (headings.length > 1) {
+    document.querySelector<HTMLElement>('[data-section-keys-hint]')?.removeAttribute('hidden');
+    document.addEventListener('keydown', (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const key = event.key.toLowerCase();
+      if ((key !== 'j' && key !== 'k') || typing(event.target)) return;
+      // The heading the reading line has passed: the same line the tree highlights by.
+      const margin = parseFloat(getComputedStyle(headings[0]!).scrollMarginTop) || 0;
+      const line = margin + 4;
+      const current = headings.reduce((found, heading, index) => (heading.getBoundingClientRect().top <= line ? index : found), -1);
+      const next = key === 'j' ? current + 1 : current - 1;
+      // Before the first section, K goes back to the top of the page.
+      if (key === 'k' && next < 0) {
+        event.preventDefault();
+        window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        return;
+      }
+      const target = headings[next];
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({
+        block: 'start',
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+    });
+  }
+</script>
+
+<style>
+  /* In view beside the text, as tall as the window allows; Share settles at its foot. */
+  .rail {
+    position: sticky;
+    top: calc(var(--pinned) + 1.5rem);
+    align-self: start;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 1.6rem;
+    max-height: calc(100dvh - var(--pinned) - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.25rem;
+    font-size: 0.9rem;
+  }
+  .rail-title {
+    margin: 0;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .rail-label {
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  /* The tree: one guide line down the left; h3 entries sit on their own, shorter guide. */
+  .tree,
+  .tree ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tree {
+    border-left: 1px solid var(--border);
+  }
+  .tree ul {
+    margin: 0.1rem 0 0.3rem 0.9rem;
+    border-left: 1px solid var(--border);
+  }
+  .tree a {
+    position: relative;
+    display: block;
+    padding: 0.32rem 0 0.32rem 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+    text-decoration: none;
+    transition: color 140ms ease-out;
+  }
+  .tree ul a {
+    font-size: 0.86rem;
+  }
+  .tree a:hover,
+  .tree a[aria-current='location'] {
+    color: var(--text);
+  }
+  .tree a[aria-current='location'] {
+    font-weight: 600;
+  }
+  .tree a[aria-current='location']::before {
+    content: '';
+    position: absolute;
+    top: 0.3rem;
+    bottom: 0.3rem;
+    left: -1px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent-text);
+  }
+  .tree a:focus-visible {
+    outline-offset: 1px;
+  }
+  /* How far through: a bar and the percent beside it. */
+  .rail-progress {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .rail-progress[hidden] {
+    display: none;
+  }
+  .read-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .read-fill {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  .read-label {
+    min-width: 4ch;
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .rail-hint {
+    margin: -0.6rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .rail-hint[hidden] {
+    display: none;
+  }
+  kbd {
+    display: inline-block;
+    min-width: 1.3em;
+    padding: 0 0.3em;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.3rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
+  }
+  /* Only where there is a keyboard to press them. */
+  @media (hover: none), (pointer: coarse) {
+    .rail-hint {
+      display: none;
+    }
+  }
+  .rail-share {
+    margin-top: auto;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+  }
+  .rail-share ul {
+    display: grid;
+    gap: 0.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rail-share li[hidden] {
+    display: none;
+  }
+  .rail-share a,
+  .rail-share button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 140ms ease-out;
+  }
+  .rail-share a:hover,
+  .rail-share button:hover {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .share-status {
+    min-height: 1.3em;
+    margin: 0.4rem 0 0;
+    color: var(--text);
+    font-size: 0.84rem;
+  }
+  .share-status:empty {
+    margin: 0;
+    min-height: 0;
+  }
+  @media (pointer: coarse) {
+    .rail-share a,
+    .rail-share button {
+      min-height: 44px;
+    }
+  }
+  /* Narrow screens: Share after the article (WritingPage orders it last); the rest moves to
+     the disclosure and the slim bar. */
+  @media (max-width: 900px) {
+    .rail {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      margin-top: 2.5rem;
+    }
+    .rail-title,
+    .rail-toc,
+    .rail-progress,
+    .rail-hint {
+      display: none;
+    }
+    .rail-share {
+      margin-top: 0;
+      padding-top: 1.5rem;
+      border-top-color: var(--border-strong);
+    }
+    .rail-share ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 1.5rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tree a,
+    .rail-share a,
+    .rail-share button {
+      transition: none;
+    }
+  }
+</style>

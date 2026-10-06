@@ -1,13 +1,14 @@
 ---
-// /blog/ (the index: the newest readable post as the feature, then the rest in a
-// grid, with the ones announced as coming soon last and without a link; every
-// entry shows its thumbnail, src/og.ts) and /blog/<post>/, an article that opens on
-// its banner (the same scene composed wide, WritingPage `banner`), with the "On this
-// page" tree (WritingPage `toc`) and the reading meter the guides use (`progress`),
-// so every article reads the same way.
+// /blog/ (the index, after anthropic.com/news: the featured story, the next posts in a
+// row, every post in a dated list with topic filters, and the announced ones apart under
+// "Coming soon"; components/blog/BlogIndex.astro, arranged by src/blog.ts) and
+// /blog/<post>/, an article (WritingPage `article`): the post's scene contained at the
+// page's width with a card for its title, a left rail with the tree, the reading meter,
+// and Share, and its figures (src/figures.ts).
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
-import BlogIndex, { type BlogEntry } from '../../components/BlogIndex.astro';
+import { arrangeBlog, isNew } from '../../blog';
+import BlogIndex, { type BlogPost, type UpcomingPost } from '../../components/blog/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
 import { site } from '../../site';
@@ -28,29 +29,35 @@ const { entry, entries, upcoming } = Astro.props as {
   entries: Writing[];
   upcoming: Writing[];
 };
+/** Who writes the blog, on each post's card. */
+const AUTHOR = 'Seth Medina';
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-const posts: BlogEntry[] = entries.map((item) => ({
+// "New" is decided when the site is built: a post wears it for 14 days after its date.
+const builtAt = new Date();
+const arranged = arrangeBlog(entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured })));
+const toPost = ({ item }: { item: Writing }): BlogPost => ({
   href: `/blog/${slugOf(item)}/`,
   title: item.data.title,
   description: item.data.description,
-  meta: item.data.draft
-    ? ['Draft · dev site only']
-    : [formatDate(item.data.date), `${readingMinutes(item)} min read`],
+  date: formatDate(item.data.date),
+  dateTime: item.data.date.toISOString().slice(0, 10),
+  readTime: `${readingMinutes(item)} min read`,
+  draft: item.data.draft,
+  tags: item.data.tags,
+  isNew: isNew(item.data.date, builtAt),
   thumbnail: postThumbnail(slugOf(item)),
-}));
-const announced: BlogEntry[] = upcoming.map((item) => ({
+});
+const announced: UpcomingPost[] = upcoming.map((item) => ({
   title: item.data.title,
   description: item.data.description,
-  meta: ['Coming soon'],
   thumbnail: postThumbnail(slugOf(item)),
 }));
-const [featured, ...more] = posts;
 const rendered = entry ? await render(entry) : null;
 const Content = rendered?.Content ?? null;
 const toc = (rendered?.headings ?? [])
-  .filter((heading) => heading.depth === 2)
-  .map((heading) => ({ slug: heading.slug, text: heading.text }));
+  .filter((heading) => heading.depth === 2 || heading.depth === 3)
+  .map((heading) => ({ slug: heading.slug, text: heading.text, depth: heading.depth }));
 ---
 
 {
@@ -68,7 +75,13 @@ const toc = (rendered?.headings ?? [])
       heading={entry.data.title}
       lede={entry.data.description}
       meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
-      banner={postBanner(slugOf(entry))}
+      article={{
+        cover: postBanner(slugOf(entry)),
+        author: AUTHOR,
+        tags: entry.data.tags,
+        url: `${site.url}/blog/${slugOf(entry)}/`,
+        markdown: twinPath(writingPath(entry)),
+      }}
       toc={toc}
       progress
     >
@@ -85,7 +98,13 @@ const toc = (rendered?.headings ?? [])
       lede="Notes from building rotli: how it works, and why it works that way."
       wide
     >
-      <BlogIndex featured={featured} rest={[...more, ...announced]} empty="The first post is on its way." />
+      <BlogIndex
+        featured={arranged.featured && toPost(arranged.featured)}
+        secondary={arranged.secondary.map(toPost)}
+        all={arranged.all.map(toPost)}
+        upcoming={announced}
+        empty="The first post is on its way."
+      />
     </WritingPage>
   )
 }

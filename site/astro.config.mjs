@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { figurePlugin } from "./src/figures";
 import { votableIds } from "./src/roadmap";
 import { readRoadmapFile } from "./src/roadmap-file";
 import { site } from "./src/site";
@@ -55,6 +56,27 @@ function cspInlineStyleGuard() {
             `Built styles would break in production:\n  ${offenders.join("\n  ")}\nInline styles are blocked by the Content-Security-Policy (style-src 'self'): move them into component <style> rules. A literal :global( left in built CSS is dropped by the browser: move that rule into <style is:global>.`,
           );
         }
+      },
+    },
+  };
+}
+
+/**
+ * A ```figure fence in a post is a chart or a small diagram, drawn at build time
+ * (src/figures.ts): no chart library and no inline style reach the page. Astro's
+ * Markdown processor (Sätteri) takes its plugins on the processor's own options,
+ * which integrations may extend; anything else fails here instead of shipping
+ * the fence as a code block.
+ */
+function figures() {
+  return {
+    name: "rotli-figures",
+    hooks: {
+      "astro:config:setup": ({ config }) => {
+        const processor = config.markdown.processor;
+        if (processor?.name !== "satteri" || !Array.isArray(processor.options?.mdastPlugins))
+          throw new Error(`rotli-figures expects Astro's Sätteri Markdown processor, found ${processor?.name}`);
+        processor.options.mdastPlugins.push(figurePlugin);
       },
     },
   };
@@ -189,6 +211,7 @@ export default defineConfig({
   redirects: site.showsFullSite ? { "/resources/mcp": "/resources/developers/" } : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
+    figures(),
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),
     cspInlineStyleGuard(),
     agentFilesGuard(),

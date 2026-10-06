@@ -57,8 +57,9 @@ test("an article that fits in the window shows no meter", async ({ page }) => {
   await expect(page.locator("[data-read-progress]")).toBeHidden();
 });
 
-// The same article flow on /privacy/ and on a published post: the meter is one system.
-for (const path of ["/privacy/", "/blog/rotli-web-and-your-mac/"]) {
+// The same article flow on /privacy/: the meter is one system. Blog posts carry the same measure
+// in their rail and, on a phone, as a slim bar (article-rail.spec.ts).
+for (const path of ["/privacy/"]) {
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 390, height: 844 },
@@ -93,9 +94,10 @@ async function settled(page: Page) {
 }
 
 // The sticky "On this page" tree and every jump target clear the pinned header and meter
-// (the owner's 2026-10-05 screenshot: the meter covered the tree's label). A guide, a post,
-// and /privacy/, with the tree's longest entries, at the start, mid-article, and after a jump.
-for (const path of ["/resources/rotli-helper/", "/blog/rotli-web-and-your-mac/", "/privacy/"]) {
+// (the owner's 2026-10-05 screenshot: the meter covered the tree's label). A guide and
+// /privacy/, with the tree's longest entries, at the start, mid-article, and after a jump (a
+// post's rail: article-rail.spec.ts).
+for (const path of ["/resources/rotli-helper/", "/privacy/"]) {
   test(`${path}: the tree's heading and its jump targets sit below the meter`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(path);
@@ -135,7 +137,7 @@ for (const path of ["/resources/rotli-helper/", "/blog/rotli-web-and-your-mac/",
 
 test("on a phone, a jump from the compact tree lands below the meter", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/blog/rotli-web-and-your-mac/");
+  await page.goto("/resources/rotli-helper/");
   const compact = page.locator(".toc-compact");
   await compact.locator("summary").click();
   const link = compact.locator("a").nth(2);

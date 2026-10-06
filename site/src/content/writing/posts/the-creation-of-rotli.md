@@ -2,6 +2,7 @@
 title: The creation of rotli
 description: Why I started building a quiet, local-first workspace, and what building it has taught me.
 section: post
+tags: [Story]
 date: 2026-09-18
 status: coming-soon
 ---

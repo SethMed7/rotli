@@ -5,6 +5,7 @@
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
 import { questions } from "./faq";
+import { figuresToMarkdown } from "./figures";
 import { catalog, featurePath, statusLine } from "./features";
 import type { RoadmapSection } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
@@ -167,7 +168,7 @@ export function roadmapMarkdown(sections: RoadmapSection[]): string {
   return lines.join("\n");
 }
 
-/** A writing page as Markdown: its title, summary, and the source body. */
+/** A writing page as Markdown: its title, summary, and the source body, its figures as tables. */
 export function writingMarkdown(entry: Writing): string {
   const url = `${site.url}${writingPath(entry)}`;
   return [
@@ -175,7 +176,7 @@ export function writingMarkdown(entry: Writing): string {
     "",
     `> ${entry.data.description}`,
     "",
-    (entry.body ?? "").trim(),
+    figuresToMarkdown((entry.body ?? "").trim()),
     "",
     "---",
     "",
