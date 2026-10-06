@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isCanvasPath } from "../lib/fileKind";
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
@@ -224,9 +225,10 @@ export function useSearchableNotes(): { notes: NoteSummary[]; ready: boolean } {
         // conservative transient (a plain root's chats/ appears a beat later,
         // never flashes in and out)
         const chats = memex ? isChats(n.folderId, memex) : isChatsPath(n.folderId);
-        // files stay out — except a canvas, listed and linked like a board
-        // (owner decision 2026-10-06)
-        if ((n.kind === "file" && !isCanvasPath(n.id)) || isSink(n.folderId) || chats) continue;
+        // files stay out — except a canvas where this build opens canvases,
+        // listed and linked like a board (owner decision 2026-10-06)
+        const canvas = LAUNCH_FEATURES.jsonCanvas && isCanvasPath(n.id);
+        if ((n.kind === "file" && !canvas) || isSink(n.folderId) || chats) continue;
         seen.set(n.id, n);
       }
     return [...seen.values()];

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -70,20 +71,32 @@ test("an empty canvas says how to begin, and lines curve out of the sides they n
 });
 
 test("a preset colour paints through a theme token; another app's hex rides along only when valid", () => {
-  const coloured = parseCanvas(
-    JSON.stringify({
-      nodes: [
-        { id: "p", type: "text", text: "preset", x: 0, y: 0, width: 100, height: 60, color: "4" },
-        { id: "h", type: "text", text: "hex", x: 200, y: 0, width: 100, height: 60, color: "#3a7bd5" },
-        { id: "x", type: "text", text: "junk", x: 400, y: 0, width: 100, height: 60, color: "red;x:y" },
-      ],
-      edges: [],
-    }),
+  // the Obsidian fixture's link card carries another app's hex colour
+  const fixture = parseCanvas(
+    readFileSync(new URL("../../jsonCanvas/fixtures/obsidian.canvas", import.meta.url), "utf8"),
   );
-  if (!coloured.ok) throw new Error(coloured.error);
+  if (!fixture.ok) throw new Error(fixture.error);
+  const hex = fixture.doc.nodes.find((node) => node.type === "link")?.color ?? "";
+  const doc = {
+    nodes: [
+      { id: "p", type: "text" as const, text: "preset", x: 0, y: 0, width: 100, height: 60, color: "4" },
+      { id: "h", type: "text" as const, text: "hex", x: 200, y: 0, width: 100, height: 60, color: hex },
+      {
+        id: "x",
+        type: "text" as const,
+        text: "junk",
+        x: 400,
+        y: 0,
+        width: 100,
+        height: 60,
+        color: "red;x:y",
+      },
+    ],
+    edges: [],
+  };
   const markup = renderToStaticMarkup(
     <CanvasEditor
-      doc={coloured.doc}
+      doc={doc}
       onChange={() => {}}
       noteFor={() => null}
       resolveLink={() => null}
@@ -91,7 +104,7 @@ test("a preset colour paints through a theme token; another app's hex rides alon
     />,
   );
   expect(markup).toContain('data-colour="4"');
-  expect(markup).toContain("--card-colour:#3a7bd5");
-  // a value that isn't a colour never reaches the style
+  expect(markup).toContain(`--card-colour:${hex}`);
+  // a value that isn't a colour never reaches the style or the attribute
   expect(markup).not.toContain("x:y");
 });

@@ -8,10 +8,11 @@ import {
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { corpusCreateCanvas, corpusCreateManagedFile } from "../lib/tauri";
+import { corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
 import { boardStore } from "../services/boardStore";
+import { createCanvasFile } from "../services/canvasFiles";
 import { createRoutedNote } from "../services/createNote";
 import { DEST, isHidden, isStorageLane, isVault } from "../services/destinations";
 import { invalidateNoteLists, primeNote } from "../services/hooks";
@@ -196,7 +197,7 @@ export async function createManagedItem(
       ? {
           // beside notes, in the folder you're in (owner decision 2026-10-06)
           async create() {
-            return { id: await corpusCreateCanvas(resolvedPhysicalFolder(), name), kind: "canvas" };
+            return { id: await createCanvasFile(resolvedPhysicalFolder(), name), kind: "canvas" };
           },
         }
       : kind === "board"

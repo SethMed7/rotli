@@ -990,10 +990,10 @@ export async function fileAssetUrl(id: string): Promise<string> {
 }
 
 /** Create an empty JSON Canvas named `name` beside the notes in `folderId`
- * (a folder that can't hold notes lands it where a new note would). Mac app
- * only for now: Rotli Web's folder vault doesn't list canvases yet. */
+ * (a folder that can't hold notes lands it where a new note would). Rotli
+ * Web's twin is services/folderCanvases.ts. */
 export async function corpusCreateCanvas(folderId: string, name: string): Promise<string> {
-  if (!isTauri()) throw new Error("Canvases open in the Mac app for now.");
+  if (!isTauri()) throw new Error("no Mac corpus to create a canvas in");
   return invoke<string>("corpus_create_canvas", { folderId, name });
 }
 

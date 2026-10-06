@@ -419,6 +419,14 @@ fn wikilink_targets_fixtures_agree() {
 }
 
 #[test]
+fn empty_canvas_file_agrees() {
+    assert_eq!(
+        crate::corpus::files::EMPTY_CANVAS,
+        entry("emptyCanvasFile").as_str().expect("emptyCanvasFile is a string")
+    );
+}
+
+#[test]
 fn metadata_link_targets_fixtures_agree() {
     for case in entry("metadataLinkTargets")
         .as_array()

@@ -52,8 +52,8 @@ test("the web platform withholds every capability that needs the desktop shell, 
     expect(web.voice).toBe(false);
     // a second browser tab would be a second writer with no coordination
     expect(web.chatWindow).toBe(false);
-    // the folder vault can't list or save a .canvas yet
-    expect(web.jsonCanvas).toBe(false);
+    // a canvas opens and saves in the connected folder, as on the Mac
+    expect(web.jsonCanvas).toBe(development);
     // channel-only gates still follow the channel: nothing about them needs Tauri
     expect(web.mermaidVisualEditing).toBe(development);
     expect(web.mermaidDiagrams).toBe(development);

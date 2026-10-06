@@ -1,3 +1,4 @@
+import { isCanvasPath } from "../lib/fileKind";
 import { corpusRestoreFile, isTauri } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary } from "../types";
@@ -5,11 +6,17 @@ import { invalidateNotes } from "./hooks";
 
 export type ActiveItemSinkLane = "note" | "file";
 
+/** A raw file Rotli Web's folder service moves and restores by path, as it
+ * does notes: a board, or a canvas (the Mac corpus has file commands). */
+const webPathItem = (item: Pick<NoteSummary, "id" | "kind">): boolean =>
+  !isTauri() && (item.kind === "board" || (item.kind === "file" && isCanvasPath(item.id)));
+
 /** Choose the mutation lane for an active item entering Archive or Trash.
  * Boards are opaque files on disk, but their active lifecycle is note-native:
- * Rust's move_note preserves their bytes and records the restorable path. */
-export function activeItemSinkLane(kind: NoteSummary["kind"]): ActiveItemSinkLane {
-  return kind === "file" ? "file" : "note";
+ * Rust's move_note preserves their bytes and records the restorable path. On
+ * Rotli Web a canvas takes the same note lane (owner decision 2026-10-06). */
+export function activeItemSinkLane(item: Pick<NoteSummary, "id" | "kind">): ActiveItemSinkLane {
+  return item.kind === "file" && !webPathItem(item) ? "file" : "note";
 }
 
 interface LifecycleStat {
@@ -67,7 +74,7 @@ export async function restoreSinkItem(
   if (item.kind === "file" || item.kind === "board") {
     // Rotli Web's folder service restores a board by the same prefix strip it
     // uses for notes; only the Mac corpus has the path-restore command
-    if (item.kind === "board" && !isTauri()) await restoreNote(item.id);
+    if (webPathItem(item)) await restoreNote(item.id);
     else await corpusRestoreFile(item.id);
     usePanesStore.getState().closeFileTabs(item.id);
     await invalidateNotes();

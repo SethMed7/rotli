@@ -130,6 +130,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
  * one capability is physically clustered later, this registry moves with it. */
 export const SERVICE_FILE_OWNERS = {
   "webLinks.ts": "graph",
+  "canvasFiles.ts": "jsonCanvas",
+  "folderCanvases.ts": "jsonCanvas",
   "boardRename.ts": "boards",
   "boardStore.ts": "boards",
   "folderBoards.ts": "boards",

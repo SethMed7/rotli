@@ -1,4 +1,5 @@
-// Wires a `.canvas` file to the Canvas editor on the Mac app: read the file,
+// Wires a `.canvas` file to the Canvas editor — on the Mac app or a connected
+// Rotli Web folder (services/canvasFiles.ts picks): read the file,
 // parse it, and save edits back (debounced, revision-checked — a canvas
 // changed on disk since it was read refuses instead of overwriting). Note
 // cards resolve through the note list the editor already holds.
@@ -7,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { resolveWikilink, buildWikilinkIndex } from "../editor/wikilink";
 import { onQuitFlush } from "../lib/quitFlush";
-import { corpusFileStat, corpusFileText, corpusWriteFileBytes, isTauri } from "../lib/tauri";
+import { type CanvasFileIo, canvasFileIo } from "../services/canvasFiles";
 import { useNoteLinks, useSearchableNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { type CanvasDoc, parseCanvas, serializeCanvas } from "./model";
@@ -23,49 +24,31 @@ const SAVE_AFTER_MS = 500;
  * open half a file. */
 export const CANVAS_MAX_BYTES = 8_000_000;
 
-export interface CanvasFileIo {
-  native: () => boolean;
-  stat: typeof corpusFileStat;
-  text: typeof corpusFileText;
-}
-const liveIo: CanvasFileIo = { native: isTauri, stat: corpusFileStat, text: corpusFileText };
-
 /** Why a canvas file didn't open — one wording, shared with the tests. */
 export const CANVAS_LOAD_REFUSAL = {
-  notHere: "Canvases open in the Mac app for now.",
+  notHere: "Canvases need a vault folder — connect one to open this canvas.",
   gone: "This canvas isn’t in the vault anymore.",
   tooLarge: "This canvas is too large to open.",
 } as const;
 
-/** Read and parse a canvas, failing closed: outside the Mac app the file
- * adapter would answer "" and accept saves without writing, so it refuses
- * instead of showing a blank canvas; the whole file is read (the adapter's
- * default cap would cut it short), and one too large to read is refused. */
+/** Read and parse a canvas, failing closed: with nowhere to hold a canvas it
+ * refuses instead of showing a blank one; the whole file is read (a default
+ * read cap would cut it short), and one too large to read is refused. */
 export async function loadCanvasFile(
   fileId: string,
-  io: CanvasFileIo = liveIo,
+  io: CanvasFileIo | null = canvasFileIo(),
 ): Promise<{ state: CanvasFileState; revision: string | null }> {
   const refuse = (error: string) => ({ state: { status: "error", error } as const, revision: null });
-  if (!io.native()) return refuse(CANVAS_LOAD_REFUSAL.notHere);
+  if (!io) return refuse(CANVAS_LOAD_REFUSAL.notHere);
   const stat = await io.stat(fileId);
   if (!stat) return refuse(CANVAS_LOAD_REFUSAL.gone);
   if (stat.len > CANVAS_MAX_BYTES) return refuse(CANVAS_LOAD_REFUSAL.tooLarge);
-  const parsed = parseCanvas(await io.text(fileId, stat.len));
+  const parsed = parseCanvas(await io.read(fileId, stat.len));
   if (!parsed.ok) return refuse(parsed.error);
   return {
     state: { status: "ready", doc: parsed.doc, writable: stat.writable, saveError: null },
     revision: stat.revision,
   };
-}
-
-async function base64Of(text: string): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(reader.error ?? new Error("couldn’t encode the canvas"));
-    reader.readAsDataURL(new Blob([text], { type: "application/json" }));
-  });
-  return dataUrl.slice(dataUrl.indexOf(",") + 1);
 }
 
 export function useCanvasFile(fileId: string): {
@@ -84,12 +67,9 @@ export function useCanvasFile(fileId: string): {
     if (!doc || revision.current === null) return;
     pending.current = null;
     try {
-      revision.current = await corpusWriteFileBytes(
-        fileId,
-        await base64Of(serializeCanvas(doc)),
-        false,
-        revision.current,
-      );
+      const io = canvasFileIo();
+      if (!io) throw new Error(CANVAS_LOAD_REFUSAL.notHere);
+      revision.current = await io.write(fileId, serializeCanvas(doc), revision.current);
       setState((current) => (current.status === "ready" ? { ...current, saveError: null } : current));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

@@ -1,19 +1,18 @@
 import { expect, test } from "bun:test";
 
-import type { FileStat } from "../lib/tauri";
-import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, type CanvasFileIo, loadCanvasFile } from "./composition";
+import type { CanvasFileIo } from "../services/canvasFiles";
+import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, loadCanvasFile } from "./composition";
 import { CANVAS_REFUSAL } from "./model";
 
-const stat = (len: number): FileStat =>
-  ({ len, revision: "r1", writable: true, lifecycleMutable: false, lifecycleReason: null }) as FileStat;
+const stat = (len: number) => ({ len, revision: "r1", writable: true });
 
 const io = (overrides: Partial<CanvasFileIo>, reads: number[] = []): CanvasFileIo => ({
-  native: () => true,
   stat: async () => stat(20),
-  text: async (_id, maxBytes) => {
-    reads.push(maxBytes ?? -1);
+  read: async (_id, len) => {
+    reads.push(len);
     return '{"nodes":[],"edges":[]}';
   },
+  write: async () => "r2",
   ...overrides,
 });
 
@@ -30,25 +29,20 @@ test("a canvas loads whole: the read asks for every byte the file has", async ()
   expect(reads).toEqual([20]);
 });
 
-test("it fails closed: no fake blank canvas off the Mac app, no half a file, no gone file", async () => {
-  const refused = async (overrides: Partial<CanvasFileIo>) => {
-    const reads: number[] = [];
-    const { state, revision } = await loadCanvasFile("wiki/Plan.canvas", io(overrides, reads));
+test("it fails closed: no fake blank canvas with nowhere to keep it, no half a file, no gone file", async () => {
+  const refused = async (port: CanvasFileIo | null) => {
+    const { state, revision } = await loadCanvasFile("wiki/Plan.canvas", port);
     expect(revision).toBeNull();
-    return { error: state.status === "error" ? state.error : null, reads };
+    return state.status === "error" ? state.error : null;
   };
-  expect(await refused({ native: () => false })).toEqual({
-    error: CANVAS_LOAD_REFUSAL.notHere,
-    reads: [],
-  });
-  expect(await refused({ stat: async () => null })).toEqual({
-    error: CANVAS_LOAD_REFUSAL.gone,
-    reads: [],
-  });
-  expect(await refused({ stat: async () => stat(CANVAS_MAX_BYTES + 1) })).toEqual({
-    error: CANVAS_LOAD_REFUSAL.tooLarge,
-    reads: [],
-  });
+  expect(await refused(null)).toBe(CANVAS_LOAD_REFUSAL.notHere);
+  const reads: number[] = [];
+  expect(await refused(io({ stat: async () => null }, reads))).toBe(CANVAS_LOAD_REFUSAL.gone);
+  expect(await refused(io({ stat: async () => stat(CANVAS_MAX_BYTES + 1) }, reads))).toBe(
+    CANVAS_LOAD_REFUSAL.tooLarge,
+  );
+  // neither refusal read a byte
+  expect(reads).toEqual([]);
   // a parse failure surfaces the parser's own reason
-  expect((await refused({ text: async () => "[1," })).error).toBe(CANVAS_REFUSAL.notJson);
+  expect(await refused(io({ read: async () => "[1," }))).toBe(CANVAS_REFUSAL.notJson);
 });

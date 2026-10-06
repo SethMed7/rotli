@@ -261,6 +261,10 @@ export function serializeCanvas(doc: CanvasDoc): string {
   return `{\n${body.join(",\n")}\n}`;
 }
 
+/** A new, empty canvas file — byte-identical to Rust `EMPTY_CANVAS`
+ * (parity.json `emptyCanvasFile`). */
+export const EMPTY_CANVAS_FILE = serializeCanvas({ nodes: [], edges: [] });
+
 /** The spec's preset names (it leaves their exact colors to each app). */
 export const PRESET_NAMES: Record<string, string> = {
   "1": "red",

@@ -187,7 +187,7 @@ export function useNoteMenu() {
         }
 
         const isNote = !isFile && !isBoard;
-        const sinkLane = activeItemSinkLane(note.kind);
+        const sinkLane = activeItemSinkLane(note);
         const inMain = mainHasNote(manifest.tree, note.id);
         const currentView = assignedView(viewsManifest, note.id);
         const starred = quickIds.includes(note.id);

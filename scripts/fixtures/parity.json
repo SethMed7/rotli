@@ -663,6 +663,10 @@
           "targets": []
         }
       ]
+    },
+    "emptyCanvasFile": {
+      "sourceOfTruth": "src-tauri/src/corpus_files.rs EMPTY_CANVAS ↔ src/jsonCanvas/model.ts EMPTY_CANVAS_FILE (a new canvas, written the way Obsidian writes one)",
+      "value": "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}"
     }
   }
 }

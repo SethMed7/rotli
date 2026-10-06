@@ -480,8 +480,10 @@ function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   return next;
 }
 
+/** The whole canvas in view, never zoomed past its own size: a canvas of
+ * one small card opens at 100%, not blown up. */
 function fitDoc(doc: CanvasDoc, width: number, height: number): View {
-  return fitView(
+  const fitted = fitView(
     doc.nodes.flatMap((node) => [
       { id: `${node.id}-a`, x: node.x, y: node.y, r: 0 },
       { id: `${node.id}-b`, x: node.x + node.width, y: node.y + node.height, r: 0 },
@@ -490,4 +492,5 @@ function fitDoc(doc: CanvasDoc, width: number, height: number): View {
     height,
     64,
   );
+  return fitted.k > 1 ? { k: 1, x: fitted.x / fitted.k, y: fitted.y / fitted.k } : fitted;
 }
