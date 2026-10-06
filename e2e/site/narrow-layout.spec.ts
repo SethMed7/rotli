@@ -16,6 +16,7 @@ for (const width of [390, 768]) {
     "/blog/",
     "/blog/rotli-web-and-your-mac/",
     "/about/",
+    "/download/",
     "/roadmap/",
   ]) {
     test(`${path} never scrolls sideways at ${width}px`, async ({ page }) => {

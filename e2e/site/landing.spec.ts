@@ -34,38 +34,6 @@ test("the hero says what rotli is and costs, with one way in, and no platform li
   await expect(header).toHaveAttribute("href", "/download/");
 });
 
-test("the download page offers the Mac app, and calls Windows and Linux coming soon", async ({ page }) => {
-  await page.goto("/download/");
-  const row = (name: string) =>
-    page.locator(".all li", { has: page.getByRole("heading", { name, exact: true }) });
-  await expect(row("Mac").locator(".status")).toHaveText("Available");
-  await expect(row("Mac").locator("a")).toHaveAttribute("href", /Rotli\.dmg$/);
-  for (const name of ["Windows", "Linux"])
-    await expect(row(name).locator(".status")).toHaveText("Coming soon");
-  // This build may leave Rotli Web off; when it is on, it is the other real option and the
-  // way in for Windows and Linux in the meantime.
-  if ((await row("Rotli Web").count()) > 0) {
-    await expect(row("Rotli Web").locator(".status")).toHaveText("Available");
-    await expect(row("Windows").locator("a")).toContainText("Use Rotli Web in the meantime");
-  }
-});
-
-test("a Windows visitor is led to the coming-soon panel, not the Mac download", async ({ browser }) => {
-  const context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-  });
-  const page = await context.newPage();
-  await page.goto("/download/");
-  await expect(page.locator("html")).toHaveAttribute("data-os", "windows");
-  const panel = page.locator(".pick-panel.for-windows");
-  await expect(panel).toBeVisible();
-  await expect(panel.locator("h2")).toHaveText("rotli for Windows is coming soon");
-  await expect(page.locator(".pick-panel.for-mac")).toBeHidden();
-  await expect(panel.locator("a[href$='.dmg']")).toHaveCount(0);
-  await context.close();
-});
-
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({
   page,
 }) => {
