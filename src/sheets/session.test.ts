@@ -10,11 +10,19 @@ import {
   getParked,
   getSetAside,
   parkedResume,
+  saveSetAsideAsCopy,
   setAsideCopyBytes,
   setAsideCopyName,
   setAsideParked,
   setParked,
 } from "./session";
+
+/** A parked session a workbook can really be written from. */
+function realPark(revision: string): ParkedSession {
+  const wb = fillFromCsvRows(newWorkbook(), "S", [["a"], ["1"]]);
+  const model = workbookToModel(wb, "storage/rotli/twice.xlsx");
+  return { wb, model, idMap: buildSheetIdMap(wb, model), diskLen: 0, revision, mode: "xlsx" };
+}
 
 function park(revision: string, mode: ParkedSession["mode"] = "xlsx"): ParkedSession {
   return {
@@ -51,12 +59,30 @@ describe("set-aside edits", () => {
     setParked(id, park("old"));
     setAsideParked(id);
     expect(getParked(id)).toBeUndefined();
-    expect(getSetAside(id)?.revision).toBe("old");
+    expect(getSetAside(id).map((s) => s.revision)).toEqual(["old"]);
     // the background flush must not retry a stale write it can only fail
     await flushDirtySheets();
-    expect(getSetAside(id)?.revision).toBe("old");
+    expect(getSetAside(id).map((s) => s.revision)).toEqual(["old"]);
     deleteSetAside(id);
-    expect(getSetAside(id)).toBeUndefined();
+    expect(getSetAside(id)).toEqual([]);
+  });
+
+  test("a second conflict adds its edits; the first ones are never replaced", async () => {
+    const id = "storage/rotli/twice.xlsx";
+    setParked(id, realPark("first"));
+    setAsideParked(id);
+    setParked(id, realPark("second"));
+    setAsideParked(id);
+    expect(getSetAside(id).map((s) => s.revision)).toEqual(["first", "second"]);
+    // Save my edits as a copy writes one workbook per set-aside session
+    const made: string[] = [];
+    const last = await saveSetAsideAsCopy(id, async (name) => {
+      made.push(name);
+      return `storage/rotli/copy-${made.length}.xlsx`;
+    });
+    expect(made).toEqual(["twice (my edits).xlsx", "twice (my edits).xlsx"]);
+    expect(last).toBe("storage/rotli/copy-2.xlsx");
+    expect(getSetAside(id)).toEqual([]);
   });
 
   test("a CSV's set-aside edits survive as a workbook copy", async () => {

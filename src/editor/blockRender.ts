@@ -402,8 +402,9 @@ class RenderBlockWidget extends WidgetType {
       o.lang === this.lang &&
       o.code === this.code &&
       o.themeSig === this.themeSig &&
-      o.sourceFrom === this.sourceFrom &&
-      o.sourceTo === this.sourceTo
+      // a chart finds its fence from its live place (chartBlock.ts), so a
+      // shift from an edit above keeps its drawing and any open form
+      (this.lang === "chart" || (o.sourceFrom === this.sourceFrom && o.sourceTo === this.sourceTo))
     );
   }
 
@@ -457,7 +458,7 @@ class RenderBlockWidget extends WidgetType {
       if (this.lang === "mermaid") {
         openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
       } else if (this.lang === "chart") {
-        openChartForm(container, this.code, this.sourceFrom, this.sourceTo);
+        openChartForm(container, this.code);
       } else {
         openExpandOverlay(this.lang, this.code, container);
       }
@@ -500,7 +501,7 @@ class RenderBlockWidget extends WidgetType {
           if (!UNCACHED.has(this.lang)) cacheSet(key, el);
           mountRendered(el);
           if (this.lang === "chart" && takeChartEdit(this.code)) {
-            openChartForm(container, this.code, this.sourceFrom, this.sourceTo);
+            openChartForm(container, this.code);
           }
         })
         .catch(() => {});

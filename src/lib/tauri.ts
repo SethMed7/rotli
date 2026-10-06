@@ -1413,19 +1413,21 @@ export function corpusWriteAi(
 export interface CorpusAiRead {
   body: string;
   revision: string;
-  /** The editor's copy of the note (desktop only). */
+  /** The editor's copy of the note, when asked for (desktop only). */
   editor?: string;
 }
 
 export async function corpusReadAiVersioned(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
+  opts?: { withEditor?: boolean },
 ): Promise<CorpusAiRead> {
   if (!isTauri()) return webCorpus()?.read(id) ?? { body: "", revision: "browser:0" };
   return invoke<CorpusAiRead>("corpus_read_ai", {
     id,
     modelId: model.id,
     endpoint: model.endpoint,
+    withEditor: opts?.withEditor ?? false,
   });
 }
 

@@ -39,7 +39,7 @@ const liveDirty = new Map<string, LiveDirty>();
 /** Parked edits whose file changed on disk since. Held out of `parked` so the
  * hide/quit flush never retries a write the revision check can only refuse;
  * the editor offers to save them as a copy or discard them. */
-const setAside = new Map<string, ParkedSheet>();
+const setAside = new Map<string, ParkedSheet[]>();
 
 /** What reopening a sheet does with edits parked from an earlier session: none
  * parked or a different mode opens the file fresh; an unchanged file resumes
@@ -150,15 +150,17 @@ export function deleteParked(fileId: string): void {
 }
 
 /** Move a stale parked session aside, out of the flush. */
+/** Each conflict adds its edits; an earlier unresolved one is never replaced. */
 export function setAsideParked(fileId: string): void {
   const session = parked.get(fileId);
   if (!session) return;
   parked.delete(fileId);
-  setAside.set(fileId, session);
+  setAside.set(fileId, [...(setAside.get(fileId) ?? []), session]);
 }
 
-export function getSetAside(fileId: string): ParkedSession | undefined {
-  return setAside.get(fileId);
+/** Edits set aside for this file, oldest first (empty when none). */
+export function getSetAside(fileId: string): readonly ParkedSession[] {
+  return setAside.get(fileId) ?? [];
 }
 
 export function deleteSetAside(fileId: string): void {
@@ -180,19 +182,30 @@ export async function setAsideCopyBytes(session: ParkedSession): Promise<Uint8Ar
 
 /** Save set-aside edits as a new workbook beside Rotli's other sheets, leaving
  * the file that changed on disk untouched. Returns the copy's id. */
-export async function saveSetAsideAsCopy(fileId: string): Promise<string> {
-  const session = setAside.get(fileId);
-  if (!session) throw new Error("there are no set-aside edits for this file");
-  const bytes = await setAsideCopyBytes(session);
+export async function saveSetAsideAsCopy(
+  fileId: string,
+  create: (name: string, base64: string, rootId?: string) => Promise<string> = corpusCreateManagedFile,
+): Promise<string> {
+  const sessions = setAside.get(fileId) ?? [];
+  if (sessions.length === 0) throw new Error("there are no set-aside edits for this file");
   // the default root is addressed by omission, as every other caller does
   const rootId = rootIdOf(fileId);
-  const copyId = await corpusCreateManagedFile(
-    setAsideCopyName(fileId),
-    b64FromBytes(bytes),
-    rootId === "default" ? undefined : rootId,
-  );
-  if (!copyId) throw new Error("this build can't create files");
-  setAside.delete(fileId);
+  let copyId = "";
+  // one copy per set-aside session, oldest first; Rust picks a free name for
+  // each. A failure keeps that session and every later one set aside.
+  while (setAside.get(fileId)?.length) {
+    const session = setAside.get(fileId)![0]!;
+    const bytes = await setAsideCopyBytes(session);
+    copyId = await create(
+      setAsideCopyName(fileId),
+      b64FromBytes(bytes),
+      rootId === "default" ? undefined : rootId,
+    );
+    if (!copyId) throw new Error("this build can't create files");
+    const rest = setAside.get(fileId)!.slice(1);
+    if (rest.length) setAside.set(fileId, rest);
+    else setAside.delete(fileId);
+  }
   return copyId;
 }
 

@@ -7,14 +7,13 @@
 
 import { looksSecret } from "./guard";
 import inlinePrompt from "./prompts/inlineAi.md?raw";
-import { modelFailure, stripThinking } from "./replyText";
+import { modelFailure, promptAsset, stripThinking } from "./replyText";
 import type { CompleteReq, Host } from "./types";
 
-const HEADER = /^version:\s*(\d+)\s*\n/;
-
+const ASSET = promptAsset(inlinePrompt);
 /** The asset's `version:` line. Bump it whenever the instructions change. */
-export const INLINE_AI_VERSION = Number(HEADER.exec(inlinePrompt)?.[1] ?? Number.NaN);
-const SYSTEM = inlinePrompt.replace(HEADER, "").trim();
+export const INLINE_AI_VERSION = ASSET.version;
+const SYSTEM = ASSET.system;
 
 /** How much of the note around the cursor the model reads. */
 export const INLINE_CONTEXT = { before: 6000, after: 1500 } as const;
@@ -44,10 +43,18 @@ export type InlineVerdict = { ok: true; text: string } | { ok: false; reason: st
  * fenced block (a chart) stays a fenced block — that is the passage. */
 export function cleanInlineReply(raw: string): InlineVerdict {
   const text = stripThinking(raw);
-  if (text === "") return { ok: false, reason: "The model's answer was empty." };
-  if (text.length > MAX_INSERT_CHARS)
-    return { ok: false, reason: "The model's answer ran too long to insert." };
+  if (text === "") return { ok: false, reason: REPLY_EMPTY };
+  if (text.length > MAX_INSERT_CHARS) return { ok: false, reason: REPLY_TOO_LONG };
   return { ok: true, text };
+}
+
+/** Where cursor point `at` of `before` sits in `after`, when the edits since
+ * didn't reach across it: unchanged text before it keeps it in place,
+ * unchanged text after it carries it along. Null when an edit spans it. */
+export function mapAnchor(before: string, at: number, after: string): number | null {
+  if (after.startsWith(before.slice(0, at))) return at;
+  const tail = before.slice(at);
+  return after.endsWith(tail) ? after.length - tail.length : null;
 }
 
 /** One request. The secret gate runs on the exact text that would be sent,

@@ -100,6 +100,12 @@ describe("asking — the gates before any model runs", () => {
   });
 });
 
+test("a note saved with Windows line endings matches the editor's LF copy", async () => {
+  const { d } = deps({ body: DOC.replace(/\n/g, "\r\n") });
+  const h = host();
+  expect((await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).ok).toBe(true);
+});
+
 describe("inserting — the person's choice, written through the AI lane", () => {
   test("writes exactly the passage at the cursor with the FRESH revision, then shows it", async () => {
     // the revision moved between Ask and Insert (a Librarian metadata write)

@@ -10,6 +10,7 @@ import { useRef, useState } from "react";
 
 import { modelIsOnDevice } from "../ai/guard";
 import { refineModelFor } from "../ai/handToAiRefine";
+import { mapAnchor } from "../ai/inlineAi";
 import { useTransientPopover } from "../lib/popover";
 import { INLINE_AI_DEPS, askAtCursor, insertAtCursor } from "../services/inlineAi";
 import { useUiStore } from "../state/ui";
@@ -20,7 +21,9 @@ import { adaptSlashInsertion } from "./slashMenu";
 type Phase =
   | { kind: "ask"; error: string | null }
   | { kind: "asking" }
-  | { kind: "answer"; text: string; error: string | null; inserting: boolean };
+  /** `text` is the passage exactly as it would land (indented to its list);
+   * `docText`/`at` are the note and cursor it was asked about. */
+  | { kind: "answer"; text: string; docText: string; at: number; error: string | null; inserting: boolean };
 
 export function InlineAiPopover({
   state,
@@ -71,27 +74,35 @@ export function InlineAiPopover({
       target.at,
     );
     if (id !== request.current) return;
-    setPhase(
-      verdict.ok
-        ? { kind: "answer", text: verdict.text, error: null, inserting: false }
-        : { kind: "ask", error: verdict.reason },
-    );
+    if (!verdict.ok) {
+      setPhase({ kind: "ask", error: verdict.reason });
+      return;
+    }
+    // what the person reads is exactly what Insert writes
+    const text = adaptSlashInsertion(verdict.text, verdict.text.length, state.continuation).insert;
+    setPhase({ kind: "answer", text, docText: target.docText, at: target.at, error: null, inserting: false });
   };
 
   const insert = async () => {
-    const target = where();
-    if (!model || !target || phase.kind !== "answer") return;
-    // the answer as it will sit in the note: indented to the list it lands in
-    const text = adaptSlashInsertion(phase.text, phase.text.length, state.continuation).insert;
+    const editor = view();
+    if (!model || !editor || phase.kind !== "answer") return;
+    const docText = editor.state.doc.toString();
+    // the note may have been edited while the answer was open: follow the
+    // cursor point, or say so if an edit reached across it
+    const at = mapAnchor(phase.docText, phase.at, docText);
+    if (at === null) {
+      setPhase({ ...phase, error: "The text around the cursor changed. Discard, then ask again." });
+      return;
+    }
     setPhase({ ...phase, inserting: true, error: null });
-    const done = await insertAtCursor(INLINE_AI_DEPS, model, noteId, text, target.docText, target.at);
+    const done = await insertAtCursor(INLINE_AI_DEPS, model, noteId, phase.text, docText, at);
     if (!done.ok) {
       setPhase({ ...phase, inserting: false, error: done.reason });
       return;
     }
-    const after = Math.min(target.at + text.length, target.editor.state.doc.length);
-    target.editor.dispatch({ selection: EditorSelection.cursor(after), scrollIntoView: true });
-    target.editor.focus();
+    const after = Math.min(at + phase.text.length, editor.state.doc.length);
+    editor.dispatch({ selection: EditorSelection.cursor(after), scrollIntoView: true });
+    editor.focus();
     onClose();
   };
 

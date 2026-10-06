@@ -204,8 +204,9 @@ second user-visible product or storage location.
   background save that fails says why. Edits parked from an earlier session
   whose file changed on disk since are never written over the newer file and
   never dropped silently: the sheet opens the version on disk and offers
-  **Save my edits as a copy** (a new `.xlsx` in the managed lane) or
-  **Discard my edits**.
+  **Save my edits as a copy** (a new `.xlsx` in the managed lane; edits set
+  aside by more than one conflict each get their own copy, never overwritten)
+  or **Discard my edits**.
 
 ## Editing capabilities
 

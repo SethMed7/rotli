@@ -40,7 +40,7 @@ export interface InlineAiDeps {
 export const INLINE_AI_DEPS: InlineAiDeps = {
   flush: flushNote,
   frontmatter: corpusFrontmatter,
-  read: corpusReadAiVersioned,
+  read: (noteId, model) => corpusReadAiVersioned(noteId, model, { withEditor: true }),
   insert: corpusInsertAi,
   adopt: (noteId, body, revision) => {
     reloadDocumentIfClean(noteId, body, revision);
@@ -78,10 +78,10 @@ async function gatedRead(
   } catch (error) {
     return { ok: false, reason: reasonOf(error) };
   }
-  // the editor must show exactly what the gate let this model read
-  return read.editor === docText
-    ? { ok: true, revision: read.revision }
-    : { ok: false, reason: STILL_SAVING };
+  // the editor must show exactly what the gate let this model read (the
+  // editor reads a CRLF note with LF line endings)
+  const gated = read.editor?.replace(/\r\n/g, "\n");
+  return gated === docText ? { ok: true, revision: read.revision } : { ok: false, reason: STILL_SAVING };
 }
 
 /** Ask the model for a passage at `at` in the note's text. Nothing is written. */

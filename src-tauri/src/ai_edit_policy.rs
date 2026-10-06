@@ -122,14 +122,14 @@ pub(crate) fn is_pure_insertion(before: &str, after: &str, text: &str) -> bool {
     let suffix = b.iter().rev().zip(a.iter().rev()).take_while(|(x, y)| x == y).count();
     // the split point i satisfies before[..i] == after[..i] (i <= prefix) and
     // before[i..] == after[i + len..] (i >= before.len() - suffix)
+    // any split in [low, prefix] already has both sides matching (the prefix
+    // and suffix counts say so); only the middle must be the accepted text
     let low = before.len().saturating_sub(suffix);
     (low..=prefix.min(before.len())).any(|i| {
         before.is_char_boundary(i)
             && after.is_char_boundary(i)
             && after.is_char_boundary(i + text.len())
             && &after[i..i + text.len()] == text
-            && after[..i] == before[..i]
-            && after[i + text.len()..] == before[i..]
     })
 }
 
@@ -230,6 +230,9 @@ mod tests {
         assert!(!is_pure_insertion(before, before, ""));
         // multi-byte text around and inside the insertion
         assert!(is_pure_insertion("café ☕", "café → ☕", "→ "));
+        // a long run of the same character stays linear and still finds its place
+        let run = "\n".repeat(50_000);
+        assert!(is_pure_insertion(&run, &format!("{run}\n"), "\n"));
         // the split falls between characters, never inside one
         assert!(is_pure_insertion("éé", "ééé", "é"));
         assert!(!is_pure_insertion("éé", "éxé", "é"));

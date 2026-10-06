@@ -60,7 +60,8 @@ exactly the accepted passage at one place, so the person's text can't be
 removed or changed. The rest of the AI write lane still applies: the read
 gate, the laundering rule, and the revision. Each insertion is journaled with
 the `inline` actor. ⌘Z in the editor takes the insertion back as the person's
-own edit; the journal row stays `applied`.
+own edit; the journal row stays `applied`. A note saved with Windows line
+endings comes back with the editor's LF endings, as any save from Rotli does.
 
 "Frontier" is decided from the ENDPOINT plus the provider registry, never from a
 flag the webview asserts. A frontier provider behind a localhost proxy is

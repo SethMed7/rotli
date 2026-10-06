@@ -82,3 +82,28 @@ test("a pie chart draws its slices", async ({ page }) => {
     .toBeGreaterThanOrEqual(3);
   await page.screenshot({ path: "test-results/chart-pie.png" });
 });
+
+test("typing above a chart keeps its drawing and its half-filled form", async ({ page }) => {
+  await gotoApp(page);
+  const editor = await newMarkdownNote(page);
+  await page.keyboard.insertText("Intro\n/bar");
+  await page.getByRole("menuitem", { name: /Bar chart/ }).click();
+  const block = page.locator(".rotli-render-block[data-lang='chart']");
+  const form = block.getByRole("group", { name: "Edit chart" });
+  await expect(form).toBeVisible();
+  await form.getByRole("textbox", { name: "Row 1, Writing" }).fill("7");
+
+  // an edit above shifts the chart's place in the note
+  await editor.getByText("Intro").click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(" and more");
+  await expect(editor).toContainText("Intro and more");
+
+  await expect(form).toBeVisible();
+  await expect(form.getByRole("textbox", { name: "Row 1, Writing" })).toHaveValue("7");
+  // and Apply still finds its fence
+  await form.getByRole("button", { name: "Apply the chart" }).click();
+  await expect(block.getByRole("group", { name: "Edit chart" })).toHaveCount(0);
+  await block.locator(".rotli-render-chart-title").click();
+  await expect(editor).toContainText("Mon, 7, 1");
+});

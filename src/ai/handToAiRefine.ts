@@ -7,14 +7,13 @@
 
 import { looksSecret } from "./guard";
 import refinePrompt from "./prompts/handToAiRefine.md?raw";
-import { modelFailure, stripThinking } from "./replyText";
+import { modelFailure, promptAsset, stripThinking } from "./replyText";
 import type { CompleteReq, Host } from "./types";
 
-const HEADER = /^version:\s*(\d+)\s*\n/;
-
+const ASSET = promptAsset(refinePrompt);
 /** The asset's `version:` line. Bump it whenever the instructions change. */
-export const HAND_TO_AI_REFINE_VERSION = Number(HEADER.exec(refinePrompt)?.[1] ?? Number.NaN);
-const SYSTEM = refinePrompt.replace(HEADER, "").trim();
+export const HAND_TO_AI_REFINE_VERSION = ASSET.version;
+const SYSTEM = ASSET.system;
 
 /** A reply can't be shorter than a task line, and a runaway reply is not a prompt. */
 const MIN_CHARS = 40;

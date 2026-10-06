@@ -2375,9 +2375,10 @@ pub struct CorpusAiRead {
     /// The whole file a model may read (frontmatter included).
     pub body: String,
     pub revision: String,
-    /// The same note as the editor holds it — what `/ai` checks its view
-    /// against and what `corpus_insert_ai` measures an insertion on.
-    pub editor: String,
+    /// The same note as the editor holds it, sent only when asked for — what
+    /// `/ai` checks its view against.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub editor: Option<String>,
 }
 
 /// A memex's board lane: where a board is born when the caller's folder isn't a
@@ -4135,8 +4136,10 @@ impl CorpusStore {
                 return Err(refusal.into());
             }
             if let AiWrite::Insert(inserted) = mode {
-                // measured against the editor body the read seam hands out
-                if !crate::ai_edit_policy::is_pure_insertion(ai_journal::editor_text(&text), body, inserted) {
+                // measured against the editor body the read seam hands out, in
+                // the editor's own line endings (it reads a CRLF note as LF)
+                let before = ai_journal::editor_text(&text).replace("\r\n", "\n");
+                if !crate::ai_edit_policy::is_pure_insertion(&before, body, inserted) {
                     return Err(
                         "The note changed while the answer was ready, so it wasn't inserted. Try again."
                             .into(),
@@ -8303,6 +8306,8 @@ pub fn corpus_read_ai(
     id: String,
     model_id: String,
     endpoint: String,
+    // Ask AI alone asks for the editor copy; every other read stays one copy
+    with_editor: Option<bool>,
 ) -> Result<CorpusAiRead, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
@@ -8310,7 +8315,9 @@ pub fn corpus_read_ai(
         let body = s.read_for_ai(&rel, model_is_local)?;
         Ok(CorpusAiRead {
             revision: crate::fsutil::revision(body.as_bytes()),
-            editor: ai_journal::editor_text(&body).to_string(),
+            editor: with_editor
+                .unwrap_or(false)
+                .then(|| ai_journal::editor_text(&body).to_string()),
             body,
         })
     })

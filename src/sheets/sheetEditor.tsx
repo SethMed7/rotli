@@ -98,7 +98,7 @@ export default function SheetEditor({
     armedRef.current = false;
     setReady(false);
     setErr(null);
-    setConflict(getSetAside(fileId) !== undefined);
+    setConflict(getSetAside(fileId).length > 0);
 
     void (async () => {
       try {

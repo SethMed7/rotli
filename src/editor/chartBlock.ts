@@ -7,7 +7,7 @@ import { EditorView } from "@codemirror/view";
 
 import { mountChartForm } from "./chartForm";
 import { type ChartSpec, parseChart, serializeChart } from "./chartSpec";
-import { fenceBodyRange } from "./fences";
+import { fenceBodyRange, scanFences } from "./fences";
 
 /** Teardowns for mounted charts, found again when their widget goes. */
 const TEARDOWNS = new WeakMap<HTMLElement, () => void>();
@@ -50,15 +50,28 @@ export function destroyChartBlocks(root: HTMLElement): void {
   }
 }
 
+/** The body of the chart fence a rendered block stands for, found from the
+ * block's place in the document now — not from offsets captured when it was
+ * drawn, so an edit above the chart neither redraws it nor loses its form. */
+function liveBodyRange(view: EditorView, container: HTMLElement): { from: number; to: number } | null {
+  let pos: number;
+  try {
+    pos = view.posAtDOM(container);
+  } catch {
+    return null; // the block left the document
+  }
+  const fence = scanFences(view.state.doc).find((f) => f.lang === "chart" && f.from <= pos && pos <= f.to);
+  return fence ? fenceBodyRange(view.state.doc, fence.from, fence.to) : null;
+}
+
 /** Write a spec over the fence body, if the fence is still what was opened. */
 export function applyChartSpec(
   view: EditorView,
+  container: HTMLElement,
   code: string,
-  sourceFrom: number,
-  sourceTo: number,
   spec: ChartSpec,
 ): string | null {
-  const range = fenceBodyRange(view.state.doc, sourceFrom, sourceTo);
+  const range = liveBodyRange(view, container);
   if (!range) return "The chart moved in the note. Close the form and open it again.";
   if (view.state.doc.sliceString(range.from, range.to) !== code) {
     return "The chart changed in the note while the form was open. Close it and open it again.";
@@ -71,17 +84,12 @@ export function applyChartSpec(
 
 /** Open the Edit form under the chart. A chart Rotli can't read has no form:
  * its source opens instead, so it can be fixed by hand. */
-export function openChartForm(
-  container: HTMLElement,
-  code: string,
-  sourceFrom: number,
-  sourceTo: number,
-): void {
+export function openChartForm(container: HTMLElement, code: string): void {
   const view = EditorView.findFromDOM(container);
   if (!view) return;
   const parsed = parseChart(code);
   if (!parsed.ok) {
-    const range = fenceBodyRange(view.state.doc, sourceFrom, sourceTo);
+    const range = liveBodyRange(view, container);
     if (range) view.dispatch({ selection: { anchor: range.from }, scrollIntoView: true });
     view.focus();
     return;
@@ -95,7 +103,7 @@ export function openChartForm(
   };
   unmount = mountChartForm(container, parsed.spec, {
     apply: (spec) => {
-      const reason = applyChartSpec(view, code, sourceFrom, sourceTo, spec);
+      const reason = applyChartSpec(view, container, code, spec);
       if (reason === null) close();
       return reason;
     },

@@ -13,6 +13,7 @@ import {
   REPLY_EMPTY,
   REPLY_TOO_LONG,
   askInline,
+  mapAnchor,
   renderInlineRequest,
 } from "./inlineAi";
 import inlinePrompt from "./prompts/inlineAi.md?raw";
@@ -134,5 +135,23 @@ describe("what never reaches a model", () => {
       reason: "Write what you want first.",
     });
     expect(stub.sent).toHaveLength(0);
+  });
+});
+
+describe("mapAnchor — where Insert lands after the note was edited", () => {
+  const before = "# Note\n\nalpha\n\nomega";
+  const at = before.indexOf("\nomega");
+
+  test("an edit after the cursor leaves it in place", () => {
+    expect(mapAnchor(before, at, `${before} more`)).toBe(at);
+  });
+
+  test("an edit above the cursor carries it along", () => {
+    const after = before.replace("alpha", "alpha and beta");
+    expect(mapAnchor(before, at, after)).toBe(after.indexOf("\nomega"));
+  });
+
+  test("an edit across the cursor has no honest answer", () => {
+    expect(mapAnchor(before, at, before.replace("alpha\n\nomega", "merged"))).toBeNull();
   });
 });

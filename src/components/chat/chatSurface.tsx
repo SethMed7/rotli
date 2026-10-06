@@ -1816,7 +1816,7 @@ export function ChatSurface({
     const assistantAt = new Date().toISOString();
     const settledThread = recentChatThread([
       ...messages,
-      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.src) },
+      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.id || image.src) },
       {
         speaker: "rotli",
         text: reply,

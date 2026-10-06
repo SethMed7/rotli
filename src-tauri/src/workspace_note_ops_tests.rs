@@ -289,6 +289,13 @@ fn an_accepted_insertion_lands_in_a_person_written_note_and_nowhere_it_was_refus
     let refused = insert(&mut ws, &secure.id, &format!("{base}\nx"), "\nx", false).unwrap_err();
     assert!(refused.contains("secure"), "the read gate refuses, not the revision: {refused}");
 
+    // a note written with Windows line endings takes one too: the editor reads
+    // it as LF, and the insertion lands in the editor's line endings
+    let crlf_rel = ws.store.resolve_note_rel(&note.id).unwrap().replace(".md", "-crlf.md");
+    fs::write(ws.store.root().join(&crlf_rel), "# Win\r\n\r\nText.\r\n").unwrap();
+    insert(&mut ws, &crlf_rel, "# Win\n\nText.\nMore.\n", "More.\n", true).unwrap();
+    assert_eq!(body_of(&mut ws, &crlf_rel), "# Win\n\nText.\nMore.\n");
+
     // a note with no frontmatter that opens on a blank line still takes one
     let rel = ws.store.resolve_note_rel(&note.id).unwrap().replace(".md", "-plain.md");
     fs::write(ws.store.root().join(&rel), "\n# Plain\n\nText.\n").unwrap();
