@@ -2,7 +2,9 @@
 // drafts and experiments appear only on the dev site (site.showsExperiments).
 // An entry with `status: coming-soon` is announced on its index but has no page.
 import { getCollection, type CollectionEntry } from 'astro:content';
+import type { MorePost } from './components/blog/ArticleAside.astro';
 import { withoutFigures } from './figures';
+import { postThumbnail } from './og';
 import { site } from './site';
 
 export type Writing = CollectionEntry<'writing'>;
@@ -42,4 +44,20 @@ export async function upcomingWriting(section: Writing['data']['section']): Prom
 export function readingMinutes(entry: Writing): number {
   const words = withoutFigures(entry.body ?? '').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 230));
+}
+
+/** A post as a card in "More from rotli" (blog/ArticleAside.astro): announced (`soon`) posts have
+ * no page, so no link and no date. */
+export function morePostCard(item: Writing, soon: boolean): MorePost {
+  const date = item.data.date;
+  return {
+    title: item.data.title,
+    href: soon ? undefined : `/blog/${slugOf(item)}/`,
+    date: soon
+      ? undefined
+      : date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }),
+    dateTime: soon ? undefined : date.toISOString().slice(0, 10),
+    thumbnail: postThumbnail(slugOf(item)),
+    soon,
+  };
 }

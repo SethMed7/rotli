@@ -7,25 +7,22 @@
 // slim rail that fills as you read; below 900px the tree folds into an
 // "On this page" disclosure above the text. The highlight and the rail are
 // script (progressive enhancement); without it the tree is plain links.
-// Pages that pass `progress` (blog posts, the guides among them, and /privacy/) also get a reading meter pinned under the
-// header on every width: a bar and "N% through", measured over the article alone
-// (src/reading.ts, the same measure that fills the tree's rail). It shows only when the
-// article is longer than the window, and it is a position, never a record: nothing is kept.
-// /privacy/ opens on a banner (`banner`, or the `banner` slot for a drawn scene): a full-width picture under the header that takes most of the first
-// window, held in place while the page rises over it. The head becomes a panel on the
-// page's own ground that overlaps the banner's lower left, where the art is kept open, so
-// the title, date, and reading time are read on the ground, never on the picture. Phones
-// get a shorter crop with the panel just below it.
-// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on the site's one
-// 76rem page, so the post's head has the header's edges: the head (blog/ArticleCover.astro: the
-// words beside the picture on a wide screen), then two columns on named tracks (--article-tracks:
-// the left rail, then the middle with the reading column of about 66 characters centred in it,
-// blog/article.css). The rail has the short title, the tree, the meter as a percent, Sources, and
-// Share, pinned only when it fits the window (blog/ArticleRail.astro). After the article, "More
-// from rotli": more posts and rotli's own spots (blog/ArticleAside.astro), which take the place of
-// the article's own Sources list where the rail shows the sources. Under 901px the tree is the
-// disclosure, the meter a slim bar under the header, the article keeps its Sources list, and
-// Share follows the article, all on the text's edges.
+// Pages that pass `progress` also get a reading meter: a bar and "N% through" pinned under the
+// header, measured over the article alone (src/reading.ts, the same measure that fills the tree's
+// rail). It shows only when the article is longer than the window, and it is a position, never a
+// record: nothing is kept. An `article` carries the same measure in its rail and, narrow, as a
+// slim bar.
+// Blog posts and /privacy/ pass `article` (opt-in), on the site's one 76rem page, so the head has
+// the header's edges: the head (blog/ArticleCover.astro: the words beside the picture on a wide
+// screen; /privacy/ draws its night scene through the `cover` slot), then two columns on named
+// tracks (--article-tracks: the left rail, then the middle with the reading column of about 66
+// characters centred in it, blog/article.css). The rail has the short title, the tree, the meter
+// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro;
+// /privacy/ shares by Copy link alone). After the article, "More from rotli": more posts and
+// rotli's own spots (blog/ArticleAside.astro), which take the place of the article's own Sources
+// list where the rail shows the sources. Under 901px the tree is the disclosure, the meter a slim
+// bar under the header, the article keeps its Sources list, and Share follows the article, all on
+// the text's edges.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
 import type { TocItem } from '../blog';
@@ -63,18 +60,23 @@ interface Props {
   center?: boolean;
   /** Pin a reading meter under the header (blog posts, /privacy/). */
   progress?: boolean;
-  /** A full-width picture above the head (a blog post's banner, src/og.ts); the `banner` slot takes a drawn one. */
-  banner?: Banner;
-  /** A blog post's layout: the contained picture and its card, the left rail, the reading column. */
+  /** The article layout (blog posts, /privacy/): the contained picture beside the words, the left
+   * rail, the reading column, "More from rotli". A drawn picture comes through the `cover` slot. */
   article?: {
     cover?: Banner;
-    author: string;
-    tags: string[];
-    /** The page's absolute address and the post's Markdown twin, for Share. */
+    /** The byline's name and mark; without it the meta line stands alone (/privacy/). */
+    author?: string;
+    tags?: string[];
+    /** The page's absolute address, for Share. */
     url: string;
-    markdown: string;
+    /** The page's Markdown twin, for Copy Markdown (only with `share: 'all'`). */
+    markdown?: string;
     /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
-    sources: Source[];
+    sources?: Source[];
+    /** Every way to share (a post), or Copy link alone (/privacy/). */
+    share?: 'all' | 'link';
+    /** What the rail calls the page in its labels: "About this post", "Position in this page". */
+    noun?: 'post' | 'page';
     /** Other posts and rotli's own spots, after the article ("More from rotli"). */
     more: MorePost[];
     promos: Promo[];
@@ -100,7 +102,6 @@ const {
   wide = false,
   center = false,
   progress = false,
-  banner,
   article,
   structuredData,
   markdownPath,
@@ -108,10 +109,11 @@ const {
   imageAlt,
 } = Astro.props;
 const items: TocItem[] = toc.map((item) => ({ ...item, depth: item.depth ?? 2 }));
-// /privacy/'s tree lists its `##` headings; a blog post's also its `###`.
+// The plain tree lists `##` headings; an article's also its `###`.
 const flatToc = article ? items : items.filter((item) => item.depth === 2);
 const hasToc = flatToc.filter((item) => item.depth === 2).length > 1;
-const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner'));
+const sources = article?.sources ?? [];
+const drawnCover = article !== undefined && Astro.slots.has('cover');
 ---
 
 <Base
@@ -125,35 +127,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
-  {
-    hasBanner && (
-      <div class:list={['article-banner', { drawn: !banner }]} data-article-banner>
-        {banner ? (
-          <picture class="banner-art">
-            <source
-              media="(max-width: 900px)"
-              srcset={banner.mobile}
-              width={banner.mobileWidth}
-              height={banner.mobileHeight}
-            />
-            <img
-              src={banner.src}
-              srcset={banner.srcset}
-              sizes="100vw"
-              width={banner.width}
-              height={banner.height}
-              alt={banner.alt}
-              fetchpriority="high"
-              decoding="async"
-            />
-          </picture>
-        ) : (
-          <slot name="banner" />
-        )}
-      </div>
-    )
-  }
-  <div class:list={{ sheet: hasBanner }}>
   <main
     id="content"
     class:list={[
@@ -161,10 +134,9 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
       {
         center,
         'has-progress': progress,
-        'has-banner': hasBanner,
         'is-article': article,
         // The rail lists the sources, so on a wide screen the article's own list gives way (article.css).
-        'has-rail-sources': article && article.sources.length > 0,
+        'has-rail-sources': sources.length > 0,
       },
     ]}
   >
@@ -177,8 +149,11 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
         lede={lede}
         author={article.author}
         meta={meta}
-        tags={article.tags}
-      />
+        tags={article.tags ?? []}
+        drawn={drawnCover}
+      >
+        {drawnCover && <Fragment slot="art"><slot name="cover" /></Fragment>}
+      </ArticleCover>
     ) : (
     <header class="writing-head">
       <div class="head-copy">
@@ -196,21 +171,8 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
         }
         {kicker && <p class="kicker">{kicker}</p>}
         <h1>{heading}</h1>
-        {/* Under a banner the date and reading time sit with the title, inside the panel's first lines. */}
-        {hasBanner && (
-          meta.length > 0 && (
-            <p class="meta">
-              {meta.map((part, index) => (
-                <>
-                  {index > 0 && <span aria-hidden="true">·</span>}
-                  <span>{part}</span>
-                </>
-              ))}
-            </p>
-          )
-        )}
         {lede && <p class="lede">{lede}</p>}
-        {!hasBanner && (
+        {
           meta.length > 0 && (
             <p class="meta">
               {meta.map((part, index) => (
@@ -221,7 +183,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
               ))}
             </p>
           )
-        )}
+        }
       </div>
     </header>
     )}
@@ -267,8 +229,15 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
           <ArticleRail
             title={heading}
             toc={flatToc}
-            sources={article.sources}
-            share={{ url: article.url, title: heading, text: description, markdown: article.markdown }}
+            sources={sources}
+            noun={article.noun}
+            share={{
+              url: article.url,
+              title: heading,
+              text: description,
+              markdown: article.markdown,
+              mode: article.share,
+            }}
           />
         ) : (
           hasToc && (
@@ -302,7 +271,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     <slot name="after" />
   </main>
   <SiteFooter />
-  </div>
 </Base>
 
 <script>
@@ -388,109 +356,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   }
   .writing :global([id]) {
     scroll-margin-top: calc(var(--pinned) + 1.5rem);
-  }
-  /* The banner: under the pinned header, most of the first window tall (enough of the window
-     is left for the title and the date), and held in place while the sheet below (the article
-     and the footer, on the page's own ground) scrolls up over it. Phones get the shorter crop. */
-  .article-banner {
-    --banner-height: clamp(20rem, calc(100svh - var(--header-height) - 12rem), 54rem);
-    position: sticky;
-    top: calc(var(--header-height) + 1px);
-    z-index: 0;
-    height: var(--banner-height);
-    overflow: hidden;
-    background: var(--surface-2);
-  }
-  .banner-art,
-  .banner-art img {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-  /* The picture keeps its quokka and props (its right half) and its sand in view at every width:
-     the scenes (scripts/brand-images/scenes.mjs, `wide`) keep the lower left open for the panel. */
-  .banner-art img {
-    object-fit: cover;
-    object-position: 100% 100%;
-    transform-origin: 80% 100%;
-  }
-  /* flow-root: the head's pull upward stays inside the sheet instead of collapsing through
-     it, so the sheet's ground starts at the banner's bottom edge and only the panel overlaps. */
-  .sheet {
-    position: relative;
-    z-index: 1;
-    display: flow-root;
-    background: var(--ground);
-  }
-  /* The head is a panel on the ground that rises over the banner's lower left, where the art
-     is open sea and sand: the title and the date are read on the ground, at full contrast. */
-  .article-banner,
-  .writing.has-banner {
-    --banner-overlap: 7rem;
-  }
-  .writing.has-banner {
-    --panel-pad: clamp(1.25rem, 2.5vw, 2.5rem);
-    padding-top: 0;
-  }
-  .has-banner .writing-head {
-    margin-top: calc(-1 * var(--banner-overlap));
-  }
-  .has-banner .head-copy {
-    position: relative;
-    max-width: 36rem;
-    margin-inline-start: calc(-1 * var(--panel-pad));
-    padding: clamp(1.5rem, 3vw, 2.25rem) var(--panel-pad) 0;
-    border-radius: var(--radius-frame) var(--radius-frame) 0 0;
-    background: var(--ground);
-  }
-  .has-banner h1 {
-    font-size: clamp(2.2rem, 4vw, 3.25rem);
-  }
-  .has-banner .meta {
-    margin-top: 1rem;
-  }
-  .has-banner .lede {
-    margin-top: 1.25rem;
-  }
-  @media (max-width: 900px) {
-    .article-banner {
-      --banner-height: min(calc(100vw * 900 / 1300), 55svh);
-    }
-    .banner-art img {
-      object-position: 50% 100%;
-    }
-    .article-banner,
-    .writing.has-banner {
-      --banner-overlap: 1.5rem;
-    }
-    /* A drawn banner (the slot) sizes to its scene and words on a phone. */
-    .article-banner.drawn {
-      height: auto;
-    }
-    .has-banner .head-copy {
-      max-width: none;
-      margin-inline: calc(-1 * var(--panel-pad));
-    }
-  }
-  /* A slow settle as the page rises over it: the art grows a few percent toward its sand.
-     Scroll-driven, so it is CSS only; still where reduced motion is asked for or unsupported. */
-  @media (prefers-reduced-motion: no-preference) {
-    @supports (animation-timeline: scroll()) {
-      /* Longhands, never the shorthand: the minifier folds a following animation-timeline into
-         `animation`, which does not accept a timeline, and the whole declaration is dropped. */
-      .banner-art img {
-        animation-name: banner-settle;
-        animation-timing-function: linear;
-        animation-fill-mode: both;
-        animation-timeline: scroll(root);
-        animation-range: 0 80svh;
-      }
-    }
-  }
-  @keyframes banner-settle {
-    to {
-      transform: scale(1.06);
-    }
   }
   /* The rule under the head spans the page; the words keep a reading width. */
   .head-copy {

@@ -15,7 +15,7 @@ import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
 import { promosFor } from '../../promos';
 import { site } from '../../site';
 import { sourcesOf } from '../../sources';
-import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
+import { morePostCard, publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
 export async function getStaticPaths() {
   if (!site.showsFullSite) return [];
@@ -58,19 +58,10 @@ const announced: UpcomingPost[] = upcoming.map((item) => ({
   description: item.data.description,
   thumbnail: postThumbnail(slugOf(item)),
 }));
-const shortDate = (date: Date) =>
-  date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 // After a post: the other posts (announced ones only to fill in) and rotli's own spots, which
 // rotate through the blog by the post's place in it (src/promos.ts).
 const more: MorePost[] = entry
-  ? morePosts(entry, entries, upcoming).map(({ item, soon }) => ({
-      title: item.data.title,
-      href: soon ? undefined : `/blog/${slugOf(item)}/`,
-      date: soon ? undefined : shortDate(item.data.date),
-      dateTime: soon ? undefined : item.data.date.toISOString().slice(0, 10),
-      thumbnail: postThumbnail(slugOf(item)),
-      soon,
-    }))
+  ? morePosts(entry, entries, upcoming).map(({ item, soon }) => morePostCard(item, soon))
   : [];
 const promos = entry ? promosFor(entries.indexOf(entry)) : [];
 const rendered = entry ? await render(entry) : null;

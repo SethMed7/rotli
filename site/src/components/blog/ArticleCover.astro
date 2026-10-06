@@ -11,7 +11,9 @@
 //     from the sky and sand; the quokka crop below 700px), then the words;
 //   - a hairline across the page before the article begins.
 // Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. A post without
-// art (`cover` undefined) is the same head without the picture.
+// art (`cover` undefined) is the same head without the picture. A page may draw its picture instead
+// (`drawn`, the `art` slot: /privacy/'s night scene), in the same rounded frame and the same place;
+// the drawing sizes the frame. Without `author` the meta line stands alone (no mark, no name).
 import mark from '../../../../src/assets/characters/_logo.svg?raw';
 import type { Banner } from '../../og';
 
@@ -21,18 +23,24 @@ interface Props {
   kicker?: string;
   heading: string;
   lede?: string;
-  author: string;
+  author?: string;
   /** The date and reading time. */
   meta: string[];
   tags: string[];
+  /** The picture is drawn (the `art` slot) rather than a `cover`. */
+  drawn?: boolean;
 }
 
-const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props;
+const { cover, crumbs, kicker, heading, lede, author, meta, tags, drawn = false } = Astro.props;
 ---
 
-<header class:list={['cover-head', { 'no-cover': !cover }]} data-article-cover>
+<header class:list={['cover-head', { 'no-cover': !cover && !drawn }]} data-article-cover>
   {
-    cover && (
+    drawn ? (
+      <div class="cover-art drawn" data-article-scene>
+        <slot name="art" />
+      </div>
+    ) : cover && (
       <picture class="cover-art" data-article-art>
         <source
           media="(min-width: 1000px)"
@@ -75,18 +83,28 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     {kicker && <p class="kicker">{kicker}</p>}
     <h1>{heading}</h1>
     {lede && <p class="lede">{lede}</p>}
-    <p class="byline">
-      <span class="avatar" set:html={mark} aria-hidden="true" />
-      <span class="author">{author}</span>
-      {
-        meta.map((part) => (
-          <>
-            <span class="dot" aria-hidden="true">·</span>
-            <span>{part}</span>
-          </>
-        ))
-      }
-    </p>
+    {
+      (author || meta.length > 0) && (
+        <p class="byline">
+          {author && (
+            <>
+              <span class="avatar" set:html={mark} aria-hidden="true" />
+              <span class="author">{author}</span>
+            </>
+          )}
+          {meta.map((part, index) => (
+            <>
+              {(author || index > 0) && (
+                <span class="dot" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              <span>{part}</span>
+            </>
+          ))}
+        </p>
+      )
+    }
     {
       tags.length > 0 && (
         <ul class="tags" aria-label="Topics">

@@ -5,18 +5,35 @@
 // this page restates it for visitors and adds this website's own practices.
 // When PRIVACY.md changes (a new data class, destination, retention behavior,
 // or control), update this page in the same change.
+// It reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
+// styles"): WritingPage's `article` layout, the title and the lede beside the night scene, the
+// left rail with the tree and the meter, and "More from rotli" at the end, with the posts about
+// privacy and the Download spot. Share is Copy link alone: a policy is pointed to, not posted.
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+import { MORE_POSTS } from '../../blog';
 import SecureScene from '../../components/SecureScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage } from '../../og';
+import { availablePromos, RAIL_PROMOS } from '../../promos';
 import { GITHUB_URL, site } from '../../site';
+import { morePostCard, publishedWriting } from '../../writing';
 
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
 const UPDATED = 'October 6, 2026';
+
+// The end of the page: the posts about privacy, newest first, and the spots for the two things this
+// page describes, the Mac app and Rotli Web (each only in builds that offer it).
+const related = (await publishedWriting('post'))
+  .filter((post) => post.data.tags.includes('Privacy'))
+  .slice(0, MORE_POSTS)
+  .map((post) => morePostCard(post, false));
+const promos = availablePromos()
+  .filter((promo) => promo.id === 'download' || promo.id === 'web')
+  .slice(0, RAIL_PROMOS);
 
 const toc = [
   { slug: 'promise', text: 'Our privacy promise' },
@@ -80,10 +97,11 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
   meta={[`Updated ${UPDATED}`]}
+  article={{ url: `${site.url}/privacy/`, share: 'link', noun: 'page', more: related, promos }}
   toc={toc}
   progress
 >
-  <div slot="banner" class="night band-night" data-reveal>
+  <div slot="cover" class="night band-night">
     <p class="night-caption">
       <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
       the clouds outside, never see them, and no model can edit a note you lock.
@@ -323,7 +341,11 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
 </WritingPage>
 
 <style>
-  /* The promise: a lead line, the matrix, five plain points, and one note. */
+  /* The promise: a lead line, the matrix, five plain points, and one note. It opens the article,
+     so its heading starts at the top of the column, level with the rail's title. */
+  :global(.writing.is-article .prose) > #promise {
+    margin-top: 0;
+  }
   .promise-lede {
     font-size: var(--step-lede);
     line-height: 1.5;
@@ -433,81 +455,70 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     font-size: 0.95rem;
   }
 
-  /* The story film's night, as the page's banner (WritingPage's `banner` slot): the dome of
-     "on this Mac" on the right, standing on the line where the title panel rises, and the
-     caption in the open sky on the left, so neither ever sits under the panel. The sky and
-     its Ocean stars come from .band-night (Base.astro), like the landing's PrivacyBrief; only
-     the colour is set here, so the stars are never overridden. Measured: the caption's
-     --deep-muted on the night --deep is 8.6:1, its inked phrase --deep-text 15.7:1. */
+  /* The story film's night, as the head's picture (WritingPage `article`, the `cover` slot): a
+     rounded frame like a post's picture, the caption in the open sky at the top and the dome of
+     "on this Mac" standing on the frame's floor below it. The frame clips (ArticleCover's
+     overflow), so the remote-AI clouds that drift in never leave it, and the caption keeps its own
+     ground, so the stars never sit under the words. The night and its caption are there at once,
+     still like a post's picture; only the scene inside plays, once (SecureScene's own reveal). The sky and its Ocean stars come from
+     .band-night (Base.astro), like the landing's PrivacyBrief; only the colour is set here.
+     Measured: the caption's --deep-muted on the night --deep is 8.6:1, its inked phrase
+     --deep-text 15.7:1. */
   .night {
     box-sizing: border-box;
     display: grid;
-    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
-    gap: 2rem;
+    gap: 0.5rem;
     height: 100%;
-    padding: clamp(2rem, 4vw, 3rem) max(var(--gutter), calc((100% - var(--page-max)) / 2))
-      calc(var(--banner-overlap) + 0.5rem);
+    padding: clamp(1.25rem, 2.5vw, 1.75rem) clamp(1.25rem, 2.5vw, 1.75rem) 0;
     background-color: var(--deep);
     color: var(--deep-text);
   }
-  /* The caption sits on the plain night, never on the stars: its own ground covers them. */
   .night-caption {
-    align-self: start;
     justify-self: start;
+    max-width: 32rem;
     margin: 0;
     background-color: var(--deep);
-    box-shadow: 0 0 0 0.6rem var(--deep);
+    box-shadow: 0 0 0 0.4rem var(--deep);
     color: var(--deep-muted);
-    font-size: var(--step-lede);
+    font-size: 1rem;
     line-height: 1.5;
+    text-wrap: pretty;
   }
   .night-caption .inked {
     color: var(--deep-text);
     font-weight: 600;
   }
-  /* The dome fills its column's height and hugs its right and bottom edges; the column clips,
-     so the remote-AI clouds that drift in never pass over the caption beside it. */
+  /* The dome on the frame's floor, centred, never taller than about half the first window, so the
+     frame stays a picture beside the words and not a wall. */
   .dome-frame {
     display: flex;
     align-items: flex-end;
-    justify-content: flex-end;
+    justify-content: center;
     min-height: 0;
-    overflow: hidden;
   }
   .dome-frame :global(.scene) {
-    height: 100%;
+    width: 100%;
+    max-width: min(100%, calc(min(20rem, 42svh) * 720 / 560));
   }
-  .dome-frame :global(.scene svg) {
-    width: auto;
-    max-width: 100%;
-    height: 100%;
-  }
-  @media (max-width: 900px) {
-    .night {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 1.25rem;
-      height: auto;
-    }
-    .dome-frame {
-      justify-self: center;
-      width: min(100%, 26rem);
-    }
-    .dome-frame :global(.scene),
-    .dome-frame :global(.scene svg) {
-      width: 100%;
-      height: auto;
+  /* The promise's matrix breaks out of the words like a post's table (blog/article.css), only
+     where the middle has room for it; on a narrow middle it keeps the measure. */
+  @container article-prose (min-width: 48.5rem) {
+    :global(.writing.is-article .prose) > .promise-matrix {
+      max-width: min(100%, var(--measure) + 10rem);
     }
   }
   /* The companion beside a section, the way the app shows it. */
-  .spot {
+  /* The column's right edge, not the middle track's: every block of the article is centred at the
+     measure (blog/article.css), and a float's auto margins are zero, so it is placed by hand. */
+  :global(.writing.is-article .prose) > .spot {
     float: right;
     width: 132px;
     height: 132px;
-    margin: 0 0 1rem 1.5rem;
+    margin: 0 max(0px, (100% - var(--measure)) / 2) 1rem 1.5rem;
     shape-outside: circle(48%);
   }
   @media (max-width: 560px) {
-    .spot {
+    :global(.writing.is-article .prose) > .spot {
       width: 96px;
       height: 96px;
     }

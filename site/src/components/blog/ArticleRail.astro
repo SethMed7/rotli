@@ -28,6 +28,9 @@
 // nothing from those sites, plus two buttons that need script and appear only with it: Copy link
 // and Copy Markdown, which copies the post's own Markdown twin (/blog/<slug>/index.md, the same
 // origin, so the CSP's `connect-src 'self'` allows it). The icons are inline SVG on currentColor.
+// `share.mode: 'link'` (/privacy/: a policy is pointed to, not posted) keeps Copy link alone, and
+// the whole Share block then waits for script and a clipboard, so it is never an empty label.
+// `noun` names the page in the labels: "About this post" or "About this page".
 import { railTitle, tocTree, type TocItem } from '../../blog';
 import type { Source } from '../../sources';
 // The reading column and the figures (global, under .is-article): loaded only on pages with a rail.
@@ -35,6 +38,8 @@ import './article.css';
 
 interface Props {
   title: string;
+  /** What the labels call the page; a post by default. */
+  noun?: 'post' | 'page';
   toc: TocItem[];
   /** The post's `## Sources`, parsed (src/sources.ts); empty renders no Sources block. */
   sources: Source[];
@@ -44,11 +49,14 @@ interface Props {
     /** The summary, for the email's body. */
     text: string;
     /** The post's Markdown twin, for Copy Markdown. */
-    markdown: string;
+    markdown?: string;
+    /** Every way (a post), or Copy link alone. */
+    mode?: 'all' | 'link';
   };
 }
 
-const { title, toc, sources, share } = Astro.props;
+const { title, noun = 'post', toc, sources, share } = Astro.props;
+const linkOnly = share.mode === 'link';
 /** The article's own Sources heading, which the rail's block links to (and the tree then skips). */
 const sourcesHeading = sources.length > 0 ? toc.find((item) => item.depth === 2 && /^sources$/i.test(item.text)) : undefined;
 const tree = tocTree(toc.filter((item) => item !== sourcesHeading));
@@ -65,7 +73,7 @@ const ICONS = {
 } as const;
 const icon = (name: keyof typeof ICONS) =>
   `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
-const shareLinks = [
+const allLinks = [
   { label: 'X', icon: 'x', href: `https://x.com/intent/post?text=${enc(share.title)}&url=${enc(share.url)}`, external: true },
   {
     label: 'LinkedIn',
@@ -80,9 +88,10 @@ const shareLinks = [
     external: false,
   },
 ] as const;
+const shareLinks = linkOnly ? [] : allLinks;
 ---
 
-<aside class="rail" aria-label="About this post" data-article-rail>
+<aside class="rail" aria-label={`About this ${noun}`} data-article-rail>
   <p class="rail-title">{railTitle(title)}</p>
   {
     tree.length > 1 && (
@@ -111,7 +120,7 @@ const shareLinks = [
     class="rail-progress"
     data-read-progress="rail"
     role="progressbar"
-    aria-label="Position in this post"
+    aria-label={`Position in this ${noun}`}
     aria-valuemin="0"
     aria-valuemax="100"
     aria-valuenow="0"
@@ -160,7 +169,7 @@ const shareLinks = [
       </section>
     )
   }
-  <div class="rail-share" data-share>
+  <div class="rail-share" data-share hidden={linkOnly} data-share-needs-clipboard={linkOnly ? '' : undefined}>
     <p class="rail-label" id="share-label">Share</p>
     <ul aria-labelledby="share-label">
       {
@@ -183,12 +192,16 @@ const shareLinks = [
           <span>Copy link</span>
         </button>
       </li>
-      <li hidden data-copy-item>
-        <button type="button" data-copy="markdown" data-copy-src={share.markdown}>
-          <Fragment set:html={icon('markdown')} />
-          <span>Copy Markdown</span>
-        </button>
-      </li>
+      {
+        !linkOnly && share.markdown && (
+          <li hidden data-copy-item>
+            <button type="button" data-copy="markdown" data-copy-src={share.markdown}>
+              <Fragment set:html={icon('markdown')} />
+              <span>Copy Markdown</span>
+            </button>
+          </li>
+        )
+      }
     </ul>
     <p class="share-status" role="status" data-share-status></p>
   </div>
@@ -279,6 +292,7 @@ const shareLinks = [
   };
   if (navigator.clipboard && window.isSecureContext) {
     document.querySelectorAll<HTMLElement>('[data-copy-item]').forEach((item) => (item.hidden = false));
+    document.querySelectorAll<HTMLElement>('[data-share-needs-clipboard]').forEach((block) => (block.hidden = false));
     document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
       button.addEventListener('click', async () => {
         try {
