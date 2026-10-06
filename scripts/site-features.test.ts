@@ -85,7 +85,10 @@ describe("the feature catalog", () => {
     const beta = features.ALL_FEATURES.filter(
       (f) => f.roadmap === "docs-beta" || f.roadmap === "sheets-beta",
     );
-    expect(beta.map((f) => f.id).sort()).toEqual(["docs", "sheets"]);
+    expect(beta.map((f) => f.id).sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+      "docs",
+      "sheets",
+    ]);
     for (const feature of beta) expect(feature.status).toBe(siteModule.DOCS_AND_SHEETS.status as Status);
     // Nothing else may claim Beta: the word belongs to DOCS_AND_SHEETS (src/site.ts).
     expect(features.ALL_FEATURES.filter((f) => f.status === "Beta").length).toBe(beta.length);
@@ -108,8 +111,12 @@ describe("the feature catalog", () => {
   });
 
   test("only the next release's items are Coming soon", () => {
-    const soon = features.ALL_FEATURES.filter((f) => f.status === "Coming soon").map((f) => f.roadmap);
-    expect(soon.sort()).toEqual(["ai-inline", "charts", "chat-attachments"]);
+    const soon = features.ALL_FEATURES.filter((f) => f.status === "Coming soon").map((f) => f.roadmap ?? "");
+    expect([...soon].sort((a: string, b: string) => a.localeCompare(b))).toEqual([
+      "ai-inline",
+      "charts",
+      "chat-attachments",
+    ]);
   });
 
   test("the launch site never lists what is still in development", () => {
