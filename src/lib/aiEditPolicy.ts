@@ -30,6 +30,19 @@ export function bodyEdit(foreign: readonly string[]): AiBodyEdit {
   return creator && (AI_CREATORS as readonly string[]).includes(creator) ? "allowed" : "person-written";
 }
 
+/** A `/ai` insertion the person read and accepted (2026-10-05): their consent
+ * stands in for the default grant on a note they wrote, never for a lock or a
+ * deliberate "no". Null when it may land; Rust's corpus_insert_ai decides
+ * again (consented_insert_refusal, pinned by parity.json). */
+export function consentedInsertRefusal(verdict: AiBodyEdit): string | null {
+  if (verdict === "locked")
+    return "This note is locked, so no AI may add to it. Unlock it from the note’s menu first.";
+  if (verdict === "revoked") {
+    return "AI editing is turned off for this note. Turn “Let AI edit the text” back on in the note’s menu to add the answer.";
+  }
+  return null;
+}
+
 /** The refusal a chat sees first; null when the edit may proceed. Rust's
  * seam refuses again in its own words. */
 export function bodyEditRefusal(verdict: AiBodyEdit): string | null {

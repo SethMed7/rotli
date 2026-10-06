@@ -29,6 +29,7 @@ import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
+import { ALIGN_CLOSE, parseAlignedLine } from "./alignedLine";
 import { ChoiceAlignWidget } from "./choiceAlignWidget";
 import { selectChoiceGroup } from "./choiceState";
 import { choiceGroupAlign, isControlLiteral } from "./controlState";
@@ -37,6 +38,7 @@ import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
+import { DIVIDER_LINE, leadingIndent, paragraphIndentLevels } from "./lineIndent";
 import {
   CHECK_EM,
   CHOICE_EM,
@@ -46,6 +48,7 @@ import {
   listStyle,
   MARKER_EM,
   numberColumnEm,
+  paragraphIndentStyle,
   RESULT_EM,
 } from "./listGeometry";
 import { widestOrdinalInRun } from "./listNumbers";
@@ -222,10 +225,6 @@ function listItemImage(
   atomics.push(d.range(contentBase, lineEnd));
   return true;
 }
-
-// a thematic break — ---, ***, ___ (frontmatter never reaches here: the Rust
-// corpus splits it off the body; table delimiter rows carry pipes so they miss)
-const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
 // resolved image urls, keyed by root + raw markdown src (see ImgWidget.toDOM)
 const IMG_SRC_CACHE = new Map<string, string>();
@@ -851,7 +850,7 @@ function build(view: EditorView): {
       }
 
       // a divider (--- / *** / ___) renders as a thin rule; caret reveals dashes
-      if (HR_LINE.test(text) && !lineTouched && line.to > ls) {
+      if (DIVIDER_LINE.test(text) && !lineTouched && line.to > ls) {
         const d = Decoration.replace({ widget: new HrWidget() });
         decos.push(d.range(ls, line.to));
         atomics.push(d.range(ls, line.to));
@@ -1126,9 +1125,28 @@ function build(view: EditorView): {
           hidePrefix(ls, prefixEnd, null, decos, atomics);
           scanInline(content, contentBase, sel, decos, atomics);
           break;
-        case "para":
-          scanInline(text, ls, sel, decos, atomics);
+        case "para": {
+          // <p align="center">…</p>: the tags are markers (hidden until the
+          // caret is in the line); the line aligns and its Markdown renders
+          const aligned = parseAlignedLine(text);
+          // a Tab-indented paragraph shows its levels as a real indent on the
+          // list ladder, not two space-widths (lineIndent.ts owns the levels)
+          const levels = paragraphIndentLevels(text);
+          if (!aligned && levels > 0) {
+            const style = paragraphIndentStyle(levels);
+            decos.push(Decoration.line({ class: "rotli-indented", attributes: { style } }).range(ls));
+            hidePrefix(ls, ls + leadingIndent(text).length, null, decos, atomics);
+          }
+          if (!aligned) {
+            scanInline(text, ls, sel, decos, atomics);
+            break;
+          }
+          decos.push(Decoration.line({ class: `rotli-align rotli-align-${aligned.align}` }).range(ls));
+          revealablePrefix(ls, ls + aligned.open, lineTouched, decos, atomics);
+          revealablePrefix(line.to - ALIGN_CLOSE.length, line.to, lineTouched, decos, atomics);
+          scanInline(aligned.inner, ls + aligned.open, sel, decos, atomics);
           break;
+        }
         case "blank":
           break;
       }

@@ -2,10 +2,13 @@
 // The one site header: brand, the site's pages (src/nav.ts), the GitHub mark
 // while the source is public, and one Download button that opens /download/,
 // which picks the right download for the visitor's system. It stays pinned to
-// the top on a solid ground (flat: no blur, no shadow). Below 1080px the
-// sections fold into a Menu disclosure. Styles live in Base.astro.
+// the top on a solid ground (flat: no blur, no shadow). Resources is a
+// disclosure dropdown (a button with aria-expanded); without script its label
+// is a plain link to /resources/. Below 1080px the sections fold into a Menu
+// disclosure, where the dropdown's pages are listed under its name. Styles
+// live in Base.astro.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import { primaryNav, type NavSection } from '../nav';
+import { isNavGroup, navEntryHolds, primaryNav, type NavSection } from '../nav';
 import { GITHUB_URL, site } from '../site';
 import { publishedWriting } from '../writing';
 
@@ -33,11 +36,45 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
       !minimal && (
         <>
           <nav class="primary-nav" aria-label="Primary navigation">
-            {links.map((link) => (
-              <a href={link.href} aria-current={link.section && link.section === current ? 'page' : undefined}>
-                {link.label}
-              </a>
-            ))}
+            {links.map((link) =>
+              isNavGroup(link) ? (
+                <div class:list={['nav-dropdown', { 'is-current': navEntryHolds(link, current) }]} data-dropdown>
+                  <a class="nav-dropdown-fallback" href={link.href} aria-current={link.section === current ? 'page' : undefined}>
+                    {link.label}
+                  </a>
+                  <button
+                    class="nav-dropdown-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls={`nav-${link.section}`}
+                  >
+                    {link.label}
+                    <svg viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
+                      <path d="M3 4.5 6 7.5l3-3" />
+                    </svg>
+                  </button>
+                  <div class="nav-dropdown-panel" id={`nav-${link.section}`} hidden>
+                    <ul>
+                      {link.items.map((item) => (
+                        <li>
+                          <a href={item.href} aria-current={item.section === current ? 'page' : undefined}>
+                            <b>
+                              {item.label}
+                              {item.status && <small>{item.status}</small>}
+                            </b>
+                            <span>{item.description}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <a href={link.href} aria-current={link.section === current ? 'page' : undefined}>
+                  {link.label}
+                </a>
+              ),
+            )}
           </nav>
           <div class="header-actions">
             {github && (
@@ -51,11 +88,23 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
             <details class="nav-menu">
               <summary>Menu</summary>
               <nav class="nav-menu-panel" aria-label="Site sections">
-                {links.map((link) => (
-                  <a href={link.href} aria-current={link.section && link.section === current ? 'page' : undefined}>
-                    {link.label}
-                  </a>
-                ))}
+                {links.map((link) =>
+                  isNavGroup(link) ? (
+                    <div class="nav-menu-group" role="group" aria-labelledby={`menu-${link.section}`}>
+                      <p class="nav-menu-label" id={`menu-${link.section}`}>{link.label}</p>
+                      {link.items.map((item) => (
+                        <a href={item.href} aria-current={item.section === current ? 'page' : undefined}>
+                          {item.label}
+                          {item.status && <small>{item.status}</small>}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <a href={link.href} aria-current={link.section === current ? 'page' : undefined}>
+                      {link.label}
+                    </a>
+                  ),
+                )}
                 {github && <a href={GITHUB_URL} rel="noopener">GitHub</a>}
                 <a class="button primary" href="/download/">Download</a>
               </nav>
@@ -87,4 +136,57 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
       });
     });
   }
+
+  // Header dropdowns (the disclosure pattern: a button that shows a list of
+  // links). Without script the button is hidden (Base.astro) and the label is
+  // a plain link. Enter, Space, or a click toggles; ArrowDown opens and moves
+  // into the list; ArrowUp/ArrowDown, Home, and End move between its links;
+  // Escape closes and returns to the button; leaving it (focus or a click
+  // elsewhere) closes it.
+  document.querySelectorAll<HTMLElement>('[data-dropdown]').forEach((dropdown) => {
+    const toggle = dropdown.querySelector<HTMLButtonElement>('.nav-dropdown-toggle');
+    const panel = dropdown.querySelector<HTMLElement>('.nav-dropdown-panel');
+    if (!toggle || !panel) return;
+    const links = [...panel.querySelectorAll<HTMLAnchorElement>('a')];
+    const setOpen = (open: boolean) => {
+      toggle.setAttribute('aria-expanded', String(open));
+      panel.hidden = !open;
+    };
+    const isOpen = () => toggle.getAttribute('aria-expanded') === 'true';
+    const focusAt = (index: number) => links[(index + links.length) % links.length]?.focus();
+
+    toggle.addEventListener('click', () => setOpen(!isOpen()));
+    toggle.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        setOpen(true);
+        focusAt(event.key === 'ArrowDown' ? 0 : -1);
+      }
+    });
+    panel.addEventListener('keydown', (event) => {
+      const index = links.indexOf(document.activeElement as HTMLAnchorElement);
+      if (event.key === 'ArrowDown') focusAt(index + 1);
+      else if (event.key === 'ArrowUp') focusAt(index - 1);
+      else if (event.key === 'Home') focusAt(0);
+      else if (event.key === 'End') focusAt(-1);
+      else return;
+      event.preventDefault();
+    });
+    dropdown.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && isOpen()) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    // Tabbing away closes it. A focusout with no new target is a click on
+    // something unfocusable (Safari does not focus links on click); the
+    // document click handler below decides those, so a link click lands.
+    dropdown.addEventListener('focusout', (event) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !dropdown.contains(next)) setOpen(false);
+    });
+    document.addEventListener('click', (event) => {
+      if (isOpen() && !dropdown.contains(event.target as Node)) setOpen(false);
+    });
+  });
 </script>

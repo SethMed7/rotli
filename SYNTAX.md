@@ -202,6 +202,24 @@ imports.
   it and shows none of its text, as does a chat's (a conversation is not
   something to flash on an accidental hover), and a link with no target shows
   no card.
+- Tab indents the caret's line wherever the caret sits in it, and Shift-Tab
+  outdents it. One level is two spaces; a tab character in a pasted note counts
+  as one level and Tab or Shift-Tab rewrites it as spaces. A list item,
+  checklist item, quote, or empty line nests one level per press, and a nested
+  numbered run counts from `1.`. A paragraph takes one level (`  text`) and
+  then stops: Rotli shows it indented, with its text lined up with a bullet's
+  text, while other Markdown readers drop up to three leading spaces and read
+  four or more as an indented code block. A paragraph already written with
+  leading spaces shows one indent level per two spaces in Rotli, and a single
+  space shows as one level. Tab leaves a heading (including one written one to
+  three spaces deep), an aligned paragraph, a divider, and an image line as
+  they are, because indenting them would make them plain text. With several
+  lines selected, each line follows its own rule and blank lines stay blank.
+  Tables (Tab moves between cells) and open pickers keep their own Tab. In
+  fenced code, Tab with no selection across lines types two spaces at the
+  caret; with several lines selected it indents every non-blank code line by
+  one level, with no paragraph limit, and leaves the fence's own ``` lines at
+  the left edge so the block stays a fence.
 - Ordered lists count with numbers (`1. `) or a single ASCII letter
   (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
   d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never
@@ -252,6 +270,71 @@ imports.
 - Inline code is opaque to the control grammar. Backticked content renders as
   ordinary literal text with no code-chip background; only the backticks are
   hidden in beautified mode. Fenced code blocks retain their code styling.
+- A centered or right-aligned paragraph is one line of HTML:
+  `<p align="center">text</p>` or `<p align="right">text</p>`, exactly that
+  spelling, with the closing tag on the same line. Left is the default and is
+  never written; choosing **Align left** removes the tags, and a hand-written
+  `<p align="left">` reads as left so it can be removed the same way. The
+  **Align left / center / right** commands (palette; no default chord) apply
+  to every paragraph line in the selection — headings, list items, quotes,
+  image lines, tables, fences, and other HTML are left alone — and choosing
+  the alignment a line already has changes nothing. A caret on an empty line,
+  `/center`, or `/align right` starts an empty aligned paragraph. Rotli
+  renders the line aligned with its inline Markdown (bold, links, wikilinks)
+  and hides the tags until the caret is in the line. Enter inside it starts
+  the next paragraph with the same alignment; Enter in an empty one ends it.
+  Plain-text readers (titles, snippets, link cards) drop the tags and rich
+  copy keeps the alignment. Other Markdown renderers that follow CommonMark
+  show the alignment but treat the line as an HTML block, so inline Markdown
+  inside it appears as literal text there and a line written directly below
+  it, with no blank line between, joins that block.
+- **Ask AI** (`/ai`, also found by `/ask`) opens a request box at the cursor.
+  The Librarian's model writes a passage for that spot: a chart as a `chart`
+  fence, a list of sources, or a paragraph. The answer is shown read-only, and
+  nothing enters the note until **Insert**, which adds it on its own line where
+  the command was typed (indented to the list it sits in). **Discard** and
+  **Try again** leave the note as it was. A secure note is never sent to a
+  remote model, and a locked note or one with `ai_edit: false` refuses (see
+  `docs/design/ai-visibility-matrix.md`). Ask AI runs in the Mac app only.
+- A chart is a fenced code block whose language is `chart`. Its body is plain
+  text any reader can follow: options first, one `key: value` per line, then a
+  blank line, then the data as comma-separated rows. The first data row names
+  the columns. The first column holds the labels and every further column is a
+  series of numbers:
+
+  ````markdown
+  ```chart
+  type: bar
+  title: Hours this week
+  unit: h
+
+  Day, Writing, Reading
+  Mon, 4, 1
+  Tue, 6, 2
+  Wed, 3, 2
+  ```
+  ````
+
+  `type` is required and is one of `bar`, `line`, `area`, or `pie`. `title`
+  and `unit` (a suffix for values, such as `h`, `%`, or `kg`) are optional.
+  Option names are lowercase. A field holding a comma is quoted as in CSV
+  (`"Smith, J."`), a value may be negative or a decimal written with a point
+  (`-2.5`), and an empty field is a missing value: a gap in a line, no bar.
+  A pie draws only the first series; its values must not be negative, and at
+  least one must be above zero. A chart holds up to 8 series and 200 rows.
+  Rotli fails closed. An unknown type or option, a value that isn't a number,
+  a row with more fields than the header, a missing header, a chart with no
+  data rows, or one past the limits shows the source as code with the reason,
+  and the source is never rewritten. **Bar chart**, **Line chart**, **Area
+  chart**, and **Pie chart** (typing `/chart` finds all four) insert a starter
+  chart and open its editor. The rendered chart's **Edit** opens a small form
+  (type, title, unit, and a grid of the rows) whose **Apply** replaces only
+  the fence's body and rewrites it in this form, one space after each comma.
+  Series take the theme's chart colors in order; several series stand side by
+  side in a bar chart, draw one line each in a line chart, and stack in an
+  area chart. A repeated label stays its own bar or slice, counted on the axis
+  (`Mon (2)`). Other Markdown readers show the fence as a code block holding
+  the same data.
 
 ## CSS and design tokens
 

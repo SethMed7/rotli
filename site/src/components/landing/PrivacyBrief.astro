@@ -1,32 +1,34 @@
 ---
 // The landing page's privacy band, staged like the story film's "secure stays home" shot: a
-// night sky, and on the right the dome of "on this Mac" with the quokka inside, a locked
+// night sky (Ocean Dark: the .band-night tokens in Base.astro), and on the right the dome of "on this Mac" with the quokka inside, a locked
 // secure note beside it and the little on-device model that may read it. Two remote-AI
 // clouds drift in, bump the dome, and back off. The scene plays once when the band comes into
 // view; reduced motion shows it at rest. The promise and the link to the full policy
-// (/privacy/) are the page text on the left.
+// (/privacy/) are the page text on the left. While the band is the focal passage, the whole
+// page steps into its Ocean Dark too (data-passage, src/passage.ts) and back out on leaving.
 import SecureScene from '../SecureScene.astro';
 
 const facts = [
-  { title: 'No account, no tracking', body: 'Nothing to sign up for. No analytics, ads, or crash uploads.' },
+  { title: 'No tracking', body: 'No analytics, ads, or crash uploads.' },
   { title: 'Files on your computer', body: 'Your notes are plain Markdown in a folder you choose.' },
   {
     title: 'AI only on your terms',
-    body: 'rotli runs the AI tools you install yourself, never holding your keys. Secure notes never reach a remote model; locked notes can’t be edited by any.',
+    body: 'rotli runs the AI tools you install yourself and never holds your keys. Secure notes stay with the model on your Mac, and locked notes are never edited by AI.',
   },
 ];
 ---
 
-<section class="section band-deep privacy" id="privacy" aria-labelledby="privacy-title">
+<section class="section band-deep band-night privacy" id="privacy" aria-labelledby="privacy-title" data-passage="ocean-dark" data-passage-color="#0e171d">
   <svg class="moon" viewBox="0 0 80 80" aria-hidden="true">
     <circle class="moon-disc" cx="40" cy="40" r="36" />
     <circle class="moon-bite" cx="57" cy="27" r="32" />
   </svg>
   <div class="wrap privacy-grid">
     <div class="privacy-copy" data-reveal>
-      <h2 class="section-title" id="privacy-title">AI is invited in. <span class="inked">It does not own the house.</span></h2>
+      <h2 class="section-title" id="privacy-title">Some notes <span class="inked">never leave this Mac.</span></h2>
       <p class="section-lede">
-        rotli is built so there is nothing about you to collect, and AI only sees what you let it see.
+        Mark a note secure and only the model on your Mac can read it. Lock it and no AI can change
+        it. There’s no account, and nothing about you to collect.
       </p>
       <ul class="facts" data-stagger>
         {facts.map((fact) => (
@@ -44,12 +46,10 @@ const facts = [
 </section>
 
 <style>
-  /* Night: the film's dark ground with a faint field of stars. */
+  /* Night: Ocean Dark with a faint field of stars (both from .band-night). */
   .privacy {
     position: relative;
     padding-bottom: 0;
-    background-image: url('/night-stars.svg');
-    background-size: 480px 480px;
   }
   .privacy-grid {
     display: grid;
@@ -91,11 +91,11 @@ const facts = [
     color: var(--deep);
   }
   .privacy-link:hover {
-    border-color: var(--tint);
-    background: var(--tint);
+    border-color: var(--accent);
+    background: var(--accent);
   }
   .privacy-link:focus-visible {
-    outline-color: var(--tint);
+    outline-color: var(--accent);
   }
 
   /* A crescent moon high over the scene, on wide screens where there is sky for it. */

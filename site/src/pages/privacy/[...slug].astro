@@ -9,13 +9,14 @@ import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp'
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 import SecureScene from '../../components/SecureScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { GITHUB_URL, site } from '../../site';
 
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const UPDATED = 'October 1, 2026';
+const UPDATED = 'October 2, 2026';
 
 const toc = [
   { slug: 'short-version', text: 'The short version' },
@@ -42,13 +43,14 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   title="Privacy — rotli"
   description="How rotli handles your notes: no account, no analytics, files on your computer, and AI only on your terms. What connects to the internet, and why."
   canonicalPath="/privacy/"
+  {...ogImage('privacy')}
   section="privacy"
-  kicker={`Updated ${UPDATED}`}
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
+  meta={[`Updated ${UPDATED}`]}
   toc={toc}
 >
-  <div slot="scene" class="night" data-reveal>
+  <div slot="scene" class="night band-night" data-reveal>
     <p class="night-caption">
       <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
       the clouds outside, never see them, and no model can edit a note you lock.
@@ -114,8 +116,8 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <img class="spot" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
   <p>
     AI in rotli is a visitor, not the owner of your workspace. You can leave it off entirely. If you use it,
-    an <strong>on-device model</strong> runs on your Mac and works without a network. <strong>Connected AI</strong>
-    means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
+    an <strong>on-device model</strong> runs on your Mac and works without a network.{' '}
+    <strong>Connected AI</strong> means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
   </p>
   <div class="access">
     <table>
@@ -205,10 +207,15 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <h2 id="website">This website</h2>
   <p>
     rotli.co sets no cookies and runs no analytics, ads, or third-party scripts. Fonts, images, and the film
-    are served from this site. Two badges in the footer, from Launch Llama and Founder.best, are images loaded
-    from their own servers, so those services see a request from your browser when a page shows them. Our
-    hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
+    are served from this site. The one exception is the Launch Llama badge in the footer, an image loaded
+    from Launch Llama's own server, so that service sees a request from your browser when a page shows it.
+    Our hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
     address to deliver pages.
+  </p>
+  <p>
+    The footer's “Hear when it’s ready” list is optional. Only when you submit it, the address you type is
+    sent to Resend, our email provider, to keep the list. You can unsubscribe anytime, and nothing else is
+    collected or shared.
   </p>
   <p>
     <strong>Why:</strong> a site about keeping your work private shouldn't watch you read it.
@@ -237,32 +244,44 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
 </WritingPage>
 
 <style>
+  /* The access table: its own full-width block below any floated companion,
+     a strong rule over the header and hairlines between rows. */
   .access {
-    margin: 1.5rem 0 1.75rem;
+    clear: both;
+    margin: 1.75rem 0 2rem;
     overflow-x: auto;
   }
-  table {
+  .access table {
     width: 100%;
+    margin: 0;
     border-collapse: collapse;
     font-size: 0.98rem;
   }
-  caption {
+  .access caption {
     padding-bottom: 0.75rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
     text-align: left;
   }
-  th,
-  td {
-    padding: 0.9rem 1rem 0.9rem 0;
-    border-bottom: 1px solid var(--border-strong);
+  .access th,
+  .access td {
+    padding: 0.85rem 1rem 0.85rem 0;
+    border-bottom: 1px solid var(--border);
     text-align: left;
     vertical-align: top;
   }
-  thead th {
+  .access thead th {
+    border-top: 1px solid var(--border-strong);
+    border-bottom-color: var(--border-strong);
     color: var(--text-muted);
     font-size: 0.84rem;
     font-weight: 600;
+  }
+  .access tbody th {
+    width: 38%;
+    color: var(--text);
+    font-size: 0.98rem;
   }
   tbody th b {
     display: block;
@@ -270,18 +289,21 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   }
   tbody th small {
     display: block;
+    margin-top: 0.15rem;
     color: var(--text-muted);
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     font-weight: 400;
   }
-  td[data-access='none'] {
+  .access td[data-access='none'] {
     color: var(--accent-text);
     font-weight: 600;
   }
-  td[data-access='read'] {
+  .access td[data-access='read'] {
     color: var(--text-muted);
   }
-  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
+  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy.
+     The sky and its Ocean stars come from .band-night (Base.astro), like the landing's
+     PrivacyBrief; only the colour is set here, so the stars are never overridden. */
   .night {
     display: grid;
     gap: 1.5rem 2rem;
@@ -290,8 +312,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
     overflow: hidden;
     border-radius: var(--radius-frame);
-    background: var(--deep) url('/night-stars.svg');
-    background-size: 480px 480px;
+    background-color: var(--deep);
     color: var(--deep-text);
   }
   .night-caption {
@@ -306,9 +327,16 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     color: var(--deep-text);
     font-weight: 600;
   }
+  /* Side by side, the words sit in the middle of the sky beside the dome
+     (the dome keeps its feet on the frame's bottom edge), so neither the
+     upper left nor the lower left is left empty. */
   @media (min-width: 900px) {
     .night {
       grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    }
+    .night-caption {
+      align-self: center;
+      padding-block: 0 clamp(1.75rem, 4vw, 3rem);
     }
   }
   /* The companion beside a section, the way the app shows it. */

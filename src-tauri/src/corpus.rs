@@ -29,6 +29,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+
+use crate::note_dates::{stamp_to_ms, today_stamp};
 use ulid::Ulid;
 
 // ─── the one place the corpus root is decided ───────────────────────────────
@@ -1178,40 +1180,6 @@ fn now_stamp() -> String {
 
 fn now_ms() -> i64 {
     (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64
-}
-
-fn stamp_to_ms(stamp: &str) -> Option<i64> {
-    // rotli's local notes stamp RFC3339; a memex note (v3.5) stamps a plain
-    // YYYY-MM-DD date — parse both so a projected note's frontmatter dates are
-    // honored (sort order + created/updated) instead of silently falling back to
-    // the file mtime, which a git clone/copy would have reset.
-    if let Ok(t) = OffsetDateTime::parse(stamp, &Rfc3339) {
-        return Some((t.unix_timestamp_nanos() / 1_000_000) as i64);
-    }
-    let s = stamp.trim();
-    if s.len() == 10 && s.as_bytes()[4] == b'-' && s.as_bytes()[7] == b'-' {
-        let y: i32 = s[0..4].parse().ok()?;
-        let mo: u8 = s[5..7].parse().ok()?;
-        let d: u8 = s[8..10].parse().ok()?;
-        let month = time::Month::try_from(mo).ok()?;
-        let date = time::Date::from_calendar_date(y, month, d).ok()?;
-        let dt = date.with_hms(0, 0, 0).ok()?.assume_utc();
-        return Some((dt.unix_timestamp_nanos() / 1_000_000) as i64);
-    }
-    None
-}
-
-/// A plain YYYY-MM-DD date stamp (UTC) — the memex note convention (v3.5). Local
-/// notes keep the RFC3339 `now_stamp`; a memex edit bumps `updated` with this so the
-/// note stays date-shaped like everything memex-vault writes.
-fn today_stamp() -> String {
-    let now = OffsetDateTime::now_utc().date();
-    format!(
-        "{:04}-{:02}-{:02}",
-        now.year(),
-        u8::from(now.month()),
-        now.day()
-    )
 }
 
 /// (created_ms, updated_ms) from file metadata — the fallback for notes that
@@ -2404,8 +2372,13 @@ pub struct CorpusWriteResult {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CorpusAiRead {
+    /// The whole file a model may read (frontmatter included).
     pub body: String,
     pub revision: String,
+    /// The same note as the editor holds it, sent only when asked for — what
+    /// `/ai` checks its view against.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub editor: Option<String>,
 }
 
 /// A memex's board lane: where a board is born when the caller's folder isn't a
@@ -4127,6 +4100,17 @@ impl CorpusStore {
         model_is_local: bool,
         expected_revision: &str,
     ) -> Result<CorpusWriteResult, String> {
+        self.write_for_ai_as(id_or_rel, body, model_is_local, expected_revision, AiWrite::Replace)
+    }
+
+    pub(crate) fn write_for_ai_as(
+        &mut self,
+        id_or_rel: &str,
+        body: &str,
+        model_is_local: bool,
+        expected_revision: &str,
+        mode: AiWrite<'_>,
+    ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
         let path = self.abs(&rel);
@@ -4144,8 +4128,23 @@ impl CorpusStore {
                         .into(),
                 );
             }
-            if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+            let refusal = match mode {
+                AiWrite::Replace => crate::ai_edit_policy::body_edit(&fm.foreign).refusal(),
+                AiWrite::Insert(_) => crate::ai_edit_policy::consented_insert_refusal(&fm.foreign),
+            };
+            if let Some(refusal) = refusal {
                 return Err(refusal.into());
+            }
+            if let AiWrite::Insert(inserted) = mode {
+                // measured against the editor body the read seam hands out, in
+                // the editor's own line endings (it reads a CRLF note as LF)
+                let before = ai_journal::editor_text(&text).replace("\r\n", "\n");
+                if !crate::ai_edit_policy::is_pure_insertion(&before, body, inserted) {
+                    return Err(
+                        "The note changed while the answer was ready, so it wasn't inserted. Try again."
+                            .into(),
+                    );
+                }
             }
             let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
                 || looks_secure(target_body);
@@ -4156,10 +4155,16 @@ impl CorpusStore {
                 );
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
             let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            let editor = match mode {
+                AiWrite::Replace => ai_journal::AiEditor::chat(model_is_local),
+                AiWrite::Insert(_) => ai_journal::AiEditor::inline(model_is_local),
+            };
+            self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, remote_visible, &editor);
             Ok(CorpusWriteResult {
                 meta,
                 revision: crate::fsutil::revision(&landed),
@@ -4203,6 +4208,7 @@ impl CorpusStore {
         id: &str,
         body: &str,
         expected_revision: &str,
+        undo_of: Option<&str>,
     ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id)?;
         if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
@@ -4229,6 +4235,8 @@ impl CorpusStore {
             let landed_rel = self.path_of(id)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            let editor = ai_journal::AiEditor::agent(undo_of);
+            self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, true, &editor);
             Ok(CorpusWriteResult {
                 meta,
                 revision: crate::fsutil::revision(&landed),
@@ -5029,12 +5037,12 @@ impl CorpusStore {
             created_at: fm
                 .created
                 .as_deref()
-                .and_then(stamp_to_ms)
+                .and_then(|s| stamp_to_ms(s, Some(file_created)))
                 .unwrap_or(file_created),
             updated_at: fm
                 .updated
                 .as_deref()
-                .and_then(stamp_to_ms)
+                .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                 .unwrap_or(file_updated),
             pinned: fm.pinned.unwrap_or(false),
         })
@@ -5118,7 +5126,7 @@ impl CorpusStore {
         let created = old_fm
             .created
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
         // a memex note stays date-shaped (v3.5: updated: YYYY-MM-DD); local notes
         // keep rotli's RFC3339 stamp.
@@ -5202,6 +5210,9 @@ impl CorpusStore {
                 Err(_) => eprintln!("secure keyword protection failed; the note is still refused to AI by its name"),
             }
         }
+        // the file was just written: its own time is the save, so a note dated
+        // today reads as just edited, not as hours old (stamp_to_ms)
+        let (_, saved_at) = file_stamps(&target_abs);
         Ok(NoteMeta {
             id: id.to_string(),
             title,
@@ -5210,8 +5221,8 @@ impl CorpusStore {
             aliases: note_aliases(&target_rel, &title_of(body), id, &fm),
             folder_id: folder,
             disk_folder_id: disk_folder.clone(),
-            created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
-            updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
+            created_at: stamp_to_ms(&created, Some(file_created)).unwrap_or_else(now_ms),
+            updated_at: stamp_to_ms(&updated, Some(saved_at)).unwrap_or_else(now_ms),
             pinned: fm.pinned.unwrap_or(false),
             origin: if is_hidden_root(&disk_folder) {
                 fm.origin
@@ -5396,12 +5407,12 @@ impl CorpusStore {
         let created = old_fm
             .created
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
         let updated = old_fm
             .updated
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_updated));
         let pinned = old_fm.pinned.unwrap_or(false);
         let fm = Frontmatter {
@@ -5458,8 +5469,8 @@ impl CorpusStore {
             aliases: note_aliases(&target_rel, &title_of(&body), id, &fm),
             folder_id: project_lifecycle_folder(self.layout, target_folder),
             disk_folder_id: target_folder.to_string(),
-            created_at: stamp_to_ms(&created).unwrap_or(file_created),
-            updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
+            created_at: stamp_to_ms(&created, Some(file_created)).unwrap_or(file_created),
+            updated_at: stamp_to_ms(&updated, Some(file_updated)).unwrap_or(file_updated),
             pinned,
             origin,
             kind: NoteKind::Note,
@@ -6063,7 +6074,7 @@ impl CorpusStore {
         atomic_write(&abs, &compose_document(&fm, &format!("\n{body}")))?;
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
-        let ms = stamp_to_ms(&now).unwrap_or_else(now_ms);
+        let ms = stamp_to_ms(&now, None).unwrap_or_else(now_ms);
         let aliases = note_aliases(&rel, &title, &id, &fm);
         Ok(NoteMeta {
             id,
@@ -6686,12 +6697,12 @@ fn walk(
                     created_at: fm
                         .created
                         .as_deref()
-                        .and_then(stamp_to_ms)
+                        .and_then(|s| stamp_to_ms(s, Some(file_created)))
                         .unwrap_or(file_created),
                     updated_at: fm
                         .updated
                         .as_deref()
-                        .and_then(stamp_to_ms)
+                        .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                         .unwrap_or(file_updated),
                     pinned: false,
                     origin: None,
@@ -6793,12 +6804,12 @@ fn walk(
                 created_at: fm
                     .created
                     .as_deref()
-                    .and_then(stamp_to_ms)
+                    .and_then(|s| stamp_to_ms(s, Some(file_created)))
                     .unwrap_or(file_created),
                 updated_at: fm
                     .updated
                     .as_deref()
-                    .and_then(stamp_to_ms)
+                    .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                     .unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
                 origin,
@@ -8295,6 +8306,8 @@ pub fn corpus_read_ai(
     id: String,
     model_id: String,
     endpoint: String,
+    // Ask AI alone asks for the editor copy; every other read stays one copy
+    with_editor: Option<bool>,
 ) -> Result<CorpusAiRead, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
@@ -8302,6 +8315,9 @@ pub fn corpus_read_ai(
         let body = s.read_for_ai(&rel, model_is_local)?;
         Ok(CorpusAiRead {
             revision: crate::fsutil::revision(body.as_bytes()),
+            editor: with_editor
+                .unwrap_or(false)
+                .then(|| ai_journal::editor_text(&body).to_string()),
             body,
         })
     })
@@ -8821,9 +8837,14 @@ pub mod rules_store;
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
-/// The AI edit control on the store: the person's grant (2026-09-29).
+/// The AI edit control on the store: the person's grant (2026-09-29) and the
+/// `/ai` insert lane (2026-10-05).
 #[path = "corpus_ai_edit.rs"]
-mod ai_edit;
+pub mod ai_edit;
+pub(crate) use ai_edit::AiWrite;
+/// Every AI body write's journal row (`.rotli/ai-edit-journal.jsonl`).
+#[path = "corpus_ai_journal.rs"]
+pub(crate) mod ai_journal;
 
 #[cfg(test)]
 #[path = "injection_evals.rs"]
@@ -12448,17 +12469,6 @@ mod tests {
     }
 
     #[test]
-    fn stamp_to_ms_parses_both_rfc3339_and_date() {
-        assert!(stamp_to_ms("2026-06-25T12:00:00Z").is_some());
-        // a bare v3.5 date parses to that day at 00:00 UTC
-        let a = stamp_to_ms("2026-06-25").unwrap();
-        let b = stamp_to_ms("2026-06-25T00:00:00Z").unwrap();
-        assert_eq!(a, b);
-        assert!(stamp_to_ms("not-a-date").is_none());
-        assert!(stamp_to_ms("2026/06/25").is_none()); // wrong separators
-    }
-
-    #[test]
     fn editing_a_memex_note_preserves_the_v35_frontmatter_and_bumps_updated() {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
@@ -12475,9 +12485,17 @@ mod tests {
         store.os_trash = false;
         // the note is reachable by its frontmatter id (indexed via list)
         let _ = store.list().unwrap();
+        let day_before = today_stamp();
         let meta = store.write("01ABC", "# Pricing\n\nedited body").unwrap();
+        let day_after = today_stamp();
         // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
         assert_eq!(meta.folder_id, "Board");
+        // the bump is a calendar day, yet the edit reads as just now — never as
+        // hours since that day's UTC midnight — on save and on every re-read
+        let fresh = |ms: i64| (0..60_000).contains(&(now_ms() - ms));
+        assert!(fresh(meta.updated_at), "saved {}ms ago", now_ms() - meta.updated_at);
+        let reread = store.read("01ABC").unwrap();
+        assert!(fresh(reread.updated_at), "re-read {}ms ago", now_ms() - reread.updated_at);
 
         // A first save normalizes the legacy slug-id filename into the clean
         // title slug while retaining the old human stem as a durable alias.
@@ -12514,6 +12532,13 @@ mod tests {
         assert!(
             !updated_line.contains('T'),
             "updated should be a date, not RFC3339: {updated_line}"
+        );
+        // ...and that date is the writer's own calendar day, not UTC's: an
+        // evening edit in the Americas must not carry tomorrow's date
+        let updated_day = updated_line.trim_start_matches("updated:").trim();
+        assert!(
+            updated_day == day_before || updated_day == day_after,
+            "updated {updated_day} is not the local day {day_before}"
         );
         // the body changed
         assert!(on_disk.contains("edited body"));

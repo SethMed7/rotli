@@ -252,6 +252,12 @@
   padding-left: 10px;
   color: var(--text-muted);
 }
+.pv-note p.pv-align-center {
+  text-align: center;
+}
+.pv-note p.pv-align-right {
+  text-align: right;
+}
 .pv-blank {
   height: 0.6em;
 }
@@ -456,8 +462,7 @@
 
 /* — the quokka character set: line-art illustrations whose LINE color follows
    the theme (each SVG is a single currentColor path), shape constant. Used in
-   the quokka-world placements only: empty states, onboarding, the chat connect
-   state (the maintainer, 2026-06-26). — */
+   three places only: Chat (the chat buddy), Settings, and first-run setup. — */
 .quokka,
 .quokka-mark {
   display: inline-flex;
@@ -509,12 +514,6 @@
 .quokka-detail-layer {
   object-fit: contain;
   user-select: none;
-}
-/* the empty-state quokka sits in the warm ink, a touch soft so it reads as a
-   friendly mascot, not a heavy graphic */
-.empty-stage .quokka {
-  color: var(--text);
-  margin-bottom: 18px;
 }
 .empty-stage .et {
   font-family: var(--font-display);
@@ -2018,52 +2017,6 @@
 .quokka-line-choice.white > span {
   background: var(--quokka-line-white);
 }
-.quokka-field-note {
-  margin: -3px 0 8px;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-.quokka-idle-poses {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-.quokka-idle-pose {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 52px 1fr;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.quokka-idle-pose:hover {
-  background: var(--hov);
-}
-.quokka-idle-pose.sel {
-  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
-  background: var(--selected-bg);
-}
-.quokka-idle-pose > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-.quokka-idle-pose strong {
-  font-size: 11px;
-  font-weight: var(--wght-label);
-}
-.quokka-idle-pose small {
-  color: var(--text-muted);
-  font-size: 9.5px;
-}
 .quokka-accessories {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2768,6 +2721,41 @@
   background: none;
   color: var(--text-muted);
   opacity: 0.6;
+}
+
+/* Appearance → Theme button → My picks: the fourteen environments as compact
+   on/off pills, in the order the sun walks them; wraps on a narrow window */
+.theme-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  max-width: 560px;
+  margin-top: 10px;
+}
+.theme-pick {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-pick:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.theme-pick.sel {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+}
+.theme-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ——— storage: the notes-folder location row + ghost buttons ——— */
@@ -3582,6 +3570,58 @@
   align-self: center;
   color: var(--text-muted);
   font-size: 12px;
+}
+/* Basic | Refined: the dashboard range's segmented grammar, sized for a card */
+.hand-to-ai-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.hand-to-ai-head .hand-to-ai-note {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.hand-to-ai-mode {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--tint);
+}
+.hand-to-ai-mode button {
+  min-height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hand-to-ai-mode button:hover:not(:disabled) {
+  color: var(--text);
+}
+.hand-to-ai-mode button.sel {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.hand-to-ai-mode button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.hand-to-ai-mode button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hand-to-ai-working {
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-inner);
 }
 
 /* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —

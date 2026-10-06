@@ -39,7 +39,6 @@ import {
 import { deriveSecureReview } from "../services/secureReview";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { Character } from "./character";
 import { ChevronRight, GearGlyph } from "./glyphs";
 
 /** The status strip's plain words for the trust rung + organizing model. */
@@ -678,7 +677,6 @@ export function ActivitySurface() {
         <p className="main-empty">Loading…</p>
       ) : pending.length === 0 && history.length === 0 ? (
         <div className="list-empty">
-          <Character name="thoughtful" size={104} className="be-quokka" />
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">
             When the Librarian files a note or updates its metadata it shows here — and you can undo any of

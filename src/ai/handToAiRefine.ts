@@ -1,0 +1,96 @@
+// Hand to AI, Refined (2026-10-02): the Librarian's model turns the Basic
+// handoff (lib/handToAi.ts) into a real prompt — task, context, constraints,
+// attachments, acceptance criteria. The instructions are a versioned asset
+// (prompts/handToAiRefine.md); this file renders the exact request, checks the
+// reply, and says no when the reply can't be trusted, so the caller falls back
+// to Basic. Pure apart from the injected host; never chooses a model.
+
+import { looksSecret } from "./guard";
+import refinePrompt from "./prompts/handToAiRefine.md?raw";
+import { modelFailure, promptAsset, stripThinking } from "./replyText";
+import type { CompleteReq, Host } from "./types";
+
+const ASSET = promptAsset(refinePrompt);
+/** The asset's `version:` line. Bump it whenever the instructions change. */
+export const HAND_TO_AI_REFINE_VERSION = ASSET.version;
+const SYSTEM = ASSET.system;
+
+/** A reply can't be shorter than a task line, and a runaway reply is not a prompt. */
+const MIN_CHARS = 40;
+const growthCap = (basic: string) => basic.length * 4 + 4000;
+
+/** The exact request the model receives: the asset as the system message, the
+ * Basic handoff fenced as data. */
+export function renderRefineRequest(basic: string): CompleteReq {
+  return {
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: `<<<\n${basic.trim()}\n>>>` },
+    ],
+  };
+}
+
+export type RefineVerdict = { ok: true; prompt: string } | { ok: false; reason: string };
+
+// what may sit right before a path (a list dash's space, a link's `(` or `<`,
+// a quote) and right after it (a closing bracket or quote, or punctuation that
+// ends a sentence); anything else means the path is part of a longer one
+const BEFORE = new Set(["", " ", "\t", "\n", "(", "<", "[", "`", '"', "'", "“", "‘"]);
+const AFTER = /^(?:[)\]>`"'”’]|[.,;:!?]*(?:\s|$))/;
+
+/** The path appears as a whole token somewhere in the text: `/a/shot.png`
+ * is not kept by `/a/shot.png.backup` or `/b/a/shot.png`. */
+export function keepsPath(text: string, path: string): boolean {
+  if (!path) return true;
+  for (let at = text.indexOf(path); at >= 0; at = text.indexOf(path, at + 1)) {
+    if (BEFORE.has(text.slice(Math.max(0, at - 1), at)) && AFTER.test(text.slice(at + path.length)))
+      return true;
+  }
+  return false;
+}
+
+/** Only a reply that keeps every attachment path (found and missing), each as
+ * a whole token, character for character, becomes the prompt. A thinking block or one fence around the whole reply is
+ * unwrapped; anything else is taken as written. */
+export function parseRefinedReply(raw: string, basic: string, paths: readonly string[]): RefineVerdict {
+  let text = stripThinking(raw);
+  const fenced = /^(```|~~~)[\w-]*\n([\s\S]*?)\n\1$/.exec(text);
+  if (fenced?.[2]) text = fenced[2].trim();
+  if (text.length < MIN_CHARS) return { ok: false, reason: "The model's answer was empty." };
+  if (text.length > growthCap(basic)) return { ok: false, reason: "The model's answer ran too long." };
+  if (paths.some((path) => !keepsPath(text, path))) {
+    return { ok: false, reason: "The model's answer dropped a file path." };
+  }
+  return { ok: true, prompt: `${text}\n` };
+}
+
+/** The model Refined asks: the Librarian's own choice (`preferred`, already
+ * resolved from its settings), but a connected lane only while the Librarian
+ * is on; otherwise, or when that lane isn't connected, this Mac's model. */
+export function refineModelFor<M extends { id: string }>(
+  groups: { local: readonly M[]; connected: readonly M[] },
+  preferred: string | undefined,
+  librarianOn: boolean,
+): M | null {
+  const local = groups.local.find((model) => model.id === preferred);
+  const connected = librarianOn ? groups.connected.find((model) => model.id === preferred) : undefined;
+  return local ?? connected ?? groups.local[0] ?? null;
+}
+
+/** One request. The secret gate runs on the exact text that would be sent,
+ * whatever model is chosen (the egress ledger in Rust still backstops it). */
+export async function refineHandoff(
+  host: Pick<Host, "complete">,
+  basic: string,
+  paths: readonly string[],
+): Promise<RefineVerdict> {
+  const request = renderRefineRequest(basic);
+  if (request.messages.some((message) => looksSecret(message.content))) {
+    return { ok: false, reason: "The prompt looks like it holds a secret, so it wasn't sent." };
+  }
+  try {
+    return parseRefinedReply(await host.complete(request), basic, paths);
+  } catch (error) {
+    return { ok: false, reason: modelFailure(error) };
+  }
+}

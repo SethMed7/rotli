@@ -32,6 +32,8 @@ describe("slash command catalog", () => {
       "Heading 2",
       "Heading 3",
       "Quote",
+      "Center",
+      "Align right",
       "Bullet",
       "Numbered",
       "Checklist",
@@ -41,7 +43,12 @@ describe("slash command catalog", () => {
       "Inline code",
       "Math",
       "Mermaid",
+      "Bar chart",
+      "Line chart",
+      "Area chart",
+      "Pie chart",
       "Attach image",
+      "Ask AI",
       "Generate image",
       "Talk to the Librarian",
       "Hand to AI",
@@ -152,6 +159,24 @@ describe("slash command catalog", () => {
       "Talk to the Librarian",
     ]);
   });
+
+  test("Ask AI needs the Mac app's model lanes, like the Librarian", () => {
+    expect(filterSlashItems("ask ai", { sheets: true, librarian: false })).toEqual([]);
+    expect(filterSlashItems("ask ai", { sheets: true }).map((item) => item.label)).toEqual(["Ask AI"]);
+  });
+
+  test("the best match leads: /ai and /ask land on Ask AI, /bar on Bar chart", () => {
+    // Mermaid holds "ai" mid-word and Checklist's keyword "tasks" holds "ask";
+    // a word of the label starting with the query outranks both
+    expect(filterSlashItems("ai", { sheets: true })[0]?.label).toBe("Ask AI");
+    expect(filterSlashItems("ask", { sheets: true })[0]?.label).toBe("Ask AI");
+    expect(filterSlashItems("bar", { sheets: true })[0]?.label).toBe("Bar chart");
+    expect(
+      filterSlashItems("chart", { sheets: true })
+        .map((item) => item.label)
+        .slice(0, 4),
+    ).toEqual(["Bar chart", "Line chart", "Area chart", "Pie chart"]);
+  });
 });
 
 describe("/attatch", () => {
@@ -196,6 +221,18 @@ describe("slash target filtering", () => {
       "storage/macros.docm",
     ]);
     expect(filterPickerNotes(files, "embedDocument", "legacy")).toEqual([]);
+  });
+
+  // owner review of PR 164: /Link note listed the open note, so it could link a
+  // note to itself — the same rule the [[ picker already keeps
+  test("Link note never offers the note being written in", () => {
+    const notes = [
+      { ...file("01HOST"), kind: "note" as const, title: "Trip plan" },
+      { ...file("01OTHER"), kind: "note" as const, title: "Trip budget" },
+    ];
+    expect(filterPickerNotes(notes, "linkNote", "trip", "01HOST").map((n) => n.id)).toEqual(["01OTHER"]);
+    expect(filterPickerNotes(notes, "linkNote", "", "01HOST").map((n) => n.id)).toEqual(["01OTHER"]);
+    expect(filterPickerNotes(notes, "linkNote", "trip").map((n) => n.id)).toEqual(["01HOST", "01OTHER"]);
   });
 });
 

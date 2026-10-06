@@ -29,8 +29,9 @@ test("filing the same quick note twice does not duplicate its reference", () => 
 
 test("a withheld kind is refused before any file is created; available kinds pass", async () => {
   // bun test compiles as the stable channel
-  expect(() => refuseWithheldKind("sheet")).toThrow("Sheet isn’t available in this build yet");
   expect(() => refuseWithheldKind("mermaid")).toThrow("Mermaid diagram isn’t available in this build yet");
+  // Sheets ship on the stable desktop channel as Beta (2026-10-05)
+  expect(() => refuseWithheldKind("sheet")).not.toThrow();
   expect(() => refuseWithheldKind("markdown")).not.toThrow();
-  await expect(createManagedItem("sheet")).rejects.toThrow("isn’t available");
+  await expect(createManagedItem("mermaid")).rejects.toThrow("isn’t available");
 });

@@ -2,7 +2,9 @@
 # pages import the canonical mark and companion art from src/assets/characters),
 # so the service sets RAILWAY_DOCKERFILE_PATH=site/Dockerfile instead of a root
 # directory. SITE_MODE / SITE_URL are service variables; Railway forwards them as
-# build args. See site/README.md.
+# build args. Caddy serves the pages; one small Bun sidecar answers the
+# coming-soon list's /api/subscribe behind it (RESEND_* are runtime variables).
+# See site/README.md.
 FROM oven/bun:1.4.0-alpine AS build
 
 ARG SITE_MODE=full
@@ -45,7 +47,19 @@ COPY breve-runtime ./breve-runtime
 RUN bun run build:web
 
 FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+# The "coming soon" list's sidecar (site/server/subscribe.ts) runs on Bun beside
+# Caddy. The binary is the pinned build stage's own; its musl build needs the C++
+# runtime, which the Caddy image does not carry. No dependencies, no install:
+# the sidecar is one file. RESEND_API_KEY / RESEND_SEGMENT_ID are RUNTIME
+# variables (never build args, so no secret lands in an image layer).
+RUN apk add --no-cache libgcc libstdc++
+COPY --from=build /usr/local/bin/bun /usr/local/bin/bun
+COPY site/server/subscribe.ts /opt/subscribe/subscribe.ts
+COPY --chmod=0755 site/entrypoint.sh /usr/local/bin/rotli-site-entrypoint
 COPY site/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/site/dist /srv
 COPY --from=app /repo/dist /srv/app
 EXPOSE 8080
+# The entrypoint starts the sidecar (failing soft), then execs Caddy as PID 1.
+ENTRYPOINT ["/usr/local/bin/rotli-site-entrypoint"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

@@ -2,10 +2,12 @@
 // ⌘B, headings, etc. — stay in the global key registry and reach the editor
 // through activeEditor()). Mirrors the old EditorSurface grammar exactly:
 //   Enter   — carry the list marker onto the next line; on an EMPTY item clear
-//             it (the exit ramp); numbered lists count up.
-//   Tab     — indent the LINE by 2 spaces (a list line nests); only fenced code
-//             gets a soft 2-space tab at the caret, since indentation inside a
-//             fence is the user's code.
+//             it (the exit ramp); numbered lists count up. In an aligned
+//             paragraph, start the next one with the same alignment.
+//   Tab     — indent the LINE by 2 spaces: a list line nests, a paragraph takes
+//             one level and stops, a heading stays put (lineIndent.ts); only
+//             fenced code gets a soft 2-space tab at the caret, since
+//             indentation inside a fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
 //   Space   — "[]"/"[ ]"/"[/]"/"[x]" becomes a task; "[][]" becomes a yes/no result;
 //             "()" becomes a one-of-many choice option.
@@ -22,6 +24,7 @@ import { CHOICE_LINE_RE } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine, setToggleOn } from "./controlState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
+import { INDENT_UNIT, indentedPrefix, leadingIndent } from "./lineIndent";
 import { nextOrderedMarker, ORDERED_MARKER_SOURCE, parseOrderedMarker } from "./listMarkers";
 import { parseResultLine } from "./resultState";
 import {
@@ -35,6 +38,7 @@ import {
   tableToText,
 } from "./tables";
 import { MARK, markOf, TASK_LINE_RE, taskStateOf } from "./taskState";
+import { alignedEnterSpec } from "./textAlign";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -164,37 +168,44 @@ const enterContinueList: Command = (view) => {
   return true;
 };
 
-/** A line's leading indent, tab-tolerant (a tab = one level = 2 columns).
- * Tab/⇧Tab NORMALIZE tab indents into the app's two-space grammar as part of
- * the gesture — foreign notes (external editors, LLM output) indent with tabs,
- * which the space-only grammar used to treat as immovable (the maintainer, 2026-07-28:
- * "shift tab on bullets is very buggy"). */
-const leadingIndent = (text: string): string => /^[ \t]*/.exec(text)?.[0] ?? "";
+const enterAlignedParagraph: Command = (view) => {
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const spec = inFence(view, line) ? null : alignedEnterSpec(view.state);
+  if (spec) view.dispatch({ ...spec, scrollIntoView: true, userEvent: "input" });
+  return spec !== null;
+};
 
+// Tab/⇧Tab NORMALIZE tab indents into the app's two-space grammar as part of
+// the gesture — foreign notes (external editors, LLM output) indent with tabs,
+// which the space-only grammar used to treat as immovable (the maintainer,
+// 2026-07-28: "shift tab on bullets is very buggy"). What Tab does to each kind
+// of line is lineIndent.ts's policy.
 const tabIndent: Command = (view) => {
   const { state } = view;
   const range = state.selection.main;
   const startLine = state.doc.lineAt(range.from);
   const endLine = state.doc.lineAt(range.to);
-  // a multi-line selection indents every line it spans (tabs normalized)
+  // a multi-line selection indents every line it spans that takes an indent;
+  // blank lines stay blank rather than gaining trailing spaces, and a fence's
+  // own ``` lines stay at column 0 — an indented marker stops being a fence
   if (startLine.number !== endLine.number) {
+    const fences = scanFences(state.doc);
+    const isMarker = (l: Line) => fences.some((f) => l.from === f.from || l.to === f.to);
     const changes = [];
     for (let n = startLine.number; n <= endLine.number; n++) {
       const l = state.doc.line(n);
-      const indent = leadingIndent(l.text);
-      changes.push({
-        from: l.from,
-        to: l.from + indent.length,
-        insert: `  ${indent.replace(/\t/g, "  ")}`,
-      });
+      const skip = l.text.trim() === "" || isMarker(l);
+      const next = skip ? null : indentedPrefix(l.text, lineInFence(l.from, fences));
+      if (next !== null)
+        changes.push({ from: l.from, to: l.from + leadingIndent(l.text).length, insert: next });
     }
-    view.dispatch({ changes, userEvent: "input.indent" });
+    if (changes.length > 0) view.dispatch({ changes, userEvent: "input.indent" });
     return true;
   }
   // fenced code is grammar-free — indentation there is the user's code, so Tab
   // stays a soft tab at the caret
   if (inFence(view, startLine)) {
-    view.dispatch(state.replaceSelection("  "));
+    view.dispatch(state.replaceSelection(INDENT_UNIT));
     return true;
   }
   // every other line INDENTS (list or prose): ⇧Tab has always outdented any
@@ -203,7 +214,10 @@ const tabIndent: Command = (view) => {
   // left "test  ", and the "- " typed next stranded at the end ("test  - ",
   // rendered literally, no bullet) instead of nesting the line.
   const indent = leadingIndent(startLine.text);
-  const insert = `  ${indent.replace(/\t/g, "  ")}`;
+  const insert = indentedPrefix(startLine.text);
+  // a heading, or a paragraph already at its one level: the line stays as it
+  // is, and Tab is still consumed so focus never leaves the editor
+  if (insert === null) return true;
   const spec: TransactionSpec = {
     changes: {
       from: startLine.from,
@@ -548,6 +562,7 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "ArrowLeft", run: imageArrow("left") },
   { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },
+  { key: "Enter", run: enterAlignedParagraph },
   { key: "Tab", run: tabIndent, shift: tabOutdent },
   { key: "Space", run: listControlOnSpace },
 ];

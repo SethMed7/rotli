@@ -1,13 +1,19 @@
 ---
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import SunsetScene from '../components/SunsetScene.astro';
+import walkingBody from '../../../src/assets/characters/concepts/layers/walking-body.webp';
+import walkingLine from '../../../src/assets/characters/concepts/layers/walking-line.webp';
+import QuokkaScene from '../components/QuokkaScene.astro';
 import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
 
-// One page for every missing path, set where the story film ends: the sunset fills the
-// window, no header or footer, one way home. The hint under the headline is chosen in the
-// browser from the path itself: /app when Rotli Web is not switched on here, /helper for the
-// helper's pages, else the plain truth.
+// One page for every missing path: the note that wandered off, one way home, and along the
+// bottom of the window a small game on the footer's beach (no header or footer): the quokka
+// runs and jumps the rocks, bushes, logs, and sandcastles in its way, and the score is how
+// far it got (src/runner/). It starts only when Play is pressed; "Take me home" and the other
+// ways in stay above it, usable before, during, and after a run. Without script the beach is
+// the footer's quokka scenery instead. The hint under the headline is chosen in the browser
+// from the path itself: /app when Rotli Web is not switched on here, /helper for the helper's
+// pages, else the plain truth.
 const also = [
   ...(site.downloadsEnabled ? [{ href: DOWNLOAD_HREF, label: 'Download for Mac' }] : []),
   ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Open Rotli Web' }] : []),
@@ -22,45 +28,69 @@ const also = [
   noindex
 >
   <main id="content" class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
-    <SunsetScene full>
-      <div class="lost" data-reveal>
-        <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-        <p class="code">404</p>
-        <h1>This note <span class="inked">wandered off.</span></h1>
-        <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
-        <p class="hint" data-hint="app" hidden>
-          Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
-        </p>
-        <p class="hint" data-hint="helper" hidden>
-          {
-            site.showsFullSite ? (
-              <>
-                Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
-              </>
-            ) : (
-              'Rotli Helper is not published at this address yet.'
-            )
-          }
-        </p>
-        <p class="path"><code data-path></code></p>
-        <a class="button primary home" href="/">Take me home</a>
+    <div class="lost" data-reveal>
+      <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+      <p class="code">404</p>
+      <h1>This note <span class="inked">wandered off.</span></h1>
+      <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
+      <p class="hint" data-hint="app" hidden>
+        Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
+      </p>
+      <p class="hint" data-hint="helper" hidden>
         {
-          also.length > 0 && (
-            <nav class="also" aria-label="Where to go instead">
-              {also.map((link, i) => (
-                <>
-                  {i > 0 && <span aria-hidden="true"> · </span>}
-                  <a href={link.href}>{link.label}</a>
-                </>
-              ))}
-            </nav>
+          site.showsFullSite ? (
+            <>
+              Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
+            </>
+          ) : (
+            'Rotli Helper is not published at this address yet.'
           )
         }
+      </p>
+      <p class="path"><code data-path></code></p>
+      <a class="button primary home" href="/">Take me home</a>
+      {
+        also.length > 0 && (
+          <nav class="also" aria-label="Where to go instead">
+            {also.map((link, i) => (
+              <>
+                {i > 0 && <span aria-hidden="true"> · </span>}
+                <a href={link.href}>{link.label}</a>
+              </>
+            ))}
+          </nav>
+        )
+      }
+    </div>
+    <section
+      class="runner"
+      data-runner
+      data-body={walkingBody.src}
+      data-line={walkingLine.src}
+      tabindex="-1"
+      aria-labelledby="runner-title"
+      aria-describedby="runner-help"
+    >
+      <canvas aria-hidden="true"></canvas>
+      <p class="runner-score" aria-hidden="true">
+        <span><span data-score>0</span> m</span>
+        <span class="runner-best">Best <span data-best>0</span> m</span>
+      </p>
+      <div class="runner-overlay" data-overlay>
+        <h2 id="runner-title" data-overlay-title>Help the quokka home</h2>
+        <p id="runner-help" data-overlay-note>Jump the rocks, bushes, and sandcastles. Space, ↑, or tap to jump.</p>
+        <button class="button primary" type="button" data-play>Play</button>
       </div>
-    </SunsetScene>
+      <p class="visually-hidden" aria-live="polite" data-announce></p>
+    </section>
+    <QuokkaScene />
   </main>
 
   <script>
+    import { mountRunner } from '../runner/stage';
+
+    const runner = document.querySelector<HTMLElement>('[data-runner]');
+    if (runner) mountRunner(runner);
     const main = document.querySelector<HTMLElement>('.not-found');
     const path = window.location.pathname;
     const kind = path.startsWith('/app') && main?.dataset.webApp !== 'on' ? 'app' : path.startsWith('/helper') ? 'helper' : 'default';
@@ -70,7 +100,85 @@ const also = [
   </script>
 
   <style>
+    /* The words in the middle of the window, the scenery along its bottom edge. */
+    .not-found {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: 100svh;
+    }
+    /* The game takes the scenery's place when script runs; without it, the scenery stays. */
+    .runner {
+      display: none;
+      position: relative;
+      height: clamp(240px, 36vh, 320px);
+      border-top: 1px solid var(--border);
+      outline: none;
+    }
+    :global(.js) .runner {
+      display: block;
+    }
+    :global(.js) .not-found > :global(.scenery-wrap) {
+      display: none;
+    }
+    .runner:focus-visible {
+      outline: 2px solid var(--accent-text);
+      outline-offset: -2px;
+    }
+    .runner canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    .runner-score {
+      position: absolute;
+      top: 0.75rem;
+      right: var(--gutter);
+      display: flex;
+      gap: 1rem;
+      margin: 0;
+      color: var(--ink);
+      font-size: 1.05rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .runner-best {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    /* Start, pause, and the result sit on the sky, above the sand line, never on the quokka. */
+    .runner-overlay {
+      position: absolute;
+      inset: 0 0 40% 0;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 0.5rem;
+      padding: 1rem var(--gutter);
+      text-align: center;
+    }
+    .runner-overlay[hidden] {
+      display: none;
+    }
+    .runner-overlay h2 {
+      margin: 0;
+      font-size: var(--step-h3);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .runner-overlay p {
+      max-width: 30rem;
+      margin: 0 0 0.4rem;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .runner-overlay .button {
+      min-height: 44px;
+    }
     .lost {
+      align-self: center;
+      padding-block: clamp(2rem, 6vh, 4rem) clamp(1.5rem, 4vh, 3rem);
       display: grid;
       justify-items: center;
       gap: 0.6rem;
@@ -106,7 +214,6 @@ const also = [
       letter-spacing: -0.045em;
       text-wrap: balance;
     }
-    /* Muted ink is too faint on the sky; the sunset reads in the page's ink. */
     .hint {
       max-width: 34rem;
       margin: 0.6rem 0 0;

@@ -200,6 +200,13 @@ second user-visible product or storage location.
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
   the main window with an error. Forced process/OS termination can still lose
   unsaved in-memory debounce work; no durable draft journal exists yet.
+- A sheet's unsaved edits are written when the window hides and at quit; a
+  background save that fails says why. Edits parked from an earlier session
+  whose file changed on disk since are never written over the newer file and
+  never dropped silently: the sheet opens the version on disk and offers
+  **Save my edits as a copy** (a new `.xlsx` in the managed lane; edits set
+  aside by more than one conflict each get their own copy, never overwritten)
+  or **Discard my edits**.
 
 ## Editing capabilities
 
@@ -227,6 +234,13 @@ second user-visible product or storage location.
   final layout. The secondary `Convert copy to Excalidraw…` action creates a new
   user-owned `.excalidraw` file in the active creation context and leaves the
   Mermaid fence unchanged.
+- A Markdown `chart` fence owns its chart as plain text (SYNTAX.md): options,
+  a blank line, then comma-separated rows. **Bar / Line / Area / Pie chart**
+  insert a starter and open its Edit form. Apply replaces only the fence body,
+  in the canonical form, after the same stale-source guard as Mermaid. A chart
+  Rotli can't read fails closed with its reason and its source and is never
+  rewritten. The renderer (TanStack Charts) sits behind one adapter
+  (`src/editor/chartRender.ts`), so it can be replaced without touching a note.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
@@ -313,7 +327,8 @@ second user-visible product or storage location.
   runtime supplies byte-backed browser `File` objects instead of native paths,
   those bytes may use the separately bounded, signature-validating image-asset
   command. Markdown drops resolve nested pointer hits to the owning editor,
-  accept physical or logical runtime coordinates, copy into that note's
+  read the runtime position in the platform's own space (logical view points
+  on macOS and Linux, client pixels on Windows) as one point, copy into that note's
   registered root, and normalize both default and root-prefixed import ids to a
   portable root-relative `storage:` source. `/attatch` (also searchable as
   `/attach`) opens a native multi-image picker whose returned paths receive the
@@ -329,6 +344,16 @@ second user-visible product or storage location.
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
   oversized sources before invoking the local macOS renderer.
+- An attached image is referenced where it was attached: attaching (picker,
+  drop, or a pasted screenshot, which is image bytes with no text) types its
+  `[Image #n]` tag at the composer's caret, or at the end when the composer
+  isn't focused. Removing its thumbnail removes the tag and numbers the later
+  ones down. On send each tag becomes the image's portable link in place (the
+  tag followed by its `storage:` target); an untagged image leads the message.
+  A sent message draws each tag as a chip with the image, its vault file name,
+  and its size when the vault can say. Rotli Web resolves the image in the
+  connected folder. It never attaches one to a chat: Rotli Helper carries text
+  only, so the picker and a paste say that sending images needs the Mac app.
 - Unsent chat title, text, and image attachments are session state owned by the
   stable tab id. Switching tabs or temporarily unmounting a chat surface never
   clears that draft; sending it does. The first successful save binds the
@@ -455,6 +480,31 @@ The Rust corpus boundary independently validates every write.
 - Rotli owns identity/provenance facts such as `id`, `created`, `updated`, and
   `pinned`. `id` is the primary key and never changes; paths, filenames, titles,
   and aliases are selectors rather than identity.
+- `created` and `updated` are either a calendar day (`YYYY-MM-DD`) or a full
+  RFC 3339 timestamp; every reader accepts both. Who writes which:
+  - Rotli Web stamps both with the writer's own calendar day.
+  - The Mac app stamps a new note's `created` and `updated` with a full UTC
+    RFC 3339 timestamp (owner decision, 2026-10-03: new notes keep full UTC
+    `created` timestamps). An edit to a memex note rewrites `updated` as the
+    writer's own calendar day; an edit in a plain folder vault keeps the full
+    UTC timestamp.
+  So a note made on the Mac carries timestamps until its first edit there or
+  on the web turns `updated` into a day; both shapes read the same age.
+- A full timestamp is taken as written. A day is never read as an hour: Rotli
+  shows a note's age from the file's own time when that time falls on the
+  stamped day — the reader's local day, widened to the UTC day because Mac
+  builds before 2026-10 stamped the UTC day — and otherwise from local
+  midnight of that day. East of UTC, a note stamped yesterday whose file was
+  moved or copied before UTC midnight can still read fresh for at most the
+  zone's offset. The Mac app (`src-tauri/src/note_dates.rs`) and Rotli Web (`stampToMs`,
+  `src/memex/dates.ts`) implement this independently; the `noteDateStamps`
+  parity fixture pins them to the same answers.
+- The file time each side supplies differs. The Mac app reads `created`
+  against the file's birth time and `updated` against its modification time.
+  Rotli Web reads both against the modification time, because the browser's
+  File API exposes only `lastModified` — there is no birth time to read. So a
+  date-only `created` can show a different hour on the web than on the Mac
+  (same rule, different input); the day itself always agrees.
 - `aliases` is a human-editable string list with Rotli-maintained rename
   history. A title/file rename appends the prior title and useful filename
   stem; the list is append-only, except that a rename strips placeholder

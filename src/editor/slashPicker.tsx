@@ -26,11 +26,19 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import type { SlashPickerMode } from "./slashMenu";
 
-function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string): NoteSummary[] {
+/** `hostNoteId` is the note being written in: Link note never offers it, as
+ * the `[[` picker doesn't — a note does not link to itself. */
+function filterNotes(
+  notes: NoteSummary[],
+  mode: SlashPickerMode,
+  query: string,
+  hostNoteId?: string,
+): NoteSummary[] {
   const q = query.trim();
   let pool = notes;
   // (linkChat is handed the chats themselves — every one of them is a target)
-  if (mode === "insertTemplate") pool = notes.filter(isTemplateNote);
+  if (mode === "linkNote" && hostNoteId) pool = notes.filter((n) => n.id !== hostNoteId);
+  else if (mode === "insertTemplate") pool = notes.filter(isTemplateNote);
   else if (mode === "continueList") pool = notes.filter((n) => (n.kind ?? "note") === "note");
   else if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
   else if (mode === "embedSheet")
@@ -123,7 +131,7 @@ export function SlashPicker({
   const presetsOn = useUiStore((s) => s.templatePresets);
   const items = useMemo(() => {
     const notes = mode === "linkChat" ? chats : usesStorage ? (storageData ?? []) : searchable.notes;
-    const found = filterNotes(notes, mode, query);
+    const found = filterNotes(notes, mode, query, hostNoteId);
     if (mode !== "insertTemplate" || !presetsOn) return found;
     // the vault's own templates first, then Rotli's built-in presets — a preset
     // the person keeps a template of the same name for steps aside
@@ -133,7 +141,7 @@ export function SlashPicker({
       (n) => !own.has(n.title.toLowerCase()) && subsequenceMatch(q, n.title),
     );
     return [...found, ...presets];
-  }, [usesStorage, storageData, searchable.notes, chats, mode, query, presetsOn]);
+  }, [usesStorage, storageData, searchable.notes, chats, mode, query, presetsOn, hostNoteId]);
   useEffect(() => {
     let cancelled = false;
     if (mode === "linkChat" || mode === "continueList") return;
@@ -299,7 +307,8 @@ export function SlashPicker({
             className={i === selectedIndex ? "slashrow sel" : "slashrow"}
             role="menuitem"
             onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={() => onHover(i)}
+            // only a moving pointer picks the row (see SlashMenu)
+            onMouseMove={() => i !== selectedIndex && onHover(i)}
             onClick={() => onPick(note)}
           >
             <span className="slashglyph">{glyphForNote(note)}</span>

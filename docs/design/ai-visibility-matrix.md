@@ -42,12 +42,26 @@ before. Nothing preloads the whole vault.
 |---|---|---|---|
 | Ordinary note an AI made (`created_by: chat\|agent\|librarian`) | see + edit | see + edit | may re-file / enrich metadata |
 | Ordinary note a person wrote (no `created_by`, or any note from before 2026-09-29) | see; edit **only with `ai_edit: true`** | see; edit **only with `ai_edit: true`** | may re-file / enrich metadata (never the text) |
-| `ai_edit: false` on any note | see, **never edit** | see, **never edit** | may re-file / enrich metadata |
+| Ask AI (`/ai`) on a person's note without a grant | **adds** an answer the person accepted (Insert); never rewrites | **adds** an answer the person accepted (Insert); never rewrites | — |
+| `ai_edit: false` on any note | see, **never edit** (Ask AI refused too) | see, **never edit** (Ask AI refused too) | may re-file / enrich metadata |
 | **Locked** (`locked: true`) | see, **never edit** | see, **never edit** | **always skipped** |
 | **Secure** (`secure: true`) | **never see** (title, snippet, body, hit) | **see** by default; edit allowed unless also locked | **always skipped** |
 | Secure **and** locked | never see | see, never edit | always skipped |
 | Reference lanes (`identity/`, `personality/`, `history/`, `MAP.md`, `inbox.md`) | **retrievable** (search / map / read) | **retrievable** | never written by any lane |
 | Control files (`memex.json`, `STRUCTURE.md`, `scripts/`, `clients/`, …) | hidden | hidden | hidden |
+
+**Ask AI** (`/ai`, 2026-10-05) is a consented insertion. The model sees only
+what the AI read gate returns for that model (a secure note never reaches a
+remote one), and nothing is written until the person reads the answer and
+chooses Insert. That one click stands in for the standing grant on a note they
+wrote; it never overrides a lock or `ai_edit: false`. Rust's
+`corpus_insert_ai` accepts the write only when the new body is the note plus
+exactly the accepted passage at one place, so the person's text can't be
+removed or changed. The rest of the AI write lane still applies: the read
+gate, the laundering rule, and the revision. Each insertion is journaled with
+the `inline` actor. ⌘Z in the editor takes the insertion back as the person's
+own edit; the journal row stays `applied`. A note saved with Windows line
+endings comes back with the editor's LF endings, as any save from Rotli does.
 
 "Frontier" is decided from the ENDPOINT plus the provider registry, never from a
 flag the webview asserts. A frontier provider behind a localhost proxy is
@@ -60,8 +74,40 @@ secure keyword (the Librarian rules' `secureByName`, even before a save has
 flagged it; in the Mac app a file name that can't be read counts as secure,
 and on Rotli Web, which has no path lookup, the title alone is checked), or
 one whose text trips the secret detector, gets no prompt
-(`src/services/handToAi.ts`). The
-prompt is built from the note alone; no model runs in Rotli.
+(`src/services/handToAi.ts`).
+
+Since v2 (2026-10-02) the files the note links to follow the same law. A
+`storage:` or vault-relative link (outside code fences, never a `.md` note
+link) is first resolved (`attachmentRel`): percent-escapes undone (repeatedly;
+a malformed one, too many rounds, or a control character makes it unreadable),
+`storage:` expanded, backslashes read as slashes, and `.`/`..` resolved. One
+whose resolved path sits under `Secure notes/` or `wiki/_secure/` (any case:
+the Mac's disk ignores it), whose file name carries a secure keyword, or that
+can't be resolved (unreadable, or climbing out of the vault) refuses the whole
+handoff before anything is located: fail closed. Every other linked file is
+located by that same resolved path (`corpus_abs`, plus a stat), listed under
+**Attachments** with its absolute path, and its in-body link rewritten to that
+path (the editor's `|width` is dropped); a file that isn't there is listed as
+missing. Rotli Web has no file paths, so it lists the vault-relative path once
+the connected folder or browser vault confirms the file is there
+(`fileExists`); one it can't confirm is listed as missing, never as found. A
+Refined rewrite must keep every listed path, found and missing, as a whole
+token (`keepsPath`), or Basic is used instead.
+
+**Basic** (the default, and the fallback) is built from the note alone; no
+model runs. **Refined** sends the Basic handoff to the Librarian's model
+through the same `Host.complete` port the Librarian bar uses
+(`tauriHostFor`): its own model when that is on this Mac, a connected lane
+only when the Librarian is on and set to that lane, otherwise this Mac's
+model (`refineModelFor`). Every refusal above is asked again before the
+call, and the secret gate runs on the exact request, so a secure note or
+secure file never reaches any model. The instructions are a versioned asset
+(`src/ai/prompts/handToAiRefine.md`, `version:` header); a reply that drops
+or alters an attachment path, comes back empty, or runs away is refused and
+the card shows Basic with the reason (`src/ai/handToAiRefine.ts`; offline
+eval `src/ai/handToAiRefineEval.test.ts`). The last mode chosen is the
+`handToAiMode` app setting on this Mac (`src/state/handToAiMode.ts`, through
+`state/appExtras.ts`).
 
 ### What changed on 2026-08-01
 

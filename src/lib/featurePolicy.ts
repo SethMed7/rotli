@@ -2,9 +2,9 @@
  * neither a URL parameter nor persisted preferences can enable it in production.
  * `agents` covers the MCP server, the agent-integration commands, the remote
  * relay, and their Settings surface: out of production until refined. The
- * plain JSON CLI is not gated. `sheets` covers XLSX workbooks (CSV editing stays
- * public), `mermaidDiagrams` the Mermaid-diagram item kind (a ```mermaid fence
- * in a note always renders), and `voice` read-aloud. */
+ * plain JSON CLI is not gated. `sheets` covers XLSX workbooks (CSV editing ships
+ * everywhere the desktop does), `mermaidDiagrams` the Mermaid-diagram item kind
+ * (a ```mermaid fence in a note always renders), and `voice` read-aloud. */
 export type Platform = "desktop" | "web";
 
 /** Two build-time axes. `development` is the release channel. `platform` is
@@ -21,7 +21,9 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     breve: desktop && development,
     mermaidVisualEditing: development,
     agents: desktop && development,
-    sheets: desktop && development,
+    // Sheets ship on the desktop as Beta (the owner, 2026-10-05); Rotli Web has
+    // no workbook lane. newItems/model.ts marks which kinds wear the Beta badge.
+    sheets: desktop,
     // DOCX editing and creation need the desktop document lane (the managed
     // storage writer and the Univer editor over corpus bytes); Rotli Web
     // names Document as coming soon rather than offering a broken create.

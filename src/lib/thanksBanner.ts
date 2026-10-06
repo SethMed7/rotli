@@ -6,7 +6,7 @@
 // URL). The banner image is theirs to attach.
 
 export const SITE_URL = "https://rotli.co";
-export const BANNER_FILE_NAME = "rotli-welcome.png";
+export const BANNER_FILE_NAME = "rotli-thank-you.png";
 export const BANNER_WIDTH = 1200;
 export const BANNER_HEIGHT = 630;
 
@@ -20,20 +20,9 @@ export function shareOnXUrl(): string {
   return `https://x.com/intent/post?${params.toString()}`;
 }
 
-export interface BannerChoices {
-  userName: string;
-  /** e.g. "Grove Dark" */
-  themeLabel: string;
-  /** e.g. "Fern" — absent for the plain line drawing */
-  quokkaLabel: string | null;
-  /** e.g. "Bucket hat" — absent when the quokka wears nothing */
-  accessoryLabel: string | null;
-}
-
 export interface BannerText {
   headline: string;
   subline: string;
-  chips: string[];
 }
 
 const NAME_LIMIT = 24;
@@ -44,16 +33,20 @@ function shortName(userName: string): string {
   return first.length > NAME_LIMIT ? `${first.slice(0, NAME_LIMIT - 1)}…` : first;
 }
 
-export function bannerText(choices: BannerChoices): BannerText {
-  const name = shortName(choices.userName);
-  const chips = [choices.themeLabel];
-  if (choices.quokkaLabel) chips.push(`${choices.quokkaLabel} quokka`);
-  if (choices.accessoryLabel) chips.push(choices.accessoryLabel);
+/** A thank-you, by first name (the owner, 2026-10-02: "more of a thank you
+ * message, less of a welcome", and no badges for the choices made). */
+export function bannerText(userName: string): BannerText {
+  const name = shortName(userName);
   return {
-    headline: name ? `Welcome to Rotli, ${name}` : "Welcome to Rotli",
-    subline: "Notes, tasks, and AI in one folder you own.",
-    chips,
+    headline: name ? `Thank you, ${name}` : "Thank you",
+    subline: "for trying Rotli. We’re so glad you’re here.",
   };
+}
+
+/** Tell a friend: a mail draft holding the invite, nobody addressed. */
+export function friendInviteMailto(): string {
+  const subject = encodeURIComponent("Try Rotli");
+  return `mailto:?subject=${subject}&body=${encodeURIComponent(FRIEND_INVITE)}`;
 }
 
 // --- reading a rendered quokka's computed styles (components/onboarding/bannerCanvas.ts)

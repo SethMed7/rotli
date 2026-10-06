@@ -83,11 +83,14 @@ import { addFragmentToMain, hydrateMain } from "./state/main";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
+import { switchVault } from "./memex/service";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
+import { routeOpenRequest } from "./state/openRequest";
 import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
+import { applyImageOutline, useAppearanceLook } from "./state/appearanceLook";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
@@ -273,8 +276,15 @@ function MainShell() {
       void workspaceTakeOpenRequest()
         .then((request) => {
           if (!request || stopped) return;
-          useUiStore.getState().setContentView("panes");
-          usePanesStore.getState().openSummary(request);
+          return routeOpenRequest(request, {
+            switchVault,
+            refreshActiveVault,
+            open: (item) => {
+              useUiStore.getState().setContentView("panes");
+              usePanesStore.getState().openSummary(item);
+            },
+            fail: (message) => useUiStore.getState().setRowActionError(message),
+          });
         })
         .catch(() => {})
         .finally(() => {
@@ -415,11 +425,13 @@ export default function App() {
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const accentColor = useUiStore((s) => s.accentColor);
   const accentHue = useUiStore((s) => s.accentHue);
+  const outlineImages = useAppearanceLook((s) => s.outlineImages);
   const surface = surfaceFromUrl();
 
   useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
+  useEffect(() => applyImageOutline(outlineImages), [outlineImages]);
 
   useAppearanceSync(surface);
 

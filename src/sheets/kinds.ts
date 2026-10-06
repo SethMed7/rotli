@@ -16,8 +16,8 @@ export const SHEET_EDITABLE = new Set(["xlsx", "csv"]);
 /** Byte gate for edit mode — matches Rust corpus_file_bytes default (8 MB). */
 export const SHEET_EDIT_MAX_BYTES = 8_000_000;
 
-/** Binary workbooks need the spreadsheet capability, which stable builds
- * withhold; CSV/TSV stay a public editing surface. A withheld workbook opens to
+/** Binary workbooks need the spreadsheet capability, which Rotli Web
+ * withholds; CSV/TSV stay a public editing surface. A withheld workbook opens to
  * the unsupported state — never a passive preview. */
 export function workbookWithheld(ext: string, features: { sheets: boolean } = LAUNCH_FEATURES): boolean {
   return !features.sheets && SHEET_BIN.has(ext);

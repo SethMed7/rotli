@@ -125,6 +125,17 @@ export function createWebFileStore(dir: VaultDir | null, kv: () => BrowserVault)
       queue = next.catch(() => {});
       return next;
     },
+    async fileExists(rel) {
+      if (rel.split("/").some((p) => p === "" || p === "." || p === "..")) return false;
+      // a `storage:` link may name a legacy `Storage/` file (case-insensitive disk)
+      for (const candidate of [rel, rel.replace(/^storage\//, "Storage/")]) {
+        const there = dir
+          ? await dir.exists(candidate)
+          : (await kv().read(ASSET_KEY(candidate))) !== undefined;
+        if (there) return true;
+      }
+      return false;
+    },
     // no cache here: the editor keeps one url per (root, src) for the session
     async imageUrl(rel) {
       if (!readableImagePath(rel)) return "";

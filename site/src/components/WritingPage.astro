@@ -1,9 +1,18 @@
 ---
 // The frame every subpage shares: the site header and footer around a page
-// head (breadcrumb, title, lede) and a body, all on the site grid so the
-// title lines up with the header's brand. Long pages pass `toc` and get an
-// "On this page" column beside the body on wide screens. Rendered Markdown
-// arrives as children, so its typography is styled with :global() in .prose.
+// head (breadcrumb, title, lede, metadata line) and a body, all on the site
+// grid so the title lines up with the header's brand. Long pages pass `toc`
+// and read as an article: a sticky "On this page" tree beside a reading
+// column (about 70 characters), with the section in view highlighted and a
+// slim rail that fills as you read; below 900px the tree folds into an
+// "On this page" disclosure above the text. The highlight and the rail are
+// script (progressive enhancement); without it the tree is plain links.
+// Pages that pass `progress` (resource articles) also get a reading meter pinned under the
+// header on every width: a bar and "N% through", measured over the article alone
+// (src/reading.ts, the same measure that fills the tree's rail). It shows only when the
+// article is longer than the window, and it is a position, never a record: nothing is kept.
+// Rendered Markdown arrives as children, so its typography is styled with
+// :global() in .prose.
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
 import { site } from '../site';
@@ -18,19 +27,25 @@ interface Props {
   section?: NavSection;
   /** A trail back up, e.g. [{ href: '/resources/', label: 'Resources' }]. */
   crumbs?: { href: string; label: string }[];
-  /** Small line above the headline: a date or a draft label. */
+  /** Small line above the headline: a draft label or a section name. */
   kicker?: string;
   heading: string;
   lede?: string;
+  /** The metadata line under the lede: a date, "Updated …", a reading time. */
+  meta?: string[];
   /** Headings for the "On this page" column (depth-2 headings only). */
   toc?: { slug: string; text: string }[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
-  /** Passed through to Base: JSON-LD facts and the Markdown twin. */
+  /** Pin a reading meter under the header (resource articles). */
+  progress?: boolean;
+  /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
+  image?: string;
+  imageAlt?: string;
 }
 
 const {
@@ -42,11 +57,15 @@ const {
   kicker,
   heading,
   lede,
+  meta = [],
   toc = [],
   wide = false,
   center = false,
+  progress = false,
   structuredData,
   markdownPath,
+  image,
+  imageAlt,
 } = Astro.props;
 const hasToc = toc.length > 1;
 ---
@@ -58,6 +77,8 @@ const hasToc = toc.length > 1;
   noindex={!site.indexable}
   structuredData={structuredData}
   markdownPath={markdownPath}
+  image={image}
+  imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
   <main id="content" class:list={['wrap writing', { center }]}>
@@ -77,24 +98,72 @@ const hasToc = toc.length > 1;
       {kicker && <p class="kicker">{kicker}</p>}
       <h1>{heading}</h1>
       {lede && <p class="lede">{lede}</p>}
+      {
+        meta.length > 0 && (
+          <p class="meta">
+            {meta.map((part, index) => (
+              <>
+                {index > 0 && <span aria-hidden="true">·</span>}
+                <span>{part}</span>
+              </>
+            ))}
+          </p>
+        )
+      }
     </header>
     <slot name="scene" />
+    {
+      progress && (
+        <div
+          class="read-progress"
+          data-read-progress
+          role="progressbar"
+          aria-label="Position in this article"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          hidden
+        >
+          <span class="read-track" aria-hidden="true">
+            <span class="read-fill" data-read-fill />
+          </span>
+          <span class="read-label" aria-hidden="true">
+            <b data-read-percent>0%</b> through
+          </span>
+        </div>
+      )
+    }
     <div class:list={['writing-body', { 'has-toc': hasToc, wide }]}>
       {
         hasToc && (
-          <nav class="toc" aria-label="On this page">
-            <p>On this page</p>
-            <ul>
-              {toc.map((item) => (
-                <li>
-                  <a href={`#${item.slug}`}>{item.text}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <>
+            <details class="toc-compact">
+              <summary>On this page</summary>
+              <ul>
+                {toc.map((item) => (
+                  <li>
+                    <a href={`#${item.slug}`}>{item.text}</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            <nav class="toc" aria-label="On this page" data-toc>
+              <p>On this page</p>
+              <div class="toc-tree">
+                <span class="toc-rail" aria-hidden="true"><span class="toc-progress" data-toc-progress></span></span>
+                <ul>
+                  {toc.map((item) => (
+                    <li>
+                      <a href={`#${item.slug}`}>{item.text}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </nav>
+          </>
         )
       }
-      <div class="prose">
+      <div class="prose" data-prose>
         <slot />
       </div>
     </div>
@@ -102,6 +171,68 @@ const hasToc = toc.length > 1;
   </main>
   <SiteFooter />
 </Base>
+
+<script>
+  import { readingProgress } from '../reading';
+
+  // The article tree and the reading meter: highlight the section being read (the last
+  // heading that has passed under the pinned header), and fill the tree's rail and the meter
+  // with how far through the article the window is (one measure, src/reading.ts). Scroll
+  // work is batched into one frame. The compact disclosure closes once a heading is chosen.
+  const toc = document.querySelector<HTMLElement>('[data-toc]');
+  const prose = document.querySelector<HTMLElement>('[data-prose]');
+  const rail = document.querySelector<HTMLElement>('[data-toc-progress]');
+  const meter = document.querySelector<HTMLElement>('[data-read-progress]');
+  const fill = meter?.querySelector<HTMLElement>('[data-read-fill]') ?? null;
+  const percentLabel = meter?.querySelector<HTMLElement>('[data-read-percent]') ?? null;
+  if (prose && (toc || meter)) {
+    const links = toc ? [...toc.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')] : [];
+    const targets = links
+      .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
+      .filter((target): target is HTMLElement => target !== null);
+    let frame = 0;
+    let shown = -1;
+    const update = () => {
+      frame = 0;
+      const header = document.querySelector('.site-header-bar')?.getBoundingClientRect().bottom ?? 0;
+      const line = header + window.innerHeight * 0.2;
+      let active = -1;
+      targets.forEach((target, index) => {
+        if (target.getBoundingClientRect().top <= line) active = index;
+      });
+      links.forEach((link, index) => {
+        if (index === active) link.setAttribute('aria-current', 'location');
+        else link.removeAttribute('aria-current');
+      });
+      // The meter covers the top of the reading area while it is pinned, so it counts as header.
+      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
+      const box = prose.getBoundingClientRect();
+      const reading = readingProgress({ top: box.top, height: box.height }, window.innerHeight, top);
+      if (rail) rail.style.transform = `scaleY(${reading.fraction})`;
+      if (meter && fill && percentLabel) {
+        meter.hidden = reading.fits;
+        fill.style.transform = `scaleX(${reading.fraction})`;
+        if (reading.percent !== shown) {
+          shown = reading.percent;
+          percentLabel.textContent = `${reading.percent}%`;
+          meter.setAttribute('aria-valuenow', String(reading.percent));
+        }
+      }
+    };
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    // Images and fonts change the article's height after load; measure again when they do.
+    new ResizeObserver(schedule).observe(prose);
+    toc?.classList.add('is-live');
+    update();
+  }
+  document.querySelectorAll<HTMLDetailsElement>('.toc-compact').forEach((details) => {
+    details.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => (details.open = false)));
+  });
+</script>
 
 <style>
   .writing {
@@ -152,6 +283,55 @@ const hasToc = toc.length > 1;
     line-height: 1.55;
     text-wrap: pretty;
   }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.55rem;
+    margin: 1.25rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  /* The reading meter: pinned just under the header while the article scrolls by, on the
+     page's own ground so the text passes beneath it. A bar and a plain number. */
+  .read-progress {
+    position: sticky;
+    top: calc(var(--header-height) + 1px);
+    z-index: 20;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    margin: calc(-1 * clamp(1.25rem, 3vw, 2rem)) 0 clamp(1.25rem, 3vw, 2rem);
+    padding: 0.6rem 0;
+    background: var(--ground);
+  }
+  .read-progress[hidden] {
+    display: none;
+  }
+  .read-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .read-fill {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  .read-label {
+    min-width: 7.5ch;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .read-label b {
+    color: var(--text);
+    font-weight: 600;
+  }
   /* The body sits on the grid's left edge; with a table of contents it gets
      a narrow first column that stays in view while reading. */
   .writing-body {
@@ -162,43 +342,158 @@ const hasToc = toc.length > 1;
     grid-template-columns: minmax(0, 1fr);
   }
   .writing-body.has-toc {
-    grid-template-columns: 13rem minmax(0, 44rem);
-    gap: clamp(2rem, 5vw, 4.5rem);
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 5rem);
+  }
+  /* The reading column: about 70 characters of body text. */
+  .writing-body.has-toc .prose {
+    max-width: 70ch;
   }
   .toc {
     position: sticky;
     top: calc(var(--header-height) + 2rem);
     align-self: start;
-    font-size: 0.92rem;
+    max-height: calc(100dvh - var(--header-height) - 4rem);
+    overflow-y: auto;
+    font-size: 0.9rem;
   }
   .toc p {
-    margin: 0 0 0.6rem;
-    color: var(--text-muted);
-    font-size: 0.82rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.84rem;
     font-weight: 600;
+  }
+  /* A tree: one rail down the left, each heading branching off it. The rail
+     fills with the share of the page read (script); the heading in view takes
+     the accent mark and full-strength text. */
+  .toc-tree {
+    position: relative;
+  }
+  .toc-rail {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .toc-progress {
+    display: block;
+    height: 100%;
+    background: var(--border-strong);
+    transform: scaleY(0);
+    transform-origin: top;
   }
   .toc ul {
     margin: 0;
     padding: 0;
     list-style: none;
-    border-left: 1px solid var(--border-strong);
+  }
+  .toc li {
+    position: relative;
+  }
+  .toc li::before {
+    content: '';
+    position: absolute;
+    top: 1.05em;
+    left: 2px;
+    width: 0.55rem;
+    border-top: 1px solid var(--border);
   }
   .toc a {
+    position: relative;
     display: block;
-    padding: 0.4rem 0 0.4rem 0.9rem;
+    padding: 0.38rem 0 0.38rem 1.1rem;
     color: var(--text-muted);
     line-height: 1.35;
     text-decoration: none;
+    transition: color 140ms ease-out;
   }
-  .toc a:hover {
+  .toc a:hover,
+  .toc a[aria-current='location'] {
+    color: var(--text);
+  }
+  .toc a[aria-current='location'] {
+    font-weight: 600;
+  }
+  .toc a[aria-current='location']::before {
+    content: '';
+    position: absolute;
+    top: 0.3rem;
+    bottom: 0.3rem;
+    left: 0;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent-text);
+  }
+  .toc a:focus-visible {
+    outline-offset: 1px;
+  }
+  /* Narrow screens: the same headings in a disclosure above the text. */
+  .toc-compact {
+    display: none;
+    margin-bottom: 2rem;
+    border-block: 1px solid var(--border-strong);
+  }
+  .toc-compact summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  .toc-compact summary::-webkit-details-marker {
+    display: none;
+  }
+  .toc-compact summary::after {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.3rem;
+    border-right: 1.5px solid var(--text-muted);
+    border-bottom: 1.5px solid var(--text-muted);
+    transform: translateY(-25%) rotate(45deg);
+    transition: transform 140ms ease-out;
+  }
+  .toc-compact[open] summary::after {
+    transform: translateY(25%) rotate(-135deg);
+  }
+  .toc-compact ul {
+    margin: 0 0 1rem;
+    padding: 0 0 0 0.9rem;
+    list-style: none;
+    border-left: 2px solid var(--border);
+  }
+  .toc-compact a {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .toc-compact a:hover {
     color: var(--text);
   }
   @media (max-width: 900px) {
     .writing-body.has-toc {
       grid-template-columns: minmax(0, 1fr);
+      gap: 0;
     }
     .toc {
       display: none;
+    }
+    .toc-compact {
+      display: block;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toc a,
+    .toc-compact summary::after {
+      transition: none;
     }
   }
   .prose {
@@ -239,8 +534,12 @@ const hasToc = toc.length > 1;
     background: var(--surface-2);
     font-size: 0.92em;
   }
+  /* Long shell lines (the Helper's install command) wrap at their spaces
+     inside the box instead of running past it; newlines are kept. */
   .prose :global(pre) {
     overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
     padding: 1rem 1.2rem;
     border: 1px solid var(--border);
     border-radius: 0.7rem;

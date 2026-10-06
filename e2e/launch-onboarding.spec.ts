@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { cycleEveryTheme, themeNow } from "./support";
+
 // Fresh-vault onboarding (development-only `?onboarding` route, empty in-memory
 // corpus). Every new vault gets a Welcome folder in Main: the welcome note and
 // three lessons as ordinary notes, opened from the left menu, edited in the
@@ -25,12 +27,18 @@ async function onboard(page: Page) {
   await page.getByLabel("New folder name").fill("Launch Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
   await page.getByRole("button", { name: "Create vault here", exact: true }).click();
-  // the Librarian has its own screen; with no signed-in client in the twin it
-  // offers only this Mac, already pressed
+  // the Librarian has its own screen. Every lane is offered with what this
+  // Mac has for it; the twin has nothing, so it says so, and this Mac stays
+  // chosen for the sidebar's Librarian to finish later
   await expect(page.getByText("3 of 4")).toBeVisible();
-  await expect(
-    page.getByRole("group", { name: "Librarian model" }).getByRole("button", { name: "On this Mac" }),
-  ).toHaveAttribute("aria-pressed", "true");
+  const lanes = page.getByRole("group", { name: "Librarian model" });
+  await expect(lanes.getByRole("button", { name: "On this Mac No model yet" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  for (const name of ["Claude", "ChatGPT", "Gemini"])
+    await expect(lanes.getByRole("button", { name: `${name} Not installed` })).toBeVisible();
+  await expect(page.getByText("Nothing is set up on this Mac yet.")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Three shortcuts, yours to change." })).toBeVisible();
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -200,7 +208,7 @@ test("the shortcuts screen says each can change, and a changed one can go back",
   await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("4 of 4")).toBeVisible();
-  await expect(page.getByText(/change them anytime in Settings → Hotkeys/)).toBeVisible();
+  await expect(page.getByText(/change them anytime in Settings → Keybindings/)).toBeVisible();
   const capture = page.getByRole("button", { name: "Change Quick capture shortcut" });
   await expect(capture).toContainText("Change");
   await capture.click();
@@ -353,6 +361,7 @@ test("checkboxes and list markers align with the H1 in every environment and a n
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await onboard(page);
+  await cycleEveryTheme(page);
   await lessonRows(page).nth(1).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
   const theme = page.getByRole("button", { name: /^Theme —/ });
@@ -369,10 +378,10 @@ test("checkboxes and list markers align with the H1 in every environment and a n
     }
   };
   for (let index = 0; index < 14; index++) {
-    const label = (await theme.getAttribute("aria-label"))!;
+    const label = themeNow(await theme.getAttribute("aria-label"));
     environments.add(label);
     await assertAligned(label);
-    if (label === "Theme — Ocean Light" || label === "Theme — Ocean Dark") {
+    if (label === "Ocean Light" || label === "Ocean Dark") {
       await page.screenshot({
         path: testInfo.outputPath(label.endsWith("Light") ? "playground-light.png" : "playground-dark.png"),
       });

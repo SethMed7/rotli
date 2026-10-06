@@ -1,7 +1,8 @@
 /**
- * Machine-level companion choices. Fixed visual values live in the brand layer;
- * product components consume the named choices and never invent character
- * colors locally.
+ * Machine-level choices for the chat buddy's look (body, ink, accessory). The
+ * person decorates it; its pose is never a choice — each placement picks the
+ * expression that explains the moment. Fixed visual values live in the brand
+ * layer; product components never invent character colors locally.
  */
 
 export const QUOKKA_STYLES = ["line", "cocoa", "green", "ocean", "iris", "berry", "amber", "custom"] as const;
@@ -291,38 +292,6 @@ export type QuokkaLineColor = (typeof QUOKKA_LINE_COLORS)[number];
 
 export const DEFAULT_QUOKKA_CUSTOM_HUE = 225;
 export const DEFAULT_QUOKKA_ACCESSORY_HUE = 38;
-
-/** Personal placements use this preferred mood. Semantic empty states keep
- * choosing their own pose so the illustration still communicates state. */
-export const QUOKKA_IDLE_POSES = [
-  "base",
-  "rest",
-  "thoughtful",
-  "listening",
-  "celebrating",
-  "waving",
-  "searching",
-  "walking",
-] as const;
-
-export type QuokkaIdlePose = (typeof QUOKKA_IDLE_POSES)[number];
-
-export const QUOKKA_IDLE_POSE_PRESENTATIONS: readonly {
-  pose: QuokkaIdlePose;
-  label: string;
-  description: string;
-}[] = [
-  { pose: "base", label: "Content", description: "Warm and present" },
-  { pose: "rest", label: "Peaceful", description: "Settled and unhurried" },
-  { pose: "thoughtful", label: "Thoughtful", description: "Quietly curious" },
-  { pose: "listening", label: "Attentive", description: "Ready to listen" },
-  { pose: "celebrating", label: "Cheerful", description: "A little brighter" },
-  // 2026-09-28: three more moods from poses already drawn (and already
-  // fitted for every accessory), before any new art
-  { pose: "waving", label: "Friendly", description: "Always says hello" },
-  { pose: "searching", label: "Inquisitive", description: "Looking into things" },
-  { pose: "walking", label: "Adventurous", description: "Off exploring" },
-];
 
 export const QUOKKA_STYLE_PRESENTATIONS: readonly {
   style: QuokkaStyle;

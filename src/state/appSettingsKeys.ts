@@ -8,6 +8,10 @@ export const APP_SETTINGS_KEYS = new Set([
   "pinnedSites",
   // the sidebar's scenery and icons (2026-10-01)
   "sidebarLook",
+  // what the titlebar sun cycles, and the editor's image outline (state/appearanceLook.ts)
+  "themeCycle",
+  "themeCyclePicks",
+  "outlineImages",
   "v",
   "theme",
   "themeFamily",
@@ -19,7 +23,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "boardBackground",
   "accentColor",
   "accentHue",
-  "quokkaCompanionEnabled",
   "quokkaStyle",
   "quokkaCustomHue",
   "quokkaLineColor",
@@ -28,6 +31,10 @@ export const APP_SETTINGS_KEYS = new Set([
   "quokkaCustomColor",
   "quokkaAccessory",
   "quokkaAccessoryHue",
+  // Retired 2026-10-02: the companion switch and its idle mood. The chat
+  // buddy is always there and picks its own pose; recognized so an old file's
+  // values are dropped on the next write, never carried forever.
+  "quokkaCompanionEnabled",
   "quokkaIdlePose",
   "chatNavigatorStyle",
   "sidebarSide",
@@ -58,4 +65,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "sidebarFronts",
   // The sidebar shows the vault's folders as on disk (services/vaultTree.ts).
   "vaultView",
+  // Hand to AI opens in the mode chosen last (state/handToAiMode.ts).
+  "handToAiMode",
 ]);

@@ -5,7 +5,9 @@
 // (PRIVACY.md; src-tauri provider lane; src/ai/connectorGuides.ts for the
 // exact commands). Rotli Web reaches the same tools through Rotli Helper,
 // which runs them on the visitor's own computer. On-device models run on the
-// Mac with no network.
+// Mac with no network. The commands sit in one terminal, one group per tool,
+// rather than a stack of boxes; how Rotli Helper works is the guide's to explain
+// (/resources/rotli-helper/), so this chapter only points there.
 import { site } from '../../site';
 
 const tools = [
@@ -29,7 +31,6 @@ const tools = [
 
 <div class="connect" data-reveal>
   <div class="connect-copy">
-    <h3>Bring the AI you already pay for.</h3>
     <p>
       Install your AI tool in Terminal and sign in, exactly as its maker describes. rotli then talks to that
       tool directly on your Mac, the same way you would from Terminal.
@@ -40,39 +41,21 @@ const tools = [
       <li>Prefer nothing leaving your Mac? Choose an on-device model instead; it works without a network.</li>
     </ul>
   </div>
-  <div class="terminals">
-    {tools.map((tool) => (
-      <figure class="terminal">
-        <figcaption>
-          <b>{tool.name}</b>
-          <span>{tool.by}</span>
-        </figcaption>
-        <pre><code>{tool.lines.map((line) => (
-          <span class="line"><span class="prompt" aria-hidden="true">$ </span>{line}</span>
-        ))}</code></pre>
-      </figure>
-    ))}
-  </div>
+  <figure class="terminal" aria-label="Install and sign in to each AI tool in Terminal">
+    <figcaption>
+      <b>Terminal</b>
+      <span>pick the one you use</span>
+    </figcaption>
+    <pre><code>{tools.map((tool) => <span class="group"><span class="line comment"># {tool.name} · {tool.by}</span>{tool.lines.map((line) => <span class="line"><span class="prompt" aria-hidden="true">$ </span>{line}</span>)}</span>)}</code></pre>
+  </figure>
 </div>
 
 {
   site.webAppEnabled && (
-    <div class="helper" data-reveal>
-      <div>
-        <h4>In the browser, Rotli Helper does the connecting.</h4>
-        <p>
-          Rotli Web cannot start programs, so Rotli Helper, a small app you install on your own computer, runs
-          the same tools for it. It listens only on your computer and refuses secure notes before anything runs.
-        </p>
-      </div>
-      <figure class="terminal">
-        <figcaption>
-          <b>Rotli Helper</b>
-          <span>Mac and Linux</span>
-        </figcaption>
-        <pre><code><span class="line"><span class="prompt" aria-hidden="true">$ </span>curl -fsSL https://rotli.co/helper/install.sh | sh</span></code></pre>
-      </figure>
-    </div>
+    <p class="helper" data-reveal>
+      In Rotli Web, <b>Rotli Helper</b> runs these same tools on your own computer.{' '}
+      <a href="/resources/rotli-helper/">How Rotli Helper works <span aria-hidden="true">→</span></a>
+    </p>
   )
 }
 
@@ -83,16 +66,9 @@ const tools = [
     gap: 2rem clamp(2rem, 6vw, 5rem);
     align-items: start;
   }
-  h3 {
-    margin: 0;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
   .connect-copy > p {
     max-width: 30rem;
-    margin: 0.8rem 0 0;
+    margin: 0;
     color: var(--text-muted);
     line-height: 1.62;
   }
@@ -119,10 +95,6 @@ const tools = [
     border-left: 2px solid var(--accent-text);
     border-bottom: 2px solid var(--accent-text);
     transform: rotate(-45deg);
-  }
-  .terminals {
-    display: grid;
-    gap: 1rem;
   }
   .terminal {
     margin: 0;
@@ -155,33 +127,36 @@ const tools = [
   .line {
     display: block;
   }
+  .group {
+    display: block;
+  }
+  .group + .group {
+    margin-top: 0.9rem;
+  }
+  .comment {
+    color: var(--deep-muted);
+  }
   .prompt {
     color: var(--tint);
     user-select: none;
   }
   .helper {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: 1.5rem clamp(2rem, 6vw, 5rem);
-    align-items: center;
-    margin-top: clamp(2.5rem, 5vw, 3.5rem);
-    padding-top: clamp(2rem, 4vw, 2.5rem);
+    margin: clamp(2rem, 4vw, 2.75rem) 0 0;
+    padding-top: 1.1rem;
     border-top: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    line-height: 1.6;
   }
-  h4 {
-    margin: 0;
-    font-size: 1.1rem;
+  .helper b {
+    color: var(--text);
     font-weight: 600;
   }
-  .helper p {
-    max-width: 30rem;
-    margin: 0.5rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.55;
+  .helper a {
+    color: var(--accent-text);
+    font-weight: 600;
   }
   @media (max-width: 860px) {
-    .connect,
-    .helper {
+    .connect {
       grid-template-columns: 1fr;
     }
   }

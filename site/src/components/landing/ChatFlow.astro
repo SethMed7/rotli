@@ -1,19 +1,17 @@
 ---
-// Chat: a real reply from the Mac app (a raw take of the launch shoot, synthetic
-// Notebook vault), then what a conversation does to your folder, step by step.
+// Chat (under its section head in Features.astro): a real reply from the Mac app
+// (a raw take of the launch shoot, synthetic Notebook vault), what a conversation
+// does to your folder in three steps, then who may change a note: the protection
+// items of a note's menu, beside what each one means.
 // Facts (current code): each chat is chats/<slug>.md; after every reply the
-// chat's own model rewrites a "Conversation notes" section in the chat's note
-// (or the note it was started from); the model can create and rewrite notes
-// directly (and, on the Mac, make DOCX documents, PDFs, and boards from a
-// chat); Lock refuses every AI edit, on-device included, in TypeScript and Rust.
-const notesExample = [
-  '### Q4 launch',
-  '- Mac beta shipped; pricing page in progress.',
-  '- Decision: record the demo before launch day.',
-  '- Action: Maya records the demo.',
-  '- Open: who reviews the pricing copy?',
-];
-
+// chat's own model rewrites a "Conversation notes" section in the chat's note (a
+// chat attached to a note you wrote keeps it in a note of its own); the model can
+// create notes and rewrite notes an AI made, while a note a person wrote is closed
+// to AI edits until "Let AI edit the text" is on (Rust owns the verdict); on the
+// Mac it can make DOCX documents, PDFs, and boards from a chat; Lock refuses every
+// AI edit and filing, on-device included, in TypeScript and Rust; secure notes
+// never reach remote models. Menu labels are copied from
+// src/components/useNoteMenu.ts and src/components/sidebar/noteProtectionItems.ts.
 const steps = [
   {
     n: '01',
@@ -23,71 +21,92 @@ const steps = [
   {
     n: '02',
     title: 'It keeps notes as you go',
-    body: 'After every reply, rotli rewrites a short “Conversation notes” section: decisions, facts worth keeping, action items, open questions. The chat itself is saved as Markdown too.',
+    body: 'After every reply, rotli updates a short “Conversation notes” section: decisions, action items, open questions. The chat itself is saved as Markdown too.',
   },
   {
     n: '03',
     title: 'It can write for you',
-    body: 'In the Mac app, ask for a new note or an edit and it makes the change in your folder. It can also make a Word document, a PDF, or a board, filed beside the chat.',
+    body: 'In the Mac app, ask for a new note and it lands in your folder. It can also make a Word document, a PDF, or a board, filed beside the chat.',
+  },
+];
+
+// An illustration of a note's menu (the real menu holds more items above and
+// below): its protection items, with nothing drawn underneath the menu.
+const menu: ({ label: string; focus?: true } | 'rule')[] = [
+  { label: 'Chat with this note' },
+  { label: 'Show in Library' },
+  'rule',
+  { label: 'Pin to top' },
+  { label: 'Lock — no AI may edit or file it', focus: true },
+  { label: 'Let AI edit the text' },
+  { label: 'Mark secure — block remote AI' },
+  'rule',
+  { label: 'Rename…' },
+];
+
+const rules = [
+  {
+    term: 'Yours by default',
+    body: 'AI can rewrite notes an AI made. A note you wrote stays as you wrote it until you turn on Let AI edit the text.',
   },
   {
-    n: '04',
-    title: 'Jump in, or lock it',
-    body: 'Everything it writes is an ordinary file you can open and keep editing. Want AI to stop touching a note? Lock it. Every model can still read it; none can edit it.',
+    term: 'Lock',
+    body: 'No AI may edit or file the note, the model on your Mac included. Every model can still read it.',
+  },
+  {
+    term: 'Mark secure',
+    body: 'Remote models never see the note. The model on your Mac still can, unless you turn that off.',
   },
 ];
 ---
 
-<div class="chat-row" data-reveal>
-  <div class="chat-copy">
-    <h3>Chat that works inside your notes.</h3>
-    <p>
-      Ask what shipped, what is left, or what you decided last week, and get an answer grounded in your own
-      files. Use a model on your Mac, or the AI tools you already use.
-    </p>
-  </div>
-  <figure class="frame">
-    <img
-      src="/shots/chat.webp"
-      width="1800"
-      height="850"
-      alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes"
-      loading="lazy"
-      decoding="async"
-    />
-  </figure>
-</div>
+<figure class="frame chat-shot" data-reveal>
+  <img
+    src="/shots/chat.webp"
+    width="1800"
+    height="850"
+    alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes"
+    loading="lazy"
+    decoding="async"
+  />
+</figure>
 
 <ol class="steps" data-stagger>
   {steps.map((step) => (
     <li>
       <span class="n">{step.n}</span>
-      <h4>{step.title}</h4>
+      <h3>{step.title}</h3>
       <p>{step.body}</p>
     </li>
   ))}
 </ol>
 
-<div class="chat-detail" data-reveal>
-  <figure class="notes-sample" aria-label="An example of the Conversation notes section a chat keeps">
-    <figcaption>In the chat’s note · updated after every reply</figcaption>
-    <div class="notes-body">
-      <p class="notes-h2">Conversation notes</p>
-      {notesExample.map((line) =>
-        line.startsWith('###') ? <p class="notes-h3">{line.replace('### ', '')}</p> : <p class="notes-li">{line.replace('- ', '')}</p>,
-      )}
+<div class="protect" id="lock" data-reveal>
+  <div class="protect-copy">
+    <h3 class="protect-title">You decide what AI may touch.</h3>
+    <p>Right-click any note. Everything chat writes is an ordinary file you can keep editing.</p>
+    <dl class="rules">
+      {rules.map((rule) => (
+        <div>
+          <dt>{rule.term}</dt>
+          <dd>{rule.body}</dd>
+        </div>
+      ))}
+    </dl>
+  </div>
+  <figure class="menu-art" aria-label="Illustration: a note’s menu in rotli, with Lock, Let AI edit the text, and Mark secure">
+    <div class="menu-note" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
+        <path d="M9.5 1.5v3h3" />
+      </svg>
+      Passport and visas
     </div>
-  </figure>
-  <figure class="frame lock">
-    <img
-      src="/shots/lock-menu.webp"
-      width="800"
-      height="1040"
-      alt="A note’s right-click menu in rotli with “Lock — no AI may edit it” and “Mark secure — block remote AI”"
-      loading="lazy"
-      decoding="async"
-    />
-    <figcaption>Right-click any note: Lock stops every AI edit. Mark secure keeps it from remote models.</figcaption>
+    <ul class="menu" aria-hidden="true">
+      {menu.map((item) =>
+        item === 'rule' ? <li class="menu-rule" /> : <li class:list={{ focus: item.focus }}>{item.label}</li>,
+      )}
+    </ul>
   </figure>
 </div>
 
@@ -103,28 +122,13 @@ const steps = [
     width: 100%;
     height: auto;
   }
-  .chat-row {
-    display: grid;
-    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
-    gap: 2rem clamp(2rem, 6vw, 5rem);
-    align-items: start;
-  }
-  h3 {
-    margin: 0;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-  .chat-copy p {
-    max-width: 30rem;
-    margin: 0.8rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.62;
+  /* The reply sits under the section head at a reading width, not the full page. */
+  .chat-shot {
+    max-width: 56rem;
   }
   .steps {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2rem clamp(1.5rem, 3vw, 2.5rem);
     margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
     padding: 0;
@@ -135,11 +139,11 @@ const steps = [
     border-top: 1px solid var(--border-strong);
   }
   .n {
-    color: var(--accent-text);
+    color: var(--text-muted);
     font-size: 0.82rem;
     font-weight: 600;
   }
-  h4 {
+  h3 {
     margin: 0.35rem 0 0;
     font-size: 1.08rem;
     font-weight: 600;
@@ -149,66 +153,106 @@ const steps = [
     color: var(--text-muted);
     line-height: 1.55;
   }
-  .chat-detail {
+
+  /* Who may change a note: the words on the left, the menu on the right, top edges level. */
+  .protect {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-    gap: 2rem clamp(1.5rem, 4vw, 3rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2.5rem clamp(2rem, 6vw, 5rem);
     align-items: start;
-    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    margin-top: clamp(3.5rem, 7vw, 5rem);
+    padding-top: clamp(2rem, 4vw, 2.75rem);
+    border-top: 1px solid var(--border-strong);
   }
-  /* A drawn example of the section, set in the editor's own type scale. */
-  .notes-sample {
+  .protect-title {
     margin: 0;
-    border-left: 3px solid var(--accent);
-    padding: 0.25rem 0 0.25rem 1.5rem;
+    font-size: var(--step-h3);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
-  .notes-sample figcaption {
+  .protect-copy > p {
+    max-width: 30rem;
+    margin: 0.7rem 0 0;
     color: var(--text-muted);
-    font-size: 0.84rem;
+    line-height: 1.6;
+  }
+  .rules {
+    display: grid;
+    margin: 1.5rem 0 0;
+  }
+  .rules div {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: 0.25rem 1.25rem;
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--border-strong);
+  }
+  .rules dt {
     font-weight: 600;
   }
-  .notes-body {
-    margin-top: 1rem;
+  .rules dd {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.55;
   }
-  .notes-body p {
+
+  /* The menu illustration, straight on the ground (no frame around it): the
+     note's row, and its menu opening below and to the right of it. The row is
+     short, so the menu covers nothing. */
+  .menu-art {
+    display: grid;
+    justify-items: start;
+    gap: 0.5rem;
     margin: 0;
   }
-  .notes-h2 {
-    font-size: 1.35rem;
+  .menu-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--tint);
+    font-size: 0.92rem;
     font-weight: 600;
-    letter-spacing: -0.015em;
   }
-  .notes-body .notes-h3 {
-    margin-top: 0.9rem;
-    font-weight: 600;
+  .menu-note svg {
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-muted);
   }
-  .notes-body .notes-li {
-    position: relative;
-    margin-top: 0.35rem;
-    padding-left: 1.1rem;
-    color: var(--text);
-  }
-  .notes-li::before {
-    content: '';
-    position: absolute;
-    left: 0.2rem;
-    top: 0.72em;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--text-muted);
-  }
-  .lock figcaption {
-    padding: 0.8rem 1rem;
-    border-top: 1px solid var(--border);
+  .menu {
+    width: min(100%, 21rem);
+    margin: 0 0 0 clamp(1rem, 4vw, 2.5rem);
+    padding: 0.4rem;
+    list-style: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.75rem;
     background: var(--surface);
-    color: var(--text-muted);
-    font-size: 0.88rem;
-    line-height: 1.5;
+    font-size: 0.9rem;
+  }
+  .menu li {
+    padding: 0.42rem 0.7rem;
+    border-radius: 0.45rem;
+  }
+  /* The item under the pointer: a tinted row, as the app marks it. */
+  .menu li.focus {
+    background: var(--tint);
+    font-weight: 600;
+  }
+  .menu .menu-rule {
+    height: 0;
+    margin: 0.3rem 0.5rem;
+    padding: 0;
+    border-top: 1px solid var(--border);
   }
   @media (max-width: 860px) {
-    .chat-row,
-    .chat-detail {
+    .steps,
+    .protect {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 480px) {
+    .rules div {
       grid-template-columns: 1fr;
     }
   }

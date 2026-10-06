@@ -67,7 +67,6 @@ describe("appearance broadcast (main → quick/capture webviews)", () => {
       accentHue: 141,
       quokkaLineColor: "black",
       quokkaAccessoryHue: 77,
-      quokkaIdlePose: "thoughtful",
       timeFormat: "24",
     });
     useBindingsStore.setState({ overrides: { "quick.search": "Meta+Shift+P" } });
@@ -84,7 +83,6 @@ describe("appearance broadcast (main → quick/capture webviews)", () => {
       accentHue: ui.accentHue,
       quokkaLineColor: "auto",
       quokkaAccessoryHue: ui.quokkaAccessoryHue,
-      quokkaIdlePose: ui.quokkaIdlePose,
       timeFormat: ui.timeFormat,
     });
     useBindingsStore.setState({ overrides: {} });
@@ -102,7 +100,6 @@ describe("appearance broadcast (main → quick/capture webviews)", () => {
     expect(after.accentHue).toBe(141);
     expect(after.quokkaLineColor).toBe("black");
     expect(after.quokkaAccessoryHue).toBe(77);
-    expect(after.quokkaIdlePose).toBe("thoughtful");
     expect(after.timeFormat).toBe("24");
     expect(useBindingsStore.getState().overrides["quick.search"]).toBe("Meta+Shift+P");
     expect(useNoteStyleStore.getState().styles.n1?.size).toBe(19);

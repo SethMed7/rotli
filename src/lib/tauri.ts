@@ -463,6 +463,9 @@ export interface ChatModelInfo {
    * since server 0.3 every installed mlx model serves on demand per request.
    * Optional (absent on connected/preset synthetic models). */
   localDefault?: boolean;
+  /** Listed in the registry, so actually installed; false for the built-in
+   * fallback Rust offers before any model exists. */
+  registered?: boolean;
 }
 
 /** The on-device model bridge (chat + web). Same guard+normalize contract as
@@ -973,7 +976,7 @@ export function rootIdOf(id: string): string {
 /** Split a corpus wire id into its root + relative path. The default LOCAL root
  * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
  * where rootid has no slash. Mirrors Rust `split_root_id`. */
-function splitRootId(id: string): { rootId: string; rel: string } {
+export function splitRootId(id: string): { rootId: string; rel: string } {
   const i = id.indexOf(":");
   if (i > 0 && !id.slice(0, i).includes("/")) {
     return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
@@ -1410,17 +1413,21 @@ export function corpusWriteAi(
 export interface CorpusAiRead {
   body: string;
   revision: string;
+  /** The editor's copy of the note, when asked for (desktop only). */
+  editor?: string;
 }
 
 export async function corpusReadAiVersioned(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
+  opts?: { withEditor?: boolean },
 ): Promise<CorpusAiRead> {
   if (!isTauri()) return webCorpus()?.read(id) ?? { body: "", revision: "browser:0" };
   return invoke<CorpusAiRead>("corpus_read_ai", {
     id,
     modelId: model.id,
     endpoint: model.endpoint,
+    withEditor: opts?.withEditor ?? false,
   });
 }
 

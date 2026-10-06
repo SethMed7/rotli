@@ -1,19 +1,23 @@
 ---
 // /features/: the whole tour, as its own page rather than a landing anchor.
-// "Rotli in 30 seconds" (the studio's eight episodes, one player) opens it; then
-// it composes Features in full (rendering, chat, documents and boards, assets,
-// the Librarian, connecting AI tools, the smaller habits), then the folder and
-// the themes. The ways in (Mac, Rotli Web, Helper) stay on the landing page and
-// /download/; the Helper also appears under connecting AI.
+// One display headline opens it, with the product film (the same real Rotli Web
+// session the landing hero plays) right under it: the real product leads, not
+// the illustrated story. Then Features in full (rendering, chat and locking,
+// documents and boards, the Librarian and the smaller habits, connecting AI
+// tools), then the folder and the themes, alternating plain and warm grounds.
+// Every chapter is one idea: a section head (h2 + lede) and one picture. The ways in (Mac, Rotli Web, Helper) stay on the landing page
+// and /download/; the Helper also appears under connecting AI. The landing
+// page's dev-only Experiments chapter is not repeated here.
 import Base from '../../layouts/Base.astro';
-import EpisodeShelf from '../../components/EpisodeShelf.astro';
+import FilmPlayer from '../../components/FilmPlayer.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
-import Experiments from '../../components/landing/Experiments.astro';
 import Features from '../../components/landing/Features.astro';
 import FinalCta from '../../components/landing/FinalCta.astro';
 import Folder from '../../components/landing/Folder.astro';
 import Personal from '../../components/landing/Personal.astro';
+import { hero } from '../../films';
+import { ogImage } from '../../og';
 import { site } from '../../site';
 
 export function getStaticPaths() {
@@ -26,6 +30,7 @@ export function getStaticPaths() {
   description="What rotli does: a quiet Markdown editor, tasks that stay text, links and search, chat that reads your notes, a Librarian that files without rewriting, and themes to make it yours."
   canonicalPath="/features/"
   noindex={!site.indexable}
+  {...ogImage('features')}
 >
   <SiteHeader current="features" />
   <main id="content">
@@ -36,9 +41,10 @@ export function getStaticPaths() {
         keeps them filed. All of it works on one folder you own.
       </p>
     </header>
-    <EpisodeShelf />
+    <div class="wrap page-film">
+      <FilmPlayer src={hero.src} poster={hero.poster} label={hero.label} silent={hero.silent === true} captioned={hero.captioned === true} />
+    </div>
     <Features />
-    <Experiments />
     <Folder />
     <Personal />
     <FinalCta />
@@ -49,6 +55,11 @@ export function getStaticPaths() {
 <style>
   .page-head {
     padding-top: clamp(3rem, 7vw, 5rem);
+    padding-bottom: clamp(2rem, 4vw, 3rem);
+  }
+  /* The product film, under the headline at the page's full width. */
+  .page-film {
+    padding-bottom: var(--section-space);
   }
   h1 {
     max-width: 16ch;

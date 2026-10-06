@@ -1,0 +1,354 @@
+---
+// The scene that opens a resource article (WritingPage's `scene` slot), the guides' answer to
+// the night frame on /privacy/: the film's island by day, with the app's own quokka in the
+// pose that fits the question and the things the article is about around it. Each guide has
+// its own (`kind`, chosen by slug in pages/resources/[...slug].astro); a new guide without one
+// gets the plain beach and the waving quokka. It plays once when it comes into view (the
+// site's [data-reveal]: the quokka hops in and the props settle) and then rests; reduced
+// motion and no script show it at rest. Decoration only: the article says it in words, so
+// the scene is hidden from assistive technology. Colours are Base.astro's film tokens with
+// the art's own --ink.
+import aiChat from '../../../src/assets/characters/filled/cocoa/ai_chat.webp';
+import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
+import knowledge from '../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+import notes from '../../../src/assets/characters/filled/cocoa/notes.webp';
+import waving from '../../../src/assets/characters/filled/cocoa/waving.webp';
+
+export type SceneKind = 'start' | 'local' | 'ai' | 'helper' | 'web' | 'beach';
+
+interface Props {
+  kind?: SceneKind;
+}
+
+const { kind = 'beach' } = Astro.props;
+const pose = { start: waving, local: notes, ai: aiChat, helper: knowledge, web: celebrating, beach: waving }[kind];
+---
+
+<div class:list={['rscene', `rscene-${kind}`]} data-reveal aria-hidden="true">
+  <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMax slice" role="presentation">
+    <g class="sky">
+      <ellipse class="cloud" cx="210" cy="58" rx="64" ry="14"></ellipse>
+      <ellipse class="cloud" cx="252" cy="48" rx="38" ry="13"></ellipse>
+      <ellipse class="cloud" cx="980" cy="40" rx="50" ry="11"></ellipse>
+      <ellipse class="cloud" cx="1012" cy="32" rx="28" ry="10"></ellipse>
+    </g>
+    <rect class="sea" x="0" y="168" width="1200" height="70"></rect>
+    <path class="sea-edge" d="M0 168H1200"></path>
+    <path class="waves" d="M90 186q10-5 20 0M330 198q10-5 20 0M610 182q10-5 20 0M880 196q10-5 20 0M1120 186q10-5 20 0"></path>
+    <path class="dune" d="M-10 300V232C120 218 260 216 400 226S700 238 820 228 1060 214 1210 224V300Z"></path>
+    <g class="scrub">
+      <ellipse cx="70" cy="226" rx="34" ry="11"></ellipse>
+      <ellipse cx="1130" cy="222" rx="30" ry="10"></ellipse>
+    </g>
+    <path class="sand" d="M-10 300V258C200 250 420 254 620 258S1000 262 1210 254V300Z"></path>
+
+    {
+      kind === 'start' && (
+        <>
+          <g class="prop prop-1">
+            <path class="folder-back" d="M250 268V178a10 10 0 0 1 10-10h62l14 16h96a10 10 0 0 1 10 10v74z" />
+            <rect class="sheet" x="282" y="150" width="70" height="88" rx="6" transform="rotate(-8 317 194)" />
+            <rect class="sheet" x="330" y="142" width="70" height="92" rx="6" transform="rotate(6 365 188)" />
+            <path class="sheet-line" d="M296 170l40-6M298 186l32-4M346 164l36 4M344 180l30 3" />
+            <path class="folder-front" d="M240 268l18-70h196l-12 70z" />
+          </g>
+          <g class="prop prop-2">
+            <rect class="key" x="842" y="236" width="56" height="44" rx="9" />
+            <text class="key-label" x="870" y="266" text-anchor="middle">⌘N</text>
+          </g>
+          <g class="prop prop-3">
+            <rect class="key" x="910" y="230" width="56" height="44" rx="9" />
+            <text class="key-label" x="938" y="260" text-anchor="middle">⌘K</text>
+          </g>
+          <g class="prop prop-4">
+            <rect class="key" x="978" y="238" width="56" height="44" rx="9" />
+            <text class="key-label" x="1006" y="268" text-anchor="middle">⌘P</text>
+          </g>
+        </>
+      )
+    }
+    {
+      kind === 'local' && (
+        <>
+          <g class="prop prop-1">
+            <path class="folder-back" d="M230 270V160a12 12 0 0 1 12-12h76l16 18h120a12 12 0 0 1 12 12v92z" />
+            <rect class="sheet" x="262" y="134" width="74" height="96" rx="6" transform="rotate(-6 299 182)" />
+            <rect class="sheet" x="318" y="128" width="74" height="100" rx="6" />
+            <rect class="sheet" x="372" y="136" width="74" height="94" rx="6" transform="rotate(7 409 183)" />
+            <path class="sheet-line" d="M276 156l44-5M278 172l36-4M332 152h44M332 168h34M388 158l40 5M388 174l32 4" />
+            <path class="folder-front" d="M218 270l20-82h238l-14 82z" />
+            <text class="folder-label" x="342" y="244" text-anchor="middle">your folder</text>
+          </g>
+          <g class="prop prop-2">
+            <path class="cloud-far" d="M930 128c-18 0-29-13-27-28 2-13 15-21 28-19 5-16 20-26 37-23 14 3 23 14 24 26 13-1 24 9 24 22 0 12-10 22-22 22z" />
+            <path class="cloud-eye" d="M948 102l8 8m0-8l-8 8M976 102l8 8m0-8l-8 8" />
+          </g>
+        </>
+      )
+    }
+    {
+      kind === 'ai' && (
+        <>
+          <g class="prop prop-1">
+            <g class="pins">
+              <rect x="246" y="168" width="7" height="14" rx="2" />
+              <rect x="266" y="168" width="7" height="14" rx="2" />
+              <rect x="286" y="168" width="7" height="14" rx="2" />
+              <rect x="306" y="168" width="7" height="14" rx="2" />
+            </g>
+            <rect class="chip" x="232" y="180" width="96" height="84" rx="16" />
+            <circle class="face" cx="262" cy="214" r="6" />
+            <circle class="face" cx="298" cy="214" r="6" />
+            <path class="smile" d="M268 232q12 10 24 0" />
+          </g>
+          <g class="prop prop-2">
+            <rect class="sheet" x="842" y="178" width="132" height="92" rx="10" transform="rotate(4 908 224)" />
+            <path class="sheet-line" d="M862 204h70M862 224h52" transform="rotate(4 908 224)" />
+            <path class="lock-shackle" d="M948 240v-8a10 10 0 0 1 20 0v8" />
+            <rect class="lock" x="942" y="238" width="32" height="24" rx="6" />
+          </g>
+          <g class="prop prop-3">
+            <path class="bubble" d="M770 70h120a16 16 0 0 1 16 16v38a16 16 0 0 1-16 16h-76l-22 18 4-18h-26a16 16 0 0 1-16-16V86a16 16 0 0 1 16-16z" />
+            <circle class="face" cx="800" cy="105" r="5" />
+            <circle class="face" cx="828" cy="105" r="5" />
+            <circle class="face" cx="856" cy="105" r="5" />
+          </g>
+        </>
+      )
+    }
+    {
+      kind === 'helper' && (
+        <>
+          <g class="prop prop-1">
+            <rect class="window" x="196" y="128" width="210" height="140" rx="12" />
+            <path class="window-bar" d="M196 156h210" />
+            <circle class="dot" cx="216" cy="142" r="5" />
+            <circle class="dot" cx="232" cy="142" r="5" />
+            <circle class="dot" cx="248" cy="142" r="5" />
+            <path class="sheet-line" d="M222 184h120M222 204h90M222 224h104" />
+          </g>
+          <path class="prop prop-3 path-dots" d="M410 212C520 150 700 150 800 212" />
+          <g class="prop prop-2">
+            <path class="folder-back" d="M820 270V172a10 10 0 0 1 10-10h62l14 16h104a10 10 0 0 1 10 10v82z" />
+            <rect class="sheet" x="852" y="146" width="70" height="88" rx="6" transform="rotate(-5 887 190)" />
+            <path class="folder-front" d="M810 270l18-72h204l-12 72z" />
+          </g>
+        </>
+      )
+    }
+    {
+      kind === 'web' && (
+        <>
+          <g class="prop prop-1">
+            <rect class="window" x="200" y="134" width="200" height="124" rx="10" />
+            <rect class="screen" x="214" y="148" width="172" height="96" rx="4" />
+            <path class="sheet-line" d="M232 172h100M232 192h76M232 212h90" />
+            <path class="laptop-base" d="M176 258h248l-14 16H190z" />
+          </g>
+          <g class="prop prop-2">
+            <rect class="window" x="806" y="124" width="210" height="146" rx="12" />
+            <path class="window-bar" d="M806 152h210" />
+            <circle class="dot" cx="826" cy="138" r="5" />
+            <circle class="dot" cx="842" cy="138" r="5" />
+            <circle class="dot" cx="858" cy="138" r="5" />
+            <path class="sheet-line" d="M832 180h100M832 200h76M832 220h90" />
+          </g>
+        </>
+      )
+    }
+
+    <image class="quokka" href={pose.src} x="474" y="42" width="252" height="252"></image>
+  </svg>
+</div>
+
+<style>
+  /* The day frame: the same rounded frame as the night on /privacy/, on the page's grid. */
+  .rscene {
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    overflow: hidden;
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .rscene svg {
+    display: block;
+    width: 100%;
+    /* Short enough on a phone that the whole stage (x 150 to 1050) stays in view. */
+    height: clamp(120px, 24vw, 300px);
+  }
+  .cloud {
+    fill: var(--surface-2);
+  }
+  .sea {
+    fill: var(--sea);
+  }
+  .sea-edge {
+    stroke: var(--sea-deep);
+    stroke-width: 2;
+  }
+  .waves {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .dune {
+    fill: var(--limestone);
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .scrub ellipse {
+    fill: var(--olive);
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .sand {
+    fill: var(--sand);
+    stroke: var(--ink);
+    stroke-width: 2;
+  }
+  .folder-back {
+    fill: var(--wood);
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linejoin: round;
+  }
+  .folder-front {
+    fill: var(--limestone);
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linejoin: round;
+  }
+  .folder-label,
+  .key-label {
+    fill: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 600;
+  }
+  .folder-label {
+    font-size: 20px;
+  }
+  .key-label {
+    font-size: 19px;
+  }
+  .sheet,
+  .window,
+  .bubble {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linejoin: round;
+  }
+  .screen {
+    fill: var(--sea-line);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .laptop-base {
+    fill: var(--limestone);
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linejoin: round;
+  }
+  .window-bar,
+  .sheet-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .sheet-line {
+    stroke: var(--accent);
+  }
+  .dot {
+    fill: var(--accent);
+  }
+  .key {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 4;
+  }
+  .chip {
+    fill: var(--olive-bright);
+    stroke: var(--ink);
+    stroke-width: 4;
+  }
+  .pins rect,
+  .face {
+    fill: var(--ink);
+  }
+  .smile,
+  .cloud-eye {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .lock {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .lock-shackle {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+  }
+  .cloud-far {
+    fill: var(--surface-2);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .path-dots {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 2 14;
+  }
+  .prop,
+  .quokka {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+
+  /* Once, when it comes into view: the quokka hops in, then each prop settles in turn. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .rscene:global(.is-visible) .quokka {
+      animation: hop-in 820ms cubic-bezier(0.34, 1.45, 0.64, 1) 180ms backwards;
+    }
+    :global(.js) .rscene:global(.is-visible) .prop {
+      animation: settle 620ms cubic-bezier(0.34, 1.5, 0.64, 1) backwards;
+    }
+    :global(.js) .rscene:global(.is-visible) .prop-1 {
+      animation-delay: 520ms;
+    }
+    :global(.js) .rscene:global(.is-visible) .prop-2 {
+      animation-delay: 700ms;
+    }
+    :global(.js) .rscene:global(.is-visible) .prop-3 {
+      animation-delay: 880ms;
+    }
+    :global(.js) .rscene:global(.is-visible) .prop-4 {
+      animation-delay: 1060ms;
+    }
+  }
+  @keyframes hop-in {
+    0% {
+      transform: translateY(70px) scale(0.9, 1.08);
+      opacity: 0;
+    }
+    55% {
+      transform: translateY(-16px);
+      opacity: 1;
+    }
+    80% {
+      transform: translateY(0) scale(1.05, 0.95);
+    }
+  }
+  @keyframes settle {
+    from {
+      transform: translateY(-26px) scale(0.85);
+      opacity: 0;
+    }
+  }
+</style>

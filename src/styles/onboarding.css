@@ -798,6 +798,42 @@
   outline-offset: 2px;
 }
 
+/* a Librarian lane and what this Mac has for it (2026-10-02): its name, and
+   under it Ready, Checking…, Not installed, Not signed in, or No model yet */
+.setup-lane {
+  display: inline-grid;
+  gap: 2px;
+  min-width: 112px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.setup-lane:hover,
+.setup-lane.selected {
+  border-color: var(--accent);
+  background: var(--tint);
+}
+.setup-lane:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.setup-lane-name {
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.setup-lane-status {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.setup-lane[data-status="ready"] .setup-lane-status {
+  color: var(--accent-text);
+}
+
 .setup-status {
   flex: none;
   color: var(--text-muted);
@@ -954,10 +990,27 @@
   height: 100%;
   display: block;
 }
+/* two rows (2026-10-02): the shares, then the status and what's next, so
+   Start now and Take the tour never squeeze onto two lines */
+.thanks-card .rename-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
 .thanks-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.thanks-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.thanks-actions .rename-btn,
+.thanks-next .rename-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 /* a brand's mark in place of its name (GitHub, X) */
 .thanks-mark {
@@ -966,7 +1019,8 @@
   gap: 7px;
 }
 .thanks-status {
-  margin-inline-end: auto;
+  flex: 1;
+  min-width: 0;
   align-self: center;
   color: var(--text-muted);
   font-size: 12.5px;

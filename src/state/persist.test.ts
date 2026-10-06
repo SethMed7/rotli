@@ -86,32 +86,27 @@ describe("custom primary color", () => {
 });
 
 describe("appearance personality", () => {
-  test("defaults to an optional filled quokka and paw navigator", () => {
+  test("defaults to a filled chat buddy and paw navigator", () => {
     const settings = parseSettings("{}");
-    expect(settings.quokkaCompanionEnabled).toBe(false);
     expect(settings.quokkaStyle).toBe("cocoa");
     expect(settings.quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
     expect(settings.quokkaLineColor).toBe("auto");
     expect(settings.quokkaAccessory).toBe("none");
     expect(settings.quokkaAccessoryHue).toBe(DEFAULT_QUOKKA_ACCESSORY_HUE);
-    expect(settings.quokkaIdlePose).toBe("rest");
     expect(settings.chatNavigatorStyle).toBe("paws");
   });
 
   test("round-trips supported treatments and rejects unknown values", () => {
     const settings = parseSettings(
       JSON.stringify({
-        quokkaCompanionEnabled: true,
         quokkaStyle: "custom",
         quokkaCustomHue: 287,
         quokkaLineColor: "white",
         quokkaAccessory: "bucket-hat",
         quokkaAccessoryHue: 128,
-        quokkaIdlePose: "thoughtful",
         chatNavigatorStyle: "dots",
       }),
     );
-    expect(settings.quokkaCompanionEnabled).toBe(true);
     expect(settings.quokkaStyle).toBe("custom");
     expect(settings.quokkaCustomHue).toBe(287);
     expect(settings.quokkaLineColor).toBe("white");
@@ -119,8 +114,6 @@ describe("appearance personality", () => {
     expect(parseSettings('{"quokkaLineColor":"black"}').quokkaLineColor).toBe("black");
     expect(settings.quokkaAccessory).toBe("bucket-hat");
     expect(settings.quokkaAccessoryHue).toBe(128);
-    expect(settings.quokkaIdlePose).toBe("thoughtful");
-    expect(parseSettings('{"quokkaIdlePose":"walking"}').quokkaIdlePose).toBe("walking");
     expect(settings.chatNavigatorStyle).toBe("dots");
     expect(parseSettings('{"quokkaStyle":"redrawn","chatNavigatorStyle":"runes"}').quokkaStyle).toBe("cocoa");
     expect(
@@ -129,7 +122,21 @@ describe("appearance personality", () => {
     expect(parseSettings('{"quokkaCustomColor":"night"}').quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
     expect(parseSettings('{"quokkaAccessory":"crown"}').quokkaAccessory).toBe("none");
     expect(parseSettings('{"quokkaAccessory":"scarf"}').quokkaAccessory).toBe("none");
-    expect(parseSettings('{"quokkaIdlePose":"dancing"}').quokkaIdlePose).toBe("rest");
+  });
+
+  test("the retired companion switch and idle mood are dropped, whatever they held", () => {
+    // the chat buddy is always on and picks its own pose; an older file's
+    // values (well-formed or not) must never crash a parse or ride along
+    for (const raw of [
+      '{"quokkaCompanionEnabled":true,"quokkaIdlePose":"walking","quokkaAccessory":"glasses"}',
+      '{"quokkaCompanionEnabled":"yes","quokkaIdlePose":{"pose":7},"quokkaAccessory":"glasses"}',
+    ]) {
+      const settings = parseSettings(raw);
+      expect(settings.quokkaAccessory).toBe("glasses");
+      expect(Object.keys(settings).filter((key) => /CompanionEnabled|IdlePose/.test(key))).toEqual([]);
+      expect(unknownSettingsKeys(raw)).toEqual({});
+      expect(unknownAppSettingsKeys(raw)).toEqual({});
+    }
   });
 });
 
@@ -250,10 +257,12 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"newTabDefault":"document"}').newTabDefault).toBe("document");
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
     // tests run as the stable channel: withheld kinds and voice never load as on
-    expect(parseSettings('{"newTabDefault":"sheet","readAloud":true}')).toMatchObject({
+    expect(parseSettings('{"newTabDefault":"mermaid","readAloud":true}')).toMatchObject({
       newTabDefault: "markdown",
       readAloud: false,
     });
+    // Sheets ship on the stable desktop channel as Beta (2026-10-05)
+    expect(parseSettings('{"newTabDefault":"sheet"}').newTabDefault).toBe("sheet");
   });
 
   test("tab layout defaults to scroll and only accepts the two visible modes", () => {

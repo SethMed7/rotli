@@ -74,11 +74,12 @@ if wants quality; then
   bun run deps licenses-check
 
   if [ -d site ]; then
-    step "quality — site check and builds (full + coming-soon modes)"
+    step "quality — site check, sidecar tests, and builds (full + coming-soon modes)"
     # CI=true: astro offers to install @astrojs/check interactively, and a gate
-    # must never wait on a prompt. The second build proves the production
+    # must never wait on a prompt. `bun run test` is the subscribe sidecar's
+    # unit suite (site/server/). The second build proves the production
     # holding page (SITE_MODE=coming-soon) still emits; see site/src/site.ts.
-    (cd site && CI=true bun run check && CI=true bun run build && CI=true SITE_MODE=coming-soon bun run build)
+    (cd site && CI=true bun run check && bun run test && CI=true bun run build && CI=true SITE_MODE=coming-soon bun run build)
   fi
 fi
 

@@ -10,7 +10,7 @@ import { slugOf, type Writing } from './writing';
 
 const NAME = 'rotli';
 const SUMMARY =
-  'rotli is a calm, local-first notes app for the Mac. Every note is a plain Markdown file in a folder you own, with no account, and AI only when you ask for it.';
+  'rotli is a private workspace for your notes, on the Mac first, with Windows and Linux apps planned. Write however you think, in plain Markdown files you own, with no account. The Librarian files, tags, and links them in the background, using AI on your own computer or the AI tools you already use, and never rewrites your words.';
 
 /**
  * AI crawlers named in robots.txt. Each gets its own group so the policy is
@@ -92,7 +92,7 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
       link('Privacy', '/privacy/', 'what connects to the internet, what AI can see, and why'),
       link('Download', '/download/', site.webAppEnabled ? 'the Mac app, Rotli Web, and Rotli Helper' : 'the Mac app'),
       link('Changelog', '/changelog/', 'every release, newest first'),
-      link('About', '/about/', 'where the name comes from, what rotli believes, and who makes it'),
+      link('About', '/about/', 'why it is being built, where the name comes from, and who makes it'),
     );
     const section = (title: string, entries: Writing[]) =>
       entries.length > 0

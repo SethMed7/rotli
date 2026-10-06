@@ -14,8 +14,9 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 1. In the work
 
-- **Sheets** · L — spreadsheets (XLSX) inside Rotli. CSV editing already ships.
-  Left: finish, polish, release.
+- **Sheets** · L — spreadsheets (XLSX and CSV) inside Rotli ship in Beta
+  (2026-10-05), beside Documents. Left: keep undo across a theme or tab switch,
+  carry dropdowns and colour rules through the grid, then drop the Beta mark.
 - **Mermaid visual editor** · M — edit a Mermaid diagram by hand on a canvas
   instead of only in code. View and Code already ship.
 - **MCP / Grok Bot plugin** · L — lets an AI agent work in the vault through
@@ -154,7 +155,8 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   tree), and the same secret gate the vault has (a remote model never sees a
   secret-shaped file).
 - **Beta channel** · M — a setting that lets testers opt into in-the-work
-  features like Sheets. Today those only exist in development builds.
+  features like the Mermaid visual editor. Today those only exist in
+  development builds.
 - **Shortcuts and Raycast hooks** · M — extend the `rotli://` link so other
   apps can create a note or a capture, for example `rotli://new?title=`. Only
   open and reveal exist today.
@@ -186,8 +188,7 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   habit.
 - **Sheet templates** · M — "New from template": task tracker, weekly planner,
   habit tracker, with status dropdowns, colours, and a frozen header, saved as
-  real .xlsx. Needs Sheets released, and dropdowns and colour rules carried
-  through the grid first.
+  real .xlsx. Needs dropdowns and colour rules carried through the grid first.
 - **Block references** · L — point at one paragraph with `^id` and show it
   elsewhere with `![[note#^id]]`, in the same syntax Obsidian reads.
 - **Librarian questions** · L — a switch in the bottom right. When it is on,

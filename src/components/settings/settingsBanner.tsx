@@ -26,7 +26,7 @@ export function SettingsBanner({
         {BANNER_BACKDROPS[family] ?? BANNER_BACKDROPS.warm}
         {BANNER_MOTIFS[motif]}
       </svg>
-      <Character name={pose} size={84} className="set-banner-quokka" accessorized alwaysVisible />
+      <Character name={pose} size={84} className="set-banner-quokka" accessorized />
       <h3 className="set-banner-title">{title}</h3>
     </div>
   );

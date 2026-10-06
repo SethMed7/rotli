@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  chatDaypart,
-  chatGreeting,
-  chatWelcomeCharacter,
-  chatWelcomeSuggestions,
-  chatWorkPrompt,
-} from "./chatWelcomeModel";
+import { chatDaypart, chatGreeting, chatWelcomeSuggestions, chatWorkPrompt } from "./chatWelcomeModel";
 
 describe("fresh chat welcome", () => {
   test("uses local time boundaries and the user's first name", () => {
@@ -19,15 +13,6 @@ describe("fresh chat welcome", () => {
     expect(chatGreeting(8, "  Avery Reed ")).toBe("Good morning, Avery.");
     expect(chatGreeting(12, "Avery Reed")).toBe("Good afternoon, Avery.");
     expect(chatGreeting(20, "")).toBe("Good evening.");
-  });
-
-  test("calm stays visually stable while lively follows the day", () => {
-    expect(chatWelcomeCharacter(8, "calm")).toBe("chat");
-    expect(chatWelcomeCharacter(20, "calm")).toBe("chat");
-    expect(chatWelcomeCharacter(8, "lively")).toBe("waving");
-    expect(chatWelcomeCharacter(12, "lively")).toBe("waving");
-    expect(chatWelcomeCharacter(14, "lively")).toBe("waving");
-    expect(chatWelcomeCharacter(20, "lively")).toBe("rest");
   });
 
   test("invites work without requiring a profile name", () => {

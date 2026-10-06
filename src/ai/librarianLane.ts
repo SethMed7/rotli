@@ -2,8 +2,9 @@
 // on setup's Librarian screen and in Settings. Pure; the Rust twin is
 // organizer_knobs::LIBRARIAN_LANES (byte-identical id list).
 
-import type { CliDetect } from "../lib/tauri";
+import type { ChatModelInfo, CliDetect } from "../lib/tauri";
 import { currentDiscovery, type DiscoveryLanes } from "../state/connectedModels";
+import { endpointIsLocal } from "./guard";
 import { type ProviderId, modelLabel, providerDefaultModel, resolveLaneModel } from "./models";
 
 /** Cursor is a read-only code-chat lane and never takes part in background work. */
@@ -52,16 +53,51 @@ export function isLibrarianLane(value: string): value is LibrarianLane {
 const ready = (detection: CliDetect | undefined): boolean =>
   !!detection?.installed && detection.authenticated;
 
-/** The lanes worth offering: local always, then every client that is installed
- * and signed in. A lane the user already chose stays listed even if its client
- * went missing, so the picker never hides the current value. */
-export function librarianOptions(
-  detections: Partial<Record<ProviderId, CliDetect>>,
-  current: LibrarianChoice,
-): LibrarianChoice[] {
-  const offered: LibrarianChoice[] = ["local"];
-  for (const lane of LIBRARIAN_LANES) if (ready(detections[lane]) || lane === current) offered.push(lane);
-  return offered;
+/** How far this Mac is with one lane. Every lane is offered either way (the
+ * owner, 2026-10-02: people still choose when nothing is set up yet, and the
+ * sidebar's Librarian helps them finish). */
+export type LaneStatus = "checking" | "ready" | "no-model" | "not-installed" | "signed-out";
+
+/** What this Mac has: its local models once listed, and each client's probe. */
+export interface LaneEvidence {
+  detections: Partial<Record<ProviderId, CliDetect>>;
+  local: readonly Pick<ChatModelInfo, "endpoint" | "registered">[];
+  localChecked: boolean;
+}
+
+export function librarianLaneStatus(lane: LibrarianChoice, evidence: LaneEvidence): LaneStatus {
+  if (lane === "local") {
+    if (!evidence.localChecked) return "checking";
+    // an installed on-device model, not Rust's built-in fallback
+    const installed = evidence.local.some(
+      (model) => model.registered === true && endpointIsLocal(model.endpoint),
+    );
+    return installed ? "ready" : "no-model";
+  }
+  const detection = evidence.detections[lane];
+  if (!detection) return "checking";
+  if (!detection.installed) return "not-installed";
+  return detection.authenticated ? "ready" : "signed-out";
+}
+
+export const LANE_STATUS_LABELS: Record<LaneStatus, string> = {
+  checking: "Checking…",
+  ready: "Ready",
+  "no-model": "No model yet",
+  "not-installed": "Not installed",
+  "signed-out": "Not signed in",
+};
+
+/** What's left before the Librarian can work through this lane, or null when
+ * nothing is (or it's still being checked). */
+export function librarianSetupStep(lane: LibrarianChoice, status: LaneStatus): string | null {
+  if (status === "ready" || status === "checking") return null;
+  if (lane === "local")
+    return "Add a local model in Settings → AI Models, and the Librarian files on this Mac.";
+  const label = LIBRARIAN_LABELS[lane];
+  return status === "signed-out"
+    ? `Sign in to ${label} on this Mac (Settings → AI Models shows how), and the Librarian files through it.`
+    : `Install ${label}'s official app (Settings → AI Models shows how), and the Librarian files through it.`;
 }
 
 /** The default the Librarian screen proposes: Gemini when it is signed in on this
@@ -69,7 +105,10 @@ export function librarianOptions(
 export function suggestedLibrarian(
   detections: Partial<Record<ProviderId, CliDetect>>,
   current: LibrarianChoice,
+  setup: { chosen: boolean } = { chosen: false },
 ): LibrarianChoice {
+  // a pick the person made, or a suggestion already made once, stands
+  if (setup.chosen) return current;
   return current === "local" && ready(detections.antigravity) ? "antigravity" : current;
 }
 

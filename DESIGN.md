@@ -38,14 +38,18 @@ characters never receive a rotated front hat. Filled and Line treatments both
 occlude the body along the selected brim's curved lower silhouette so no ear,
 body ink, or preserved raster detail pokes through; Rotli never paints a guessed
 surface color behind the accessory.
-The companion itself is optional: when off,
-full-body quokkas appear only during onboarding; the compact product mark is
-unaffected and always remains the original line art. When on, body hue, ink,
-glasses or bucket hat (goggles are parked: stored values still render, pickers
-no longer offer them), accessory hue, and a preferred idle mood/pose are
-machine-level choices that survive vault switches. Personal idle placements use
-the preferred mood. Semantic empty states choose the pose that explains their
-state while preserving the user's body, ink, and accessory treatment.
+Full-body quokkas appear in exactly three places: Chat (the chat buddy),
+Settings (the pane banners and the Appearance studio), and first-run setup
+(including the thank-you card). Every other surface, including empty states,
+the empty pane, What's new, and the app's launch opening, uses the
+non-character design: scenery, title, and quiet actions. The compact product
+mark is not a placement; it always remains the original line art. The chat
+buddy is always present; there is no switch to hide it. The person decorates
+it, never poses it: body hue, ink, glasses or bucket hat (goggles are parked:
+stored values still render, pickers no longer offer them), and accessory hue
+are machine-level app settings that survive vault switches, previewed live in
+Settings → Appearance → Chat buddy. Each placement picks the pose that
+explains its moment while wearing that decoration. Setup's quokka stays plain.
 
 - Consume semantic color, typography, spacing, focus, and state roles exposed by
   the shared foundation. Fixed `--rotli-*` palette values are foundation inputs,
@@ -230,7 +234,7 @@ exception.
   lanes, removes Main references only after success, and reports partial
   progress instead of pretending the group was atomic.
 - Every tab is closeable, including the last one: the lone pane rests on the
-  quokka empty state with quiet ways back in (new note · search · reopen tab).
+  theme's scene with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.
 - A brand-new vault keeps the ordinary titlebar, Home sidebar, tab strip, and
   pane body visible. Rotli seeds and opens one real `Welcome to Rotli.md` note
@@ -316,6 +320,15 @@ destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
 
+A capability that ships but is still being finished wears one **Beta** mark,
+defined once (`beta` on its `NEW_ITEM_DEFINITIONS` entry). Where it is offered
+or open (a New chooser card, the open file's header), the mark is the shared
+`BetaBadge`: a calm pill (muted text on a hairline, never accent), next to
+the name and never inside another badge. Text-only surfaces (a menu row, a
+select option, a palette title, a slash hint) append ` · Beta`. A coming-soon
+card or a read-only view does not wear it. Sheets (XLSX and CSV) and DOCX
+documents, both on Univer, are Beta.
+
 ## Chat artifacts
 
 - Creating an image, board, document, or other artifact leaves the conversation
@@ -348,13 +361,12 @@ polish work.
   The header is always the surface's fixed first row above the conversation;
   content height and fresh-chat layouts must never displace it to the footer.
 - A fresh, unsent chat is one centered working composition: time-aware greeting,
-  still companion illustration, composer, and three useful prompt starters. A
-  machine-level Calm/Lively preference changes the companion
-  pose and adds a quiet Morning, Noon, Afternoon, or Evening scene contained
-  behind the companion rather than tinting the workspace; sun position, terrain,
-  and dusk treatment convey the period without motion. The character follows
-  the user's full-body treatment and preferred idle mood/pose; a chosen accessory is
-  layered independently, and neither setting creates idle animation.
+  the still chat buddy, composer, and three useful prompt starters. The buddy
+  waves by day and rests in the evening. A machine-level Calm/Lively preference
+  only adds Lively's one arrival hop and a quiet Morning, Noon, Afternoon, or
+  Evening scene contained behind the buddy rather than tinting the workspace;
+  sun position, terrain, and dusk treatment convey the period without motion.
+  Neither setting chooses the pose or creates idle animation.
 - Saved-chat headers use the available pane width while transcript and composer
   measures remain independently readable.
 - Long-chat prompt markers may be quiet lines, soft dots, a restrained quokka
@@ -363,9 +375,16 @@ polish work.
   rail stays unboxed; accent and scale identify the active marker, while hover
   preview uses lower opacity only. The list stays beside the rail and inside
   its owning chat pane.
-- A settled thread ends with one larger full-body companion on its own row. It
-  uses the chosen treatment and optional accessory with at most one restrained
-  arrival; the streaming state keeps the compact line mark.
+- A chat view has one chat buddy, never one per message: in the welcome while
+  the thread is empty (taking the live pose if a run is under way there), and
+  on its own row at the live edge once the thread has messages. It arrives
+  once with at most one restrained hop, then only its pose changes:
+  thoughtful while a reply is queued or running, celebrating when a reply
+  lands in view (a Stop that produced nothing is no landing), listening when
+  the person spoke last and nothing runs, and resting on a thread reopened
+  later. Chat's no-runtime and no-vault states hold the buddy too (listening,
+  gentle attention). The policy lives in
+  `src/components/chat/chatBuddyModel.ts`.
 
 ## First-run setup
 
@@ -373,9 +392,15 @@ polish work.
   many steps before I can use the app"): **you** (an optional name and a
   theme, mode, and accent), **your vault** (an explicit decision), **the
   Librarian** (whether, as two cards, and only then where it thinks and on
-  which model), and **your shortcuts**. The vault step asks nothing about the
+  which model), and **your shortcuts**. The Librarian screen offers every
+  lane with what this Mac has for it (Ready, Checking…, Not installed, Not
+  signed in, No model yet); a lane that isn't ready can still be chosen, and
+  the sidebar's Librarian then wears a dot until it is set up, opening
+  Settings → Librarian with the step left. The vault step asks nothing about the
   Librarian; one screen owns that choice, whichever way the vault arrived. Then the thank-you
-  card, the tour, and a note beside Settings naming what else is there.
+  card (a thank-you banner with no badges for the choices made; Start now and
+  Take the tour on their own row), the tour, and a note beside Settings
+  naming what else is there.
   Everything else waits where it is used: the window behavior and the quokka's
   look in Settings, music in the sidebar player (shown from the first run,
   quiet until Play), and chat models the first time Chat has none. Skipping
@@ -389,9 +414,8 @@ polish work.
 - The companion character appears directly on the ground, without a card, on
   every setup and activation state. Its state entrance is short and one-shot.
   Setup's quokka is the plain one; dressing it is a Settings choice. Waving,
-  knowledge, listening, and gentle-attention expressions give the screens and
-  empty states semantic variety rather than repeating one neutral pose
-  everywhere.
+  knowledge, listening, and gentle-attention expressions give the screens
+  semantic variety rather than repeating one neutral pose everywhere.
   Welcome may keep two partly hidden edge companions visible while a slow,
   low-opacity pair alternates positions; reduced motion keeps two static.
   Scanning may use a bounded loading indicator while work is active.

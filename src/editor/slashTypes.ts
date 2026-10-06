@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 
 import type { DateWord } from "../lib/noteDates";
+import type { ChartType } from "./chartSpec";
 import type { BlockToggle } from "./commands";
 
 export type SlashPickerMode =
@@ -19,15 +20,21 @@ export type SlashPickerMode =
 export type SlashOp =
   | { kind: "heading"; level: 1 | 2 | 3 }
   | { kind: "block"; block: BlockToggle }
+  /** Starts a centered or right-aligned paragraph (alignedLine.ts). */
+  | { kind: "align"; align: "center" | "right" }
   | { kind: "code" }
   | { kind: "table" }
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
+  /** A ```chart fence with a starter of this type; its Edit form opens (SYNTAX.md). */
+  | { kind: "chart"; chartType: ChartType }
   | { kind: "picker"; mode: SlashPickerMode }
   /** Opens Finder and inserts copied vault image assets at this position. */
   | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
   | { kind: "imageGen" }
+  /** Ask AI: a request at the cursor, the answer inserted only on Insert (2026-10-05). */
+  | { kind: "ai" }
   /** Swaps the format bar for the Librarian bar (2026-09-28). */
   | { kind: "librarian" }
   /** Opens Hand to AI's prompt for this note (2026-09-28). */

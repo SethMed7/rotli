@@ -1,10 +1,14 @@
 ---
-// /resources/ (the index) and /resources/<article>/. The MCP guide is its own
-// page (resources/mcp/) and joins the index on the dev site only.
+// /resources/ (the Guides index) and /resources/<article>/. Each article opens on its own
+// scene and pins a reading meter under the header (WritingPage `progress`). The header's
+// Resources dropdown also leads to the Blog, Developers (resources/developers/),
+// and the Changelog; this index lists the guides only.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
+import ResourceScene, { type SceneKind } from '../../components/ResourceScene.astro';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { site } from '../../site';
 import { publishedWriting, slugOf, type Writing } from '../../writing';
 
@@ -18,30 +22,26 @@ export async function getStaticPaths() {
 }
 
 const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
-const items = [
-  ...entries.map((item) => ({
-    href: `/resources/${slugOf(item)}/`,
-    title: item.data.title,
-    description: item.data.description,
-    meta: item.data.draft ? 'Draft · dev site only' : undefined,
-  })),
-  ...(site.showsExperiments
-    ? [
-        {
-          href: '/resources/mcp/',
-          title: 'Work from Claude, Grok, or any agent',
-          description: 'Connect an MCP client and your rotli folder becomes the memory your agents read and write.',
-          meta: 'In development · dev site only',
-        },
-      ]
-    : []),
-];
+const items = entries.map((item) => ({
+  href: `/resources/${slugOf(item)}/`,
+  title: item.data.title,
+  description: item.data.description,
+  meta: item.data.draft ? 'Draft · dev site only' : undefined,
+}));
 const rendered = entry ? await render(entry) : null;
 const Content = rendered?.Content ?? null;
 const toc = (rendered?.headings ?? [])
   .filter((heading) => heading.depth === 2)
   .map((heading) => ({ slug: heading.slug, text: heading.text }));
 const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(entry)}/`) : [];
+/** Each guide's opening scene (ResourceScene.astro); a guide not listed gets the plain beach. */
+const scenes: Record<string, SceneKind> = {
+  'getting-started': 'start',
+  'why-local': 'local',
+  'ai-and-your-notes': 'ai',
+  'rotli-helper': 'helper',
+  'web-and-mac': 'web',
+};
 ---
 
 {
@@ -50,28 +50,32 @@ const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(e
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/resources/${slugOf(entry)}/`}
+      {...ogImage('resources')}
       structuredData={writingGraph(entry)}
       markdownPath={twinPath(writingPath(entry))}
       section="resources"
-      crumbs={[{ href: '/resources/', label: 'Resources' }]}
+      crumbs={[{ href: '/resources/', label: 'Guides' }]}
       kicker={entry.data.draft ? 'Draft · dev site only' : undefined}
       heading={entry.data.title}
       lede={entry.data.description}
       toc={toc}
+      progress
     >
+      <ResourceScene slot="scene" kind={scenes[slugOf(entry)] ?? 'beach'} />
       <Content />
       <section slot="after" class="more" aria-labelledby="more-title">
-        <h2 id="more-title">More resources</h2>
+        <h2 id="more-title">More guides</h2>
         <WritingList items={more} empty="" />
       </section>
     </WritingPage>
   ) : (
     <WritingPage
-      title="Resources — rotli"
+      title="Guides — rotli"
       description="Short answers to the questions people ask about rotli: why local, where notes live, and how it works."
       canonicalPath="/resources/"
+      {...ogImage('resources')}
       section="resources"
-      heading="Resources"
+      heading="Guides"
       lede="Short answers to the questions people ask about rotli: why local, where notes live, and how the pieces fit."
       wide
     >

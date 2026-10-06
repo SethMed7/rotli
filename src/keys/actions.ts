@@ -24,7 +24,7 @@ import {
   createManagedItemInTabOptimistically,
   requestNamedItemCreation,
 } from "../newItems/composition";
-import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
+import { type NewItemKind, isNameFirstKind, isNewItemAvailable, withBetaLabel } from "../newItems/model";
 import { openChatForNoteId } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { focusChatWindow } from "../services/chatWindowShell";
@@ -43,6 +43,7 @@ import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { ALL_NOTES, SIDEBAR_ZOOM_STEP, TASKS, useUiStore } from "../state/ui";
+import { registerAlignActions } from "./alignActions";
 import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
@@ -368,7 +369,7 @@ export function registerDefaultActions(): void {
     if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({
       id,
-      title,
+      title: withBetaLabel(title, kind),
       defaultChord: null,
       run: () => {
         if (useUiStore.getState().sidebarMode !== "breve") runCreate(kind, true);
@@ -440,6 +441,7 @@ export function registerDefaultActions(): void {
   });
 
   registerNoteProtectionActions();
+  registerAlignActions();
   registerLeaderActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses

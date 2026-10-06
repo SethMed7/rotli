@@ -8,7 +8,6 @@ import {
   DEFAULT_QUOKKA_ACCESSORY_HUE,
   DEFAULT_QUOKKA_CUSTOM_HUE,
   type QuokkaAccessory,
-  type QuokkaIdlePose,
   type QuokkaLineColor,
   type QuokkaStyle,
   normalizeQuokkaAccessoryHue,
@@ -25,11 +24,11 @@ import { DEFAULT_TASK_ARCHIVE_AGE, type TaskArchiveAge } from "../services/tasks
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { nextThemeNow } from "./appearanceLook";
 import type { Measure } from "./noteStyle";
 import type { OnboardingPhase } from "./onboardingPhase";
 import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
-import { systemPrefersDark } from "./systemScheme";
-import { SOLID_THEMES, type ThemeFamily } from "./themeChoices";
+import type { ThemeFamily } from "./themeChoices";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
@@ -256,10 +255,7 @@ interface UiState {
   /** Hue used by the contrast-managed Custom accent (0–359). */
   accentHue: number;
   setAccentHue: (hue: number) => void;
-  /** The optional personal companion layer. Onboarding characters are exempt. */
-  quokkaCompanionEnabled: boolean;
-  setQuokkaCompanionEnabled: (enabled: boolean) => void;
-  /** Canonical full-body quokka treatment used across product character placements. */
+  /** The chat buddy's body treatment (also worn by Settings and setup's quokkas). */
   quokkaStyle: QuokkaStyle;
   setQuokkaStyle: (style: QuokkaStyle) => void;
   /** Hue used by the contrast-managed Custom body treatment (0–359). */
@@ -274,9 +270,6 @@ interface UiState {
   /** Hue used by colorable accessory layers (0–359). */
   quokkaAccessoryHue: number;
   setQuokkaAccessoryHue: (hue: number) => void;
-  /** Preferred mood/pose for personal idle placements, never semantic empty states. */
-  quokkaIdlePose: QuokkaIdlePose;
-  setQuokkaIdlePose: (pose: QuokkaIdlePose) => void;
   /** Visual treatment for the prompt navigator shown in longer chats. */
   chatNavigatorStyle: ChatNavigatorStyle;
   setChatNavigatorStyle: (style: ChatNavigatorStyle) => void;
@@ -720,14 +713,12 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   theme: DEFAULT_APPEARANCE.theme,
   setTheme: (theme) => set({ theme }),
-  // The titlebar sun walks the same ordered environment catalog shown in Appearance;
+  // The titlebar sun steps by Appearance → Theme button (state/themeCycle.ts);
   // a "system" setting resolves to its current mode before stepping on.
   cycleTheme: () =>
     set((s) => {
-      const mode = s.theme === "system" ? (systemPrefersDark() ? "dark" : "light") : s.theme;
-      const i = SOLID_THEMES.findIndex((t) => t.family === s.themeFamily && t.mode === mode);
-      const next = SOLID_THEMES[(i + 1) % SOLID_THEMES.length];
-      return next ? { themeFamily: next.family, theme: next.mode } : s;
+      const next = nextThemeNow(s);
+      return { themeFamily: next.family, theme: next.mode };
     }),
 
   themeFamily: DEFAULT_APPEARANCE.themeFamily,
@@ -740,8 +731,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAccentColor: (accent) => set({ accentColor: accent }),
   accentHue: DEFAULT_ACCENT_HUE,
   setAccentHue: (hue) => set({ accentHue: Math.max(0, Math.min(359, Math.round(hue))) }),
-  quokkaCompanionEnabled: false,
-  setQuokkaCompanionEnabled: (enabled) => set({ quokkaCompanionEnabled: enabled }),
   quokkaStyle: "cocoa",
   setQuokkaStyle: (style) => set({ quokkaStyle: style }),
   quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
@@ -752,8 +741,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuokkaAccessory: (accessory) => set({ quokkaAccessory: accessory }),
   quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
   setQuokkaAccessoryHue: (hue) => set({ quokkaAccessoryHue: normalizeQuokkaAccessoryHue(hue) }),
-  quokkaIdlePose: "rest",
-  setQuokkaIdlePose: (pose) => set({ quokkaIdlePose: pose }),
   chatNavigatorStyle: "paws",
   setChatNavigatorStyle: (style) => set({ chatNavigatorStyle: style }),
   sidebarSide: "left",

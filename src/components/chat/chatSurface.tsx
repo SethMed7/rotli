@@ -47,7 +47,6 @@ import { renderInline } from "../../editor/render";
 import {
   CHAT_IMAGE_ASSET_EXTS,
   CHAT_IMAGE_ASSET_MAX_BYTES,
-  attachmentReference,
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
@@ -119,7 +118,6 @@ import {
 import { useViewsStore } from "../../state/views";
 import { takeSentences } from "../../voice/sentences";
 import { speaker } from "../../voice/speech";
-import { Character, QuokkaMark } from "../character";
 import {
   CheckGlyph,
   CopyGlyph,
@@ -133,11 +131,20 @@ import {
 import { WebDialogFrame } from "../webDialogFrame";
 import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
+import { ChatBuddy, useJustFinished } from "./chatBuddy";
+import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
 import { UserMessageText } from "./chatImageRefs";
+import {
+  WEB_IMAGES_NEED_THE_MAC_APP,
+  attachToChatDraft,
+  composeImageText,
+  pastedChatImages,
+  removeChatDraftImage,
+} from "./chatImageTokens";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
@@ -158,7 +165,6 @@ import {
 } from "./chatTitleModel";
 import {
   chatDaypart,
-  chatWelcomeCharacter,
   chatWelcomeSuggestions,
   chatWorkPrompt,
   type ChatWelcomeSuggestionKind,
@@ -929,8 +935,8 @@ const ChatMessage = memo(function ChatMessage({
   speech?: "idle" | "preparing" | "speaking";
   at?: string;
   images?: string[];
-  /** The one quiet Rotli signature rests below the final reply's controls so
-   * hover actions never overlap or visually merge with it. */
+  /** The chat buddy rests below the final reply, so its controls take their
+   * own row instead of overlapping or visually merging with it. */
   endMark?: boolean;
   /** Files created by the completed assistant turn stay attached to that turn. */
   artifacts?: ChatArtifact[];
@@ -944,7 +950,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? <UserMessageText text={text} /> : renderMessage(text, mediaRoot)}
+        {you ? <UserMessageText text={text} images={images} /> : renderMessage(text, mediaRoot)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -974,11 +980,6 @@ const ChatMessage = memo(function ChatMessage({
           )}
         </div>
       </div>
-      {endMark && (
-        <div className="chat-endmark-row">
-          <Character name="celebrating" size={80} className="chat-endmark" personalIdle />
-        </div>
-      )}
     </div>
   );
 });
@@ -1578,20 +1579,12 @@ export function ChatSurface({
     // The portable storage link makes an image referable afterwards and keeps
     // the relationship durable. The bubble hides its storage target; the Rust
     // command has already copied the bytes into this vault's asset lane.
-    const userText =
-      imgs.length > 0
-        ? `${imgs
-            .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
-            .join(" ")}${typed ? `\n${typed}` : ""}`
-        : typed;
+    // A tag typed where the image was referenced links there; an untagged
+    // image leads the message (chatImageTokens.ts).
+    const userText = composeImageText(typed, imgs);
     // Routing syntax remains in the durable user turn, while the provider sees
     // the question without Rotli's @provider[:model] control token.
-    const providerUserText =
-      imgs.length > 0
-        ? `${imgs
-            .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
-            .join(" ")}${providerTyped ? `\n${providerTyped}` : ""}`
-        : providerTyped;
+    const providerUserText = composeImageText(providerTyped, imgs);
     const sentTitle = normalizeChatTitle(title) || deriveChatTitle(visibleChatText(userText));
     setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
@@ -1607,7 +1600,8 @@ export function ChatSurface({
         speaker: "you",
         text: userText,
         at: userAt,
-        images: imgs.map((image) => image.src),
+        // the vault id when there is one, so the chip can name the file
+        images: imgs.map((image) => image.id || image.src),
       },
     ]);
     setBusy(true);
@@ -1822,7 +1816,7 @@ export function ChatSurface({
     const assistantAt = new Date().toISOString();
     const settledThread = recentChatThread([
       ...messages,
-      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.src) },
+      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.id || image.src) },
       {
         speaker: "rotli",
         text: reply,
@@ -2085,6 +2079,10 @@ export function ChatSurface({
   };
 
   const onAttachClick = () => {
+    if (!isTauri()) {
+      setAttachmentErr(WEB_IMAGES_NEED_THE_MAC_APP);
+      return;
+    }
     if (!canVision) {
       setVisionHint(true); // this model can't see — prompt to pick one that can
       return;
@@ -2092,8 +2090,12 @@ export function ChatSurface({
     fileRef.current?.click();
   };
 
-  const onPickFiles = async (files: FileList | null) => {
+  const onPickFiles = async (files: FileList | readonly File[] | null) => {
     if (!files) return;
+    if (!isTauri()) {
+      setAttachmentErr(WEB_IMAGES_NEED_THE_MAC_APP);
+      return;
+    }
     // Finder/WebKit can omit MIME metadata for otherwise valid local images.
     // The extension allowlist is the portable UI check; Rust independently
     // validates both the name and decoded payload before writing the asset.
@@ -2109,7 +2111,7 @@ export function ChatSurface({
         const src = await readAsDataURL(file);
         const payload = src.split(",", 2)[1];
         if (!payload) throw new Error("the selected image could not be encoded");
-        const id = isTauri() ? await corpusCreateImageAsset(rootId, file.name, payload) : "";
+        const id = await corpusCreateImageAsset(rootId, file.name, payload);
         attached.push({ id, name: file.name, src });
       } catch (error) {
         setAttachmentErr(
@@ -2118,9 +2120,21 @@ export function ChatSurface({
       }
     }
     if (attached.length > 0) {
-      setDraftImages(tabId, [...(useChatDrafts.getState().drafts[tabId]?.images ?? []), ...attached]);
+      attachToChatDraft(tabId, attached, msgRef.current);
       if (attached.length === picks.length && picks.length === files.length) setAttachmentErr(null);
     }
+  };
+
+  // A pasted screenshot (image bytes, no text) attaches like a picked image.
+  const onComposerPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const images = pastedChatImages([...event.clipboardData.files], [...event.clipboardData.types]);
+    if (images.length === 0) return;
+    event.preventDefault();
+    if (isTauri() && !canVision) {
+      setVisionHint(true);
+      return;
+    }
+    void onPickFiles(images);
   };
 
   // — dropped images (the maintainer, 2026-08-04) — the window handler hands us OS PATHS.
@@ -2159,12 +2173,12 @@ export function ChatSurface({
           }
         }
         if (attached.length > 0) {
-          setDraftImages(tabId, [...(useChatDrafts.getState().drafts[tabId]?.images ?? []), ...attached]);
+          attachToChatDraft(tabId, attached, msgRef.current);
           if (attached.length === paths.length) setAttachmentErr(null);
         }
       })();
     },
-    [active, tabId, setDraftImages],
+    [active, tabId],
   );
 
   useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
@@ -2204,6 +2218,18 @@ export function ChatSurface({
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
   const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
+  const lastMessage = messages.at(-1);
+  const lastSpeaker = lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null;
+  // the buddy follows the reply, not the composer's post-run hold
+  const buddyWorking = chatBuddyWorking({ busy, foreignRun, foreignPending, lastSpeaker });
+  const lastReply = lastReplyPosition(messages, hiddenMessageCount);
+  const justFinished = useJustFinished(buddyWorking, chatSlug, lastReply);
+  const buddy = chatBuddyPlacement({
+    hasMessages: messages.length > 0,
+    working: buddyWorking,
+    pristine: pristineChat,
+    live: chatBuddyMoment({ working: buddyWorking, queued: queued !== null, lastSpeaker, justFinished }),
+  });
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
   /** Open the attached note per the Settings choice: a new tab here, or a
@@ -2421,7 +2447,7 @@ export function ChatSurface({
 
       {!runtimeAvailable ? (
         <div className="list-empty chat-empty">
-          <Character name="listening" size={120} accessorized />
+          <ChatBuddy moment="unavailable" hour={welcomeHour} size={120} />
           {PLATFORM === "web" ? (
             <>
               <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
@@ -2435,7 +2461,7 @@ export function ChatSurface({
         </div>
       ) : !active ? (
         <div className="list-empty chat-empty">
-          <Character name="attention" size={120} />
+          <ChatBuddy moment="no-vault" hour={welcomeHour} size={120} />
           <p>No vault connected yet.</p>
           <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
             Connect one in Settings → Location
@@ -2461,15 +2487,11 @@ export function ChatSurface({
                   <div className={`chat-newhint ${pristineChat ? chatWelcomeStyle : "calm"}`}>
                     <div className="chat-welcome-heading">
                       <div className="chat-welcome-scene">
-                        <Character
-                          name={pristineChat ? chatWelcomeCharacter(welcomeHour, chatWelcomeStyle) : "chat"}
+                        <ChatBuddy
+                          moment={buddy.welcome ?? (pristineChat ? "welcome" : "empty")}
+                          hour={welcomeHour}
                           size={pristineChat ? 58 : 50}
                           className="chat-welcome-character"
-                          accessorized={pristineChat}
-                          // Calm = the user's preferred idle pose; Lively = the
-                          // time-of-day pose from chatWelcomeCharacter (personalIdle
-                          // used to discard it, DESIGN.md "Calm/Lively", 2026-09-01)
-                          personalIdle={pristineChat && chatWelcomeStyle === "calm"}
                         />
                       </div>
                       <p className="chat-hint-title">
@@ -2485,7 +2507,7 @@ export function ChatSurface({
                   </div>
                 ) : (
                   // messages are PLAIN text — no per-message author label; the
-                  // brand mark appears once at the thread's live edge instead
+                  // chat buddy appears once at the thread's live edge instead
                   // (the maintainer, 2026-07-30: match the premium chat grammar). Options
                   // ride each message, revealed on hover/focus.
                   messages.map((m, idx) => (
@@ -2521,7 +2543,6 @@ export function ChatSurface({
                   )}
                 {working && !streamingText && (
                   <div className="cmsg ai">
-                    <QuokkaMark size={17} className="chat-mark" />
                     {queued ? (
                       // waiting on measured compute headroom, not thinking — say
                       // which, and offer the jump-the-line the user actually has
@@ -2551,6 +2572,11 @@ export function ChatSurface({
                         {status}
                       </div>
                     )}
+                  </div>
+                )}
+                {buddy.edge && (
+                  <div className="chat-buddy-row" data-moment={buddy.edge}>
+                    <ChatBuddy moment={buddy.edge} hour={welcomeHour} size={72} className="chat-endmark" />
                   </div>
                 )}
                 {saveErr && (
@@ -2592,17 +2618,13 @@ export function ChatSurface({
                             {/* the handle you can talk about — the same number the
                             sent message carries as [Image #N] (2026-08-04) */}
                             <span className="chat-attachment-n" aria-hidden="true">{`#${i + 1}`}</span>
-                            <img src={image.src} alt={`Attached image ${i + 1}`} />
+                            <img src={image.src} alt={`Attached image ${i + 1}`} title={image.name} />
                             <button
                               type="button"
                               className="chat-attachment-x"
                               title="Remove"
-                              onClick={() =>
-                                setDraftImages(
-                                  tabId,
-                                  images.filter((_, j) => j !== i),
-                                )
-                              }
+                              aria-label={`Remove image ${i + 1}`}
+                              onClick={() => removeChatDraftImage(tabId, i)}
                             >
                               ×
                             </button>
@@ -2679,6 +2701,7 @@ export function ChatSurface({
                         placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
+                        onPaste={onComposerPaste}
                         onKeyDown={(e) => {
                           e.stopPropagation();
                           if (e.key === "Enter" && !e.shiftKey) {

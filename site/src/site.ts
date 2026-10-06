@@ -50,7 +50,7 @@ export const STUDIO_URL = 'https://studio.rotli.co/';
 /**
  * The earlier launch film. The reviewed export lives in `public/media/`; the
  * holding page plays it on request (PromoFilm.astro). The launch page plays the
- * studio's story film instead (src/films.ts).
+ * hero's product film instead (src/films.ts).
  */
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';
@@ -116,6 +116,11 @@ function publicFileExists(publicDir: string | null, path: string): boolean {
   if (publicDir === null) return false;
   const file = join(publicDir, path.replace(/^\//, ''));
   return existsSync(file) && statSync(file).isFile() && statSync(file).size > 0;
+}
+
+/** Whether a generated file (a post's link card, say) is in `public/` for this build. */
+export function hasPublicFile(path: string): boolean {
+  return publicFileExists(findPublicDir(), path);
 }
 
 /**
@@ -186,4 +191,20 @@ export const site = {
   webAppEnabled: readWebAppEnabled(),
   /** The launch film, when its artifacts are present. */
   promo: readPromo(),
+} as const;
+
+/**
+ * Where rotli runs, said one way everywhere (the owner, 2026-10-05). The
+ * promise is a private workspace for your notes, not a Mac app: the Mac comes
+ * first, and native Windows and Linux apps are planned, with no date. Pages
+ * state availability with these words and never imply the Mac is the only
+ * platform rotli will ever have, or that Windows and Linux apps exist today.
+ */
+export const PLATFORMS = {
+  /** Beside the hero's ways in. */
+  availability: site.webAppEnabled
+    ? 'Mac first, and in your browser today. Windows and Linux apps are planned.'
+    : 'Mac first. Windows and Linux apps are planned.',
+  /** The status of a platform that is planned but not built. */
+  planned: 'Planned',
 } as const;

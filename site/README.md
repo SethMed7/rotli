@@ -1,7 +1,8 @@
 # Rotli — marketing site
 
-A product-led landing page for Rotli, the local-first Mac workspace where one
-ordinary folder remains the durable source of truth. The launch page explains
+A product-led landing page for Rotli, the local-first workspace for your notes
+where one ordinary folder remains the durable source of truth. The Mac comes
+first; native Windows and Linux apps are planned (see "Where rotli runs"). The launch page explains
 the Markdown workspace (tasks, links, views), the Playground, optional local or
 connected chat, the privacy boundary, theme families, the optional quokka
 companion, and local stdio MCP. Features under review (Breve, DOCX and
@@ -33,6 +34,15 @@ bun run build    # static output → site/dist/
 bun run preview  # serve the built dist/ locally
 ```
 
+The interactive pieces have two proofs, both run from the repository root:
+`bun test scripts/site-interactions.test.ts` (the rules without a browser: the
+privacy passage's trigger, the reading meter, the 404 game, the footer scene's
+play) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
+site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
+The unit file runs inside `bun run verify`; the site's E2E lane is not yet
+wired into `verify` or CI (an owner decision: it would add a site build to
+the e2e lane), so run it by hand after changing those pages.
+
 ## Production details
 
 - The canonical origin comes from `SITE_URL` (default `https://rotli.co`) in
@@ -42,8 +52,8 @@ bun run preview  # serve the built dist/ locally
   | Mode          | Deployment                    | Pages                    | Downloads | Indexed |
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
-  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + `/resources/mcp/` | no | no |
-  | `full`        | production · `rotli.co`       | landing, Resources, Blog, About, 404 | yes | yes |
+  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
+  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -53,37 +63,67 @@ bun run preview  # serve the built dist/ locally
   pending fidelity review. Site labels do not enforce app access.
 - **Structure and navigation.** `src/nav.ts` is the one navigation policy.
   The header links real pages, never landing anchors: Features · Privacy ·
-  Resources · About, plus Blog once a post is published (an empty index is
-  never linked). On the right sit the GitHub mark (icon only, while the source
-  is public) and one Download button, which opens `/download/`. Download is
-  not also a menu item. The footer's link columns (Product · Learn · Open
-  source, the last only while the source is public) and tagline default from
-  the same file. Pages pass only `current`. The header stays pinned on a solid
-  ground (flat: no blur, no shadow); `[id]` targets carry a matching
-  `scroll-margin-top`. Below 1080px the pages fold into a Menu disclosure
-  (`<details>`; Escape, an outside click, or choosing a link closes it); below
-  560px the GitHub mark and Download move into it too. The footer's closing
-  row holds the maker line and the two directory badges.
+  Resources · About. Resources is a dropdown of four pages, each with a
+  one-line description: Guides (`/resources/`), Blog (`/blog/`, listed only
+  once a post can be read, so an index of nothing but "coming soon" is never
+  linked), Developers (`/resources/developers/`, marked "Coming soon" outside
+  the dev site), and Changelog (`/changelog/`). The dropdown is a disclosure:
+  a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
+  into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
+  focus; tabbing away or an outside click closes). Without script the button
+  is hidden and "Resources" is a plain link to `/resources/`. On the right sit
+  the GitHub mark (icon only, while the source is public) and one Download
+  button, which opens `/download/`. Download is not also a menu item. The
+  footer's link columns (Product · Learn · Open source, the last only while
+  the source is public) and tagline default from the same file. Pages pass
+  only `current` (a dropdown's label is marked current when any of its pages
+  is). The header stays pinned on a solid ground (flat: no blur, no shadow);
+  `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
+  fold into a Menu disclosure (`<details>`; Escape, an outside click, or
+  choosing a link closes it), where the dropdown's pages are listed under its
+  name; below 560px the GitHub mark and Download move into it too. The
+  footer's lead column holds the brand, the tagline, and the "Hear when it's
+  ready." sign-up (see "The coming-soon list" below); its closing row holds
+  the maker line and the Launch Llama badge; the quokka scenery runs along its
+  bottom edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
-  chapters from `src/components/landing/`, bookended like the studio's story
-  film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
-  steps with the app's quokkas, then links to the episodes and `/features/`;
-  the dev-only Experiments follow) → PrivacyBrief (the night scene, three
-  facts, and a link to `/privacy/`) → Everywhere (Rotli Web, only while
-  `WEB_APP_ENABLED`) → Personal (themes + companion, with a faint island
-  vignette) → Faq → FinalCta (the film's sunset). The landing page carries
-  exactly one video. **`/features/`** opens with "Rotli in 30 seconds"
-  (`EpisodeShelf.astro`: the eight episodes in one player) and then composes
-  the chapters in full (Features with every smaller habit, Folder, Personal)
-  under its own page head. On narrow screens the theme studio is a carousel
-  (previous/next and a swipe on the capture), like the quokka companion's.
+  chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
+  steps with the app's quokkas, then one link to `/features/`)
+  → TwoKinds ("You write for yourself. AI reads differently.": the same
+  file as typed and as the Librarian files it, in two open columns on the band
+  with no card around either; the added frontmatter lines carry a "+" and a
+  tint, the body is marked unchanged, and `area` is a flat area as the memex
+  contract requires) → StatBand (two sourced figures, footnoted, beside a
+  bench by the sea where four idle AI tools, two asleep, are each handed a
+  note by the quokka; keep the sources and "never wasted" wording) → the
+  dev-only Experiments → PrivacyBrief (the night scene in Ocean Dark via
+  `.band-night` in `Base.astro`, three facts, and a link to `/privacy/`; while
+  it is the focal passage the whole page steps into its night, see "The
+  privacy passage") → Everywhere (Rotli Web and how Rotli Helper connects it, with
+  the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
+  theme studio, with a faint island vignette) → Faq → FinalCta (the closing call; the footer's quokka beach ends the
+  page). The landing page carries exactly one video. **`/features/`** has
+  one display headline with the product film right under it (the hero's
+  `FilmPlayer`, the same real Rotli Web session: the real product leads, not
+  the illustrated story; visitors asked for it, 2026-10-05), then the chapters
+  in full (Features with every smaller habit, Folder, Personal). Every chapter
+  is one idea: the same section head (one h2 at `--step-h2` and a lede) and
+  one picture, with no second explanation of something another chapter or
+  page owns (Rotli Helper is explained by its guide; /features/ links there).
+  The chapters alternate plain and warm grounds. The landing page's dev-only
+  Experiments chapter is not repeated there. On narrow screens the theme
+  studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Nothing on the page moves on a timer: the theme studio
-  and companion change only when a visitor picks a swatch or steps the
-  carousel, and scroll reveals fire once and rest. Two-column rows share a
+  changes only when a visitor picks a swatch or steps the
+  carousel, and scroll reveals (the drawn scenes included) fire once and
+  rest. The sanctioned exceptions are the quokka scenery under the footer
+  (the owner's call, 2026-10-02), described below, which lives in its own
+  band, below every word, and stands still under reduced motion, and the 404
+  page's game, which moves only after the visitor presses Play. Two-column rows share a
   top edge so each heading starts level with its picture.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
@@ -96,34 +136,133 @@ bun run preview  # serve the built dist/ locally
   changes. Features that are off in released builds (Breve, remote agents)
   are described as off, not as available.
 - **Subpages** (`WritingPage.astro`) sit on the site grid: breadcrumb, title,
-  and lede line up with the header's brand, a full-width rule divides the head
-  from the body, and long pages pass `toc` for a sticky "On this page" column
-  (resource articles build it from their `##` headings). Resource articles end
-  with "More resources". Index lists (`WritingList.astro`) are plain entries
-  in columns with a hairline above each, never boxes.
+  lede, and an optional metadata line (`meta`: a date, "Updated …", a reading
+  time) line up with the header's brand, and a full-width rule divides the
+  head from the body. Long pages pass `toc` and read as an article: a sticky
+  "On this page" tree beside a reading column of about 70 characters, the
+  section in view highlighted and a slim rail filling as you read (one
+  bundled script; without it the tree is plain links). Below 900px the tree
+  becomes an "On this page" disclosure above the text. Privacy, resource
+  articles, and blog posts use it (articles and posts build it from their
+  `##` headings). Resource articles end with "More guides".
+- **Resource articles** open on their own scene (`ResourceScene.astro`, the
+  guides' answer to the night frame on `/privacy/`): the island by day, the
+  app's quokka in the pose that fits the question, and what the article is
+  about around it (the folder and keys for Getting started, the folder at
+  home for Why local, the on-device model and a locked note for AI, the
+  browser and the folder for Rotli Helper, the laptop and the browser for
+  Web and Mac). `pages/resources/[...slug].astro` maps each guide to its
+  scene; a new guide without one gets the plain beach. They pass `progress`,
+  so a reading meter is pinned under the header on every width: a bar and
+  "N% through", measured over the article alone (`src/reading.ts`, the same
+  measure that fills the tree's rail), so the end of the article reads 100%
+  and the related links and footer never count. It follows scrolling either
+  way and jumps through the tree, re-measures when the article changes
+  height, and hides when the whole article fits in the window. It is a
+  position, not proof of reading: nothing is recorded or sent. Posts and
+  `/privacy/` can opt in with the same prop after review. Index lists
+  (`WritingList.astro`) are plain entries in columns with a hairline above
+  each, never boxes; an entry without a link is announced ("Coming soon").
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
   publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
-  entries only on the dev site. Routes: `/resources/`, `/resources/<file>/`,
-  `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
-  links the `the-creation-of-rotli` post once it is published). Markdown code
-  blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
+  entries only on the dev site. `status: coming-soon` announces a piece: it is
+  listed on its index with a "Coming soon" label and no link, and has no
+  page, Markdown twin, sitemap entry, or llms.txt line until the field comes
+  off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
+  `/blog/`, `/blog/<file>/`, and `/about/` (the maker's first-person story of
+  why rotli exists: notes first, people and AI note differently, the vault
+  you own beside the "stays local" quokka, no extra AI fee, house rules for
+  AI, then the name story and who makes it; it links the
+  `the-creation-of-rotli` post once it is published). Markdown code
+  blocks wrap long lines at their spaces inside the box (the Helper's install
+  line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
 - **`/download/`** is where the header's Download button goes. It leads with
   the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
   linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
-  "coming soon" with Rotli Web to use in the meantime and Rotli Helper for
-  browsers without folder access. Without script the Mac panel shows. Below,
-  "Every platform" lists Mac, Windows, Linux, and any browser with their
-  status. The hero's Download for Mac still fetches the DMG directly
+  a native app that is planned, with Rotli Web to use in the meantime and
+  Rotli Helper for browsers without folder access. Without script the Mac
+  panel shows. Below, "Every platform" lists Mac, Windows, Linux, and any
+  browser with their status (Windows and Linux: "Planned", never "Coming
+  soon", which would promise a date).
+- **Where rotli runs** (the owner, 2026-10-05). The promise is a private
+  workspace for your notes, not a Mac app: pages state availability
+  separately, with `PLATFORMS` in `src/site.ts` (the hero's line under the
+  ways in: "Mac first. Windows and Linux apps are planned.", plus "and in your
+  browser today" while `WEB_APP_ENABLED`). Never imply the Mac is the only
+  platform rotli will have, or that Windows or Linux apps exist today.
+  Sentences about what the Mac app does today (the on-device model, the
+  Keychain) stay about the Mac. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
-- **The 404 page** (`src/pages/404.astro`) is set where the story film ends:
-  `SunsetScene.astro` (`full`) fills the window with the sunset, there is no
-  header or footer, and one "Take me home" button leads back with a quiet line
-  of other ways in. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser. `SunsetScene.astro` is also the closing invitation's ground.
+- **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
+  note wandered off." in the middle of the window, one "Take me home" button
+  with a quiet line of other ways in, and along the bottom edge a small game
+  on the footer's beach (`src/runner/`: `game.ts` is the game without a
+  screen, `stage.ts` draws it on a canvas). The quokka (the walking pose)
+  runs, Space, ↑, W, a click, or a tap jumps (letting go early makes a short
+  hop), and rocks, bushes, logs, and sandcastles come at a speed that grows;
+  the score is metres, and a fall shows the distance and "Play again". It
+  never starts by itself: Play starts a run and moves focus to the stage,
+  which alone reads the keys, so Space on "Take me home" or any other
+  control is never taken. Escape or P pauses; so does leaving the stage (a
+  Tab, a click elsewhere), hiding the tab, or scrolling it out of view. The
+  frame loop runs only during a run. Reduced motion keeps the game playable
+  (the visitor chose to start it) but stills the decorative layers (drifting
+  clouds, the run's bob, kicked-up sand). The best run lasts as long as the
+  page: no score is stored. Without script the footer's quokka scenery stands
+  there instead. The missing path and a hint (`/app`, `/helper`) are chosen
+  in the browser.
+- **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
+  footer, `/subscribed/`, and the 404 without script) is a strip of Rottnest
+  by day in the film's palette (sea, the far lighthouse, scrub on the dunes,
+  sand) where the quokkas live, each doing its own thing (the owner's brief,
+  2026-10-05): the sitter, up on its haunches by the leaf pile, eating a leaf
+  from its paws; the nibbler beside it, a paw at its mouth, chewing (hidden
+  below 760px); the guard, minding the pile; two players in the right-hand
+  corner tossing a beach ball between them; and now and then a stroller
+  walking the dunes behind them in profile. Every pose is the app's own art,
+  never redrawn: `base.svg` is rigged (`src/quokka/art.ts` thins its outline
+  and takes the outer ring as the body fill); `waving.svg` and
+  `celebrating.svg` are swapped in whole (their outer ring is their body
+  fill, and celebrating's confetti is dropped); the sitter, nibbler, and
+  stroller are the approved layered poses (`concepts/layers/`) as SVG masks
+  filled with the scene's tokens, split at the neck. `src/quokka/rig.ts`
+  holds every landmark (pivots, eyes, paws, the ball, each layered pose's
+  view, neck, and seam). There is no drawn reaching arm: arms move only as
+  the art does (the wave, the catch).
+  `src/quokka/scene.ts` (one external module) brings them to life. The guard's
+  eyes and head follow the pointer, it waves when the visitor arrives, frowns
+  when the pointer nears the pile, looks sad with a hand on it or a leaf
+  wasted, and cheers when a leaf reaches a friend. The eaters take bites (the
+  leaf shrinks), stop to look at a pointer that comes close, look to the pile
+  when theirs is gone, and fetch another after a while. The players watch the
+  ball, pause to watch a visitor who comes close, and the catcher reaches up
+  (the cheering pose) as it arrives; a click or tap on them or the ball sends
+  it high. Everyone blinks.
+  **The drag** (the decision, 2026-10-05): the visitor can pick a leaf off
+  the pile and carry it (mouse, pen, or touch; `touch-action: none` only on
+  the pile). The residents watch it, a hungry eater perks up as it comes
+  near, and letting go over a quokka hands it over (it eats, the others hop,
+  the guard is pleased); letting go over open sand wastes it (it drifts down,
+  rests, fades, and the guard is sad). The leaves are their lunch, so the
+  drag gives the visitor a part in the scene's one story rather than moving
+  the quokkas around like objects. "Hand the quokkas a leaf", a button before
+  the band (outside its `aria-hidden`), does the same from the keyboard
+  (visible on focus, offered only while the scene runs, with a polite status
+  line saying who took it). The rules without the DOM (who receives a leaf,
+  the ball's arc, a falling leaf, the guard's mood) are `src/quokka/play.ts`.
+  It runs one `requestAnimationFrame` loop only while the scene is on
+  screen, the tab is visible, and motion is allowed, uses pointer events
+  only, and writes SVG attributes and CSSOM transforms (never an inline
+  `style` attribute, which the CSP would drop). Under reduced motion, or
+  without script, nothing runs, the scene stands at rest (each resident in its
+  pose, the sitter and nibbler holding a leaf, a player holding the ball),
+  and the keyboard button stays hidden. The band is decorative
+  (`aria-hidden`), has a fixed height (no layout shift), clips its own
+  content, and holds no text, so nothing can overlap a word or a link.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
@@ -165,9 +304,25 @@ bun run preview  # serve the built dist/ locally
   release page. Do not construct a DMG URL from the app package version: a
   version bump can merge before its signed asset is published.
 - Site tokens in `src/layouts/Base.astro` keep every page in Rotli Light,
-  regardless of OS appearance or previously saved site preferences. The
-  theme showcase changes its own screenshot and caption; it never recolors
-  the site. The site is flat like the app (DESIGN.md "Flat material"): no
+  regardless of OS appearance or previously saved site preferences, with one
+  exception, the privacy passage below. The theme showcase changes its own
+  screenshot and caption; it never recolors the site. Drawn scenes use
+  `--ink` (the art's own line colour) rather than `--text`, so a drawing keeps
+  its lines in either environment.
+- **The privacy passage** (the owner's call, 2026-10-05; `src/passage.ts`).
+  A section marked `data-passage="ocean-dark"` (the landing's privacy band)
+  takes the whole page into the app's Ocean Dark while it is the focal
+  passage: the ground, text, accents, bands, buttons, and the sticky header
+  with its navigation, dropdown, and Menu all switch to Ocean Dark tokens
+  (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
+  the night's stars spread over the plain grounds, `color-scheme` and the
+  `theme-color` meta follow, and it all fades back out on leaving the band in
+  either direction. The trigger is a line across the middle of the window
+  with a margin of hysteresis on both edges (8% of the window), so a page
+  resting near a boundary never flickers; a reload mid-band lands in the
+  night at once. Colours fade over 600 ms; reduced motion switches at once.
+  It is a passage, not a preference: nothing is stored. Lowest night pair:
+  muted text on `--surface-2`, 6.75:1. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
   orb swatches (the owner's call, 2026-09-23):
   each orb is lit with radial gradients and an inset shadow so it reads as the
@@ -181,8 +336,8 @@ bun run preview  # serve the built dist/ locally
   1536 × 1536 from the canonical SVG with the existing fill pipeline
   (`bun scripts/build-character-fills.mjs --site`); app-sized 512px exports
   stay unchanged.
-- The companion carousel reads `src/assets/characters/showcase/` (renders +
-  `showcase.json`), produced by `bun scripts/build-companion-showcase.ts`. That
+- The companion renders in `src/assets/characters/showcase/` (renders +
+  `showcase.json`; the landing page no longer shows them), produced by `bun scripts/build-companion-showcase.ts`. That
   script composites body preset, accessory, line color, and pose with the same
   placement rules as `src/components/character.tsx`, so every slide is a
   combination a person can pick in Settings → Companion. Edit `COMBOS` there
@@ -192,13 +347,14 @@ bun run preview  # serve the built dist/ locally
   `src/layouts/Base.astro`. Pages own only their sections.
 - The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
   columns with no screenshot.
-- The hero is the promise, the two ways in, and the story film right under
-  them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
+- The hero is the promise (a private workspace for your notes), the two ways
+  in, where rotli runs (`PLATFORMS.availability`), and the product film right
+  under them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
-  entrance and the film's clay line (`.inked`, `public/ink-underline.svg`)
-  draws itself under "Files you keep." The landing page shows no capture;
-  the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
+  entrance and the clay line (`.inked`, `public/ink-underline.svg`)
+  draws itself under "Files you keep." Apart from the film, the landing page
+  shows no capture; the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
@@ -213,32 +369,44 @@ bun run preview  # serve the built dist/ locally
   - `board`: an Excalidraw board drawn with its own toolbar in Rotli Web
     (`bun run dev:web`, an origin-private test vault, the same path as
     `e2e/web/rotli-web-boards.spec.ts`).
-  - `chat` and `lock-menu`: frames of the Mac launch shoot's raw takes
-    (`_review/promo-v5/rec/R5d.mov` at 130.8 s, `R4.mov` at 73.6 s; synthetic
-    Notebook vault), cropped with the cursor painted out.
+  - `chat`: a frame of the Mac launch shoot's raw take
+    (`_review/promo-v5/rec/R5d.mov` at 130.8 s; synthetic Notebook vault),
+    cropped with the cursor painted out. The note menu beside "You decide what
+    AI may touch" is not a capture: it is drawn in HTML from the app's own
+    labels (`useNoteMenu.ts`, `noteProtectionItems.ts`); change it when they
+    change.
   Re-capture rather than hand-edit them. `--capture-ground` in `Base.astro` is
   the editor paper those captures sit on.
 - **The features area** (`landing/Features.astro`, on `/features/` under the
-  episode player) is organized as you meet the product:
-  RenderShowcase (the same note rendered and as raw Markdown, then tasks,
-  choices, diagrams, tables/code/math with their syntax) → ChatFlow (a real
-  reply; the four steps: asks, keeps "Conversation notes" after every reply,
-  writes notes and files on the Mac, you jump in or Lock it) → Formats
-  (Documents on Univer, Sheets coming soon, Boards on Excalidraw, with status
-  chips from `featurePolicy.ts`, and where Assets live) → the Librarian →
-  ConnectAI (each provider's own CLI installed in Terminal; rotli never signs in,
-  reads login files, or stores credentials; Rotli Helper runs the same tools for
-  Rotli Web; the install lines mirror `src/ai/connectorGuides.ts`) → habits.
+  product film) is organized as you meet the product:
+  RenderShowcase (the same note rendered and as raw Markdown, which already
+  shows tasks, results, switches, and choices; then only the two blocks the
+  pair cannot show, diagrams and tables/code/math, with their syntax) →
+  ChatFlow (a real reply; three steps: asks, keeps "Conversation notes" after
+  every reply, writes notes and files on the Mac; then "You decide what AI may
+  touch": notes you wrote are closed to AI edits until Let AI edit the text,
+  Lock, and Mark secure, beside the drawn note menu) → Formats (Documents on
+  Univer, Sheets coming soon, Boards on Excalidraw, with status chips from
+  `featurePolicy.ts`, and one line on where Assets live) → the Librarian and
+  the smaller habits → ConnectAI (each provider's own CLI in one terminal;
+  rotli never signs in, reads login files, or stores credentials; the install
+  lines mirror `src/ai/connectorGuides.ts`; one line links the Rotli Helper
+  guide while `WEB_APP_ENABLED`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
-  `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
+  `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
-  stays home" night (the landing privacy band on `public/night-stars.svg`,
-  and the night frame on `/privacy/`); `IslandScene.astro` is the island by
+  stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
+  through `.band-night` (the landing privacy band and the night frame on
+  `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards; the
-  closing invitation is the film's sunset in flat bands. `/privacy/` and
+  the `/about/` story, captioned with where the name comes from); the
+  StatBand's bench by the sea and each resource article's
+  `ResourceScene.astro` are the island by day too; the FAQ has the searching
+  quokka among question cards. The
+  closing invitation has no scene of its own (2026-10-02): the footer's
+  quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
   uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and
@@ -249,14 +417,19 @@ bun run preview  # serve the built dist/ locally
   public, "Watch the film" when the film exists, and otherwise nothing. Mobile
   uses one column; the product preview sits beside the copy from 960px.
   It does not expose downloads or the full landing page's navigation.
-- `/resources/mcp/` (moved from `/mcp/` on 2026-09-18; the Caddyfile
-  redirects the old path) is the connection guide for local stdio clients (Claude Code, Codex,
-  Cursor), the workspace policy, and disposable verification. Since 2026-09-11
-  the whole guide, the landing page's agent section, and their navigation
-  render only on the dev site under the experiment label: MCP and agent
-  integrations left production until refined. The remote route (Grok Bot, the
-  relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
-  deployment has been verified.
+- **`/resources/developers/`** is the one home for MCP and the CLI, for
+  agents (Claude Code, Codex, Cursor) working in a configured vault; facts
+  restate `docs/architecture/agent-workspace.md`. MCP and the agent commands
+  run in development builds only and have not shipped, so the launch site
+  shows an honest "Coming soon" summary, and the dev site
+  (`showsExperiments`) shows the full reference under the experiment label:
+  connecting a local stdio client, `agent doctor` and `agent self-test`, the
+  tools, the rules every call follows, the JSON CLI, limits, and remote
+  agents (Grok Bot, the relay, self-hosting). Do not publish a hosted relay
+  URL there until that deployment has been verified. The old
+  `/resources/mcp/` guide (itself moved from `/mcp/`) folded in on
+  2026-10-02: the build writes a refresh page there (`redirects` in
+  `astro.config.mjs`); the Caddyfile sends `/mcp` straight to the developer page.
 - `public/social-card.svg` is the editable source for the link preview, set on
   the story film's island by day: the wordmark and the hero line over a faint
   file-icon pattern that fades out before the bay, the lighthouse on its hill,
@@ -280,6 +453,26 @@ bun run preview  # serve the built dist/ locally
   `src-tauri/icons/icon.png`) for the previews that cannot use the SVG favicon.
   LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
   after a deploy.
+- **Per-page link cards** (`public/og/`, 1200×630) give each page its own
+  preview: home, Features, Privacy, Guides (and every guide), Blog, each
+  published post (`public/og/blog/<slug>.png`, from its frontmatter title),
+  About, Download, and Developers. One family: the warm ground, the wordmark,
+  the page's own heading and one line of its lede, and the quokka pose that fits
+  the page, standing on a beach over the bay. `src/og.ts` holds the words, the
+  poses, and the alt text; pages pass `{...ogImage('<page>')}` (posts
+  `postOgImage`) to Base's `image` / `imageAlt`. A post without a rendered card
+  falls back to the Blog card, and pages without one (the changelog, the 404,
+  the holding page) keep `social-card.png`. After changing a heading or adding
+  a post, run `bun run build:brand-images` from the repository root: it renders
+  every card in Chromium with the bundled fonts and the network off, shrinks a
+  title only as far as its three-line limit, fails if any text leaves the safe
+  area or touches the quokka or the lighthouse, or if the title and line colors
+  fall under 4.5:1 on the solid warm ground (text over the pattern, sea, sand,
+  or underline is not sampled; check the contact sheet), and
+  palette-compresses the PNGs (about 35 KB each). The same run writes the
+  banners, profile pictures, and thumbnails described in `brand/README.md`, and
+  a contact sheet of everything at `_review/brand-images/contact-sheet.png`
+  (gitignored).
 
 ## Agents and search engines
 
@@ -347,12 +540,12 @@ download, so landing there first costs nothing.
 The site is a static Astro build served by Caddy from a pinned two-stage
 [`Dockerfile`](Dockerfile). [`Caddyfile`](Caddyfile) is the one home for the
 browser-security and cache headers. There is no SSR, adapter, or Worker.
-The footer's Launch Llama and Founder.best badges are the site's only
-third-party images: `img-src` allows only `https://tools.launchllama.co` and
-`https://www.founder.best` beyond same-origin and data images,
-and `check:security` keeps literal remote `<img>` origins aligned with that
-deployed policy so a local-preview success cannot become a blank production
-badge.
+The footer's Launch Llama badge is the site's only third-party image:
+`img-src` allows only `https://tools.launchllama.co` beyond same-origin and
+data images, and `check:security` keeps literal remote `<img>` origins aligned
+with that deployed policy so a local-preview success cannot become a blank
+production badge. Pages may talk only to their own origin (`connect-src
+'self'`, `form-action 'self'`), which is all the coming-soon list needs.
 
 The Docker build context is the **repository root**, because the pages import
 the canonical mark and companion art from `src/assets/characters/`. The
@@ -377,6 +570,46 @@ TXT ownership token (the CLI omits it; read it from the dashboard or the API's
 `customDomain.status.verificationToken`). Without the TXT record Railway answers
 `Application not found` even though the CNAME routes. Cloudflare's proxy may
 stay on with the SSL/TLS mode set to **Full** (not Full strict).
+
+### The coming-soon list (Resend)
+
+The footer's "Hear when it's ready." sign-up adds an address to a Resend
+segment. The static site cannot hold an API key, so the image runs one more
+process: a small Bun sidecar (`server/subscribe.ts`, one file, no
+dependencies) on `127.0.0.1:8787`. Caddy proxies `/api/*` to it under the
+site's own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a
+retry loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft:
+if it is down, `/api/*` answers 503, the footer hides its form, and every page
+keeps serving.
+
+- `GET /api/subscribe` → `{ "live": true | false }`. The footer hides the form
+  unless it reads `live: true` (so it is also hidden under `astro dev` and
+  `astro preview`, which have no sidecar).
+- `POST /api/subscribe` (JSON from the footer's script, or a plain form post
+  without JavaScript, which is redirected to `/subscribed/`): validates the
+  address, drops a filled honeypot field (`website`) with a fake success,
+  limits each visitor to 5 tries per 10 minutes (keyed on `CF-Connecting-IP`,
+  then `X-Real-IP`; 120 per 10 minutes overall), then calls Resend's
+  `POST https://api.resend.com/contacts` with
+  `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
+  per address in Resend, so when the contact already exists it calls
+  `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
+  answered exactly like a new one, and an earlier unsubscribe is never
+  overridden. Addresses are never logged (only Resend's status and error name).
+- Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
+
+Set these as **runtime** service variables in Railway (never build args; the
+Dockerfile does not declare them, so no secret lands in an image layer):
+
+| Variable            | Purpose                                                                 |
+| ------------------- | ----------------------------------------------------------------------- |
+| `RESEND_API_KEY`    | A Resend API key with full access (contacts need it; a sending-only key is refused). Unset: the list is off. |
+| `RESEND_SEGMENT_ID` | The segment new contacts join (Resend → Audience → Segments; the old Audiences API is deprecated). Unset: the list is off. |
+| `SUBSCRIBE_PORT`    | Optional. The sidecar's loopback port, read by both Caddy and the sidecar (default `8787`). |
+
+To rehearse it in the prod twin, pass the variables to `docker run`
+(`-e RESEND_API_KEY=… -e RESEND_SEGMENT_ID=…`); with a test key, use a test
+segment.
 
 ### Going live (turning off the holding page)
 
@@ -417,6 +650,47 @@ docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  
 
 ## Films
 
+**The hero film** (`public/media/hero/rotli-hero.mp4` and
+`rotli-hero-poster.webp`, `hero` in `src/films.ts`) is the product itself: a
+real Rotli Web session, under a minute, made by `bun run capture:hero` from a
+local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
+tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
+finds the note with search, asks chat what is still open, and ends on the note
+as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
+in a 162 px band under the picture, never over the UI, in 80 px type so they
+still read (about 15 px) when a phone shows the film 350 px wide. Each caption
+is one line (the script refuses one over 1760 px), the last stays on the frame
+the player rests on, and the player keeps Watch again and pause above the band
+(`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18 (about 1.75 MB); the poster is a frame of the
+written note. What is fixture, all synthetic:
+
+- **The Library's filed notes** (Travel, People, Home) are planted as files
+  carrying the Librarian's own fields (`area`, `summary`, `tags`, `links`,
+  `filed_by`). The Librarian runs only in the Mac app, so the film shows what
+  it filed, never a live run, and the note written on camera stays a capture.
+- **Chat** runs through a fake Rotli Helper on loopback (the
+  `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
+  every prompt and runs the search and both note reads; only the model's text
+  is scripted, and it answers from what those reads returned.
+- **The clock** starts at the real time (New York time zone) so the app's
+  clock and the vault's file times, which the browser stamps itself, agree:
+  the note written on camera reads "just now" and the dates are the day it
+  was shot.
+
+The script fails if the note written on camera is not Markdown in the vault
+or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the
+poster before committing a new take.
+
+`FilmPlayer.astro` plays it muted, once, as soon as it is on screen, then it
+rests on its last frame; it never loops. A silent film (`silent` in
+`films.ts`) gets no sound control: a pause button while it plays and "Watch
+again" when it ends. A film with a soundtrack gets "Click for sound", which
+restarts it from the top with sound and native controls. It pauses when
+scrolled away and resumes if it was playing, and the file downloads only once
+the player first comes into view. Under reduced motion, Save-Data, or without
+script it is a poster with native controls.
+
 The studio's films (`public/media/story/`, `src/films.ts`) come from the
 motion room kept on the maintainer's Mac (`rotli-studio/motion/out/video`),
 outside this repository, re-encoded for the web: H.264 with `-tune animation`,
@@ -424,18 +698,14 @@ outside this repository, re-encoded for the web: H.264 with `-tune animation`,
 CRF 30, about 2.5 to 3.5 MB). Posters and episode thumbnails are frames of the
 films (WebP, via `cwebp`).
 
-- **The story film** (`rotli-story.mp4`, 60 s) plays in the landing hero
-  through `FilmPlayer.astro`: muted, once, as soon as it is on screen, then it
-  rests on its last frame; it never loops. "Click for sound" restarts it from
-  the top with sound and native controls; a pause button is there while it
-  plays muted; it pauses when scrolled away and resumes if it was playing, and
-  the film itself downloads only once the player first comes into view. Under reduced motion, Save-Data,
-  or without script it is a poster with native controls.
-- **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) lives in one player
-  on `/features/` (`EpisodeShelf.astro`), `preload="none"`: no film downloads
-  until an episode is played (the poster and thumbnails do), and choosing one
-  plays it with sound. Without
-  script each episode is a plain link to its file.
+- **The story film** (`rotli-story.mp4`, 60 s) played in the hero until the
+  product film replaced it; its files stay, and no page plays it now.
+- **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) is no longer
+  played by any page (2026-10-05): visitors asked for the real product over
+  the story, so `/features/` plays the product film instead. The files stay
+  for now. Episode 7's opening card burns in the retired line "AI is invited
+  in. It does not own the house." and episode 4 counts six theme families, so
+  neither may be shown again without a new cut from the studio.
 
 The earlier launch film still lives in `public/media/` for the holding page:
 `PromoFilm.astro` renders it there when `rotli-promo.mp4`, its poster, and its
@@ -443,7 +713,7 @@ captions all exist (click-to-play with native controls, `preload="none"`, no
 autoplay). Its opening card still reads "Mac beta in preparation" and needs a
 new cut before the holding page is used again.
 
-The theme studio previews twelve environments from `public/themes/` (six
+The theme studio previews fourteen environments from `public/themes/` (seven
 families × light/dark), one row per family with Light and Dark swatches.
 
 | Artifact | Path |
