@@ -1267,14 +1267,61 @@ with a test key, use a test segment.
 
 `/roadmap/` is `ROADMAP.md` (repository root) rendered at build time by
 `src/roadmap.ts`; the Dockerfile copies the file in, as it does the changelog.
-It shows the three public sections (In the work as cards with a small drawing
-from `RoadmapMock.astro`, Planned and Ideas as a list) and leaves the rest of
-the file (known bugs, web parity, platforms, later) in the repository. Each
-item carries a stable id (`<!-- id: … -->` after its title; the convention is at
-the top of ROADMAP.md), and votes attach to ids, so a retitle keeps its votes.
-The build fails on a missing or repeated id, and `astro.config.mjs`
-(`rotli-roadmap-guard`) fails it if the built page and the file disagree.
-`/roadmap/index.md` is its Markdown twin, linked from `llms.txt`.
+It shows the three public sections and leaves the rest of the file (known
+bugs, web parity, platforms, later) in the repository. Each item carries a
+stable id (`<!-- id: … -->` after its title; the convention is at the top of
+ROADMAP.md), and votes attach to ids, so a retitle keeps its votes. The build
+fails on a missing or repeated id, and `astro.config.mjs`
+(`rotli-roadmap-guard`) fails it if the built page's `data-roadmap-item`s and
+the file disagree. `/roadmap/index.md` is its Markdown twin, linked from
+`llms.txt`.
+
+The page (`src/pages/roadmap/[...slug].astro`, its parts in
+`src/components/roadmap/`), top to bottom:
+
+- **Head** (`RoadmapHead.astro`), laid out like a blog post's: from 1000px the
+  words on the left (Resources /, the title, a lede on what the roadmap is and
+  how to take part, "Direction, not a promise · No dates", the voting state,
+  See what's in the work and Ask for something, and "Roadmap source" to
+  ROADMAP.md on GitHub while the source is public) and the picture on the
+  right; narrower, the words first. The picture (`RoadmapScene.astro`) is
+  drawn in SVG at a cover's 1300 × 900 with the site's tokens and the quokka's
+  own art (`searching`): a map whose route runs through a done, a current, and
+  an open stop, and a signpost pointing three ways. Decorative, so
+  `aria-hidden`; nothing is fetched.
+- **On this page** (`RoadmapNav.astro`): a link per group with its item count.
+  From 1100px a column pinned under the header beside the groups, marking the
+  group being read (`aria-current`, a bar and weight); narrower, a wrapping row
+  of chips in the flow.
+- **In the work**: each item under its drawing (`RoadmapMock.astro`, the
+  item's one frame; the words sit on the page, never in a card around both).
+  **Planned** and **Ideas**: a calm list on hairlines. Every item shows its
+  title, summary, status (In the work, Planned, Idea), size, and vote
+  (`VoteButton.astro`).
+- **Recently shipped** (`RecentlyShipped.astro`): the newest four releases in
+  CHANGELOG.md (`src/releases.ts`), each with its version, date, and the bold
+  leads of its first three items (Added, then Changed, then Fixed) word for
+  word, linked to its heading on `/changelog/` (the anchor Astro gives
+  `## [x.y.z] - date`). A missing release fails the build; nothing is written
+  by hand.
+- **Ask for something** (`RequestForm.astro`): title, description, and an
+  optional email ("Not needed"), beside "What happens to a request", the
+  privacy page's "This website" account in short (what's kept, the in-memory
+  spam key, Railway, never published, how to delete), linked to
+  `/privacy/#website`, and a consent line by the button.
+
+States: votes are off until the probe answers `{ live: true }` (disabled
+dashed pills, "Voting and requests open soon.", every form field disabled,
+"Requests open soon."). Live, a vote is optimistic: pressed, counted, and
+saved in localStorage at once, then the sidecar's count replaces the guess; a
+refusal takes all three back and says why under the item (and to screen
+readers). Voted shows a tick, "Voted", and the accent tint, never colour
+alone. Ideas get "Roadmap order / Most votes" (ties keep the file's order;
+the list moves only when asked). The form checks each field before sending
+(focus on the first to fix, the message beside it, cleared as it's fixed),
+waits with "Sending…", then gives way to a focused thank-you block with Send
+another; a sidecar refusal marks the field it names. Without script the form
+posts and lands on `#request-sent`, the same block.
 
 The sidecar keeps participation in one SQLite file (`bun:sqlite`, built into
 Bun; no ORM, no new service):
@@ -1298,8 +1345,11 @@ Bun; no ORM, no new service):
   page keeps its "Voting and requests open soon." line, the vote buttons stay
   disabled, and the form says requests open soon. CSP is unchanged
   (`connect-src 'self'`, `form-action 'self'`).
-- Tests: `bun run test` (`server/roadmap.test.ts`, `server/roadmap-file.test.ts`)
-  and `e2e/site/roadmap.spec.ts` (the API stubbed with Playwright routes).
+- Tests: `bun run test` (`server/roadmap.test.ts`, `server/roadmap-file.test.ts`),
+  `scripts/site-releases.test.ts` (Recently shipped's parsing), and
+  `e2e/site/roadmap.spec.ts` (the API stubbed with Playwright routes: the head,
+  Recently shipped against CHANGELOG.md and its anchors, votes off and live,
+  the form, the nav, and no sideways scroll from 320 to 2560 px).
 
 **Owner setup.**
 

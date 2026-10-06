@@ -55,11 +55,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file path, you get Basic and the reason; edits you made to Basic stay. Hand to AI remembers which one you chose last.
 - **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
   being built, what's planned, and what's still an idea, straight from the
-  roadmap kept with rotli's source, each with how big it is. Vote for what
-  you want (once per item; your browser remembers) or ask for something new
-  with a short form; requests are read, never published. Until voting opens
-  on the live site, the page says so. It's in the Resources menu and the
-  footer, and the privacy page says what votes and requests keep.
+  roadmap kept with rotli's source, each with its status and how big it is.
+  It opens like a blog post, the title beside a drawing of the quokka with a
+  map and a signpost, and ends with Recently shipped: the newest releases,
+  their dates, and a few headlines from each, read from this changelog and
+  linked to their notes. Vote for what you want (once per item; your browser
+  remembers): the vote shows at once and is taken back, with the reason
+  beside the item, if it doesn't go through, and Ideas can be ordered by
+  votes. Or ask for something new with a short form that needs no account
+  and no email; it says what's kept, and requests are read, never published.
+  Until voting opens on the live site, the page says so. "On this page"
+  stays beside the list on a wide screen, the page reads well on a phone,
+  and "Roadmap source" links the full roadmap on GitHub. It's in the
+  Resources menu and the footer, and the privacy page says what votes and
+  requests keep.
 
 ### Changed
 

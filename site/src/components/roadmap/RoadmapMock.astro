@@ -1,5 +1,5 @@
 ---
-// A small drawing of an "In the work" item, on top of its card on /roadmap/: a
+// A small drawing of an "In the work" item, above its title on /roadmap/: a
 // window from the app as it will look, drawn in HTML with the site's semantic tokens
 // (no screenshots, so nothing goes stale with a capture). Decorative: the card's own
 // heading and sentence say what the item is, so the whole drawing is aria-hidden.
@@ -253,14 +253,15 @@ Thu  4
 </div>
 
 <style>
-  /* The stage: a quiet ground the window sits on, flush with the card's top edge. */
+  /* The stage: the item's one frame, a quiet rounded ground the window sits on. The item's
+     words sit below it on the page, never in a second box around both. */
   .stage {
     display: grid;
     place-items: center;
-    height: 14rem;
+    height: 13rem;
     padding: 1.5rem 1.25rem;
+    border-radius: var(--radius-frame);
     background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
     overflow: hidden;
   }
   .win {

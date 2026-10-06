@@ -1,0 +1,119 @@
+---
+// "Recently shipped" on /roadmap/: the newest releases from CHANGELOG.md (src/releases.ts), each
+// with its version, its date, and the bold leads of its first few changelog items, word for
+// word, linked to its notes on /changelog/. A row per release on hairlines, like the lists
+// above it: the version and date on the left, the items on the right.
+import { codeParts } from '../../roadmap';
+import type { ShippedRelease } from '../../releases';
+
+interface Props {
+  releases: ShippedRelease[];
+}
+
+const { releases } = Astro.props;
+---
+
+<ol class="shipped">
+  {
+    releases.map((release) => (
+      <li data-release={release.version}>
+        <div class="when">
+          <h3>rotli {release.version}</h3>
+          <p>
+            <time datetime={release.date}>{release.label}</time>
+          </p>
+        </div>
+        <div class="what">
+          <ul>
+            {release.items.map((item) => (
+              <li>{codeParts(item).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</li>
+            ))}
+          </ul>
+          <a href={`/changelog/#${release.anchor}`} data-release-link>
+            Read the {release.version} notes<span class="visually-hidden"> on the changelog</span>
+          </a>
+        </div>
+      </li>
+    ))
+  }
+</ol>
+<p class="all">
+  <a href="/changelog/">Every release, on the changelog</a>
+</p>
+
+<style>
+  .shipped {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .shipped > li {
+    display: grid;
+    grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+    gap: 0.5rem 2rem;
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .shipped > li:last-child {
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .when p {
+    margin: 0.15rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .what ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    line-height: 1.5;
+  }
+  .what li + li {
+    margin-top: 0.25rem;
+  }
+  .what li::marker {
+    color: var(--text-muted);
+  }
+  code {
+    padding: 0.05em 0.3em;
+    border-radius: 0.3rem;
+    background: var(--surface-2);
+    font-size: 0.92em;
+  }
+  a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-underline-offset: 0.2em;
+  }
+  .what a {
+    display: inline-block;
+    margin-top: 0.6rem;
+    font-size: 0.92rem;
+  }
+  .all {
+    margin: 1.25rem 0 0;
+  }
+  @media (pointer: coarse) {
+    a {
+      display: inline-block;
+      padding-block: 0.7rem;
+      margin-block: -0.45rem;
+    }
+  }
+  @media (max-width: 640px) {
+    .shipped > li {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .when {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.2rem 0.75rem;
+    }
+  }
+</style>
