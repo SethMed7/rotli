@@ -1,13 +1,13 @@
 ---
 // The launch page, in the order of docs/design/landing-layout-2026-10-05.md. The hero (the
 // product film) says what rotli is; the StatBand says why it exists, in figures (the AI you
-// already pay for is mostly waiting; the owner, 2026-10-06, moved it up from third); three cards
-// say what it does (write, keep, ask); TwoKinds shows the Librarian filing a note without
-// touching its words; the tour shows each part up close and
-// holds Rotli Web and the Helper; then make it yours, privacy in brief, questions, and one
-// closing panel that asks for a first note, right above the footer's quokka beach. Grounds
-// alternate plain and warm, with the privacy night between. Base.astro owns the tokens and
-// the section grammar.
+// already pay for is mostly waiting; the owner, 2026-10-06, moved it up from third); the
+// Overview tells what it does as one story (write in your view, the Librarian files it in the
+// vault without touching your words, ask and the AI reads only what it needs; it absorbed the
+// former TwoKinds section, 2026-10-06); the tour shows each part up close and holds Rotli Web
+// and the Helper; then make it yours, privacy in brief, questions, and one closing panel that
+// asks for a first note, right above the footer's quokka beach. Grounds alternate plain and
+// warm, with the privacy night between. Base.astro owns the tokens and the section grammar.
 import { landingGraph } from '../agents';
 import { ogImage } from '../og';
 import Base from '../layouts/Base.astro';
@@ -20,7 +20,6 @@ import Faq from './landing/Faq.astro';
 import Hero from './landing/Hero.astro';
 import Overview from './landing/Overview.astro';
 import StatBand from './landing/StatBand.astro';
-import TwoKinds from './landing/TwoKinds.astro';
 import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
 import Tour from './landing/Tour.astro';
@@ -32,7 +31,6 @@ import Tour from './landing/Tour.astro';
     <Hero />
     <StatBand />
     <Overview />
-    <TwoKinds />
     <Tour />
     <Experiments />
     <Personal />

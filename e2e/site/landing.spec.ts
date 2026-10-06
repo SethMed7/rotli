@@ -1,5 +1,5 @@
-// The landing page: what rotli is, its two buttons ("Download free" and "Our privacy promise"; where it runs is
-// /download/'s to say), the header's matching button and GitHub star count, the short stat band, the cardless
+// The landing page: what rotli is, its two buttons ("Our privacy promise" and "Download free"; where it runs is
+// /download/'s to say), the header's matching button and plain, gold GitHub star count, the short stat band, the cardless
 // before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -263,6 +263,8 @@ test("the before and after are open columns: the same words, with added lines ma
   await expect(pair.locator(".added .row")).toHaveCount(6);
   await expect(pair.locator(".added")).toContainText("area: Clients");
   await expect(pair.locator(".added")).not.toContainText("Clients/");
+  // Filing moves the file from the Library intake into its area folder (corpus.rs file_note).
+  await expect(pair.locator(".file")).toHaveText(["wiki/_inbox/dana-call.md", "wiki/Clients/dana-call.md"]);
 });
 
 test("the page passes into the privacy night and back out, either way", async ({ page }) => {
@@ -341,7 +343,8 @@ test("the band keeps two figures, each with its population and its source", asyn
 
 test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".overview .section-lede")).toContainText("Everything starts as a Markdown file");
+  // The Overview tells the view-and-vault story now; "more than notes" is the hero's and the FAQ's.
+  await expect(page.locator(".hero .hero-lede")).toContainText("Docs and Sheets");
   await expect(page.locator("#waiting .close")).toContainText("no extra AI plan to buy");
   const faq = page.locator(".faq-list summary");
   await expect(faq.filter({ hasText: "Do I have to pay for AI?" })).toHaveCount(1);

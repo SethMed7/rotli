@@ -294,3 +294,120 @@ calendar. Below 1180px, where the words would outgrow it, the picture goes
 under them at its own shape. Rejected: the headline across the top with the
 figures and picture under it, which moved the empty space beside the
 headline instead of removing it.
+
+## Revised 2026-10-06 (evening): the view, the vault, and one story
+
+The owner, verbatim:
+
+> "don't put it in a card, just logo and star count, maybe to the left, in
+> gold matching GitHub star color. Privacy promise goes on the left. [cards]
+> here is where I want to clarify view vs where it actually lives,
+> clarifying you write a note and open it in your view, Librarian puts it in
+> vault accordingly, later ask AI about it and AI has indexing to get to it
+> quick without wasting your tokens. Also have a 'what is an LLM Wiki' with a
+> link to a source of what it is."
+
+And, the same evening: "Write it down. rotli puts it away." and "You write
+for yourself. AI reads differently." are redundant; make them one section.
+
+### The header's stars
+
+A plain link left of "Download free": the GitHub mark in ink, then a star
+and the count in `--github-star`, with no border or fill. GitHub's own star
+gold (Primer `base.color.yellow.2`: `#eac54f` by day, `#e3b341` by night) is
+1.5:1 on the header's ground, so it fails as text. The day value is that gold
+darkened to `#8a5d00`, 5.17:1 on `--ground`. The night value is GitHub's own
+`#e3b341`, 9.31:1 on the night ground. Through the privacy passage it switches
+with the other inks and leans onto `--text` around the switch, and every
+frame is measured (`scripts/site-interactions.test.ts`). Hover underlines the
+count, and focus shows the site's ring. On a phone it stays in Menu, because
+beside the brand it would crowd the bar at 320.
+
+### The hero's buttons
+
+"Our privacy promise" is on the left and "Download free" on the right. On a
+phone they stack in that same order. The page has one order in its markup,
+so what is seen first is what the keyboard and a screen reader reach first.
+Putting the download on top would need `column-reverse`, which splits those
+orders. The download still reads as the main action by its fill.
+
+### One section, three steps
+
+The Overview and TwoKinds are now one section: "Write it down. rotli puts it
+away." Each step has its words beside one drawn picture:
+
+| Step | Words | Picture | Contract |
+|---|---|---|---|
+| 1 Write in your view | "Start a note and keep it open in your view: Main, or a named view for a project. A view is your own arrangement of notes, never a copy of them." | The note in Main under "This week", its one file at `wiki/_inbox/dana-call.md`, joined by a dotted "same file" line | `memex-data-contract.md`, "One physical home, many views": Main and named views store references and never own or copy content; with the Librarian on, a new note starts in the Library intake, `wiki/_inbox/` |
+| 2 The Librarian files it | "When it's on, the Librarian later moves the file to its area folder in your vault and adds an area, a summary, tags, and links at the top. It never changes your words, and your view still shows the note where you put it." | The before and after, moved whole from TwoKinds, now with the paths `wiki/_inbox/` → `wiki/Clients/` | "Metadata ownership" (the Librarian owns `area`, `summary`, `tags`, `links`; filing writes every byte after the frontmatter unchanged); `corpus.rs` `file_note` (moves to `wiki/<area>/`); the quiet-window rule ("a note's place in Main never follows its file"); `features.ts` (the Librarian is opt-in and Mac-only, hence "When it's on") |
+| 3 Ask, and AI goes straight to it | "Later, ask AI about it. rotli searches your vault on your computer, and the AI reads only the few notes that matter, not the whole vault, so your tokens go to the answer. Secure notes never go to a remote model." | A chat whose dashed middle row says the vault was searched on this computer and names the two notes read | "Master memory retrieval" (a bounded table of contents, then `search_memory` and `read_memory`: "The model does not receive the whole vault"); `docs/design/tantivy-search.md` (the Mac app's derived index in `.rotli/search/`, behind `corpus_search_ai` with the per-hit secure gate); `ai-visibility-matrix.md` |
+
+The copy says "on your computer" and not "the index", because the Tantivy
+index is the Mac app's. Rotli Web's AI corpus searches the browser's notes
+service, which is also local. The headline stays. The lede is new:
+"Where a note shows up and where its file lives are two different things.
+You arrange notes in a view. Each file lives once, in your vault: the folder
+you chose."
+
+What each old section kept, merged, or dropped:
+
+- **Overview.** Kept: the headline, the three-part shape, the quokkas, and
+  the drawn panel language, with no outer cards. Merged: "Write in plain
+  Markdown" into step 1, "Keep it in your folder" into step 2, and "Ask your
+  notes" into step 3. Dropped: the lede "Everything starts as a Markdown file
+  in a folder you choose. Docs and Sheets (beta), chat, and boards open from
+  the same folder." The hero lede and the FAQ already say it. Also dropped:
+  the rendered Launch week note and the frontmatter-fields panel, whose
+  points the filing play now makes.
+- **TwoKinds.** Kept: the before and after with its play, its Replay, its
+  reduced-motion and no-script end state, and its phone layout. It is now
+  step 2's picture, and the comparison alone still fits one 1440×900 window.
+  Merged: its caption, which now also says the file moves into Clients.
+  Dropped: the headline "You write for yourself. AI reads differently." and
+  the lede "An AI finds a note again by its area, tags, and links…". Step 2
+  and the LLM wiki aside carry that point. The About page keeps its own
+  version.
+
+The Librarian now appears twice on the landing, from two sides: step 2 (your
+words stay, the file moves) and the tour's item (filed into Library areas).
+
+### What is an LLM wiki?
+
+This is an aside under the steps, below one hairline, rather than an FAQ
+entry. FAQ answers are plain strings that double as the FAQPage JSON-LD, and
+this answer needs its source linked:
+
+> Plain Markdown notes, kept organized and linked so an AI can build on what
+> you already know instead of starting from scratch on every question. Andrej
+> Karpathy described the idea in his LLM Wiki note (April 2026), and your
+> rotli vault works the same way: you write, and the Librarian adds the
+> areas, summaries, tags, and links. Getting started with your vault →
+
+The source is Karpathy's gist `llm-wiki.md`
+(`https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f`,
+2026-04-04). It describes "a pattern for building personal knowledge bases
+using LLMs" where "the LLM incrementally builds and maintains a persistent
+wiki — a structured, interlinked collection of markdown files", in contrast
+to RAG re-deriving knowledge on every question. In his pattern the LLM
+writes the pages. In rotli the person writes, and the Librarian adds only
+metadata and links. That is why the aside says "works the same way", not
+"is one".
+
+### Grounds after the merge
+
+Taking one section out of an alternating chain flips everything after it, so
+two sections were re-grounded rather than reordered:
+
+| # | Section | Ground |
+|---|---|---|
+| 1 | Hero + film | plain |
+| 2 | StatBand | warm |
+| 3 | Overview: the three steps | plain |
+| 4 | Tour | **warm** (was plain) |
+| — | Experiments | plain, dev only |
+| 5 | Personal | **plain** (was warm); its arrows' hover moved from `--ground` to `--surface-2` so it still shows |
+| 6 | PrivacyBrief | night |
+| 7 | FAQ | plain |
+| 8 | Closing banner | plain, framed |
+
+Only the dev site, with Experiments, shows two plain grounds in a row.

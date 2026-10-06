@@ -1,12 +1,15 @@
 ---
-// Two kinds of notes: the way a person writes, and the way an AI finds things again. The
-// comparison is plain HTML on the site's tokens (not a capture): the same file twice, as typed
-// and as filed, set straight on the band with no card around either. The Librarian adds only
-// its frontmatter fields (area, summary, tags, links; see docs/architecture/memex-data-contract.md)
-// above the words, which stay byte for byte as written: the added lines carry a "+" and a tint,
-// the body is marked unchanged. `area` is a flat top-level area, as the contract requires (only
-// People/<group> may nest). Synthetic people and text. Two columns side by side; one after the
-// other, in reading order, on narrow widths.
+// File, the second step of "Write it down. rotli puts it away." (Overview.astro): the before and
+// after, moved whole from the former "You write for yourself. AI reads differently." section
+// (the owner, 2026-10-06: the two said the same thing). The same file twice, as typed in the
+// Library intake and as the Librarian files it into its area folder, set straight on the band
+// with no card around either. The Librarian adds only its frontmatter fields (area, summary,
+// tags, links; docs/architecture/memex-data-contract.md, "Metadata ownership") above the words,
+// which stay byte for byte as written: the added lines carry a "+" and a tint, the body is
+// marked unchanged. Filing moves the file to wiki/<area>/ (corpus.rs file_note); `area` is a
+// flat top-level area, as the contract requires (only People/<group> may nest). Synthetic
+// people and text. Two columns side by side; one after the other, in reading order, on narrow
+// widths.
 //
 // It plays the filing once when it comes into view (the owner, 2026-10-05: "more motion and
 // alive like it actually happens"; the timing is src/filingTimeline.ts): the note is typed, the
@@ -14,6 +17,8 @@
 // diff, and it rests with the words marked unchanged. Replay plays it again. The markup is the
 // finished state, so without script or under reduced motion nothing moves. Both bodies keep
 // their full text at every moment: the play hides characters, never removes them.
+import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+
 const typed = ['call w/ dana re pricing', '', 'she’s ok w/ annual. wants the', 'deck fri?? ask jo about the', 'discount thing'];
 const filed = [
   { key: 'area', value: 'Clients' },
@@ -23,51 +28,48 @@ const filed = [
 ];
 ---
 
-<section class="section band-warm two-kinds" id="two-kinds" aria-labelledby="two-kinds-title">
-  <div class="wrap">
-    <header class="section-head" data-reveal>
-      <h2 class="section-title" id="two-kinds-title">You write for yourself. <span class="inked">AI reads differently.</span></h2>
-      <p class="section-lede">
-        An AI finds a note again by its area, tags, and links. In rotli you just write, and the Librarian fills
-        those in at the top of the file.
-      </p>
-    </header>
-
-    <figure class="pair" data-filing>
-      <div class="state" role="group" aria-labelledby="typed-label">
+<figure class="pair" data-filing>
+  <div class="state" role="group" aria-labelledby="typed-label">
+    <div class="state-head">
+      <div>
         <p class="state-label" id="typed-label">As you write it</p>
-        <p class="file">dana-call.md</p>
-        <pre class="lines"><code class="body" data-typed>{typed.join('\n')}</code></pre>
+        <p class="file">wiki/_inbox/dana-call.md</p>
       </div>
-      <div class="state filed" role="group" aria-labelledby="filed-label">
-        <p class="state-label" id="filed-label">After the Librarian</p>
-        <p class="file">dana-call.md</p>
-        <div class="diff">
-          <p class="note-mark added-mark">Added by the Librarian</p>
-          <pre class="lines added"><code><span class="row fence">---</span>{
-              filed.map((field) => (
-                <span class="row"><b>{field.key}:</b> {field.value}</span>
-              ))
-            }<span class="row fence">---</span></code></pre>
-          <div class="kept">
-            <p class="note-mark kept-mark">
-              <svg class="check" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7" /></svg>
-              Your words, unchanged
-            </p>
-            <pre class="lines kept-lines"><code class="body">{typed.join('\n')}</code></pre>
-          </div>
-        </div>
-      </div>
-      <figcaption>
-        <span>The Librarian adds the fields at the top. Everything under them is exactly what you typed.</span>
-        <button type="button" class="replay" data-replay hidden>
-          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 8a5.25 5.25 0 1 0 1.6-3.78M2.75 2.5v2.75H5.5" /></svg>
-          Replay
-        </button>
-      </figcaption>
-    </figure>
+    </div>
+    <pre class="lines"><code class="body" data-typed>{typed.join('\n')}</code></pre>
   </div>
-</section>
+  <div class="state filed" role="group" aria-labelledby="filed-label">
+    <div class="state-head">
+      <div>
+        <p class="state-label" id="filed-label">After the Librarian</p>
+        <p class="file">wiki/Clients/dana-call.md</p>
+      </div>
+      <img class="quokka" src={knowledge.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+    </div>
+    <div class="diff">
+      <p class="note-mark added-mark">Added by the Librarian</p>
+      <pre class="lines added"><code><span class="row fence">---</span>{
+          filed.map((field) => (
+            <span class="row"><b>{field.key}:</b> {field.value}</span>
+          ))
+        }<span class="row fence">---</span></code></pre>
+      <div class="kept">
+        <p class="note-mark kept-mark">
+          <svg class="check" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7" /></svg>
+          Your words, unchanged
+        </p>
+        <pre class="lines kept-lines"><code class="body">{typed.join('\n')}</code></pre>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    <span>The Librarian adds the fields at the top and moves the file into Clients. Everything under the fields is exactly what you typed.</span>
+    <button type="button" class="replay" data-replay hidden>
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 8a5.25 5.25 0 1 0 1.6-3.78M2.75 2.5v2.75H5.5" /></svg>
+      Replay
+    </button>
+  </figcaption>
+</figure>
 
 <script>
   import { filingFrame, timeline, wordsLift, type FilingFrame } from '../../filingTimeline';
@@ -179,14 +181,6 @@ const filed = [
 </script>
 
 <style>
-  .section-title {
-    max-width: 22ch;
-  }
-  .section-lede {
-    max-width: 40rem;
-    font-size: 1.1rem;
-    line-height: 1.65;
-  }
   /* Two open columns on the band, split by one hairline: no card, no fill, no frame. Kept to a
      reading width, so the whole comparison sits in one window on a laptop. */
   .pair {
@@ -213,13 +207,33 @@ const filed = [
     letter-spacing: -0.015em;
     line-height: 1.2;
   }
-  .file {
-    margin: 0.3rem 0 1rem;
+  /* The label and the file's path over one hairline, at one height on both sides; the
+     Librarian's quokka stands on the hairline of the filed side. */
+  .state-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 64px;
+    margin-bottom: 1rem;
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border-strong);
+  }
+  .state-head > div {
+    min-width: 0;
+  }
+  .file {
+    margin: 0.3rem 0 0;
     color: var(--text-muted);
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .quokka {
+    flex: none;
+    width: 56px;
+    height: 56px;
+    margin: 0 0.25rem calc(-0.75rem - 1px) 0;
   }
   /* The file's own text: monospace because it is the literal file. */
   .lines {

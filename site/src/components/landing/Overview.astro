@@ -1,27 +1,29 @@
 ---
-// What rotli does, in three cards: write, keep, ask. Each card is a small picture of the app
-// over a heading and one sentence (the owner's reference, 2026-10-05: a live-looking panel on
-// top, plain words below). The pictures are drawn in HTML on the site's tokens, never
-// captures, so they stay sharp and follow the privacy passage like the rest of the page. They
-// use the app's own words: a rendered note with tasks and a [[link]], the frontmatter fields
-// the Librarian fills in (area, summary, tags, links; docs/architecture/memex-data-contract.md),
-// and a chat reply that answers from notes by name. The app shows no "sources" control, so
-// none is drawn. Notes are the launch film's synthetic vault (Q4 launch plan, Call with Maya).
-// Each picture is one image to assistive tech (role="img" and a label), and its quokka, the
-// app's own character art, stands on the panel's top edge. The panel sits straight on the
-// band: no outer card around it (the owner, 2026-10-05).
-// The full tour is the next chapter down (Tour.astro) and /features/.
-import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
-import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
-import notes from '../../../../src/assets/characters/filled/cocoa/notes.webp';
-import { DOCS_AND_SHEETS } from '../../site';
+// What rotli does, as one story in three steps (the owner, 2026-10-06: "clarify view vs where
+// it actually lives … you write a note and open it in your view, Librarian puts it in vault
+// accordingly, later ask AI about it and AI has indexing to get to it quick without wasting your
+// tokens"). It also absorbed the former "You write for yourself. AI reads differently." section,
+// whose before and after is now the File step's picture (the owner, the same day: the two were
+// redundant). Each step is a heading and one or two sentences beside one picture drawn in HTML
+// on the site's tokens, with the app's quokka standing on it; no outer cards (the owner,
+// 2026-10-05):
+//   1. Write: the note in your view and its one file in the vault (ViewAndVault.astro);
+//   2. File: the Librarian's before and after, which plays once (Filing.astro);
+//   3. Ask: a chat that searches on your computer and reads only what it found (AskIndex.astro).
+// Every claim is a contract's (docs/design/landing-layout-2026-10-05.md lists them): views are
+// reference projections, never stores, and a note's place in Main never follows its file
+// (memex-data-contract.md, "One physical home, many views"); the Librarian is optional and
+// Mac-only, moves files to wiki/<area>/ and writes only its declared fields, never the body
+// ("Metadata ownership"); the AI searches locally and reads only selected notes, never the
+// whole vault ("Master memory retrieval"); secure notes never reach a remote model
+// (docs/design/ai-visibility-matrix.md).
+// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source.
+import AskIndex from './AskIndex.astro';
+import Filing from './Filing.astro';
+import ViewAndVault from './ViewAndVault.astro';
 
-const filled = [
-  { key: 'area', kind: 'pill', value: 'Projects' },
-  { key: 'summary', kind: 'text', value: 'Beta shipped, demo next.' },
-  { key: 'tags', kind: 'text', value: 'launch · q4' },
-  { key: 'links', kind: 'link', value: 'Call with Maya' },
-] as const;
+/** Andrej Karpathy's "LLM Wiki" gist (2026-04-04), the source of the term. */
+const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f';
 ---
 
 <section class="section overview" id="features" aria-labelledby="overview-title">
@@ -29,340 +31,148 @@ const filled = [
     <header class="section-head" data-reveal>
       <h2 class="section-title" id="overview-title">Write it down. <span class="inked">rotli puts it away.</span></h2>
       <p class="section-lede">
-        Everything starts as a Markdown file in a folder you choose. Docs and Sheets ({DOCS_AND_SHEETS.inline}),
-        chat, and boards open from the same folder.
+        Where a note shows up and where its file lives are two different things. You arrange notes in a view.
+        Each file lives once, in your vault: the folder you chose.
       </p>
     </header>
 
-    <ol class="cards" data-stagger>
-      <li class="card">
-        <figure class="stage" role="img" aria-label="A note called Launch week, rendered: a heading, one finished task, one open task, and a link to another note">
-          <div class="stage-top">
-            <span class="file">launch-week.md</span>
-            <img class="quokka" src={notes.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <span class="panel-title">Launch week</span>
-              <span class="chip">Aa</span>
-            </div>
-            <div class="note">
-              <p class="note-h">This week</p>
-              <p class="task done">
-                <svg class="box" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m4 8.5 2.6 2.6L12 5.5" /></svg><s>Ship the Mac beta</s>
-              </p>
-              <p class="task"><span class="box" aria-hidden="true"></span><span>Record the demo with <b>Maya</b></span></p>
-              <p class="note-p">Plan: <span class="wikilink">Q4 launch plan</span></p>
-            </div>
-          </div>
-        </figure>
-        <h3>Write in plain Markdown</h3>
-        <p>Start typing and it renders as you go: tasks, tables, links. On disk it stays plain text.</p>
+    <ol class="steps">
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <span class="step-number" aria-hidden="true">1</span>
+          <h3>Write in your view</h3>
+          <p>
+            Start a note and keep it open in your view: Main, or a named view for a project. A view is your own
+            arrangement of notes, never a copy of them.
+          </p>
+        </div>
+        <ViewAndVault />
       </li>
 
-      <li class="card">
-        <figure class="stage" role="img" aria-label="The Librarian's fields on the note Q4 launch plan: area Projects, a summary, tags, and a link, each with a tick">
-          <div class="stage-top">
-            <span class="file">q4-launch-plan.md</span>
-            <img class="quokka" src={knowledge.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <span class="panel-title">Added by the Librarian</span>
-            </div>
-            <dl class="fields">
-              {
-                filled.map((field) => (
-                  <div class="field">
-                    <dt>{field.key}</dt>
-                    <dd>
-                      {field.kind === 'pill' ? (
-                        <span class="pill">{field.value}</span>
-                      ) : field.kind === 'link' ? (
-                        <span class="wikilink">{field.value}</span>
-                      ) : (
-                        field.value
-                      )}
-                    </dd>
-                    <svg class="tick" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
-                      <path d="m3.5 8.5 3 3 6-7" />
-                    </svg>
-                  </div>
-                ))
-              }
-            </dl>
-          </div>
-        </figure>
-        <h3>Keep it in your folder</h3>
-        <p>Every note is a file you own. The Librarian adds an area, tags, and links at the top, and leaves your words alone.</p>
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <span class="step-number" aria-hidden="true">2</span>
+          <h3>The Librarian files it</h3>
+          <p>
+            When it’s on, the Librarian later moves the file to its area folder in your vault and adds an area, a
+            summary, tags, and links at the top. It never changes your words, and your view still shows the note
+            where you put it.
+          </p>
+        </div>
+        <Filing />
       </li>
 
-      <li class="card">
-        <figure class="stage" role="img" aria-label="A chat: asked what is left before launch, rotli answers from the notes Q4 launch plan and Call with Maya">
-          <div class="stage-top">
-            <span class="file">chats/launch-check-in.md</span>
-            <img class="quokka" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <span class="panel-title">Launch check-in</span>
-            </div>
-            <div class="chat">
-              <p class="ask">What’s left before launch?</p>
-              <p class="reply">
-                Your <b>Q4 launch plan</b> has the Mac beta shipped. <b>Call with Maya</b> says she records the demo
-                next.
-              </p>
-              <p class="meta">11:41 AM</p>
-            </div>
-          </div>
-        </figure>
-        <h3>Ask your notes</h3>
-        <p>Chat answers from your own files, with a model on your computer or the AI tools you already use.</p>
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <span class="step-number" aria-hidden="true">3</span>
+          <h3>Ask, and AI goes straight to it</h3>
+          <p>
+            Later, ask AI about it. rotli searches your vault on your computer, and the AI reads only the few notes
+            that matter, not the whole vault, so your tokens go to the answer. Secure notes never go to a remote
+            model.
+          </p>
+        </div>
+        <AskIndex />
       </li>
     </ol>
+
+    <aside class="llm-wiki" aria-labelledby="llm-wiki-title" data-reveal>
+      <h3 id="llm-wiki-title">What is an LLM wiki?</h3>
+      <p>
+        Plain Markdown notes, kept organized and linked so an AI can build on what you already know instead of
+        starting from scratch on every question. Andrej Karpathy described the idea in his{' '}
+        <a href={LLM_WIKI_SOURCE} rel="noopener">LLM Wiki note</a> (April 2026), and your rotli vault works the same
+        way: you write, and the Librarian adds the areas, summaries, tags, and links.{' '}
+        <a href="/resources/getting-started/">Getting started with your vault</a>
+      </p>
+    </aside>
   </div>
 </section>
 
 <style>
-  .cards {
+  .steps {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 3rem clamp(1.25rem, 2.5vw, 2rem);
+    gap: clamp(4rem, 8vw, 6rem);
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  /* Each card is a picture, a heading, and a sentence; the rows line up across the three. */
-  .card {
+  /* A step: its words on the left, its picture on the right; stacked below 1080px. */
+  .step {
     display: grid;
-    grid-row: span 3;
-    grid-template-rows: subgrid;
-    row-gap: 0;
-    min-width: 0;
+    grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 2rem clamp(2.5rem, 5vw, 4.5rem);
   }
-  .card > h3 {
-    margin: 1.5rem 0 0;
+  .step-copy {
+    padding-top: 3.4rem;
+  }
+  .step-number {
+    display: block;
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-copy h3 {
+    margin: 0.35rem 0 0;
     font-size: var(--step-h3);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.2;
   }
-  .card > p {
-    margin: 0.55rem 0 0;
+  .step-copy p {
+    margin: 0.65rem 0 0;
     color: var(--text-muted);
-    line-height: 1.55;
+    line-height: 1.6;
+  }
+  @media (max-width: 1080px) {
+    .step {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .step-copy {
+      max-width: 38rem;
+      padding-top: 0;
+    }
   }
 
-  /* The picture: one panel in the app's language (a surface, one hairline, no shadow) set
-     straight on the band, with its file name above it and the quokka standing on its top
-     edge. No well or card around it (the owner, 2026-10-05: "remove the outer cards"), so it
-     never reads as a card inside a card. */
-  .stage {
-    display: flex;
-    flex-direction: column;
+  /* What is an LLM wiki: a short aside after the story, under one hairline. */
+  .llm-wiki {
+    max-width: 44rem;
+    margin-top: clamp(4rem, 8vw, 5.5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .llm-wiki h3 {
     margin: 0;
-  }
-  .stage-top {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-height: 64px;
-  }
-  .file {
-    min-width: 0;
-    padding-bottom: 0.55rem;
-    overflow: hidden;
-    color: var(--text-muted);
-    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.78rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .quokka {
-    flex: none;
-    width: 64px;
-    height: 64px;
-    margin: 0 0.25rem -1px 0;
-  }
-  .panel {
-    flex: 1;
-    border: 1px solid var(--border-strong);
-    border-radius: 0.7rem;
-    background: var(--surface);
-    font-size: 0.86rem;
-    line-height: 1.45;
-  }
-  .panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .panel-title {
+    font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: -0.015em;
   }
-  .chip {
-    padding: 0.05rem 0.45rem;
-    border-radius: 0.35rem;
-    background: var(--surface-2);
+  .llm-wiki p {
+    margin: 0.6rem 0 0;
     color: var(--text-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
+    line-height: 1.65;
   }
-  .wikilink {
+  .llm-wiki a {
     color: var(--accent-text);
+    font-weight: 600;
     text-decoration: underline;
     text-decoration-color: var(--accent);
     text-underline-offset: 0.2em;
   }
-
-  /* Write: a rendered note. */
-  .note {
-    display: grid;
-    gap: 0.45rem;
-    padding: 0.8rem 0.85rem 0.9rem;
+  .llm-wiki a[href^='/'] {
+    display: inline-block;
   }
-  .note p {
-    margin: 0;
-  }
-  .note-h {
-    font-size: 1.02rem;
-    font-weight: 600;
-  }
-  .task {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .box {
-    flex: none;
-    width: 0.95rem;
-    height: 0.95rem;
-    border: 1.5px solid var(--border-strong);
-    border-radius: 0.25rem;
-  }
-  .done .box {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--on-accent);
-  }
-  .done s {
-    color: var(--text-muted);
+  .llm-wiki a[href^='/']::after {
+    content: ' →';
   }
 
-  /* Keep: the fields the Librarian filled, one per row, each ticked. */
-  .fields {
-    margin: 0;
-    padding: 0.35rem 0.85rem 0.45rem;
-  }
-  .field {
-    display: grid;
-    grid-template-columns: 4.6rem minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.42rem 0;
-  }
-  .field + .field {
-    border-top: 1px solid var(--border);
-  }
-  .field dt {
-    color: var(--text-muted);
-    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.78rem;
-  }
-  .field dd {
-    min-width: 0;
-    margin: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .pill {
-    padding: 0.08rem 0.55rem;
-    border-radius: 999px;
-    background: var(--tint);
-    color: var(--accent-text);
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
-  .tick {
-    width: 1rem;
-    height: 1rem;
-    color: var(--accent-text);
-  }
-
-  /* Ask: a question and an answer that names the notes it came from. */
-  .chat {
-    display: grid;
-    gap: 0.6rem;
-    padding: 0.8rem 0.85rem 0.75rem;
-  }
-  .chat p {
-    margin: 0;
-  }
-  .ask {
-    justify-self: end;
-    max-width: 85%;
-    padding: 0.35rem 0.7rem;
-    border-radius: 0.8rem;
-    background: var(--tint);
-  }
-  .meta {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-  }
-
-  @media (max-width: 900px) {
-    .cards {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .card {
-      grid-row: auto;
-      grid-template-rows: none;
-    }
-  }
-  /* Tablet widths: one card per row, the picture beside its words. */
-  @media (min-width: 600px) and (max-width: 900px) {
-    .card {
-      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-      grid-template-rows: 1fr auto auto 1fr;
-      column-gap: clamp(1.5rem, 4vw, 2.5rem);
-    }
-    .stage {
-      grid-row: 1 / span 4;
-    }
-    .card > h3,
-    .card > p {
-      grid-column: 2;
-    }
-    .card > h3 {
-      grid-row: 2;
-      margin-top: 0;
-    }
-    .card > p {
-      grid-row: 3;
-    }
-  }
-  @media (max-width: 599px) {
-    .cards {
-      max-width: 34rem;
-    }
-  }
-  /* The quokkas hop onto their panels once, when the cards come in. */
+  /* The quokkas hop onto their pictures once, as each step comes in. */
   @media (prefers-reduced-motion: no-preference) {
-    :global(.js) .cards:global(.is-visible) .quokka {
-      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 120ms backwards;
+    :global(.js) .step:global(.is-visible) :global(.quokka) {
+      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 220ms backwards;
       transform-origin: 50% 100%;
-    }
-    :global(.js) .cards:global(.is-visible) > li:nth-child(2) .quokka {
-      animation-delay: 210ms;
-    }
-    :global(.js) .cards:global(.is-visible) > li:nth-child(3) .quokka {
-      animation-delay: 300ms;
     }
   }
   @keyframes hop {

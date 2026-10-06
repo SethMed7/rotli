@@ -31,7 +31,7 @@ const stops = families.flatMap((family) =>
 const first = stops[0];
 ---
 
-<section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
+<section class="section personal" id="personal" aria-labelledby="personal-title">
   <div class="backdrop">
     <IslandScene faint />
   </div>
@@ -375,8 +375,10 @@ const first = stops[0];
     color: var(--text);
     cursor: pointer;
   }
+  /* On the plain ground since 2026-10-06 (the grounds re-alternated when TwoKinds merged into
+     the Overview): the hover takes the warm surface, which still reads against the page. */
   .carousel-step:hover {
-    background: var(--ground);
+    background: var(--surface-2);
   }
   .carousel-step svg {
     width: 20px;

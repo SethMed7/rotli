@@ -48,15 +48,16 @@ for (const width of [768, 1024, 1180, 1440]) {
   });
 }
 
-test("each card puts its picture beside its words on a tablet", async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 1024 });
-  await page.goto("/");
-  for (const card of await page.locator(".overview .card").all()) {
-    const art = (await card.locator(".stage").boundingBox())!;
-    const title = (await card.locator("h3").boundingBox())!;
-    expect(title.x).toBeGreaterThan(art.x + art.width);
-    expect(title.y).toBeGreaterThan(art.y);
-    expect(title.y + title.height).toBeLessThan(art.y + art.height);
+test("each step of the story puts its words above its picture on a tablet and a phone", async ({ page }) => {
+  for (const width of [390, 768]) {
+    await page.setViewportSize({ width, height: 1024 });
+    await page.goto("/");
+    for (const step of await page.locator("#features .steps > li").all()) {
+      const words = (await step.locator(".step-copy").boundingBox())!;
+      const picture = (await step.locator("> figure").boundingBox())!;
+      expect(picture.y).toBeGreaterThanOrEqual(words.y + words.height);
+      expect(picture.x + picture.width).toBeLessThanOrEqual(width);
+    }
   }
 });
 

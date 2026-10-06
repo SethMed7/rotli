@@ -1,6 +1,8 @@
 // The landing's layout of 2026-10-05 (docs/design/landing-layout-2026-10-05.md): the section
-// order and its grounds, the three cards with their drawn pictures, the before and after's
-// filing play (it plays once in view, holds off screen, rests marked, and replays), the tour
+// order and its grounds, the Overview's three steps (write in your view, the Librarian files it
+// in the vault, ask) with their drawn pictures and the LLM wiki aside, the before and after's
+// filing play (the File step's picture: it plays once in view, holds off screen, rests marked,
+// and replays), the tour
 // (pinned beside its list and stepped by the scroll on wide screens, a click or a key moving to
 // a part's step, a plain sequence on phones and without script), and the closing banner, whose
 // art never sits on its words. This suite's build has WEB_APP_ENABLED off, so the tour has five
@@ -33,49 +35,94 @@ test("the sections run in order, alternating plain and warm grounds", async ({ p
   const ids = await page
     .locator("main > section")
     .evaluateAll((sections) => sections.map((s) => s.id || s.classList[0]));
-  expect(ids).toEqual([
-    "hero",
-    "waiting",
-    "features",
-    "two-kinds",
-    "tour",
-    "personal",
-    "privacy",
-    "faq",
-    "start",
-  ]);
+  // TwoKinds merged into the Overview (2026-10-06), so the tour took the warm ground and the
+  // theme studio the plain one: the grounds still alternate up to the privacy night.
+  expect(ids).toEqual(["hero", "waiting", "features", "tour", "personal", "privacy", "faq", "start"]);
+  await expect(page.locator("#two-kinds")).toHaveCount(0);
   const warm = await page
     .locator("main > section")
     .evaluateAll((sections) => sections.map((s) => s.classList.contains("band-warm")));
-  expect(warm).toEqual([false, true, false, true, false, true, false, false, false]);
+  expect(warm).toEqual([false, true, false, true, false, false, false, false]);
 });
 
-test("three cards say what rotli does, each a drawn picture over a heading and one sentence", async ({
-  page,
-}) => {
+test("one story in three steps: write in your view, the Librarian files it, ask", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  const cards = page.locator(".overview .card");
-  await expect(cards.locator("h3")).toHaveText([
-    "Write in plain Markdown",
-    "Keep it in your folder",
-    "Ask your notes",
+  const section = page.locator("#features");
+  await expect(section.locator("h2")).toHaveText("Write it down. rotli puts it away.");
+  await expect(section.locator(".section-lede")).toContainText("lives once, in your vault");
+  const steps = section.locator(".steps > li");
+  await expect(steps.locator("h3")).toHaveText([
+    "Write in your view",
+    "The Librarian files it",
+    "Ask, and AI goes straight to it",
   ]);
-  for (const card of await cards.all()) {
-    const picture = card.getByRole("img").first();
-    await expect(picture).toHaveAttribute("aria-label", /.+/);
-    await expect(card.locator(".stage .quokka")).toHaveCount(1);
-    await expect(card.locator("> p")).toHaveCount(1);
+  // The product's own words, and only what its contracts say.
+  await expect(steps.nth(0)).toContainText("Main, or a named view");
+  await expect(steps.nth(0)).toContainText("never a copy");
+  await expect(steps.nth(1)).toContainText("When it’s on");
+  await expect(steps.nth(1)).toContainText("never changes your words");
+  await expect(steps.nth(1)).toContainText("your view still shows the note where you put it");
+  await expect(steps.nth(2)).toContainText("on your computer");
+  await expect(steps.nth(2)).toContainText("not the whole vault");
+  await expect(steps.nth(2)).toContainText("Secure notes never go to a remote model");
+  // Each step has one picture and one quokka; the pictures are HTML, not screenshots.
+  for (const step of await steps.all()) {
+    await expect(step.locator(".quokka")).toHaveCount(1);
+    await expect(step.locator("img:not(.quokka)")).toHaveCount(0);
   }
-  // No screenshots: the pictures are HTML in the app's words.
-  await expect(cards.locator(".stage img:not(.quokka)")).toHaveCount(0);
-  await expect(cards.nth(1).locator(".pill")).toHaveText("Projects");
-  await expect(cards.nth(1).locator(".tick")).toHaveCount(4);
-  // The headings line up across the row.
-  const tops = await cards
-    .locator("h3")
-    .evaluateAll((titles) => titles.map((t) => Math.round(t.getBoundingClientRect().top)));
-  expect(new Set(tops).size).toBe(1);
+  await expect(steps.nth(0).getByRole("img")).toHaveAttribute("aria-label", /view.*vault/);
+  await expect(steps.nth(2).getByRole("img")).toHaveAttribute("aria-label", /on this computer/);
+  // The words sit left of the picture on a laptop.
+  for (const step of await steps.all()) {
+    const words = await box(step.locator(".step-copy"));
+    const picture = await box(step.locator("> figure"));
+    expect(picture.x).toBeGreaterThanOrEqual(words.x + words.width);
+  }
+});
+
+test("the view and the vault: the same note on both sides, joined by a dotted line", async ({ page }) => {
+  await page.goto("/");
+  const where = page.locator(".where");
+  await expect(where.locator(".here")).toHaveText(["Call with Dana", "dana-call.md"]);
+  await expect(where.locator(".side-label")).toHaveText(["In your view", "In your vault"]);
+  for (const width of [320, 390, 768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await where.scrollIntoViewIfNeeded();
+    const view = await box(where.locator(".here").nth(0));
+    const vault = await box(where.locator(".here").nth(1));
+    const line = await box(where.locator(".link-line"));
+    if (width >= 600) {
+      // Side by side: the line runs level with both marked rows, from one to the other.
+      const middle = (b: Box) => b.y + b.height / 2;
+      expect(Math.abs(middle(view) - middle(vault)), `rows level at ${width}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(line.y - middle(view)), `line level at ${width}`).toBeLessThanOrEqual(3);
+      expect(line.x).toBeLessThanOrEqual(view.x + view.width + 1);
+      expect(line.x + line.width).toBeGreaterThanOrEqual(vault.x - 1);
+    } else {
+      // Stacked: the view above, the vault below, the line running down between them.
+      expect(vault.y).toBeGreaterThan(view.y + view.height);
+      expect(line.height).toBeGreaterThan(line.width);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+});
+
+test("what is an LLM wiki: two sentences beside the story, linked to the term's source", async ({ page }) => {
+  await page.goto("/");
+  const aside = page.locator("#features .llm-wiki");
+  await expect(aside.locator("h3")).toHaveText("What is an LLM wiki?");
+  const source = aside.getByRole("link", { name: "LLM Wiki note" });
+  await expect(source).toHaveAttribute(
+    "href",
+    "https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f",
+  );
+  await expect(source).toHaveAttribute("rel", /noopener/);
+  await expect(aside).toContainText("Andrej Karpathy");
+  await expect(aside.getByRole("link", { name: /Getting started/ })).toHaveAttribute(
+    "href",
+    "/resources/getting-started/",
+  );
 });
 
 test("the tour follows the scroll: each step pins its part beside the list", async ({ page }) => {
@@ -241,10 +288,11 @@ test("the before and after files the note once in view, holds off screen, and re
   await page.goto("/");
   const pair = page.locator("[data-filing]");
   await expect(pair).toHaveAttribute("data-state", "idle");
-  // The whole comparison, headline to caption, fits in one window under the header.
-  const head = await box(page.locator("#two-kinds .section-head"));
+  // The whole comparison, from its labels to its caption, fits in one window under the header
+  // (since 2026-10-06 it is the File step's picture; the three-step section is taller).
+  const top = await box(pair);
   const caption = await box(pair.locator("figcaption"));
-  expect(caption.y + caption.height - head.y).toBeLessThanOrEqual(900 - HEADER);
+  expect(caption.y + caption.height - top.y).toBeLessThanOrEqual(900 - HEADER);
 
   await pair.scrollIntoViewIfNeeded();
   await expect(pair).toHaveAttribute("data-state", "playing");

@@ -266,6 +266,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with "Your words, unchanged" marked; Replay plays it again. It's smaller,
   so it fits on one laptop screen. The three cards near the top lost their
   outer frames too. Reduced motion keeps all of it still.
+- **rotli.co shows where a note lives, and what an LLM wiki is.** "Write it
+  down. rotli puts it away." is now one story in three steps. You write in
+  your view (Main, or a named view), which arranges your notes and never
+  copies them. The Librarian, when it's on, later files the file into its
+  area folder in your vault and leaves your words alone, while your view
+  keeps the note where you put it. When you ask AI about it, rotli searches
+  on your computer and the AI reads only the few notes that matter, not the
+  whole vault. A small picture joins the note in your view to its file in the
+  vault with a dotted line. The before-and-after that had its own section
+  ("You write for yourself. AI reads differently.") is now the second step's
+  picture and plays the same way. A short "What is an LLM wiki?" links to
+  Andrej Karpathy's note that named the idea.
 - **rotli.co's About page tells the story across the page.** It's written in
   first person around what rotli is now: a free workspace on plain Markdown
   files, notes first with Docs and Sheets (beta), chat and boards in the same

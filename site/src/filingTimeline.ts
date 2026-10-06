@@ -1,4 +1,5 @@
-// The before and after plays the Librarian filing a note (landing/TwoKinds.astro; the owner,
+// The before and after plays the Librarian filing a note (landing/Filing.astro, the File step of
+// the landing's Overview; the owner,
 // 2026-10-05: "make this part more motion and alive like it actually happens"). Once, when the
 // comparison comes into view: the note is typed on the left; the same words appear on the
 // right; the Librarian's frontmatter lines arrive above them one by one, each pushing the words

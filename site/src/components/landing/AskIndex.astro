@@ -1,0 +1,145 @@
+---
+// Ask, the third step of "Write it down. rotli puts it away." (Overview.astro): a chat that
+// finds the note it needs instead of reading the vault. Between the question and the answer
+// sits the step a visitor never sees: the search runs on the visitor's own computer, and only
+// the notes it found are read. That is the retrieval contract
+// (docs/architecture/memex-data-contract.md, "Master memory retrieval"): the model gets a
+// bounded table of contents, searches (search_memory, over corpus_search_ai, which in the Mac
+// app answers from the derived Tantivy index in .rotli/search/), then reads only the notes it
+// chose (read_memory); it never receives the whole vault. The middle row is drawn as that
+// step, dashed, not as a control: the app shows no "sources" panel, so none is drawn. Synthetic
+// notes, the same ones the filing step uses. One image to assistive tech.
+import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
+
+const found = ['Call with Dana', 'Discount policy'];
+---
+
+<figure
+  class="ask"
+  role="img"
+  aria-label="A chat. Asked what Dana wanted, rotli first searches the vault on this computer and reads two notes, Call with Dana and Discount policy, then answers from them."
+>
+  <div class="stage-top">
+    <span class="file">chats/dana-follow-up.md</span>
+    <img class="quokka" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+  </div>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Dana follow-up</span>
+    </div>
+    <div class="chat">
+      <p class="question">What did Dana want, and what’s left?</p>
+      <div class="lookup">
+        <p class="lookup-line searched">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
+          <span>Searched your vault, on this computer</span>
+        </p>
+        <p class="lookup-line read">
+          Read {found.length} notes:
+          {found.map((title) => <span class="note-name">{title}</span>)}
+        </p>
+      </div>
+      <p class="reply">
+        From <b>Call with Dana</b>: she’s fine with annual pricing and wants the deck on Friday. Still open: ask
+        Jo about the discount; <b>Discount policy</b> has the current terms.
+      </p>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .ask {
+    display: flex;
+    flex-direction: column;
+    max-width: 34rem;
+    margin: 0;
+  }
+  .stage-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 64px;
+  }
+  .file {
+    min-width: 0;
+    padding-bottom: 0.55rem;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .quokka {
+    flex: none;
+    width: 56px;
+    height: 56px;
+    margin: 0 0.25rem -1px 0;
+  }
+  .panel {
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--surface);
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+  .panel-head {
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-weight: 600;
+  }
+  .chat {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.85rem;
+  }
+  .chat p {
+    margin: 0;
+  }
+  .question {
+    justify-self: end;
+    max-width: 85%;
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.8rem;
+    background: var(--tint);
+  }
+  /* The step between question and answer: drawn dashed, as what happens, not as a control. */
+  .lookup {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px dashed var(--border-strong);
+    border-radius: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .lookup-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.45rem;
+  }
+  /* The icon stays with its words at any width. */
+  .lookup-line.searched {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+  .lookup-line.searched svg {
+    margin-top: 0.15em;
+  }
+  .lookup-line svg {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+  .note-name {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+</style>

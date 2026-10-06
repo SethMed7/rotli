@@ -55,11 +55,13 @@ Narrow widths are part of that proof: `e2e/site/narrow-layout.spec.ts`
 checks that no page scrolls sideways at 390 and 768, and the landing at 320,
 1024, and 1920 too (inline code in the changelog breaks inside the column).
 It also checks that the theme studio's island never sits under its lede, that
-each Overview card puts its picture beside its words on a tablet, and that
+each step of the Overview puts its words above its picture on a tablet and a phone, and that
 the landing's smallest controls (the footnote marks, the 404's other ways in)
 answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
-holds the landing's order and grounds, the cards, the before and after's
+holds the landing's order and grounds, the Overview's three steps (the view and
+vault picture's dotted line level with both marked rows from 320 to 1920, the
+LLM wiki source link), the before and after's
 play (once in view, held off screen, resting marked, Replay, one window at
 1440×900), the tour (each scroll step, click and keys to a step, the pin
 never holding the scroll or overlapping its list at 1024, 1440, and 1920,
@@ -153,31 +155,49 @@ whose art never touches its words from 320 to 1920.
      Never write "wasted"; Bango stays in the post as context. "Product names
      belong to their owners." stays while ChatGPT is named. It is the one
      chapter whose headline has no lede: its figures are the lede.
-  3. Overview ("Write it down. rotli puts it away."; plain): three columns,
-     each a small picture of the app drawn in HTML on the site's tokens (a
-     rendered note, the fields the Librarian filled with an area pill and
-     ticks, a chat reply that names the notes it came from), with the app's
-     quokka standing on the panel, then a heading and one sentence. The panel
-     sits straight on the band under its file name, with no outer card
-     around it (the owner, 2026-10-05: no card in a card). The pictures are one image
-     each to assistive tech (`role="img"` and a label); no "sources" control is
-     drawn because the app has none. Its lede carries the owner's item 2
-     message, as does the FAQ.
-  4. TwoKinds ("You write for yourself. AI reads differently."; warm): the
-     same file as typed and as the Librarian files it, in two open columns on
-     the band with no card around either, at a reading width so the whole
-     comparison fits one 1440×900 window. The added frontmatter lines carry a
-     "+" and a tint, the body is marked unchanged in ink (a tick and a rule,
-     not a second fill), and `area` is a flat area, as the memex contract
-     requires. It plays the filing once when it comes into view
-     (`src/filingTimeline.ts`; the owner, 2026-10-05): the note is typed, the
-     same words appear on the right, the added lines open above them one by
-     one like a live diff, and it rests marked. One frame loop, held off
-     screen and in a hidden tab; a quiet Replay (44px) plays it again. Both
-     bodies keep their full text at every moment, and the markup is the
-     finished state, so without script or under reduced motion nothing
-     moves.
-  5. Tour ("A closer look."; plain), stepped by the scroll (the owner,
+  3. Overview ("Write it down. rotli puts it away."; plain): what rotli does,
+     as one story in three steps (the owner, 2026-10-06: "clarify view vs
+     where it actually lives"). It absorbed the former TwoKinds section ("You
+     write for yourself. AI reads differently.") the same day, because the
+     two said the same thing. Each step is a number, a heading, and one or two
+     sentences beside one picture drawn in HTML on the site's tokens (words
+     above the picture below 1080px), with the app's quokka standing on it and
+     no outer card (the owner, 2026-10-05: no card in a card):
+     1. Write in your view (`ViewAndVault.astro`): the note in Main under a
+        folder, and its one file in the vault at `wiki/_inbox/dana-call.md`,
+        the two marked rows joined by a dotted "same file" line. Both panels
+        share one row height, so the line sits level with both rows at every
+        width; below 600px the panels stack and the line runs down between
+        them.
+     2. The Librarian files it (`Filing.astro`, the former TwoKinds before
+        and after, moved whole): the same file as typed in the intake and as
+        filed into `wiki/Clients/`, in two open columns with no card around
+        either, so the comparison alone fits one 1440×900 window. The added
+        frontmatter lines carry a "+" and a tint, the body is marked
+        unchanged in ink (a tick and a rule, not a second fill), and `area`
+        is a flat area, as the memex contract requires. It plays the filing
+        once when it comes into view (`src/filingTimeline.ts`; the owner,
+        2026-10-05): the note is typed, the same words appear on the right,
+        the added lines open above them one by one like a live diff, and it
+        rests marked. One frame loop, held off screen and in a hidden tab; a
+        quiet Replay (44px) plays it again. Both bodies keep their full text
+        at every moment, and the markup is the finished state, so without
+        script or under reduced motion nothing moves.
+     3. Ask, and AI goes straight to it (`AskIndex.astro`): a chat whose
+        middle row, drawn dashed as a step and not as a control, says the
+        vault was searched on this computer and names the two notes read.
+        The app has no "sources" control, so none is drawn.
+     Every claim is a contract's; `docs/design/landing-layout-2026-10-05.md`
+     ("Revised 2026-10-06 (evening)") lists the source of each. Under the
+     steps, "What is an LLM wiki?" is a short aside under one hairline: two
+     sentences, Andrej Karpathy's "LLM Wiki" gist (2026-04-04) as the term's
+     source, and Getting started as rotli's own page. It is an aside, not an
+     FAQ entry, because FAQ answers are plain strings (they are also the
+     FAQPage JSON-LD) and this one needs its source linked. The
+     "more than notes" message the old lede carried stays in the hero lede
+     and the FAQ.
+  4. Tour ("A closer look."; warm since 2026-10-06, when TwoKinds merged
+     into the Overview), stepped by the scroll (the owner,
      2026-10-05, overriding the no-scroll-scrub preference for this section;
      rules in `src/tourSteps.ts`). From 960px wide and 620px tall, with
      script, the list and the preview are pinned under the header while a
@@ -202,18 +222,20 @@ whose art never touches its words from 320 to 1920.
      panel language where a capture isn't honest or readable at that size
      (Docs and Sheets, the chat answer from `shots/chat.webp`, the
      Librarian's filing). It ends on the one link to `/features/`.
-  6. The dev-only Experiments.
-  7. Personal (the theme studio; warm), with a faint island vignette from
+  5. The dev-only Experiments (plain; between the warm tour and the plain
+     theme studio, so only the dev site shows two plain grounds in a row).
+  6. Personal (the theme studio; plain since 2026-10-06; its arrows' hover
+     takes the warm surface), with a faint island vignette from
      1180px up. Narrower, its left edge would reach into the lede, so it steps
      out.
-  8. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
+  7. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
      `Base.astro`, three facts, and "Read our privacy promise", to
      `/privacy/#promise`. While it is the
      focal passage the whole page steps into its night (see "The privacy
      passage").
-  9. Faq (plain): two entries carry the owner's item 2 message. Notes are the
+  8. Faq (plain): two entries carry the owner's item 2 message. Notes are the
      foundation of a workspace, and rotli charges nothing for AI.
-  10. Closing (plain, one framed panel on the warm colour). The two-tone
+  9. Closing (plain, one framed panel on the warm colour). The two-tone
       headline "Start with one note." / "It stays in your folder." has its
       first line in full ink and the second muted. Under it are "Free, with
       no account to make." and the hero's one way in, "Download free"
