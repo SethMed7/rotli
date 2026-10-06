@@ -8,7 +8,8 @@
 // and a chat reply that answers from notes by name. The app shows no "sources" control, so
 // none is drawn. Notes are the launch film's synthetic vault (Q4 launch plan, Call with Maya).
 // Each picture is one image to assistive tech (role="img" and a label), and its quokka, the
-// app's own character art, stands on the panel's top edge.
+// app's own character art, stands on the panel's top edge. The panel sits straight on the
+// band: no outer card around it (the owner, 2026-10-05).
 // The full tour is the next chapter down (Tour.astro) and /features/.
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
@@ -141,7 +142,7 @@ const filled = [
     min-width: 0;
   }
   .card > h3 {
-    margin: 1.4rem 0 0;
+    margin: 1.5rem 0 0;
     font-size: var(--step-h3);
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -153,15 +154,14 @@ const filled = [
     line-height: 1.55;
   }
 
-  /* The picture: the page's own ground as a well, and on it one panel in the app's language
-     (a surface, one hairline, no shadow). The quokka stands on the panel's top edge. */
+  /* The picture: one panel in the app's language (a surface, one hairline, no shadow) set
+     straight on the band, with its file name above it and the quokka standing on its top
+     edge. No well or card around it (the owner, 2026-10-05: "remove the outer cards"), so it
+     never reads as a card inside a card. */
   .stage {
     display: flex;
     flex-direction: column;
     margin: 0;
-    padding: 0.9rem 1.1rem 1.1rem;
-    border-radius: var(--radius-frame);
-    background: var(--ground);
   }
   .stage-top {
     display: flex;
