@@ -22,7 +22,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `cd site && CI=true SITE_MODE=full bun run build && bunx astro preview --host 127.0.0.1 --port ${PORT}`,
+    command: `cd site && CI=true SITE_MODE=full SOURCE_REPOSITORY_PUBLIC=true SITE_GITHUB_STARS=1234 bun run build && bunx astro preview --host 127.0.0.1 --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,

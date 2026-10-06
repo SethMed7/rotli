@@ -1,9 +1,15 @@
 ---
-// The one site header: brand, the site's pages (src/nav.ts), the GitHub mark
-// while the source is public, and one "Try now" button that opens /download/,
-// which offers the Mac app and Rotli Web and leads with the visitor's system. The landing's own
-// button says "Download free" (2026-10-06); the header keeps "Try now" because it is on every
-// page, short, and true on systems with no download yet, where Rotli Web is the way in. It stays pinned to
+// The one site header: brand, the site's pages (src/nav.ts), GitHub with its star count while
+// the source is public, and the way in (WAY_IN in src/site.ts: "Download free", to /download/,
+// the same label and button as the hero's; the owner, 2026-10-06: "the top right button should
+// align with button on hero for consistency"). /download/ offers the Mac app and Rotli Web and
+// leads with the visitor's system, so the label holds on Windows and Linux too.
+//
+// The star count is read once while the site is built (src/githubStars.ts); the visitor's
+// browser never calls GitHub. The link is a plain <a> whose visible text is its name ("Star",
+// then "rotli on GitHub" for assistive tech, then the count); without a count, "Star rotli on GitHub".
+// The mark is Primer Octicons' mark-github (MIT, github.com/primer/octicons), inline, unmodified.
+// Below 560px the star link and the button move into Menu. It stays pinned to
 // the top on a solid ground (flat: no blur, no shadow). Resources is a
 // disclosure dropdown (a button with aria-expanded); without script its label
 // is a plain link to /resources/. Below 1080px the sections fold into a Menu
@@ -11,7 +17,8 @@
 // live in Base.astro.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
 import { isNavGroup, navEntryHolds, primaryNav, type NavSection } from '../nav';
-import { GITHUB_URL, site } from '../site';
+import { buildStarCount, formatStarCount } from '../githubStars';
+import { GITHUB_URL, WAY_IN, site } from '../site';
 import { publishedWriting } from '../writing';
 
 interface Props {
@@ -24,7 +31,10 @@ const { current } = Astro.props;
 // The holding page (coming-soon) has no other pages to link to, so every page
 // of that build (the 404 included) shows the brand alone.
 const minimal = Astro.props.minimal === true || !site.showsFullSite;
-const github = site.sourcePublic;
+const github = site.sourcePublic && !minimal;
+const stars = github ? await buildStarCount() : null;
+const starText = stars === null ? null : formatStarCount(stars);
+const starWord = stars === 1 ? 'star' : 'stars';
 const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0 });
 ---
 
@@ -80,13 +90,21 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
           </nav>
           <div class="header-actions">
             {github && (
-              <a class="github-link" href={GITHUB_URL} rel="noopener" aria-label="rotli on GitHub">
+              <a class="github-link" href={GITHUB_URL} rel="noopener">
                 <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                 </svg>
+                <span class="github-star">Star</span>
+                <span class="visually-hidden"> rotli on GitHub{starText !== null ? ', ' : ''}</span>
+                {starText !== null && (
+                  <>
+                    <span class="github-count">{starText}</span>
+                    <span class="visually-hidden"> {starWord}</span>
+                  </>
+                )}
               </a>
             )}
-            <a class="button primary header-download" href="/download/" aria-current={current === 'download' ? 'page' : undefined}>Try now</a>
+            <a class="button primary header-download" href={WAY_IN.href} aria-current={current === 'download' ? 'page' : undefined}>{WAY_IN.label}</a>
             <details class="nav-menu">
               <summary>Menu</summary>
               <nav class="nav-menu-panel" aria-label="Site sections">
@@ -107,8 +125,18 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
                     </a>
                   ),
                 )}
-                {github && <a href={GITHUB_URL} rel="noopener">GitHub</a>}
-                <a class="button primary" href="/download/">Try now</a>
+                {github && (
+                  <a
+                    class="menu-github"
+                    href={GITHUB_URL}
+                    rel="noopener"
+                    aria-label={starText === null ? undefined : `Star rotli on GitHub, ${starText} ${starWord}`}
+                  >
+                    Star rotli on GitHub
+                    {starText !== null && <small>{starText}</small>}
+                  </a>
+                )}
+                <a class="button primary" href={WAY_IN.href}>{WAY_IN.label}</a>
               </nav>
             </details>
           </div>

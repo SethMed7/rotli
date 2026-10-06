@@ -1,21 +1,17 @@
 ---
-// The landing's one way in, defined once: "Download free", to /download/, which offers the Mac
-// app and Rotli Web and leads with the visitor's own system (the owner, 2026-10-06: "Download
-// free" in the hero, after "Try now" of 2026-10-05). The header keeps its shorter "Try now" to
-// the same page. A deployment without the Mac download but with Rotli Web says "Try now"
-// instead, so the button never promises a download that isn't there; one that offers neither
-// says so instead of linking to an empty page. Direct DMG links live only on /download/.
-import { site } from '../site';
-
-const offered = site.downloadsEnabled || site.webAppEnabled;
-const label = site.downloadsEnabled ? 'Download free' : 'Try now';
+// The way in, defined once (WAY_IN in src/site.ts): "Download free", to /download/, which
+// offers the Mac app and Rotli Web and leads with the visitor's own system. The header's button
+// says the same (the owner, 2026-10-06). One that offers neither says so instead of linking to an
+// empty page. Direct DMG links live only on /download/. A page may pass a secondary button
+// after it (the hero's privacy promise); it sits in the same row, at the same size.
+import { WAY_IN } from '../site';
 ---
 
 <div class="site-actions">
   {
-    offered ? (
-      <a class="button primary action-try" href="/download/">
-        {label}
+    WAY_IN.offered ? (
+      <a class="button primary action-try" href={WAY_IN.href}>
+        {WAY_IN.label}
       </a>
     ) : (
       <span class="button primary pending" aria-disabled="true">
@@ -23,4 +19,5 @@ const label = site.downloadsEnabled ? 'Download free' : 'Try now';
       </span>
     )
   }
+  <slot />
 </div>

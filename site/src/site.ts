@@ -32,8 +32,7 @@ export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
-// Only /download/ links it: every other call to action ("Download free" on the landing, "Try
-// now" in the header) goes to that page.
+// Only /download/ links it: every other call to action (WAY_IN below) goes to that page.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is
@@ -189,6 +188,20 @@ export const site = {
   webAppEnabled: readWebAppEnabled(),
   /** The launch film, when its artifacts are present. */
   promo: readPromo(),
+} as const;
+
+/**
+ * The site's one way in, said the same everywhere a primary button appears: the header, the
+ * hero, and the closing banner (the owner, 2026-10-06: "the top right button should align with
+ * button on hero for consistency"). It opens /download/, which offers the Mac app and Rotli Web
+ * and leads with the visitor's system, so it is true on Windows and Linux too. A deployment
+ * without the Mac download says "Try now" instead, so no button promises a download that isn't
+ * there; `offered` is false when there is neither a download nor Rotli Web.
+ */
+export const WAY_IN = {
+  href: '/download/',
+  label: site.downloadsEnabled ? 'Download free' : 'Try now',
+  offered: site.downloadsEnabled || site.webAppEnabled,
 } as const;
 
 /**

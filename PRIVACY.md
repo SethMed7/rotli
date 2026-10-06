@@ -78,7 +78,9 @@ rotli.co sets no cookies and runs no analytics, ads, or third-party scripts.
 Its pages, fonts, images, and films are served from the site itself. The one
 exception is the Launch Llama badge in the footer, an image loaded from Launch
 Llama's own server, which therefore sees a request from the visitor's browser.
-Railway (hosting) and Cloudflare (DNS) process standard request details such
+The star count beside the header's GitHub link is read from GitHub's public
+API once, when the site is built; the visitor's browser never contacts GitHub
+to show it. Railway (hosting) and Cloudflare (DNS) process standard request details such
 as the IP address to deliver pages.
 
 The footer's optional "Hear when it's ready" list sends the address a visitor

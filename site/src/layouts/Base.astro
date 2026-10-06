@@ -557,8 +557,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       .primary-nav > a,
       .nav-dropdown-fallback,
-      .nav-dropdown-toggle,
-      .github-link {
+      .nav-dropdown-toggle {
         min-height: 44px;
         display: inline-flex;
         align-items: center;
@@ -571,8 +570,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .nav-dropdown-fallback:hover,
       .nav-dropdown-toggle:hover,
       .nav-dropdown-toggle[aria-expanded='true'],
-      .nav-dropdown.is-current > *,
-      .github-link:hover {
+      .nav-dropdown.is-current > * {
         color: var(--text);
       }
       .primary-nav > a[aria-current='page'],
@@ -677,13 +675,42 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .primary-nav + .header-actions {
         margin-left: 0;
       }
+      /* GitHub with its star count (SiteHeader.astro): an outlined button at the header
+         button's size, the mark, "Star", and the count after a hairline. */
       .github-link {
-        width: 44px;
-        justify-content: center;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.8rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.6rem;
+        color: var(--text);
+        font-size: 0.88rem;
+        font-weight: 600;
+        line-height: 1;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background-color 140ms ease-out;
+      }
+      .github-link:hover {
+        background: var(--surface-2);
       }
       .github-link svg {
-        width: 20px;
-        height: 20px;
+        flex: none;
+        width: 18px;
+        height: 18px;
+      }
+      .github-count {
+        padding-left: 0.5rem;
+        border-left: 1px solid var(--border-strong);
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .nav-menu-panel > .menu-github small {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 500;
       }
       .button {
         min-height: 50px;
@@ -815,8 +842,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .nav-menu-group > a {
         padding-left: 1.4rem;
       }
-      .nav-menu-panel > .button {
+      .nav-menu-panel > .button,
+      .nav-menu-panel > .menu-github {
         display: none;
+      }
+      .nav-menu-panel > .button {
         margin-top: 0.4rem;
       }
 
@@ -1041,7 +1071,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
         .header-actions > .github-link {
           display: none;
         }
-        .nav-menu-panel > .button {
+        .nav-menu-panel > .button,
+        .nav-menu-panel > .menu-github {
           display: flex;
         }
         .footer-groups {
