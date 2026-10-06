@@ -328,6 +328,11 @@ The seven open questions, answered by the owner on 2026-10-06:
 7. **Canvas colours:** six roles (`--canvas-1`…`--canvas-6`) in every theme
    family, light and dark, so JSON Canvas colours paint.
 
+8. **Canvas in search and lists** (2026-10-06): yes, like a board — found
+   by name in ⌘K and listed in All notes, with its own icon.
+9. **Canvas lifecycle** (2026-10-06): Archive and Move to Trash work on a
+   canvas like a note, keeping its folder path.
+
 **Sequencing:** the Graph (with decision 4) ships as its own PR to `dev`
 first. The Canvas continues on its branch with the decisions applied and
 these pieces added, as a second PR: New → Canvas, dragging notes in,
