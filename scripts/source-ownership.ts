@@ -69,6 +69,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "emptyState.tsx": "shared empty-state primitive",
   "fileNotice.tsx": "application-shell transient notice for Finder drops and pastes that landed out of sight",
   "glyphs.tsx": "shared first-party glyph registry",
+  "noteGlyph.tsx": "shared row mark for a note, board, canvas, or file (split from glyphs.tsx)",
   "hotkeyBadges.tsx": "shared shortcut badge overlay",
   "icon.tsx": "shared semantic icon primitive",
   "iconButton.tsx": "shared accessible icon-button primitive",

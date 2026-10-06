@@ -21,17 +21,10 @@ import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary, SearchHit } from "../types";
 import { QuokkaMark } from "./character";
-import {
-  glyphForNote,
-  ChatGlyph,
-  FocusGlyph,
-  KeyboardGlyph,
-  PlusGlyph,
-  SplitGlyph,
-  SunGlyph,
-} from "./glyphs";
+import { ChatGlyph, FocusGlyph, KeyboardGlyph, PlusGlyph, SplitGlyph, SunGlyph } from "./glyphs";
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
+import { glyphForNote } from "./noteGlyph";
 import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
 
 function actionIcon(id: string): ReactNode {

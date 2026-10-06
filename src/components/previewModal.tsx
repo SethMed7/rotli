@@ -19,8 +19,8 @@ import { chatSlugOf, isChatItem, kindLabel } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { kindOf } from "./fileSurface";
-import { glyphForNote } from "./glyphs";
 import { MarkdownPeek } from "./markdownPeek";
+import { glyphForNote } from "./noteGlyph";
 
 const TEXT_PEEK_BYTES = 64_000;
 

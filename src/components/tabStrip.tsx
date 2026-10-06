@@ -67,9 +67,9 @@ import {
   PlusGlyph,
   SpeakerGlyph,
   XGlyph,
-  glyphForNote,
 } from "./glyphs";
 import { InlineRenameInput } from "./inlineRenameInput";
+import { glyphForNote } from "./noteGlyph";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {

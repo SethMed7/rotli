@@ -85,8 +85,8 @@ import {
   StarGlyph,
   StorageGlyph,
   TrashGlyph,
-  glyphForNote,
 } from "../glyphs";
+import { glyphForNote } from "../noteGlyph";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";

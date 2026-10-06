@@ -3084,102 +3084,6 @@ impl CorpusStore {
         })
     }
 
-    /// Why a surfaced storage asset cannot enter Rotli's in-memex Archive/Trash
-    /// (None = it can). Markdown and boards keep their own lifecycle.
-    fn storage_file_lifecycle_block(&self, rel: &str) -> Option<&'static str> {
-        if self.mutation_allowed().is_err() {
-            return Some("read-only vault");
-        }
-        if !self.guard_rel(rel).is_ok_and(|path| path.is_file()) {
-            return Some("not a file");
-        }
-        let in_storage = match self.layout {
-            Layout::Memex => rel.starts_with("storage/"),
-            Layout::LegacyRotli => rel.starts_with("Storage/"),
-        };
-        let ext = Path::new(rel)
-            .extension()
-            .and_then(|value| value.to_str())
-            .map(str::to_ascii_lowercase);
-        let own_lifecycle = matches!(ext.as_deref(), Some("md" | "markdown" | "excalidraw"));
-        (!in_storage || own_lifecycle).then_some("outside Rotli storage")
-    }
-
-    /// Move an existing storage asset into Archive/Trash while preserving its
-    /// original relative path below that sink. The breadcrumb is therefore
-    /// durable user-visible structure, not `.rotli/` state.
-    pub fn move_file_to_sink(&mut self, rel: &str, sink: &str) -> Result<String, String> {
-        validate_rel(rel)?;
-        if sink != "Archive" && sink != "Trash" {
-            return Err(format!("not a file lifecycle destination: {sink}"));
-        }
-        if let Some(reason) = self.storage_file_lifecycle_block(rel) {
-            return Err(format!("this file can't move ({reason}): {rel}"));
-        }
-        let abs = self.abs(rel);
-        let name = Path::new(rel)
-            .file_name()
-            .map(|value| value.to_string_lossy().into_owned())
-            .ok_or_else(|| format!("file has no name: {rel}"))?;
-        let disk_sink = lifecycle_disk_folder(self.layout, sink);
-        let original_folder = folder_of(rel);
-        let sink_folder = if original_folder.is_empty() {
-            disk_sink
-        } else {
-            format!("{disk_sink}/{original_folder}")
-        };
-        validate_rel(&sink_folder)?;
-        self.guard_rel(&sink_folder)?;
-        fs::create_dir_all(self.abs(&sink_folder))
-            .map_err(|e| format!("create {sink_folder}: {e}"))?;
-        let target_rel = self.free_name(&sink_folder, &name, None);
-        let target_abs = self.abs(&target_rel);
-        self.suppress.mark(&abs);
-        self.suppress.mark(&target_abs);
-        fs::rename(&abs, &target_abs).map_err(|e| format!("move {rel} to {sink}: {e}"))?;
-        Ok(target_rel)
-    }
-
-    /// Restore a file from Archive/Trash to the storage path nested beneath the
-    /// sink. Collisions are renamed safely; no restore overwrites another file.
-    pub fn restore_file(&mut self, rel: &str) -> Result<String, String> {
-        validate_rel(rel)?;
-        self.mutation_allowed()?;
-        self.guard_rel(rel)?;
-        let original_rel = rel
-            .strip_prefix("Archive/")
-            .or_else(|| rel.strip_prefix("Trash/"))
-            .or_else(|| rel.strip_prefix("archive/"))
-            .or_else(|| rel.strip_prefix("trash/"))
-            .ok_or_else(|| format!("file is not in Archive or Trash: {rel}"))?;
-        let in_storage = match self.layout {
-            Layout::Memex => original_rel.starts_with("storage/"),
-            Layout::LegacyRotli => original_rel.starts_with("Storage/"),
-        };
-        // a BOARD restores by this lane too (2026-08-04): it is path-addressed
-        // with no frontmatter origin, so the sink-relative path is its only way
-        // home — and in LegacyRotli boards live in `Board/`, outside storage.
-        let is_board = original_rel.ends_with(".excalidraw");
-        if (!in_storage && !is_board) || !self.abs(rel).is_file() {
-            return Err(format!("file has no restorable storage origin: {rel}"));
-        }
-        let name = Path::new(original_rel)
-            .file_name()
-            .map(|value| value.to_string_lossy().into_owned())
-            .ok_or_else(|| format!("file has no name: {rel}"))?;
-        let original_folder = folder_of(original_rel);
-        self.guard_rel(&original_folder)?;
-        fs::create_dir_all(self.abs(&original_folder))
-            .map_err(|e| format!("create {original_folder}: {e}"))?;
-        let target_rel = self.free_name(&original_folder, &name, None);
-        let source_abs = self.abs(rel);
-        let target_abs = self.abs(&target_rel);
-        self.suppress.mark(&source_abs);
-        self.suppress.mark(&target_abs);
-        fs::rename(&source_abs, &target_abs).map_err(|e| format!("restore {rel}: {e}"))?;
-        Ok(target_rel)
-    }
-
     /// Overwrite a surfaced FILE's raw bytes — the spreadsheet editor's SAVE lane.
     /// Same per-store `writable()` gate as every user write, PLUS the sanctioned
     /// storage-office exception (storage_office_editable): an existing sheet/DOCX
@@ -6838,12 +6742,17 @@ fn walk(
         } else if kind.is_file() {
             // Any OTHER file (image, pdf, txt, …): surfaced read-only so a folder
             // like Storage shows what's actually in it. id == its relative path,
-            // title = the filename WITH its extension (so "photo.png" reads true).
+            // title = the filename WITH its extension (so "photo.png" reads true)
+            // — except a JSON Canvas, named like a board without its extension.
             let abs = entry.path();
             let (file_created, file_updated) = file_stamps(&abs);
             notes.push(NoteMeta {
                 id: rel.clone(),
-                title: name,
+                title: if is_canvas_path(&rel) {
+                    board_title(&rel)
+                } else {
+                    name
+                },
                 snippet: String::new(),
                 body_empty: false,
                 aliases: Vec::new(),
@@ -8831,6 +8740,12 @@ pub mod alias_cleanup;
 /// The Graph view's Links projection — a child module.
 #[path = "corpus_links.rs"]
 pub mod links;
+
+/// Files that aren't notes: a canvas born beside notes, and how a file moves
+/// to Archive/Trash and back — a child module.
+#[path = "corpus_files.rs"]
+pub mod files;
+pub(crate) use files::is_canvas_path;
 /// The Librarian rules' store side (secure keywords, the batch) — a child module.
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
@@ -9453,76 +9368,6 @@ mod tests {
         assert!(!store.managed_file_creation_available());
         assert!(store.create_managed_file("blocked.docx", b"nope").is_err());
         assert!(!root.join("storage/rotli/blocked.docx").exists());
-    }
-
-    #[test]
-    fn storage_files_move_to_memex_sinks_and_restore_only_when_mutable() {
-        let dir = TempDir::new().unwrap();
-        let root = dir.path().join("brain");
-        seed_memex(&root);
-        let mut store = CorpusStore::open(root.clone()).unwrap();
-        store.os_trash = false;
-
-        let doc = store.create_managed_file("draft.docx", b"docx").unwrap();
-        let stat = store.file_stat(&doc).unwrap();
-        assert!(
-            stat.writable,
-            "DOCX files open in Rotli's local document editor"
-        );
-        assert!(
-            stat.lifecycle_mutable,
-            "managed files still need a lifecycle action"
-        );
-        let trashed = store.move_file_to_sink(&doc, "Trash").unwrap();
-        assert!(!root.join(&doc).exists());
-        assert_eq!(trashed, "trash/storage/rotli/draft.docx");
-        assert!(root.join(&trashed).is_file());
-        let listed = store.list().unwrap();
-        assert!(
-            listed.notes.iter().any(|note| {
-                note.id == trashed
-                    && note.folder_id == "Trash/storage/rotli"
-                    && note.kind == NoteKind::File
-            }),
-            "trashed file was not surfaced: {:?}",
-            listed.notes
-        );
-        assert_eq!(store.restore_file(&trashed).unwrap(), doc);
-        assert!(root.join(&doc).is_file());
-
-        let archived = store.move_file_to_sink(&doc, "Archive").unwrap();
-        assert_eq!(archived, "archive/storage/rotli/draft.docx");
-        assert_eq!(store.restore_file(&archived).unwrap(), doc);
-
-        // the FILE lifecycle stays a storage-lane affair even though wiki/ is a
-        // writable NOTE lane (2026-08-03): a binary parked in wiki/ is outside
-        // Rotli storage, so the sink move still refuses it.
-        fs::create_dir_all(root.join("wiki/projects")).unwrap();
-        fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
-        assert!(store
-            .move_file_to_sink("wiki/projects/reference.pdf", "Trash")
-            .is_err());
-        assert!(root.join("wiki/projects/reference.pdf").is_file());
-        assert!(store.move_file_to_sink(&doc, "Somewhere").is_err());
-    }
-
-    #[test]
-    fn file_stat_names_why_a_file_cannot_enter_archive_or_trash() {
-        let dir = TempDir::new().unwrap();
-        let root = dir.path().join("brain");
-        seed_memex(&root);
-        let mut store = CorpusStore::open(root.clone()).unwrap();
-        let doc = store.create_managed_file("reasons.docx", b"docx").unwrap();
-        assert_eq!(store.file_stat(&doc).unwrap().lifecycle_reason, None);
-        fs::create_dir_all(root.join("wiki/projects")).unwrap();
-        fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
-        let outside = store.file_stat("wiki/projects/reference.pdf").unwrap();
-        assert!(!outside.lifecycle_mutable);
-        assert_eq!(outside.lifecycle_reason.as_deref(), Some("outside Rotli storage"));
-        store.set_perms_read_only(true);
-        let locked = store.file_stat(&doc).unwrap();
-        assert!(!locked.lifecycle_mutable);
-        assert_eq!(locked.lifecycle_reason.as_deref(), Some("read-only vault"));
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).

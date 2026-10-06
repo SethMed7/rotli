@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { isCanvasPath } from "../lib/fileKind";
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
   corpusFileStat,
@@ -223,7 +224,9 @@ export function useSearchableNotes(): { notes: NoteSummary[]; ready: boolean } {
         // conservative transient (a plain root's chats/ appears a beat later,
         // never flashes in and out)
         const chats = memex ? isChats(n.folderId, memex) : isChatsPath(n.folderId);
-        if (n.kind === "file" || isSink(n.folderId) || chats) continue;
+        // files stay out — except a canvas, listed and linked like a board
+        // (owner decision 2026-10-06)
+        if ((n.kind === "file" && !isCanvasPath(n.id)) || isSink(n.folderId) || chats) continue;
         seen.set(n.id, n);
       }
     return [...seen.values()];

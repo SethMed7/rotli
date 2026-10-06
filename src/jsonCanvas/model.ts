@@ -67,6 +67,13 @@ export interface CanvasDoc {
   extra?: Record<string, unknown>;
 }
 
+/** Why a file can't open as a canvas — one wording, shared with the tests. */
+export const CANVAS_REFUSAL = {
+  notJson: "This canvas isn’t valid JSON.",
+  notObject: "This canvas isn’t a JSON Canvas object.",
+  notLists: "This canvas’s nodes or edges aren’t lists.",
+} as const;
+
 export type ParseResult = { ok: true; doc: CanvasDoc } | { ok: false; error: string };
 
 const SIDES = new Set<string>(["top", "right", "bottom", "left"]);
@@ -168,13 +175,13 @@ export function parseCanvas(text: string): ParseResult {
   try {
     raw = JSON.parse(text);
   } catch {
-    return { ok: false, error: "This canvas isn’t valid JSON." };
+    return { ok: false, error: CANVAS_REFUSAL.notJson };
   }
-  if (!isObject(raw)) return { ok: false, error: "This canvas isn’t a JSON Canvas object." };
+  if (!isObject(raw)) return { ok: false, error: CANVAS_REFUSAL.notObject };
   const rawNodes = raw.nodes ?? [];
   const rawEdges = raw.edges ?? [];
   if (!Array.isArray(rawNodes) || !Array.isArray(rawEdges)) {
-    return { ok: false, error: "This canvas’s nodes or edges aren’t lists." };
+    return { ok: false, error: CANVAS_REFUSAL.notLists };
   }
   const nodes: CanvasNode[] = [];
   const ids = new Set<string>();

@@ -14,6 +14,15 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 1. In the work
 
+- **Canvas** · L — cards on an open plane, saved as JSON Canvas `.canvas`
+  files that Obsidian also opens. Development builds: New → Canvas makes one
+  beside your notes, found in ⌘K and All notes, and Archive and Trash take it
+  like a note. Type a card, or put just `[[a note]]` in one
+  to show that note; connect cards with lines and gather them into groups.
+  A note card shows the note and opens it in a tab; lines stay drawings and
+  never become links. A new canvas sits beside your notes. Excalidraw boards
+  stay as they are, for drawing (owner decisions 2026-10-06,
+  [design](docs/design/canvas-and-graph-2026-10-05.md)).
 - **Sheets** · L — spreadsheets (XLSX and CSV) inside Rotli ship in Beta
   (2026-10-05), beside Documents. Left: keep undo across a theme or tab switch,
   carry dropdowns and colour rules through the grid, then drop the Beta mark.
@@ -37,13 +46,6 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 2. Planned
 
-- **Canvas** · L — cards on an open plane, saved as JSON Canvas `.canvas`
-  files that Obsidian also opens. Type a card, or put just `[[a note]]` in one
-  to show that note; connect cards with lines and gather them into groups.
-  A note card shows the note and opens it in a tab; lines stay drawings and
-  never become links. A new canvas sits beside your notes. Excalidraw boards
-  stay as they are, for drawing (owner decisions 2026-10-06,
-  [design](docs/design/canvas-and-graph-2026-10-05.md)).
 - **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
   format bar at the bottom turns into a small Librarian chat, like the chat
   bubble on a website; one click opens the same conversation full size in

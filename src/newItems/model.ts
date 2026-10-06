@@ -1,5 +1,6 @@
 /** Stable item kinds used by every creation entry point and persisted setting. */
-export const NEW_ITEM_KINDS = ["markdown", "document", "sheet", "board", "mermaid"] as const;
+/** Chooser order; a new kind goes LAST so every earlier digit stays put. */
+export const NEW_ITEM_KINDS = ["markdown", "document", "sheet", "board", "mermaid", "canvas"] as const;
 
 export type NewItemKind = (typeof NEW_ITEM_KINDS)[number];
 
@@ -13,7 +14,7 @@ export interface NewItemDefinition {
 
 /** Kinds whose filename IS their name, so the name is collected before the
  * file exists — cancelling leaves nothing behind. */
-const NAME_FIRST_KINDS = ["board", "document"] as const;
+const NAME_FIRST_KINDS = ["board", "canvas", "document"] as const;
 export type NameFirstKind = (typeof NAME_FIRST_KINDS)[number];
 
 export function isNameFirstKind(kind: NewItemKind): kind is NameFirstKind {
@@ -29,12 +30,14 @@ export interface NewItemFeatures {
   documents: boolean;
   sheets: boolean;
   mermaidDiagrams: boolean;
+  jsonCanvas: boolean;
 }
 
 export function newItemAvailability(kind: NewItemKind, features: NewItemFeatures): NewItemAvailability {
   if (kind === "document" && !features.documents) return "comingSoon";
   if (kind === "sheet" && !features.sheets) return "comingSoon";
   if (kind === "mermaid" && !features.mermaidDiagrams) return "comingSoon";
+  if (kind === "canvas" && !features.jsonCanvas) return "comingSoon";
   return "available";
 }
 
@@ -95,6 +98,11 @@ export const NEW_ITEM_DEFINITIONS: readonly NewItemDefinition[] = [
     kind: "mermaid",
     label: "Mermaid diagram",
     description: "A note born with a flowchart fence and its diagram workspace.",
+  },
+  {
+    kind: "canvas",
+    label: "Canvas",
+    description: "Cards and notes on an open plane, saved as a JSON Canvas.",
   },
 ];
 

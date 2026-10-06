@@ -10,8 +10,9 @@ import { extOf } from "../../lib/fileKind";
 import { FOLDER_ICON_KIND, iconKind } from "../../lib/sidebarLook";
 import { renameTargetFor } from "../../services/itemRename";
 import type { NoteSummary } from "../../types";
-import { ChevronRight, FolderGlyph, glyphForNote } from "../glyphs";
+import { ChevronRight, FolderGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
+import { glyphForNote } from "../noteGlyph";
 import { useCommitRename } from "../renameDialog";
 
 export function FolderRenameRow({

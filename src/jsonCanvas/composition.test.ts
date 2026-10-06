@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 
 import type { FileStat } from "../lib/tauri";
-import { CANVAS_MAX_BYTES, type CanvasFileIo, loadCanvasFile } from "./composition";
+import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, type CanvasFileIo, loadCanvasFile } from "./composition";
+import { CANVAS_REFUSAL } from "./model";
 
 const stat = (len: number): FileStat =>
   ({ len, revision: "r1", writable: true, lifecycleMutable: false, lifecycleReason: null }) as FileStat;
@@ -37,16 +38,17 @@ test("it fails closed: no fake blank canvas off the Mac app, no half a file, no 
     return { error: state.status === "error" ? state.error : null, reads };
   };
   expect(await refused({ native: () => false })).toEqual({
-    error: "Canvases open in the Mac app for now.",
+    error: CANVAS_LOAD_REFUSAL.notHere,
     reads: [],
   });
   expect(await refused({ stat: async () => null })).toEqual({
-    error: "This canvas isn’t in the vault anymore.",
+    error: CANVAS_LOAD_REFUSAL.gone,
     reads: [],
   });
   expect(await refused({ stat: async () => stat(CANVAS_MAX_BYTES + 1) })).toEqual({
-    error: "This canvas is too large to open.",
+    error: CANVAS_LOAD_REFUSAL.tooLarge,
     reads: [],
   });
-  expect((await refused({ text: async () => "{nope" })).error).toBe("This canvas isn’t valid JSON.");
+  // a parse failure surfaces the parser's own reason
+  expect((await refused({ text: async () => "[1," })).error).toBe(CANVAS_REFUSAL.notJson);
 });

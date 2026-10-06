@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { isValidElement } from "react";
 
-import { DocumentGlyph, WordGlyph, glyphForNote } from "./glyphs";
+import { DocumentGlyph, WordGlyph } from "./glyphs";
+import { CanvasGlyph, glyphForNote } from "./noteGlyph";
 
 function glyphType(title: string): unknown {
   const glyph = glyphForNote({ kind: "file", title });
@@ -21,4 +22,11 @@ describe("conventional file glyph identity", () => {
     expect(glyphType("report.odt")).toBe(DocumentGlyph);
     expect(glyphType("notes.rtf")).toBe(DocumentGlyph);
   });
+});
+
+test("a canvas wears the canvas mark, listed by id or tabbed by file name", () => {
+  const listed = glyphForNote({ kind: "file", id: "wiki/Q3 plan.canvas", title: "Q3 plan" });
+  const tabbed = glyphForNote({ kind: "file", title: "Q3 plan.canvas" });
+  expect(isValidElement(listed) && listed.type).toBe(CanvasGlyph);
+  expect(isValidElement(tabbed) && tabbed.type).toBe(CanvasGlyph);
 });

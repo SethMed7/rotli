@@ -8,7 +8,7 @@ import {
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { corpusCreateManagedFile } from "../lib/tauri";
+import { corpusCreateCanvas, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
 import { boardStore } from "../services/boardStore";
@@ -114,7 +114,7 @@ const creator: NewItemCreator = {
         kind,
       };
     }
-    throw new Error("a board needs a name before it can be created");
+    throw new Error(`a ${kind} needs a name before it can be created`);
   },
 };
 
@@ -190,22 +190,30 @@ export async function createManagedItem(
   refuseWithheldKind(kind);
   const name = options.name?.trim() ?? "";
   if (kind === "board" && !name) throw new Error("a board needs a name");
+  if (kind === "canvas" && !name) throw new Error("a canvas needs a name");
   const baseItemCreator: NewItemCreator =
-    kind === "board"
+    kind === "canvas"
       ? {
+          // beside notes, in the folder you're in (owner decision 2026-10-06)
           async create() {
-            const board = await boardStore().create(resolvedPhysicalFolder(), name);
-            return { id: board.id, kind: "board" };
+            return { id: await corpusCreateCanvas(resolvedPhysicalFolder(), name), kind: "canvas" };
           },
         }
-      : kind === "document" && name
+      : kind === "board"
         ? {
             async create() {
-              const { createManagedDocument } = await import("../documents/composition");
-              return { id: await createManagedDocument(Date.now(), name), kind: "document" };
+              const board = await boardStore().create(resolvedPhysicalFolder(), name);
+              return { id: board.id, kind: "board" };
             },
           }
-        : creator;
+        : kind === "document" && name
+          ? {
+              async create() {
+                const { createManagedDocument } = await import("../documents/composition");
+                return { id: await createManagedDocument(Date.now(), name), kind: "document" };
+              },
+            }
+          : creator;
   const filingContext = options.filing ?? currentFilingContext();
   let pendingNotePrepared = false;
   let abandonedBlankMarkdown = false;

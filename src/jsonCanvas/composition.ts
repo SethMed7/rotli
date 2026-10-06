@@ -30,6 +30,13 @@ export interface CanvasFileIo {
 }
 const liveIo: CanvasFileIo = { native: isTauri, stat: corpusFileStat, text: corpusFileText };
 
+/** Why a canvas file didn't open — one wording, shared with the tests. */
+export const CANVAS_LOAD_REFUSAL = {
+  notHere: "Canvases open in the Mac app for now.",
+  gone: "This canvas isn’t in the vault anymore.",
+  tooLarge: "This canvas is too large to open.",
+} as const;
+
 /** Read and parse a canvas, failing closed: outside the Mac app the file
  * adapter would answer "" and accept saves without writing, so it refuses
  * instead of showing a blank canvas; the whole file is read (the adapter's
@@ -39,10 +46,10 @@ export async function loadCanvasFile(
   io: CanvasFileIo = liveIo,
 ): Promise<{ state: CanvasFileState; revision: string | null }> {
   const refuse = (error: string) => ({ state: { status: "error", error } as const, revision: null });
-  if (!io.native()) return refuse("Canvases open in the Mac app for now.");
+  if (!io.native()) return refuse(CANVAS_LOAD_REFUSAL.notHere);
   const stat = await io.stat(fileId);
-  if (!stat) return refuse("This canvas isn’t in the vault anymore.");
-  if (stat.len > CANVAS_MAX_BYTES) return refuse("This canvas is too large to open.");
+  if (!stat) return refuse(CANVAS_LOAD_REFUSAL.gone);
+  if (stat.len > CANVAS_MAX_BYTES) return refuse(CANVAS_LOAD_REFUSAL.tooLarge);
   const parsed = parseCanvas(await io.text(fileId, stat.len));
   if (!parsed.ok) return refuse(parsed.error);
   return {

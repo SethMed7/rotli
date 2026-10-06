@@ -366,6 +366,7 @@ export function registerDefaultActions(): void {
     ["items.newDocument", "New document", "document"],
     ["items.newSheet", "New sheet", "sheet"],
     ["items.newMermaid", "New Mermaid diagram", "mermaid"],
+    ["items.newCanvas", "New canvas", "canvas"],
   ] as const) {
     if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({

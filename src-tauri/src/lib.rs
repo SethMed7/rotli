@@ -2321,6 +2321,7 @@ pub fn run() {
             corpus::corpus_restore_file,
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
+            corpus::files::corpus_create_canvas,
             corpus::corpus_create_managed_file,
             corpus::corpus_export_note_pdf,
             corpus::corpus_convert_document,

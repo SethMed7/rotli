@@ -2,7 +2,8 @@
 
 import { type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { PlusGlyph, glyphForNote } from "../components/glyphs";
+import { PlusGlyph } from "../components/glyphs";
+import { glyphForNote } from "../components/noteGlyph";
 import { DOCX_EDITABLE } from "../documents/kinds";
 import { extOf, fileName } from "../lib/fileKind";
 import { subsequenceMatch } from "../lib/fuzzy";

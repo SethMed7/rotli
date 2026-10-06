@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { colorName, fileTitle, parseCanvas, serializeCanvas } from "./model";
+import { CANVAS_REFUSAL, colorName, fileTitle, parseCanvas, serializeCanvas } from "./model";
 
 // the shape Obsidian writes (tabs, one item per line), with every node type,
 // an unknown type, an extra field, a hex color, and a top-level key from
@@ -41,9 +41,9 @@ test("a broken canvas is refused with a reason instead of opening half-read", ()
     const parsed = parseCanvas(text);
     return parsed.ok ? null : parsed.error;
   };
-  expect(refused("{nope")).toBe("This canvas isn’t valid JSON.");
-  expect(refused("[]")).toBe("This canvas isn’t a JSON Canvas object.");
-  expect(refused('{"nodes":{}}')).toBe("This canvas’s nodes or edges aren’t lists.");
+  expect(refused("{nope")).toBe(CANVAS_REFUSAL.notJson);
+  expect(refused("[]")).toBe(CANVAS_REFUSAL.notObject);
+  expect(refused('{"nodes":{}}')).toBe(CANVAS_REFUSAL.notLists);
   expect(refused('{"nodes":[{"id":"a","type":"text","x":0,"y":0,"width":1}]}')).toContain(
     "no position or size",
   );

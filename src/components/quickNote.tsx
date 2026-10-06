@@ -38,9 +38,10 @@ import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { ContextMenu } from "./contextMenu";
-import { PlusGlyph, SearchGlyph, ShieldGlyph, glyphForNote } from "./glyphs";
+import { PlusGlyph, SearchGlyph, ShieldGlyph } from "./glyphs";
 import { HotkeyBadges } from "./hotkeyBadges";
 import { IconButton } from "./iconButton";
+import { glyphForNote } from "./noteGlyph";
 import { WhichKey } from "./whichKey";
 
 /** Manual drag (never data-tauri-drag-region) so double-click can't zoom. */

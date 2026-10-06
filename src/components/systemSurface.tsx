@@ -68,9 +68,9 @@ import {
   ListViewGlyph,
   NewFolderGlyph,
   SearchGlyph,
-  glyphForNote,
   ChatGlyph,
 } from "./glyphs";
+import { glyphForNote } from "./noteGlyph";
 import { NoteListRow } from "./noteListRow";
 import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
 import { useNoteMenu } from "./useNoteMenu";
