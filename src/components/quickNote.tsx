@@ -410,10 +410,16 @@ export function QuickNote() {
               <ShieldGlyph size={15} />
             </IconButton>
           )}
-          <IconButton label="Switch or pin a note — ⌘P" hotkey="quick.search" onClick={openPicker}>
+          {/* the Quick window's right edge clips a centred label: these open leftward */}
+          <IconButton
+            className="tb-trail"
+            label="Switch or pin a note — ⌘P"
+            hotkey="quick.search"
+            onClick={openPicker}
+          >
             <SearchGlyph size={15} />
           </IconButton>
-          <IconButton label="New quick note — ⌘N" hotkey="quick.new" onClick={newNote}>
+          <IconButton className="tb-trail" label="New quick note — ⌘N" hotkey="quick.new" onClick={newNote}>
             <PlusGlyph size={15} />
           </IconButton>
         </div>

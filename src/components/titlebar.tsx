@@ -226,11 +226,19 @@ export function Titlebar() {
         )}
         {/* pinned sites, left of the globe (2026-10-01) */}
         {!settingsOpen && !WEB && <PinButtons />}
-        {!settingsOpen && !WEB && !hidden.browserButton && (
-          <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
-            <BrowserGlyph size={TB_ICON} />
-          </IconButton>
-        )}
+        {!settingsOpen &&
+          !WEB &&
+          !hidden.browserButton && (
+            // the trailing group's labels open leftward: with the theme button
+            // hidden this one sits second from the edge (audit 2026-10-06)
+            <IconButton
+              className="tb-trail"
+              label="New private browser"
+              onClick={() => usePanesStore.getState().openBrowser()}
+            >
+              <BrowserGlyph size={TB_ICON} />
+            </IconButton>
+          )}
         {/* The sun steps through environments as Appearance → Theme button says. */}
         {/* second from the right with the longest label: it anchors right
             too, or its centred tip reaches past the window (2026-10-06) */}

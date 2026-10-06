@@ -30,3 +30,19 @@ for (const width of [1280, 900]) {
     expect(await page.evaluate(() => window.scrollX)).toBe(0);
   });
 }
+
+test("the Quick Note window's hover labels stay inside it", async ({ page }) => {
+  await page.setViewportSize({ width: 420, height: 520 });
+  await page.goto("/?window=quick");
+  await page.locator(".quick-actions").waitFor();
+  const outside = await page.evaluate(() => {
+    const right = document.documentElement.clientWidth;
+    return [...document.querySelectorAll(".quick-actions .tip")]
+      .filter((tip) => {
+        const box = tip.getBoundingClientRect();
+        return box.width > 0 && (box.right > right + 0.5 || box.left < -0.5);
+      })
+      .map((tip) => tip.textContent);
+  });
+  expect(outside).toEqual([]);
+});
