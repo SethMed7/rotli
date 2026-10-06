@@ -1,34 +1,38 @@
 ---
 // Why the Librarian exists, in two figures from other people's research and one sentence of
-// ours, beside a small scene from the film's island: four AI tools (the average subscriber's
-// four) idle on a bench by the sea, two of them asleep, until the quokka arrives with a stack
-// of notes and hands each one something to file. The four read as the products people pay
-// for (the owner, 2026-10-05: "so people know we are talking about gemini/antigravity,
-// chatGPT, claude"): each bot wears its product's signature colour (the --bot-* tokens in
-// Base.astro), a generic cue on its head, and its name underneath. Nothing traces or copies a
+// ours, beside a small scene from the film's island: four AI tools idle on a bench by the sea,
+// two of them asleep, until the quokka arrives with a stack of notes and hands each one something
+// to file. The four read as the products people pay for (the owner, 2026-10-05: "so people know
+// we are talking about gemini/antigravity, chatGPT, claude"): each bot wears its product's
+// signature colour (the --bot-* tokens in Base.astro), a generic cue on its head, and its name
+// underneath. The count of four is the scene's, not a statistic. Nothing traces or copies a
 // product's logo artwork; the names are plain text. It plays once when revealed and rests on
 // everyone busy; reduced motion and no script show that resting state. The figures stay plain
 // text with their footnotes: no card, no chart, no count-up.
 //
-// Each figure is checked against its source (verified 2026-10-02, population wording corrected
-// 2026-10-05 per the #156 review): Self Financial surveyed 1,272 U.S. adults who pay for at least
-// one subscription of any kind, and among its respondents paying for ChatGPT, 50.4% had not used
-// it in the past 30 days; Bango's 2025 report puts the average AI subscriber at about $66 a month
-// across 4 AI tools. Never call it "wasted".
+// Each figure is checked against its source (re-fetched 2026-10-05; the post
+// the-ai-you-already-pay-for carries the full audit). Self Financial (March 2026) surveyed 1,272
+// U.S. adults who pay for at least one subscription of any kind, and among its respondents paying
+// for ChatGPT, 50.4% had not used it in the past 30 days. Menlo Ventures / Morning Consult (July
+// 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for AI, 50% use AI daily,
+// so half don't (our arithmetic on Menlo's figure). The earlier "4 tools, about $66 a month"
+// figure (Bango) came out: it is a paying-for-several-tools number from a report whose headline is
+// that the plans are essential, so it is context in the post, not evidence of idle plans.
+// Never call it "wasted".
 import working from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 
 const figures = [
-  { value: 'Half', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
-  { value: '4 tools', text: 'is what the average AI subscriber pays for, about $66 a month.', note: 2 },
+  { value: '50.4%', text: 'of paying ChatGPT users hadn’t used it in the past 30 days.', note: 1 },
+  { value: 'Half', text: 'of paying AI users don’t use AI every day.', note: 2 },
 ];
 const sources = [
   {
     href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
-    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The figure is among respondents paying for ChatGPT (50.4%).',
+    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The figure is among respondents paying for ChatGPT.',
   },
   {
-    href: 'https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/',
-    text: 'Bango, “The rise of the AI subscriber,” 2025',
+    href: 'https://menlovc.com/perspective/2026-the-state-of-consumer-ai/',
+    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often.',
   },
 ];
 /** The four tools on the bench, left to right; the first and third start asleep. `cue` is the

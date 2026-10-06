@@ -1,60 +1,75 @@
 ---
-title: The AI you already pay for could be filing your notes
-description: Two recent surveys on paid AI plans found many of them unopened for a month or more. What the numbers say, what they don't, and why rotli puts the plan you already have to work instead of selling you another one.
+title: Paid AI plans often sit unopened. rotli can put them to work.
+description: What recent surveys say about paid AI plans that go unused, what they can't say, and how rotli's Librarian files your notes with the plan or tool you already have, or a model on your Mac.
 section: post
 date: 2026-10-05
 ---
 
-rotli's home page has a short band with two numbers in it: half of the people paying for ChatGPT
-hadn't used it in the past 30 days, and the average AI subscriber pays for four tools. This post gives
-the longer version. It covers where those numbers come from, who was asked, what they don't show, and
-why they shaped how rotli handles AI.
+We can't tell you how much of your AI plan goes unused. No survey we found measures that. What surveys
+can tell us is how many people pay for an AI tool and then haven't opened it lately. That number is
+large enough to matter. It is why rotli doesn't sell an AI plan of its own, and puts the one you
+already have to work instead. This post sets out the numbers, who was asked, and what they leave out.
 
-## Self Financial: plans that sit for a month
+## What the numbers say
 
-In March 2026, Self Financial surveyed 1,272 U.S. adults about their subscriptions. Only people who paid
-for at least one subscription of any kind were asked about use and cost. The survey counted a paid
-subscription as unused if the person hadn't used it in the last 30 days.
-
-It asked about ten paid AI services. Among the respondents who paid for each one, the share who hadn't
-used it in the past 30 days was:
+**Many paying users hadn't opened their plan in a month.** In March 2026, Self Financial surveyed 1,272
+U.S. adults who pay for at least one subscription of any kind. It asked about ten paid AI services. Among
+respondents who had each one, the share who hadn't used it in the past 30 days was:
 
 - **ChatGPT:** 50.4%, the highest of the ten
 - **Midjourney:** 42.6%
 - **Canva AI:** 40.2%
 - **Gemini:** 35.3%
-- **Claude:** 27.2%
+- **Claude:** 27.2%, the lowest of the ten
 
-The same survey looked past AI. 59.9% of respondents said they had a paid subscription going unused each
-month, 2.6 of them on average. It put the average value of those unused subscriptions at $26.79 a
-month.
+The other five (Grammarly AI, Jasper AI, Notion AI, Writesonic, and Perplexity) fell between 35.8% and
+38.7%. Every tool in the survey had at least a quarter of its paying users unused for the month.
 
-It also found that people like what they pay for. 90.3% of those with a paid AI plan said the paid
+**It isn't only AI.** In the same survey, 59.9% of respondents said they had at least one paid
+subscription going unused each month. Self Financial's report puts the average at 2.6 unused
+subscriptions per person.
+
+**Many paying users don't use AI every day.** Menlo Ventures and Morning Consult surveyed 5,067 U.S.
+adults in July 2026. Among people who use AI, 55% pay for at least one AI product, and 50% of those
+payers use AI daily (against 26% of non-payers). The other half use it less often than daily. That is
+our arithmetic on Menlo's figure, not a number Menlo prints.
+
+**People use several assistants.** In the same Menlo survey, the average AI user now uses 3.0 general AI
+assistants, up from 2.2 a year earlier. Bango asked 2,000 U.S. adults
+who pay for at least one AI service in October 2025. The average subscriber in it pays for 4 AI tools,
+about $66 a month. Menlo counts tools people use and Bango counts tools they pay for, so the two don't
+add up to one figure. Together they say that one person often has more than one assistant to open on
+a given day.
+
+## What they don't say
+
+**Usage is not value.** None of these surveys says the money was poorly spent, and we don't either. A
+month without opening ChatGPT might be a quiet month, a month spent in another tool, or a plan kept for
+the weeks that need it. In the Self Financial survey, 90.3% of people with a paid AI plan said the paid
 version is better value than the free one.
 
-## Bango: four tools, about $66 a month
+**Nobody measured the unused part of a plan.** The surveys ask whether a plan was used at all. None of
+them reports how much of its allowance, such as messages or usage limits, was left over. So we can't say how
+much room a plan has.
 
-Bango's report "The rise of the AI subscriber" came out in November 2025. It is based on 2,000
-people in the U.S. who pay for at least one AI service, surveyed in October 2025 with the research agency
-3Gem.
+**Thirty days is short, and the answers are self-reported.** People who hadn't opened a tool in 30 days
+may open it tomorrow. Menlo's "AI user" means someone who reported using specific tools in the past six
+months. Self Financial's page says its respondents came from "a range of backgrounds" and doesn't say how
+they were chosen. Its average of unused subscriptions rose from 0.8 in 2025 to 2.6 in 2026, so compare
+its years with care.
 
-The average subscriber in it pays almost $66 a month across 4 AI tools, and 24% pay more than $100.
-77% say their AI subscriptions are now essential to everyday life. 56% say they can't afford all the AI
-tools they want.
+**Everyone surveyed was in the U.S., and some pull the other way.** Bango's own headline is that 77% of
+its respondents say their AI subscriptions are now essential to everyday life, and The Desk reports that
+nearly two-thirds of them use AI daily. Menlo's payers are the heavier users. People who pay for AI use
+it more than people who don't. Some plans sit idle while others are busy.
 
-## What the numbers don't say
+**We left out enterprise figures.** The seat-usage numbers we found for workplace AI tools came from
+licensing consultancies we couldn't trace to a primary report, and they describe companies, not people
+paying for their own plan.
 
-Neither survey says this money is wasted, and we don't either. A month without opening ChatGPT might be
-a quiet month, or a month spent in a different tool, or a plan kept for the weeks that need it. The
-people who pay say these plans are worth it.
+## Putting the idle part to work
 
-The two surveys also asked different groups different questions, so their figures don't combine into one
-number. What they show together is simpler. Many people now pay for more than one AI tool, and many of
-those plans go weeks without being opened.
-
-## A small job for a waiting plan
-
-Filing notes is a good job for a plan like that. Each note needs a title, a few tags, links to related notes,
+Filing notes is a job a waiting plan can do. Each note needs a title, a few tags, links to related notes,
 and a place to live. That is how an AI finds a note again later. It is also the part people skip when
 they write quickly, because it pulls their attention away from the thinking.
 
@@ -63,27 +78,35 @@ it uses: a model that runs on your Mac, or an AI tool you already use, like Clau
 in with your own account. rotli doesn't sell an AI plan and charges nothing for AI.
 
 When the Librarian files a note, it gives the note a place in your Library and writes a few fields at the
-top of the file, called frontmatter: an area, a one-line summary, tags, and links. Everything you wrote
-stays exactly as you wrote it. The note is still a plain Markdown file in your folder, so any other app
-can read it, and so can the AI you chat with later.
+top of the file, called frontmatter: an area, a one-line summary, tags, and links. It never rewrites
+what you wrote. The note is still a plain Markdown file in your folder, so any other app can read it, and
+so can the AI you chat with later.
 
 Some limits worth knowing:
 
 - A connected tool works through your own plan. Filing with it counts toward that plan's usage, the same
-  as anything else you ask it.
+  as anything else you ask it. If your plan is tight, the on-device model doesn't use any plan's allowance.
 - Secure notes never reach a remote model, and the Librarian leaves them alone.
 - The Librarian runs only in the Mac app. Rotli Web doesn't run it.
 - You can turn it off. rotli is still a complete Markdown workspace without AI.
 
-The pitch, then, is small. If you already pay for an AI tool that sits idle for weeks at a time, it can
-keep your notes in order while you write. If you'd rather keep everything on your computer, the model on
-your Mac can do the same job without a network.
+If you already pay for an AI tool you open less than you expected, it can keep your notes in order while
+you write. If you'd rather keep everything on your computer, the model on your Mac can do the same job
+without a network.
 
 ## Sources
 
 1. Self Financial, [“The Cost of Unused Paid Subscriptions 2026”](https://www.self.inc/info/cost-of-unused-paid-subscriptions/),
-   a survey of 1,272 U.S. adults, March 2026.
-2. Bango, [“It’s not a bubble: Over three-quarters say their AI subscriptions are now essential to everyday life”](https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/),
-   19 November 2025, from the report [“The rise of the AI subscriber”](https://bango.com/reports/the-rise-of-the-ai-subscriber/).
-3. The Desk, [“Bango: Americans juggling four AI-based subscriptions on average, and costs are growing”](https://thedesk.net/2025/11/bango-american-survey-subscription-ai-bundles/),
-   November 2025, for the survey's size, timing, and research agency.
+   a survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. Source of the 30-day
+   figures per AI tool, the 59.9%, the 2.6, and the 90.3%.
+2. Menlo Ventures, [“2026: The State of Consumer AI”](https://menlovc.com/perspective/2026-the-state-of-consumer-ai/),
+   16 September 2026, a Morning Consult survey of 5,067 U.S. adults in July 2026. Source of the 55%, the
+   50% and 26% daily use, and the 3.0 assistants.
+3. Bango, [“It’s not a bubble: Over three-quarters say their AI subscriptions are now essential to everyday life”](https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/),
+   November 2025, from the report [“The rise of the AI subscriber”](https://bango.com/reports/the-rise-of-the-ai-subscriber/),
+   which describes data from 2,000 AI subscribers. Source of the 4 tools, about $66 a month, and the 77%.
+   Used as context, not as evidence of idle plans.
+4. The Desk, [“Bango: Americans juggling four AI-based subscriptions on average, and costs are growing”](https://thedesk.net/2025/11/bango-american-survey-subscription-ai-bundles/),
+   November 2025. A news write-up, cited only for details Bango's pages omit: that the 2,000 respondents
+   were U.S. adults with at least one AI subscription, that they were surveyed in October 2025 with the
+   research agency 3Gem, and the daily-use figure.
