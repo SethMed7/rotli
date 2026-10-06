@@ -531,7 +531,7 @@ whose art never touches its words from 320 to 1920.
   development builds in the same release). The word comes from
   `DOCS_AND_SHEETS` in `src/site.ts` (`status` for a label, `inline` inside a
   sentence); never write "Beta" by hand, and say no more about them than that
-  they open and edit. The hero, the Overview, the feature catalog, the FAQ,
+  they open and edit. The hero, the tour, the feature catalog, the FAQ,
   and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
   Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404

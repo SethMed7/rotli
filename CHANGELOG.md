@@ -264,8 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with no frames around them. The before-and-after now shows the note being
   typed, then the Librarian adding its lines above the same words, ending
   with "Your words, unchanged" marked; Replay plays it again. It's smaller,
-  so it fits on one laptop screen. The three cards near the top lost their
-  outer frames too. Reduced motion keeps all of it still.
+  so it fits on one laptop screen. Reduced motion keeps all of it still.
 - **rotli.co shows where a note lives, and what an LLM wiki is.** "Write it
   down. rotli puts it away." is now one story in three steps. You write in
   your view (Main, or a named view), which arranges your notes and never
