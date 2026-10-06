@@ -63,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co's blog uses the room a wide window has.** Posts and the blog
+  page are wider than the rest of the site on large screens, and the side
+  columns grow a little so sources and links wrap less. The text keeps a
+  comfortable line of about 68 characters, a touch larger on the widest
+  screens, while charts, diagrams, tables, and code spread wider than the
+  text where there is room. On a narrower window the right column moves
+  under the post first, then the left one, and nothing overlaps or scrolls
+  sideways at any width. The blog page shows a bigger featured post, a row
+  of up to four more that fits the width, and keeps each line of the post
+  list short enough to scan.
 - **rotli.co's guides are on the blog.** Getting started, Why local?, What
   does AI see in rotli?, What is Rotli Helper?, and rotli in the browser and
   on the Mac are blog posts marked Guide, each with its own picture, and the

@@ -16,13 +16,15 @@
 // page's own ground that overlaps the banner's lower left, where the art is kept open, so
 // the title, date, and reading time are read on the ground, never on the picture. Phones
 // get a shorter crop with the panel just below it.
-// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above): three columns
-// on one set of tracks (--col-left, the reading column, --col-right): the head across them
+// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on the blog's
+// wider page (Base `widePage`, which the index asks for too): named tracks (--article-tracks:
+// rail, main with the text centred in it, side) shared by the head across them
 // (blog/ArticleCover.astro), a left rail with the short title, the tree, the meter as a percent,
-// Sources, and Share (blog/ArticleRail.astro), the reading column (blog/article.css), and from
-// 1280px the right side, more posts and rotli's own spots (blog/ArticleAside.astro). Under 1280px
-// the right side follows the article; under 900px the tree is the disclosure, the meter a slim
-// bar under the header, and Share follows the article.
+// Sources, and Share (blog/ArticleRail.astro), the middle with its reading column of about 68
+// characters and the figures that break out of it (blog/article.css), and from 1280px the right
+// side, more posts and rotli's own spots (blog/ArticleAside.astro). Under 1280px the right side
+// follows the article; under 901px the tree is the disclosure, the meter a slim bar under the
+// header, and Share follows the article, all on the text's edges.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
 import type { TocItem } from '../blog';
