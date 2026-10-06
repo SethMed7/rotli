@@ -45,7 +45,10 @@ const changelog = flat(
 const readme = flat(read("README.md"));
 
 beforeAll(async () => {
+  // The same build as scripts/site-agents.test.ts: test files share one module cache.
   process.env.SITE_MODE = "full";
+  process.env.SITE_URL = "https://rotli.co";
+  process.env.SOURCE_REPOSITORY_PUBLIC = "true";
   features = (await import(site("features.ts"))) as typeof features;
   siteModule = (await import(site("site.ts"))) as typeof siteModule;
   const roadmap = (await import(site("roadmap.ts"))) as {

@@ -1,0 +1,315 @@
+---
+// One capability's page (/features/<id>/), from its entry in src/features.ts: a breadcrumb back
+// to the catalog and its area, the name with its status and where it runs, its one sentence,
+// the picture (a capture or a drawing, FeatureArt.astro; the area's quokka stands beside the
+// heading on every page), then what it does, how to use it, what it doesn't do yet, and where to
+// read more. It ends on the rest of its area as compact tiles and the way back to everything.
+// Plain HTML and CSS: no script, nothing moves.
+import { catalog, isOut, runsLabel, type Area, type Feature } from '../../features';
+import { POSE_ART } from './areaArt';
+import FeatureArt from './FeatureArt.astro';
+import FeatureTile from './FeatureTile.astro';
+import StatusChip from './StatusChip.astro';
+
+interface Props {
+  feature: Feature;
+  area: Area;
+}
+
+const { feature, area } = Astro.props;
+const shipping = isOut(feature);
+const siblings = (catalog().find((group) => group.area.id === area.id)?.features ?? []).filter(
+  (other) => other.id !== feature.id,
+);
+const areaHref = `/features/?area=${area.id}#${area.id}`;
+---
+
+<article class="feature" aria-labelledby="feature-title">
+  <header class="wrap head">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="/features/">Features</a></li>
+        <li><a href={areaHref}>{area.name}</a></li>
+      </ol>
+    </nav>
+    <div class="title-row">
+      <div class="title-copy">
+        <h1 id="feature-title">{feature.name}</h1>
+        <p class="lede">{feature.line}</p>
+        <p class="meta">
+          <StatusChip status={feature.status} />
+          {shipping && <span>{runsLabel(feature)}</span>}
+        </p>
+      </div>
+      <img class="quokka" src={POSE_ART[area.pose].src} width="512" height="512" alt="" decoding="async" />
+    </div>
+  </header>
+
+  {
+    feature.picture && (
+      <div class="wrap picture">
+        <FeatureArt picture={feature.picture} />
+      </div>
+    )
+  }
+
+  <div class="wrap body">
+    <section class="what" aria-labelledby="what-title">
+      <h2 id="what-title">What it does</h2>
+      {feature.body.map((paragraph) => <p>{paragraph}</p>)}
+    </section>
+    <div class="side">
+      {
+        feature.use.length > 0 && (
+          <section aria-labelledby="use-title">
+            <h2 id="use-title">{shipping ? 'How to use it' : 'How it will work'}</h2>
+            <dl class="use">
+              {feature.use.map((step) => (
+                <div>
+                  <dt>
+                    <kbd>{step.keys}</kbd>
+                  </dt>
+                  <dd>{step.text}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )
+      }
+      {
+        feature.limits.length > 0 && (
+          <section aria-labelledby="limits-title">
+            <h2 id="limits-title">{shipping ? 'Limits' : 'Where it stands'}</h2>
+            <ul class="limits">
+              {feature.limits.map((limit) => (
+                <li>{limit}</li>
+              ))}
+            </ul>
+          </section>
+        )
+      }
+      {
+        feature.links.length > 0 && (
+          <section aria-labelledby="more-title">
+            <h2 id="more-title">Read more</h2>
+            <ul class="links">
+              {feature.links.map((link) => (
+                <li>
+                  <a href={link.href}>
+                    {link.label} <span aria-hidden="true">→</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      }
+    </div>
+  </div>
+
+  <section class="wrap rest" aria-labelledby="rest-title">
+    <h2 id="rest-title">{siblings.length > 0 ? `More in ${area.name}` : 'Everything else'}</h2>
+    {
+      siblings.length > 0 && (
+        <ul class="tiles">
+          {siblings.map((other) => (
+            <FeatureTile feature={other} compact />
+          ))}
+        </ul>
+      )
+    }
+    <p class="back">
+      <a class="button secondary" href="/features/">Every feature</a>
+    </p>
+  </section>
+</article>
+
+<style>
+  .head {
+    padding-top: clamp(2rem, 5vw, 3.5rem);
+  }
+  .crumbs ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+  }
+  .crumbs li + li::before {
+    content: '/';
+    margin-right: 0.5rem;
+  }
+  .crumbs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .crumbs a:hover {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .title-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 1.5rem;
+    margin-top: 0.75rem;
+  }
+  h1 {
+    max-width: 20ch;
+    margin: 0;
+    font-size: var(--step-h2);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+  .lede {
+    max-width: 40rem;
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 1rem;
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .quokka {
+    width: clamp(88px, 10vw, 128px);
+    height: auto;
+  }
+
+  .picture {
+    padding-top: clamp(2rem, 4vw, 3rem);
+  }
+
+  /* What it does beside how to use it: a reading column and a narrower side, top edges level. */
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 2.5rem clamp(2.5rem, 6vw, 5rem);
+    align-items: start;
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  h2 {
+    margin: 0 0 0.75rem;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  .what p {
+    max-width: var(--copy-max);
+    margin: 0 0 1rem;
+    font-size: 1.08rem;
+    line-height: 1.65;
+  }
+  .side {
+    display: grid;
+    gap: 2rem;
+  }
+  .use {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+  }
+  .use div {
+    display: grid;
+    gap: 0.3rem;
+  }
+  .use dd {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  kbd {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0.15rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.45rem;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .limits {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .links {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .links a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  .rest {
+    margin-top: clamp(3.5rem, 7vw, 5rem);
+    padding-bottom: var(--section-space);
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .back {
+    margin: 2rem 0 0;
+  }
+
+  @media (max-width: 1080px) {
+    .tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 820px) {
+    .body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 640px) {
+    .tiles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .title-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .quokka {
+      display: none;
+    }
+  }
+</style>

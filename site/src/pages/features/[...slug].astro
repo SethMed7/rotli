@@ -1,63 +1,81 @@
 ---
-// /features/: the whole tour, as its own page rather than a landing anchor.
-// One display headline opens it, with the product film (the same real Rotli Web
-// session the landing hero plays) right under it: the real product leads, not
-// the illustrated story. Then Features in full (rendering, chat and locking,
-// documents and boards, the Librarian and the smaller habits, connecting AI
-// tools), then the folder and the themes, alternating plain and warm grounds.
-// Every chapter is one idea: a section head (h2 + lede) and one picture. The ways in (Mac, Rotli Web, Helper) stay on the landing page
-// and /download/; the Helper also appears under connecting AI. The landing
-// page's dev-only Experiments chapter is not repeated here.
+// /features/ and /features/<id>/: the capability catalog and one page per capability, all from
+// src/features.ts, so the catalog, the pages, their Markdown twin (/features/index.md), and
+// /llms.txt list the same things with the same status. /features/ opens on the page's one
+// headline (the link card in src/og.ts restates it) and the catalog under it: tiles grouped by
+// area, filtered in place with script, a plain grouped list without. A tile opens the
+// capability's own page (FeatureDetail.astro), which can be linked and indexed on its own.
+// The landing page's tour shows the main parts up close and ends on "See every feature", here.
+// Platforms are /download/'s to explain; how Rotli Helper works is its guide's.
 import Base from '../../layouts/Base.astro';
-import FilmPlayer from '../../components/FilmPlayer.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
-import Features from '../../components/landing/Features.astro';
-import Folder from '../../components/landing/Folder.astro';
-import Personal from '../../components/landing/Personal.astro';
-import { hero } from '../../films';
+import Catalog from '../../components/features/Catalog.astro';
+import FeatureDetail from '../../components/features/FeatureDetail.astro';
+import { areaOf, visibleFeatures, type Feature } from '../../features';
 import { ogImage } from '../../og';
-import { site } from '../../site';
+import { DOCS_AND_SHEETS, site } from '../../site';
 
 export function getStaticPaths() {
-  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+  if (!site.showsFullSite) return [];
+  return [
+    { params: { slug: undefined }, props: { feature: undefined } },
+    ...visibleFeatures().map((feature) => ({ params: { slug: feature.id }, props: { feature } })),
+  ];
 }
+
+const { feature } = Astro.props as { feature: Feature | undefined };
 ---
 
-<Base
-  title="Features — rotli"
-  description="What rotli does: a quiet Markdown editor, tasks that stay text, links and search, chat that reads your notes, a Librarian that files without rewriting, and themes to make it yours."
-  canonicalPath="/features/"
-  noindex={!site.indexable}
-  {...ogImage('features')}
->
-  <SiteHeader current="features" />
-  <main id="content">
-    <header class="wrap page-head">
-      <h1>Everything rotli does, in plain files.</h1>
-      <p>
-        A calm editor, tasks and links that stay Markdown, chat that reads your notes, and a Librarian that
-        keeps them filed. All of it works on one folder you own.
-      </p>
-    </header>
-    <div class="wrap page-film">
-      <FilmPlayer src={hero.src} poster={hero.poster} label={hero.label} silent={hero.silent === true} captioned={hero.captioned === true} />
-    </div>
-    <Features />
-    <Folder />
-    <Personal />
-  </main>
-  <SiteFooter />
-</Base>
+{
+  feature ? (
+    <Base
+      title={`${feature.name} — rotli features`}
+      description={feature.line}
+      canonicalPath={`/features/${feature.id}/`}
+      noindex={!site.indexable}
+      {...ogImage('features')}
+    >
+      <SiteHeader current="features" />
+      <main id="content">
+        <FeatureDetail feature={feature} area={areaOf(feature)} />
+      </main>
+      <SiteFooter />
+    </Base>
+  ) : (
+    <Base
+      title="Features — rotli"
+      description={`Everything rotli does, in one catalog: the Markdown editor, tasks and links, chat with your notes, the Librarian, Docs and Sheets (${DOCS_AND_SHEETS.inline}), boards, and the privacy rules around them.`}
+      canonicalPath="/features/"
+      noindex={!site.indexable}
+      markdownPath="/features/index.md"
+      {...ogImage('features')}
+    >
+      <SiteHeader current="features" />
+      <main id="content">
+        <header class="wrap page-head">
+          <h1>Everything rotli does, in plain files.</h1>
+          <p>
+            Every part of rotli, grouped by what it is for. Open one to see what it does, how to use it, and where it
+            stops.
+          </p>
+          <p class="legend">
+            <b>Shipped</b> is in the app today. <b>{DOCS_AND_SHEETS.status}</b> is usable and still being finished.{' '}
+            <b>Coming soon</b> is in the next release.
+            {site.showsExperiments && <> <b>In development</b> runs in development builds only.</>}
+          </p>
+        </header>
+        <Catalog />
+      </main>
+      <SiteFooter />
+    </Base>
+  )
+}
 
 <style>
   .page-head {
     padding-top: clamp(3rem, 7vw, 5rem);
-    padding-bottom: clamp(2rem, 4vw, 3rem);
-  }
-  /* The product film, under the headline at the page's full width. */
-  .page-film {
-    padding-bottom: var(--section-space);
+    padding-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
   }
   h1 {
     max-width: 16ch;
@@ -73,5 +91,13 @@ export function getStaticPaths() {
     color: var(--text-muted);
     font-size: var(--step-lede);
     line-height: 1.55;
+  }
+  .legend {
+    margin-top: 0.9rem;
+    font-size: 0.95rem;
+  }
+  .legend b {
+    color: var(--text);
+    font-weight: 600;
   }
 </style>

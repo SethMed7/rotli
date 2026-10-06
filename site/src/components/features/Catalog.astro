@@ -1,0 +1,357 @@
+---
+// The catalog on /features/: every capability (src/features.ts), grouped by area, each a tile
+// that opens its own page. Without script it is the complete grouped list, with a row of area
+// links to jump down. With script, a search box and area chips filter it in place (the jump
+// links step aside): a chip is a toggle button (aria-pressed), the count is announced, an area
+// with nothing left steps out, and when nothing matches the page says so with a way back. The
+// filter lives in the address (?area=ai&q=chat), so Back from a feature's page returns to it
+// and a filtered catalog can be shared. Hiding uses the hidden attribute, never inline styles
+// (the production CSP drops them). Nothing moves on its own; there is no animation to reduce.
+import { catalog } from '../../features';
+import { POSE_ART } from './areaArt';
+import FeatureTile from './FeatureTile.astro';
+
+const groups = catalog();
+const total = groups.reduce((sum, group) => sum + group.features.length, 0);
+---
+
+<div class="wrap catalog" data-catalog data-total={total}>
+  <div class="tools" data-catalog-tools hidden>
+    <label class="search">
+      <span class="visually-hidden">Search features</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M10.5 4a6.5 6.5 0 1 0 0.01 0M15.2 15.2L20 20" />
+      </svg>
+      <input type="search" name="q" placeholder="Search features" autocomplete="off" spellcheck="false" data-catalog-search />
+    </label>
+    <div class="chips" role="group" aria-label="Show one area">
+      <button type="button" class="chip" aria-pressed="true" data-chip="">All</button>
+      {
+        groups.map(({ area }) => (
+          <button type="button" class="chip" aria-pressed="false" data-chip={area.id}>
+            {area.name}
+          </button>
+        ))
+      }
+    </div>
+    <p class="count" aria-live="polite" data-catalog-count>{total} features</p>
+  </div>
+
+  <nav class="jump" aria-label="Areas">
+    <ul>
+      {
+        groups.map(({ area }) => (
+          <li>
+            <a href={`#${area.id}`}>{area.name}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+
+  {
+    groups.map(({ area, features }) => (
+      <section class="area" id={area.id} aria-labelledby={`area-${area.id}`} data-catalog-area={area.id}>
+        <header class="area-head">
+          <img class="quokka" src={POSE_ART[area.pose].src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+          <div>
+            <h2 id={`area-${area.id}`}>{area.name}</h2>
+            <p>{area.line}</p>
+          </div>
+        </header>
+        <ul class="tiles">
+          {features.map((feature) => (
+            <FeatureTile feature={feature} />
+          ))}
+        </ul>
+      </section>
+    ))
+  }
+
+  <div class="empty" data-catalog-empty hidden>
+    <p>Nothing here matches that. Try another word, or see every feature.</p>
+    <button type="button" class="button secondary" data-catalog-reset>Show every feature</button>
+  </div>
+
+  <p class="next">
+    Looking for what comes next? <a href="/roadmap/">The roadmap</a> lists what is being built, and you can vote for
+    what you want.
+  </p>
+</div>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-catalog]');
+  if (root) {
+    const tools = root.querySelector<HTMLElement>('[data-catalog-tools]')!;
+    const input = root.querySelector<HTMLInputElement>('[data-catalog-search]')!;
+    const chips = [...root.querySelectorAll<HTMLButtonElement>('[data-chip]')];
+    const count = root.querySelector<HTMLElement>('[data-catalog-count]')!;
+    const empty = root.querySelector<HTMLElement>('[data-catalog-empty]')!;
+    const areas = [...root.querySelectorAll<HTMLElement>('[data-catalog-area]')];
+    const names = new Map(chips.map((chip) => [chip.dataset.chip ?? '', chip.textContent?.trim() ?? '']));
+    const known = new Set(chips.map((chip) => chip.dataset.chip ?? ''));
+
+    const params = new URLSearchParams(location.search);
+    let area = known.has(params.get('area') ?? '') ? (params.get('area') ?? '') : '';
+    input.value = params.get('q') ?? '';
+    tools.hidden = false;
+    root.classList.add('is-filtering');
+
+    const words = () =>
+      input.value
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((word) => word.length > 0);
+
+    const apply = () => {
+      const query = words();
+      let shown = 0;
+      for (const section of areas) {
+        const inArea = area === '' || section.dataset.catalogArea === area;
+        let left = 0;
+        for (const tile of section.querySelectorAll<HTMLElement>('[data-feature]')) {
+          const text = tile.dataset.search ?? '';
+          const match = inArea && query.every((word) => text.includes(word));
+          tile.hidden = !match;
+          if (match) left += 1;
+        }
+        section.hidden = left === 0;
+        shown += left;
+      }
+      chips.forEach((chip) => chip.setAttribute('aria-pressed', String((chip.dataset.chip ?? '') === area)));
+      empty.hidden = shown > 0;
+      const noun = shown === 1 ? 'feature' : 'features';
+      count.textContent = area === '' ? `${shown} ${noun}` : `${shown} ${noun} in ${names.get(area)}`;
+
+      const next = new URLSearchParams();
+      if (area !== '') next.set('area', area);
+      if (input.value.trim() !== '') next.set('q', input.value.trim());
+      const search = next.toString();
+      history.replaceState(history.state, '', `${location.pathname}${search ? `?${search}` : ''}${location.hash}`);
+    };
+
+    chips.forEach((chip) =>
+      chip.addEventListener('click', () => {
+        const picked = chip.dataset.chip ?? '';
+        area = picked === area ? '' : picked;
+        apply();
+      }),
+    );
+    input.addEventListener('input', apply);
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && input.value !== '') {
+        event.preventDefault();
+        input.value = '';
+        apply();
+      }
+    });
+    root.querySelector<HTMLButtonElement>('[data-catalog-reset]')!.addEventListener('click', () => {
+      area = '';
+      input.value = '';
+      apply();
+      input.focus();
+    });
+    apply();
+  }
+</script>
+
+<style>
+  .catalog {
+    padding-bottom: var(--section-space);
+  }
+
+  /* The tools: one search box and a row of chips, wrapping on narrow screens. */
+  .tools {
+    display: grid;
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem 1.5rem;
+    padding-bottom: 1.25rem;
+  }
+  .tools[hidden] {
+    display: none;
+  }
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 48px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--surface);
+    color: var(--text-muted);
+  }
+  .search:focus-within {
+    border-color: var(--accent);
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+  }
+  .search svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+  }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    min-height: 46px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+    outline: none;
+  }
+  .search input::placeholder {
+    color: var(--text-muted);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .chip {
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .chip:hover {
+    background: var(--surface-2);
+  }
+  .chip[aria-pressed='true'] {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--on-text);
+  }
+  .chip:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+  .count {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  /* Without script: the areas as plain jump links. With it, the chips take their place. */
+  .jump ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.5rem;
+    margin: 0;
+    padding: 0 0 1.5rem;
+    list-style: none;
+  }
+  .jump a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .jump a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .is-filtering .jump {
+    display: none;
+  }
+
+  /* An area: its quokka beside its name and one line, then its tiles in columns. */
+  .area {
+    padding-top: clamp(2.5rem, 5vw, 3.75rem);
+    scroll-margin-top: var(--header-height);
+  }
+  .area[hidden] {
+    display: none;
+  }
+  .area-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .quokka {
+    flex: none;
+    width: 72px;
+    height: 72px;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  .area-head p {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: 1.02rem;
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .empty {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+    padding: 2rem 0;
+  }
+  .empty[hidden] {
+    display: none;
+  }
+  .empty p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+  }
+  .next {
+    margin: clamp(3rem, 6vw, 4.5rem) 0 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .next a {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+
+  @media (max-width: 1080px) {
+    .tiles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 1180px) {
+    .tools {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .search {
+      max-width: 26rem;
+    }
+  }
+  @media (max-width: 640px) {
+    .tiles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .quokka {
+      width: 56px;
+      height: 56px;
+    }
+  }
+</style>

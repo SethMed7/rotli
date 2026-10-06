@@ -90,7 +90,7 @@ export interface Basis {
 /** A detail page's picture: a real capture from public/, or a drawing (FeatureArt.astro). */
 export type Picture =
   | { kind: 'shot'; src: string; width: number; height: number; alt: string }
-  | { kind: 'tasks' | 'links' | 'filing' | 'menu' | 'tree' | 'doc' | 'sheet' | 'terminal' | 'keys' };
+  | { kind: 'tasks' | 'links' | 'filing' | 'menu' | 'tree' | 'doc' | 'sheet' | 'terminal' };
 
 export interface Step {
   /** Keys, a command, or a path through the app, shown as written. */
@@ -113,7 +113,7 @@ export interface Feature {
   runs: 'mac' | 'both' | 'web';
   /** A 24×24 stroke icon (one path). */
   icon: string;
-  /** Without one, the page shows its keys (`use`) or the area's quokka. */
+  /** A capture or a drawing for the feature's page; without one the page leads with its words. */
   picture?: Picture;
   /** What it does, a paragraph each. */
   body: string[];
@@ -332,7 +332,6 @@ const FEATURES: Feature[] = [
     status: 'Shipped',
     runs: 'both',
     icon: ICON.slash,
-    picture: { kind: 'keys' },
     body: [
       'A slash opens a short menu of what you can drop in where you are typing. It works inside a list item, after your text, and leaves ordinary slashes in your writing alone.',
       'The date commands write the date into the note. In a template they leave a placeholder, so a daily template shows the day you use it.',
@@ -378,7 +377,6 @@ const FEATURES: Feature[] = [
     status: 'Shipped',
     runs: 'both',
     icon: ICON.search,
-    picture: { kind: 'keys' },
     body: [
       '⌘K searches titles and text across the whole vault, and the app’s own commands too, so the same box opens a note or runs an action.',
     ],
@@ -399,7 +397,6 @@ const FEATURES: Feature[] = [
     status: 'Shipped',
     runs: 'mac',
     icon: ICON.capture,
-    picture: { kind: 'keys' },
     body: [
       'Capture a thought without leaving what you are doing. It lands in Captures, and the Librarian files it later if you have turned it on.',
       '⌥Space brings rotli up from anywhere and hides it again. ⌥Q opens only the Quick Note, a small window for one note.',
@@ -426,7 +423,6 @@ const FEATURES: Feature[] = [
     status: 'Shipped',
     runs: 'mac',
     icon: ICON.panes,
-    picture: { kind: 'keys' },
     body: [
       'Open notes side by side in panes, each with its own tabs. Every hotkey can be changed in Settings → Keybindings.',
     ],
@@ -774,7 +770,7 @@ const FEATURES: Feature[] = [
     picture: { kind: 'doc' },
     body: [`Open and edit Word documents in the Mac app, in ${DOCS_AND_SHEETS.inline}.`],
     use: [],
-    limits: ['Mac app.'],
+    limits: ['Mac app only, for now.'],
     links: [],
     roadmap: 'docs-beta',
     keywords: 'docx word document univer',
@@ -790,7 +786,7 @@ const FEATURES: Feature[] = [
     picture: { kind: 'sheet' },
     body: [`Open and edit Excel workbooks in the Mac app, in ${DOCS_AND_SHEETS.inline}.`],
     use: [],
-    limits: ['Mac app.'],
+    limits: ['Mac app only, for now.'],
     links: [],
     roadmap: 'sheets-beta',
     keywords: 'xlsx excel spreadsheet csv univer',
@@ -1018,6 +1014,13 @@ export function catalog(): { area: Area; features: Feature[] }[] {
   );
 }
 
+/** Out today, in a release (Shipped or Beta): only these say where they run. */
+export const isOut = (feature: Feature) => feature.status === 'Shipped' || feature.status === 'Beta';
+
+/** Status, then where it runs once it is out: "Shipped · Mac app", "Coming soon". */
+export const statusLine = (feature: Feature) =>
+  isOut(feature) ? `${feature.status} · ${runsLabel(feature)}` : feature.status;
+
 /** Where a feature works, in the site's words. Rotli Web is named only while it is offered. */
 export function runsLabel(feature: Feature): string {
   if (!site.webAppEnabled) return 'Mac app';
@@ -1037,7 +1040,7 @@ export function catalogMarkdown(origin: string): string {
     lines.push('', `## ${area.name}`, '', area.line, '');
     for (const feature of features) {
       lines.push(
-        `- [${feature.name}](${origin}${featurePath(feature)}) (${feature.status}; ${runsLabel(feature)}): ${feature.line}`,
+        `- [${feature.name}](${origin}${featurePath(feature)}) (${statusLine(feature)}): ${feature.line}`,
       );
     }
   }
