@@ -30,6 +30,7 @@ fix both in the same change.
 | Cross-window and host event registry | [`architecture/window-events.md`](architecture/window-events.md) |
 | Code quality, redundancy, and AI-readiness scorecard | [`architecture/code-quality-and-ai-readiness-2026-09-01.md`](architecture/code-quality-and-ai-readiness-2026-09-01.md) |
 | Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
+| Canvas, Graph, and setup round — audit and fix list (2026-10-06) | [`architecture/canvas-graph-audit-2026-10-06.md`](architecture/canvas-graph-audit-2026-10-06.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
 | Bun 1.4 architecture audit and promotion record | [`architecture/bun-1.4-audit-2026-08-21.md`](architecture/bun-1.4-audit-2026-08-21.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
