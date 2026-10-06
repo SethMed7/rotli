@@ -1,6 +1,6 @@
 // The website's interactive rules, without a browser: the privacy passage's trigger and
 // crossfade (site/src/passage.ts), the theme studio's autoplay (site/src/themeCycle.ts), the
-// resource reading meter (site/src/reading.ts), and the footer scene's play
+// resource reading meter (site/src/reading.ts), a blog post's rail pinning (site/src/railPin.ts), and the footer scene's play
 // (site/src/quokka/play.ts, the person in human.ts, and the traced-pose cleanup in art.ts).
 // The 404 game has its own file, site-runner.test.ts. The pages wire these to the DOM; e2e/site/ proves the
 // wiring. Like site-agents.test.ts, the site's modules load through a computed path so
@@ -48,6 +48,15 @@ let reading: {
     viewport: number,
     header: number,
   ): { fraction: number; percent: number; fits: boolean };
+};
+interface RailBounds {
+  max: number;
+  min: number;
+  fits: boolean;
+}
+let rail: {
+  railBounds(room: { headerBottom: number; viewport: number; height: number; margin: number }): RailBounds;
+  railTop(previous: number, scrolledBy: number, bounds: RailBounds): number;
 };
 let play: {
   dropTarget<T extends { box: Box }>(point: Point, residents: readonly T[], reach: number): T | null;
@@ -112,6 +121,7 @@ let art: {
 beforeAll(async () => {
   passage = (await import(site("passage.ts"))) as typeof passage;
   reading = (await import(site("reading.ts"))) as typeof reading;
+  rail = (await import(site("railPin.ts"))) as typeof rail;
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
   cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
@@ -332,6 +342,33 @@ describe("the reading meter", () => {
       percent: 100,
       fits: true,
     });
+  });
+});
+
+describe("a blog post's rail pinning", () => {
+  const room = (height: number, viewport = 900) => ({ headerBottom: 69, viewport, height, margin: 24 });
+  test("a rail that fits is pinned under the header, and scrolling never moves it", () => {
+    const bounds = rail.railBounds(room(700));
+    expect(bounds).toEqual({ max: 93, min: 93, fits: true });
+    expect(rail.railTop(Number.POSITIVE_INFINITY, 0, bounds)).toBe(93);
+    expect(rail.railTop(93, 500, bounds)).toBe(93);
+    expect(rail.railTop(93, -500, bounds)).toBe(93);
+  });
+  test("a taller rail moves with the page, then holds its foot going down and its head going up", () => {
+    const bounds = rail.railBounds(room(963));
+    expect(bounds.fits).toBe(false);
+    // Its foot 24px above the window's bottom: 900 - 963 - 24.
+    expect(bounds.min).toBe(-87);
+    // Down 100px: it moves up with the page; far down, its foot holds.
+    expect(rail.railTop(93, 100, bounds)).toBe(-7);
+    expect(rail.railTop(-7, 5000, bounds)).toBe(-87);
+    // Back up 50px: it moves down with the page; far up, its head holds under the header.
+    expect(rail.railTop(-87, -50, bounds)).toBe(-37);
+    expect(rail.railTop(-37, -5000, bounds)).toBe(93);
+  });
+  test("exactly as tall as the room fits; a pixel more does not", () => {
+    expect(rail.railBounds(room(900 - 69 - 48)).fits).toBe(true);
+    expect(rail.railBounds(room(900 - 69 - 47)).fits).toBe(false);
   });
 });
 

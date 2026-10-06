@@ -2,11 +2,12 @@
 // under the header that takes most of the first window, a head panel on the page's ground whose
 // title and date are in that first window at full contrast, and the page rising over the pinned
 // banner as it scrolls (the meter and the tree still pinned and clear of each other).
-// Blog posts open on their cover instead (WritingPage `article`, blog/ArticleCover.astro): the
-// scene across the article's columns, rounded and still, then the title, the summary, the meta
-// line, and the topics on the page's ground, nothing over the picture, "Blog /" straight above the
-// title, the words on the page's (and the left rail's) edge from 901px and on the reading column's
-// below, contrast measured, the title in the first window.
+// Blog posts open on their head instead (WritingPage `article`, blog/ArticleCover.astro), on the
+// header's edges: from 1000px (SIDE_BY_SIDE) "Blog /", the title, the summary, the meta line, and
+// the topics on the left and the post's picture on the right, whole (never cropped), the two
+// centred on each other; below it, stacked as on a phone, the picture across the page and the
+// words under it (on the page's edge from 901px, the reading column's below). Rounded and still,
+// nothing over the picture, contrast measured, the title in the first window.
 import { expect, test, type Page } from "@playwright/test";
 
 const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
@@ -130,17 +131,23 @@ for (const path of ["/privacy/"]) {
 }
 
 const POST_VIEWPORTS = [
+  { width: 2560, height: 1440 },
   { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
   { width: 1280, height: 800 },
+  { width: 1100, height: 800 },
   { width: 1024, height: 768 },
+  { width: 999, height: 800 },
+  { width: 900, height: 900 },
   { width: 768, height: 1024 },
   { width: 390, height: 844 },
 ];
+/** Where the words and the picture go side by side (blog/ArticleCover.astro). */
+const SIDE_BY_SIDE = 1000;
 
 for (const path of POSTS) {
   for (const viewport of POST_VIEWPORTS) {
-    test(`${path} opens on its picture, then its title, summary, and meta line (${viewport.width}px)`, async ({
+    test(`${path} opens on its title beside its picture, or under it when narrow (${viewport.width}px)`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -189,9 +196,29 @@ for (const path of POSTS) {
       expect(await size("h1")).toBeGreaterThan(await size(".lede"));
       expect(await size(".lede")).toBeGreaterThan(await size(".byline"));
 
-      // Nothing over the picture: the words start below it, at every width.
+      // Nothing over the picture: beside it on a wide screen, below it on a narrow one.
       const copy = await box(page, "[data-article-cover] .head-copy");
-      expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+      const beside = viewport.width >= SIDE_BY_SIDE;
+      if (beside) {
+        expect(copy.x + copy.width).toBeLessThan(art.x);
+        // Side by side and balanced: the two overlap in height and are centred on each other, so
+        // neither leaves an empty band.
+        expect(copy.y).toBeLessThan(art.y + art.height);
+        expect(art.y).toBeLessThan(copy.y + copy.height);
+        expect(Math.abs(copy.y + copy.height / 2 - (art.y + art.height / 2))).toBeLessThan(4);
+        expect(Math.abs(copy.height - art.height)).toBeLessThan(Math.max(copy.height, art.height) * 0.25);
+        // The picture is whole: the quokka crop at its own shape, nothing cut off.
+        const shape = await page.locator("[data-article-art] img").evaluate((el: HTMLImageElement) => ({
+          src: el.currentSrc,
+          drawn: el.getBoundingClientRect().width / el.getBoundingClientRect().height,
+          natural: el.naturalWidth / el.naturalHeight,
+          fit: getComputedStyle(el).objectFit,
+        }));
+        expect(shape.src).toMatch(/-mobile\.webp$/);
+        expect(Math.abs(shape.drawn - shape.natural)).toBeLessThan(0.02);
+      } else {
+        expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+      }
       // The title is in the first window.
       expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
@@ -200,18 +227,17 @@ for (const path of POSTS) {
       expect(Math.abs(crumbs.x - title!.x)).toBeLessThan(1.5);
       expect(crumbs.y + crumbs.height).toBeLessThanOrEqual(title!.y + 1);
       expect(title!.y - (crumbs.y + crumbs.height)).toBeLessThan(24);
-      expect(crumbs.y).toBeGreaterThanOrEqual(art.y + art.height);
+      if (!beside) expect(crumbs.y).toBeGreaterThanOrEqual(art.y + art.height);
 
       if (viewport.width > 900) {
-        // On the article's tracks: the words on the page's edge, which is the picture's and the
-        // left rail's, so the head is one block under the picture, not indented into empty space.
+        // On the header's edges: the words on the left one, which is the left rail's, so the head
+        // is not indented into empty space; the picture ends on the right one.
+        const header = await box(page, ".site-header");
         const rail = await box(page, "[data-article-rail]");
-        expect(Math.abs(copy.x - art.x)).toBeLessThan(1.5);
-        expect(Math.abs(art.x - rail.x)).toBeLessThan(1.5);
-        if (viewport.width >= 1360) {
-          const aside = await box(page, "[data-article-more]");
-          expect(Math.abs(art.x + art.width - (aside.x + aside.width))).toBeLessThan(1.5);
-        }
+        expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
+        expect(Math.abs(rail.x - header.x)).toBeLessThan(1.5);
+        expect(Math.abs(art.x + art.width - (header.x + header.width))).toBeLessThan(1.5);
+        if (!beside) expect(Math.abs(art.x - header.x)).toBeLessThan(1.5);
       } else {
         // One column: the words on the reading column's edge.
         const text = await box(page, "[data-prose] > p");

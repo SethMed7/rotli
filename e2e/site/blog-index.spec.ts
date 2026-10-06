@@ -182,7 +182,7 @@ test("without script there are no filters, and the whole list shows", async ({ b
   await context.close();
 });
 
-test("a post opens on its cover: the same scene as its thumbnail, composed wide", async ({ page }) => {
+test("a post opens on its cover: the same scene as its thumbnail, beside its title", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/blog/");
   const tile = page
@@ -197,8 +197,14 @@ test("a post opens on its cover: the same scene as its thumbnail, composed wide"
   await expect(art).toHaveAttribute("height", "1000");
   await expect(art).toHaveAttribute("src", "/banners/blog/rotli-web-and-your-mac.webp");
   await expect(art).toHaveAttribute("alt", tileAlt!);
-  await expect(page.locator("[data-article-art] source")).toHaveAttribute(
-    "srcset",
-    "/banners/blog/rotli-web-and-your-mac-mobile.webp",
-  );
+  // The quokka crop beside the title on a wide screen and on a phone (the wide scene between).
+  const sources = page.locator("[data-article-art] source");
+  await expect(sources).toHaveCount(2);
+  for (const source of await sources.all())
+    await expect(source).toHaveAttribute("srcset", "/banners/blog/rotli-web-and-your-mac-mobile.webp");
+  await expect(sources.first()).toHaveAttribute("media", "(min-width: 1000px)");
+  await expect(sources.last()).toHaveAttribute("media", "(max-width: 700px)");
+  await expect
+    .poll(() => art.evaluate((el: HTMLImageElement) => el.currentSrc))
+    .toMatch(/rotli-web-and-your-mac-mobile\.webp$/);
 });
