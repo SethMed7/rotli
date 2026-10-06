@@ -209,3 +209,44 @@ test("the bench's AI tools are named, and no two names touch at any width", asyn
     for (const box of boxes) expect(box.right).toBeLessThanOrEqual(scene.right);
   }
 });
+
+test("the film sits across the hand-off: the warm band begins behind it, with no strip between", async ({
+  browser,
+}) => {
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    const context = await browser.newContext({ reducedMotion, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    // Let the film's arrival finish: it rises once and rests.
+    await page.locator(".hero-film").evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const state = await page.evaluate(() => {
+      const strip = document.querySelector(".below-fold")!;
+      const film = document.querySelector(".hero-film video")!.getBoundingClientRect();
+      const band = document.querySelector("#waiting")!;
+      const bandTop = band.getBoundingClientRect().top;
+      return {
+        // The strip's ground eases from the page's into the band's.
+        image: getComputedStyle(strip).backgroundImage,
+        bandColour: getComputedStyle(band).backgroundColor,
+        stripIsBefore: strip.nextElementSibling === band,
+        gap: bandTop - film.bottom,
+        // Nothing about the film is tied to the scroll.
+        scrollLinked: document
+          .getAnimations()
+          .some((a) => a.timeline && !(a.timeline instanceof DocumentTimeline)),
+      };
+    });
+    expect(state.image).toContain("linear-gradient");
+    expect(state.image).toContain("241, 231, 216");
+    expect(state.bandColour).toBe("rgb(241, 231, 216)");
+    expect(state.stripIsBefore).toBe(true);
+    expect(state.gap).toBeGreaterThanOrEqual(0);
+    expect(state.gap).toBeLessThan(8);
+    expect(state.scrollLinked).toBe(false);
+    if (reducedMotion === "reduce") {
+      const running = await page.locator(".hero-film").evaluate((el) => el.getAnimations().length);
+      expect(running).toBe(0);
+    }
+    await context.close();
+  }
+});
