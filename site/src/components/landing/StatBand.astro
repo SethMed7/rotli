@@ -1,56 +1,42 @@
 ---
-// Why rotli exists, right after the hero (the owner, 2026-10-06), in four figures from other
-// people's research and one sentence of ours, beside a small scene from the film's island: four
-// AI tools idle on a bench by the sea, two of them asleep, until the quokka arrives with a stack
-// of notes and hands each one something to file. Each tool is its product's own mark on a plain
-// badge with its name under it (the owner, 2026-10-06: "actually use company logos"): ChatGPT,
-// Claude, Gemini, and Perplexity, the last because it is one of the ten tools in the Self
-// Financial survey the first figure comes from. The marks are the unmodified files in
-// public/logos/ (their sources and usage notes are public/logos/SOURCES.md), shown as images in
-// the single colour they are published in: never traced, recoloured, rotated, squashed, or
-// drawn over (the idle z's and the handed note sit beside a mark, never on it). The count of four
-// is the scene's, not a statistic. It plays once when revealed and rests on everyone holding a
-// note; reduced motion and no script show that resting state. The figures stay plain text with
-// their footnotes: no card, no chart, no count-up.
+// Why rotli exists, right after the hero (the owner, 2026-10-06), kept short (the owner, the same
+// day: "keep it simple, those who want more will read the blog"): the headline, two figures from
+// other people's research, one sentence of ours, and beside them the post's own thumbnail as a
+// teaser, "Read the study →", to the post that sets out both surveys in full. The figures stay
+// plain text with their footnotes: no card, no chart, no count-up.
 //
-// Lead with the figures (the owner, 2026-10-06: "more numbers backed"). Each is checked against
-// its source and keeps its exact population; the post the-ai-you-already-pay-for carries the full
-// audit and is the link under the close. Self Financial (March 2026) surveyed 1,272 U.S. adults
+// Each figure keeps its exact population. Self Financial (March 2026) surveyed 1,272 U.S. adults
 // who pay for at least one subscription of any kind: among its respondents paying for ChatGPT,
-// 50.4% had not used it in the past 30 days, and 59.9% of all respondents had at least one paid
-// subscription (of any kind, not only AI) going unused each month, 2.6 on average. Menlo Ventures /
-// Morning Consult (July 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for
-// AI, 50% use AI daily, so half don't (our arithmetic on Menlo's figure), and the average AI user
-// uses 3.0 general assistants, up from 2.2 a year earlier. Bango's "4 tools, about $66 a month"
-// stays out: it is a paying-for-several-tools number from a report whose headline is that the
-// plans are essential, so it is context in the post, not evidence of idle plans. Never call any
-// of it "wasted". Footnote numbers are per source, so two figures share each.
-import working from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+// 50.4% had not used it in the past 30 days. Menlo Ventures / Morning Consult (July 2026, 5,067
+// U.S. adults, published 2026-09-16): among AI users who pay for AI, 50% use AI daily, so half
+// don't (our arithmetic on Menlo's figure). The rest (59.9% and 2.6 unused subscriptions of any
+// kind, 3.0 assistants per AI user, and Bango as context) lives in the post. Never call any of it
+// "wasted".
+//
+// The text column and the thumbnail share a top and a bottom edge: the picture fills its column's
+// height, cropping only sky (object-position keeps the bottom, where the bench and the quokka
+// are). Below 1180px the picture goes under the words at its own shape. The bench of company
+// logos this replaced left with it, so the band carries no third-party marks.
+import { postThumbnail } from '../../og';
+
+const POST = 'the-ai-you-already-pay-for';
+const postHref = `/blog/${POST}/`;
+const thumbnail = postThumbnail(POST);
 
 const figures = [
   { value: '50.4%', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
   { value: 'Half', text: 'of people who pay for AI don’t use it every day.', note: 2 },
-  { value: '3.0', text: 'general AI assistants used by the average AI user, up from 2.2 a year earlier.', note: 2 },
-  { value: '59.9%', text: 'of subscribers had at least one paid subscription, of any kind, unused each month (2.6 on average).', note: 1 },
 ];
 const sources = [
   {
     href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
-    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The 50.4% is among respondents paying for ChatGPT; the 59.9% and the 2.6 count subscriptions of any kind, not only AI.',
+    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The 50.4% is among respondents paying for ChatGPT.',
   },
   {
     href: 'https://menlovc.com/perspective/2026-the-state-of-consumer-ai/',
-    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often (our arithmetic). The 3.0 is general AI assistants per AI user.',
+    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often (our arithmetic).',
   },
 ];
-/** The four tools on the bench, left to right; the first and third start asleep. `logo` is the
- * unmodified file in public/logos/. */
-const tools = [
-  { id: 'chatgpt', name: 'ChatGPT', logo: '/logos/openai.svg', asleep: true },
-  { id: 'claude', name: 'Claude', logo: '/logos/claude.svg', asleep: false },
-  { id: 'gemini', name: 'Gemini', logo: '/logos/googlegemini.svg', asleep: true },
-  { id: 'perplexity', name: 'Perplexity', logo: '/logos/perplexity.svg', asleep: false },
-] as const;
 ---
 
 <section class="section band-warm stat-band" id="waiting" aria-labelledby="waiting-title">
@@ -73,46 +59,29 @@ const tools = [
         }
       </ul>
       <p class="close" data-reveal>
-        rotli gives that AI something useful to do: keep your notes in order while you write. There is no
-        extra AI plan to buy. It uses the one you already have, or a model on your Mac.
+        rotli puts that idle plan to work keeping your notes in order while you write, with no extra AI plan to buy.
       </p>
-      <p class="study"><a href="/blog/the-ai-you-already-pay-for/">Where these numbers come from <span aria-hidden="true">→</span></a></p>
     </div>
 
-    <div
-      class="bench-scene"
-      data-reveal
-      role="img"
-      aria-label={`The quokka hands a note to each of four AI tools waiting on a bench: ${tools.map((tool) => tool.name).join(', ')}.`}
-    >
-      <svg class="bench-art" viewBox="0 0 640 400" aria-hidden="true">
-        <rect class="sea" x="16" y="196" width="608" height="132" rx="44"></rect>
-        <path class="sea-edge" d="M60 196H580"></path>
-        <path class="waves" d="M70 222q9-5 18 0M200 300q9-5 18 0M330 214q9-5 18 0M470 306q9-5 18 0M560 226q9-5 18 0"></path>
-        <path class="sand" d="M0 400V356C40 330 110 318 230 320S470 336 540 328C596 322 626 338 640 352V400Z"></path>
-        <path class="sand-edge" d="M0 356C40 330 110 318 230 320S470 336 540 328C596 322 626 338 640 352"></path>
-        <path class="bench-leg" d="M60 270V338M608 270V336"></path>
-        <rect class="bench-seat" x="40" y="256" width="588" height="16" rx="6"></rect>
-      </svg>
-      <img class="bench-quokka" src={working.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-      <ul class="bench-tools">
-        {
-          tools.map((tool, i) => (
-            <li class:list={['tool', `tool-${i + 1}`, { asleep: tool.asleep }]}>
-              <span class="badge">
-                <img class="mark" src={tool.logo} width="24" height="24" alt="" loading="lazy" decoding="async" />
-                <span class="name">{tool.name}</span>
-              </span>
-              {tool.asleep && <span class="zz">z<span>z</span></span>}
-              <svg class="note" viewBox="0 0 44 30">
-                <rect class="note-card" x="1.5" y="1.5" width="41" height="27" rx="4"></rect>
-                <path class="note-line" d="M8 11h26M8 19h16"></path>
-              </svg>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
+    <a class="study" href={postHref} data-reveal>
+      {
+        thumbnail && (
+          <span class="study-art">
+            <img
+              src={thumbnail.src}
+              srcset={thumbnail.srcset}
+              sizes="(max-width: 1179px) 40rem, 55vw"
+              width={thumbnail.width}
+              height={thumbnail.height}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
+        )
+      }
+      <span class="study-cta">Read the study <span class="arrow" aria-hidden="true">→</span></span>
+    </a>
 
     <div class="notes">
       <ol class="sources">
@@ -124,28 +93,33 @@ const tools = [
           ))
         }
       </ol>
-      <p class="marks">Product names and logos belong to their owners.</p>
+      <p class="marks">Product names belong to their owners.</p>
     </div>
   </div>
 </section>
 
 <style>
-  /* The words on the left, the bench on the right, sitting on the same baseline; the sources
-     run under both. One column, words first, on narrow widths. */
+  /* The words on the left, the post's picture on the right, sharing one top edge (the headline
+     and the picture) and one bottom edge (the close and the call to action); the sources run
+     under both. One column, words first, below 1180px. */
   .waiting-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-    gap: clamp(1.5rem, 4vw, 4rem) clamp(2rem, 5vw, 5rem);
-    align-items: end;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+    gap: clamp(1.75rem, 3vw, 2.5rem) clamp(2rem, 4vw, 4rem);
+    align-items: stretch;
   }
   .section-title {
     max-width: 16ch;
+  }
+  .waiting-copy {
+    display: flex;
+    flex-direction: column;
   }
   .figures {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.5rem clamp(1.5rem, 3vw, 2.5rem);
-    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
+    margin: clamp(1.5rem, 2.5vw, 2rem) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -185,31 +159,81 @@ const tools = [
     font-size: clamp(0.95rem, 0.6rem + 1vw, 1.08rem);
     line-height: 1.45;
   }
+  /* The close sits on the column's bottom edge, level with the call to action beside it. */
   .close {
     max-width: 30rem;
-    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
-    font-size: var(--step-lede);
+    margin: auto 0 0;
+    padding-top: clamp(1.5rem, 2.5vw, 2rem);
+    font-size: clamp(1.05rem, 0.9rem + 0.4vw, 1.2rem);
     font-weight: 600;
     line-height: 1.45;
   }
-  /* The link to the post on these figures: text column only, a small aside after the claim. */
+
+  /* The teaser: the post's thumbnail, then the call to action, one link. The picture takes the
+     height the words set (it has none of its own here) within a narrow range around its own
+     shape: up to 13% shorter, which crops only sky (object-position keeps the bottom), or up to
+     8% taller, which crops the margins beside the bench and the calendar. The bench, the
+     quokka, and its notes always stay whole. */
   .study {
-    margin: 0.75rem 0 0;
-    font-size: 0.95rem;
-  }
-  .study a {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-width: 0;
+    container-type: inline-size;
     color: var(--accent-text);
-    font-weight: 600;
     text-decoration: none;
   }
-  .study a:hover {
+  .study-art {
+    position: relative;
+    flex: 1 1 0;
+    min-height: calc(100cqw * 630 / 1200 * 0.87);
+    max-height: calc(100cqw * 630 / 1200 * 1.08);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .study-art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 80% 100%;
+    transition: scale 300ms ease-out;
+  }
+  .study:hover .study-art img {
+    scale: 1.02;
+  }
+  /* The call to action keeps to the bottom edge, level with the close. */
+  .study-cta {
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 44px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .study:hover .study-cta {
     text-decoration: underline;
     text-underline-offset: 0.25em;
   }
+  .study .arrow {
+    display: inline-block;
+    transition: translate 160ms ease-out;
+  }
+  .study:hover .arrow {
+    translate: 3px 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .study-art img,
+    .study .arrow {
+      transition: none;
+    }
+  }
+
   /* The sources and the owners' line run under both columns. */
   .notes {
     grid-column: 1 / -1;
@@ -250,276 +274,29 @@ const tools = [
       padding-block: 0.6rem;
     }
   }
-
   .marks {
     margin: 0.6rem 0 0;
     color: var(--text-muted);
     font-size: 0.85rem;
   }
 
-  /* The bench by the sea, in the film's palette with the art's own ink (--ink). The drawing is
-     one picture at a fixed 640 x 400 ratio; the quokka, the badges, and the notes are laid over
-     it in percentages of that box, so they track it at every width. The scene is a size
-     container, and the badges' type follows its width (cqw). */
-  .bench-scene {
-    position: relative;
-    container-type: inline-size;
-  }
-  .bench-art {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-  .sea {
-    fill: var(--sea);
-  }
-  .sea-edge {
-    stroke: var(--sea-deep);
-    stroke-width: 2;
-  }
-  .waves {
-    fill: none;
-    stroke: var(--sea-line);
-    stroke-width: 3;
-    stroke-linecap: round;
-  }
-  .sand {
-    fill: var(--sand);
-  }
-  .sand-edge {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 2.5;
-    stroke-linecap: round;
-  }
-  .bench-seat {
-    fill: var(--wood);
-    stroke: var(--ink);
-    stroke-width: 3;
-  }
-  .bench-leg {
-    fill: none;
-    stroke: var(--wood-dark);
-    stroke-width: 7;
-    stroke-linecap: round;
-  }
-  /* The quokka stands on the sand at the bench's left end, in front of it. */
-  .bench-quokka {
-    position: absolute;
-    left: 0;
-    bottom: 3%;
-    width: 29%;
-    height: auto;
-  }
-  /* The four badges stand on the seat (its top is y 256 of 400, so 36% from the bottom), right
-     of the quokka's whole picture (its box, not only its outline). Each is the mark over its
-     name on the editor's paper, in the art's ink. */
-  .bench-tools {
-    position: absolute;
-    left: 30.5%;
-    right: 2%;
-    bottom: 36%;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 2.2cqw;
-    align-items: end;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .tool {
-    position: relative;
-    min-width: 0;
-  }
-  .badge {
-    display: grid;
-    justify-items: center;
-    gap: 1.4cqw;
-    padding: 2.4cqw 0.8cqw 1.8cqw;
-    border: 2px solid var(--ink);
-    border-radius: 2.4cqw;
-    background: var(--capture-ground);
-  }
-  .mark {
-    display: block;
-    width: 52%;
-    max-width: 52px;
-    height: auto;
-    aspect-ratio: 1;
-  }
-  .name {
-    max-width: 100%;
-    color: var(--ink);
-    font-size: clamp(0.66rem, 2.25cqw, 0.92rem);
-    font-weight: 600;
-    line-height: 1.1;
-    white-space: nowrap;
-  }
-  /* The note each tool is handed, tucked against its badge's top right corner, off the mark. */
-  .note {
-    position: absolute;
-    top: -19%;
-    right: -8%;
-    width: 36%;
-    height: auto;
-    rotate: 8deg;
-    overflow: visible;
-  }
-  .note-card {
-    fill: var(--capture-ground);
-    stroke: var(--ink);
-    stroke-width: 2.5;
-  }
-  .note-line {
-    stroke: var(--accent);
-    stroke-width: 3;
-    stroke-linecap: round;
-  }
-  /* The idle tools' z's, above a badge's top left, never on the mark. */
-  .zz {
-    position: absolute;
-    top: -2.2em;
-    left: 6%;
-    color: var(--text-muted);
-    font-size: clamp(0.7rem, 2.4cqw, 1rem);
-    font-weight: 600;
-    line-height: 1;
-  }
-  .zz span {
-    position: relative;
-    top: -0.55em;
-    margin-left: 0.15em;
-  }
-  /* At rest every tool holds a note and nobody is asleep. */
-  .zz {
-    opacity: 0;
-  }
-  .tool,
-  .note,
-  .bench-quokka {
-    transform-origin: 50% 100%;
-  }
-
-  /* Once, when the scene comes into view: the quokka hops in with its stack, hands a note to
-     each tool in turn (the sleepers wake as theirs lands), and each badge gives a small hop.
-     Only translation moves a badge: a mark is never scaled, squashed, or turned. */
-  @media (prefers-reduced-motion: no-preference) {
-    :global(.js) .bench-scene .zz {
-      opacity: 1;
-    }
-    :global(.js) .bench-scene .note {
-      opacity: 0;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .zz {
-      opacity: 0;
-      animation: hold-then-go 1ms linear backwards;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .note {
-      opacity: 1;
-      animation: note-fly 720ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .bench-quokka {
-      animation: hop-in 900ms cubic-bezier(0.34, 1.4, 0.64, 1) 150ms backwards;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .tool {
-      animation: perk 520ms cubic-bezier(0.34, 1.6, 0.64, 1) backwards;
-    }
-    .tool-1 {
-      --from: -26cqw;
-      --at: 1000ms;
-    }
-    .tool-2 {
-      --from: -44cqw;
-      --at: 1350ms;
-    }
-    .tool-3 {
-      --from: -62cqw;
-      --at: 1700ms;
-    }
-    .tool-4 {
-      --from: -80cqw;
-      --at: 2050ms;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .note {
-      animation-delay: var(--at);
-    }
-    :global(.js) .bench-scene:global(.is-visible) .zz {
-      animation-delay: calc(var(--at) + 620ms);
-    }
-    :global(.js) .bench-scene:global(.is-visible) .tool {
-      animation-delay: calc(var(--at) + 600ms);
-    }
-  }
-  @keyframes hop-in {
-    0% {
-      transform: translateX(-24%) translateY(0);
-      opacity: 0;
-    }
-    35% {
-      transform: translateX(-13%) translateY(-11%);
-      opacity: 1;
-    }
-    60% {
-      transform: translateX(-4%) translateY(0) scale(1.04, 0.96);
-    }
-    80% {
-      transform: translateX(0) translateY(-4%);
-    }
-  }
-  @keyframes note-fly {
-    0% {
-      transform: translate(var(--from), 6cqw) rotate(-26deg) scale(0.8);
-      opacity: 0;
-    }
-    12% {
-      opacity: 1;
-    }
-    55% {
-      transform: translate(calc(var(--from) * 0.45), -10cqw) rotate(-12deg);
-    }
-  }
-  @keyframes hold-then-go {
-    from {
-      opacity: 1;
-    }
-  }
-  @keyframes perk {
-    0% {
-      transform: none;
-    }
-    40% {
-      transform: translateY(-1.6cqw);
-    }
-  }
-  /* A narrow scene gives the badges the whole seat: the quokka steps down in front of the
-     bench's legs, below the seat line, so it never sits on a badge or a name. */
-  @container (max-width: 520px) {
-    .bench-tools {
-      left: 3%;
-      right: 3%;
-      gap: 2.6cqw;
-    }
-    .bench-quokka {
-      left: 1%;
-      bottom: 0;
-      width: 20%;
-    }
-    .name {
-      font-size: clamp(0.66rem, 3.3cqw, 0.92rem);
-    }
-    .mark {
-      width: 58%;
-    }
-  }
-  @media (max-width: 900px) {
+  /* Narrower, the words would outgrow the picture beside them: the words, then the picture at
+     its own shape under them. */
+  @media (max-width: 1179px) {
     .waiting-grid {
       grid-template-columns: 1fr;
     }
-    .bench-scene {
-      max-width: 34rem;
+    .study {
+      max-width: 40rem;
+    }
+    .study-art {
+      flex: none;
+      min-height: 0;
+      max-height: none;
+      aspect-ratio: 1200 / 630;
     }
   }
-  /* Two figures a row down to a small phone, so the four stay one short block above the scene. */
+  /* The two figures side by side down to a small phone. */
   @media (max-width: 359px) {
     .figures {
       grid-template-columns: 1fr;

@@ -1,5 +1,5 @@
-// The landing page: what rotli is, its one "Download free" and the pointer to the privacy promise (where it runs is
-// /download/'s to say), the cardless
+// The landing page: what rotli is, its two buttons ("Download free" and "Our privacy promise"; where it runs is
+// /download/'s to say), the header's matching button and GitHub star count, the short stat band, the cardless
 // before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -13,7 +13,7 @@ const scrollToPrivacy = (page: Page, share: number) =>
     window.scrollTo({ top: top + band.offsetHeight * s - window.innerHeight / 2, behavior: "instant" });
   }, share);
 
-test("the hero says what rotli is and costs, with one way in, and no platform line", async ({ page }) => {
+test("the hero says what rotli is and costs, with two buttons, and no platform line", async ({ page }) => {
   await page.goto("/");
   const hero = page.locator(".hero");
   const lede = hero.locator(".hero-lede");
@@ -24,42 +24,164 @@ test("the hero says what rotli is and costs, with one way in, and no platform li
   // Where rotli runs is the download page's (and the FAQ's) to say (the owner, 2026-10-05).
   await expect(hero).not.toContainText("Windows");
   await expect(page.locator("#start")).not.toContainText("Windows");
-  // One way in, "Download free", to the page that offers the Mac app and Rotli Web; no direct
-  // DMG. The header keeps its shorter "Try now" to the same page.
+  // Two buttons, the way in first: "Download free" to the page that offers the Mac app and
+  // Rotli Web (no direct DMG), then the privacy promise, outlined, with its lock. The old
+  // one-line pointer is gone.
   const actions = hero.locator(".site-actions a");
-  await expect(actions).toHaveCount(1);
-  await expect(actions).toHaveText("Download free");
-  await expect(actions).toHaveAttribute("href", "/download/");
+  await expect(actions).toHaveCount(2);
+  await expect(actions.nth(0)).toHaveText("Download free");
+  await expect(actions.nth(0)).toHaveAttribute("href", "/download/");
+  await expect(actions.nth(0)).toHaveClass(/\bprimary\b/);
+  await expect(actions.nth(1)).toHaveText("Our privacy promise");
+  await expect(actions.nth(1)).toHaveAttribute("href", "/privacy/#promise");
+  await expect(actions.nth(1)).toHaveClass(/\bsecondary\b/);
+  await expect(actions.nth(1).locator("svg")).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator("main a[href$='.dmg']")).toHaveCount(0);
-  const header = page.locator(".site-header .header-download");
-  await expect(header).toHaveText("Try now");
-  await expect(header).toHaveAttribute("href", "/download/");
+  await expect(hero.locator(".hero-promise b, .promise-text")).toHaveCount(0);
 });
 
-test("the hero points to the privacy promise, and the night band points to the same place", async ({
+test("the hero's two buttons share one size: side by side on a laptop, stacked full width on a phone", async ({
   page,
 }) => {
-  for (const width of [390, 1440]) {
+  for (const width of [320, 390, 768, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const promise = page.locator(".hero .hero-promise a");
-    await expect(promise).toBeVisible();
-    await expect(promise).toHaveText(/Our privacy promise: you decide what any AI can see or change/);
-    await expect(promise).toHaveAttribute("href", "/privacy/#promise");
-    // Under the button, inside the first window, and a full touch target.
-    const [button, link] = await Promise.all([
-      page.locator(".hero .site-actions a").boundingBox(),
-      promise.boundingBox(),
-    ]);
-    expect(link!.y).toBeGreaterThan(button!.y + button!.height);
-    expect(link!.y + link!.height).toBeLessThanOrEqual(900);
-    expect(link!.height).toBeGreaterThanOrEqual(44);
+    const buttons = page.locator(".hero .site-actions .button");
+    const look = await buttons.evaluateAll((els) =>
+      els.map((el) => {
+        const style = getComputedStyle(el);
+        const box = el.getBoundingClientRect();
+        return {
+          height: Math.round(box.height),
+          radius: style.borderRadius,
+          size: style.fontSize,
+          weight: style.fontWeight,
+          box: { x: box.x, y: box.y, width: box.width, bottom: box.bottom },
+        };
+      }),
+    );
+    expect(look).toHaveLength(2);
+    const [primary, secondary] = look as [(typeof look)[0], (typeof look)[0]];
+    expect(secondary.height, `height at ${width}`).toBe(primary.height);
+    expect(secondary.radius).toBe(primary.radius);
+    expect(secondary.size).toBe(primary.size);
+    expect(secondary.weight).toBe(primary.weight);
+    expect(primary.height).toBeGreaterThanOrEqual(44);
+    if (width <= 520) {
+      // Stacked, the download first, each the column's full width.
+      expect(secondary.box.y).toBeGreaterThanOrEqual(primary.box.bottom);
+      expect(Math.abs(secondary.box.width - primary.box.width)).toBeLessThanOrEqual(1);
+      const column = await page.locator(".hero-copy").evaluate((el) => el.getBoundingClientRect().width);
+      expect(primary.box.width).toBeGreaterThanOrEqual(column - 1);
+    } else {
+      expect(Math.abs(secondary.box.y - primary.box.y)).toBeLessThanOrEqual(1);
+      expect(secondary.box.x).toBeGreaterThan(primary.box.x + primary.box.width);
+    }
+    // Both, and the quiet line under them, inside the first window.
+    expect(look.every((button) => button.box.bottom <= 900)).toBe(true);
+    const meta = (await page.locator(".hero-meta").boundingBox())!;
+    expect(meta.y).toBeGreaterThanOrEqual(Math.max(primary.box.bottom, secondary.box.bottom));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+});
+
+test("the privacy promise button and the night band lead to the same place", async ({ page }) => {
+  await page.goto("/");
   await expect(page.locator("#privacy .privacy-link")).toHaveAttribute("href", "/privacy/#promise");
   // Following it lands on the promise, under the header.
-  await page.locator(".hero .hero-promise a").click();
+  await page.locator(".hero .hero-promise").click();
   await expect(page).toHaveURL(/\/privacy\/#promise$/);
   await expect(page.locator("#promise")).toBeInViewport();
+});
+
+test("the header's button matches the hero's: the same words, place, and style family", async ({ page }) => {
+  for (const width of [768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const hero = page.locator(".hero .site-actions .button.primary");
+    const header = page.locator(".site-header .header-download");
+    await expect(header).toBeVisible();
+    await expect(header).toHaveText((await hero.textContent())!.trim());
+    await expect(header).toHaveText("Download free");
+    await expect(header).toHaveAttribute("href", (await hero.getAttribute("href"))!);
+    await expect(header).toHaveClass(/\bbutton\b.*\bprimary\b/);
+    const [a, b] = await Promise.all(
+      [hero, header].map((el) =>
+        el.evaluate((node) => {
+          const style = getComputedStyle(node);
+          return [style.backgroundColor, style.color, style.fontWeight];
+        }),
+      ),
+    );
+    expect(b).toEqual(a);
+  }
+  // Every primary call to action on the page says the same.
+  await expect(page.locator("#start .action-try")).toHaveText("Download free");
+  // On a phone the button waits in Menu, saying the same.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator(".site-header .header-download")).toBeHidden();
+  await page.locator(".nav-menu summary").click();
+  await expect(page.locator(".nav-menu-panel > .button")).toHaveText("Download free");
+});
+
+test("GitHub with its star count sits up top, read at build time, never fetched by the browser", async ({
+  page,
+}) => {
+  const github: string[] = [];
+  page.on("request", (request) => {
+    if (/github/i.test(new URL(request.url()).hostname)) github.push(request.url());
+  });
+  type Box = { left: number; right: number; top: number; bottom: number };
+  for (const width of [320, 390, 561, 768, 1024, 1081, 1150, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const link = page.locator(".site-header .github-link");
+    if (width > 560) {
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", "https://github.com/SethMed7/rotli");
+      // Its visible words are its name: "Star", whose repository, and the count (this build's
+      // SITE_GITHUB_STARS=1234, formatted short).
+      await expect(link).toHaveAccessibleName("Star rotli on GitHub, 1.2k stars");
+      await expect(link.locator(".github-count")).toHaveText("1.2k");
+      await expect(link.locator("svg")).toHaveAttribute("aria-hidden", "true");
+      // Beside the button, one height.
+      const [star, button] = await Promise.all([
+        link.boundingBox(),
+        page.locator(".header-download").boundingBox(),
+      ]);
+      expect(star!.x + star!.width).toBeLessThanOrEqual(button!.x);
+      expect(Math.round(star!.height)).toBe(Math.round(button!.height));
+    } else {
+      await expect(link).toBeHidden();
+    }
+    // Nothing in the bar overlaps, and nothing runs off the side.
+    const boxes = await page
+      .locator(
+        ".site-header .brand, .site-header .primary-nav > *, .site-header .github-link, .site-header .header-download, .site-header .nav-menu > summary",
+      )
+      .evaluateAll((els) =>
+        els
+          .filter((el) => el.getBoundingClientRect().width > 0)
+          .map((el) => el.getBoundingClientRect().toJSON() as Box),
+      );
+    boxes.forEach((a, i) =>
+      boxes.slice(i + 1).forEach((b) => {
+        expect(a.right <= b.left + 0.5 || b.right <= a.left + 0.5, `header overlap at ${width}`).toBe(true);
+      }),
+    );
+    expect(Math.max(...boxes.map((box) => box.right))).toBeLessThanOrEqual(width);
+  }
+  // On a phone it waits in Menu, with its count.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.locator(".nav-menu summary").click();
+  const entry = page.locator(".nav-menu-panel .menu-github");
+  await expect(entry).toBeVisible();
+  await expect(entry).toHaveAccessibleName("Star rotli on GitHub, 1.2k stars");
+  // No script, frame, or image from GitHub: the count is text in the page.
+  await expect(page.locator("script[src*='github'], iframe, img[src*='github']")).toHaveCount(0);
+  expect(github).toEqual([]);
 });
 
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({
@@ -139,32 +261,34 @@ test("the theme studio's steps sit on one row at phone width", async ({ page }) 
   expect(label!.x).toBeLessThan(next!.x);
 });
 
-test("the figures lead the band, each with its population and its source", async ({ page }) => {
+test("the band keeps two figures, each with its population and its source", async ({ page }) => {
   await page.goto("/");
   const figures = page.locator("#waiting .figures li");
-  await expect(figures.locator(".value")).toHaveText([/^50\.4%/, /^Half/, /^3\.0/, /^59\.9%/]);
+  await expect(figures.locator(".value")).toHaveText([/^50\.4%/, /^Half/]);
   await expect(figures.nth(0)).toContainText("paying for ChatGPT");
+  await expect(figures.nth(0)).toContainText("past 30 days");
   await expect(figures.nth(1)).toContainText("pay for AI");
-  await expect(figures.nth(2)).toContainText("average AI user");
-  await expect(figures.nth(3)).toContainText("of any kind");
   // Footnotes are per source: Self Financial (1) and Menlo (2).
   const marks = await figures
     .locator("sup a")
     .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
-  expect(marks).toEqual(["#fn-1", "#fn-2", "#fn-2", "#fn-1"]);
-  await expect(page.locator("#fn-1")).toContainText("Self Financial");
+  expect(marks).toEqual(["#fn-1", "#fn-2"]);
+  await expect(page.locator("#fn-1")).toContainText(
+    "1,272 U.S. adults who pay for at least one subscription",
+  );
+  await expect(page.locator("#fn-1")).toContainText("among respondents paying for ChatGPT");
   await expect(page.locator("#fn-2")).toContainText("Menlo Ventures");
+  await expect(page.locator("#fn-2")).toContainText("Among AI users who pay for AI, 50% use it daily");
   await expect(page.locator("#waiting")).not.toContainText(/wasted/i);
+  // ChatGPT is still named, so the owners' line stays; the logos left with the bench.
+  await expect(page.locator("#waiting .marks")).toHaveText("Product names belong to their owners.");
+  await expect(page.locator("img[src^='/logos/']")).toHaveCount(0);
 });
 
 test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".overview .section-lede")).toContainText("Everything starts as a Markdown file");
   await expect(page.locator("#waiting .close")).toContainText("no extra AI plan to buy");
-  await expect(page.locator("#waiting .study a")).toHaveAttribute(
-    "href",
-    "/blog/the-ai-you-already-pay-for/",
-  );
   const faq = page.locator(".faq-list summary");
   await expect(faq.filter({ hasText: "Do I have to pay for AI?" })).toHaveCount(1);
   await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
@@ -213,106 +337,55 @@ test("under reduced motion the page switches to the night at once", async ({ bro
   await context.close();
 });
 
-test("the bench shows each AI tool's own mark and name, readable and apart at every width", async ({
+test("the band's teaser is the post's thumbnail, linked to the study, level with the words", async ({
   page,
 }) => {
+  await page.goto("/");
+  const study = page.locator("#waiting a.study");
+  await expect(study).toHaveAttribute("href", "/blog/the-ai-you-already-pay-for/");
+  await expect(study).toHaveAccessibleName("Read the study");
+  const art = study.locator("img");
+  await expect(art).toHaveAttribute("src", "/thumbs/blog/the-ai-you-already-pay-for.webp");
+  await expect(art).toHaveAttribute("alt", "");
+  await study.click();
+  await expect(page).toHaveURL(/\/blog\/the-ai-you-already-pay-for\/$/);
+
   type Box = { left: number; right: number; top: number; bottom: number; width: number; height: number };
-  const apart = (a: Box, b: Box) =>
-    a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5;
-  for (const width of [320, 390, 768, 1024, 1440, 1920]) {
+  for (const width of [320, 390, 768, 1024, 1180, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const scene = page.locator(".bench-scene");
-    await scene.scrollIntoViewIfNeeded();
-    // Let the scene play once and rest: the measures are of where everything settles.
-    await expect(scene).toHaveClass(/is-visible/);
-    await scene.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
-    await expect(scene).toHaveAttribute("role", "img");
-    await expect(scene).toHaveAttribute("aria-label", /ChatGPT, Claude, Gemini, Perplexity/);
-    const names = scene.locator(".tool .name");
-    await expect(names).toHaveText(["ChatGPT", "Claude", "Gemini", "Perplexity"]);
-    const marks = scene.locator(".tool .mark");
-    await expect(marks).toHaveCount(4);
-    const srcs = await marks.evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src")));
-    expect(srcs).toEqual([
-      "/logos/openai.svg",
-      "/logos/claude.svg",
-      "/logos/googlegemini.svg",
-      "/logos/perplexity.svg",
-    ]);
-    for (const mark of await marks.all()) {
-      await expect(mark).toBeVisible();
-      expect(await mark.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-    }
+    const band = page.locator("#waiting");
+    await band.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        band.locator(".study img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+      )
+      .toBe(true);
     const read = (selector: string) =>
-      scene
-        .locator(selector)
-        .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().toJSON() as Box));
-    const [nameBoxes, markBoxes, badgeBoxes, noteBoxes, sceneBox] = await Promise.all([
-      read(".tool .name"),
-      read(".tool .mark"),
-      read(".tool .badge"),
-      read(".tool .note"),
-      scene.evaluate((el) => el.getBoundingClientRect().toJSON() as Box),
+      band.locator(selector).evaluate((el) => el.getBoundingClientRect().toJSON() as Box);
+    const [title, close, frame, cta] = await Promise.all([
+      read("#waiting-title"),
+      read(".close"),
+      read(".study-art"),
+      read(".study-cta"),
     ]);
-    // Big enough to recognise and to read, at phone width too.
-    for (const box of markBoxes)
-      expect(box.width, `mark at ${width}`).toBeGreaterThanOrEqual(width < 390 ? 26 : 32);
-    const nameSize = await names.first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-    expect(nameSize).toBeGreaterThanOrEqual(10.5);
-    const tools = nameBoxes.map((name, i) => ({
-      name,
-      mark: markBoxes[i]!,
-      badge: badgeBoxes[i]!,
-      note: noteBoxes[i]!,
-    }));
-    tools.forEach((tool, i) => {
-      // A name sits inside its badge, under its mark, and never runs past the badge.
-      expect(tool.name.left).toBeGreaterThanOrEqual(tool.badge.left);
-      expect(tool.name.right).toBeLessThanOrEqual(tool.badge.right);
-      expect(tool.name.top).toBeGreaterThanOrEqual(tool.mark.bottom);
-      // Badges never touch another tool's, and a handed note never covers a mark or a name.
-      tools.forEach((other, j) => {
-        expect(apart(tool.note, other.mark), `note ${i} on mark ${j} at ${width}`).toBe(true);
-        expect(apart(tool.note, other.name), `note ${i} on name ${j} at ${width}`).toBe(true);
-        if (i !== j) expect(apart(tool.badge, other.badge), `badges ${i} and ${j} at ${width}`).toBe(true);
-      });
-      // Everything stays inside the page.
-      expect(tool.note.right).toBeLessThanOrEqual(width);
-      expect(tool.badge.left).toBeGreaterThanOrEqual(sceneBox.left);
-    });
-    // The quokka never stands on a badge.
-    const quokka = await scene
-      .locator(".bench-quokka")
-      .evaluate((el) => el.getBoundingClientRect().toJSON() as Box);
-    for (const badge of badgeBoxes) expect(apart(quokka, badge), `quokka on a badge at ${width}`).toBe(true);
-    // Below 900px the figures stack above the scene.
-    if (width < 900) {
-      const figures = await page
-        .locator("#waiting .figures")
-        .evaluate((el) => el.getBoundingClientRect().toJSON() as Box);
-      expect(figures.bottom).toBeLessThanOrEqual(sceneBox.top);
+    const shape = frame.width / frame.height;
+    if (width >= 1180) {
+      // Beside the words: the picture's top on the headline's, the call to action's bottom on
+      // the close's, and a crop that only ever takes sky or a sliver of the side margins.
+      expect(Math.abs(frame.top - title.top), `top edge at ${width}`).toBeLessThanOrEqual(2);
+      expect(Math.abs(cta.bottom - close.bottom), `bottom edge at ${width}`).toBeLessThanOrEqual(2);
+      expect(frame.left).toBeGreaterThan(close.right);
+      expect(shape, `shape at ${width}`).toBeGreaterThanOrEqual(1200 / 630 / 1.08 - 0.01);
+      expect(shape, `shape at ${width}`).toBeLessThanOrEqual(1200 / 630 / 0.87 + 0.01);
+    } else {
+      // Under the words, at its own shape.
+      expect(frame.top).toBeGreaterThan(close.bottom);
+      expect(Math.abs(shape - 1200 / 630)).toBeLessThan(0.02);
     }
+    expect(cta.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  await expect(page.locator("#waiting .marks")).toHaveText("Product names and logos belong to their owners.");
-});
-
-test("without motion the bench rests at once: every tool holds a note and nobody sleeps", async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    reducedMotion: "reduce",
-    viewport: { width: 390, height: 844 },
-  });
-  const page = await context.newPage();
-  await page.goto("/");
-  const scene = page.locator(".bench-scene");
-  await scene.scrollIntoViewIfNeeded();
-  for (const note of await scene.locator(".note").all()) await expect(note).toHaveCSS("opacity", "1");
-  for (const zz of await scene.locator(".zz").all()) await expect(zz).toHaveCSS("opacity", "0");
-  expect(await scene.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
-  await context.close();
 });
 
 test("the film sits across the hand-off: the warm band begins behind it, with no strip between", async ({

@@ -43,8 +43,10 @@ crossfade, the theme studio's autoplay, the reading meter, the footer scene's
 play and the visitor's person), `bun test scripts/site-motion.test.ts` (the
 tour's scroll steps and the before and after's filing play) and
 `bun test scripts/site-runner.test.ts` (the 404 game), `bun test scripts/site-writing.test.ts`
-(post figures, the blog's arrangement, "New", and the article tree), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
-the site, serves it with `astro preview` on port 4392, and drives
+(post figures, the blog's arrangement, "New", and the article tree), `bun test scripts/site-github.test.ts`
+(the header's star count), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
+the site as production does, with `SOURCE_REPOSITORY_PUBLIC=true`, plus
+`SITE_GITHUB_STARS=1234` so the build never asks GitHub, serves it with `astro preview` on port 4392, and drives
 `e2e/site/`). The unit files run inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
@@ -94,10 +96,13 @@ whose art never touches its words from 320 to 1920.
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
   is hidden and "Resources" is a plain link to `/resources/`. On the right sit
-  the GitHub mark (icon only, while the source is public) and one "Try now"
-  button, which opens `/download/` (shorter than the landing's "Download
-  free", and true on systems with no download yet, where Rotli Web is the way
-  in). That page is not also a menu item. The
+  GitHub with its star count (while the source is public; see "The GitHub
+  star count" below) and the way in, "Download free" (`WAY_IN` in
+  `src/site.ts`), the hero's own label and button scaled to the header (the
+  owner, 2026-10-06: "the top right button should align with button on hero
+  for consistency"). It opens `/download/`, which offers Rotli Web on systems
+  with no download yet, so the label holds there too. That page is not also a
+  menu item. The
   footer's link columns (Product · Learn · Open source, the last only while
   the source is public) and tagline default from the same file. Pages pass
   only `current` (a dropdown's label is marked current when any of its pages
@@ -105,7 +110,8 @@ whose art never touches its words from 320 to 1920.
   `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
   fold into a Menu disclosure (`<details>`; Escape, an outside click, or
   choosing a link closes it), where the dropdown's pages are listed under its
-  name; below 560px the GitHub mark and Try now move into it too. The
+  name; below 560px the star link ("Star rotli on GitHub" and the count) and
+  "Download free" move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
   ready." sign-up, always shown (see "The coming-soon list" below); its
   closing row holds the maker line, with a drawn X mark (not the platform's
@@ -116,25 +122,33 @@ whose art never touches its words from 320 to 1920.
   chapters from `src/components/landing/`, in the order set out in
   `docs/design/landing-layout-2026-10-05.md` (each thing said once; grounds
   alternate plain and warm):
-  1. Hero (the product film; plain): "Download free" (`SiteActions`), "No
-     account. Works offline.", and one quiet line with a lock, "Our privacy
-     promise: you decide what any AI can see or change", to
-     `/privacy/#promise`. The film sits across the boundary into the next
+  1. Hero (the product film; plain): two buttons side by side at one height,
+     radius, and type size (the owner, 2026-10-06: "our privacy policy should
+     be more like a button matching the download"): "Download free"
+     (`SiteActions`, primary) and "Our privacy promise" (outlined, with a
+     lock, to `/privacy/#promise`, passed into `SiteActions`' slot). Below
+     520px they stack full width, the download first. "No account. Works
+     offline." stays one quiet line under them. The film sits across the boundary into the next
      band: behind its lower half the page ground eases into the warm one
      (`.below-fold`, one gradient between the two ground tokens), so there is
      no strip or hard line between them, and the band's top padding shrinks
      to match. The film rises in once on arrival; nothing is scroll-linked.
   2. StatBand (warm; the owner, 2026-10-06, moved it up so the reason comes
-     before the product): four sourced figures, footnoted per source (50.4%
-     and 59.9% with its 2.6 from Self Financial; "Half" and 3.0 from Menlo
-     Ventures and Morning Consult), each with its exact population, beside a
-     bench by the sea where four idle AI tools, two asleep, are each handed a
-     note by the quokka (see "The bench's AI tools" below). Never write
-     "wasted"; Bango stays in the post as context. The text column ends on
-     "Where these numbers come from", a link to the post
-     `the-ai-you-already-pay-for`, which sets out both surveys in full. It is
-     the one chapter whose headline has no lede: its figures are the lede.
-     Below 900px the figures stack above the scene.
+     before the product; then, the same day, "keep it simple, those who want
+     more will read the blog"): the headline, two sourced figures, each
+     footnoted with its exact population (50.4% from Self Financial; "Half"
+     from Menlo Ventures and Morning Consult), and one sentence on rotli
+     putting that idle plan to work. Beside them is the post's own thumbnail
+     (`postThumbnail`), one link with "Read the study →" to
+     `the-ai-you-already-pay-for`, which sets out both surveys and the other
+     figures in full. The picture's top sits on the headline's and the call
+     to action's bottom on the close's: the picture takes the height the
+     words set, within 13% shorter (cropping sky) to 8% taller (cropping the
+     side margins) than its own shape, so the bench and the quokka stay
+     whole. Below 1180px the picture goes under the words at its own shape.
+     Never write "wasted"; Bango stays in the post as context. "Product names
+     belong to their owners." stays while ChatGPT is named. It is the one
+     chapter whose headline has no lede: its figures are the lede.
   3. Overview ("Write it down. rotli puts it away."; plain): three columns,
      each a small picture of the app drawn in HTML on the site's tokens (a
      rendered note, the fields the Librarian filled with an area pill and
@@ -231,22 +245,26 @@ whose art never touches its words from 320 to 1920.
   screen, or in a hidden tab (one timeout, no frame loop), waits a full step on
   coming back, and swaps only to a capture that has decoded. Its own steps
   are not announced (`aria-live="off"`); the visitor's are.
-- **The bench's AI tools** (`landing/StatBand.astro`; the owner, 2026-10-05,
-  then 2026-10-06: "actually use company logos … make sure that this would
-  work on mobile") are ChatGPT, Claude, Gemini, and Perplexity (one of the ten
-  tools in the Self Financial survey). Each is its product's own mark on a
-  plain badge with its name under it. The marks are the unmodified files in
-  `public/logos/`, shown as images in the single colour they are published
-  in; `public/logos/SOURCES.md` records each one's source, licence, the
-  owner's usage terms, and a checksum. Never trace, redraw, recolour, rotate,
-  squash, or draw over a mark: the idle z's and the handed note sit beside
-  it, and a badge only moves by translation. "Product names and logos belong
-  to their owners." sits under the footnotes. The quokka, badges, and notes
-  are laid over the drawing in percentages of one 640 × 400 box; below a
-  520px scene the badges take the whole seat and the quokka stands in front
-  of the legs, so at 390 the marks are 32px or more.
-  `e2e/site/landing.spec.ts` holds the names, the marks, their sizes, and
-  that nothing overlaps from 320 to 1920.
+- **The GitHub star count** (`src/githubStars.ts`; the owner, 2026-10-06:
+  "up top I want github with star count"). The visitor's browser never calls
+  GitHub: the build asks `https://api.github.com/repos/SethMed7/rotli` once
+  (a module-level promise shared by every page; nothing is written to the
+  repository), with a 3 s timeout and no token. If `GITHUB_TOKEN` is in the
+  build's environment it is sent for the higher rate limit and never logged.
+  Any failure (no network, a timeout, a non-200 such as a rate limit, an
+  unexpected body) logs one warning and renders the link without a number;
+  the build never fails on it. Only a build with `SOURCE_REPOSITORY_PUBLIC`
+  and the full site asks. `SITE_GITHUB_STARS` overrides the request: a whole
+  number is used as the count (the E2E build sets 1234), `off` shows none.
+  Counts read short (5, 999, 1.2k, 12k, 123k, 1.3m). The link is a plain
+  `<a>` to `GITHUB_URL` with no script, frame, or image from GitHub; the mark
+  is Primer Octicons' `mark-github` (MIT), inline. Its visible words make its
+  name: "Star rotli on GitHub, 1.2k stars". The Docker build stage has the
+  network (it already runs `bun ci`); `GITHUB_TOKEN` is deliberately not a
+  build arg, since a build arg lands in an image layer.
+  `scripts/site-github.test.ts` holds the request, the fallbacks, and the
+  formatting; `e2e/site/landing.spec.ts` the link, its name, its place, no
+  GitHub request from the page, and no overlap in the header from 320 to 1920.
 - **`/privacy/`** is the full privacy policy in plain language. It opens on
   the privacy promise (`#promise`, the owner, 2026-10-06; the hero and the
   landing's night band link there): a lead line, a matrix of who may read and
@@ -428,8 +446,8 @@ whose art never touches its words from 320 to 1920.
   once; reduced motion and no script show them at rest.
   `e2e/site/about.spec.ts` holds the order, the links, the dates against
   the changelog, and that words and pictures never overlap from 320 to 1920.
-- **`/download/`** is where every way in goes (the header's "Try now"; the
-  landing's "Download free" in the hero and the closing panel; the 404's "Try
+- **`/download/`** is where every way in goes ("Download free" in the
+  header, the hero, and the closing panel; the 404's "Try
   rotli" and the About page's too). It has its
   own wide layout. The head sets the title, the lede, and the way in for the
   visitor's own system (`Base.astro` stamps `data-os`: mac, windows, linux,
@@ -612,13 +630,15 @@ whose art never touches its words from 320 to 1920.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
-- **The way in.** `SiteActions.astro` renders the one call to action,
-  "Download free" (the owner, 2026-10-06), to `/download/`, in the hero and
-  the closing panel; a build with Rotli Web but no Mac download says "Try now"
-  instead, so it never promises a download that isn't there. The header has
-  its own "Try now". The earlier pair (Open in browser and Download for Mac, reordered by
+- **The way in.** `WAY_IN` in `src/site.ts` is the one call to action,
+  "Download free" (the owner, 2026-10-06), to `/download/`: `SiteActions.astro`
+  renders it in the hero and the closing panel, and the header renders the
+  same label. A build with Rotli Web but no Mac download says "Try now"
+  everywhere instead, so it never promises a download that isn't there. The
+  hero passes its secondary button, "Our privacy promise", into
+  `SiteActions`' slot. The earlier pair (Open in browser and Download for Mac, reordered by
   platform) is gone: the download page makes that choice with the visitor's
-  system in view, so the hero keeps one primary button and no second one. A
+  system in view, so the hero keeps one primary button. A
   deployment that offers neither the Mac download nor Rotli Web shows "Mac
   alpha coming soon" in its place.
 - `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
@@ -642,7 +662,8 @@ whose art never touches its words from 320 to 1920.
   those, build the Docker prod twin below with `--build-arg WEB_APP_ENABLED=true`
   and open `http://localhost:8080/app/`).
 - `SOURCE_REPOSITORY_PUBLIC` decides whether pages link to the source
-  repository (GitHub header/footer links, "Explore the source", LICENSE,
+  repository (GitHub header/footer links and the build's one star-count
+  request, "Explore the source", LICENSE,
   PRIVACY.md, ROADMAP.md, and the MCP contract documents). The repository is
   private, so those links would 404 for visitors. The toggle fails closed: only
   the exact string `true` enables the links; unset or any other value hides
@@ -797,9 +818,8 @@ whose art never touches its words from 320 to 1920.
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  the `/about/` story, captioned with where the name comes from); the
-  StatBand's bench by the sea and each resource article's
-  `ResourceScene.astro` are the island by day too; the FAQ has the searching
+  the `/about/` story, captioned with where the name comes from); each
+  resource article's `ResourceScene.astro` is the island by day too; the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
   closing scene. `/privacy/` places its night through `WritingPage`'s

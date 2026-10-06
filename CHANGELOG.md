@@ -133,9 +133,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file sits in two open columns, as you write it and after the Librarian: the
   lines it adds are marked, and your words are marked unchanged. Its example
   files the note in a real area.
-- **The unused-AI figures on rotli.co have a scene.** Four idle AI tools wait
-  on a bench by the sea until the quokka hands each one a note to file. The
-  survey footnote now says who was asked.
 - **Scrolling into "Some notes never leave this Mac" takes the whole of
   rotli.co into the night.** The page, its header, menus, and buttons step
   into Ocean Dark while the privacy section is in view, and step back out
@@ -165,15 +162,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the score. The game is taller, and the page around it says less: the
   headline, "Take me home", and "Try rotli · Resources".
 - **rotli.co says "Download free" and keeps where it runs on the download
-  page.** The home page's top and its closing panel each have one "Download
-  free" button, and the header has a shorter "Try now". All three open the
-  download page, which offers the Mac app and Rotli Web and leads with your
+  page.** The header, the home page's top, and its closing panel each have
+  the same "Download free" button. All three open the download page, which offers the Mac app and Rotli Web and leads with your
   system: on Windows or Linux it says their apps are coming soon and offers
   Rotli Web in the meantime. The home page no longer repeats where rotli runs
   under its buttons, and the Mac download link lives only on the download
   page.
-- **rotli.co states its privacy promise.** Right under the download button, a
-  line with a lock opens the promise at the top of the privacy page: you
+- **rotli.co's header shows rotli's GitHub stars.** Beside "Download free",
+  a GitHub button shows the star count (in the menu on a phone). The count is
+  read once when the site is built, so your browser never contacts GitHub to
+  show it; if GitHub can't be reached then, the button shows without a
+  number.
+- **rotli.co states its privacy promise.** Beside the download button, an
+  "Our privacy promise" button of the same size, with a lock, opens the
+  promise at the top of the privacy page (on a phone the two stack, download
+  first): you
   choose which AI tools rotli uses and, note by note, what each one may read
   and change. A small table shows who may read and change a note you wrote
   (the model on your Mac, a connected AI tool, the Librarian) for an everyday,
@@ -182,11 +185,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same place.
 - **rotli.co's home page leads with the numbers.** "The AI you already pay
   for is mostly waiting." now comes right after the film, before what rotli
-  does, and opens on four sourced figures: 50.4% of people paying for ChatGPT
-  hadn't used it in 30 days, half of people who pay for AI don't use it every
-  day, the average AI user uses 3.0 assistants, and 59.9% of subscribers had
-  a paid subscription of any kind go unused each month. Each is footnoted to
-  its survey. The film now leads into that section on a ground that shifts
+  does, and keeps it short: two sourced figures (50.4% of people paying for
+  ChatGPT hadn't used it in 30 days; half of people who pay for AI don't use
+  it every day), each footnoted to its survey, one sentence on putting that
+  idle plan to work, and beside them the blog post's picture with "Read the
+  study", for the full numbers. The film now leads into that section on a ground that shifts
   softly under it, instead of ending on a gap and a hard edge, and it rises
   in once on arrival rather than moving with the scroll.
 - **rotli.co's guides open on their own scene and show how far through you
@@ -228,11 +231,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Long commands fit their boxes on rotli.co.** The Rotli Helper install
   line wraps inside its box in the guide and the blog post instead of being
   cut off, and the privacy page's night scene sets its words beside the dome.
-- **The AI tools on rotli.co's bench are ChatGPT, Claude, Gemini, and
-  Perplexity, shown by their own logos.** Each sits on a badge with its name
-  underneath, so it's clear which AI the figures are about, and the logos stay
-  large enough to recognise on a phone. A line under the sources says the
-  names and logos belong to their owners.
 - **rotli.co's night falls like dusk.** Scrolling into the privacy section,
   the page, its header, and its buttons fade into the night together, on one
   clock, a little sooner, and the section's edges fade into the page instead

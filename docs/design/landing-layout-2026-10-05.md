@@ -226,3 +226,71 @@ thing under the banner rather than a page of its own: a visitor arriving from
 the hero lands on the promise and has the full policy right below it. It
 restates the AI visibility matrix and the 2026-09-29 body-edit decision for a
 visitor, and it is now the page's one access table.
+
+## Revised 2026-10-06 (later): buttons, the header, and a shorter band
+
+The owner, verbatim:
+
+> "Our privacy policy should be more like a button matching the download and
+> the top right button should align with button on hero for consistency then
+> up top I want github with star count. then this part - The AI you already
+> pay for is mostly waiting. - can be better laid out, a lot of dead space on
+> top of the image in right and maybe have the blog thumbnail here and
+> instead point to the blog for like a read more type thing to simplify
+> things and keep it simple, those who want more will read the blog"
+
+### The hero's two buttons
+
+"Download free" (primary, to `/download/`) and "Our privacy promise"
+(outlined, with the lock, to `/privacy/#promise`) sit side by side at one
+height, radius, and type size: both are `.button`, the second passed into
+`SiteActions`' slot. The one-line pointer is gone. "No account. Works
+offline." stays as the quiet line under them: it is short, and it answers
+the first question a download button raises. Below 520px the buttons stack
+full width, the download first.
+
+### One way in, said the same everywhere
+
+The header's "Try now" becomes "Download free", the hero's button scaled to
+the header. The earlier reason to differ (Windows and Linux visitors can't
+download) is handled by `/download/`, which offers Rotli Web on those
+systems. The label is `WAY_IN` in `site/src/site.ts`, read by the header,
+the hero, the closing banner, and the Menu; a build without the Mac
+download says "Try now" in all of them. The 404's "Try rotli" stays: it is a
+plain link in a list, not a button.
+
+### GitHub with its star count
+
+Beside the button: the GitHub mark, "Star", and the count after a hairline,
+an outlined button at the header button's height. The count is read once
+while the site is built (`site/src/githubStars.ts`), so the visitor's browser
+never calls GitHub, and any failure shows the button without a number. On a
+phone the bar stays the brand and Menu: below 560px "Star rotli on GitHub"
+with its count and "Download free" wait in Menu, as the actions did before.
+Nothing in the bar overlaps from 320 to 1920 (1081 and 1150, the edge where
+the page links are still shown, included).
+
+### The band, shorter
+
+Two figures, not four: 50.4% of people paying for ChatGPT hadn't used it in
+30 days (Self Financial), and half of people who pay for AI don't use it
+every day (Menlo Ventures and Morning Consult), each with its footnote and
+population. The 3.0 assistants and the 59.9% move to the post alone. One
+sentence closes it: "rotli puts that idle plan to work keeping your notes in
+order while you write, with no extra AI plan to buy."
+
+The bench of company logos is replaced by the post's own thumbnail, one
+link with "Read the study →". That also retires the open question of
+permission to show those logos: the files and their `SOURCES.md` are
+deleted, and only "Product names belong to their owners." stays, because
+ChatGPT is still named.
+
+The dead space came from a text column far taller than the picture beside
+it. Now the picture's top sits on the headline's and "Read the study"
+sits level with the close. The picture takes the height the words set,
+within a narrow range of its own shape: up to 13% shorter, which crops only
+sky, or 8% taller, which crops the margins beside the bench and the
+calendar. Below 1180px, where the words would outgrow it, the picture goes
+under them at its own shape. Rejected: the headline across the top with the
+figures and picture under it, which moved the empty space beside the
+headline instead of removing it.
