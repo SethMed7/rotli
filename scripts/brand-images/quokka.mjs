@@ -1,9 +1,10 @@
 // The quokka for brand images: the app's canonical line art in src/assets/characters/, filled
 // the way scripts/build-character-fills.mjs fills the site's poses (the Cocoa body under the
-// ink), with two differences that matter at picture size:
-//   - the eye and nose highlights stay light, and
-//   - what the quokka holds is painted as the scene paints its props (paper pages, a wood
-//     folder, a glass lens) instead of disappearing into the body colour.
+// ink), with one difference that matters at picture size: what the quokka holds is painted as
+// the scene paints its props (paper pages, a wood folder, a glass lens) instead of
+// disappearing into the body colour. The face keeps the app's fill: eye and nose glints and
+// the mouth take the body colour, never white (2026-10-06: white glints read as blotches at
+// banner size).
 // The fill always runs at the drawing's own resolution (1254 px, or a multiple for big
 // images), so the paint seeds below land in the same regions at every output size, and the
 // result is then resized: crisp from a 300 px grid tile to a 2400 px banner.
@@ -20,7 +21,6 @@ export const ART = 1254;
 /** The drawings' line weight, in art units: the ink a prop beside the quokka should match. */
 export const ART_LINE = 15;
 const COCOA = [198, 132, 95];
-const HIGHLIGHT = [255, 250, 242];
 
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
@@ -143,12 +143,11 @@ export async function quokka(pose, { size, viewBox, openBottom = false, ink = C.
   }
   for (let y = 0; y < height; y += 1) edge.push(y * width, y * width + width - 1);
   flood(edge, 1);
-  // Small enclosed openings are the eye and nose highlights: they stay light.
-  const small = new Set();
+  // Every enclosed opening is its own region, so a held prop's seed paints only that prop.
   let label = 2;
   for (let index = 0; index < count; index += 1) {
     if (region[index] !== 0 || !open(index)) continue;
-    if (flood([index], label) < count * 0.0012) small.add(label);
+    flood([index], label);
     label += 1;
   }
   // The held props: each seed's whole region takes its paint.
@@ -171,7 +170,7 @@ export async function quokka(pose, { size, viewBox, openBottom = false, ink = C.
       out.set([data[source], data[source + 1], data[source + 2], data[source + 3]], target);
       continue;
     }
-    const fill = paint.get(region[index]) ?? (small.has(region[index]) ? HIGHLIGHT : COCOA);
+    const fill = paint.get(region[index]) ?? COCOA;
     for (let c = 0; c < 3; c += 1)
       out[target + c] = Math.round(data[source + c] * alpha + fill[c] * (1 - alpha));
     out[target + 3] = 255;
