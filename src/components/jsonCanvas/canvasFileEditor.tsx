@@ -17,7 +17,7 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
         : [],
     [state],
   );
-  const { noteFor, resolveLink, noteIdAt } = useCanvasNotes(paths);
+  const { noteFor, resolveLink, noteIdAt, notePathFor } = useCanvasNotes(paths);
 
   if (state.status === "loading") return <p className="file-loading">Opening canvas…</p>;
   if (state.status === "error") return <p className="file-err jc-error">⚠ {state.error}</p>;
@@ -36,6 +36,7 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
         onChange={change}
         noteFor={noteFor}
         resolveLink={resolveLink}
+        notePathFor={notePathFor}
         onOpenNote={(path) => {
           const id = noteIdAt(path);
           if (id) usePanesStore.getState().openNote(id, { newTab: true });

@@ -183,5 +183,13 @@ export function useCanvasNotes(paths: readonly string[]) {
     [index, notes],
   );
   const noteIdAt = useCallback((path: string) => noteAtPath(notes, path)?.id ?? null, [notes]);
-  return { noteFor, resolveLink, noteIdAt };
+  // a dragged row's id → its card's path; only Markdown notes become note cards
+  const notePathFor = useCallback(
+    (noteId: string) => {
+      const note = notes.find((each) => each.id === noteId);
+      return note && (note.kind ?? "note") === "note" ? notePath(note) : null;
+    },
+    [notes],
+  );
+  return { noteFor, resolveLink, noteIdAt, notePathFor };
 }

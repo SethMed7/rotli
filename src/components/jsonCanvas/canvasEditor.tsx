@@ -20,6 +20,7 @@ import { type CanvasDoc, type CanvasNode, fileTitle } from "../../jsonCanvas/mod
 import { lonelyWikilink } from "../../jsonCanvas/notePaths";
 import {
   NOTE_CARD,
+  addFile,
   addText,
   bringToFront,
   connect,
@@ -31,6 +32,7 @@ import {
   setLabel,
   setText,
 } from "../../jsonCanvas/workflow";
+import { registerCanvasDrop } from "../../lib/canvasDrop";
 import { Card, type CanvasEditing, type CanvasNoteView } from "./canvasCard";
 import { EdgeHandles, EdgeLines } from "./canvasEdges";
 
@@ -45,6 +47,9 @@ export interface CanvasEditorProps {
   /** The path `[[target]]` resolves to, or null. */
   resolveLink: (target: string) => string | null;
   onOpenNote: (path: string) => void;
+  /** The vault path a dragged note's card names, or null for anything that
+   * isn't a note (a folder, a board, a file). */
+  notePathFor?: (noteId: string) => string | null;
 }
 
 type Drag =
@@ -53,7 +58,14 @@ type Drag =
   | { kind: "resize"; sx: number; sy: number; id: string; width: number; height: number; origin: CanvasDoc }
   | { kind: "connect"; from: string };
 
-export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }: CanvasEditorProps) {
+export function CanvasEditor({
+  doc,
+  onChange,
+  noteFor,
+  resolveLink,
+  onOpenNote,
+  notePathFor,
+}: CanvasEditorProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -108,6 +120,28 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
   }, []);
+
+  // a note dragged in from the sidebar lands as its card where it's dropped;
+  // several fan out a step apart
+  useEffect(() => {
+    const plane = viewportRef.current;
+    if (!plane || !notePathFor) return;
+    return registerCanvasDrop(plane, (noteIds, clientX, clientY) => {
+      const rect = plane.getBoundingClientRect();
+      const [x, y] = toGraph(view, rect.width, rect.height, clientX - rect.left, clientY - rect.top);
+      let next = doc;
+      const added: string[] = [];
+      for (const path of noteIds.map(notePathFor).filter((each) => each !== null)) {
+        const card = addFile(next, x + added.length * 32, y + added.length * 32, path);
+        next = card.doc;
+        added.push(card.id);
+      }
+      if (added.length === 0) return;
+      onChange(next);
+      setSelected(new Set(added));
+      setSelectedEdge(null);
+    });
+  }, [doc, view, notePathFor, onChange]);
 
   const world = (clientX: number, clientY: number): [number, number] => {
     const rect = viewportRef.current?.getBoundingClientRect();
@@ -378,6 +412,7 @@ export function CanvasEditor({ doc, onChange, noteFor, resolveLink, onOpenNote }
     <div
       ref={viewportRef}
       className="jc-plane"
+      data-canvas-drop="true"
       tabIndex={0}
       role="application"
       aria-roledescription="canvas"
