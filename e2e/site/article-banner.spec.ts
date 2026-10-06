@@ -4,8 +4,9 @@
 // banner as it scrolls (the meter and the tree still pinned and clear of each other).
 // Blog posts open on their cover instead (WritingPage `article`, blog/ArticleCover.astro): the
 // scene across the article's columns, rounded and still, then the title, the summary, the meta
-// line, and the topics on the page's ground, nothing over the picture, the words on the reading
-// column's edge and "Blog /" on the rail's, contrast measured, the title in the first window.
+// line, and the topics on the page's ground, nothing over the picture, "Blog /" straight above the
+// title, the words on the page's (and the left rail's) edge from 901px and on the reading column's
+// below, contrast measured, the title in the first window.
 import { expect, test, type Page } from "@playwright/test";
 
 const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
@@ -194,19 +195,27 @@ for (const path of POSTS) {
       // The title is in the first window.
       expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
+      // "Blog /" is part of the head: straight above the title, on its edge, nothing beside it.
+      const crumbs = await box(page, "[data-article-cover] .head-copy .crumbs");
+      expect(Math.abs(crumbs.x - title!.x)).toBeLessThan(1.5);
+      expect(crumbs.y + crumbs.height).toBeLessThanOrEqual(title!.y + 1);
+      expect(title!.y - (crumbs.y + crumbs.height)).toBeLessThan(24);
+      expect(crumbs.y).toBeGreaterThanOrEqual(art.y + art.height);
+
       if (viewport.width > 900) {
-        // On the article's tracks: the words on the reading column's edge (a paragraph's, since
-        // [data-prose] is the wider middle that figures break out to), "Blog /" on the rail's, the
-        // picture across the columns.
-        const text = await box(page, "[data-prose] > p");
+        // On the article's tracks: the words on the page's edge, which is the picture's and the
+        // left rail's, so the head is one block under the picture, not indented into empty space.
         const rail = await box(page, "[data-article-rail]");
-        expect(Math.abs(copy.x - text.x)).toBeLessThan(1.5);
-        expect(Math.abs((await box(page, "[data-article-cover] .crumbs")).x - rail.x)).toBeLessThan(1.5);
+        expect(Math.abs(copy.x - art.x)).toBeLessThan(1.5);
         expect(Math.abs(art.x - rail.x)).toBeLessThan(1.5);
-        if (viewport.width >= 1280) {
+        if (viewport.width >= 1360) {
           const aside = await box(page, "[data-article-more]");
           expect(Math.abs(art.x + art.width - (aside.x + aside.width))).toBeLessThan(1.5);
         }
+      } else {
+        // One column: the words on the reading column's edge.
+        const text = await box(page, "[data-prose] > p");
+        expect(Math.abs(copy.x - text.x)).toBeLessThan(1.5);
       }
 
       // Read on the page's own ground: measured, at least 4.5:1, topics included.

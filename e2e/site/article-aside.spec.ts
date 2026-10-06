@@ -1,9 +1,11 @@
-// A blog post's right side (blog/ArticleAside.astro): from 1280px a third column beside the
-// reading column with other posts (never the one being read; announced posts only to fill in, not
-// links) and two "From rotli" spots (src/promos.ts, rotli's own, local art, first-party links);
-// below 1280px the same as "More from rotli" after the article, with one spot. The reading column
-// keeps 60 to 80 characters a line, and nothing overlaps or overflows from 320 to 1920 (the full
-// sweep to 2560 is e2e/site/article-width.spec.ts).
+// A blog post's right side (blog/ArticleAside.astro): from 1360px a third column beside the start
+// of the reading column with other posts (never the one being read; announced posts only to fill
+// in, not links) and two "From rotli" spots (src/promos.ts, rotli's own, local art, first-party
+// links). It is never pinned: it scrolls away with the page while the left rail stays (the owner,
+// 2026-10-06: "only show at top, not with the scroll"). Below 1360px it is "More from rotli" after
+// the article, with one spot. The reading column keeps 62 to 70 characters a line beside both
+// rails, and nothing overlaps or overflows from 320 to 1920 (the full sweep to 2560 is
+// e2e/site/article-width.spec.ts).
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
@@ -43,7 +45,7 @@ const overlaps = (
 for (const viewport of [
   { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
-  { width: 1280, height: 800 },
+  { width: 1360, height: 800 },
 ]) {
   test(`the right rail: more posts and two From rotli spots beside the text (${viewport.width}px)`, async ({
     page,
@@ -100,32 +102,42 @@ for (const viewport of [
     }
     await expect(aside.locator("iframe, script")).toHaveCount(0);
 
-    // In view while reading, and whole: nothing of it below the window.
+    // Beside the start of the article: its top level with the text's.
+    expect(Math.abs(box.y - prose.y)).toBeLessThan(2);
+    // It is not pinned: far down the post it has scrolled away above the window, while the left
+    // rail is still in view under the header.
+    expect(await aside.evaluate((el) => getComputedStyle(el).position)).toBe("static");
     await page.evaluate(() => {
       document.documentElement.style.scrollBehavior = "auto";
       const text = document.querySelector<HTMLElement>("[data-prose]")!;
       window.scrollTo(0, text.getBoundingClientRect().top + window.scrollY + text.offsetHeight / 2);
     });
-    const held = (await aside.boundingBox())!;
-    expect(held.y).toBeGreaterThan(0);
-    expect(held.y + held.height).toBeLessThanOrEqual(viewport.height);
+    const gone = (await aside.boundingBox())!;
+    expect(gone.y + gone.height).toBeLessThan(0);
+    const rail = (await page.locator("[data-article-rail]").boundingBox())!;
+    expect(rail.y).toBeGreaterThan(0);
+    expect(rail.y + rail.height).toBeLessThanOrEqual(viewport.height);
+    expect(await page.locator("[data-article-rail]").evaluate((el) => getComputedStyle(el).position)).toBe(
+      "sticky",
+    );
     // Only this site's own files were asked for by the article and its sides.
     expect(elsewhere.filter((url) => !/launchllama/.test(url))).toEqual([]);
   });
 }
 
 for (const viewport of [
+  { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
-  { width: 1280, height: 800 },
+  { width: 1360, height: 800 },
 ]) {
-  test(`the reading column keeps 60 to 80 characters a line beside both rails (${viewport.width}px)`, async ({
+  test(`the reading column keeps 62 to 70 characters a line beside both rails (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto(POST);
     const characters = await measure(page);
-    expect(characters).toBeGreaterThanOrEqual(60);
-    expect(characters).toBeLessThanOrEqual(80);
+    expect(characters).toBeGreaterThanOrEqual(62);
+    expect(characters).toBeLessThanOrEqual(70);
     const rail = (await page.locator("[data-article-rail]").boundingBox())!;
     const prose = (await page.locator("[data-prose]").boundingBox())!;
     const aside = (await more(page).boundingBox())!;
@@ -159,11 +171,12 @@ test("the newsletter spot goes to the sign-up at the foot of the page", async ({
 });
 
 for (const viewport of [
+  { width: 1280, height: 800 },
   { width: 1024, height: 768 },
   { width: 768, height: 1024 },
   { width: 390, height: 844 },
 ]) {
-  test(`below 1280px, "More from rotli" follows the article with one spot (${viewport.width}px)`, async ({
+  test(`below 1360px, "More from rotli" follows the article with one spot (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -188,7 +201,7 @@ for (const viewport of [
   });
 }
 
-for (const width of [320, 390, 768, 1024, 1280, 1440, 1920]) {
+for (const width of [320, 390, 768, 1024, 1280, 1360, 1440, 1920]) {
   test(`a post neither overlaps nor overflows at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(POST);

@@ -1,15 +1,20 @@
-// The blog's width (the owner, 2026-10-06: "for blogs let's use more width, we have more space to
-// use, and let's consider responsiveness"). A post sits on the blog's wider page (Base `widePage`:
-// 96rem, 104rem on the widest screens) on named tracks (WritingPage --article-tracks): fluid rails
-// and a middle that holds a reading column of about 68 characters, which figures break out of.
+// The blog's width (the owner, 2026-10-06: first "for blogs let's use more width ... and let's
+// consider responsiveness", then "now the blog width is too much ... the left and right panels use
+// more width to clear up visual clutter"). A post sits on its own page (Base `widePage`: 88rem,
+// fixed) on named tracks (WritingPage --article-tracks): wide fluid rails and a middle that holds
+// a reading column of about 66 characters. /blog/ is the site's standard 76rem page.
 // Swept from 320 to 2560: no sideways scroll, nothing over the reading column, 60 to 80
-// characters a line wherever the window is wider than a phone, the head on the text's edge, the
-// rails folding right side first (under 1280px) and then the left rail (under 901px), and the
+// characters a line wherever the window is wider than a phone (62 to 70 beside both rails), the
+// head on the page's edge, rails at least 18rem at 1440 and 1920, the rails folding right side
+// first (under 1360px) and then the left rail (under 901px), figures never over-wide, and the
 // same layout after a live resize as on a fresh load. The index is swept the same way.
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
-const WIDTHS = [320, 390, 600, 768, 900, 1024, 1180, 1280, 1440, 1680, 1920, 2560];
+const WIDTHS = [320, 390, 600, 768, 900, 1024, 1180, 1280, 1359, 1360, 1440, 1680, 1920, 2560];
+/** Where the right side comes beside the text (WritingPage, blog/ArticleAside.astro). */
+const THREE_COLUMNS = 1360;
+const REM = 16;
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -53,6 +58,7 @@ const geometry = (page: Page) =>
       main: rect("main.writing")!,
       header: rect(".site-header")!,
       characters: paragraph.getBoundingClientRect().width / ch,
+      fontSize: parseFloat(getComputedStyle(paragraph).fontSize),
       figures,
     };
   });
@@ -69,9 +75,18 @@ for (const width of WIDTHS) {
     // 60 to 80 characters a line; on a phone the window, not the measure, sets the width.
     expect(g.characters).toBeLessThanOrEqual(80);
     if (width >= 768) expect(g.characters).toBeGreaterThanOrEqual(60);
+    // Beside both rails, a comfortable 62 to 70.
+    if (width >= THREE_COLUMNS) {
+      expect(g.characters).toBeGreaterThanOrEqual(62);
+      expect(g.characters).toBeLessThanOrEqual(70);
+    }
+    // 18px at every width: no growth on the widest screens.
+    expect(g.fontSize).toBeCloseTo(18, 1);
 
-    // The head's words start on the reading column's edge; the picture spans the page's width.
-    expect(Math.abs(g.copy.x - g.text.x)).toBeLessThan(1.5);
+    // The picture spans the page's width; the head's words start on its edge (the left rail's)
+    // where there is a rail, on the reading column's edge where there is not.
+    if (width >= 901) expect(Math.abs(g.copy.x - g.main.x)).toBeLessThan(1.5);
+    else expect(Math.abs(g.copy.x - g.text.x)).toBeLessThan(1.5);
     expect(Math.abs(g.art.x - g.main.x)).toBeLessThan(1.5);
     expect(Math.abs(g.art.width - g.main.width)).toBeLessThan(1.5);
     // The header keeps the site's standard width on every page (the owner, 2026-10-06): never
@@ -79,7 +94,7 @@ for (const width of WIDTHS) {
     expect(g.header.width).toBeLessThanOrEqual(76 * 16 + 1.5);
     expect(Math.abs(g.header.x - (width - g.header.width) / 2)).toBeLessThan(2);
 
-    // The rails fold in order: both beside the text from 1280px, the right side under the article
+    // The rails fold in order: both beside the text from 1360px, the right side under the article
     // below that, and the left rail's Share under it below 901px (its tree is the disclosure).
     if (width >= 901) {
       expect(g.rail, "the left rail shows").not.toBeNull();
@@ -90,54 +105,56 @@ for (const width of WIDTHS) {
       await expect(page.locator(".toc-compact")).toBeVisible();
       expect(g.railBox!.y).toBeGreaterThan(g.text.y);
     }
-    if (width >= 1280) {
+    if (width >= THREE_COLUMNS) {
       expect(apart(g.middle, g.more!)).toBe(true);
       expect(g.more!.x + g.more!.width).toBeLessThanOrEqual(width);
+      // The right side and the cover's picture end on the same edge.
+      expect(Math.abs(g.art.x + g.art.width - (g.more!.x + g.more!.width))).toBeLessThan(1.5);
     } else {
       expect(g.more!.y).toBeGreaterThan(g.middle.y + g.middle.height);
       expect(Math.abs(g.more!.x - g.text.x)).toBeLessThan(1.5);
     }
 
-    // Figures stay inside the middle, never in a rail; where the middle has room they break out
-    // wider than the words, and are never narrower.
+    // Figures stay inside the middle, never in a rail, never narrower than the words, and never
+    // more than 5rem a side wider than them (nothing over-wide).
     expect(g.figures.length).toBeGreaterThan(0);
     for (const figure of g.figures) {
       expect(figure.x).toBeGreaterThanOrEqual(g.middle.x - 1);
       expect(figure.x + figure.width).toBeLessThanOrEqual(g.middle.x + g.middle.width + 1);
       expect(figure.width).toBeGreaterThanOrEqual(g.text.width - 1);
+      expect(figure.width).toBeLessThanOrEqual(g.text.width + 10 * REM + 1);
       if (g.railBox && width >= 901) expect(overlaps(figure, g.railBox)).toBe(false);
-      if (width >= 1280) expect(overlaps(figure, g.more!)).toBe(false);
+      if (width >= THREE_COLUMNS) expect(overlaps(figure, g.more!)).toBe(false);
     }
-    if (width >= 1680) expect(g.figures[0]!.width).toBeGreaterThan(g.text.width + 64);
+    // With the left rail alone the middle has room, and a figure breaks out of the words.
+    if (width >= 1180 && width < THREE_COLUMNS)
+      expect(g.figures[0]!.width).toBeGreaterThan(g.text.width + 64);
   });
 }
 
-test("the blog's page is wider than the site's, and grows on the widest screens", async ({ page }) => {
-  const widthAt = async (viewport: number) => {
-    await page.setViewportSize({ width: viewport, height: 900 });
-    await page.goto(POST);
-    return (await page.locator("main.writing").boundingBox())!.width;
-  };
-  // The site's own page stops at 76rem (1216px); the blog's at 96rem, 104rem at 2560.
-  expect(await widthAt(1920)).toBeCloseTo(1536, 0);
-  expect(await widthAt(2560)).toBeCloseTo(1664, 0);
-  await page.goto("/privacy/");
-  expect((await page.locator("main.writing").boundingBox())!.width).toBeCloseTo(1216, 0);
-});
-
-test("type eases up a little on the widest screens and the line keeps its measure", async ({ page }) => {
-  const sizeAt = async (width: number) => {
+for (const width of [1440, 1920]) {
+  test(`at ${width}px both rails have room: at least 18rem each`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(POST);
-    return page
-      .locator("[data-prose] > p")
-      .first()
-      .evaluate((p) => parseFloat(getComputedStyle(p).fontSize));
+    const g = await geometry(page);
+    expect(g.railBox!.width).toBeGreaterThanOrEqual(18 * REM);
+    expect(g.more!.width).toBeGreaterThanOrEqual(18 * REM);
+  });
+}
+
+test("a post's page is 88rem and never grows; /blog/ and the rest of the site are 76rem", async ({
+  page,
+}) => {
+  const widthAt = async (path: string, viewport: number) => {
+    await page.setViewportSize({ width: viewport, height: 900 });
+    await page.goto(path);
+    return (await page.locator("main.writing").boundingBox())!.width;
   };
-  expect(await sizeAt(1440)).toBeCloseTo(18, 0);
-  const wide = await sizeAt(2560);
-  expect(wide).toBeGreaterThan(18);
-  expect(wide).toBeLessThanOrEqual(20);
+  expect(await widthAt(POST, 1920)).toBeCloseTo(88 * REM, 0);
+  expect(await widthAt(POST, 2560)).toBeCloseTo(88 * REM, 0);
+  expect(await widthAt("/blog/", 1920)).toBeCloseTo(76 * REM, 0);
+  expect(await widthAt("/blog/", 2560)).toBeCloseTo(76 * REM, 0);
+  expect(await widthAt("/privacy/", 1920)).toBeCloseTo(76 * REM, 0);
 });
 
 test("a live resize lands on the same layout as a fresh load", async ({ page }) => {
@@ -178,8 +195,7 @@ test("in a short wide window both rails stay whole beside the text", async ({ pa
   const header = (await page.locator(".site-header-bar").boundingBox())!;
   expect(rail.y).toBeGreaterThanOrEqual(header.y + header.height);
   expect(rail.y + rail.height).toBeLessThanOrEqual(700);
-  // The right side is too tall to hold in a 700px window, so it scrolls with the page instead of
-  // being cut off.
+  // The right side is never pinned (blog/ArticleAside.astro): it scrolls away with the page.
   expect(await page.locator("[data-article-more]").evaluate((el) => getComputedStyle(el).position)).toBe(
     "static",
   );
@@ -217,6 +233,8 @@ for (const width of WIDTHS) {
     for (const row of layout.rows) expect(row.copy).toBeLessThanOrEqual(46 * layout.rem + 1);
     // The row never has more than four columns.
     expect(layout.columns).toBeLessThanOrEqual(4);
+    // The index is on the site's standard page, never wider than 76rem.
+    expect(layout.page).toBeLessThanOrEqual(76 * layout.rem + 1);
   });
 }
 
@@ -235,9 +253,10 @@ test("the row under the feature fits as many columns as there is room for, up to
       },
       [count, width] as const,
     );
-  expect(await columnsWith(4, 1536)).toBe(4);
-  expect(await columnsWith(3, 1536)).toBe(3);
-  expect(await columnsWith(2, 1536)).toBe(2);
+  // 1216px: the index's own width on the standard 76rem page.
+  expect(await columnsWith(4, 1216)).toBe(4);
+  expect(await columnsWith(3, 1216)).toBe(3);
+  expect(await columnsWith(2, 1216)).toBe(2);
   expect(await columnsWith(4, 900)).toBe(3);
   expect(await columnsWith(4, 600)).toBe(2);
   expect(await columnsWith(4, 340)).toBe(1);
