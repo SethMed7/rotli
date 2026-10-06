@@ -9,15 +9,22 @@ import { lazy, type ReactNode, Suspense, useState } from "react";
 import { finishFirstRun } from "../../services/firstRun";
 import { flushSettingsNow } from "../../state/persist";
 import { type OnboardingPhase, useUiStore } from "../../state/ui";
-import { useVaultStore } from "../../state/vault";
+import { type VaultStatus, useVaultStore } from "../../state/vault";
 
 const Onboarding = lazy(() => import("./onboarding").then((m) => ({ default: m.Onboarding })));
 const VaultActivation = lazy(() => import("./vaultActivation").then((m) => ({ default: m.VaultActivation })));
+const VaultNeeded = lazy(() => import("./vaultNeeded").then((m) => ({ default: m.VaultNeeded })));
 
 declare const __APP_VERSION__: string;
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
 const flushQuietly = () => void flushSettingsNow().catch(() => {});
+
+/** Where Skip setup goes: straight into the app when a vault is already
+ * chosen, else to the one prompt for a folder. */
+export function skipLeadsTo(vaultStatus: VaultStatus): "app" | "vaultPrompt" {
+  return vaultStatus === "configured" ? "app" : "vaultPrompt";
+}
 
 /** The setup screen to show now, or null for the workspace. */
 export function useSetupFront(onboardingActive: boolean, native: boolean): ReactNode | null {
@@ -27,9 +34,6 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
   const [vaultPending, setVaultPending] = useState(false);
   // back from a later screen keeps what was chosen (no intro, no reset)
   const [resumed, setResumed] = useState(false);
-  // Skip (the owner, 2026-10-05): "only required thing is a vault" — after it
-  // the app opens, with every other choice at its default
-  const [skipping, setSkipping] = useState(false);
   const finish = () => finishFirstRun(APP_VERSION);
   const go = (next: OnboardingPhase, back = false) => {
     setResumed(back);
@@ -50,8 +54,30 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
         resumed={resumed}
         onDone={() => go("vault")}
         onSkip={() => {
-          setSkipping(true);
-          go("vault");
+          // Skip (the owner, 2026-10-05: "only required thing is a vault";
+          // 2026-10-06: Skip goes straight to the app). With a vault already
+          // chosen the app just opens; without one, it opens to a prompt.
+          if (skipLeadsTo(vaultStatus) === "app") finish();
+          else go("skipped");
+        }}
+      />,
+    );
+  }
+
+  if (onboardingActive && phase === "skipped") {
+    return screen(
+      <VaultNeeded
+        onDone={() => {
+          setVaultPending(false);
+          finish();
+        }}
+        onBeforeSwitch={() => {
+          setVaultPending(true);
+          return flushSettingsNow();
+        }}
+        onSwitchFailed={() => {
+          setVaultPending(false);
+          return flushSettingsNow();
         }}
       />,
     );
@@ -62,14 +88,12 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     return screen(
       <VaultActivation
         onboarding={onboardingActive}
-        skipping={skipping}
         allowCurrent={vaultStatus === "configured"}
         {...(onboardingActive
           ? {
               onBack: () => go("preferences", true),
               onDone: () => {
                 setVaultPending(false);
-                if (skipping) return finish();
                 useUiStore.getState().setOnboardingPhase("librarian");
                 return flushSettingsNow();
               },

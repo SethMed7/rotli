@@ -62,8 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pick the Markdown folder you already use and Rotli works in it as it is.
   Rotli's own folder browser is gone.
 - **Setup can be skipped; only a folder is needed.** Skip setup on the first
-  screen asks for a folder and opens the app. After the folder, Skip the rest
-  finishes setup with what you chose so far.
+  screen goes straight to the app. With a vault already chosen it simply
+  opens; without one, the app asks for a folder in one small prompt, the only
+  part of setup that can't be skipped, and asks again the same way if you
+  quit first. After the folder, Skip the rest finishes setup with what you
+  chose so far.
 - **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
   are still being finished, so the New chooser, the New… menu, Settings, the
   slash menu, and an open document or sheet say Beta.

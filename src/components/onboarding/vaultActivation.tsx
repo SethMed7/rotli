@@ -53,42 +53,22 @@ export function vaultPlan(kind: "memex" | "markdown" | "empty"): "create" | "ope
   return kind === "empty" ? "create" : "open";
 }
 
-export function VaultActivation({
-  onboarding = false,
-  allowCurrent = false,
+/** Picking the folder, shared by setup's vault step and the prompt a skipped
+ * setup shows: the folder panel, then a fresh vault or the folder used in
+ * place. `librarian` is whether a NEW vault's Librarian starts on. */
+export function useVaultChoice({
+  librarian,
   onDone,
-  onBack,
   onBeforeSwitch,
   onSwitchFailed,
-  skipping = false,
 }: {
-  /** The person skipped setup: this screen is the one thing left. */
-  skipping?: boolean;
-  onboarding?: boolean;
-  allowCurrent?: boolean;
-  onDone?: () => void | Promise<void>;
-  onBack?: () => void;
-  onBeforeSwitch?: () => void | Promise<void>;
-  onSwitchFailed?: () => void | Promise<void>;
+  librarian: () => boolean;
+  onDone?: (() => void | Promise<void>) | undefined;
+  onBeforeSwitch?: (() => void | Promise<void>) | undefined;
+  onSwitchFailed?: (() => void | Promise<void>) | undefined;
 }) {
-  // outside setup no Librarian screen follows, so a new vault asks here
-  const [librarian, setLibrarian] = useState<"on" | "off">("on");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [current, setCurrent] = useState<CorpusRefView | null>(null);
-
-  useEffect(() => {
-    if (!onboarding || !allowCurrent) return;
-    let live = true;
-    void corpusListConfig()
-      .then((config) => {
-        if (live) setCurrent(keepableVault(config));
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [allowCurrent, onboarding]);
 
   const restoreVaultStep = async () => {
     try {
@@ -111,8 +91,7 @@ export function VaultActivation({
       await onBeforeSwitch?.();
       await flushSettingsNow();
       if (plan === "create") {
-        // in setup, whether the Librarian works here is the next screen's question
-        await initMemexAsCorpus(path, onboarding ? useUiStore.getState().brainEnabled : librarian === "on");
+        await initMemexAsCorpus(path, librarian());
         await activateCreatedVault();
       } else if (await chooseFolder(path)) {
         await refreshActiveVault();
@@ -128,6 +107,48 @@ export function VaultActivation({
       setBusy(false);
     }
   };
+
+  return { choose, busy, setBusy, error, chooseLabel: busy ? "Working…" : "Choose a folder" };
+}
+
+export function VaultActivation({
+  onboarding = false,
+  allowCurrent = false,
+  onDone,
+  onBack,
+  onBeforeSwitch,
+  onSwitchFailed,
+}: {
+  onboarding?: boolean;
+  allowCurrent?: boolean;
+  onDone?: () => void | Promise<void>;
+  onBack?: () => void;
+  onBeforeSwitch?: () => void | Promise<void>;
+  onSwitchFailed?: () => void | Promise<void>;
+}) {
+  // outside setup no Librarian screen follows, so a new vault asks here
+  const [librarian, setLibrarian] = useState<"on" | "off">("on");
+  const [current, setCurrent] = useState<CorpusRefView | null>(null);
+  // in setup, whether the Librarian works here is the next screen's question
+  const { choose, busy, setBusy, error, chooseLabel } = useVaultChoice({
+    librarian: () => (onboarding ? useUiStore.getState().brainEnabled : librarian === "on"),
+    onDone,
+    onBeforeSwitch,
+    onSwitchFailed,
+  });
+
+  useEffect(() => {
+    if (!onboarding || !allowCurrent) return;
+    let live = true;
+    void corpusListConfig()
+      .then((config) => {
+        if (live) setCurrent(keepableVault(config));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [allowCurrent, onboarding]);
 
   /** Re-onboarding with a vault already chosen: keep it, no folder panel. */
   const keepCurrent = async () => {
@@ -163,12 +184,9 @@ export function VaultActivation({
           <div className="setup-content">
             <h1 id="vault-title">Where should your notes live?</h1>
             <p className="setup-lede">
-              {skipping
-                ? "One thing before you start: pick a folder for your notes. "
-                : "Pick a folder for your notes. "}
-              Make a new one with New Folder and Rotli starts a fresh vault there, or pick the Markdown folder
-              you already use, like an Obsidian vault: it stays as it is, and Rotli adds only a hidden .rotli
-              folder.
+              Pick a folder for your notes. Make a new one with New Folder and Rotli starts a fresh vault
+              there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is,
+              and Rotli adds only a hidden .rotli folder.
             </p>
             {!onboarding && (
               <SetupChoiceGroup
@@ -213,7 +231,7 @@ export function VaultActivation({
               </button>
             )}
             <SetupPrimary disabled={busy} onClick={primary}>
-              {busy ? "Working…" : "Choose a folder"}
+              {chooseLabel}
             </SetupPrimary>
           </div>
         </footer>
