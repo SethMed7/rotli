@@ -357,38 +357,55 @@ from 320 to 1920.
   leaf shrinks), stop to look at a pointer that comes close, look to the pile
   when theirs is gone, and fetch another after a while. The players watch the
   ball, pause to watch a visitor who comes close, and the catcher reaches up
-  (the cheering pose) as it arrives; a click or tap on them or the ball sends
-  it high. Everyone blinks.
+  (the cheering pose) as it arrives. Everyone blinks.
   **The person** (the owner, 2026-10-05: "when I am hovering over it with my
   mouse it inserts a human I am controlling. I can walk my human all the way
   to the food and feed the quokkas. I can also go play with the quokkas with
-  the ball"). A small person drawn in code in the scene's ink and tokens (a
-  round face, a bucket hat, a shirt in `--lantern`, trousers in
-  `--wood-dark`, outlines at about the art's weight; nobody in particular)
-  appears when the pointer comes onto the sand, a short walk in from the
-  nearer side, and walks to the pointer's x with an eased stride (it speeds
-  up, slows to arrive, never overshoots), legs and arms swinging, facing the
-  way it goes, on the sand line and behind the residents. Only where it
-  stops counts, so passing by does nothing: at the pile it picks a leaf up
-  (the guard is cross while it carries their lunch), at a quokka it stands
-  beside it (never in front) and hands the leaf over through the same feed
-  and guard-mood rules as the drag, and by the two with the ball it joins
-  their catch, which then goes player, person, other player until it walks
-  away (and it hands the ball back if it leaves holding it). It wanders off
-  seven seconds after the visitor stops playing. On a touch screen a tap
-  sends it; from the keyboard, "Walk on the beach", a button before the band
-  (visible on focus, with a described instruction), takes ← and →: held, it
-  walks, and let go near the pile or a quokka it stops at it. Its rules
-  without the DOM (the walk, the swing, what it does where it stops) are
-  `src/quokka/human.ts`; `src/quokka/person.ts` poses the drawing.
+  the ball"; and later that day: "when my mouse is there let me use arrows to
+  move ... I can click what quokka to throw the ball to or give feed to"). A
+  small person drawn in code in the scene's ink and tokens (a round face, a
+  bucket hat, a shirt in `--lantern`, trousers in `--wood-dark`, outlines at
+  about the art's weight; nobody in particular) appears when the mouse comes
+  onto the sand, a short walk in from the nearer side to the pointer, and
+  then stays put: it no longer chases the pointer, which let the arrow keys
+  and clicks steer it without fighting the mouse. It walks with a brisk start
+  and a soft arrival (it never overshoots), legs and arms swinging, facing the
+  way it goes, on the sand line and behind the residents. What a click (a tap
+  on a touch screen) asks of it is `command` in `src/quokka/human.ts`:
+  - the leaf pile: walk there and pick a leaf up (the pile gives a little and
+    the leaf flies up into its hand);
+  - a quokka, with a leaf in hand: walk beside it (never in front) and hand
+    it over, through the same feed and guard-mood rules as the drag; a small
+    heart rises over the quokka;
+  - a quokka, with the ball in hand or while in the game: throw it the ball in
+    an arc (at once, or on its next catch). Any resident catches it (the
+    guard and the players reach up in the cheering pose; the sitter and the
+    nibbler take it in their paws), hops, and throws it back to the person;
+  - the ball, or a player with empty hands: walk to the two with the ball and
+    join their catch, which then goes player, person, other player until it
+    walks away (and it hands the ball back if it leaves holding it);
+  - any other quokka with empty hands: walk over to it; open sand: walk there.
+  Under the mouse, whatever a click would act on (a quokka, the pile, the
+  ball) shows a pointer and a small ring on the sand at its feet. The arrow
+  keys walk it whenever the pointer is over the beach (`:hover`, so a page
+  scrolled under a still mouse counts right) or focus is on its buttons:
+  held, it walks, and let go near the pile or a quokka it stops at it. They
+  are never taken from a form field or with a modifier held, and ↑ and ↓ stay
+  the page's, so scrolling works. From the keyboard alone, "Walk on the
+  beach", a button before the band (visible on focus, with a described
+  instruction), brings it in and takes ← and →. It wanders off seven seconds
+  after the visitor stops playing and the pointer leaves the beach. Its rules
+  without the DOM (the walk, the swing, what a click asks, what it does where
+  it stops) are `src/quokka/human.ts`; `src/quokka/person.ts` poses the
+  drawing.
   **The drag** (the decision, 2026-10-05) stays alongside as the second way to
   play: the visitor can press on the pile and carry a leaf (mouse, pen, or
   touch; `touch-action: none` only on the pile). The residents watch it, a
   hungry eater perks up as it comes near, and letting go over a quokka hands
   it over (it eats, the others hop, the guard is pleased); letting go over
   open sand wastes it (it drifts down, rests, fades, and the guard is sad). A
-  tap on the pile without dragging carries nothing off (on touch it sends the
-  person). The leaves are their lunch, so both give the visitor a part in the
+  click or tap on the pile without dragging sends the person to pick a leaf
+  up. The leaves are their lunch, so both give the visitor a part in the
   scene's one story rather than moving the quokkas around like objects. "Hand
   the quokkas a leaf", the other button before the band (outside its
   `aria-hidden`), does the same from the keyboard (visible on focus, with a

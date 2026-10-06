@@ -99,6 +99,11 @@ let human: {
   deed(holding: boolean, spot: Spot): "pick" | "feed" | "join" | null;
   onSand(x: number, width: number, bodyWidth: number): number;
   entrance(target: number, width: number, bodyWidth: number): number;
+  command(
+    holding: "leaf" | "ball" | null,
+    hit: "pile" | "ball" | "quokka" | "sand",
+    context: { joined: boolean; player: boolean },
+  ): string | null;
 };
 let art: {
   tracedPose(svg: string): { line: string; silhouette: string; transform: string; viewBox: number };
@@ -378,6 +383,31 @@ describe("the person on the footer beach", () => {
     expect(human.deed(false, { ...none, players: true, quokka: "player-a" })).toBe("join");
     expect(human.deed(true, { ...none, players: true, quokka: "player-a" })).toBe("feed");
     expect(human.deed(false, none)).toBeNull();
+  });
+
+  test("sets off briskly: near full speed within a few frames", () => {
+    let walk = human.createWalk(0);
+    for (let i = 0; i < 7; i++) walk = human.stepWalk(walk, 1000, 16);
+    expect(walk.v).toBeGreaterThan(human.STRIDE.speed * 0.9);
+  });
+
+  test("a click asks for the one thing that fits what it lands on and what is in hand", () => {
+    const loose = { joined: false, player: false };
+    // The pile: fetch a leaf with empty hands; with something in hand, just go there.
+    expect(human.command(null, "pile", loose)).toBe("fetch");
+    expect(human.command("leaf", "pile", loose)).toBe("walk");
+    // A quokka: feed it a leaf in hand; throw it the ball in hand (or while in the game).
+    expect(human.command("leaf", "quokka", loose)).toBe("feed");
+    expect(human.command("ball", "quokka", { joined: true, player: false })).toBe("throw");
+    expect(human.command(null, "quokka", { joined: true, player: true })).toBe("throw");
+    // Empty hands, out of the game: a player means joining; anyone else, a visit.
+    expect(human.command(null, "quokka", { joined: false, player: true })).toBe("join");
+    expect(human.command(null, "quokka", loose)).toBe("visit");
+    // The ball: join the game; already holding it, nothing; a leaf in hand, just go there.
+    expect(human.command(null, "ball", loose)).toBe("join");
+    expect(human.command("ball", "ball", loose)).toBeNull();
+    expect(human.command("leaf", "ball", loose)).toBe("walk");
+    expect(human.command(null, "sand", loose)).toBe("walk");
   });
 
   test("it stays on the sand, and arrives from the nearer side", () => {

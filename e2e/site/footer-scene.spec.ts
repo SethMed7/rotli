@@ -1,8 +1,9 @@
-// The footer's quokka scene: residents doing their own things; the visitor's person, walked
-// by the mouse, a finger, or the arrow keys to the leaf pile, to a quokka to feed it, and to
-// the game of catch; a leaf still carried by hand from the pile to a quokka or dropped on the
-// sand; and a scene that never moves on its own under reduced motion, where the person steps
-// straight to where it is sent.
+// The footer's quokka scene: residents doing their own things; the visitor's person, brought in
+// by the mouse and sent by clicks, a finger, or the arrow keys (over the beach, or from "Walk
+// on the beach") to the leaf pile, to a quokka to feed it, and to the game of catch, where a
+// click on a quokka throws it the ball; a ring under what a click would act on; a leaf still
+// carried by hand from the pile to a quokka or dropped on the sand; and a scene that never
+// moves on its own under reduced motion, where the person steps straight to where it is sent.
 import { expect, test, type Page } from "@playwright/test";
 
 async function toFooter(page: Page) {
@@ -98,19 +99,35 @@ const sandY = async (page: Page) => {
   return scene.y + scene.height * 0.75;
 };
 
-test("the mouse brings a person onto the beach; it walks to the leaves, then feeds a quokka", async ({
+const centreOf = async (page: Page, selector: string) => {
+  const box = (await page.locator(selector).boundingBox())!;
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+const personX = async (page: Page) => {
+  const box = (await person(page).boundingBox())!;
+  return box.x + box.width / 2;
+};
+
+test("the mouse brings a person onto the beach; a click on the leaves, then on a quokka, feeds it", async ({
   page,
 }) => {
   await toFooter(page);
   const y = await sandY(page);
   await expect(person(page)).not.toHaveClass(/is-here/);
+  // Coming onto the sand brings the person in; passing over the pile does nothing more.
   await page.mouse.move(await centreX(page, "[data-food]"), y, { steps: 4 });
   await expect(person(page)).toHaveClass(/is-here/);
+  await page.waitForTimeout(800);
+  await expect(status(page)).not.toHaveText("You picked up a leaf.");
+  const food = await centreOf(page, "[data-food]");
+  await page.mouse.click(food.x, food.y);
   await expect(status(page)).toHaveText("You picked up a leaf.", { timeout: 8000 });
   await expect(person(page).locator("[data-person-leaf]")).not.toHaveAttribute("visibility", "hidden");
-  await page.mouse.move(await centreX(page, '[data-quokka="sitter"]'), y, { steps: 4 });
+  const sitter = await centreOf(page, '[data-quokka="sitter"]');
+  await page.mouse.click(sitter.x, sitter.y);
   await expect(status(page)).toHaveText("The quokka sitting by the pile took the leaf.", { timeout: 8000 });
   await expect(page.locator('[data-quokka="guard"]')).toHaveAttribute("data-mood", "happy");
+  await expect(page.locator("[data-pop]")).toHaveClass(/is-popping/);
   // It stands beside the quokka it fed, never on top of it.
   const [them, us] = await Promise.all([
     page.locator('[data-quokka="sitter"]').boundingBox(),
@@ -120,19 +137,73 @@ test("the mouse brings a person onto the beach; it walks to the leaves, then fee
   expect(gap).toBeGreaterThan(them!.width / 2);
 });
 
-test("walked to the two with the ball, the person joins their game of catch", async ({ page }) => {
+test("a click on the ball joins the catch; then a click on a quokka throws it there, and it comes back", async ({
+  page,
+}) => {
   await toFooter(page);
-  const y = await sandY(page);
-  const a = (await page.locator('[data-quokka="player-a"]').boundingBox())!;
-  const b = (await page.locator('[data-quokka="player-b"]').boundingBox())!;
-  await page.mouse.move((a.x + a.width + b.x) / 2, y, { steps: 4 });
-  await expect(status(page)).toHaveText(/You joined the game of catch\.|You caught the ball\./, {
-    timeout: 8000,
-  });
-  await expect(status(page)).toHaveText("You caught the ball.", { timeout: 8000 });
+  const ball = await centreOf(page, "[data-ball]");
+  await page.mouse.move(ball.x, ball.y, { steps: 4 });
+  await page.mouse.click(ball.x, ball.y);
+  await expect(status(page)).toHaveText("You caught the ball.", { timeout: 10_000 });
+  const guard = await centreOf(page, '[data-quokka="guard"]');
+  await page.mouse.click(guard.x, guard.y);
+  await expect(status(page)).toHaveText("You threw the ball to the quokka minding the pile.");
+  await expect(status(page)).toHaveText("You caught the ball.", { timeout: 10_000 });
 });
 
-test("the arrow keys walk the person from the keyboard", async ({ page }) => {
+test("what a click would act on shows a pointer and a ring on the sand", async ({ page }) => {
+  await toFooter(page);
+  const scene = page.locator("[data-scenery]");
+  const sitter = await centreOf(page, '[data-quokka="sitter"]');
+  await page.mouse.move(sitter.x, sitter.y, { steps: 3 });
+  await expect(scene).toHaveAttribute("data-hover", "quokka");
+  await expect(scene).toHaveCSS("cursor", "pointer");
+  await expect(page.locator("[data-target-mark]")).toHaveClass(/is-on/);
+  // Open sky over the sand between the pile and the guard: nothing to act on.
+  const food = (await page.locator("[data-food]").boundingBox())!;
+  const box = (await scene.boundingBox())!;
+  await page.mouse.move(food.x + food.width + 40, box.y + 12, { steps: 3 });
+  await expect(scene).not.toHaveAttribute("data-hover");
+  await expect(page.locator("[data-target-mark]")).not.toHaveClass(/is-on/);
+});
+
+test("with the mouse over the beach the arrow keys walk the person; elsewhere they are the page's", async ({
+  page,
+}) => {
+  await toFooter(page);
+  const y = await sandY(page);
+  const guard = await centreOf(page, '[data-quokka="guard"]');
+  await page.mouse.move(guard.x, y, { steps: 4 });
+  await expect(person(page)).toHaveClass(/is-here/);
+  await page.waitForTimeout(1200); // it has walked in and stopped
+  const before = await personX(page);
+  await page.keyboard.down("ArrowLeft");
+  await page.waitForTimeout(400);
+  await page.keyboard.up("ArrowLeft");
+  await expect.poll(() => personX(page)).toBeLessThan(before - 40);
+  // The pointer off the beach: the keys are the page's again.
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(600);
+  const still = await personX(page);
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(400);
+  await page.keyboard.up("ArrowRight");
+  await page.waitForTimeout(300);
+  expect(Math.abs((await personX(page)) - still)).toBeLessThan(2);
+  // Typing in a field never walks the person, even with the pointer over the beach.
+  const field = page.locator(".site-footer input").first();
+  if ((await field.count()) > 0) {
+    await field.focus();
+    await page.mouse.move(guard.x, y, { steps: 2 });
+    await page.waitForTimeout(300);
+    const typed = await personX(page);
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(300);
+    expect(Math.abs((await personX(page)) - typed)).toBeLessThan(2);
+  }
+});
+
+test("from the keyboard, Walk on the beach takes the arrow keys", async ({ page }) => {
   await toFooter(page);
   const walk = page.getByRole("button", { name: "Walk on the beach" });
   await walk.focus();
@@ -203,11 +274,16 @@ test("under reduced motion nothing moves on its own, and the person steps straig
   const foodX = await centreX(page, "[data-food]");
   await page.mouse.move(foodX, y);
   await expect(person(page)).toHaveClass(/is-here/);
-  // No walk: it is already standing at the pile, and has picked a leaf up.
+  // No walk: it is already standing where the mouse came in.
   const box = (await person(page).boundingBox())!;
   expect(Math.abs(box.x + box.width / 2 - foodX)).toBeLessThan(6);
+  // The page was scrolled up a little, so the band's bottom edge is under the window's: click
+  // the top of the pile and the middle of the guard, both in view.
+  const food = (await page.locator("[data-food]").boundingBox())!;
+  await page.mouse.click(foodX, food.y + 8);
   await expect(status(page)).toHaveText("You picked up a leaf.");
-  await page.mouse.move(await centreX(page, '[data-quokka="guard"]'), y);
+  const guard = await centreOf(page, '[data-quokka="guard"]');
+  await page.mouse.click(guard.x, guard.y - 10);
   await expect(status(page)).toHaveText("The quokka minding the pile took the leaf.");
   // The stroller never set off.
   await expect(page.locator('[data-quokka="walker"]')).not.toHaveAttribute("style", /translateX\((?!-?\d)/);

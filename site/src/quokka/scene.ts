@@ -1,18 +1,23 @@
 // Brings QuokkaScene.astro to life. One requestAnimationFrame loop per scene, running only
-// while the scene is on screen and the tab is visible. Pointer events only: a mouse brings the
-// visitor's person onto the beach and it walks to the pointer (a tap does the same on a touch
-// screen, the arrow keys from "Walk on the beach"); stopped at the pile it picks a leaf up, at
-// a quokka it hands it over, by the players it joins their catch (./human.ts, ./person.ts). A
-// press-and-drag on the leaf pile still carries a leaf by hand (mouse, pen, or touch) to a
-// quokka or onto the sand; a tap pokes a quokka or throws the ball.
+// while the scene is on screen and the tab is visible. Pointer events only. A mouse coming
+// onto the beach brings the visitor's person in (it walks in once, to the pointer); from then
+// a click (a tap on a touch screen) says where it goes and what it does there (./human.ts
+// `command`): a click on the pile fetches a leaf, on a quokka with a leaf in hand feeds it,
+// with the ball in hand (or while in the game) throws the ball to that quokka, which catches
+// it and throws it back, and on the ball or the players joins their catch. The arrow keys walk
+// it whenever the pointer is over the beach or focus is on its buttons (never from a form
+// field, never ↑ or ↓, so the page still scrolls). A targetable quokka, the pile, and the ball
+// show a pointer and a small ring on the sand under the mouse. A press-and-drag on the pile
+// still carries a leaf by hand (mouse, pen, or touch) to a quokka or onto the sand.
 //
 // Under reduced motion nothing moves on its own (no stroll, no game of catch, no blinks or
 // bites, no hops, no heads following the pointer), and the loop runs only while the visitor
-// plays: the person steps straight to where it is sent, and leaves and balls arrive at once. Everything moves through SVG attributes and CSSOM transforms, so the page's
+// plays: the person steps straight to where it is sent, and leaves and balls arrive at once.
+// Everything moves through SVG attributes and CSSOM transforms, so the page's
 // Content-Security-Policy (style-src 'self') is never asked for an inline style attribute.
 // The rules that do not need the DOM (who gets a leaf, the ball's arc, a falling leaf, the
 // guard's mood) live in ./play.ts.
-import { arrived, createWalk, deed, entrance, onSand, stepWalk, type Spot, type Walk } from './human';
+import { STRIDE, arrived, command, createWalk, deed, entrance, onSand, stepWalk, type Hit, type Spot, type Walk } from './human';
 import { PERSON_BALL, personView, type ArmPose, type PersonView } from './person';
 import { arc, dropTarget, guardMood, leafFall, type Box, type Mood, type Point } from './play';
 import { BALL, CENTER_X, EYES, EYE_TRAVEL, HEAD_PIVOT, HEAD_TILT, LAYERED, PAWS, VIEWBOX, type LayeredPose } from './rig';
@@ -109,6 +114,8 @@ interface Person {
   settled: boolean;
   keyDir: -1 | 0 | 1;
   focused: boolean;
+  /** The quokka the visitor picked for the ball's next throw, while the ball is elsewhere. */
+  throwTo: Quokka | null;
 }
 
 /** Whoever can hold the ball: a quokka or the visitor's person. */
@@ -254,6 +261,8 @@ function animate(scenery: HTMLElement) {
   const foodEl = scenery.querySelector<SVGSVGElement>('[data-food]');
   const ballEl = scenery.querySelector<SVGSVGElement>('[data-ball]');
   const carriedEl = scenery.querySelector<SVGSVGElement>('[data-carried]');
+  const markEl = scenery.querySelector<HTMLElement>('[data-target-mark]');
+  const popEl = scenery.querySelector<SVGSVGElement>('[data-pop]');
   const svgs = [...scenery.querySelectorAll<SVGSVGElement>('[data-quokka]')];
   if (!foodEl || !ballEl || !carriedEl || !personEl || svgs.length === 0) return;
   for (const svg of svgs) if (svg.dataset.mood) svg.dataset.restMood = svg.dataset.mood;
@@ -280,6 +289,7 @@ function animate(scenery: HTMLElement) {
     settled: true,
     keyDir: 0,
     focused: false,
+    throwTo: null,
   };
   let cast: Quokka[] = [];
   let by: Partial<Record<Role, Quokka>> = {};
@@ -328,7 +338,21 @@ function animate(scenery: HTMLElement) {
     cast.forEach((other, i) => {
       if (other !== q && other.role !== 'walker') setTimeout(() => hop(other, performance.now(), 0.6), 120 + i * 90);
     });
+    pop(q);
     say(`${NAMES[q.role]} took the leaf.`);
+  }
+
+  /** A small heart rises over a quokka that was just fed (a reaction you can read at a glance;
+   * none under reduced motion, where the status line says it). */
+  function pop(q: Quokka) {
+    if (!popEl || !ambient) return;
+    const size = popEl.getBoundingClientRect().width || 22;
+    const x = q.box.left + q.box.width / 2 - sceneRect.left - size / 2;
+    const y = q.box.top - sceneRect.top + q.box.height * 0.08;
+    popEl.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    popEl.classList.remove('is-popping');
+    void popEl.getBoundingClientRect(); // restart the animation
+    popEl.classList.add('is-popping');
   }
 
   function handTo(q: Quokka, from: Point, now: number, ms: number, lift: number) {
@@ -347,14 +371,11 @@ function animate(scenery: HTMLElement) {
     if (!carry) return;
     const point = { x: carry.x, y: carry.y };
     const moved = Math.hypot(carry.x - carry.fromX, carry.y - carry.fromY);
-    const mouse = carry.mouse;
     carry = null;
     scenery.classList.remove('is-carrying');
-    // A tap on the pile, not a drag: nothing is carried off. On a touch screen it sends the
-    // person there instead (a mouse already brought it).
+    // A click or tap on the pile, not a drag: the person goes and picks a leaf up.
     if (moved < 8) {
-      say('');
-      if (!mouse) sendPerson(point.x, now);
+      act('pile', point.x, null, now);
       return;
     }
     const target = dropTarget(
@@ -409,14 +430,30 @@ function animate(scenery: HTMLElement) {
     }
     if (event.pointerType !== 'mouse') return;
     pointer = { x: event.clientX, y: event.clientY, at: now, mouse: true };
-    // The person comes onto the beach with the mouse and walks to it. While the loop runs the
-    // boxes are the frame's; resting (reduced motion), they are measured now.
+    // While the loop runs the boxes are the frame's; resting (reduced motion), measure now.
     if (!raf) measure();
-    if (near(pointer, sceneRect, 0)) sendPerson(event.clientX, now);
+    if (!near(pointer, sceneRect, 0)) return;
+    // The mouse coming onto the beach brings the person in, once; clicks and keys move it.
+    if (!person.here) sendPerson(event.clientX, now, 0, false);
+    else person.seenAt = now;
+    if (!raf) hover();
   }
   function onLeave() {
     pointer = null;
+    hover();
   }
+
+  /** What is under a point of the beach, most specific first: the ball, a quokka, the sand. */
+  function hitAt(at: Point): { hit: Hit; q: Quokka | null } {
+    if (near(at, ballRect, 6) && ball?.phase !== 'flying') return { hit: 'ball', q: null };
+    let found: Quokka | null = null;
+    for (const q of cast) {
+      if (q.role === 'walker' || !visible(q) || !near(at, q.box, 0)) continue;
+      if (!found || Math.abs(at.x - (q.box.left + q.box.right) / 2) < Math.abs(at.x - (found.box.left + found.box.right) / 2)) found = q;
+    }
+    return found ? { hit: 'quokka', q: found } : { hit: 'sand', q: null };
+  }
+
   function onDown(event: PointerEvent) {
     const now = performance.now();
     const at = { x: event.clientX, y: event.clientY };
@@ -432,24 +469,73 @@ function animate(scenery: HTMLElement) {
         // A pointer the browser no longer tracks: the window's listeners still follow it.
       }
       scenery.classList.add('is-carrying');
-      say('You picked up a leaf.');
       return;
     }
-    if (near(at, ballRect, 10) && ball?.phase === 'held') {
-      throwBall(now, true);
-      return;
-    }
-    let poked = false;
-    for (const q of cast) {
-      if (!visible(q) || !near(at, q.box, 0)) continue;
-      poked = true;
+    const { hit, q } = hitAt(at);
+    if (q) {
+      // Whatever the click asks, the quokka is pleased to be picked.
       hop(q, now);
       if (q.mood !== 'sad') setMood(q, 'happy', now);
       q.moodUntil = now + HAPPY_MS;
-      if (q.role.startsWith('player') && ball?.phase === 'held') throwBall(now, true);
     }
-    // A tap on the sand (or on a quokka) sends the person there; a mouse already brought it.
-    if (event.pointerType !== 'mouse' || (poked && !person.here)) sendPerson(at.x, now);
+    act(hit, at.x, q, now);
+  }
+
+  const personHasBall = () => ball?.phase === 'held' && ball.by === person;
+
+  /** Carry out a click or tap on the beach (./human.ts `command`). */
+  function act(hit: Hit, clientX: number, q: Quokka | null, now: number) {
+    const holding = person.holding ? 'leaf' : personHasBall() ? 'ball' : null;
+    const order = command(holding, hit, {
+      joined: person.here && person.joined,
+      player: !!q && q.role.startsWith('player'),
+    });
+    if (order === 'throw' && q) {
+      if (personHasBall()) throwBall(now, q);
+      else {
+        person.throwTo = q;
+        person.seenAt = now;
+        say(`Your next throw goes to ${NAMES[q.role].toLowerCase()}.`);
+      }
+      return;
+    }
+    if (order === null) return;
+    const players = [by['player-a'], by['player-b']].filter((p): p is Quokka => !!p && visible(p));
+    const between = players.length === 2 ? (players[0]!.box.right + players[1]!.box.left) / 2 : clientX;
+    const x = order === 'fetch' ? pileCentre().x : order === 'join' ? between : clientX;
+    sendPerson(x, now, 0, true, order === 'feed' || order === 'visit' ? q : null);
+  }
+
+  /** The ring under whatever the mouse would act on, and a pointer over it. */
+  function hover() {
+    if (!markEl) return;
+    const over = pointer?.mouse && !carry && near(pointer, sceneRect, 0) ? pointer : null;
+    let box: DOMRect | null = null;
+    let kind = '';
+    if (over && near(over, foodRect, 6)) {
+      box = foodRect;
+      kind = 'pile';
+    } else if (over) {
+      const { hit, q } = hitAt(over);
+      if (hit === 'ball') {
+        box = ballRect;
+        kind = 'ball';
+      } else if (q) {
+        box = q.box;
+        kind = 'quokka';
+      }
+    }
+    write(scenery, 'data-hover', kind || null);
+    if (!box) {
+      markEl.classList.remove('is-on');
+      return;
+    }
+    const width = Math.max(28, box.width * 0.8);
+    markEl.style.width = `${width.toFixed(1)}px`;
+    // Under the feet (a quokka's box ends at them); under the ball wherever it is.
+    const bottom = kind === 'ball' ? box.bottom + 2 : box.bottom - 4;
+    markEl.style.transform = `translate(${(box.left + box.width / 2 - width / 2 - sceneRect.left).toFixed(1)}px, ${(bottom - sceneRect.top - 6).toFixed(1)}px)`;
+    markEl.classList.add('is-on');
   }
   function onUp(event: PointerEvent) {
     if (carry && event.pointerId === carry.id) release(performance.now());
@@ -457,9 +543,12 @@ function animate(scenery: HTMLElement) {
 
   // ——— The ball: two quokkas in the corner playing catch, and the person if it joins ———
 
-  const holdAt = (c: Catcher): Point => (isPerson(c) ? c.view.toScreen(PERSON_BALL.held) : toScreen(c, BALL.held));
+  // The base rig holds the ball at its belly and catches it overhead; the layered poses (the
+  // sitter and the nibbler) catch and hold it where they hold a leaf.
+  const holdAt = (c: Catcher): Point =>
+    isPerson(c) ? c.view.toScreen(PERSON_BALL.held) : toScreen(c, c.layered ? heldPoint(c) : BALL.held);
   const catchAt = (c: Catcher): Point =>
-    isPerson(c) ? c.view.toScreen(PERSON_BALL.caught) : toScreen(c, BALL.caught);
+    isPerson(c) ? c.view.toScreen(PERSON_BALL.caught) : toScreen(c, c.layered ? heldPoint(c) : BALL.caught);
   const hopCatcher = (c: Catcher, now: number, height: number) => {
     if (!isPerson(c)) hop(c, now, height);
   };
@@ -477,10 +566,17 @@ function animate(scenery: HTMLElement) {
 
   const toPersonSoon = () => person.here && person.joined;
 
-  /** Who the ball goes to next: between the players, by way of the person when it plays. */
+  /** Who the ball goes to next: between the players, by way of the person when it plays; a
+   * quokka the person threw to throws it back to the person (or, if it has gone, to a player). */
   function nextCatcher(thrower: Catcher): Catcher | undefined {
     const a = by['player-a'];
     const b = by['player-b'];
+    if (!isPerson(thrower) && thrower !== a && thrower !== b) {
+      if (person.here) return person;
+      const x = thrower.box.left + thrower.box.width / 2;
+      const gap = (q: Quokka | undefined) => (q ? Math.abs(q.box.left + q.box.width / 2 - x) : Infinity);
+      return gap(a) <= gap(b) ? a : b;
+    }
     if (isPerson(thrower)) {
       if (thrower.joined && thrower.lastFrom) return thrower.lastFrom === a ? b : a;
       // Leaving the game (or the beach) with the ball: it goes to the nearer player.
@@ -495,11 +591,18 @@ function animate(scenery: HTMLElement) {
     return thrower === a ? b : a;
   }
 
-  function throwBall(now: number, high: boolean) {
+  /** Throw the ball on to whoever is next, or (the visitor's pick) high to `to`. */
+  function throwBall(now: number, to?: Quokka) {
     if (ball?.phase !== 'held') return;
+    const high = !!to;
     const thrower = ball.by;
-    const catcher = nextCatcher(thrower);
-    if (!catcher || (!isPerson(catcher) && !visible(catcher))) return;
+    const catcher = to ?? nextCatcher(thrower);
+    if (!catcher || catcher === thrower || (!isPerson(catcher) && !visible(catcher))) return;
+    if (isPerson(thrower) && to) {
+      person.lastFrom = to;
+      person.throwTo = null;
+      say(`You threw the ball to ${NAMES[to.role].toLowerCase()}.`);
+    }
     hopCatcher(thrower, now, 0.7);
     if (isPerson(thrower)) thrower.catchUntil = 0;
     const lift = high ? sceneRect.height * 0.62 : sceneRect.height * 0.32;
@@ -522,14 +625,22 @@ function animate(scenery: HTMLElement) {
       const holder = ball.by;
       if (isPerson(holder)) {
         // The person keeps playing while it stands with them; leaving, it hands the ball back.
-        if (!holder.here || !holder.joined) throwBall(now, false);
-        else if (ambient && now - ball.since > ball.wait) throwBall(now, false);
+        // A quokka the visitor picked gets it at once.
+        if (!holder.here || !holder.joined) throwBall(now);
+        else if (holder.throwTo && visible(holder.throwTo) && now - ball.since > 250) throwBall(now, holder.throwTo);
+        else if (ambient && now - ball.since > ball.wait) throwBall(now);
+      } else if (!visible(holder)) {
+        // Its holder was hidden by a narrower window: a player picks it up, so it never sticks.
+        const player = by['player-a'];
+        if (player && visible(player)) ball = { phase: 'held', by: player, since: now, wait: 800 };
       } else {
-        const pointerNear = pointer?.mouse && near(pointer, holder.box, 140) && !person.joined;
+        const player = holder.role.startsWith('player');
+        const pointerNear = player && pointer?.mouse && near(pointer, holder.box, 140) && !person.joined;
         if (pointerNear) ball.since = now; // they stop to watch you
-        // On their own they play only while motion is allowed; with the person, they throw to it.
-        const toPerson = person.here && person.joined;
-        if ((ambient || toPerson) && now - ball.since > ball.wait) throwBall(now, false);
+        // On their own they play only while motion is allowed; with the person, they throw to it
+        // (and a quokka the person threw to always throws it back).
+        const toPerson = (person.here && person.joined) || !player;
+        if ((ambient || toPerson) && now - ball.since > ball.wait) throwBall(now);
       }
       if (ball.phase === 'held') return holdAt(ball.by);
     }
@@ -550,7 +661,14 @@ function animate(scenery: HTMLElement) {
       if (t < 0.55) return top;
       if (t >= 1) {
         const holder = ball.by;
-        const wait = isPerson(holder) ? random(900, 1500) : toPersonSoon() ? random(500, 900) : random(1400, 3200);
+        // The person holds on long enough for the visitor to pick who gets it next.
+        const throwsBack = !isPerson(holder) && !holder.role.startsWith('player') && person.here;
+        const wait = isPerson(holder)
+          ? random(2400, 3200)
+          : toPersonSoon() || throwsBack
+            ? random(500, 900)
+            : random(1400, 3200);
+        if (!isPerson(holder)) hop(holder, now, 0.5);
         ball = { phase: 'held', by: holder, since: now, wait };
         lower(holder);
         return holdAt(holder);
@@ -776,10 +894,10 @@ function animate(scenery: HTMLElement) {
 
   /** Bring the person onto the beach if it is not there, and send it to `clientX`. Sent to a
    * quokka, it stops beside it (on the side it comes from), so the quokka stays in view. */
-  function sendPerson(clientX: number, now: number, stepDir: -1 | 0 | 1 = 0) {
+  function sendPerson(clientX: number, now: number, stepDir: -1 | 0 | 1 = 0, arm = true, aimAt?: Quokka | null) {
     if (!running) return;
     const width = sceneRect.width;
-    const q = quokkaAt(clientX);
+    const q = aimAt === undefined ? quokkaAt(clientX) : aimAt;
     person.aim = q?.role ?? null;
     let x = clientX - sceneRect.left;
     if (q) {
@@ -797,9 +915,12 @@ function animate(scenery: HTMLElement) {
       person.here = true;
       person.walk = createWalk(ambient ? entrance(target, width, bodyWidth()) : target, target < width / 2 ? 1 : -1);
       person.view.show(true);
+      // Brought in by the mouse, it only arrives; it acts when the visitor asks.
+      if (!arm) person.settled = true;
       say('');
     }
-    if (Math.abs(target - person.target) > 1) person.settled = false;
+    // Every click re-arms what it does on arrival, even sent to where it already stands.
+    if (arm) person.settled = false;
     person.target = target;
     person.seenAt = now;
     calmUntil = now + CALM_MS;
@@ -817,6 +938,24 @@ function animate(scenery: HTMLElement) {
     const reach = bodyWidth() * 0.7;
     const players = !!a && !!b && visible(a) && at >= a.box.left - reach && at <= b.box.right + reach;
     return { pile, quokka: aimed?.role ?? null, players };
+  }
+
+  /** A leaf off the pile into the person's hand: the pile gives a little, the leaf flies up. */
+  function pick(now: number) {
+    if (foodEl && ambient) {
+      foodEl.classList.remove('is-picked');
+      void foodEl.getBoundingClientRect(); // restart the animation
+      foodEl.classList.add('is-picked');
+    }
+    const done = () => {
+      person.holding = true;
+      say('You picked up a leaf.');
+    };
+    if (!ambient || flight) {
+      done();
+      return;
+    }
+    flight = { from: pileCentre(), to: () => person.view.hand(), at: now, ms: 280, lift: 22, onLand: done };
   }
 
   function stepPerson(now: number, dt: number) {
@@ -838,16 +977,14 @@ function animate(scenery: HTMLElement) {
     if (stopped && !person.settled && !carry) {
       person.settled = true;
       const act = deed(person.holding, spot);
-      if (act === 'pick') {
-        person.holding = true;
-        say('You picked up a leaf.');
-      } else if (act === 'feed') {
+      if (act === 'pick') pick(now);
+      else if (act === 'feed') {
         const q = cast.find((candidate) => candidate.role === spot.quokka);
         if (q) {
           person.holding = false;
           handTo(q, person.view.hand(), now, 380, 26);
         }
-      } else if (act === 'join') {
+      } else if (act === 'join' && !person.joined) {
         person.joined = true;
         person.lastFrom = null;
         say('You joined the game of catch.');
@@ -860,6 +997,7 @@ function animate(scenery: HTMLElement) {
       person.here = false;
       person.holding = false;
       person.joined = false;
+      person.throwTo = null;
       person.view.show(false);
       return;
     }
@@ -868,8 +1006,20 @@ function animate(scenery: HTMLElement) {
     person.view.pose(person.walk, person.walk.x, arms, person.holding);
   }
 
+  /** The arrow keys walk the person while the pointer is over the beach or focus is on its
+   * buttons, and never from a form field or with a modifier held; ↑ and ↓ stay the page's. */
+  function keysAreOurs(event: KeyboardEvent): boolean {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return false;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    const active = document.activeElement;
+    const inWrap = !!wrap && !!active && wrap.contains(active);
+    if (!inWrap && active instanceof HTMLElement && active.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return false;
+    // :hover is the browser's own answer, so a page scrolled under a still mouse counts right.
+    return inWrap || scenery.matches(':hover');
+  }
+
   function onWalkKey(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (!keysAreOurs(event)) return;
     event.preventDefault();
     const now = performance.now();
     const dir = event.key === 'ArrowLeft' ? -1 : 1;
@@ -877,7 +1027,8 @@ function animate(scenery: HTMLElement) {
     if (ambient) {
       person.keyDir = dir;
       person.aim = null;
-    } else if (event.type === 'keydown') {
+    } else if (!event.repeat) {
+      if (!raf) measure();
       sendPerson(sceneRect.left + person.walk.x + dir * Math.max(48, sceneRect.width * 0.06), now, dir);
     }
     calmUntil = now + CALM_MS;
@@ -885,14 +1036,21 @@ function animate(scenery: HTMLElement) {
   }
   function onWalkKeyUp(event: KeyboardEvent) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const dir = event.key === 'ArrowLeft' ? -1 : 1;
+    if (person.keyDir !== dir) return;
     person.keyDir = 0;
     // Ease to a stop just ahead rather than halting mid-stride, and if that is close to the
     // pile or a quokka, stop at it: the keyboard has no pointer to aim with.
     const { x, v } = person.walk;
-    const stop = sceneRect.left + x + Math.sign(v) * Math.min(40, (v * v) / (2 * 0.0011));
+    const stop = sceneRect.left + x + Math.sign(v) * Math.min(40, (v * v) / (2 * STRIDE.brake));
     const spots = [pileCentre().x, ...cast.filter((q) => q.role !== 'walker' && visible(q)).map((q) => (q.box.left + q.box.right) / 2)];
     const nearest = spots.reduce((best, at) => (Math.abs(at - stop) < Math.abs(best - stop) ? at : best), Infinity);
     sendPerson(Math.abs(nearest - stop) < bodyWidth() * 0.9 ? nearest : stop, performance.now());
+  }
+  /** A lost key-up (the window lost focus mid-walk) never leaves the person walking. */
+  function onBlur() {
+    person.keyDir = 0;
+    onLeave();
   }
   /** The keyboard's way in: the person appears in the middle of the beach. */
   function summon(now: number) {
@@ -950,6 +1108,7 @@ function animate(scenery: HTMLElement) {
 
     const live = pointer && (pointer.mouse || now - pointer.at < TAP_MS) ? pointer : null;
     stepPerson(now, dt);
+    hover();
     const ballAt = stepBall(now);
     if (ballAt) {
       const size = ballRect.width;
@@ -1006,7 +1165,9 @@ function animate(scenery: HTMLElement) {
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
     document.documentElement.addEventListener('mouseleave', onLeave);
-    window.addEventListener('blur', onLeave);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('keydown', onWalkKey);
+    window.addEventListener('keyup', onWalkKeyUp);
     scenery.addEventListener('pointerdown', onDown);
     // Under reduced motion it waits for the visitor; otherwise it lives on its own.
     if (ambient) wake();
@@ -1016,13 +1177,17 @@ function animate(scenery: HTMLElement) {
     cancelAnimationFrame(raf);
     raf = 0;
     running = false;
-    Object.assign(person, { here: false, holding: false, joined: false, keyDir: 0, lastFrom: null, catchUntil: 0 });
+    Object.assign(person, { here: false, holding: false, joined: false, keyDir: 0, lastFrom: null, catchUntil: 0, throwTo: null });
+    markEl?.classList.remove('is-on');
+    write(scenery, 'data-hover', null);
     person.view.rest();
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
     document.documentElement.removeEventListener('mouseleave', onLeave);
-    window.removeEventListener('blur', onLeave);
+    window.removeEventListener('blur', onBlur);
+    window.removeEventListener('keydown', onWalkKey);
+    window.removeEventListener('keyup', onWalkKeyUp);
     scenery.removeEventListener('pointerdown', onDown);
     carry = null;
     flight = null;
@@ -1052,8 +1217,6 @@ function animate(scenery: HTMLElement) {
     person.keyDir = 0;
     person.seenAt = performance.now();
   });
-  walkButton?.addEventListener('keydown', onWalkKey);
-  walkButton?.addEventListener('keyup', onWalkKeyUp);
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   let onScreen = false;

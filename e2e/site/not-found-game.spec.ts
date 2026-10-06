@@ -20,10 +20,11 @@ test("the words are few: the headline, the way home, and two quiet links", async
 });
 
 test("the taller game and the way home both fit a laptop's window", async ({ page }) => {
-  for (const [width, height] of [
+  const laptops: [number, number][] = [
     [1440, 900],
     [1280, 800],
-  ]) {
+  ];
+  for (const [width, height] of laptops) {
     await page.setViewportSize({ width, height });
     await page.goto("/no-such-page/");
     const stage = (await page.locator("[data-runner]").boundingBox())!;
