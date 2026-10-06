@@ -38,7 +38,7 @@ export const questions: { q: string; a: string }[] = [
   {
     q: 'What about Windows and Linux?',
     a: site.webAppEnabled
-      ? 'Native Windows and Linux apps are coming soon. Until then, Rotli Web works in your browser today.'
+      ? 'Native Windows and Linux apps are coming soon. Until then, use Rotli Web: it runs in your browser today.'
       : 'Native Windows and Linux apps are coming soon.',
   },
 ];

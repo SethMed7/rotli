@@ -1,10 +1,10 @@
 ---
-// /download/: where the header's Download button goes. It leads with the
-// visitor's own system (Base.astro stamps data-os): the Mac download on a
-// Mac; on Windows and Linux, a native app that is coming soon (the words are
-// PLATFORMS in src/site.ts), with Rotli Web to use in the meantime. Without script the Mac panel shows. Below, every platform and its
-// status in one list. The hero's "Download for Mac" still fetches the DMG
-// directly (DOWNLOAD_HREF in src/site.ts).
+// /download/: where every "Try now" goes (the header, the hero, the closing banner, the 404).
+// It offers the two real ways in, the Mac app and Rotli Web, and leads with the visitor's
+// own system (Base.astro stamps data-os): the Mac download on a Mac; on Windows and Linux, a
+// native app that is coming soon and a prominent Rotli Web button to use in the meantime (the
+// words are PLATFORMS in src/site.ts). Without script the Mac panel shows. Below, every
+// platform and its status in one list. This page alone links the DMG (DOWNLOAD_URL).
 import { application } from '../../agents';
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage } from '../../og';
@@ -18,31 +18,33 @@ const web = site.webAppEnabled;
 const mac = site.downloadsEnabled;
 
 type Status = 'available' | 'soon';
-const platforms: { name: string; detail: string; status: Status; action?: { href: string; label: string; external?: boolean } }[] = [
+type Action = { href: string; label: string; external?: boolean };
+const meantime: Action | undefined = web ? { href: WEB_APP_PATH, label: PLATFORMS.meantime } : undefined;
+const platforms: { name: string; detail: string; status: Status; action?: Action }[] = [
   {
     name: 'Mac',
     detail: 'The whole workspace, including on-device AI and the Librarian. Apple silicon, macOS 11 or later.',
     status: mac ? 'available' : 'soon',
     action: mac ? { href: DOWNLOAD_URL, label: 'Download .dmg', external: true } : undefined,
   },
-  { name: 'Windows', detail: 'A native Windows app is on the way.', status: 'soon' },
-  { name: 'Linux', detail: 'A native Linux app is on the way.', status: 'soon' },
   ...(web
     ? [
         {
-          name: 'Any browser',
-          detail: 'Rotli Web in Chrome, Edge, Arc, Firefox, Zen, or Brave: the editor, folders, tasks, and links, working in a folder on your computer.',
+          name: 'Rotli Web',
+          detail: 'In Chrome, Edge, Arc, Firefox, Zen, or Brave: the editor, folders, tasks, and links, working in a folder on your computer.',
           status: 'available' as const,
           action: { href: WEB_APP_PATH, label: 'Open Rotli Web' },
         },
       ]
     : []),
+  { name: 'Windows', detail: 'A native Windows app is on the way.', status: 'soon', action: meantime },
+  { name: 'Linux', detail: 'A native Linux app is on the way.', status: 'soon', action: meantime },
 ];
 ---
 
 <WritingPage
   title="Download — rotli"
-  description="Get rotli, free and with no account: the Mac app, or Rotli Web in your browser. Windows and Linux apps are coming soon."
+  description={`Get rotli, free and with no account: the Mac app${web ? ', or Rotli Web in your browser' : ''}. ${PLATFORMS.availability}`}
   canonicalPath="/download/"
   {...ogImage('download')}
   section="download"
@@ -63,36 +65,49 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
             <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
           )
         }
-        {web && <a class="button secondary" href={WEB_APP_PATH}>Or open it in your browser</a>}
+        {web && <a class="button secondary" href={WEB_APP_PATH}>Or open Rotli Web in your browser</a>}
       </div>
     </div>
 
     {
-      (['windows', 'linux', 'other'] as const).map((os) => (
+      (['windows', 'linux'] as const).map((os) => (
         <div class={`pick-panel for-${os}`}>
-          <h2>{os === 'windows' ? 'rotli for Windows is coming soon' : os === 'linux' ? 'rotli for Linux is coming soon' : 'rotli runs on your computer'}</h2>
+          <h2>rotli for {os === 'windows' ? 'Windows' : 'Linux'} is coming soon</h2>
           <p>
             {web
-              ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account. In Chrome, Edge, or Arc there is nothing to install.'
-              : 'The Mac app is the first one out. Native apps for Windows and Linux are coming soon.'}
+              ? `${PLATFORMS.meantime}: the same workspace in your browser, with no account. In Chrome, Edge, or Arc there is nothing to install.`
+              : 'The Mac app is out today. Native apps for Windows and Linux are next.'}
           </p>
-          <div class="pick-actions">
-            {web && <a class="button primary" href={WEB_APP_PATH}>Open rotli in your browser</a>}
-            {mac && <a class="button secondary" href={DOWNLOAD_URL} rel="noopener">Download for Mac instead</a>}
-          </div>
+          {web && (
+            <div class="pick-actions">
+              <a class="button primary" href={WEB_APP_PATH}>Open Rotli Web</a>
+            </div>
+          )}
           {web && (
             <p class="pick-note">
-              Using Firefox, Zen, or Brave? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a small program
-              that lets Rotli Web save into your folder and chat through the AI tools on your computer. Safari and
-              phones aren’t supported yet.
+              Using Firefox, Zen, or Brave? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a small program that lets
+              Rotli Web save into your folder and chat through the AI tools on your computer.
             </p>
           )}
         </div>
       ))
     }
+
+    <div class="pick-panel for-other">
+      <h2>rotli runs on your computer</h2>
+      <p>
+        {web
+          ? 'Get the Mac app, or open Rotli Web in Chrome, Edge, or Arc. Safari and phones aren’t supported yet.'
+          : 'The Mac app is out today. Native apps for Windows and Linux are coming soon.'}
+      </p>
+      <div class="pick-actions">
+        {web && <a class="button primary" href={WEB_APP_PATH}>Open Rotli Web</a>}
+        {mac && <a class:list={['button', web ? 'secondary' : 'primary']} href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>}
+      </div>
+    </div>
   </section>
 
-  <section class="all" aria-labelledby="all-title">
+<section class="all" aria-labelledby="all-title">
     <h2 id="all-title">Every platform</h2>
     <ul>
       {platforms.map((platform) => (
@@ -179,7 +194,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
   }
   .all li {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 8rem 11rem;
+    grid-template-columns: minmax(0, 1fr) 8rem 16rem;
     gap: 0.5rem 2rem;
     align-items: center;
     margin: 0;

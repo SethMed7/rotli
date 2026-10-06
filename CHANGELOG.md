@@ -99,6 +99,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs along the beach: jump the rocks, bushes, logs, and sandcastles with
   Space, ↑, or a tap, and see how far you get. It pauses when you leave it,
   and "Take me home" works the whole time. Your best run is not saved.
+- **rotli.co says "Try now" and keeps where it runs on the download page.**
+  The header, the home page's top, and its closing panel each have one
+  "Try now" button. It opens the download page, which offers the Mac app and
+  Rotli Web and leads with your system: on Windows or Linux it says their apps
+  are coming soon and offers Rotli Web in the meantime. The home page no
+  longer repeats where rotli runs under its buttons, and the Mac download
+  link lives only on the download page.
 - **rotli.co's guides open on their own scene and show how far through you
   are.** Each guide starts with a small island scene about its subject, and a
   bar with "N% through" stays under the header as you scroll the article.

@@ -1,4 +1,4 @@
-// The landing page: what rotli is and costs before where it runs (Windows and Linux coming soon), the cardless
+// The landing page: what rotli is and costs and its one "Try now" (where it runs is /download/'s to say), the cardless
 // before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -12,7 +12,7 @@ const scrollToPrivacy = (page: Page, share: number) =>
     window.scrollTo({ top: top + band.offsetHeight * s - window.innerHeight / 2, behavior: "instant" });
   }, share);
 
-test("the hero says free before it says where rotli runs, and never leads with the Mac", async ({ page }) => {
+test("the hero says what rotli is and costs, with one way in, and no platform line", async ({ page }) => {
   await page.goto("/");
   const hero = page.locator(".hero");
   const lede = hero.locator(".hero-lede");
@@ -20,17 +20,50 @@ test("the hero says free before it says where rotli runs, and never leads with t
   await expect(lede).toContainText("Docs and Sheets (beta)");
   await expect(lede).not.toContainText("Mac");
   await expect(hero.locator(".hero-cost")).toHaveText("Free. No account. Works offline.");
-  await expect(hero.locator(".hero-platforms")).toHaveText(
-    /^(In your browser and on the Mac|On the Mac) today\. Windows and Linux apps are coming soon\.$/,
-  );
+  // Where rotli runs is the download page's (and the FAQ's) to say (the owner, 2026-10-05).
+  await expect(hero).not.toContainText("Windows");
+  await expect(page.locator("#start")).not.toContainText("Windows");
+  // One way in, "Try now", to the page that offers the Mac app and Rotli Web; no direct DMG.
+  const actions = hero.locator(".site-actions a");
+  await expect(actions).toHaveCount(1);
+  await expect(actions).toHaveText("Try now");
+  await expect(actions).toHaveAttribute("href", "/download/");
+  await expect(page.locator("main a[href$='.dmg']")).toHaveCount(0);
+  const header = page.locator(".site-header .header-download");
+  await expect(header).toHaveText("Try now");
+  await expect(header).toHaveAttribute("href", "/download/");
 });
 
-test("the download page calls Windows and Linux coming soon, not available", async ({ page }) => {
+test("the download page offers the Mac app, and calls Windows and Linux coming soon", async ({ page }) => {
   await page.goto("/download/");
-  for (const name of ["Windows", "Linux"]) {
-    const row = page.locator(".all li", { has: page.getByRole("heading", { name, exact: true }) });
-    await expect(row.locator(".status")).toHaveText("Coming soon");
+  const row = (name: string) =>
+    page.locator(".all li", { has: page.getByRole("heading", { name, exact: true }) });
+  await expect(row("Mac").locator(".status")).toHaveText("Available");
+  await expect(row("Mac").locator("a")).toHaveAttribute("href", /Rotli\.dmg$/);
+  for (const name of ["Windows", "Linux"])
+    await expect(row(name).locator(".status")).toHaveText("Coming soon");
+  // This build may leave Rotli Web off; when it is on, it is the other real option and the
+  // way in for Windows and Linux in the meantime.
+  if ((await row("Rotli Web").count()) > 0) {
+    await expect(row("Rotli Web").locator(".status")).toHaveText("Available");
+    await expect(row("Windows").locator("a")).toContainText("Use Rotli Web in the meantime");
   }
+});
+
+test("a Windows visitor is led to the coming-soon panel, not the Mac download", async ({ browser }) => {
+  const context = await browser.newContext({
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+  });
+  const page = await context.newPage();
+  await page.goto("/download/");
+  await expect(page.locator("html")).toHaveAttribute("data-os", "windows");
+  const panel = page.locator(".pick-panel.for-windows");
+  await expect(panel).toBeVisible();
+  await expect(panel.locator("h2")).toHaveText("rotli for Windows is coming soon");
+  await expect(page.locator(".pick-panel.for-mac")).toBeHidden();
+  await expect(panel.locator("a[href$='.dmg']")).toHaveCount(0);
+  await context.close();
 });
 
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({

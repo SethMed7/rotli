@@ -88,8 +88,8 @@ from 320 to 1920.
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
   is hidden and "Resources" is a plain link to `/resources/`. On the right sit
-  the GitHub mark (icon only, while the source is public) and one Download
-  button, which opens `/download/`. Download is not also a menu item. The
+  the GitHub mark (icon only, while the source is public) and one "Try now"
+  button, which opens `/download/`. That page is not also a menu item. The
   footer's link columns (Product · Learn · Open source, the last only while
   the source is public) and tagline default from the same file. Pages pass
   only `current` (a dropdown's label is marked current when any of its pages
@@ -97,7 +97,7 @@ from 320 to 1920.
   `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
   fold into a Menu disclosure (`<details>`; Escape, an outside click, or
   choosing a link closes it), where the dropdown's pages are listed under its
-  name; below 560px the GitHub mark and Download move into it too. The
+  name; below 560px the GitHub mark and Try now move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
   ready." sign-up, always shown (see "The coming-soon list" below); its
   closing row holds the maker line, with a drawn X mark (not the platform's
@@ -154,8 +154,9 @@ from 320 to 1920.
      foundation of a workspace, and rotli charges nothing for AI.
   10. Closing (plain, one framed panel on the warm colour). The two-tone
       headline "Start with one note." / "It stays in your folder." has its
-      first line in full ink and the second muted. Under it are "Free, with no
-      account to make." and the hero's two ways in (`SiteActions`). The writing
+      first line in full ink and the second muted. Under it are "Free, with
+      no account to make." and the hero's one way in, "Try now"
+      (`SiteActions`). The writing
       quokka comes in from the right, cut off by the frame. Under 900px it
       steps below the words, never onto them. It asks for a first step rather
       than repeating the hero (the earlier invitation was cut for that). Right
@@ -261,23 +262,28 @@ from 320 to 1920.
   blocks wrap long lines at their spaces inside the box (the Helper's install
   line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
-- **`/download/`** is where the header's Download button goes. It leads with
-  the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
-  linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
-  a native app that is coming soon, with Rotli Web to use in the meantime and
-  Rotli Helper for browsers without folder access. Without script the Mac
-  panel shows. Below, "Every platform" lists Mac, Windows, Linux, and any
-  browser with their status (Windows and Linux: "Coming soon", the owner's
-  call on 2026-10-05, replacing the earlier "Planned").
+- **`/download/`** is where every "Try now" goes (the header, the hero, the
+  closing panel; the 404's "Try rotli" and the About page's too). It offers
+  the two real ways in, the Mac app and Rotli Web, and leads with the
+  visitor's own system (`Base.astro` stamps `data-os`: mac, windows, linux,
+  mobile, or other): the Mac download on a Mac, with Rotli Web beside it; on
+  Windows and Linux, "rotli for Windows is coming soon" and a prominent Open
+  Rotli Web button ("Use Rotli Web in the meantime"), with Rotli Helper for
+  browsers without folder access and no Mac download. Without script the Mac
+  panel shows. Below, "Every platform" lists Mac and Rotli Web (Available)
+  and then Windows and Linux ("Coming soon", each pointing to Rotli Web for
+  now). This is the only page that links the DMG (`DOWNLOAD_URL`).
 - **Where rotli runs** (the owner, 2026-10-05). The promise is a free
-  workspace, not a Mac app: pages lead with what it is and what it costs
-  ("Free. No account. Works offline." under the hero's ways in) and state
-  availability separately, with `PLATFORMS` in `src/site.ts` ("On the Mac
-  today. Windows and Linux apps are coming soon.", or "In your browser and on
-  the Mac today. …" while `WEB_APP_ENABLED`; `PLATFORMS.soon` is the status
-  label). The ways-in section is "On your computer. In your browser." Never
-  imply the Mac is the only platform rotli will have, or that Windows or
-  Linux apps exist today.
+  workspace, not a Mac app. The landing page says what it is and what it
+  costs ("Free. No account. Works offline." under the hero's "Try now") and
+  never where it runs: that line was clutter (the owner's second call that
+  day, "clean up some clutter on the website and improve readability").
+  Availability is `/download/`'s, the FAQ's, the meta description's, and
+  `llms.txt`'s to say, all from `PLATFORMS` in `src/site.ts`
+  (`availability` for one-sentence summaries, `soon` for the status label,
+  `meantime` for where Windows and Linux visitors go). Never imply the Mac is
+  the only platform rotli will have, or that Windows or Linux apps exist
+  today.
 - **Docs and Sheets** (Word `.docx` and Excel `.xlsx`, edited with Univer in
   the Mac app) are named as beta (the owner, 2026-10-05; Sheets leaves
   development builds in the same release). The word comes from
@@ -286,8 +292,7 @@ from 320 to 1920.
   they open and edit. The hero, the Overview, the Features page's formats,
   the FAQ, and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
-  Keychain) stay about the Mac. The hero's Download for Mac still fetches the DMG directly
-  (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
+  Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
 - **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
   note wandered off." in the middle of the window, one "Take me home" button
@@ -385,16 +390,17 @@ from 320 to 1920.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
-- **Download and the browser.** `SiteActions.astro` renders the two ways in —
-  Open in browser and Download — in the hero (the header has only its
-  Download button to `/download/`). `DOWNLOAD_HREF` in
-  `src/site.ts` is where those Download buttons go (today the newest Mac DMG,
-  directly). `Base.astro` stamps `data-platform` on `<html>`; off a
-  Mac (iPads included) the browser action leads and the download reads
-  "Download for Mac". Without script the Mac order stays.
+- **The way in.** `SiteActions.astro` renders the one call to action, "Try
+  now", to `/download/`, in the hero and the closing panel (the header has its
+  own). The earlier pair (Open in browser and Download for Mac, reordered by
+  platform) is gone: the download page makes that choice with the visitor's
+  system in view, so the hero keeps one primary button and no second one. A
+  deployment that offers neither the Mac download nor Rotli Web shows "Mac
+  alpha coming soon" in its place.
 - `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
   served from `/app/` on this origin. Fails closed: only the exact string
-  `"true"` shows the hero action, the navigation entry, and the footer link.
+  `"true"` shows the download page's Rotli Web options, the navigation entry,
+  and the footer link.
   The bundle is built by the `app` stage of `site/Dockerfile` (repository
   root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
@@ -483,9 +489,9 @@ from 320 to 1920.
 - Rotli Web and Rotli Helper are the tour's last part on the landing page
   (only while `WEB_APP_ENABLED`): words, the copyable install line, and links,
   with no screenshot.
-- The hero is the promise (a private workspace for your notes), the two ways
-  in, where rotli runs (`PLATFORMS.availability`), and the product film right
-  under them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
+- The hero is the promise (a private workspace for your notes), one way in
+  ("Try now"), what it costs, and the product film right under them
+  (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)

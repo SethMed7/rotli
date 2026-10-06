@@ -2,8 +2,8 @@
 // order and its grounds, the three cards with their drawn pictures, the tour (a disclosure list
 // with one part open, by mouse and by keyboard, its preview beside the list on wide screens and
 // inside the open part on phones), and the closing banner, whose art never sits on its words.
-// This suite's build has WEB_APP_ENABLED off, so the tour has five parts and the banner offers
-// only the download; each check holds with the sixth part and the browser button too.
+// This suite's build has WEB_APP_ENABLED off, so the tour has five parts; each check holds
+// with the sixth part too. The banner's one way in is "Try now", to /download/.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -157,7 +157,7 @@ test("the closing banner: two lines, one short line, the way in, and art clear o
   await expect(banner.locator("h2 .strong")).toHaveText("Start with one note.");
   await expect(banner.locator("h2 .soft")).toHaveText("It stays in your folder.");
   await expect(banner.locator(".line")).toHaveText("Free, with no account to make.");
-  await expect(banner.locator(".action-download")).toHaveCount(1);
+  await expect(banner.locator(".action-try")).toHaveText("Try now");
   await expect(banner.locator(".art")).toHaveAttribute("aria-hidden", "true");
   // The strong line and the muted line read in two colours.
   const [strong, soft] = await Promise.all(
