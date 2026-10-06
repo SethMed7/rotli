@@ -5,6 +5,7 @@
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
 import { questions } from "./faq";
+import { catalog, featurePath, statusLine } from "./features";
 import type { RoadmapSection } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
@@ -94,7 +95,9 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
       link(
         "Features",
         "/features/",
-        `the editor, tasks, links, chat, Docs and Sheets (${DOCS_AND_SHEETS.inline}), boards, the Librarian, and themes`,
+        `every capability with its status and where it runs, grouped as ${catalog()
+          .map(({ area }) => area.name)
+          .join(", ")}`,
       ),
       link("Privacy", "/privacy/", "what connects to the internet, what AI can see, and why"),
       link(
@@ -121,6 +124,16 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
             ),
           ]
         : [];
+    lines.push(
+      "",
+      "## Features",
+      "",
+      ...catalog().flatMap(({ features }) =>
+        features.map((feature) =>
+          link(feature.name, featurePath(feature), `${statusLine(feature)}. ${feature.line}`),
+        ),
+      ),
+    );
     lines.push(...section("Resources", writing.resources), ...section("Blog", writing.posts));
   }
   const optional = [
