@@ -74,10 +74,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The before-and-after on rotli.co says it plainly.** The Librarian files
   the note and fills in the frontmatter at the top of the file; it never
   changes what you wrote.
-- **A new post explains the unused-AI figures.** "The AI you already pay for
-  could be filing your notes" sets out both surveys behind the home page's
-  figures, who was asked, and what the numbers don't say, with links to the
-  sources. The figures on the home page link to it.
+- **The post behind the home page's AI figures is rewritten with new sources.**
+  "Paid AI plans often sit unopened. rotli can put them to work." re-checks
+  Self Financial's March 2026 survey, adds Menlo Ventures' July 2026 survey of
+  daily use among people who pay for AI, and says what the numbers cannot show.
+  Bango's "about four tools, $66 a month" figure came from a report arguing the
+  plans are essential, so it is now context in the post and no longer one of
+  the home page's two figures. The second figure there is Menlo's: half of paying
+  AI users don't use AI every day.
 - **The before-and-after note on rotli.co is no longer two cards.** The same
   file sits in two open columns, as you write it and after the Librarian: the
   lines it adds are marked, and your words are marked unchanged. Its example
