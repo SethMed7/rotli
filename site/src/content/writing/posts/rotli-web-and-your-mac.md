@@ -143,4 +143,4 @@ AI tools held by us. The page is just the editor. Your folder stays on your comp
 it in any other app, or delete rotli and keep every word.
 
 What connects where, in full: [Privacy](/privacy/#web). Setup help: [What is Rotli
-Helper?](/resources/rotli-helper/)
+Helper?](/blog/rotli-helper/)

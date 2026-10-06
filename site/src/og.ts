@@ -46,8 +46,8 @@ export const OG_CARDS = {
     pose: 'stays_local',
   },
   resources: {
-    title: 'Guides',
-    line: 'Short answers to the questions people ask about rotli.',
+    title: 'Resources',
+    line: 'The blog and its guides, the developer reference, the roadmap, and every release.',
     pose: 'searching',
   },
   blog: {
@@ -116,6 +116,32 @@ export const POST_ART: Record<string, PostArt> = {
     pose: 'excalidraw_board',
     scene: 'making',
     around: 'beside sketches laid out on the sand, the lighthouse behind',
+  },
+  // The guides (tagged Guide), moved from /resources/ on 2026-10-06.
+  'getting-started': {
+    pose: 'notes',
+    scene: 'two-notes',
+    around: 'between a scribbled page and the same page filed, with a block of fields on top',
+  },
+  'why-local': {
+    pose: 'rest',
+    scene: 'beach',
+    around: 'on the beach',
+  },
+  'ai-and-your-notes': {
+    pose: 'ai_chat',
+    scene: 'memory',
+    around: 'between a small AI chip with a speech bubble and three notes joined by links',
+  },
+  'rotli-helper': {
+    pose: 'knowledge_system',
+    scene: 'helper',
+    around: 'between a browser window and a laptop open on Terminal, a dotted path joining them',
+  },
+  'web-and-mac': {
+    pose: 'waving',
+    scene: 'helper',
+    around: 'between a browser window and a laptop open on Terminal, a dotted path joining them',
   },
 };
 

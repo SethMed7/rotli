@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co's guides are on the blog.** Getting started, Why local?, What
+  does AI see in rotli?, What is Rotli Helper?, and rotli in the browser and
+  on the Mac are blog posts marked Guide, each with its own picture, and the
+  blog can show just the guides. Old guide links still work: they go
+  straight to the new address. The Resources menu lists the Blog,
+  Developers, the Changelog, and the Roadmap.
 - **Choosing where your notes live opens the macOS folder panel.** Setup,
   Settings, and the sidebar's Connect all use the Finder panel you know, with
   one button, Choose a folder. Make a new folder there for a fresh vault, or

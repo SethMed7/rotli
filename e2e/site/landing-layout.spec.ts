@@ -121,7 +121,7 @@ test("what is an LLM wiki: two sentences beside the story, linked to the term's 
   await expect(aside).toContainText("Andrej Karpathy");
   await expect(aside.getByRole("link", { name: /Getting started/ })).toHaveAttribute(
     "href",
-    "/resources/getting-started/",
+    "/blog/getting-started/",
   );
 });
 

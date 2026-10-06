@@ -194,6 +194,10 @@ const localWebApp = {
   },
 };
 
+/** The guides that lived at /resources/<slug>/ until 2026-10-06, now /blog/<slug>/. The
+ * Caddyfile's `movedGuide` matcher lists the same slugs (scripts/site-agents.test.ts holds both). */
+export const MOVED_GUIDES = ["getting-started", "why-local", "ai-and-your-notes", "rotli-helper", "web-and-mac"];
+
 // Minimal static build. Which pages exist, whether downloads are offered, and
 // the canonical origin all come from src/site.ts (SITE_MODE + SITE_URL).
 export default defineConfig({
@@ -205,10 +209,17 @@ export default defineConfig({
   // only external stylesheets, and Astro's default inlines small ones (the 404
   // page shipped unstyled that way). The guard below proves it.
   build: { inlineStylesheets: "never" },
-  // The MCP guide folded into /resources/developers/ (2026-10-02). The static
-  // build writes a small refresh page at the old address; the Caddyfile's
-  // /mcp redirect lands on it and follows through.
-  redirects: site.showsFullSite ? { "/resources/mcp": "/resources/developers/" } : {},
+  // The MCP guide folded into /resources/developers/ (2026-10-02), and the
+  // guides joined the blog as posts tagged Guide (2026-10-06). The static build
+  // writes a small refresh page at each old address (any host, `astro
+  // preview`, the e2e lane); in production the Caddyfile answers the same
+  // addresses, Markdown twins included, with a permanent redirect first.
+  redirects: site.showsFullSite
+    ? {
+        "/resources/mcp": "/resources/developers/",
+        ...Object.fromEntries(MOVED_GUIDES.map((slug) => [`/resources/${slug}`, `/blog/${slug}/`])),
+      }
+    : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
     figures(),

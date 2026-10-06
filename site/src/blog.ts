@@ -6,7 +6,12 @@ export interface Dated {
   date: Date;
   /** The frontmatter flag that leads the page instead of the newest post. */
   featured: boolean;
+  /** A guide (tagged GUIDE): evergreen, so it never leads the page on its date alone. */
+  guide?: boolean;
 }
+
+/** The tag that marks a guide: the evergreen how-to posts, which were /resources/ until 2026-10-06. */
+export const GUIDE = 'Guide';
 
 /** How long a post wears "New": computed when the site is built, so it ages out by rebuilding. */
 export const NEW_FOR_DAYS = 14;
@@ -28,13 +33,14 @@ export interface Arranged<T> {
 }
 
 /**
- * The featured story is the newest post marked `featured`, or else the newest post; the next
- * posts (newest first, up to SECONDARY) form the row under it. The list holds every post,
- * the featured ones included, so filtering by a topic never hides a post that matches it.
+ * The featured story is the newest post marked `featured`, or else the newest post that is not a
+ * guide (a guide leads only when marked, or when there is nothing else); the next posts (newest
+ * first, up to SECONDARY, guides included) form the row under it. The list holds every post, the
+ * featured ones included, so filtering by a topic never hides a post that matches it.
  */
 export function arrangeBlog<T extends Dated>(posts: readonly T[]): Arranged<T> {
   const all = [...posts].sort((a, b) => b.date.getTime() - a.date.getTime());
-  const featured = all.find((post) => post.featured) ?? all[0];
+  const featured = all.find((post) => post.featured) ?? all.find((post) => !post.guide) ?? all[0];
   const secondary = all.filter((post) => post !== featured).slice(0, SECONDARY);
   return { featured, secondary, all };
 }

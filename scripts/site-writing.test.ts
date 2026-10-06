@@ -49,7 +49,10 @@ interface Post {
 let blog: {
   isNew(date: Date, now: Date, days?: number): boolean;
   NEW_FOR_DAYS: number;
-  arrangeBlog(posts: Post[]): { featured: Post | undefined; secondary: Post[]; all: Post[] };
+  arrangeBlog<T extends { date: Date; featured: boolean; guide?: boolean }>(
+    posts: T[],
+  ): { featured: T | undefined; secondary: T[]; all: T[] };
+  GUIDE: string;
   topicsOf(posts: { tags: string[] }[]): string[];
   topicKey(topic: string): string;
   tocTree(
@@ -86,6 +89,11 @@ interface Source {
 let sources: { sourcesOf(markdown: string): Source[] };
 
 beforeAll(async () => {
+  // promos.ts reads src/site.ts, which reads the environment once per process: the same full,
+  // public build the other site tests set (site-agents, site-features), whichever loads it first.
+  process.env.SITE_MODE = "full";
+  process.env.SITE_URL = "https://rotli.co";
+  process.env.SOURCE_REPOSITORY_PUBLIC = "true";
   figures = (await import(siteSrc("figures.ts"))) as typeof figures;
   blog = (await import(siteSrc("blog.ts"))) as typeof blog;
   sources = (await import(siteSrc("sources.ts"))) as typeof sources;
@@ -285,6 +293,19 @@ describe("the blog index", () => {
     const many = ["01", "02", "03", "04", "05", "06"].map((d) => post(d, `2026-09-${d}`));
     expect(blog.arrangeBlog(many).secondary).toHaveLength(3);
     expect(blog.arrangeBlog([]).featured).toBeUndefined();
+  });
+
+  test("a guide never leads on its date alone: the newest other post does, unless one is marked", () => {
+    const guide = { date: day("2026-10-09"), featured: false, guide: true };
+    const older: { date: Date; featured: boolean; guide?: boolean } = {
+      date: day("2026-10-01"),
+      featured: false,
+    };
+    expect(blog.GUIDE).toBe("Guide");
+    expect(blog.arrangeBlog([guide, older]).featured).toBe(older);
+    expect(blog.arrangeBlog([guide, older]).secondary).toEqual([guide]);
+    expect(blog.arrangeBlog([{ ...guide, featured: true }, older]).featured!.guide).toBe(true);
+    expect(blog.arrangeBlog([guide]).featured).toBe(guide);
   });
 
   test("topics come in the order they appear, once each, with a stable key", () => {

@@ -7,7 +7,7 @@
 // and Share, and its figures (src/figures.ts).
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
-import { arrangeBlog, isNew, morePosts } from '../../blog';
+import { arrangeBlog, GUIDE, isNew, morePosts } from '../../blog';
 import type { MorePost } from '../../components/blog/ArticleAside.astro';
 import BlogIndex, { type BlogPost, type UpcomingPost } from '../../components/blog/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
@@ -38,7 +38,9 @@ const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 // "New" is decided when the site is built: a post wears it for 14 days after its date.
 const builtAt = new Date();
-const arranged = arrangeBlog(entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured })));
+const arranged = arrangeBlog(
+  entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured, guide: item.data.tags.includes(GUIDE) })),
+);
 const toPost = ({ item }: { item: Writing }): BlogPost => ({
   href: `/blog/${slugOf(item)}/`,
   title: item.data.title,

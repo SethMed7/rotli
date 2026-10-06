@@ -74,7 +74,7 @@ test.describe("touch", () => {
   });
 
   test("a guide's breadcrumb answers a 44px-tall touch", async ({ page }) => {
-    await page.goto("/resources/getting-started/");
+    await page.goto("/blog/getting-started/");
     expect((await page.locator(".crumbs a").first().boundingBox())!.height).toBeGreaterThanOrEqual(44);
   });
 

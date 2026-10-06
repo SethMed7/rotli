@@ -78,7 +78,7 @@ whose art never touches its words from 320 to 1920.
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
   | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
-  | `full`        | production · `rotli.co`       | landing, Features (a catalog and a page per feature), Privacy, Resources (Guides, Blog, Developers, Changelog, Roadmap), About, 404 | yes | yes |
+  | `full`        | production · `rotli.co`       | landing, Features (a catalog and a page per feature), Privacy, Resources (Blog with its guides, Developers, Changelog, Roadmap), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -88,16 +88,17 @@ whose art never touches its words from 320 to 1920.
   pending fidelity review. Site labels do not enforce app access.
 - **Structure and navigation.** `src/nav.ts` is the one navigation policy.
   The header links real pages, never landing anchors: Features · Privacy ·
-  Resources · About. Resources is a dropdown of five pages, each with a
-  one-line description: Guides (`/resources/`), Blog (`/blog/`, listed only
-  once a post can be read, so an index of nothing but "coming soon" is never
-  linked), Developers (`/resources/developers/`, marked "Coming soon" outside
+  Resources · About. Resources is a dropdown (`resourceItems`), each entry with a
+  one-line description: Blog (`/blog/`, the one writing section, guides
+  included since 2026-10-06; listed only once a post can be read, so an index
+  of nothing but "coming soon" is never linked), Developers (`/resources/developers/`, marked "Coming soon" outside
   the dev site), Changelog (`/changelog/`), and Roadmap (`/roadmap/`, see "The
   roadmap: votes and requests" below). The dropdown is a disclosure:
   a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
-  is hidden and "Resources" is a plain link to `/resources/`. On the right sit
+  is hidden and "Resources" is a plain link to `/resources/`, a slim page that
+  lists the same entries. On the right sit
   GitHub with its star count (while the source is public; see "The GitHub
   star count" below), a plain link left of the button, and the way in, "Download free" (`WAY_IN` in
   `src/site.ts`), the hero's own label and button scaled to the header (the
@@ -327,35 +328,43 @@ whose art never touches its words from 320 to 1920.
   "On this page" tree beside a reading column of about 70 characters, the
   section in view highlighted and a slim rail filling as you read (one
   bundled script; without it the tree is plain links). Below 900px the tree
-  becomes an "On this page" disclosure above the text. Privacy and resource
-  articles use it (articles build it from their `##` headings) and pass
-  `progress` for the reading meter below; blog posts pass `article` instead
-  (see "The blog post" below), so every article on the site reads the same way (the owner's item 16:
-  the flow of the claude.dev mods post, with the footer's strolling quokka as
-  its walking character). Resource articles end with "More guides".
-- **Resource articles** open on their own scene (`ResourceScene.astro`, the
-  guides' answer to the night frame on `/privacy/`): the island by day, the
-  app's quokka in the pose that fits the question, and what the article is
-  about around it (the folder and keys for Getting started, the folder at
-  home for Why local, the on-device model and a locked note for AI, the
-  browser and the folder for Rotli Helper, the laptop and the browser for
-  Web and Mac). `pages/resources/[...slug].astro` maps each guide to its
-  scene; a new guide without one gets the plain beach. They pass `progress`,
-  so a reading meter is pinned under the header on every width: a bar and
-  "N% through", measured over the article alone (`src/reading.ts`, the same
-  measure that fills the tree's rail), so the end of the article reads 100%
-  and the related links and footer never count. It follows scrolling either
-  way and jumps through the tree, re-measures when the article changes
+  becomes an "On this page" disclosure above the text. `/privacy/` uses it
+  (its tree from its `##` headings) and passes `progress` for the reading
+  meter; blog posts pass `article` instead (see "The blog post" below), so
+  every article on the site reads the same way (the owner's item 16: the flow
+  of the claude.dev mods post, with the footer's strolling quokka as its
+  walking character).
+- **The reading meter** (`progress`): a bar and "N% through" pinned under the
+  header on `/privacy/` at every width, measured over the article alone
+  (`src/reading.ts`, the same measure that fills the tree's rail), so the end
+  of the article reads 100% and the footer never counts. It follows scrolling
+  either way and jumps through the tree, re-measures when the article changes
   height, and hides when the whole article fits in the window. It is a
-  position, not proof of reading: nothing is recorded or sent. `/privacy/`
-  carries the same meter (2026-10-05); blog posts carry it in their rail. The meter has a fixed
-  height, and everything under it clears header plus meter (`--pinned` in
-  `WritingPage.astro`): the sticky "On this page" tree sits 1.5rem below the
-  meter, and every heading and `[id]` in the article lands below it when
-  jumped to (`e2e/site/resource-reading.spec.ts` holds both on a guide, a
-  post, and `/privacy/`). The guides' index (`WritingList.astro`) is plain
-  entries in columns with a hairline above each, never boxes; an entry
-  without a link is announced ("Coming soon").
+  position, not proof of reading: nothing is recorded or sent. Blog posts
+  carry the same measure in their rail and, under 900px, as a slim bar. The
+  meter has a fixed height, and everything under it clears header plus meter
+  (`--pinned` in `WritingPage.astro`): the sticky "On this page" tree sits
+  1.5rem below the meter, and every heading and `[id]` lands below it when
+  jumped to (`e2e/site/reading-meter.spec.ts`).
+- **The guides** were `/resources/<slug>/` with their own scenes until
+  2026-10-06 (the owner: "guides move into the blog; the Blog is the only
+  writing section"). They are blog posts tagged **Guide** now
+  (`src/content/writing/posts/`, `POST_ART` art like every post): Getting
+  started, Why local?, What does AI see in rotli?, What is Rotli Helper?, and
+  rotli in the browser and on the Mac. A guide never leads `/blog/` on its date
+  alone (`arrangeBlog`: the featured story is a marked post, else the newest
+  post that is not a guide); `/blog/` offers a Guide filter, and `llms.txt`
+  lists them under "Guides". Every old address redirects: `MOVED_GUIDES` in
+  `astro.config.mjs` writes a refresh page at each `/resources/<slug>/` (any
+  host, `astro preview`), and in production the Caddyfile's `movedGuide`
+  matcher answers the page, the bare path, and the Markdown twin
+  (`/resources/<slug>/index.md`) with a permanent redirect first.
+  `scripts/site-agents.test.ts` holds both lists against the guides on disk;
+  `e2e/site/guides-moved.spec.ts` the redirects, the menu, the filter, and
+  that no page links an old address. `/resources/` stays as a slim page
+  listing the Resources menu (`WritingList.astro`: plain entries in columns
+  with a hairline above each, never boxes), and `/resources/developers/` stays
+  where it is: it is a page with its own layout, not a piece of writing.
 - **The blog index** (`components/blog/BlogIndex.astro`, after
   anthropic.com/news, the owner's 2026-10-06 "better layout and clarity,
   especially for what is new/big"; `src/blog.ts` arranges it): one featured
@@ -480,18 +489,17 @@ whose art never touches its words from 320 to 1920.
   and the tree are unchanged. `e2e/site/article-banner.spec.ts` holds it at
   1920, 1440, 1280, 768, and 390: the title and date in the first window,
   their contrast measured on the panel's opaque ground, the rise, and the
-  meter and tree after it. Guides keep their
-  `scene` and can opt in by passing a banner; About keeps its own layout.
-- **Writing.** Resources (evergreen, question-titled) and blog posts are
-  Markdown in one content collection, `src/content/writing/{resources,posts}/`
-  (schema: `src/content.config.ts`; posts may add `tags`, up to four short
-  topics shown on their card and filtering /blog/, and `featured: true`). `src/writing.ts` decides what a build
+  meter and tree after it. About keeps its own layout.
+- **Writing.** Blog posts, the guides among them (tagged Guide), are Markdown
+  in one content collection, `src/content/writing/posts/` (schema:
+  `src/content.config.ts`; posts may add `tags`, up to four short topics shown
+  on their card and filtering /blog/, and `featured: true`). `src/writing.ts` decides what a build
   publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
   entries only on the dev site. `status: coming-soon` announces a piece: it is
   listed on its index with a "Coming soon" label and no link, and has no
   page, Markdown twin, sitemap entry, or llms.txt line until the field comes
-  off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
-  `/blog/`, and `/blog/<file>/` (`/about/` has its own layout, below). Markdown code
+  off (`publishedWriting` vs `upcomingWriting`). Routes: `/blog/` and
+  `/blog/<file>/` (`/about/` has its own layout, below). Markdown code
   blocks wrap long lines at their spaces inside the box (the Helper's install
   line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
@@ -585,7 +593,7 @@ whose art never touches its words from 320 to 1920.
   they open and edit. The hero, the tour, the feature catalog, the FAQ,
   and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
-  Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
+  Keychain) stay about the Mac. The Helper guide is `/blog/rotli-helper/`; the 404
   page's `/helper` hint links there.
 - **The 404 page** (`src/pages/404.astro`) has no header or footer, and few
   words (the owner, 2026-10-05: "simplify the text, remove the mac"): "This
@@ -907,8 +915,7 @@ whose art never touches its words from 320 to 1920.
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  the `/about/` story, captioned with where the name comes from); each
-  resource article's `ResourceScene.astro` is the island by day too; the FAQ has the searching
+  the `/about/` story, captioned with where the name comes from); the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
   closing scene. `/privacy/` places its night through `WritingPage`'s
@@ -959,7 +966,7 @@ whose art never touches its words from 320 to 1920.
   LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
   after a deploy.
 - **Per-page link cards** (`public/og/`, 1200×630) give each page its own
-  preview: home, Features, Privacy, Guides (and every guide), Blog, each
+  preview: home, Features, Privacy, Resources, Blog, each
   published post (`public/og/blog/<slug>.png`, from its frontmatter title),
   About, Download, and Developers. One family: the warm ground, the wordmark,
   the page's own heading and one line of its lede, and the quokka pose that fits
@@ -982,7 +989,7 @@ whose art never touches its words from 320 to 1920.
   same run and the same definition as the post's card: `POST_ART` in
   `src/og.ts` gives each post a quokka pose and a scene
   (`scripts/brand-images/scenes.mjs`: the island by day with the post's
-  subject around the quokka, drawn in the guides' scene vocabulary). Each
+  subject around the quokka). Each
   scene is art-directed twice: `thumb` puts the main prop on the left third,
   the quokka on the right third, and the second prop up the beach; `wide`
   gathers them right of centre and keeps the lower left open for the

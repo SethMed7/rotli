@@ -76,6 +76,12 @@
 	# developer page on 2026-10-02; old links go straight there in one hop.
 	redir /mcp /resources/developers/ permanent
 	redir /mcp/ /resources/developers/ permanent
+	# The guides joined the blog as posts tagged Guide on 2026-10-06: each old
+	# address, its Markdown twin, and the bare path go to the post in one hop.
+	# The slugs match MOVED_GUIDES in astro.config.mjs (whose refresh pages are
+	# the fallback on any other host).
+	@movedGuide path_regexp movedGuide ^/resources/(getting-started|why-local|ai-and-your-notes|rotli-helper|web-and-mac)(/.*)?$
+	redir @movedGuide /blog/{re.movedGuide.1}{re.movedGuide.2} permanent
 	# The motion studio lives on its own subdomain; people type the path.
 	redir /studio https://studio.rotli.co/ permanent
 	redir /studio/ https://studio.rotli.co/ permanent

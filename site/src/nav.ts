@@ -53,24 +53,24 @@ export function navEntryHolds(entry: NavEntry, current: NavSection | undefined):
 }
 
 /**
- * Header links: real pages, never landing-page anchors. /download/ is not
- * listed; it is the header's one button, "Try now" (SiteHeader.astro). Resources is a
- * dropdown (Guides, Blog, Developers, Changelog, Roadmap) whose label links to
- * /resources/ when script is off. Blog appears only once a post can be read,
- * so the header never leads to an index of nothing but "coming soon". The
- * developer reference (MCP and the CLI) is a development-build feature: the
- * launch site labels it coming soon (src/site.ts `showsExperiments`).
+ * The Resources dropdown, and the /resources/ page that lists the same entries for anyone without
+ * script: Blog (the one writing section; the guides are posts tagged Guide since 2026-10-06),
+ * Developers, Changelog, and Roadmap. Blog appears only once a post can be read, so nothing leads
+ * to an index of nothing but "coming soon". The developer reference (MCP and the CLI) is a
+ * development-build feature: the launch site labels it coming soon (src/site.ts
+ * `showsExperiments`).
  */
-export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
-  const resources: NavItem[] = [
-    {
-      section: 'resources',
-      href: '/resources/',
-      label: 'Guides',
-      description: 'Short answers on how rotli works',
-    },
+export function resourceItems(options: { hasPosts: boolean }): NavItem[] {
+  return [
     ...(options.hasPosts
-      ? [{ section: 'blog' as const, href: '/blog/', label: 'Blog', description: 'Notes from building rotli' }]
+      ? [
+          {
+            section: 'blog' as const,
+            href: '/blog/',
+            label: 'Blog',
+            description: 'Guides and notes from building rotli',
+          },
+        ]
       : []),
     {
       section: 'developers',
@@ -92,10 +92,18 @@ export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
       description: 'What’s next, and your vote on it',
     },
   ];
+}
+
+/**
+ * Header links: real pages, never landing-page anchors. /download/ is not listed; it is the
+ * header's one button (SiteHeader.astro). Resources is a dropdown (`resourceItems`) whose label
+ * links to /resources/ when script is off.
+ */
+export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
   return [
     { section: 'features', href: '/features/', label: 'Features' },
     { section: 'privacy', href: '/privacy/', label: 'Privacy' },
-    { section: 'resources', href: '/resources/', label: 'Resources', items: resources },
+    { section: 'resources', href: '/resources/', label: 'Resources', items: resourceItems(options) },
     { section: 'about', href: '/about/', label: 'About' },
   ];
 }
@@ -120,10 +128,10 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
     {
       title: 'Learn',
       links: [
-        { href: '/resources/', label: 'Resources' },
-        { href: '/resources/getting-started/', label: 'Getting started' },
-        { href: '/roadmap/', label: 'Roadmap' },
         ...(options.hasPosts ? [{ href: '/blog/', label: 'Blog' }] : []),
+        { href: '/blog/getting-started/', label: 'Getting started' },
+        { href: '/resources/', label: 'Resources' },
+        { href: '/roadmap/', label: 'Roadmap' },
         { href: '/about/', label: 'About' },
         // The open motion studio; not gated on the source flag, it is its own site.
         { href: STUDIO_URL, label: 'Rotli Studio' },
