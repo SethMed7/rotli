@@ -289,10 +289,35 @@ whose art never touches its words from 320 to 1920.
   picture is a real `<img>` at the thumbnails' one shape (1200 × 630, with a
   600-wide copy in `srcset`), with its size and alt text; the feature loads
   first and the grid lazily. No entry has a box: a framed picture with its
-  words under it. A post's own head shows the same picture beside its title
-  above 1080px, under its words below that (`WritingPage`'s `cover`).
-  `e2e/site/blog-index.spec.ts` holds the feature, every tile's picture at
-  one shape, the labels, and the cover at 1440, 768, and 390.
+  words under it. `e2e/site/blog-index.spec.ts` holds the feature, every
+  tile's picture at one shape, and the labels at 1440, 768, and 390, and that
+  a post opens on the same scene composed wide.
+- **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
+  "almost takes over the top and you scroll in"): a blog post and `/privacy/`
+  open on a full-width picture under the header, `clamp(20rem, 100svh −
+  header − 12rem, 54rem)` tall, pinned (`position: sticky`) while the sheet
+  below it, the article and the footer on `--ground` (`display: flow-root`,
+  so the head's pull upward never collapses through it), scrolls up over it.
+  The head is a panel on `--ground` (36rem, rounded top) that rises 7rem over
+  the banner's lower left; under a banner the date and reading time follow
+  the title, before the lede, so all three are in the first window. The text
+  is never on the art: the scenes keep their quokka and props clear of that
+  corner at every banner shape (`object-position: 100% 100%`, the wide
+  scenes' layout rule in `scripts/brand-images/scenes.mjs`). Under 900px the
+  banner is the phone crop at its own shape (at most 55svh) and the panel
+  overlaps only 1.5rem, full width. Posts pass `postBanner(slug)` (a
+  `<picture>`: 2400 and 1200 wide, the phone crop under 900px); `/privacy/`
+  passes its night through the `banner` slot: the caption on its own night
+  ground beside the dome, the dome standing on the panel's line and clipped to
+  its column so the drifting clouds never cross the words. A CSS scroll
+  timeline scales the art 6% over the first 80svh of scroll (longhands only:
+  the minifier folds `animation-timeline` into the `animation` shorthand,
+  which drops it), never under reduced motion or without support. The meter
+  and the tree are unchanged. `e2e/site/article-banner.spec.ts` holds it at
+  1920, 1440, 1280, 768, and 390: the title and date in the first window,
+  their contrast measured on the panel's opaque ground, the rise, the meter
+  and tree after it, and the still art under reduced motion. Guides keep their
+  `scene` and can opt in by passing a banner; About keeps its own layout.
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
@@ -633,9 +658,9 @@ whose art never touches its words from 320 to 1920.
   `ResourceScene.astro` are the island by day too; the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
-  closing scene. `/privacy/` and
-  `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
-  uses the centered layout (`center`).
+  closing scene. `/privacy/` places its night through `WritingPage`'s
+  `banner` slot (see "The article banner"); `/about/` places its scene through
+  the `scene` slot and uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and
   three facts on the left, the night scene on the right.
 - The coming-soon page keeps the same Rotli Light foundation and shows the real
@@ -698,12 +723,25 @@ whose art never touches its words from 320 to 1920.
   or underline is not sampled; check the contact sheet), and
   palette-compresses the PNGs (about 35 KB each).
 - **Post thumbnails** (`public/thumbs/blog/<slug>.webp` and `<slug>-600.webp`,
-  about 10 to 30 KB each) come from the same run and the same definition as
-  the post's card: `POST_ART` in `src/og.ts` gives each post a quokka pose
-  and a scene (`scripts/brand-images/scenes.mjs`: the island by day with the
-  post's subject on either side of the quokka, drawn in the guides' scene
-  vocabulary). The thumbnail is the whole scene with no words; the link card
-  stands the same pose beside the scene's first prop under the post's title.
+  about 10 to 35 KB each) and **banners** (`public/banners/blog/<slug>.webp`,
+  2400 × 1000, with `-1200.webp` and the 1300 × 900 phone crop
+  `-mobile.webp`, about 20 to 45 KB each, published posts only) come from the
+  same run and the same definition as the post's card: `POST_ART` in
+  `src/og.ts` gives each post a quokka pose and a scene
+  (`scripts/brand-images/scenes.mjs`: the island by day with the post's
+  subject around the quokka, drawn in the guides' scene vocabulary). Each
+  scene is art-directed twice: `thumb` puts the main prop on the left third,
+  the quokka on the right third, and the second prop up the beach; `wide`
+  gathers them right of centre and keeps the lower left open for the
+  banner's panel. The quokka is the app's canonical line art filled at its own
+  resolution (`scripts/brand-images/quokka.mjs`), with what it holds painted
+  like the props (`POSE_PAINT`: seeded regions; a seed off its region fails
+  the run), and every prop line is the quokka's own weight at the size it is
+  drawn (`ART_LINE`), so nothing reads heavier or lighter than the
+  character. Colours are read from `Base.astro`'s tokens (the sky is
+  `--surface-2`, the ink `--ink`), never restated. The thumbnail is the whole
+  scene with no words; the link card stands the same pose beside the scene's
+  first prop under the post's title.
   Every post gets one, coming-soon posts included, and titles are read from
   frontmatter when the run renders, never stored with the art, so a retitled
   post needs only a re-run. `postThumbnail(slug)` hands pages the image, its
