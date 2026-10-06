@@ -2,7 +2,8 @@
 // reading column with other posts (never the one being read; announced posts only to fill in, not
 // links) and two "From rotli" spots (src/promos.ts, rotli's own, local art, first-party links);
 // below 1280px the same as "More from rotli" after the article, with one spot. The reading column
-// keeps at least 62 characters a line, and nothing overlaps or overflows from 320 to 1920.
+// keeps 60 to 80 characters a line, and nothing overlaps or overflows from 320 to 1920 (the full
+// sweep to 2560 is e2e/site/article-width.spec.ts).
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
@@ -18,16 +19,20 @@ const POSTS = [
 
 const more = (page: Page) => page.locator("[data-article-more]");
 
-/** How many characters of the reading column's own type fit across it. */
+/** How many characters of the reading column's own type fit across a paragraph of it. The
+ * paragraph, not [data-prose]: the prose box is the grid's middle, which figures break out to. */
 const measure = (page: Page) =>
-  page.locator("[data-prose]").evaluate((prose) => {
-    const probe = document.createElement("span");
-    probe.style.cssText = "position:absolute;visibility:hidden;width:1ch";
-    prose.querySelector("p")!.append(probe);
-    const ch = probe.getBoundingClientRect().width;
-    probe.remove();
-    return prose.getBoundingClientRect().width / ch;
-  });
+  page
+    .locator("[data-prose] > p")
+    .first()
+    .evaluate((paragraph) => {
+      const probe = document.createElement("span");
+      probe.style.cssText = "position:absolute;visibility:hidden;width:1ch";
+      paragraph.append(probe);
+      const ch = probe.getBoundingClientRect().width;
+      probe.remove();
+      return paragraph.getBoundingClientRect().width / ch;
+    });
 
 const overlaps = (
   a: { x: number; y: number; width: number; height: number },
@@ -113,12 +118,14 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1280, height: 800 },
 ]) {
-  test(`the reading column keeps at least 62 characters a line beside both rails (${viewport.width}px)`, async ({
+  test(`the reading column keeps 60 to 80 characters a line beside both rails (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto(POST);
-    expect(await measure(page)).toBeGreaterThanOrEqual(62);
+    const characters = await measure(page);
+    expect(characters).toBeGreaterThanOrEqual(60);
+    expect(characters).toBeLessThanOrEqual(80);
     const rail = (await page.locator("[data-article-rail]").boundingBox())!;
     const prose = (await page.locator("[data-prose]").boundingBox())!;
     const aside = (await more(page).boundingBox())!;
@@ -164,11 +171,12 @@ for (const viewport of [
     const aside = more(page);
     await expect(aside.getByRole("heading", { level: 2, name: "More from rotli" })).toBeVisible();
     const prose = (await page.locator("[data-prose]").boundingBox())!;
+    const text = (await page.locator("[data-prose] > p").first().boundingBox())!;
     const box = (await aside.boundingBox())!;
     expect(box.y).toBeGreaterThan(prose.y + prose.height);
-    // Within the reading column's edges.
-    expect(box.x).toBeGreaterThanOrEqual(prose.x - 1);
-    expect(box.x + box.width).toBeLessThanOrEqual(prose.x + Math.max(prose.width, 640) + 1);
+    // On the reading column's edges.
+    expect(Math.abs(box.x - text.x)).toBeLessThan(1.5);
+    expect(Math.abs(box.x + box.width - (text.x + text.width))).toBeLessThan(1.5);
     await expect(aside.locator("[data-promos] li:visible")).toHaveCount(1);
     await expect(aside.locator("[data-promos] li:visible .promo-label")).toHaveText("From rotli");
     expect(await aside.locator("[data-more-posts] li:visible").count()).toBeGreaterThanOrEqual(2);

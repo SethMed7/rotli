@@ -68,7 +68,7 @@ for (const viewport of [
       .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
     expect(guideHrefs.length).toBeGreaterThan(0);
     expect(secondaryHrefs).toEqual(
-      hrefs.filter((href) => href !== featuredHref && !guideHrefs.includes(href)).slice(0, 3),
+      hrefs.filter((href) => href !== featuredHref && !guideHrefs.includes(href)).slice(0, 4),
     );
     for (const img of await page.locator("[data-secondary] img").all()) await expectThumbnail(img);
 

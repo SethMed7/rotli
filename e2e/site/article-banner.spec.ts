@@ -195,11 +195,12 @@ for (const path of POSTS) {
       expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
       if (viewport.width > 900) {
-        // On the article's tracks: the words on the reading column's edge, "Blog /" on the rail's,
-        // the picture across the columns.
-        const prose = await box(page, "[data-prose]");
+        // On the article's tracks: the words on the reading column's edge (a paragraph's, since
+        // [data-prose] is the wider middle that figures break out to), "Blog /" on the rail's, the
+        // picture across the columns.
+        const text = await box(page, "[data-prose] > p");
         const rail = await box(page, "[data-article-rail]");
-        expect(Math.abs(copy.x - prose.x)).toBeLessThan(1.5);
+        expect(Math.abs(copy.x - text.x)).toBeLessThan(1.5);
         expect(Math.abs((await box(page, "[data-article-cover] .crumbs")).x - rail.x)).toBeLessThan(1.5);
         expect(Math.abs(art.x - rail.x)).toBeLessThan(1.5);
         if (viewport.width >= 1280) {
