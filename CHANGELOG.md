@@ -251,20 +251,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co's home page reads in a clearer order, and says each thing
   once.** Three cards show what rotli does (write, keep, ask), each with a
   small picture of the app in place of the old list of bullets. The AI
-  figures and the before-and-after follow, then "A closer look": pick a part
-  of rotli (notes, Docs and Sheets, chat, boards, the Librarian, Rotli Web)
-  and see it beside the list, or inside it on a phone. Rotli Web and the
-  Helper's install line now live there instead of in a section of their own.
+  figures and the before-and-after follow. Rotli Web and the Helper no longer
+  have a section of their own: the questions answer "Can I use rotli in my
+  browser?", with links to the Helper guide and why it goes through Terminal.
   The page ends on one panel, "Start with one note.", with the download, just
   above the quokka beach.
-- **rotli.co's closer look moves with your scroll, and the before-and-after
-  plays.** Scroll through "A closer look." and the list and its preview stay
-  put while each part takes its turn, or click a part to jump to it; on a
-  phone the parts simply follow one another. The previews sit on the page
-  with no frames around them. The before-and-after now shows the note being
-  typed, then the Librarian adding its lines above the same words, ending
-  with "Your words, unchanged" marked; Replay plays it again. It's smaller,
-  so it fits on one laptop screen. Reduced motion keeps all of it still.
+- **rotli.co's before-and-after plays.** It shows the note being typed, then
+  the Librarian adding its lines above the same words, ending with "Your
+  words, unchanged" marked; Replay plays it again. It's smaller, so it fits
+  on one laptop screen. Reduced motion keeps it still.
 - **rotli.co shows where a note lives, and what an LLM wiki is.** "Write it
   down. rotli puts it away." is now one story in three steps. You write in
   your view (Main, or a named view), which arranges your notes and never
