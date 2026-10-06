@@ -1,11 +1,14 @@
-// The article banner (WritingPage `banner`) on blog posts and /privacy/: a full-width picture
-// under the header that takes most of the first window, a head panel on the page's ground
-// whose title and date are in that first window at full contrast, the page rising over the
-// pinned banner as it scrolls (the meter and the tree still pinned and clear of each other),
-// and a still banner when reduced motion is asked for.
+// The top of an article. /privacy/ keeps the banner (WritingPage `banner`): a full-width picture
+// under the header that takes most of the first window, a head panel on the page's ground whose
+// title and date are in that first window at full contrast, and the page rising over the pinned
+// banner as it scrolls (the meter and the tree still pinned and clear of each other).
+// Blog posts open on their cover instead (WritingPage `article`, blog/ArticleCover.astro): the
+// scene contained at the page's width, rounded and still, with a card over its lower left on a
+// wide screen (author, date, title, summary, topics, contrast measured on the card's ground) and
+// the picture first, then the head, below 1100px.
 import { expect, test, type Page } from "@playwright/test";
 
-const POST = "/blog/rotli-web-and-your-mac/";
+const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
 const VIEWPORTS = [
   { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
@@ -46,7 +49,7 @@ async function box(page: Page, selector: string) {
   return (await page.locator(selector).first().boundingBox())!;
 }
 
-for (const path of [POST, "/blog/the-ai-you-already-pay-for/", "/privacy/"]) {
+for (const path of ["/privacy/"]) {
   for (const viewport of VIEWPORTS) {
     test(`${path} opens on its banner with the title readable in the first window (${viewport.width}px)`, async ({
       page,
@@ -60,13 +63,6 @@ for (const path of [POST, "/blog/the-ai-you-already-pay-for/", "/privacy/"]) {
       expect(banner.width).toBeGreaterThanOrEqual(viewport.width - 1);
       if (viewport.width > 900) expect(banner.height).toBeGreaterThan(viewport.height * 0.5);
       else expect(banner.height).toBeLessThan(viewport.height * 0.62);
-      if (path !== "/privacy/") {
-        const img = page.locator("[data-article-banner] img");
-        await expect
-          .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
-          .toBe(true);
-        expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
-      }
 
       // The title and the date line are inside the first window, with no scrolling.
       for (const selector of [".writing-head h1", ".writing-head .meta"]) {
@@ -132,25 +128,90 @@ for (const path of [POST, "/blog/the-ai-you-already-pay-for/", "/privacy/"]) {
   });
 }
 
-test("the post's banner settles as the page scrolls, and stays still under reduced motion", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const art = page.locator("[data-article-banner] img");
-  const transformAt = async (y: number) => {
-    await page.evaluate((top) => {
-      document.documentElement.style.scrollBehavior = "auto";
-      window.scrollTo(0, top);
-    }, y);
-    await page.waitForTimeout(150);
-    return art.evaluate((el) => getComputedStyle(el).transform);
-  };
-  await page.goto(POST);
-  expect(await transformAt(0)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
-  expect(await transformAt(400)).not.toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+for (const path of POSTS) {
+  for (const viewport of VIEWPORTS) {
+    test(`${path} opens on its contained cover and its card (${viewport.width}px)`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(path);
+      // No banner, no pinned picture: the cover sits inside the page's width.
+      await expect(page.locator("[data-article-banner]")).toHaveCount(0);
+      const header = await box(page, ".site-header-bar");
+      const wrap = await box(page, "main.writing");
+      const art = await box(page, "[data-article-art]");
+      expect(art.x).toBeGreaterThanOrEqual(wrap.x - 1);
+      expect(art.x + art.width).toBeLessThanOrEqual(wrap.x + wrap.width + 1);
+      expect(art.width).toBeLessThan(viewport.width);
+      expect(art.y).toBeGreaterThan(header.y + header.height);
+      expect(
+        await page.locator("[data-article-art]").evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
+      ).not.toBe("0px");
+      const img = page.locator("[data-article-art] img");
+      await expect
+        .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+        .toBe(true);
+      expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
 
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(POST);
-  expect(await art.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
-  expect(await transformAt(400)).toBe("none");
+      // The card: the author, the date, the title, the summary, and the topics.
+      const card = page.locator(".head-card");
+      await expect(card.locator(".author")).toHaveText("Seth Medina");
+      await expect(card.locator(".byline")).toContainText("min read");
+      await expect(card.locator(".byline")).toContainText(/2026/);
+      await expect(card.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(card.locator(".lede")).toBeVisible();
+      expect(await card.getByRole("list", { name: "Topics" }).getByRole("listitem").count()).toBeGreaterThan(
+        0,
+      );
+
+      const cardBox = await box(page, ".head-card");
+      if (viewport.width > 1100) {
+        // Over the picture's lower edge, from the left, leaving the quokka's half clear.
+        const overlap = art.y + art.height - cardBox.y;
+        expect(overlap).toBeGreaterThan(48);
+        expect(overlap).toBeLessThan(140);
+        expect(cardBox.x).toBeGreaterThan(art.x);
+        expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(art.x + art.width * 0.62);
+      } else {
+        // The picture first, then the head.
+        expect(cardBox.y).toBeGreaterThanOrEqual(art.y + art.height);
+      }
+      // The byline and the title are in the first window.
+      for (const selector of [".head-card .byline", ".head-card h1"]) {
+        const part = await box(page, selector);
+        expect(part.y + part.height).toBeLessThanOrEqual(viewport.height);
+      }
+      // Read on the card's own opaque ground (the page's, below 1100px): measured, at least 4.5:1.
+      const ground = viewport.width > 1100 ? ".head-card" : "body";
+      for (const text of [".head-card h1", ".head-card .byline", ".head-card .lede", ".head-card .author"]) {
+        const { fg, bg } = await colours(page, text, ground);
+        expect(contrastOf(fg, bg), `${text}`).toBeGreaterThanOrEqual(4.5);
+      }
+      const tag = await colours(page, ".head-card .tags li", ".head-card .tags li");
+      expect(contrastOf(tag.fg, tag.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBeLessThanOrEqual(0);
+    });
+  }
+}
+
+test("a post's cover stays still as the page scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(POSTS[0]!);
+  const before = await box(page, "[data-article-art]");
+  await page.evaluate(() => {
+    document.documentElement.style.scrollBehavior = "auto";
+    window.scrollTo(0, 300);
+  });
+  await page.waitForTimeout(150);
+  const after = await box(page, "[data-article-art]");
+  // It scrolls away with the page (nothing pinned), and nothing scales it.
+  expect(before.y - after.y).toBeGreaterThan(290);
+  expect(await page.locator("[data-article-art] img").evaluate((el) => getComputedStyle(el).transform)).toBe(
+    "none",
+  );
+  expect(
+    await page.locator("[data-article-art] img").evaluate((el) => getComputedStyle(el).animationName),
+  ).toBe("none");
 });
