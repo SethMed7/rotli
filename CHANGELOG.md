@@ -190,6 +190,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with "Your words, unchanged" marked; Replay plays it again. It's smaller,
   so it fits on one laptop screen. The three cards near the top lost their
   outer frames too. Reduced motion keeps all of it still.
+- **rotli.co's About page tells the story across the page.** It's written in
+  first person around what rotli is now: a free workspace on plain Markdown
+  files, notes first with Docs and Sheets (beta), chat and boards in the same
+  folder, a Librarian that files and never touches your words, and AI that
+  uses the plan you already pay for. Words and real pictures of the app take
+  turns down the page, with two pull quotes, the island and the name, and a
+  short timeline of releases since 1.0 that ends on the roadmap.
+- **rotli.co's download page has life.** It opens on a little dock where one
+  quokka waves beside a laptop and another sails in under a browser-window
+  sail. The Mac app and Rotli Web each get a panel that says what you need
+  and what you get, and the one for your computer comes first: the Mac
+  download on a Mac, Rotli Web on Windows and Linux, whose own apps are
+  marked "Coming soon" with links to the roadmap and the sign-up. Below are
+  what you get, the first few minutes, and a few answers. Reduced motion
+  keeps the scene still.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small

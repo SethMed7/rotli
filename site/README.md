@@ -301,25 +301,63 @@ whose art never touches its words from 320 to 1920.
   listed on its index with a "Coming soon" label and no link, and has no
   page, Markdown twin, sitemap entry, or llms.txt line until the field comes
   off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
-  `/blog/`, `/blog/<file>/`, and `/about/` (the maker's first-person story of
-  why rotli exists: notes first, people and AI note differently, the vault
-  you own beside the "stays local" quokka, no extra AI fee, house rules for
-  AI, then the name story and who makes it; it links the
-  `the-creation-of-rotli` post once it is published). Markdown code
+  `/blog/`, and `/blog/<file>/` (`/about/` has its own layout, below). Markdown code
   blocks wrap long lines at their spaces inside the box (the Helper's install
   line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
+- **`/about/`** (the owner's item 18 and his 2026-10-05 "use more width and
+  redo it now that our message is better") is the maker's first-person story
+  on its own wide layout, not `WritingPage`'s reading column: a head with the
+  title beside the lede, the story film's island (`IslandScene`), then rows
+  across the full page grid that alternate words and a picture (one column,
+  words first, below 960px): notes first beside the app window
+  (`public/themes/`), people and AI read notes differently beside a filed
+  note drawn in HTML (the added lines tinted with a "+", the words under
+  "Your words, unchanged"), yours and private beside the plain Markdown
+  (`shots/render-raw.webp`) with the "stays local" quokka at its foot, no
+  extra AI fee beside the chat capture (it links the post
+  `the-ai-you-already-pay-for`), and the name beside the celebrating quokka.
+  Two pull quotes are lines from the story itself. "How it got here" is a
+  short timeline on the warm band: the words for each release are
+  `src/milestones.ts`, every date is read from `CHANGELOG.md` and a missing
+  version fails the build, and it ends on what's next (`/roadmap/`). "Who
+  makes it" closes with the X link (`rel="me"`), the GitHub link while the
+  source is public, and the `the-creation-of-rotli` post once it is
+  published. The `[[OWNER: …]]` comments at the top mark where a personal
+  "why I started" moment and the name's real reason can go. Rows rise in
+  once; reduced motion and no script show them at rest.
+  `e2e/site/about.spec.ts` holds the order, the links, the dates against
+  the changelog, and that words and pictures never overlap from 320 to 1920.
 - **`/download/`** is where every "Try now" goes (the header, the hero, the
-  closing panel; the 404's "Try rotli" and the About page's too). It offers
-  the two real ways in, the Mac app and Rotli Web, and leads with the
+  closing panel; the 404's "Try rotli" and the About page's too). It has its
+  own wide layout. The head sets the title, the lede, and the way in for the
   visitor's own system (`Base.astro` stamps `data-os`: mac, windows, linux,
-  mobile, or other): the Mac download on a Mac, with Rotli Web beside it; on
-  Windows and Linux, "rotli for Windows is coming soon" and a prominent Open
-  Rotli Web button ("Use Rotli Web in the meantime"), with Rotli Helper for
-  browsers without folder access and no Mac download. Without script the Mac
-  panel shows. Below, "Every platform" lists Mac and Rotli Web (Available)
-  and then Windows and Linux ("Coming soon", each pointing to Rotli Web for
-  now). This is the only page that links the DMG (`DOWNLOAD_URL`).
+  mobile, or other) beside the dock scene (`DownloadScene.astro`: a laptop on
+  a crate and a waving quokka on the dock, a boat whose sail is a browser
+  window with a second quokka in it, the lighthouse between; no product
+  logos). The scene plays once as it comes into view (the boat sails in, the
+  quokkas hop up, both screens write their lines) and rests; reduced motion
+  and no script show it still. On a Mac, and without script, the head offers
+  the DMG ("Apple silicon · macOS 11 or later", the DMG's build target and
+  minimum); on Windows and Linux it says "rotli for Windows is coming soon"
+  and offers Open Rotli Web ("Use Rotli Web in the meantime"), or the
+  roadmap while Rotli Web is off; on a phone it says rotli runs on a
+  computer. "Two ways in" are two panels, rotli for Mac (what it includes,
+  signed and notarized by Apple, Download .dmg and the release notes) and
+  Rotli Web (which browsers open the folder, which need Rotli Helper, which
+  aren't supported yet, and what stays in the Mac app); the one for this
+  computer comes first, marked, and on Windows and Linux the Mac's button
+  steps back to a quiet one. Then Windows and Linux, each "Coming soon"
+  (`PLATFORMS.soon`) with Rotli Web for the meantime and links to the
+  roadmap and the footer's sign-up; what you get (four plain columns on the
+  warm band); the first five minutes (four numbered steps); and a short FAQ
+  that reuses `src/faq.ts` where it can, with no second FAQPage JSON-LD.
+  This is the only page that links the DMG (`DOWNLOAD_URL`). The version
+  and the DMG's size are not shown: no site constant holds them for the
+  published release. `e2e/site/download.spec.ts` holds the lead for each
+  system and without script, the coming-soon entries, the scene's motion,
+  and that nothing overlaps from 320 to 1920; its Rotli Web checks run only
+  when the build offers Rotli Web.
 - **Where rotli runs** (the owner, 2026-10-05). The promise is a free
   workspace, not a Mac app. The landing page says what it is and what it
   costs ("Free. No account. Works offline." under the hero's "Try now") and
