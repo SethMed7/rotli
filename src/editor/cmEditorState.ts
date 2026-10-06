@@ -23,7 +23,7 @@ export interface PickerState {
 /** The anchor of a popover a slash command opens at the cursor: /image-gen
  * (engine + prompt → PNG in storage/images) or Ask AI (`/ai`). */
 export interface ImageGenState {
-  kind: "imageGen" | "ai";
+  kind: "imageGen" | "ai" | "chart";
   left: number;
   top: number;
   up: boolean;

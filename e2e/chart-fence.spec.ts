@@ -18,13 +18,17 @@ async function newMarkdownNote(page: import("@playwright/test").Page) {
   return editor;
 }
 
-test("Bar chart from the slash menu draws, edits in its form, and Apply rewrites the fence", async ({
-  page,
-}) => {
+test("/chart, then Bar, draws, edits in its form, and Apply rewrites the fence", async ({ page }) => {
   await gotoApp(page);
   const editor = await newMarkdownNote(page);
-  await page.keyboard.insertText("/bar");
-  await page.getByRole("menuitem", { name: /Bar chart/ }).click();
+  await page.keyboard.insertText("/chart");
+  await page.getByRole("menuitem", { name: /^Chart/ }).click();
+  // one command, then the kind
+  await page
+    .getByRole("menu", { name: "Choose a chart" })
+    .getByRole("menuitem", { name: /^Bar/ })
+    .first()
+    .click();
 
   const block = page.locator(".rotli-render-block[data-lang='chart']");
   await expect(block.locator(".rotli-render-chart-title")).toHaveText("Hours this week");
@@ -55,26 +59,27 @@ test("Bar chart from the slash menu draws, edits in its form, and Apply rewrites
 test("a chart Rotli can't read shows its reason and its source, untouched", async ({ page }) => {
   await gotoApp(page);
   const editor = await newMarkdownNote(page);
-  await page.keyboard.insertText("Before\n\n```chart\ntype: radar\n\nX, Y\na, 1\n```\n\nAfter");
+  await page.keyboard.insertText("Before\n\n```chart\ntype: gauge\n\nX, Y\na, 1\n```\n\nAfter");
   await page.getByText("Before").click();
 
   const refused = page.locator(".rotli-render-chart-refused");
-  await expect(refused.locator(".rotli-render-error")).toContainText("“radar” isn’t a chart type");
-  await expect(refused.locator("pre")).toContainText("type: radar");
+  await expect(refused.locator(".rotli-render-error")).toContainText("“gauge” isn’t a chart type");
+  await expect(refused.locator("pre")).toContainText("type: gauge");
   // Edit opens the source to fix by hand, never a form over a guess
   await page
     .locator(".rotli-render-block[data-lang='chart']")
     .getByRole("button", { name: "Edit chart" })
     .click();
   await expect(page.getByRole("group", { name: "Edit chart" })).toHaveCount(0);
-  await expect(editor).toContainText("type: radar");
+  await expect(editor).toContainText("type: gauge");
 });
 
 test("a pie chart draws its slices", async ({ page }) => {
   await gotoApp(page);
   await newMarkdownNote(page);
-  await page.keyboard.insertText("/pie");
-  await page.getByRole("menuitem", { name: /Pie chart/ }).click();
+  await page.keyboard.insertText("/chart");
+  await page.getByRole("menuitem", { name: /^Chart/ }).click();
+  await page.getByRole("menu", { name: "Choose a chart" }).getByRole("menuitem", { name: /^Pie/ }).click();
   const block = page.locator(".rotli-render-block[data-lang='chart']");
   await expect(block.locator(".rotli-render-chart-title")).toHaveText("Where the time went");
   await expect
@@ -86,8 +91,13 @@ test("a pie chart draws its slices", async ({ page }) => {
 test("typing above a chart keeps its drawing and its half-filled form", async ({ page }) => {
   await gotoApp(page);
   const editor = await newMarkdownNote(page);
-  await page.keyboard.insertText("Intro\n/bar");
-  await page.getByRole("menuitem", { name: /Bar chart/ }).click();
+  await page.keyboard.insertText("Intro\n/chart");
+  await page.getByRole("menuitem", { name: /^Chart/ }).click();
+  await page
+    .getByRole("menu", { name: "Choose a chart" })
+    .getByRole("menuitem", { name: /^Bar/ })
+    .first()
+    .click();
   const block = page.locator(".rotli-render-block[data-lang='chart']");
   const form = block.getByRole("group", { name: "Edit chart" });
   await expect(form).toBeVisible();
@@ -106,4 +116,50 @@ test("typing above a chart keeps its drawing and its half-filled form", async ({
   await expect(block.getByRole("group", { name: "Edit chart" })).toHaveCount(0);
   await block.locator(".rotli-render-chart-title").click();
   await expect(editor).toContainText("Mon, 7, 1");
+});
+
+// /chart (the owner, 2026-10-05): one command, then a list of the ten kinds
+test("/chart lists ten kinds, and each kind's starter draws", async ({ page }) => {
+  await gotoApp(page);
+  await newMarkdownNote(page);
+  await page.keyboard.insertText("/chart");
+  await page.getByRole("menuitem", { name: /^Chart/ }).click();
+  const picker = page.getByRole("menu", { name: "Choose a chart" });
+  await expect(picker.getByRole("menuitem")).toHaveText([
+    /^Bar/,
+    /^Horizontal bar/,
+    /^Stacked bar/,
+    /^Line/,
+    /^Area/,
+    /^Pie/,
+    /^Donut/,
+    /^Scatter/,
+    /^Radar/,
+    /^Heatmap/,
+  ]);
+  await page.keyboard.press("Escape");
+
+  // each kind, picked from the list in a note of its own, draws its starter
+  // (one chart per note: CodeMirror keeps only the visible blocks in the DOM)
+  for (const kind of [
+    "Horizontal bar",
+    "Stacked bar",
+    "Line",
+    "Area",
+    "Donut",
+    "Scatter",
+    "Radar",
+    "Heatmap",
+  ]) {
+    await newMarkdownNote(page);
+    await page.keyboard.insertText("/chart");
+    await page.getByRole("menuitem", { name: /^Chart/ }).click();
+    await page
+      .getByRole("menu", { name: "Choose a chart" })
+      .getByRole("menuitem", { name: new RegExp(`^${kind}`) })
+      .click();
+    const block = page.locator(".rotli-render-block[data-lang='chart']").last();
+    await expect(block.locator(".rotli-render-chart-canvas svg").first(), kind).toBeVisible();
+    await expect(block.locator(".rotli-render-chart-refused"), kind).toHaveCount(0);
+  }
 });

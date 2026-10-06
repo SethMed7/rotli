@@ -11,7 +11,14 @@
 // two surfaces can evolve independently. Glyphs are reused from FormatBar's
 // vocabulary — same SVG voice, same 15px size.
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { fitMenuToWindow, scrollRowIntoList } from "../lib/popover";
@@ -192,6 +199,88 @@ export function slashQueryAtCaret(line: string, caret: number): string | null {
   return slashSpanAtCaret(line, caret)?.query ?? null;
 }
 
+/** One row of a slash-style menu: the slash menu's commands, or the chart
+ * picker's kinds. */
+export interface SlashRowView {
+  key: string;
+  glyph: ReactNode;
+  label: string;
+  hint: string;
+  group: string;
+}
+
+/** The slash menu's list look, shared by every menu that opens at the caret:
+ * group headings, the highlighted row kept in view, and a height that fits
+ * the window above or below the caret. */
+export function SlashRows({
+  label,
+  rows,
+  selectedIndex,
+  onHover,
+  onPick,
+  rootRef,
+  focusable = false,
+  onKeyDown,
+  empty,
+}: {
+  label: string;
+  rows: readonly SlashRowView[];
+  selectedIndex: number;
+  onHover: (index: number) => void;
+  onPick: (index: number) => void;
+  rootRef: RefObject<HTMLDivElement | null>;
+  /** The menu takes focus itself (a picker), instead of leaving it in the editor. */
+  focusable?: boolean;
+  onKeyDown?: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  empty?: ReactNode;
+}) {
+  // arrowing past the fold scrolls the menu with the highlight (and its group label)
+  useEffect(() => {
+    const root = rootRef.current;
+    const sel = root?.querySelector(".slashrow.sel");
+    if (root) scrollRowIntoList(root, sel?.closest(".slashgrouped") ?? sel);
+  }, [rootRef, selectedIndex, rows]);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (root) fitMenuToWindow(root, !!root.closest(".rotli-slash-anchor.up"));
+  }, [rootRef, rows]);
+  return (
+    <div
+      className="slashmenu"
+      role="menu"
+      aria-label={label}
+      ref={rootRef}
+      {...(focusable ? { tabIndex: -1, onKeyDown } : {})}
+    >
+      {rows.length === 0 && empty}
+      {rows.map((row, i) => (
+        <div key={row.key} className="slashgrouped">
+          {row.group !== rows[i - 1]?.group && (
+            <div className="slashgroup" aria-hidden="true">
+              {row.group}
+            </div>
+          )}
+          <button
+            type="button"
+            className={i === selectedIndex ? "slashrow sel" : "slashrow"}
+            role="menuitem"
+            // keep the editor (or the picker) focused — picking must never end the edit
+            onMouseDown={(e) => e.preventDefault()}
+            // a moving pointer picks the row; a resting one the menu opened
+            // under does not, or it would steal the keyboard's first row
+            onMouseMove={() => i !== selectedIndex && onHover(i)}
+            onClick={() => onPick(i)}
+          >
+            <span className="slashglyph">{row.glyph}</span>
+            <span className="slashlabel">{row.label}</span>
+            <span className="slashhint">{row.hint}</span>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SlashMenu({
   query,
   selectedIndex,
@@ -204,48 +293,27 @@ export function SlashMenu({
   onPick: (item: SlashItem) => void;
 }) {
   const items = filterSlashItems(query);
-  // arrowing past the fold scrolls the menu with the highlight (and its group label)
   const rootRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const root = rootRef.current;
-    const sel = root?.querySelector(".slashrow.sel");
-    if (root) scrollRowIntoList(root, sel?.closest(".slashgrouped") ?? sel);
-  }, [selectedIndex, query]);
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (root) fitMenuToWindow(root, !!root.closest(".rotli-slash-anchor.up"));
-  }, [query]);
+  const rows = items.map((item) => ({
+    key: item.label,
+    glyph: item.glyph,
+    label: item.label,
+    hint: item.hint,
+    group: item.group,
+  }));
   return (
-    <div className="slashmenu" role="menu" aria-label="Insert block" ref={rootRef}>
-      {items.length === 0 && (
+    <SlashRows
+      label="Insert block"
+      rows={rows}
+      selectedIndex={selectedIndex}
+      onHover={onHover}
+      onPick={(i) => onPick(items[i]!)}
+      rootRef={rootRef}
+      empty={
         <div className="slashmenu-empty" role="status">
           No commands found <span>Esc to close</span>
         </div>
-      )}
-      {items.map((item, i) => (
-        <div key={item.label} className="slashgrouped">
-          {item.group !== items[i - 1]?.group && (
-            <div className="slashgroup" aria-hidden="true">
-              {item.group}
-            </div>
-          )}
-          <button
-            type="button"
-            className={i === selectedIndex ? "slashrow sel" : "slashrow"}
-            role="menuitem"
-            // keep the editor focused — picking must never end the edit
-            onMouseDown={(e) => e.preventDefault()}
-            // a moving pointer picks the row; a resting one the menu opened
-            // under does not, or it would steal the keyboard's first row
-            onMouseMove={() => i !== selectedIndex && onHover(i)}
-            onClick={() => onPick(item)}
-          >
-            <span className="slashglyph">{item.glyph}</span>
-            <span className="slashlabel">{item.label}</span>
-            <span className="slashhint">{item.hint}</span>
-          </button>
-        </div>
-      ))}
-    </div>
+      }
+    />
   );
 }

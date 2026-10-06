@@ -470,7 +470,7 @@ function CmEditorImpl({
           openSlashPanel(item.op.kind, paneId, noteId);
           return;
         }
-        if (item.op.kind === "imageGen" || item.op.kind === "ai") {
+        if (item.op.kind === "imageGen" || item.op.kind === "ai" || item.op.kind === "chart") {
           setSlash((s) => ({ ...s, open: false }));
           const kind = item.op.kind;
           setImageGen({ kind, insertAt: contentFrom, continuation: span.continuation, left, top, up });

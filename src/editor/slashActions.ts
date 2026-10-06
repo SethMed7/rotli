@@ -1,7 +1,5 @@
 import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
 import { ALIGN_CLOSE, alignOpenTag } from "./alignedLine";
-import { requestChartEdit } from "./chartPending";
-import { chartStarter } from "./chartSpec";
 import { applyBlockToggle, applyHeading } from "./commands";
 import type { SlashOp, SlashPickerMode } from "./slashTypes";
 import { cellSpansOf, insertTableText } from "./tables";
@@ -18,11 +16,11 @@ export const MERMAID_STARTER = `flowchart LR
  * inserting text: their `/word` is cleared and the flow takes over. */
 type FlowOp = Extract<
   SlashOp,
-  { kind: "picker" | "attachImage" | "imageGen" | "ai" | "librarian" | "handToAi" }
+  { kind: "picker" | "attachImage" | "imageGen" | "ai" | "chart" | "librarian" | "handToAi" }
 >;
 
 export function opensFlow(op: SlashOp): op is FlowOp {
-  return ["picker", "attachImage", "imageGen", "ai", "librarian", "handToAi"].includes(op.kind);
+  return ["picker", "attachImage", "imageGen", "ai", "chart", "librarian", "handToAi"].includes(op.kind);
 }
 
 /** Canonical scaffold for every immediate slash command. Picker commands — and
@@ -56,14 +54,6 @@ export function slashInsertion(
     }
     const insert = `\`\`\`${op.lang}\n\n\`\`\``;
     return { insert, caret: 4 + op.lang.length };
-  }
-  if (op.kind === "chart") {
-    // the caret lands below the fence so the chart renders, and its block
-    // opens the Edit form once (chartBlock.ts) — fill in the rows from there
-    const body = chartStarter(op.chartType);
-    requestChartEdit(body);
-    const insert = `\`\`\`chart\n${body}\n\`\`\`\n`;
-    return { insert, caret: insert.length };
   }
   if (op.kind === "align") {
     const open = alignOpenTag(op.align);

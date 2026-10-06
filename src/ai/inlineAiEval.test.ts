@@ -42,7 +42,7 @@ const SOURCES_REPLY =
 
 describe("the request", () => {
   test("is the versioned asset, the note fenced as data with the cursor marked, then the ask", () => {
-    expect(INLINE_AI_VERSION).toBe(1);
+    expect(INLINE_AI_VERSION).toBe(2);
     const request = renderInlineRequest(
       "  a chart of my pages  ",
       "# Reading\n\nW1 40, W2 55.\n",

@@ -5,7 +5,7 @@
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import { DATE_WORDS } from "../lib/noteDates";
 import { withBetaLabel } from "../newItems/model";
-import { CHART_TYPES, type ChartType } from "./chartSpec";
+import { chartGlyph } from "./chartGlyphs";
 import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { ALIGN_SLASH_ITEMS } from "./slashAlign";
 import type { SlashItem } from "./slashTypes";
@@ -52,46 +52,6 @@ const mermaidGlyph = (
     <path d="M6.5 9v4a2 2 0 0 0 2 2h5.5" />
   </svg>
 );
-
-const CHART_LABELS: Record<ChartType, string> = { bar: "Bar", line: "Line", area: "Area", pie: "Pie" };
-const CHART_HINTS: Record<ChartType, string> = {
-  bar: "Compare values side by side",
-  line: "A trend across steps",
-  area: "A trend with its volume",
-  pie: "Parts of a whole",
-};
-
-// one small mark per chart type, in the same stroke voice as Mermaid's
-function chartGlyph(type: ChartType) {
-  const shape =
-    type === "bar" ? (
-      <path d="M5 20v-6M10 20V8M15 20v-9M20 20V4" />
-    ) : type === "line" ? (
-      <path d="M3 17l5-6 4 3 5-7 4 4" />
-    ) : type === "area" ? (
-      <path d="M3 19l5-7 4 3 5-7 4 4v7z" />
-    ) : (
-      <>
-        <circle cx="12" cy="12" r="8" />
-        <path d="M12 4v8l6 5" />
-      </>
-    );
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={15}
-      height={15}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {shape}
-    </svg>
-  );
-}
 
 // a framed picture with a sun + hill — the classic image mark, in the Gl voice
 const calendarGlyph = (
@@ -328,14 +288,26 @@ export const SLASH_ITEMS: SlashItem[] = [
     op: { kind: "fence", lang: "mermaid" },
     keywords: ["diagram", "flowchart", "graph"],
   },
-  ...CHART_TYPES.map((type): SlashItem => ({
-    label: `${CHART_LABELS[type]} chart`,
+  {
+    label: "Chart",
     group: "Insert",
-    hint: CHART_HINTS[type],
-    glyph: chartGlyph(type),
-    op: { kind: "chart", chartType: type },
-    keywords: ["chart", "graph", "plot", type, ...(type === "pie" ? ["donut", "share"] : [])],
-  })),
+    hint: "Choose from ten kinds",
+    glyph: chartGlyph("bar"),
+    op: { kind: "chart" },
+    keywords: [
+      "chart",
+      "graph",
+      "plot",
+      "bar",
+      "line",
+      "area",
+      "pie",
+      "donut",
+      "scatter",
+      "radar",
+      "heatmap",
+    ],
+  },
   {
     label: "Attach image",
     group: "Insert",

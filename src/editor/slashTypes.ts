@@ -4,7 +4,6 @@
 import type { ReactNode } from "react";
 
 import type { DateWord } from "../lib/noteDates";
-import type { ChartType } from "./chartSpec";
 import type { BlockToggle } from "./commands";
 
 export type SlashPickerMode =
@@ -26,8 +25,9 @@ export type SlashOp =
   | { kind: "table" }
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
-  /** A ```chart fence with a starter of this type; its Edit form opens (SYNTAX.md). */
-  | { kind: "chart"; chartType: ChartType }
+  /** Opens the chart picker; the chosen kind's starter fence lands and its
+   * Edit form opens (SYNTAX.md). */
+  | { kind: "chart" }
   | { kind: "picker"; mode: SlashPickerMode }
   /** Opens Finder and inserts copied vault image assets at this position. */
   | { kind: "attachImage" }

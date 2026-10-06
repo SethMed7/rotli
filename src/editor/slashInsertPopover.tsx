@@ -6,6 +6,7 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
+import { ChartTypePopover } from "./chartTypePopover";
 import type { ImageGenState } from "./cmEditorState";
 import { ImageGenPopover } from "./imageGenPopover";
 import { InlineAiPopover } from "./inlineAiPopover";
@@ -42,5 +43,6 @@ export function SlashInsertPopover({
 }) {
   if (state.kind === "ai")
     return <InlineAiPopover state={state} noteId={noteId} view={view} onClose={onClose} />;
+  if (state.kind === "chart") return <ChartTypePopover onDone={onDone} onClose={onClose} />;
   return <ImageGenPopover onDone={onDone} onClose={onClose} />;
 }
