@@ -8,27 +8,41 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 
-/** The site's tokens (site/src/layouts/Base.astro), written out because these images render outside it. */
+// The site's tokens, read from site/src/layouts/Base.astro's first :root block (its Rotli Light
+// values), because these images render outside the page. One home for every colour: a token
+// changed there changes every picture at the next render.
+const baseCss = readFileSync(join(root, "site/src/layouts/Base.astro"), "utf8");
+const rootBlock = baseCss.slice(baseCss.indexOf(":root {"), baseCss.indexOf("}", baseCss.indexOf(":root {")));
+const token = (name) => {
+  const value = rootBlock.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})\\b`, "i"))?.[1];
+  if (!value) throw new Error(`Base.astro has no --${name} colour token`);
+  return value.toLowerCase();
+};
+
 export const C = {
-  ground: "#f8f2e9",
-  text: "#3a3028",
-  muted: "#6e6155",
-  accent: "#c97e62",
-  line: "#2b231d",
-  sea: "#7fcfc6",
-  seaDeep: "#3fa3a6",
-  seaLine: "#e9fbf6",
-  sand: "#f1e3c4",
-  limestone: "#e6d3ad",
-  olive: "#8d9a76",
-  oliveDark: "#6d7a58",
-  lantern: "#8fb9c9",
-  cloud: "#fffaf2",
-  oliveBright: "#a9b78f",
-  wood: "#b98b62",
-  lake: "#f0a7a0",
-  paper: "#ffffff",
-  sky: "#f3e7d6",
+  ground: token("ground"),
+  text: token("text"),
+  muted: token("muted-ink"),
+  accent: token("accent"),
+  /** The drawn scenes' line: the art's own ink (--ink), the quokka's and every prop's. */
+  ink: token("ink"),
+  line: token("ink"),
+  sea: token("sea"),
+  seaDeep: token("sea-deep"),
+  seaLine: token("sea-line"),
+  sand: token("sand"),
+  limestone: token("limestone"),
+  olive: token("olive"),
+  oliveBright: token("olive-bright"),
+  lantern: token("lantern"),
+  wood: token("wood"),
+  woodDark: token("wood-dark"),
+  lake: token("lake"),
+  /** Paper: the app's editor paper (--capture-ground), what every page and screen is drawn on. */
+  paper: token("capture-ground"),
+  /** The day sky and its clouds: the guides' scenes' warm surfaces, the other way round. */
+  sky: token("surface-2"),
+  cloud: token("surface"),
 };
 
 export const esc = (text) =>
@@ -86,7 +100,7 @@ export function beach({ x, footY, bottom, k = 1 }) {
 export function lighthouse({ x, y, s }) {
   return `<g transform="translate(${x} ${y}) scale(${s})" stroke-linejoin="round">
     <path d="M-195 0C-117 -30 -60 -88 0 -88S126.75 -26 195 0Z" fill="${C.limestone}" stroke="${C.line}" stroke-width="3"/>
-    <ellipse cx="-90" cy="-48" rx="22" ry="9" fill="${C.olive}"/><ellipse cx="-60" cy="-58" rx="18" ry="8" fill="${C.oliveDark}"/><ellipse cx="55" cy="-60" rx="20" ry="8" fill="${C.olive}"/><ellipse cx="95" cy="-44" rx="24" ry="9" fill="${C.oliveDark}"/>
+    <ellipse cx="-90" cy="-48" rx="22" ry="9" fill="${C.oliveBright}"/><ellipse cx="-60" cy="-58" rx="18" ry="8" fill="${C.olive}"/><ellipse cx="55" cy="-60" rx="20" ry="8" fill="${C.oliveBright}"/><ellipse cx="95" cy="-44" rx="24" ry="9" fill="${C.olive}"/>
     <g transform="translate(0 -84) scale(0.95)" stroke="${C.line}" stroke-width="3">
       <path d="M-17 0l5-92h24l5 92z" fill="${C.cloud}"/><path d="M-15 -30h30M-16 -60h32" stroke-opacity="0.35"/>
       <rect x="-17" y="-98" width="34" height="6" fill="${C.line}"/><rect x="-10" y="-118" width="20" height="20" fill="${C.lantern}"/>
@@ -173,7 +187,7 @@ export function card({
   const qx = footX - qSize / 2;
   const qy = footY - art.box.bottom * qSize;
   // `beside({ footX, footY, k })`: a prop on its own stretch of beach left of the quokka; the text keeps clear of it.
-  const prop = beside?.({ footX, footY, k });
+  const prop = beside?.({ footX, footY, k, qSize });
   const artLeft = Math.min(qx + art.box.left * qSize, prop?.left ?? Infinity);
   const textW = Math.min(artLeft - pad - 36 * k, 660 * k);
   const textTop = 150 * k;
