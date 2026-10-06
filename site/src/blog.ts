@@ -97,7 +97,7 @@ export function railTitle(title: string): string {
   return match ? match[1]! : title;
 }
 
-/** How many other posts a post suggests (its right rail, or "More from rotli" under it). */
+/** How many other posts a post suggests, in "More from rotli" at its end. */
 export const MORE_POSTS = 3;
 
 /**

@@ -16,15 +16,16 @@
 // page's own ground that overlaps the banner's lower left, where the art is kept open, so
 // the title, date, and reading time are read on the ground, never on the picture. Phones
 // get a shorter crop with the panel just below it.
-// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on a post's own
-// page (Base `widePage`, 88rem; /blog/ itself is the standard 76rem): named tracks
-// (--article-tracks: rail, main with the text centred in it, side) shared by the head across them
-// (blog/ArticleCover.astro), a sticky left rail with the short title, the tree, the meter as a
-// percent, Sources, and Share (blog/ArticleRail.astro), the middle with its reading column of
-// about 66 characters (blog/article.css), and from 1360px the right side, more posts and rotli's
-// own spots (blog/ArticleAside.astro), beside the start of the post and scrolling away with it.
-// Under 1360px the right side follows the article; under 901px the tree is the disclosure, the
-// meter a slim bar under the header, and Share follows the article, all on the text's edges.
+// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on the site's one
+// 76rem page, so the post's head has the header's edges: the head (blog/ArticleCover.astro: the
+// words beside the picture on a wide screen), then two columns on named tracks (--article-tracks:
+// the left rail, then the middle with the reading column of about 66 characters centred in it,
+// blog/article.css). The rail has the short title, the tree, the meter as a percent, Sources, and
+// Share, pinned only when it fits the window (blog/ArticleRail.astro). After the article, "More
+// from rotli": more posts and rotli's own spots (blog/ArticleAside.astro), which take the place of
+// the article's own Sources list where the rail shows the sources. Under 901px the tree is the
+// disclosure, the meter a slim bar under the header, the article keeps its Sources list, and
+// Share follows the article, all on the text's edges.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
 import type { TocItem } from '../blog';
@@ -74,7 +75,7 @@ interface Props {
     markdown: string;
     /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
     sources: Source[];
-    /** Other posts and rotli's own spots, beside the post on wide screens and after it below. */
+    /** Other posts and rotli's own spots, after the article ("More from rotli"). */
     more: MorePost[];
     promos: Promo[];
   };
@@ -122,7 +123,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   markdownPath={markdownPath}
   image={image}
   imageAlt={imageAlt}
-  widePage={article !== undefined}
 >
   <SiteHeader current={section} />
   {
@@ -156,7 +156,17 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   <div class:list={{ sheet: hasBanner }}>
   <main
     id="content"
-    class:list={['wrap writing', { center, 'has-progress': progress, 'has-banner': hasBanner, 'is-article': article }]}
+    class:list={[
+      'wrap writing',
+      {
+        center,
+        'has-progress': progress,
+        'has-banner': hasBanner,
+        'is-article': article,
+        // The rail lists the sources, so on a wide screen the article's own list gives way (article.css).
+        'has-rail-sources': article && article.sources.length > 0,
+      },
+    ]}
   >
     {article ? (
       <ArticleCover
@@ -281,8 +291,14 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
       <div class="prose" data-prose>
         <slot />
       </div>
-      {article && <ArticleAside posts={article.more} promos={article.promos} />}
     </div>
+    {
+      article && (
+        <div class="article-after">
+          <ArticleAside posts={article.more} promos={article.promos} />
+        </div>
+      )
+    }
     <slot name="after" />
   </main>
   <SiteFooter />
@@ -591,22 +607,17 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   .read-progress.slim {
     display: none;
   }
-  /* The article's grid (the owner, 2026-10-06: first "for blogs let's use more width", then "now
-     the blog width is too much ... the left and right panels use more width to clear up visual
-     clutter"). The page is a post's own (Base `widePage`, 88rem), and the tracks are named so the
-     cover (blog/ArticleCover.astro) and the body share them exactly:
+  /* The article's grid (the owner, 2026-10-06: "remove the part on right and move blog content
+     more right"). The post is on the site's one 76rem page, the header's width, and the tracks are
+     named so the head (blog/ArticleCover.astro) and the body share them:
        [rail] the left rail · a gap · [main] the middle, holding [text] the reading column centred
-       in it · a gap · [side] the right side, from 1360px.
+       in it, so the column sits in the middle of the room right of the rail.
      The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
-     characters. The rails are the room the page gives beyond that, so they are wide enough for a
-     source's title or a spot's words to wrap on two lines, not five. Rails and gaps are fluid in
-     the page's own width (cqi: main is the container):
-       - 901 to 1359px, two columns: the left rail 10rem at 901px to 16rem by about 1180px, the
-         middle the rest (the column 61 to 66 characters; figures may break out a little);
-       - from 1360px, three: both rails 16.5rem at 1360px to 19.5rem from about 1490px (where the
-         page stops at 88rem), the middle 42rem to 44rem, so the column is 64 to 66 characters.
-     The gaps are 2rem to 2.5rem. Below 901px it is one column (the rail's Share and the right side
-     follow the article, on the text's edges). */
+     characters. The rail and the gap are fluid in the page's own width (cqi: main is the
+     container): the rail 10rem at 901px to 16rem from about 1180px (where it stops), the gap 2rem
+     to 2.5rem. At the full 76rem page the middle is 57.5rem: the column and about 7rem a side,
+     room that figures, tables, and code may break out into. Below 901px it is one column (the
+     rail's Share and "More from rotli" follow the article, on the text's edges). */
   .writing.is-article {
     container-type: inline-size;
     --prose-size: 1.125rem;
@@ -622,15 +633,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
         [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
     }
   }
-  /* Three columns where both rails get at least 16.5rem beside a 64-character column. */
-  @media (min-width: 1360px) {
-    .writing.is-article {
-      --col-left: clamp(16.5rem, 37.5cqi - 13.5rem, 19.5rem);
-      --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
-        [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end] var(--col-gap) [side-start]
-        var(--col-left) [side-end];
-    }
-  }
   .writing-body.has-rail {
     grid-template-columns: var(--article-tracks);
     gap: 0;
@@ -641,8 +643,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   .writing-body.has-rail > .prose {
     grid-column: main;
   }
-  .writing-body.has-rail > :global(.rail),
-  .writing-body.has-rail > :global([data-article-more]) {
+  .writing-body.has-rail > :global(.rail) {
     grid-column: text;
   }
   @media (min-width: 901px) {
@@ -653,16 +654,15 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     .writing-body.has-rail > .prose {
       grid-row: 1;
     }
-    /* Below 1360px the right side follows the article, on the text's edges. */
-    .writing-body.has-rail > :global([data-article-more]) {
-      grid-row: 2;
-    }
   }
-  @media (min-width: 1360px) {
-    .writing-body.has-rail > :global([data-article-more]) {
-      grid-column: side;
-      grid-row: 1;
-    }
+  /* After the article, "More from rotli" on the text's edges, outside the rail's grid: the pinned
+     rail stops at the article's end, so it never reaches this section or the footer. */
+  .article-after {
+    display: grid;
+    grid-template-columns: var(--article-tracks);
+  }
+  .article-after > :global([data-article-more]) {
+    grid-column: text;
   }
   @media (max-width: 900px) {
     .writing.is-article.has-progress {
@@ -689,9 +689,6 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     }
     .writing-body.has-rail > :global(.rail) {
       order: 2;
-    }
-    .writing-body.has-rail > :global([data-article-more]) {
-      order: 3;
     }
   }
   .toc-compact li.sub {

@@ -1,13 +1,13 @@
 ---
-// A blog post's right side (WritingPage `article`; the owner, 2026-10-06: "on right side we can
-// make room for 1. ad spots 2. promoting other blogs"). One block in the article's grid:
-//   - from 1360px wide it is the third column, beside the start of the reading column: "More
-//     posts" (other posts with a thumbnail, title, and date; src/blog.ts `morePosts`) and two
-//     "From rotli" spots (src/promos.ts, rotli's own promotions only). It is never pinned: it
-//     sits at the top of the post and scrolls away with the page, so while reading there is
-//     only the text and the left rail (the owner, 2026-10-06: "I also want the right side to only
-//     show at top, not with the scroll, makes everything more readable");
-//   - below 1360px it follows the article as "More from rotli": the same posts and one spot.
+// The end of a blog post: "More from rotli" (WritingPage `article`). It began as a right-hand
+// column; the owner, 2026-10-06: "remove the part on right ... stuff on right can go at end of
+// blog in replace of sources since sources is already on left side". So it closes the article, on
+// the reading column's edges at every width, in the place the article's own Sources list had on a
+// wide screen (that list now lives in the left rail; article.css):
+//   - "More posts": other posts as small cards, a thumbnail over the title and date (src/blog.ts
+//     `morePosts`), in a row of up to three, side by side on a phone;
+//   - two "From rotli" spots (src/promos.ts, rotli's own promotions only), side by side where
+//     there is room.
 // An announced post fills in only when there are too few published ones; it says "Coming soon"
 // and is not a link (it has no page). Every picture is local; the spots are plain links.
 import type { Thumbnail } from '../../og';
@@ -60,7 +60,7 @@ const poseImage = (pose: Promo['pose']) => {
                       <img
                         src={post.thumbnail.src}
                         srcset={post.thumbnail.srcset}
-                        sizes="8rem"
+                        sizes="(max-width: 560px) 7.5rem, 15rem"
                         width={post.thumbnail.width}
                         height={post.thumbnail.height}
                         alt=""
@@ -135,10 +135,14 @@ const poseImage = (pose: Promo['pose']) => {
 }
 
 <style>
+  /* After the article, on the text's edges (WritingPage places it): a section after a rule. */
   .more {
     display: flex;
     flex-direction: column;
     gap: 1.6rem;
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    padding-top: clamp(1.75rem, 3vw, 2.25rem);
+    border-top: 1px solid var(--border-strong);
     font-size: 0.88rem;
   }
   .more-title {
@@ -156,17 +160,24 @@ const poseImage = (pose: Promo['pose']) => {
   .more-posts ul,
   .promos {
     display: grid;
-    gap: 0.9rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  /* A post: a small picture beside its title and date. */
+  /* Up to three cards in a row (the column holds three at 12rem); one a row on a phone. */
+  .more-posts ul {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+    gap: 1.1rem 1.25rem;
+  }
+  .promos {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 0.9rem 1rem;
+  }
+  /* A post: its picture over its title and date. */
   .post {
     display: grid;
-    grid-template-columns: 5.25rem minmax(0, 1fr);
-    align-items: start;
-    gap: 0.75rem;
+    align-content: start;
+    gap: 0.6rem;
     color: var(--text);
     text-decoration: none;
   }
@@ -204,12 +215,14 @@ const poseImage = (pose: Promo['pose']) => {
     font-weight: 600;
   }
   /* A spot: rotli's own promotion, labelled, on a quiet surface with a hairline: the one boxed
-     thing on the side, so it never reads as the article. */
+     thing in the section, so it never reads as the article. */
   .promo {
     display: grid;
     grid-template-columns: 3.25rem minmax(0, 1fr);
     align-items: start;
     gap: 0.75rem;
+    height: 100%;
+    box-sizing: border-box;
     padding: 0.85rem 0.9rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-frame);
@@ -252,38 +265,12 @@ const poseImage = (pose: Promo['pose']) => {
       min-height: 44px;
     }
   }
-  /* Beside the start of the article, scrolling away with it (never sticky): the section's heading
-     is for screen readers (its parts are labelled). */
-  @media (min-width: 1360px) {
-    .more {
-      align-self: start;
-    }
-    .more-title {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-  }
-  /* Under the article, on the text's edges (WritingPage places it): a section after a rule, the
-     posts and one spot. */
-  @media (max-width: 1359.98px) {
-    .more {
-      margin-top: clamp(3rem, 6vw, 4.5rem);
-      padding-top: clamp(1.75rem, 3vw, 2.25rem);
-      border-top: 1px solid var(--border-strong);
-    }
-    .more-posts ul {
-      grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-      gap: 1.1rem 1.75rem;
-    }
+  /* A phone: a post's picture beside its words, so three posts stay short. */
+  @media (max-width: 560px) {
     .post {
       grid-template-columns: 7.5rem minmax(0, 1fr);
-    }
-    .promos > li + li {
-      display: none;
+      align-items: start;
+      gap: 0.75rem;
     }
   }
   @media (prefers-reduced-motion: reduce) {

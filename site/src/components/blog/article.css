@@ -3,12 +3,11 @@
    scoped styles; every rule is held under .is-article so other pages are untouched. Tokens only.
    Measured in the article specs: about 66 characters a line, every text pair at 4.5:1 or more. */
 
-/* The column: 18px type at every width (--prose-size in WritingPage; it no longer grows on the
-   widest screens, where the page stops at 88rem and the room goes to the rails), generous
-   leading. .prose fills the grid's middle track; the words keep the measure, about 66 characters
-   a line (60 to 80 at every width, 62 to 70 beside both rails, e2e/site/article-width.spec.ts),
-   centred in it, and figures, tables, and code may break out a little into the middle, never
-   into a rail. */
+/* The column: 18px type at every width (--prose-size in WritingPage; it never grows on the widest
+   screens, where the page stops at 76rem), generous leading. .prose fills the grid's middle
+   track; the words keep the measure, about 66 characters a line (60 to 80 at every width, 62 to
+   70 from 1180px, e2e/site/article-width.spec.ts), centred in it, and figures, tables, and code
+   may break out a little into the middle, never into the rail. */
 .writing.is-article .prose {
   font-size: var(--prose-size);
   line-height: 1.72;
@@ -27,9 +26,9 @@
 }
 /* Figures, tables, and code break out of the words, but only where the middle is at least about
    2rem past them on each side (a sliver wider than the text would read as a mistake), and never by
-   more than 5rem a side, so nothing feels over-wide. Beside both rails (from 1360px) the middle is
-   only the column and a little more, so they keep the measure there; with the left rail alone
-   (901 to 1359px), and on a tablet, they may spread. */
+   more than 5rem a side, so nothing feels over-wide. Beside the rail the middle is the column and
+   about 7rem a side at the full page, so they spread there; on a narrow middle they keep the
+   measure. */
 @container article-prose (min-width: 48.5rem) {
   .writing.is-article .prose > :is(.figure, table, pre) {
     max-width: min(100%, var(--measure) + 10rem);
@@ -101,6 +100,17 @@
 
 /* Sources (a "## Sources" list) and footnotes: a smaller, numbered list with hairlines between,
    so a citation reads as a reference, not as more of the argument. */
+/* Where the left rail lists the sources (from 901px, when the post's list parsed:
+   .has-rail-sources), the article's own list gives way to "More from rotli" after it (the owner,
+   2026-10-06: "in replace of sources since sources is already on left side"). Screens only: print
+   keeps the full citations, as do phones and tablets (no rail there) and the Markdown twin. It is
+   the post's last section (src/sources.ts reads it to the next heading), so nothing else hides. */
+@media screen and (min-width: 901px) {
+  .writing.is-article.has-rail-sources .prose h2#sources,
+  .writing.is-article.has-rail-sources .prose h2#sources + ol {
+    display: none;
+  }
+}
 .writing.is-article .prose h2#sources {
   margin-top: 4rem;
   padding-top: 1.6rem;

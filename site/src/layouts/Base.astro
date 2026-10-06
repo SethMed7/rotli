@@ -12,8 +12,6 @@ interface Props {
   structuredData?: Record<string, unknown>[];
   /** The page's Markdown twin, declared for agents (src/agents.ts). */
   markdownPath?: string;
-  /** A blog post's wider page (--page-max-wide); the header and footer keep the standard width. */
-  widePage?: boolean;
 }
 
 const {
@@ -25,7 +23,6 @@ const {
   noindex = false,
   structuredData,
   markdownPath,
-  widePage = false,
 } = Astro.props as Props;
 const siteUrl = Astro.site ?? Astro.url;
 const canonicalUrl = new URL(canonicalPath, siteUrl).href;
@@ -115,14 +112,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-wordmark: 'Baloo 2', var(--font-body);
-        --page-max-standard: 76rem;
-        --page-max: var(--page-max-standard);
-        /* A blog post's page (widePage): 88rem, a little wider than the site's so the post's two
-           side rails have room beside a comfortable reading column (the owner, 2026-10-06: "the
-           blog width is too much ... the left and right panels use more width"). Fixed, so it
-           never grows on a wide screen. Only posts use it; /blog/ and every other page are 76rem,
-           and the header and footer keep the standard width on every page, so nothing shifts. */
-        --page-max-wide: 88rem;
+        /* One page width for every page, blog posts included (the owner, 2026-10-06: a post's
+           head lines up with the header's edges, so the post is on the same 76rem as the rest). */
+        --page-max: 76rem;
         --copy-max: 68ch;
         --ground: #f8f2e9;
         --surface: #fbf6ee;
@@ -444,13 +436,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --step-h2: clamp(2.1rem, 4.2vw, 3.5rem);
         --step-h3: clamp(1.3rem, 1.9vw, 1.55rem);
         --step-lede: clamp(1.1rem, 1.5vw, 1.28rem);
-      }
-      body.page-wide {
-        --page-max: var(--page-max-wide);
-      }
-      body.page-wide .site-header,
-      body.page-wide .site-footer-shell {
-        --page-max: var(--page-max-standard);
       }
       .wrap {
         width: min(100% - 2 * var(--gutter), var(--page-max));
@@ -1144,7 +1129,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
     </style>
   </head>
-  <body class:list={{ 'page-wide': widePage }}>
+  <body>
     <a class="skip-link" href="#content">Skip to content</a>
     <slot />
     <script>

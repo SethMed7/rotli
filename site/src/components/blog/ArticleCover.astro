@@ -1,18 +1,17 @@
 ---
 // The top of a blog post (WritingPage `article`; the owner, 2026-10-06: "the blog page headers, I
-// still needed that cleaned up", then "it has a lot of awkward space, especially where the 'blog/'
-// is"). Calm and on the article's own columns (WritingPage's --article-tracks), so the head lines
-// up with what follows it:
-//   - the post's illustration across the page's full width (the edges of the rails below), in a
-//     rounded frame, short enough that the title is well inside the first window;
-//   - under it one block from the page's left edge, the left rail's edge: "Blog /" small and quiet,
-//     then the title, the summary (at the reading measure), one meta line (the author's mark and
-//     name, the date, the reading time), and the topics as light outlined labels, in one tight
-//     rhythm. Nothing sits alone in the rail's column and nothing is indented into empty space;
+// still needed that cleaned up", then "picture matches header width" and "title beside the
+// picture"). On the site's 76rem page, so its edges are the header's (the logo's and Download's):
+//   - from 1000px, two columns: on the left "Blog /" small and quiet, then the title, the summary,
+//     one meta line (the author's mark and name, the date, the reading time), and the topics as
+//     light outlined labels; on the right the post's illustration, whole (the scene's quokka crop,
+//     src/og.ts `Banner.mobile`, never cropped further, so no ears or feet are cut), rounded, in a
+//     hairline frame. The two are centred on each other, so neither leaves an empty band;
+//   - below 1000px it stacks, as on a phone: the picture across the page (the wide scene, cropped
+//     from the sky and sand; the quokka crop below 700px), then the words;
 //   - a hairline across the page before the article begins.
-// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. Below 901px it
-// is one column on the text's edges: the picture (the phone crop below 700px), then the words. A
-// post without art (`cover` undefined) is the same head without the picture.
+// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. A post without
+// art (`cover` undefined) is the same head without the picture.
 import mark from '../../../../src/assets/characters/_logo.svg?raw';
 import type { Banner } from '../../og';
 
@@ -36,6 +35,12 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     cover && (
       <picture class="cover-art" data-article-art>
         <source
+          media="(min-width: 1000px)"
+          srcset={cover.mobile}
+          width={cover.mobileWidth}
+          height={cover.mobileHeight}
+        />
+        <source
           media="(max-width: 700px)"
           srcset={cover.mobile}
           width={cover.mobileWidth}
@@ -44,7 +49,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
         <img
           src={cover.src}
           srcset={cover.srcset}
-          sizes="(min-width: 1488px) 88rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
+          sizes="calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
           width={cover.width}
           height={cover.height}
           alt={cover.alt}
@@ -95,9 +100,9 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
 </header>
 
 <style>
-  /* On the article's named tracks (WritingPage --article-tracks) at every width: the picture
-     across all of them, the words from the page's left edge from 901px (the left rail's edge) and
-     on the text's edges below that. */
+  /* Stacked (below 1000px), on the article's named tracks (WritingPage --article-tracks): the
+     picture across all of them, the words from the page's left edge from 901px (the left rail's
+     edge) and on the text's edges below that. */
   .cover-head {
     display: grid;
     grid-template-columns: var(--article-tracks);
@@ -129,8 +134,8 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
       margin: -0.7rem 0;
     }
   }
-  /* The picture: the columns' full width, rounded with a hairline, short enough that the title
-     is in the first window; its quokka and props (the scene's right half) stay in view. */
+  /* Stacked, the picture: the page's full width, rounded with a hairline, short enough that the
+     title is in the first window; its quokka and props (the scene's right half) stay in view. */
   .cover-art {
     grid-column: 1 / -1;
     display: block;
@@ -232,6 +237,35 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   @media (min-width: 901px) {
     .head-copy {
       grid-column: 1 / -1;
+    }
+  }
+  /* From 1000px, the words beside the picture: two columns across the page (the header's edges),
+     the words on the left edge and the picture on the right, centred on each other. The words get
+     a little more room than the picture; the picture is whole (the quokka crop at its own shape),
+     so its height follows its width and never cuts the quokka. */
+  @media (min-width: 1000px) {
+    .cover-head {
+      grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+      grid-template-areas: 'copy art';
+      align-items: center;
+      column-gap: clamp(2rem, 4.5vw, 4rem);
+    }
+    .cover-head.no-cover {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'copy';
+    }
+    .head-copy {
+      grid-area: copy;
+    }
+    .cover-art {
+      grid-area: art;
+      margin-bottom: 0;
+    }
+    .cover-art img {
+      height: auto;
+      aspect-ratio: 1300 / 900;
+      object-fit: contain;
+      object-position: 50% 50%;
     }
   }
   /* Narrow screens: the "On this page" disclosure's own rules close the head. */

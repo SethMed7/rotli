@@ -2,9 +2,9 @@
 // /blog/ (the index, after anthropic.com/news: the featured story, the next posts in a
 // row, every post in a dated list with topic filters, and the announced ones apart under
 // "Coming soon"; components/blog/BlogIndex.astro, arranged by src/blog.ts) and
-// /blog/<post>/, an article (WritingPage `article`): the post's scene contained at the
-// page's width with a card for its title, a left rail with the tree, the reading meter,
-// and Share, and its figures (src/figures.ts).
+// /blog/<post>/, an article (WritingPage `article`): the title beside the post's scene on the
+// site's 76rem page, a left rail with the tree, the reading meter, Sources, and Share, its
+// figures (src/figures.ts), and "More from rotli" at its end.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import { arrangeBlog, GUIDE, isNew, morePosts } from '../../blog';
@@ -60,7 +60,7 @@ const announced: UpcomingPost[] = upcoming.map((item) => ({
 }));
 const shortDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
-// Beside a post: the other posts (announced ones only to fill in) and rotli's own spots, which
+// After a post: the other posts (announced ones only to fill in) and rotli's own spots, which
 // rotate through the blog by the post's place in it (src/promos.ts).
 const more: MorePost[] = entry
   ? morePosts(entry, entries, upcoming).map(({ item, soon }) => ({

@@ -77,7 +77,7 @@ export const PROMOS: readonly Promo[] = [
   },
 ];
 
-/** How many spots the wide right rail shows; below it, the article ends with one. */
+/** How many spots a post shows, in "More from rotli" at its end. */
 export const RAIL_PROMOS = 2;
 
 /** The promos this build can honestly offer (no Download without a download, and so on). */

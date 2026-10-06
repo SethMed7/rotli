@@ -201,8 +201,9 @@ export function postThumbnail(slug: string): Thumbnail | undefined {
 /**
  * A post's banner: the same scene composed wide (2400 × 1000, with a 1200-wide copy), its
  * quokka and props in the right half so the article's title panel rises over open sea and
- * sand on the left, and a phone crop (1300 × 900) of the quokka and its props. The article's
- * head (WritingPage `banner`) shows it full width.
+ * sand on the left, and a crop (1300 × 900) of the quokka and its props, whole. A post's head
+ * (blog/ArticleCover.astro) shows the crop beside the title from 1000px and on phones, and the
+ * wide scene across the page between.
  */
 export interface Banner {
   src: string;

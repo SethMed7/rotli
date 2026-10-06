@@ -7,15 +7,22 @@
 //   3. how far through the post the window is: a bar and a percent (src/reading.ts, the same
 //      measure as every meter on the site);
 //   4. Sources: a compact numbered list read from the post's own `## Sources` at build time
-//      (src/sources.ts), publisher and short title linking out in a new tab. The article keeps
-//      the full citations (no script, print, phones); the tree leaves out its "Sources" entry and
-//      the block ends with a link to them, so the rail says "Sources" once;
-//   5. Share, at the rail's foot: links with icons.
-// It stays in view beside the text on wide screens, never taller than the window: when it would
-// be, the sources list gives up height and scrolls inside itself (it keeps at least a few rows),
-// and past that the whole rail scrolls, so nothing is ever cut off. Below 900px only Share
-// remains, after the article: the tree becomes WritingPage's "On this page" disclosure, the meter
-// a slim bar under the header, and the sources are the article's own list.
+//      (src/sources.ts), publisher and short title linking out in a new tab. Every entry is shown
+//      whole: no inner scroll, no fade, no line clamp (the owner, 2026-10-06, of a list cut off
+//      mid-title: "only show the top 4 sources then a load more if more"). With script, the first
+//      four show and a "Show all N sources" button (aria-expanded) opens the rest in place;
+//      without it, all of them show. On a wide screen this is the post's one Sources list (the
+//      article's own gives way to "More from rotli", blog/article.css), so the tree leaves out
+//      its "Sources" entry;
+//   5. Share, at the rail's foot: five links with icons in a two-column grid.
+// The rail is pinned under the header when the whole of it fits the window. When it does not (a
+// short window, or every source open), it moves with the page until its foot is in view (scrolling
+// down) or its head (scrolling up), and holds there (src/railPin.ts), so every part of it is a
+// little scroll away: nothing in it scrolls inside itself, fades, or is cut off. Without script it
+// simply scrolls with the page. It stops at the end of the article (WritingPage puts "More from rotli"
+// after the rail's grid), so it never reaches that section or the footer. Below 901px only Share remains, after
+// the article: the tree becomes WritingPage's "On this page" disclosure, the meter a slim bar
+// under the header, and the sources are the article's own list (full citations, no script).
 //
 // Share is plain links (X, LinkedIn, an email) that carry the page's address and title and load
 // nothing from those sites, plus two buttons that need script and appear only with it: Copy link
@@ -45,6 +52,8 @@ const { title, toc, sources, share } = Astro.props;
 /** The article's own Sources heading, which the rail's block links to (and the tree then skips). */
 const sourcesHeading = sources.length > 0 ? toc.find((item) => item.depth === 2 && /^sources$/i.test(item.text)) : undefined;
 const tree = tocTree(toc.filter((item) => item !== sourcesHeading));
+/** How many sources show before "Show all N sources" (with script; without it, all of them). */
+const FIRST_SOURCES = 4;
 const enc = encodeURIComponent;
 const ICONS = {
   x: '<path class="solid" d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.4l-5.8-7.59-6.64 7.59H.47l8.6-9.83L0 1.15h7.6l5.24 6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3Z"/>',
@@ -115,7 +124,7 @@ const shareLinks = [
     sources.length > 0 && (
       <section class="rail-sources" aria-labelledby="rail-sources-label" data-rail-sources>
         <p class="rail-label" id="rail-sources-label">Sources</p>
-        <ol class="sources">
+        <ol class="sources" id="rail-sources-list">
           {sources.map((source) => (
             <li>
               <span class="source-number" aria-hidden="true">{source.number}</span>
@@ -133,10 +142,20 @@ const shareLinks = [
             </li>
           ))}
         </ol>
-        {sourcesHeading && (
-          <a class="sources-all" href={`#${sourcesHeading.slug}`}>
-            Full citations
-          </a>
+        {sources.length > FIRST_SOURCES && (
+          <button
+            type="button"
+            class="sources-toggle"
+            aria-expanded="false"
+            aria-controls="rail-sources-list"
+            data-sources-toggle
+            data-first={FIRST_SOURCES}
+            data-show-all={`Show all ${sources.length} sources`}
+            data-show-fewer="Show fewer sources"
+            hidden
+          >
+            Show all {sources.length} sources
+          </button>
         )}
       </section>
     )
@@ -176,6 +195,70 @@ const shareLinks = [
 </aside>
 
 <script>
+  import { railBounds, railTop, type RailBounds } from '../../railPin';
+
+  // Pinning (src/railPin.ts): pinned under the header when all of the rail fits the window;
+  // otherwise it moves with the page until its foot (scrolling down) or its head (scrolling up) is
+  // in view, and holds. Measured again when it changes size (Sources, fonts) and when the window
+  // does. Until this runs (and without script) it is not sticky at all: it scrolls with the page.
+  const rail = document.querySelector<HTMLElement>('[data-article-rail]');
+  const headerBar = document.querySelector<HTMLElement>('.site-header-bar');
+  let bounds: RailBounds | null = null;
+  let top = Number.POSITIVE_INFINITY;
+  let lastY = window.scrollY;
+  const place = (next: number) => {
+    top = next;
+    rail?.style.setProperty('--rail-top', `${top.toFixed(2)}px`);
+  };
+  const measure = () => {
+    if (!rail) return;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    bounds = railBounds({
+      headerBottom: headerBar?.offsetHeight ?? 0,
+      viewport: window.innerHeight,
+      height: rail.offsetHeight,
+      margin: 1.5 * rem,
+    });
+    rail.toggleAttribute('data-rail-fits', bounds.fits);
+    place(railTop(top, 0, bounds));
+  };
+  if (rail) {
+    measure();
+    rail.toggleAttribute('data-pinned', true);
+    new ResizeObserver(measure).observe(rail);
+    window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener(
+      'scroll',
+      () => {
+        const y = window.scrollY;
+        if (bounds && !bounds.fits) place(railTop(top, y - lastY, bounds));
+        lastY = y;
+      },
+      { passive: true },
+    );
+  }
+
+  // Sources: the first few, then "Show all N sources" opens the rest in place (and closes them
+  // again), the button staying where it was under the pointer. The list is whole in the HTML;
+  // only script folds it, so without script all show.
+  const sourcesBlock = document.querySelector<HTMLElement>('[data-rail-sources]');
+  const sourcesToggle = document.querySelector<HTMLButtonElement>('[data-sources-toggle]');
+  if (sourcesBlock && sourcesToggle) {
+    const setOpen = (open: boolean) => {
+      sourcesBlock.toggleAttribute('data-folded', !open);
+      sourcesToggle.setAttribute('aria-expanded', String(open));
+      sourcesToggle.textContent = (open ? sourcesToggle.dataset.showFewer : sourcesToggle.dataset.showAll) ?? '';
+    };
+    setOpen(false);
+    sourcesToggle.hidden = false;
+    sourcesToggle.addEventListener('click', () => {
+      const before = sourcesToggle.getBoundingClientRect().top;
+      setOpen(sourcesToggle.getAttribute('aria-expanded') !== 'true');
+      measure();
+      if (bounds) place(railTop(top, sourcesToggle.getBoundingClientRect().top - before, bounds));
+    });
+  }
+
   // Copy link and Copy Markdown: shown only where the clipboard can be written. Markdown is
   // fetched from this site (the post's twin) and handed to the clipboard as a promise where the
   // browser takes one (Safari needs the write to start inside the click), else written once read.
@@ -219,24 +302,21 @@ const shareLinks = [
 </script>
 
 <style>
-  /* In view beside the text, never taller than the window: the blocks keep their height, the
-     sources list gives way and scrolls inside itself, and Share settles at the foot. */
+  /* Beside the text, at its natural height: nothing in it scrolls or clips. Sticky once the
+     script has placed it (data-pinned), at the `top` src/railPin.ts picks: 1.5rem under the header
+     where all of it fits, moving with the page where it does not. */
   .rail {
-    position: sticky;
-    top: calc(var(--pinned) + 1.5rem);
     align-self: start;
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
-    max-height: calc(100dvh - var(--pinned) - 3rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-right: 0.25rem;
     font-size: 0.88rem;
   }
-  .rail > * {
-    flex: none;
+  @media (min-width: 901px) {
+    .rail[data-pinned] {
+      position: sticky;
+      top: var(--rail-top, calc(var(--pinned) + 1.5rem));
+    }
   }
   .rail-title {
     margin: 0;
@@ -313,11 +393,11 @@ const shareLinks = [
     height: 4px;
     border-radius: 2px;
     background: var(--border);
-    overflow: hidden;
   }
   .read-fill {
     display: block;
     height: 100%;
+    border-radius: inherit;
     background: var(--accent);
     transform: scaleX(0);
     transform-origin: left;
@@ -330,53 +410,20 @@ const shareLinks = [
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
-  /* Sources: the one block that gives up height when the window is short. It keeps a floor of a
-     few rows and scrolls inside itself below that. */
-  .rail > .rail-sources {
-    display: flex;
-    flex: 0 1 auto;
-    flex-direction: column;
-    min-height: 10rem;
+  /* Sources: every entry whole, the first four until "Show all" (script folds the rest). */
+  .rail-sources {
     padding-top: 0.9rem;
     border-top: 1px solid var(--border);
   }
   .sources {
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     display: grid;
-    align-content: start;
     gap: 0.55rem;
     margin: 0;
-    padding: 0 0.25rem 0 0;
+    padding: 0;
     list-style: none;
-    scrollbar-width: thin;
-    mask-image: linear-gradient(to bottom, black calc(100% - var(--sources-fade)), transparent);
   }
-  /* While the list scrolls, its last visible line fades out to say there is more; at the end of
-     the list (or when it all fits, and where scroll timelines are unsupported) nothing fades. */
-  @property --sources-fade {
-    syntax: '<length>';
-    inherits: false;
-    initial-value: 0px;
-  }
-  @supports (animation-timeline: scroll()) {
-    .sources {
-      animation-name: sources-fade;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
-      animation-timeline: scroll(self);
-    }
-  }
-  @keyframes sources-fade {
-    from,
-    96% {
-      --sources-fade: 1.75rem;
-    }
-    to {
-      --sources-fade: 0px;
-    }
+  .rail-sources[data-folded] .sources > li:nth-child(n + 5) {
+    display: none;
   }
   .sources li {
     display: grid;
@@ -400,43 +447,54 @@ const shareLinks = [
     color: var(--text-muted);
     font-size: 0.78rem;
   }
-  /* A long title keeps two lines; the link's name is still the whole title. */
   .source-title {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
     font-size: 0.84rem;
+    text-wrap: pretty;
   }
   a.source:hover .source-title {
     color: var(--accent-text);
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
-  .sources-all {
-    align-self: flex-start;
-    flex: none;
-    margin-top: 0.7rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
+  /* "Show all 9 sources": a quiet text button under the list, its hit area taller than its text. */
+  .sources-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    margin: 0.35rem 0 -0.35rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sources-toggle[hidden] {
+    display: none;
+  }
+  .sources-toggle:hover {
+    text-decoration: underline;
     text-underline-offset: 0.2em;
   }
-  .sources-all:hover {
-    color: var(--text);
-  }
   .rail-share {
-    margin-top: auto;
     padding-top: 0.9rem;
     border-top: 1px solid var(--border);
   }
+  /* Five ways in a two-column grid where the rail has the room (one column in the narrowest
+     rail); Copy Markdown, the longest and the last, takes the whole of its row. */
   .rail-share ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.1rem 1.1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 6.5rem), 1fr));
+    gap: 0.15rem 0.75rem;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .rail-share li:last-child {
+    grid-column: 1 / -1;
   }
   .rail-share li[hidden] {
     display: none;
@@ -494,6 +552,7 @@ const shareLinks = [
   @media (pointer: coarse) {
     .rail-share a,
     .rail-share button,
+    .sources-toggle,
     .source {
       min-height: 44px;
     }
@@ -502,9 +561,6 @@ const shareLinks = [
      to the disclosure, the slim bar, and the article's own Sources. */
   @media (max-width: 900px) {
     .rail {
-      position: static;
-      max-height: none;
-      overflow: visible;
       margin-top: 2.5rem;
     }
     .rail-title,
