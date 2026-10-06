@@ -1,8 +1,9 @@
 ---
 // The launch page, in the order of docs/design/landing-layout-2026-10-05.md. The hero (the
-// product film) says what rotli is; three cards say what it does (write, keep, ask); the
-// StatBand and TwoKinds say why the Librarian exists (the AI you already pay for is idle, and
-// it can file your notes without touching your words); the tour shows each part up close and
+// product film) says what rotli is; the StatBand says why it exists, in figures (the AI you
+// already pay for is mostly waiting; the owner, 2026-10-06, moved it up from third); three cards
+// say what it does (write, keep, ask); TwoKinds shows the Librarian filing a note without
+// touching its words; the tour shows each part up close and
 // holds Rotli Web and the Helper; then make it yours, privacy in brief, questions, and one
 // closing panel that asks for a first note, right above the footer's quokka beach. Grounds
 // alternate plain and warm, with the privacy night between. Base.astro owns the tokens and
@@ -29,8 +30,8 @@ import Tour from './landing/Tour.astro';
   <SiteHeader current="product" />
   <main id="content">
     <Hero />
-    <Overview />
     <StatBand />
+    <Overview />
     <TwoKinds />
     <Tour />
     <Experiments />

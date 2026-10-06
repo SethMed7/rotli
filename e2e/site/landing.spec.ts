@@ -1,4 +1,5 @@
-// The landing page: what rotli is and costs and its one "Try now" (where it runs is /download/'s to say), the cardless
+// The landing page: what rotli is, its one "Download free" and the pointer to the privacy promise (where it runs is
+// /download/'s to say), the cardless
 // before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -19,19 +20,46 @@ test("the hero says what rotli is and costs, with one way in, and no platform li
   await expect(lede).toContainText("a free workspace built on plain Markdown files");
   await expect(lede).toContainText("Docs and Sheets (beta)");
   await expect(lede).not.toContainText("Mac");
-  await expect(hero.locator(".hero-cost")).toHaveText("Free. No account. Works offline.");
+  await expect(hero.locator(".hero-cost")).toHaveText("No account. Works offline.");
   // Where rotli runs is the download page's (and the FAQ's) to say (the owner, 2026-10-05).
   await expect(hero).not.toContainText("Windows");
   await expect(page.locator("#start")).not.toContainText("Windows");
-  // One way in, "Try now", to the page that offers the Mac app and Rotli Web; no direct DMG.
+  // One way in, "Download free", to the page that offers the Mac app and Rotli Web; no direct
+  // DMG. The header keeps its shorter "Try now" to the same page.
   const actions = hero.locator(".site-actions a");
   await expect(actions).toHaveCount(1);
-  await expect(actions).toHaveText("Try now");
+  await expect(actions).toHaveText("Download free");
   await expect(actions).toHaveAttribute("href", "/download/");
   await expect(page.locator("main a[href$='.dmg']")).toHaveCount(0);
   const header = page.locator(".site-header .header-download");
   await expect(header).toHaveText("Try now");
   await expect(header).toHaveAttribute("href", "/download/");
+});
+
+test("the hero points to the privacy promise, and the night band points to the same place", async ({
+  page,
+}) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const promise = page.locator(".hero .hero-promise a");
+    await expect(promise).toBeVisible();
+    await expect(promise).toHaveText(/Our privacy promise: you decide what any AI can see or change/);
+    await expect(promise).toHaveAttribute("href", "/privacy/#promise");
+    // Under the button, inside the first window, and a full touch target.
+    const [button, link] = await Promise.all([
+      page.locator(".hero .site-actions a").boundingBox(),
+      promise.boundingBox(),
+    ]);
+    expect(link!.y).toBeGreaterThan(button!.y + button!.height);
+    expect(link!.y + link!.height).toBeLessThanOrEqual(900);
+    expect(link!.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(page.locator("#privacy .privacy-link")).toHaveAttribute("href", "/privacy/#promise");
+  // Following it lands on the promise, under the header.
+  await page.locator(".hero .hero-promise a").click();
+  await expect(page).toHaveURL(/\/privacy\/#promise$/);
+  await expect(page.locator("#promise")).toBeInViewport();
 });
 
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({
@@ -111,6 +139,24 @@ test("the theme studio's steps sit on one row at phone width", async ({ page }) 
   expect(label!.x).toBeLessThan(next!.x);
 });
 
+test("the figures lead the band, each with its population and its source", async ({ page }) => {
+  await page.goto("/");
+  const figures = page.locator("#waiting .figures li");
+  await expect(figures.locator(".value")).toHaveText([/^50\.4%/, /^Half/, /^3\.0/, /^59\.9%/]);
+  await expect(figures.nth(0)).toContainText("paying for ChatGPT");
+  await expect(figures.nth(1)).toContainText("pay for AI");
+  await expect(figures.nth(2)).toContainText("average AI user");
+  await expect(figures.nth(3)).toContainText("of any kind");
+  // Footnotes are per source: Self Financial (1) and Menlo (2).
+  const marks = await figures
+    .locator("sup a")
+    .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+  expect(marks).toEqual(["#fn-1", "#fn-2", "#fn-2", "#fn-1"]);
+  await expect(page.locator("#fn-1")).toContainText("Self Financial");
+  await expect(page.locator("#fn-2")).toContainText("Menlo Ventures");
+  await expect(page.locator("#waiting")).not.toContainText(/wasted/i);
+});
+
 test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".overview .section-lede")).toContainText("Everything starts as a Markdown file");
@@ -167,17 +213,145 @@ test("under reduced motion the page switches to the night at once", async ({ bro
   await context.close();
 });
 
-test("the bench's AI tools are named, and no two names touch at any width", async ({ page }) => {
-  for (const width of [390, 768, 1440]) {
+test("the bench shows each AI tool's own mark and name, readable and apart at every width", async ({
+  page,
+}) => {
+  type Box = { left: number; right: number; top: number; bottom: number; width: number; height: number };
+  const apart = (a: Box, b: Box) =>
+    a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5;
+  for (const width of [320, 390, 768, 1024, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const names = page.locator(".bench-scene .bot-name");
-    await expect(names).toHaveText(["ChatGPT", "Claude", "Gemini", "Grok"]);
-    const boxes = await names.evaluateAll((items) =>
-      items.map((item) => item.getBoundingClientRect().toJSON()),
-    );
-    for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right + 2);
-    const scene = await page.locator(".bench-scene").evaluate((el) => el.getBoundingClientRect().toJSON());
-    for (const box of boxes) expect(box.right).toBeLessThanOrEqual(scene.right);
+    const scene = page.locator(".bench-scene");
+    await scene.scrollIntoViewIfNeeded();
+    // Let the scene play once and rest: the measures are of where everything settles.
+    await expect(scene).toHaveClass(/is-visible/);
+    await scene.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+    await expect(scene).toHaveAttribute("role", "img");
+    await expect(scene).toHaveAttribute("aria-label", /ChatGPT, Claude, Gemini, Perplexity/);
+    const names = scene.locator(".tool .name");
+    await expect(names).toHaveText(["ChatGPT", "Claude", "Gemini", "Perplexity"]);
+    const marks = scene.locator(".tool .mark");
+    await expect(marks).toHaveCount(4);
+    const srcs = await marks.evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src")));
+    expect(srcs).toEqual([
+      "/logos/openai.svg",
+      "/logos/claude.svg",
+      "/logos/googlegemini.svg",
+      "/logos/perplexity.svg",
+    ]);
+    for (const mark of await marks.all()) {
+      await expect(mark).toBeVisible();
+      expect(await mark.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    }
+    const read = (selector: string) =>
+      scene
+        .locator(selector)
+        .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().toJSON() as Box));
+    const [nameBoxes, markBoxes, badgeBoxes, noteBoxes, sceneBox] = await Promise.all([
+      read(".tool .name"),
+      read(".tool .mark"),
+      read(".tool .badge"),
+      read(".tool .note"),
+      scene.evaluate((el) => el.getBoundingClientRect().toJSON() as Box),
+    ]);
+    // Big enough to recognise and to read, at phone width too.
+    for (const box of markBoxes)
+      expect(box.width, `mark at ${width}`).toBeGreaterThanOrEqual(width < 390 ? 26 : 32);
+    const nameSize = await names.first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(nameSize).toBeGreaterThanOrEqual(10.5);
+    const tools = nameBoxes.map((name, i) => ({
+      name,
+      mark: markBoxes[i]!,
+      badge: badgeBoxes[i]!,
+      note: noteBoxes[i]!,
+    }));
+    tools.forEach((tool, i) => {
+      // A name sits inside its badge, under its mark, and never runs past the badge.
+      expect(tool.name.left).toBeGreaterThanOrEqual(tool.badge.left);
+      expect(tool.name.right).toBeLessThanOrEqual(tool.badge.right);
+      expect(tool.name.top).toBeGreaterThanOrEqual(tool.mark.bottom);
+      // Badges never touch another tool's, and a handed note never covers a mark or a name.
+      tools.forEach((other, j) => {
+        expect(apart(tool.note, other.mark), `note ${i} on mark ${j} at ${width}`).toBe(true);
+        expect(apart(tool.note, other.name), `note ${i} on name ${j} at ${width}`).toBe(true);
+        if (i !== j) expect(apart(tool.badge, other.badge), `badges ${i} and ${j} at ${width}`).toBe(true);
+      });
+      // Everything stays inside the page.
+      expect(tool.note.right).toBeLessThanOrEqual(width);
+      expect(tool.badge.left).toBeGreaterThanOrEqual(sceneBox.left);
+    });
+    // The quokka never stands on a badge.
+    const quokka = await scene
+      .locator(".bench-quokka")
+      .evaluate((el) => el.getBoundingClientRect().toJSON() as Box);
+    for (const badge of badgeBoxes) expect(apart(quokka, badge), `quokka on a badge at ${width}`).toBe(true);
+    // Below 900px the figures stack above the scene.
+    if (width < 900) {
+      const figures = await page
+        .locator("#waiting .figures")
+        .evaluate((el) => el.getBoundingClientRect().toJSON() as Box);
+      expect(figures.bottom).toBeLessThanOrEqual(sceneBox.top);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await expect(page.locator("#waiting .marks")).toHaveText("Product names and logos belong to their owners.");
+});
+
+test("without motion the bench rests at once: every tool holds a note and nobody sleeps", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    reducedMotion: "reduce",
+    viewport: { width: 390, height: 844 },
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  const scene = page.locator(".bench-scene");
+  await scene.scrollIntoViewIfNeeded();
+  for (const note of await scene.locator(".note").all()) await expect(note).toHaveCSS("opacity", "1");
+  for (const zz of await scene.locator(".zz").all()) await expect(zz).toHaveCSS("opacity", "0");
+  expect(await scene.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
+  await context.close();
+});
+
+test("the film sits across the hand-off: the warm band begins behind it, with no strip between", async ({
+  browser,
+}) => {
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    const context = await browser.newContext({ reducedMotion, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    // Let the film's arrival finish: it rises once and rests.
+    await page.locator(".hero-film").evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const state = await page.evaluate(() => {
+      const strip = document.querySelector(".below-fold")!;
+      const film = document.querySelector(".hero-film video")!.getBoundingClientRect();
+      const band = document.querySelector("#waiting")!;
+      const bandTop = band.getBoundingClientRect().top;
+      return {
+        // The strip's ground eases from the page's into the band's.
+        image: getComputedStyle(strip).backgroundImage,
+        bandColour: getComputedStyle(band).backgroundColor,
+        stripIsBefore: strip.nextElementSibling === band,
+        gap: bandTop - film.bottom,
+        // Nothing about the film is tied to the scroll.
+        scrollLinked: document
+          .getAnimations()
+          .some((a) => a.timeline && !(a.timeline instanceof DocumentTimeline)),
+      };
+    });
+    expect(state.image).toContain("linear-gradient");
+    expect(state.image).toContain("241, 231, 216");
+    expect(state.bandColour).toBe("rgb(241, 231, 216)");
+    expect(state.stripIsBefore).toBe(true);
+    expect(state.gap).toBeGreaterThanOrEqual(0);
+    expect(state.gap).toBeLessThan(8);
+    expect(state.scrollLinked).toBe(false);
+    if (reducedMotion === "reduce") {
+      const running = await page.locator(".hero-film").evaluate((el) => el.getAnimations().length);
+      expect(running).toBe(0);
+    }
+    await context.close();
   }
 });

@@ -1,63 +1,70 @@
 ---
-// Why the Librarian exists, in two figures from other people's research and one sentence of
-// ours, beside a small scene from the film's island: four AI tools idle on a bench by the sea,
-// two of them asleep, until the quokka arrives with a stack of notes and hands each one something
-// to file. The four read as the products people pay for (the owner, 2026-10-05: "so people know
-// we are talking about gemini/antigravity, chatGPT, claude"): each bot wears its product's
-// signature colour (the --bot-* tokens in Base.astro), a generic cue on its head, and its name
-// underneath. The count of four is the scene's, not a statistic. Nothing traces or copies a
-// product's logo artwork; the names are plain text. It plays once when revealed and rests on
-// everyone busy; reduced motion and no script show that resting state. The figures stay plain
-// text with their footnotes: no card, no chart, no count-up.
+// Why rotli exists, right after the hero (the owner, 2026-10-06), in four figures from other
+// people's research and one sentence of ours, beside a small scene from the film's island: four
+// AI tools idle on a bench by the sea, two of them asleep, until the quokka arrives with a stack
+// of notes and hands each one something to file. Each tool is its product's own mark on a plain
+// badge with its name under it (the owner, 2026-10-06: "actually use company logos"): ChatGPT,
+// Claude, Gemini, and Perplexity, the last because it is one of the ten tools in the Self
+// Financial survey the first figure comes from. The marks are the unmodified files in
+// public/logos/ (their sources and usage notes are public/logos/SOURCES.md), shown as images in
+// the single colour they are published in: never traced, recoloured, rotated, squashed, or
+// drawn over (the idle z's and the handed note sit beside a mark, never on it). The count of four
+// is the scene's, not a statistic. It plays once when revealed and rests on everyone holding a
+// note; reduced motion and no script show that resting state. The figures stay plain text with
+// their footnotes: no card, no chart, no count-up.
 //
-// Each figure is checked against its source (re-fetched 2026-10-05; the post
-// the-ai-you-already-pay-for carries the full audit). Self Financial (March 2026) surveyed 1,272
-// U.S. adults who pay for at least one subscription of any kind, and among its respondents paying
-// for ChatGPT, 50.4% had not used it in the past 30 days. Menlo Ventures / Morning Consult (July
-// 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for AI, 50% use AI daily,
-// so half don't (our arithmetic on Menlo's figure). The earlier "4 tools, about $66 a month"
-// figure (Bango) came out: it is a paying-for-several-tools number from a report whose headline is
-// that the plans are essential, so it is context in the post, not evidence of idle plans.
-// Never call it "wasted".
+// Lead with the figures (the owner, 2026-10-06: "more numbers backed"). Each is checked against
+// its source and keeps its exact population; the post the-ai-you-already-pay-for carries the full
+// audit and is the link under the close. Self Financial (March 2026) surveyed 1,272 U.S. adults
+// who pay for at least one subscription of any kind: among its respondents paying for ChatGPT,
+// 50.4% had not used it in the past 30 days, and 59.9% of all respondents had at least one paid
+// subscription (of any kind, not only AI) going unused each month, 2.6 on average. Menlo Ventures /
+// Morning Consult (July 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for
+// AI, 50% use AI daily, so half don't (our arithmetic on Menlo's figure), and the average AI user
+// uses 3.0 general assistants, up from 2.2 a year earlier. Bango's "4 tools, about $66 a month"
+// stays out: it is a paying-for-several-tools number from a report whose headline is that the
+// plans are essential, so it is context in the post, not evidence of idle plans. Never call any
+// of it "wasted". Footnote numbers are per source, so two figures share each.
 import working from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 
 const figures = [
-  { value: '50.4%', text: 'of paying ChatGPT users hadn’t used it in the past 30 days.', note: 1 },
-  { value: 'Half', text: 'of paying AI users don’t use AI every day.', note: 2 },
+  { value: '50.4%', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
+  { value: 'Half', text: 'of people who pay for AI don’t use it every day.', note: 2 },
+  { value: '3.0', text: 'general AI assistants used by the average AI user, up from 2.2 a year earlier.', note: 2 },
+  { value: '59.9%', text: 'of subscribers had at least one paid subscription, of any kind, unused each month (2.6 on average).', note: 1 },
 ];
 const sources = [
   {
     href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
-    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The figure is among respondents paying for ChatGPT.',
+    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The 50.4% is among respondents paying for ChatGPT; the 59.9% and the 2.6 count subscriptions of any kind, not only AI.',
   },
   {
     href: 'https://menlovc.com/perspective/2026-the-state-of-consumer-ai/',
-    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often.',
+    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often (our arithmetic). The 3.0 is general AI assistants per AI user.',
   },
 ];
-/** The four tools on the bench, left to right; the first and third start asleep. `cue` is the
- * generic shape on each one's head: a speech bubble, an asterisk, a four-point sparkle, and a
- * slanted antenna. */
+/** The four tools on the bench, left to right; the first and third start asleep. `logo` is the
+ * unmodified file in public/logos/. */
 const tools = [
-  { x: 252, id: 'chatgpt', name: 'ChatGPT', asleep: true },
-  { x: 336, id: 'claude', name: 'Claude', asleep: false },
-  { x: 420, id: 'gemini', name: 'Gemini', asleep: true },
-  { x: 504, id: 'grok', name: 'Grok', asleep: false },
+  { id: 'chatgpt', name: 'ChatGPT', logo: '/logos/openai.svg', asleep: true },
+  { id: 'claude', name: 'Claude', logo: '/logos/claude.svg', asleep: false },
+  { id: 'gemini', name: 'Gemini', logo: '/logos/googlegemini.svg', asleep: true },
+  { id: 'perplexity', name: 'Perplexity', logo: '/logos/perplexity.svg', asleep: false },
 ] as const;
 ---
 
-<section class="section stat-band" id="waiting" aria-labelledby="waiting-title">
+<section class="section band-warm stat-band" id="waiting" aria-labelledby="waiting-title">
   <div class="wrap waiting-grid">
     <div class="waiting-copy">
       <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
       <ul class="figures" data-stagger>
         {
-          figures.map((figure) => (
+          figures.map((figure, i) => (
             <li>
               <p class="value">
                 {figure.value}
                 <sup>
-                  <a href={`#fn-${figure.note}`} id={`fnref-${figure.note}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
+                  <a href={`#fn-${figure.note}`} id={`fnref-${i + 1}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
                 </sup>
               </p>
               <p class="text">{figure.text}</p>
@@ -72,91 +79,53 @@ const tools = [
       <p class="study"><a href="/blog/the-ai-you-already-pay-for/">Where these numbers come from <span aria-hidden="true">→</span></a></p>
     </div>
 
-    <div class="bench-scene" data-reveal aria-hidden="true">
-      <svg viewBox="0 0 620 380" role="presentation">
-        <rect class="sea" x="24" y="232" width="572" height="110" rx="40"></rect>
-        <path class="sea-edge" d="M64 232H556"></path>
-        <path class="waves" d="M64 252q9-5 18 0M150 268q9-5 18 0M300 246q9-5 18 0M470 262q9-5 18 0M548 250q9-5 18 0"></path>
-        <path class="sand" d="M0 352C30 330 90 314 200 314S440 330 520 322C580 316 612 334 620 352Z"></path>
-        <path class="sand-edge" d="M0 352C30 330 90 314 200 314S440 330 520 322C580 316 612 334 620 352"></path>
-
-        <g class="bench">
-          <path class="bench-leg" d="M243 276V328M592 276V326"></path>
-          <rect class="bench-seat" x="232" y="262" width="376" height="16" rx="6"></rect>
-        </g>
-
+    <div
+      class="bench-scene"
+      data-reveal
+      role="img"
+      aria-label={`The quokka hands a note to each of four AI tools waiting on a bench: ${tools.map((tool) => tool.name).join(', ')}.`}
+    >
+      <svg class="bench-art" viewBox="0 0 640 400" aria-hidden="true">
+        <rect class="sea" x="16" y="196" width="608" height="132" rx="44"></rect>
+        <path class="sea-edge" d="M60 196H580"></path>
+        <path class="waves" d="M70 222q9-5 18 0M200 300q9-5 18 0M330 214q9-5 18 0M470 306q9-5 18 0M560 226q9-5 18 0"></path>
+        <path class="sand" d="M0 400V356C40 330 110 318 230 320S470 336 540 328C596 322 626 338 640 352V400Z"></path>
+        <path class="sand-edge" d="M0 356C40 330 110 318 230 320S470 336 540 328C596 322 626 338 640 352"></path>
+        <path class="bench-leg" d="M60 270V338M608 270V336"></path>
+        <rect class="bench-seat" x="40" y="256" width="588" height="16" rx="6"></rect>
+      </svg>
+      <img class="bench-quokka" src={working.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+      <ul class="bench-tools">
         {
           tools.map((tool, i) => (
-            <g class:list={['tool', `tool-${i + 1}`, `bot-${tool.id}`, { asleep: tool.asleep }]}>
-              <path class="tool-legs" d={`M${tool.x + 20} 262v22M${tool.x + 44} 262v22`}></path>
-              {tool.id === 'chatgpt' && (
-                <g class="cue">
-                  <path class="cue-stem" d={`M${tool.x + 32} 196v8`}></path>
-                  <path class="cue-bubble" d={`M${tool.x + 22} 178h20a6 6 0 0 1 6 6v6a6 6 0 0 1-6 6h-9l-6 5v-5h-5a6 6 0 0 1-6-6v-6a6 6 0 0 1 6-6Z`}></path>
-                </g>
-              )}
-              {tool.id === 'claude' && (
-                <g class="cue">
-                  <path class="cue-stem" d={`M${tool.x + 32} 194v10`}></path>
-                  <path class="cue-star" d={`M${tool.x + 32} 176v16M${tool.x + 25} 180l14 8M${tool.x + 39} 180l-14 8`}></path>
-                </g>
-              )}
-              {tool.id === 'gemini' && (
-                <g class="cue">
-                  <path class="cue-stem" d={`M${tool.x + 32} 196v8`}></path>
-                  <path class="cue-spark" d={`M${tool.x + 32} 172Q${tool.x + 34} 182 ${tool.x + 44} 184Q${tool.x + 34} 186 ${tool.x + 32} 196Q${tool.x + 30} 186 ${tool.x + 20} 184Q${tool.x + 30} 182 ${tool.x + 32} 172Z`}></path>
-                </g>
-              )}
-              {tool.id === 'grok' && (
-                <g class="cue">
-                  <path class="cue-stem" d={`M${tool.x + 28} 204l12-20`}></path>
-                  <circle class="cue-tip" cx={tool.x + 41} cy="182" r="4.5"></circle>
-                </g>
-              )}
-              <rect class="tool-body" x={tool.x} y="204" width="64" height="60" rx="15"></rect>
-              <g class="face-idle">
-                {tool.asleep ? (
-                  <path class="face-line" d={`M${tool.x + 14} 225q6 5 12 0M${tool.x + 38} 225q6 5 12 0`}></path>
-                ) : (
-                  <>
-                    <circle class="face-ink" cx={tool.x + 20} cy="225" r="4.5"></circle>
-                    <circle class="face-ink" cx={tool.x + 44} cy="225" r="4.5"></circle>
-                  </>
-                )}
-                <path class="face-line" d={`M${tool.x + 25} 241h14`}></path>
-              </g>
-              <g class="face-busy">
-                <circle class="face-ink" cx={tool.x + 20} cy="223" r="4.5"></circle>
-                <circle class="face-ink" cx={tool.x + 44} cy="223" r="4.5"></circle>
-                <path class="face-line" d={`M${tool.x + 24} 236q8 7 16 0`}></path>
-              </g>
-              {tool.asleep && (
-                <text class="zz" x={tool.x + 58} y="196">z<tspan dx="2" dy="-10">z</tspan></text>
-              )}
-              <g class="note">
-                <rect class="note-card" x={tool.x + 10} y="244" width="44" height="28" rx="4"></rect>
-                <path class="note-line" d={`M${tool.x + 17} 253h28M${tool.x + 17} 261h18`}></path>
-              </g>
-            </g>
+            <li class:list={['tool', `tool-${i + 1}`, { asleep: tool.asleep }]}>
+              <span class="badge">
+                <img class="mark" src={tool.logo} width="24" height="24" alt="" loading="lazy" decoding="async" />
+                <span class="name">{tool.name}</span>
+              </span>
+              {tool.asleep && <span class="zz">z<span>z</span></span>}
+              <svg class="note" viewBox="0 0 44 30">
+                <rect class="note-card" x="1.5" y="1.5" width="41" height="27" rx="4"></rect>
+                <path class="note-line" d="M8 11h26M8 19h16"></path>
+              </svg>
+            </li>
           ))
         }
-
-        <image class="quokka" href={working.src} x="6" y="122" width="232" height="232"></image>
-      </svg>
-      <ul class="bot-names">
-        {tools.map((tool, i) => <li class={`bot-name bot-name-${i + 1}`}>{tool.name}</li>)}
       </ul>
     </div>
 
-    <ol class="sources">
-      {
-        sources.map((source, index) => (
-          <li id={`fn-${index + 1}`}>
-            <a href={source.href} target="_blank" rel="noopener noreferrer">{source.text}</a>
-          </li>
-        ))
-      }
-    </ol>
+    <div class="notes">
+      <ol class="sources">
+        {
+          sources.map((source, index) => (
+            <li id={`fn-${index + 1}`}>
+              <a href={source.href} target="_blank" rel="noopener noreferrer">{source.text}</a>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="marks">Product names and logos belong to their owners.</p>
+    </div>
   </div>
 </section>
 
@@ -213,7 +182,7 @@ const tools = [
   .text {
     margin: 0.6rem 0 0;
     color: var(--text);
-    font-size: 1.08rem;
+    font-size: clamp(0.95rem, 0.6rem + 1vw, 1.08rem);
     line-height: 1.45;
   }
   .close {
@@ -241,13 +210,17 @@ const tools = [
     text-decoration: underline;
     text-underline-offset: 0.25em;
   }
-  .sources {
+  /* The sources and the owners' line run under both columns. */
+  .notes {
     grid-column: 1 / -1;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .sources {
     display: grid;
     gap: 0.25rem;
     margin: 0;
-    padding: 1rem 0 0 1.2rem;
-    border-top: 1px solid var(--border);
+    padding: 0 0 0 1.2rem;
     color: var(--text-muted);
     font-size: 0.85rem;
     line-height: 1.5;
@@ -278,13 +251,24 @@ const tools = [
     }
   }
 
-  /* The bench by the sea, in the film's palette with the art's own ink (--ink, so the lines
-     hold when the page passes into the privacy night just below). */
-  .bench-scene svg {
+  .marks {
+    margin: 0.6rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* The bench by the sea, in the film's palette with the art's own ink (--ink). The drawing is
+     one picture at a fixed 640 x 400 ratio; the quokka, the badges, and the notes are laid over
+     it in percentages of that box, so they track it at every width. The scene is a size
+     container, and the badges' type follows its width (cqw). */
+  .bench-scene {
+    position: relative;
+    container-type: inline-size;
+  }
+  .bench-art {
     display: block;
     width: 100%;
     height: auto;
-    overflow: visible;
   }
   .sea {
     fill: var(--sea);
@@ -313,117 +297,73 @@ const tools = [
     stroke: var(--ink);
     stroke-width: 3;
   }
-  .bench-leg,
-  .tool-legs {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 4;
-    stroke-linecap: round;
-  }
   .bench-leg {
+    fill: none;
     stroke: var(--wood-dark);
     stroke-width: 7;
-  }
-  .tool-body {
-    stroke: var(--ink);
-    stroke-width: 3.5;
-  }
-  .bot-chatgpt .tool-body {
-    fill: var(--bot-chatgpt);
-  }
-  .bot-claude .tool-body {
-    fill: var(--bot-claude);
-  }
-  .bot-gemini .tool-body {
-    fill: var(--bot-gemini);
-  }
-  .bot-grok .tool-body {
-    fill: var(--bot-grok);
-  }
-  /* Each bot's cue, drawn in the scene's own line weight. */
-  .cue-stem {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 4;
     stroke-linecap: round;
   }
-  .cue-bubble {
-    fill: var(--capture-ground);
-    stroke: var(--ink);
-    stroke-width: 3;
-    stroke-linejoin: round;
+  /* The quokka stands on the sand at the bench's left end, in front of it. */
+  .bench-quokka {
+    position: absolute;
+    left: 0;
+    bottom: 3%;
+    width: 29%;
+    height: auto;
   }
-  .cue-star {
-    fill: none;
-    stroke: var(--bot-claude);
-    stroke-width: 4.5;
-    stroke-linecap: round;
-  }
-  .cue-spark {
-    fill: var(--bot-gemini-spark);
-    stroke: var(--ink);
-    stroke-width: 2.5;
-    stroke-linejoin: round;
-  }
-  .cue-tip {
-    fill: var(--bot-grok-ink);
-    stroke: var(--ink);
-    stroke-width: 3;
-  }
-  /* On the near-black bot the face is drawn light. */
-  .bot-grok .face-ink {
-    fill: var(--bot-grok-ink);
-  }
-  .bot-grok .face-line {
-    stroke: var(--bot-grok-ink);
-  }
-  /* The names, in plain text under each bot over the sea, in the art's ink (it holds when the
-     page passes into the night just below). Positions are each bot's centre in the 620 × 380
-     drawing, so they track it at every width. */
-  .bench-scene {
-    position: relative;
-  }
-  .bot-names {
+  /* The four badges stand on the seat (its top is y 256 of 400, so 36% from the bottom), right
+     of the quokka's whole picture (its box, not only its outline). Each is the mark over its
+     name on the editor's paper, in the art's ink. */
+  .bench-tools {
+    position: absolute;
+    left: 30.5%;
+    right: 2%;
+    bottom: 36%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2.2cqw;
+    align-items: end;
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  .bot-name {
-    position: absolute;
-    top: calc(299 / 380 * 100%);
-    translate: -50% -50%;
+  .tool {
+    position: relative;
+    min-width: 0;
+  }
+  .badge {
+    display: grid;
+    justify-items: center;
+    gap: 1.4cqw;
+    padding: 2.4cqw 0.8cqw 1.8cqw;
+    border: 2px solid var(--ink);
+    border-radius: 2.4cqw;
+    background: var(--capture-ground);
+  }
+  .mark {
+    display: block;
+    width: 52%;
+    max-width: 52px;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .name {
+    max-width: 100%;
     color: var(--ink);
-    font-size: clamp(0.66rem, 1.1vw, 0.86rem);
+    font-size: clamp(0.66rem, 2.25cqw, 0.92rem);
     font-weight: 600;
-    line-height: 1;
+    line-height: 1.1;
     white-space: nowrap;
   }
-  .bot-name-1 {
-    left: calc(284 / 620 * 100%);
-  }
-  .bot-name-2 {
-    left: calc(368 / 620 * 100%);
-  }
-  .bot-name-3 {
-    left: calc(452 / 620 * 100%);
-  }
-  .bot-name-4 {
-    left: calc(536 / 620 * 100%);
-  }
-  .face-ink {
-    fill: var(--ink);
-  }
-  .face-line {
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 3.5;
-    stroke-linecap: round;
-  }
-  .zz {
-    fill: var(--text-muted);
-    font-family: var(--font-body);
-    font-size: 17px;
-    font-weight: 600;
+  /* The note each tool is handed, tucked against its badge's top right corner, off the mark. */
+  .note {
+    position: absolute;
+    top: -19%;
+    right: -8%;
+    width: 36%;
+    height: auto;
+    rotate: 8deg;
+    overflow: visible;
   }
   .note-card {
     fill: var(--capture-ground);
@@ -435,74 +375,75 @@ const tools = [
     stroke-width: 3;
     stroke-linecap: round;
   }
-  /* At rest every tool is busy: idle faces and the z's are gone, each holds a note. */
-  .face-idle,
+  /* The idle tools' z's, above a badge's top left, never on the mark. */
+  .zz {
+    position: absolute;
+    top: -2.2em;
+    left: 6%;
+    color: var(--text-muted);
+    font-size: clamp(0.7rem, 2.4cqw, 1rem);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .zz span {
+    position: relative;
+    top: -0.55em;
+    margin-left: 0.15em;
+  }
+  /* At rest every tool holds a note and nobody is asleep. */
   .zz {
     opacity: 0;
   }
   .tool,
   .note,
-  .quokka {
-    transform-box: fill-box;
+  .bench-quokka {
     transform-origin: 50% 100%;
   }
 
   /* Once, when the scene comes into view: the quokka hops in with its stack, hands a note to
-     each tool in turn (they wake as theirs lands), and everyone settles in to file. */
+     each tool in turn (the sleepers wake as theirs lands), and each badge gives a small hop.
+     Only translation moves a badge: a mark is never scaled, squashed, or turned. */
   @media (prefers-reduced-motion: no-preference) {
-    /* Before it is revealed: idle, two asleep, no notes yet. */
-    :global(.js) .bench-scene .face-idle,
     :global(.js) .bench-scene .zz {
       opacity: 1;
     }
-    :global(.js) .bench-scene .face-busy,
     :global(.js) .bench-scene .note {
       opacity: 0;
     }
-    :global(.js) .bench-scene:global(.is-visible) .face-idle,
     :global(.js) .bench-scene:global(.is-visible) .zz {
       opacity: 0;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .face-busy,
-    :global(.js) .bench-scene:global(.is-visible) .note {
-      opacity: 1;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .quokka {
-      animation: hop-in 900ms cubic-bezier(0.34, 1.4, 0.64, 1) 150ms backwards;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .note {
-      animation: note-fly 720ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
-    }
-    :global(.js) .bench-scene:global(.is-visible) .face-idle,
-    :global(.js) .bench-scene:global(.is-visible) .zz {
       animation: hold-then-go 1ms linear backwards;
     }
-    :global(.js) .bench-scene:global(.is-visible) .face-busy {
-      animation: wake 1ms linear backwards;
+    :global(.js) .bench-scene:global(.is-visible) .note {
+      opacity: 1;
+      animation: note-fly 720ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .bench-quokka {
+      animation: hop-in 900ms cubic-bezier(0.34, 1.4, 0.64, 1) 150ms backwards;
     }
     :global(.js) .bench-scene:global(.is-visible) .tool {
       animation: perk 520ms cubic-bezier(0.34, 1.6, 0.64, 1) backwards;
     }
     .tool-1 {
-      --from: -150px;
+      --from: -26cqw;
       --at: 1000ms;
     }
     .tool-2 {
-      --from: -234px;
+      --from: -44cqw;
       --at: 1350ms;
     }
     .tool-3 {
-      --from: -318px;
+      --from: -62cqw;
       --at: 1700ms;
     }
     .tool-4 {
-      --from: -402px;
+      --from: -80cqw;
       --at: 2050ms;
     }
     :global(.js) .bench-scene:global(.is-visible) .note {
       animation-delay: var(--at);
     }
-    :global(.js) .bench-scene:global(.is-visible) :is(.face-idle, .zz, .face-busy) {
+    :global(.js) .bench-scene:global(.is-visible) .zz {
       animation-delay: calc(var(--at) + 620ms);
     }
     :global(.js) .bench-scene:global(.is-visible) .tool {
@@ -511,30 +452,30 @@ const tools = [
   }
   @keyframes hop-in {
     0% {
-      transform: translateX(-90px) translateY(0);
+      transform: translateX(-24%) translateY(0);
       opacity: 0;
     }
     35% {
-      transform: translateX(-50px) translateY(-26px);
+      transform: translateX(-13%) translateY(-11%);
       opacity: 1;
     }
     60% {
-      transform: translateX(-16px) translateY(0) scale(1.04, 0.96);
+      transform: translateX(-4%) translateY(0) scale(1.04, 0.96);
     }
     80% {
-      transform: translateX(0) translateY(-10px);
+      transform: translateX(0) translateY(-4%);
     }
   }
   @keyframes note-fly {
     0% {
-      transform: translate(var(--from), -26px) rotate(-18deg) scale(0.8);
+      transform: translate(var(--from), 6cqw) rotate(-26deg) scale(0.8);
       opacity: 0;
     }
     12% {
       opacity: 1;
     }
     55% {
-      transform: translate(calc(var(--from) * 0.45), -92px) rotate(-6deg);
+      transform: translate(calc(var(--from) * 0.45), -10cqw) rotate(-12deg);
     }
   }
   @keyframes hold-then-go {
@@ -542,17 +483,32 @@ const tools = [
       opacity: 1;
     }
   }
-  @keyframes wake {
-    from {
-      opacity: 0;
-    }
-  }
   @keyframes perk {
     0% {
       transform: none;
     }
     40% {
-      transform: translateY(-12px) scale(0.96, 1.05);
+      transform: translateY(-1.6cqw);
+    }
+  }
+  /* A narrow scene gives the badges the whole seat: the quokka steps down in front of the
+     bench's legs, below the seat line, so it never sits on a badge or a name. */
+  @container (max-width: 520px) {
+    .bench-tools {
+      left: 3%;
+      right: 3%;
+      gap: 2.6cqw;
+    }
+    .bench-quokka {
+      left: 1%;
+      bottom: 0;
+      width: 20%;
+    }
+    .name {
+      font-size: clamp(0.66rem, 3.3cqw, 0.92rem);
+    }
+    .mark {
+      width: 58%;
     }
   }
   @media (max-width: 900px) {
@@ -563,7 +519,8 @@ const tools = [
       max-width: 34rem;
     }
   }
-  @media (max-width: 480px) {
+  /* Two figures a row down to a small phone, so the four stay one short block above the scene. */
+  @media (max-width: 359px) {
     .figures {
       grid-template-columns: 1fr;
     }
