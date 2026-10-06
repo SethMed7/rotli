@@ -519,7 +519,8 @@ whose art never touches its words from 320 to 1920.
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)
   draws itself under "the filing." Besides the film, the landing page shows
   captures in two places: the theme studio, and the tour's previews
-  (`public/shots/render-note`, `chat`, `board`). `public/rotli-app-warm-light@3x.png` (the social
+  (`public/shots/render-note`, `board`; the tour draws the `chat` capture's
+  answer instead, because its text falls to about 10px there). `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
