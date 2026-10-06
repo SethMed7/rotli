@@ -197,13 +197,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rest in a grid; posts that are coming soon are labelled on their picture. A
   post shows the same picture at the top, and its link preview uses the same
   scene.
-- **Blog posts and the privacy page open on a full-width banner.** The
-  post's scene, or the privacy page's night, fills most of the first screen
-  under the header, and the page rises over it as you scroll, with the title,
-  date, and reading time on a panel at the bottom left so they're always easy
-  to read. Phones get a shorter picture with the title just below it. The
-  banner settles slightly as you scroll and stays still if you've asked for
-  reduced motion.
+- **The privacy page opens on a full-width banner.** The night fills most of
+  the first screen under the header, and the page rises over it as you
+  scroll, with the title, date, and reading time on a panel at the bottom
+  left so they're always easy to read.
 - **The blog's pictures are redrawn.** The quokka is larger and crisper, at
   the same size in every picture, and what it holds (a notepad, a shield, a
   laptop, a folder of notes, a drawing board) is drawn like the things around
