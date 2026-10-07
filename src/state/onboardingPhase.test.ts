@@ -6,6 +6,7 @@ test("a saved phase resumes where it was; the old Models screen resumes at the L
   expect(onboardingPhaseOf("vault")).toBe("vault");
   expect(onboardingPhaseOf("librarian")).toBe("librarian");
   expect(onboardingPhaseOf("shortcuts")).toBe("shortcuts");
+  expect(onboardingPhaseOf("skipped")).toBe("skipped");
   expect(onboardingPhaseOf("models")).toBe("librarian");
   expect(onboardingPhaseOf("sound")).toBe("preferences");
   expect(onboardingPhaseOf(undefined)).toBe("preferences");

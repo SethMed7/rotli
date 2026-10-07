@@ -7,6 +7,7 @@ import { NameFieldDialog } from "./nameFieldDialog";
 
 const COPY: Record<NameFirstKind, { title: string; field: string; create: string; noun: string }> = {
   board: { title: "Name Excalidraw board", field: "Board name", create: "Create board", noun: "board" },
+  canvas: { title: "Name canvas", field: "Canvas name", create: "Create canvas", noun: "canvas" },
   document: { title: "Name document", field: "Document name", create: "Create document", noun: "document" },
 };
 

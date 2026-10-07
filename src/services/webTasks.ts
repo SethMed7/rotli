@@ -6,26 +6,34 @@
 
 import { checkOff, joinedTaskText, openTasksInBody } from "../lib/taskLines";
 import type { TaskItem } from "../lib/tauri";
+import type { Note, NoteSummary } from "../types";
 import { isChatsPath, isSink } from "./destinations";
 import { notesService } from "./notes";
 
 const STALE = "This task changed since the list was made — it refreshes on its own.";
 
-export async function listWebTasks(): Promise<TaskItem[]> {
+/** Every live Markdown note with its body — never Archive, Trash, or a chat
+ * transcript. The walk the web twins of the Tasks and Links projections share. */
+export async function liveWebNotes(): Promise<{ summary: NoteSummary; note: Note }[]> {
   const summaries = await notesService.listAll();
   const live = summaries.filter(
     (note) => (note.kind ?? "note") === "note" && !isSink(note.folderId) && !isChatsPath(note.folderId),
   );
   const notes = await Promise.all(live.map((summary) => notesService.getNote(summary.id)));
-  return notes.flatMap((note) =>
-    note === null
-      ? []
-      : openTasksInBody(note.body).map((task) => ({
-          noteId: note.id,
-          noteTitle: note.title,
-          line: task.line,
-          text: task.text,
-        })),
+  return live.flatMap((summary, at) => {
+    const note = notes[at];
+    return note ? [{ summary, note }] : [];
+  });
+}
+
+export async function listWebTasks(): Promise<TaskItem[]> {
+  return (await liveWebNotes()).flatMap(({ note }) =>
+    openTasksInBody(note.body).map((task) => ({
+      noteId: note.id,
+      noteTitle: note.title,
+      line: task.line,
+      text: task.text,
+    })),
   );
 }
 

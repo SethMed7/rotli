@@ -21,6 +21,7 @@ import {
   type DropPos,
 } from "../services/mainTree";
 import { useMainStore } from "../state/main";
+import { canvasDropAt } from "./canvasDrop";
 import { createDragGhost } from "./dragGhost";
 import { createPointerDragSession } from "./pointerDrag";
 
@@ -71,7 +72,11 @@ export function startMainAddDrag(
 ): void {
   const ids = opts?.ids && opts.ids.length > 1 && opts.ids.includes(id) ? opts.ids : [id];
   const ghostLabel = ids.length > 1 ? `${ids.length} items` : label;
-  let drop: { kind: "main"; id: string; pos: DropPos } | { kind: "trash" } | null = null;
+  let drop:
+    | { kind: "main"; id: string; pos: DropPos }
+    | { kind: "trash" }
+    | { kind: "canvas"; drop: (noteIds: readonly string[]) => void }
+    | null = null;
   let hovered: HTMLElement | null = null;
 
   const clearHover = () => {
@@ -87,8 +92,10 @@ export function startMainAddDrag(
             '[data-system-trash-drop="1"]',
           ) as HTMLElement | null)
         : null;
-      const at = opts?.allowMain === false ? null : mainDropAt(x, y);
-      const nextHovered = trash ?? at?.el ?? null;
+      // an open canvas takes the notes as cards where they land
+      const canvas = trash ? null : canvasDropAt(x, y);
+      const at = canvas || opts?.allowMain === false ? null : mainDropAt(x, y);
+      const nextHovered = trash ?? canvas?.el ?? at?.el ?? null;
       if (hovered !== nextHovered) {
         clearHover();
         hovered = nextHovered;
@@ -96,6 +103,10 @@ export function startMainAddDrag(
       }
       if (trash) {
         drop = { kind: "trash" };
+        return;
+      }
+      if (canvas) {
+        drop = { kind: "canvas", drop: canvas.drop };
         return;
       }
       if (!at) {
@@ -106,6 +117,7 @@ export function startMainAddDrag(
     },
     onDrop: () => {
       if (drop?.kind === "trash") opts?.onTrash?.();
+      else if (drop?.kind === "canvas") drop.drop(ids);
       else if (drop?.kind === "main") {
         for (const each of dropOrder(ids, drop.id, drop.pos)) commitMainAdd(each, drop);
       }

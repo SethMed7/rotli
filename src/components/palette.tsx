@@ -21,17 +21,10 @@ import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary, SearchHit } from "../types";
 import { QuokkaMark } from "./character";
-import {
-  glyphForNote,
-  ChatGlyph,
-  FocusGlyph,
-  KeyboardGlyph,
-  PlusGlyph,
-  SplitGlyph,
-  SunGlyph,
-} from "./glyphs";
+import { ChatGlyph, FocusGlyph, KeyboardGlyph, PlusGlyph, SplitGlyph, SunGlyph } from "./glyphs";
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
+import { glyphForNote } from "./noteGlyph";
 import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
 
 function actionIcon(id: string): ReactNode {
@@ -254,8 +247,10 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     // a PDF/xlsx in Storage should be reachable by typing its name. The full
     // index carries them; openSummary already routes kind "file" to its viewer.
     const fileRows: Row[] = [];
+    // a canvas is searchable like a board, so it may already be listed above
+    const listed = new Set(noteRows.map((row) => row.key));
     for (const n of noteIndex.values()) {
-      if (n.kind !== "file" || !subsequenceMatch(q, n.title)) continue;
+      if (n.kind !== "file" || listed.has(`note:${n.id}`) || !subsequenceMatch(q, n.title)) continue;
       fileRows.push(noteRow(n));
     }
     // Chats by TITLE (audit F3) — "everything has a chat", so a chat must at

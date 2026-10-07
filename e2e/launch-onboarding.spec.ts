@@ -380,13 +380,20 @@ test("checkboxes and list markers align with the H1 in every environment and a n
 });
 
 // Skip (the owner, 2026-10-05): "we can offer a skip; the only required thing
-// is a vault". From the first screen it goes to the vault and, once a folder
-// is picked, straight into the app; later screens skip the rest.
-test("Skip setup asks only for a folder, then opens the app", async ({ page }) => {
+// is a vault"; 2026-10-06: Skip goes straight to the app, and with no vault yet
+// a prompt asks for one — never a screen that looks like setup's next step.
+test("Skip setup opens the app to one prompt for a folder, then the app", async ({ page }) => {
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Skip setup" }).click();
-  await expect(page.getByText("One thing before you start")).toBeVisible();
-  await page.getByRole("button", { name: "Choose a folder" }).click();
+  const prompt = page.getByRole("dialog", { name: "Rotli needs a folder for your notes" });
+  await expect(prompt).toBeVisible();
+  // not a setup step: no step count, no Back, one action
+  await expect(page.locator(".setup-progress")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Back/ })).toHaveCount(0);
+  await expect(prompt.getByRole("button")).toHaveCount(1);
+  // the prompt takes focus, so the keyboard and VoiceOver land on its action
+  await expect(prompt.getByRole("button", { name: /Choose a folder/ })).toBeFocused();
+  await prompt.getByRole("button", { name: /Choose a folder/ }).click();
   // no Librarian or shortcuts screen: the thank-you card and the app follow
   await expect(page.getByText("3 of 4")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Thank you for trying Rotli" })).toBeVisible();

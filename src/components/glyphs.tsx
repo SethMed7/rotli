@@ -4,15 +4,12 @@
 
 import type { ReactNode } from "react";
 
-import { DOCUMENT_EXTS, WORD_EXTS } from "../documents/kinds";
-import { IMAGE_EXTS, extOf } from "../lib/fileKind";
-
-interface GlyphProps {
+export interface GlyphProps {
   size?: number | undefined;
   className?: string | undefined;
 }
 
-function Glyph({ size = 15, className, children }: GlyphProps & { children: ReactNode }) {
+export function Glyph({ size = 15, className, children }: GlyphProps & { children: ReactNode }) {
   return (
     <svg
       className={className}
@@ -332,28 +329,6 @@ export function CoffeeGlyph(props: GlyphProps) {
       <path d="M7 2.5c-1 1-.8 2 .2 3M11 2.5c-1 1-.8 2 .2 3M4 21h15" />
     </Glyph>
   );
-}
-
-/** The row glyph for a note/board/file, by kind + filename extension: the REAL
- * format mark for files (svg/pdf/raster image) and the Excalidraw logo for
- * canvases; notes and unknown files stay the generic document. */
-export function glyphForNote(
-  note: {
-    kind?: "note" | "board" | "file" | undefined;
-    title?: string | undefined;
-  },
-  props?: GlyphProps,
-): ReactNode {
-  if (note.kind === "board") return <ExcalidrawGlyph {...props} />;
-  if (note.kind === "file") {
-    const ext = extOf(note.title ?? "");
-    if (ext === "svg") return <SvgFormatGlyph {...props} />;
-    if (ext === "pdf") return <PdfGlyph {...props} />;
-    if (WORD_EXTS.has(ext)) return <WordGlyph {...props} />;
-    if (DOCUMENT_EXTS.has(ext)) return <DocumentGlyph {...props} />;
-    if (IMAGE_EXTS.has(ext)) return <ImageGlyph {...props} />;
-  }
-  return <FileGlyph {...props} />;
 }
 
 /** A padlock — closed (locked) or open (the shackle lifted = unlocked). */

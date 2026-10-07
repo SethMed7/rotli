@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A graph of your notes.** Search "Graph" in ⌘K to see every note as a
+  dot and every `[[link]]` you wrote as a line, or right-click a note and
+  choose **Show in graph** for the notes around it, one or two steps out.
+  Hovering a note fades everything it isn't linked to, searching highlights
+  without moving anything, and the arrow keys and Enter reach every note.
+  Related notes the Librarian found draw as dashed lines, on by default;
+  **Librarian links** hides them, and Rotli remembers. A secure note shows
+  its title and never its text. Nothing is written into your notes.
 - **Ask AI from the note.** Type `/ai` (or `/ask`), say what you want ("a bar
   chart of these hours", "three sources on this", "a closing paragraph"), and
   the Librarian's model writes it for that spot. You read the answer first;
@@ -62,8 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pick the Markdown folder you already use and Rotli works in it as it is.
   Rotli's own folder browser is gone.
 - **Setup can be skipped; only a folder is needed.** Skip setup on the first
-  screen asks for a folder and opens the app. After the folder, Skip the rest
-  finishes setup with what you chose so far.
+  screen goes straight to the app. With a vault already chosen it simply
+  opens; without one, the app asks for a folder in one small prompt, the only
+  part of setup that can't be skipped, and asks again the same way if you
+  quit first. After the folder, Skip the rest finishes setup with what you
+  chose so far.
 - **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
   are still being finished, so the New chooser, the New… menu, Settings, the
   slash menu, and an open document or sheet say Beta.
@@ -269,6 +280,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A vault opens on your freshest note.** When the newest file in a vault
+  was an Excalidraw board, Rotli opened the board as a broken, empty note tab
+  on start. It now opens the most recent note.
+- **The window no longer scrolls sideways.** The hover labels on the theme
+  button and on a tab strip's **+** reached past the right edge of the window,
+  so picking something from ⌘K could slide the whole app 50 px to the left.
+  Both labels now open toward the window.
 - **Rotli Web says plainly that chat images need the Mac app.** Choosing a
   photo, or pasting one, used to attach it and then fail on send. Images in
   a chat written on the Mac now show when you open it on the web, instead of

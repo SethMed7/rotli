@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
+import type { NoteLinks } from "../graph/model";
 import type {
   BrevePdfPalette,
   BreveConfig,
@@ -988,6 +989,14 @@ export async function fileAssetUrl(id: string): Promise<string> {
   return abs ? convertFileSrc(abs) : "";
 }
 
+/** Create an empty JSON Canvas named `name` beside the notes in `folderId`
+ * (a folder that can't hold notes lands it where a new note would). Rotli
+ * Web's twin is services/folderCanvases.ts. */
+export async function corpusCreateCanvas(folderId: string, name: string): Promise<string> {
+  if (!isTauri()) throw new Error("no Mac corpus to create a canvas in");
+  return invoke<string>("corpus_create_canvas", { folderId, name });
+}
+
 /** Read a surfaced FILE's text content (for the in-app text viewer). Capped on
  * the Rust side. "" outside Tauri. */
 export async function corpusFileText(id: string, maxBytes?: number): Promise<string> {
@@ -1369,6 +1378,12 @@ export interface TaskItem {
 export async function corpusTasks(): Promise<TaskItem[]> {
   if (!isTauri()) return [];
   return invoke<TaskItem[]>("corpus_tasks");
+}
+
+/** Every live note's raw outgoing wikilinks — the Graph view's projection. */
+export async function corpusLinks(): Promise<NoteLinks[]> {
+  if (!isTauri()) return [];
+  return invoke<NoteLinks[]>("corpus_links_list");
 }
 
 /** Check one task off — Rust re-validates the exact text before flipping. */

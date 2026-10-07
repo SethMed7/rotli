@@ -25,6 +25,14 @@ export function isSecureBrainFolder(folderId: string): boolean {
   return folderId === SECURE_BRAIN_FOLDER || folderId.startsWith(`${SECURE_BRAIN_FOLDER}/`);
 }
 
+/** Filed in a secure folder by either of its folders (the shelf it shows on,
+ * or the folder it sits in on disk) — secure whatever its frontmatter says. */
+export function inSecureFolder(note: { folderId: string; diskFolderId?: string | undefined }): boolean {
+  return [note.folderId, note.diskFolderId ?? note.folderId].some(
+    (folder) => isSecureNotesFolder(folder) || isSecureBrainFolder(folder),
+  );
+}
+
 export function creationIsSecure(folderId: string, policy?: NoteCreationPolicy): boolean {
   return policy?.secure === true || isSecureNotesFolder(folderId);
 }

@@ -37,6 +37,7 @@ import { copyFilePath } from "../services/notePathCopy";
 import { notesService } from "../services/notes";
 import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { openGraph } from "../state/graph";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
@@ -186,7 +187,7 @@ export function useNoteMenu() {
         }
 
         const isNote = !isFile && !isBoard;
-        const sinkLane = activeItemSinkLane(note.kind);
+        const sinkLane = activeItemSinkLane(note);
         const inMain = mainHasNote(manifest.tree, note.id);
         const currentView = assignedView(viewsManifest, note.id);
         const starred = quickIds.includes(note.id);
@@ -262,6 +263,13 @@ export function useNoteMenu() {
               useUiStore.getState().setRowActionError(null);
               void openChatForNote(note, { create: true }).catch(chatError);
             },
+          });
+        }
+        if ((note.kind ?? "note") === "note" && !isSink(note.folderId)) {
+          items.push({
+            kind: "action" as const,
+            label: "Show in graph",
+            onClick: () => openGraph({ kind: "around", noteId: note.id, depth: 1 }),
           });
         }
         items.push({

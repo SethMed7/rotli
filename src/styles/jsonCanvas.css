@@ -1,0 +1,305 @@
+/* The Canvas editor (spike, 2026-10-05). Flat: one-pixel borders and surface
+   contrast, no shadow or glow. Cards are content; chrome appears only around
+   what the pointer or keyboard is on. */
+
+.jc-host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.jc-banner {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.jc-plane {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ground);
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+  /* a drag across cards moves, pans, or connects; it never selects text */
+  user-select: none;
+}
+/* a note dragged from the sidebar is over this canvas */
+.jc-plane.main-dropover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
+.jc-plane:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.jc-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.jc-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.jc-edge path {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+.jc-edge.is-near path {
+  stroke: var(--accent);
+}
+.jc-arrowhead {
+  fill: var(--border-strong);
+}
+.jc-edge-draft {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+/* a line's handle sits at its middle: its name when it has one, otherwise a
+   dot that shows only on hover, keyboard focus, or selection */
+.jc-edge-handle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 12px;
+  min-height: 12px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--ground);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.jc-edge-handle:not(.has-label) {
+  padding: 0;
+  width: 12px;
+  height: 12px;
+  border-color: var(--border-strong);
+  opacity: 0;
+  transition: opacity var(--motion-enter, 120ms) var(--motion-ease, ease);
+}
+.jc-edge-handle:hover,
+.jc-edge-handle:focus-visible,
+.jc-edge-handle.is-selected {
+  opacity: 1;
+  border-color: var(--accent);
+  outline: none;
+}
+.jc-edge-handle.is-editing {
+  padding: 0;
+  opacity: 1;
+}
+/* the one-line field a group or a line is named in */
+.jc-label-edit {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  min-width: 120px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-control);
+  outline: none;
+  user-select: text;
+}
+.jc-card {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  cursor: default;
+}
+.jc-card:focus-visible,
+.jc-card.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* a coloured card: its colour on the edge and a faint wash, never on the
+   text. Presets 1–6 are theme tokens; another app's hex arrives as
+   --card-colour from the card itself (canvasCard.tsx validates it). */
+.jc-card[data-colour="1"] { --card-colour: var(--canvas-1); }
+.jc-card[data-colour="2"] { --card-colour: var(--canvas-2); }
+.jc-card[data-colour="3"] { --card-colour: var(--canvas-3); }
+.jc-card[data-colour="4"] { --card-colour: var(--canvas-4); }
+.jc-card[data-colour="5"] { --card-colour: var(--canvas-5); }
+.jc-card[data-colour="6"] { --card-colour: var(--canvas-6); }
+.jc-card.has-color {
+  border-color: var(--card-colour, var(--border-strong));
+  background: color-mix(in srgb, var(--card-colour, var(--surface)) 9%, var(--surface));
+}
+.jc-group.has-color {
+  background: color-mix(in srgb, var(--card-colour, transparent) 5%, transparent);
+}
+.jc-group {
+  background: transparent;
+  border-color: var(--border-strong);
+}
+.jc-group-label {
+  position: absolute;
+  min-width: 24px;
+  min-height: 16px;
+  cursor: text;
+  left: 0;
+  bottom: 100%;
+  padding-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.jc-unknown {
+  border-style: dashed;
+}
+.jc-body {
+  height: 100%;
+  overflow: hidden;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+/* the card is the frame: the peek's own page padding and size step aside */
+.jc-body .pv-note.jc-md {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.jc-md h1,
+.jc-md h2,
+.jc-md h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.jc-md p {
+  margin: 0 0 6px;
+}
+.jc-note-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jc-quiet {
+  margin: 0;
+  color: var(--text-muted);
+}
+.jc-text-edit {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-card);
+  resize: none;
+  outline: none;
+  user-select: text;
+}
+/* connect dots and the resize corner: only where attention already is */
+.jc-dot,
+.jc-resize {
+  position: absolute;
+  opacity: 0;
+  transition: opacity var(--motion-enter, 120ms) var(--motion-ease, ease);
+}
+.jc-dot {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  cursor: crosshair;
+}
+.jc-dot-top {
+  left: 50%;
+  top: 0;
+}
+.jc-dot-right {
+  left: 100%;
+  top: 50%;
+}
+.jc-dot-bottom {
+  left: 50%;
+  top: 100%;
+}
+.jc-dot-left {
+  left: 0;
+  top: 50%;
+}
+.jc-resize {
+  right: -1px;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  border-bottom-right-radius: var(--r-card);
+  cursor: nwse-resize;
+}
+.jc-card:hover > .jc-dot,
+.jc-card:hover > .jc-resize,
+.jc-card:focus-within > .jc-dot,
+.jc-card:focus-within > .jc-resize,
+.jc-card.is-selected > .jc-dot,
+.jc-card.is-selected > .jc-resize {
+  opacity: 1;
+}
+/* the one quiet line while C waits for an arrow */
+.jc-key-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  pointer-events: none;
+}
+.jc-empty {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 36ch;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jc-edge-handle,
+  .jc-dot,
+  .jc-resize {
+    transition: none;
+  }
+}

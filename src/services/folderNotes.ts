@@ -9,7 +9,9 @@
 // are listed and moved here the way the Mac corpus lists them — id = path, no
 // frontmatter, never read to be indexed; their scene I/O is folderBoards.ts.
 
+import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { extOf, fileName, fileNameStem, userFileName } from "../lib/fileKind";
 import {
   type NoteFrontmatter,
@@ -27,6 +29,7 @@ import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
 import { BOARD_LANE, boardTitle, isBoardPath } from "./folderBoards";
+import { canvasTitle, isCanvasFile } from "./folderCanvases";
 import {
   assertSafeStem,
   ignoreInGit,
@@ -37,6 +40,10 @@ import {
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import { type VaultDir, baseName, freeVaultPath, joinVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
+
+/** A board, or a canvas where this build opens canvases: a raw file named by
+ * its path, never frontmatter. */
+const isPathItem = (path: string) => isBoardPath(path) || (LAUNCH_FEATURES.jsonCanvas && isCanvasFile(path));
 
 /** Disk roots that hold notes in a memex vault. Everything else — `.rotli/`,
  * dotfiles, `chats/` transcripts, and the `identity/ personality/ history/`
@@ -148,7 +155,7 @@ export class FolderNotesService implements NotesService {
     }
     const index = new Map<string, string>();
     for (const path of paths) {
-      if (isBoardPath(path)) {
+      if (isPathItem(path)) {
         index.set(path, path);
         continue;
       }
@@ -166,7 +173,7 @@ export class FolderNotesService implements NotesService {
       if (entry.kind === "directory") {
         if (isRoot && SKIPPED_ROOTS.has(entry.name)) continue;
         await this.collect(child, out);
-      } else if (entry.name.toLowerCase().endsWith(".md") || isBoardPath(entry.name)) out.push(child);
+      } else if (entry.name.toLowerCase().endsWith(".md") || isPathItem(entry.name)) out.push(child);
     }
   }
 
@@ -188,7 +195,7 @@ export class FolderNotesService implements NotesService {
   }
 
   private async noteAt(path: string): Promise<Note> {
-    if (isBoardPath(path)) return this.boardAt(path);
+    if (isPathItem(path)) return this.boardAt(path);
     const text = await this.readFile(path);
     const stat = await this.dir.stat(path);
     if (!stat) throw new Error(`unknown note: ${path}`);
@@ -212,20 +219,22 @@ export class FolderNotesService implements NotesService {
       secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
+      suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),
       body,
       revision: `${stat.lastModified}:${stat.size}`,
     };
   }
 
-  /** A board's row. The scene is never read to list it (Rust lists boards by
-   * stat alone), so `body` is empty — board content goes through folderBoards. */
+  /** A board's or a canvas's row. Never read to list it (Rust lists both by
+   * stat alone), so `body` is empty — their content goes through
+   * folderBoards / folderCanvases. A canvas lists as a file, like the Mac. */
   private async boardAt(path: string): Promise<Note> {
     const stat = await this.dir.stat(path);
     if (!stat) throw new Error(`unknown board: ${path}`);
     const diskFolderId = parentPath(path);
     return {
       id: path,
-      title: boardTitle(path),
+      title: isCanvasFile(path) ? canvasTitle(path) : boardTitle(path),
       snippet: "",
       bodyEmpty: false,
       aliases: [],
@@ -234,7 +243,7 @@ export class FolderNotesService implements NotesService {
       createdAt: stat.lastModified,
       updatedAt: stat.lastModified,
       pinned: false,
-      kind: "board",
+      kind: isCanvasFile(path) ? "file" : "board",
       secure: false,
       body: "",
       revision: `${stat.lastModified}:${stat.size}`,
@@ -391,7 +400,7 @@ export class FolderNotesService implements NotesService {
     const index = await this.ensureIndex();
     const path = index.get(id);
     // a board is not a note: its scene is read through folderBoards
-    if (!path || isBoardPath(path) || !(await this.dir.exists(path))) return null;
+    if (!path || isPathItem(path) || !(await this.dir.exists(path))) return null;
     return this.noteAt(path);
   }
 
@@ -452,7 +461,7 @@ export class FolderNotesService implements NotesService {
 
   async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
     const path = await this.pathOf(id);
-    if (isBoardPath(path)) throw new Error(`not a note: ${id}`);
+    if (isPathItem(path)) throw new Error(`not a note: ${id}`);
     const current = await this.noteAt(path);
     if (!expectedRevision || (expectedRevision !== current.revision && expectedBody !== current.body)) {
       throw new Error(
@@ -486,7 +495,7 @@ export class FolderNotesService implements NotesService {
    * is. Only `updateNote` stamps `updated` — a move never does. */
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const path = await this.pathOf(id);
-    if (isBoardPath(path)) return this.moveFile(id, path, this.targetPath(path, targetFolder));
+    if (isPathItem(path)) return this.moveFile(id, path, this.targetPath(path, targetFolder));
     const current = await this.noteAt(path);
     const { frontmatter, body } = parseNoteDocument(await this.readFile(path));
     if (!frontmatter) return this.moveFile(id, path, this.targetPath(path, targetFolder));
@@ -556,7 +565,7 @@ export class FolderNotesService implements NotesService {
   }
 
   private async clearOrigin(id: string, path: string): Promise<Note> {
-    const { frontmatter, body } = isBoardPath(path)
+    const { frontmatter, body } = isPathItem(path)
       ? { frontmatter: null, body: "" }
       : parseNoteDocument(await this.readFile(path));
     if (frontmatter && frontmatter.origin !== null) {

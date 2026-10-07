@@ -13,16 +13,24 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { PANE_SCENES } from "./paneEmptyScenes";
 
-export function PaneEmptyState() {
+/** The empty pane's small scene in the theme family's own art — also the
+ * backdrop of the vault prompt after a skipped setup. */
+export function PaneScene() {
   const family = useUiStore((s) => s.themeFamily);
   const scene = PANE_SCENES[family] ?? PANE_SCENES.warm;
   return (
+    <div className="pane-scene" data-scene={scene.name}>
+      <svg className="pane-scene-art" viewBox="0 0 440 200" aria-hidden="true" focusable="false">
+        {scene.art}
+      </svg>
+    </div>
+  );
+}
+
+export function PaneEmptyState() {
+  return (
     <div className="list-empty pane-empty">
-      <div className="pane-scene" data-scene={scene.name}>
-        <svg className="pane-scene-art" viewBox="0 0 440 200" aria-hidden="true" focusable="false">
-          {scene.art}
-        </svg>
-      </div>
+      <PaneScene />
       <p className="be-title">All clear</p>
       <p className="be-sub">
         <button type="button" className="pane-empty-act" onClick={() => dispatch("tabs.new")}>

@@ -395,3 +395,67 @@ fn note_date_stamps_match_fixture() {
         );
     }
 }
+
+/// The Graph view's edges: both link readers agree on every fixture body.
+#[test]
+fn wikilink_targets_fixtures_agree() {
+    for case in entry("wikilinkTargets")
+        .as_array()
+        .expect("wikilinkTargets is an array")
+    {
+        let body = case["body"].as_str().expect("body is a string");
+        let expected: Vec<String> = case["targets"]
+            .as_array()
+            .expect("targets is an array")
+            .iter()
+            .map(|t| t.as_str().expect("target is a string").to_string())
+            .collect();
+        assert_eq!(
+            crate::corpus::links::body_link_targets(body),
+            expected,
+            "body_link_targets({body:?})"
+        );
+    }
+}
+
+#[test]
+fn empty_canvas_file_agrees() {
+    assert_eq!(
+        crate::corpus::files::EMPTY_CANVAS,
+        entry("emptyCanvasFile").as_str().expect("emptyCanvasFile is a string")
+    );
+}
+
+#[test]
+fn canvas_home_fixtures_agree() {
+    for case in entry("canvasHome").as_array().expect("canvasHome is an array") {
+        let folder = case["folder"].as_str().expect("folder is a string");
+        let memex = case["memex"].as_bool().expect("memex is a bool");
+        assert_eq!(
+            crate::corpus::files::canvas_home(memex, folder),
+            case["home"].as_str().expect("home is a string"),
+            "canvas_home({memex}, {folder:?})"
+        );
+    }
+}
+
+#[test]
+fn metadata_link_targets_fixtures_agree() {
+    for case in entry("metadataLinkTargets")
+        .as_array()
+        .expect("metadataLinkTargets is an array")
+    {
+        let fields = case["fields"].as_str().expect("fields is a string");
+        let expected: Vec<String> = case["targets"]
+            .as_array()
+            .expect("targets is an array")
+            .iter()
+            .map(|t| t.as_str().expect("target is a string").to_string())
+            .collect();
+        assert_eq!(
+            crate::corpus::links::metadata_link_targets(fields),
+            expected,
+            "metadata_link_targets({fields:?})"
+        );
+    }
+}

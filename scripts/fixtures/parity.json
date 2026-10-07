@@ -605,6 +605,116 @@
           }
         ]
       }
+    },
+    "wikilinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
+      "value": [
+        {
+          "body": "See [[Books]] and [[Philosophy|phil]].\n`[[not a link]]` but ![[Diagram]] is.\n```\n[[fenced]]\n```\nAgain [[Books]] and [[René Descartes#Life]].\n[[]] [[ ]]",
+          "targets": [
+            "Books",
+            "Philosophy|phil",
+            "Diagram",
+            "René Descartes#Life"
+          ]
+        },
+        {
+          "body": "[[a [[b]] c]] and [[unclosed",
+          "targets": []
+        },
+        {
+          "body": "  ```js\n[[inside]]\n  ```\n[[after]]",
+          "targets": [
+            "after"
+          ]
+        },
+        {
+          "body": "A ``code [[Spanned]] here`` and [[Kept]].",
+          "targets": [
+            "Kept"
+          ]
+        },
+        {
+          "body": "~~~\n[[Tilde fenced]]\n~~~\n[[After tilde]]",
+          "targets": [
+            "After tilde"
+          ]
+        },
+        {
+          "body": "````md\n```\n[[Inside longer]]\n```\n````\n[[After longer]]",
+          "targets": [
+            "After longer"
+          ]
+        },
+        {
+          "body": "a lone ` tick, then [[Still linked]]",
+          "targets": [
+            "Still linked"
+          ]
+        },
+        {
+          "body": "```\n[[Unclosed fence]]",
+          "targets": []
+        },
+        {
+          "body": "`one` and [[Between]] and `two`",
+          "targets": [
+            "Between"
+          ]
+        }
+      ]
+    },
+    "metadataLinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs metadata_link_targets ↔ src/graph/linkTargets.ts metadataLinkTargets (independent implementations, fixture-aligned: the Graph view's Librarian links)",
+      "value": [
+        {
+          "fields": "area: work\nlinks: [[Pricing]], [[Q3 plan|plan]]\ntags: [a]",
+          "targets": [
+            "Pricing",
+            "Q3 plan|plan"
+          ]
+        },
+        {
+          "fields": "links: []",
+          "targets": []
+        },
+        {
+          "fields": "summary: see [[Pricing]]",
+          "targets": []
+        },
+        {
+          "fields": " links: [[indented]]",
+          "targets": []
+        },
+        {
+          "fields": "links:[[A]] [[A]] `[[code]]`",
+          "targets": [
+            "A"
+          ]
+        },
+        {
+          "fields": "",
+          "targets": []
+        }
+      ]
+    },
+    "canvasHome": {
+      "sourceOfTruth": "src-tauri/src/corpus_files.rs canvas_home ↔ src/services/folderCanvases.ts canvasHome (where a new canvas is written; a plain vault's reserved lanes are each side's own note rule and stay out)",
+      "value": [
+        { "folder": "wiki", "memex": true, "home": "wiki" },
+        { "folder": "wiki/projects", "memex": true, "home": "wiki/projects" },
+        { "folder": "", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "chats", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "storage", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "wikis", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "", "memex": false, "home": "" },
+        { "folder": "Plans", "memex": false, "home": "Plans" },
+        { "folder": "Plans/Q3", "memex": false, "home": "Plans/Q3" }
+      ]
+    },
+    "emptyCanvasFile": {
+      "sourceOfTruth": "src-tauri/src/corpus_files.rs EMPTY_CANVAS ↔ src/jsonCanvas/model.ts EMPTY_CANVAS_FILE (a new canvas, written the way Obsidian writes one)",
+      "value": "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}"
     }
   }
 }

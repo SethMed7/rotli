@@ -22,6 +22,7 @@ import {
 } from "react";
 
 import { dispatch } from "../../keys/registry";
+import { canvasDropAt } from "../../lib/canvasDrop";
 import { createDragGhost } from "../../lib/dragGhost";
 import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
 import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
@@ -85,8 +86,8 @@ import {
   StarGlyph,
   StorageGlyph,
   TrashGlyph,
-  glyphForNote,
 } from "../glyphs";
+import { glyphForNote } from "../noteGlyph";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
@@ -429,6 +430,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     // gathered selections only move within Main
     const paneable = dragIds.length === 1 && !id.startsWith(MAIN_ROOT);
     let paneDrop: DropPreview = null;
+    // notes dropped on an open canvas become cards there (folders don't)
+    let canvasDrop: ReturnType<typeof canvasDropAt> = null;
     didMainDragRef.current = false;
     createPointerDragSession(e, {
       ghost: (x, y) => createDragGhost(dragLabel, x, y),
@@ -443,7 +446,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           "[data-main-id]",
         ) as HTMLElement | null;
         const tid = hit?.dataset.mainId;
-        paneDrop = !hit && paneable ? panePreviewAt(x, y) : null;
+        canvasDrop = hit ? null : canvasDropAt(x, y);
+        paneDrop = !hit && !canvasDrop && paneable ? panePreviewAt(x, y) : null;
         usePanesStore.getState().setDropPreview(paneDrop);
         if (!hit || !tid || dragIds.includes(tid)) {
           drop = null;
@@ -460,6 +464,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         setMainDrop(drop);
       },
       onDrop: () => {
+        if (canvasDrop) {
+          canvasDrop.drop(dragIds.filter((each) => !each.startsWith(MAIN_ROOT)));
+          return;
+        }
         if (paneDrop) {
           commitPaneDrop(id, paneDrop);
           return;

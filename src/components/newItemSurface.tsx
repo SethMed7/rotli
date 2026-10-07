@@ -18,9 +18,11 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BetaBadge } from "./betaBadge";
 import { BoardGlyph, BrowserGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
+import { CanvasGlyph } from "./noteGlyph";
 
 function kindGlyph(kind: NewItemKind) {
   if (kind === "board") return <BoardGlyph size={22} />;
+  if (kind === "canvas") return <CanvasGlyph size={22} />;
   if (kind === "document") return <DocumentGlyph size={22} />;
   if (kind === "sheet") return <FileGlyph size={22} />;
   return <NewFileGlyph size={22} />;
