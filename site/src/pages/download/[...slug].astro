@@ -1,14 +1,30 @@
 ---
-// /download/: where the header's Download button goes. It leads with the
-// visitor's own system (Base.astro stamps data-os): the Mac download on a
-// Mac; on Windows and Linux, a native app that is planned (no date; the words
-// are PLATFORMS in src/site.ts), with Rotli Web to use in the meantime. Without script the Mac panel shows. Below, every platform and its
-// status in one list. The hero's "Download for Mac" still fetches the DMG
-// directly (DOWNLOAD_HREF in src/site.ts).
+// /download/: where every way in goes (the header's "Try now", the landing's "Download free" in
+// the hero and the closing panel, the 404, and About). Its own wide layout: a head with the
+// dock scene (DownloadScene.astro), the two real ways in as two panels (the Mac app and Rotli
+// Web), Windows and Linux as "Coming soon", what you get, the first few minutes, and a short FAQ.
+//
+// It leads with the visitor's own system (Base.astro stamps data-os): on a Mac (and without
+// script) the head offers the Mac download and the Mac panel comes first, marked for this
+// computer; on Windows and Linux the head says that system's app is coming soon and offers Rotli
+// Web in the meantime, and the Rotli Web panel comes first; on a phone it says rotli runs on a
+// computer. When Rotli Web is off in a build, Windows and Linux are pointed at the roadmap and
+// the sign-up instead. The platform words are PLATFORMS in src/site.ts, and Docs and Sheets
+// carry DOCS_AND_SHEETS. Every claim matches the guides (web-and-mac, getting-started,
+// rotli-helper) and /privacy/: Apple silicon and macOS 11 are the DMG's build target and
+// minimum, and the app and the disk image are signed and notarized (scripts/release.sh).
+// This page alone links the DMG (DOWNLOAD_URL).
+//
+// Motion: the scene plays once as it comes into view and the rest rises in (Base.astro's
+// reveal); reduced motion and no script show it all at rest.
 import { application } from '../../agents';
-import WritingPage from '../../components/WritingPage.astro';
+import DownloadScene from '../../components/DownloadScene.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import { questions } from '../../faq';
+import Base from '../../layouts/Base.astro';
 import { ogImage } from '../../og';
-import { DOWNLOAD_URL, PLATFORMS, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
+import { DOCS_AND_SHEETS, DOWNLOAD_URL, PLATFORMS, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
 
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
@@ -16,225 +32,802 @@ export function getStaticPaths() {
 
 const web = site.webAppEnabled;
 const mac = site.downloadsEnabled;
+const MAC_NEEDS = 'Apple silicon · macOS 11 or later';
+const SIGNUP = '#subscribe-title';
 
-type Status = 'available' | 'soon' | 'planned';
-const platforms: { name: string; detail: string; status: Status; action?: { href: string; label: string; external?: boolean } }[] = [
+const soon = [
+  { os: 'windows', name: 'Windows' },
+  { os: 'linux', name: 'Linux' },
+] as const;
+
+const gets = [
   {
-    name: 'Mac',
-    detail: 'The whole workspace, including on-device AI and the Librarian. Apple silicon, macOS 11 or later.',
-    status: mac ? 'available' : 'soon',
-    action: mac ? { href: DOWNLOAD_URL, label: 'Download .dmg', external: true } : undefined,
+    icon: 'file',
+    title: 'Plain Markdown files',
+    text: 'Every note is a file in a folder you choose. Any other editor can open it.',
   },
-  { name: 'Windows', detail: 'A native app is planned. No date yet.', status: 'planned' },
-  { name: 'Linux', detail: 'A native app is planned. No date yet.', status: 'planned' },
+  {
+    icon: 'stack',
+    title: 'More than notes',
+    text: `Docs and Sheets (${DOCS_AND_SHEETS.inline}), chat, and boards, all from the same folder.`,
+  },
+  {
+    icon: 'spark',
+    title: 'AI if you want it',
+    text: 'A model on your Mac, or the AI tools you already pay for. There is no AI plan to buy.',
+  },
+  {
+    icon: 'key',
+    title: 'No account',
+    text: 'Free. Writing, tasks, links, and search all work offline.',
+  },
+] as const;
+
+const answer = (q: string) => questions.find((item) => item.q === q)?.a ?? '';
+const faq = [
+  { q: 'Is rotli free?', a: answer('Is rotli free?') },
+  {
+    q: 'Which Macs does it run on?',
+    a: 'Macs with Apple silicon, on macOS 11 or later. There is no build for Intel Macs.',
+  },
+  {
+    q: 'Is the download safe to open?',
+    a: 'The app and the disk image are signed and notarized by Apple, and macOS checks that before it opens them.',
+  },
+  {
+    q: 'How do updates arrive?',
+    a: 'The app checks for a new version and tells you when there is one. Nothing downloads until you choose Install, and Settings → General turns the check off.',
+  },
   ...(web
     ? [
         {
-          name: 'Any browser',
-          detail: 'Rotli Web in Chrome, Edge, Arc, Firefox, Zen, or Brave: the editor, folders, tasks, and links, working in a folder on your computer.',
-          status: 'available' as const,
-          action: { href: WEB_APP_PATH, label: 'Open Rotli Web' },
+          q: 'Which browsers does Rotli Web work in?',
+          a: 'Chrome, Edge, and Arc open your folder directly. Firefox, Zen, and Brave reach it through Rotli Helper, a small program on your computer. Safari and phones aren’t supported yet.',
         },
       ]
     : []),
+  { q: 'Where do my notes live?', a: answer('Where do my notes live?') },
+  { q: 'What about Windows and Linux?', a: answer('What about Windows and Linux?') },
+  {
+    q: 'How do I uninstall it?',
+    a: 'Drag rotli from Applications to the Trash. Your notes stay where they are, in their folder.',
+  },
 ];
 ---
 
-<WritingPage
+<Base
   title="Download — rotli"
-  description="Get rotli for Mac, the first platform, or open it in your browser. Windows and Linux apps are planned."
+  description={`Get rotli, free and with no account: the Mac app${web ? ', or Rotli Web in your browser' : ''}. ${PLATFORMS.availability}`}
   canonicalPath="/download/"
-  {...ogImage('download')}
-  section="download"
+  noindex={!site.indexable}
   structuredData={[application()]}
-  heading="Get rotli"
-  lede="Free, with no account. Your notes stay in a folder you choose."
-  wide
+  {...ogImage('download')}
 >
-  <section class="pick" aria-label="Recommended for your computer">
-    <div class="pick-panel for-mac">
-      <h2>rotli for Mac</h2>
-      <p>Apple silicon · macOS 11 or later · free, no account</p>
-      <div class="pick-actions">
+  <SiteHeader current="download" />
+  <main id="content" class="download">
+    <header class="wrap get-head">
+      <div class="head-copy">
+        <h1>Get rotli</h1>
+        <p class="lede">Free, with no account. Your notes stay in a folder you choose.</p>
+
+        <div class="lead lead-mac">
+          <p class="lead-title">{mac ? 'The Mac app is the whole workspace.' : 'The Mac alpha is in preparation.'}</p>
+          <div class="lead-actions">
+            {
+              mac ? (
+                <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
+              ) : (
+                <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+              )
+            }
+            {web && <a class="button secondary" href={WEB_APP_PATH}>Or open Rotli Web</a>}
+          </div>
+          <p class="lead-meta">{MAC_NEEDS} · free</p>
+        </div>
+
         {
-          mac ? (
-            <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
-          ) : (
-            <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+          soon.map(({ os, name }) => (
+            <div class={`lead lead-${os}`}>
+              <p class="lead-title">rotli for {name} is coming soon</p>
+              <p class="lead-text">
+                {web
+                  ? `${PLATFORMS.meantime}: the same workspace in your browser, working in a folder on your computer.`
+                  : `The Mac app is out today. A native ${name} app is on the way.`}
+              </p>
+              <div class="lead-actions">
+                {web ? (
+                  <a class="button primary" href={WEB_APP_PATH}>Open Rotli Web</a>
+                ) : (
+                  <a class="button primary" href="/roadmap/">Follow it on the roadmap</a>
+                )}
+              </div>
+            </div>
+          ))
+        }
+
+        <div class="lead lead-elsewhere">
+          <p class="lead-title">rotli runs on your computer</p>
+          <p class="lead-text">
+            {
+              web
+                ? 'Get the Mac app, or open Rotli Web in Chrome, Edge, or Arc. Safari, phones, and tablets aren’t supported yet.'
+                : 'The Mac app is out today. Phones and tablets aren’t supported yet.'
+            }
+          </p>
+        </div>
+      </div>
+      <DownloadScene />
+    </header>
+
+    <section class="wrap ways" aria-labelledby="ways-title">
+      <h2 class="section-h" id="ways-title">Two ways in</h2>
+      <div class:list={['choices', { single: !web }]} data-stagger>
+        <article class="choice choice-mac" aria-labelledby="mac-title">
+          <p class="fit">For this Mac</p>
+          <svg class="glyph" viewBox="0 0 64 48" aria-hidden="true">
+            <rect x="10" y="4" width="44" height="32" rx="3" />
+            <path d="M18 14h22M18 21h28M18 28h14" class="ink" />
+            <path d="M4 40h56l-4 5H8z" />
+          </svg>
+          <h3 id="mac-title">rotli for Mac</h3>
+          <p class="choice-lede">The whole workspace, with on-device AI and the Librarian.</p>
+          <ul class="facts">
+            <li>Notes, Docs and Sheets ({DOCS_AND_SHEETS.inline}), chat, and boards</li>
+            <li>{MAC_NEEDS}</li>
+            <li>Signed and notarized by Apple</li>
+            <li>Updates when you choose to install them</li>
+          </ul>
+          <div class="choice-actions">
+            {
+              mac ? (
+                <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download .dmg</a>
+              ) : (
+                <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+              )
+            }
+            {mac && <a class="quiet" href={RELEASES_URL} rel="noopener">Release notes and older versions</a>}
+          </div>
+        </article>
+
+        {
+          web && (
+            <article class="choice choice-web" aria-labelledby="web-title">
+              <p class="fit">For this computer</p>
+              <svg class="glyph" viewBox="0 0 64 48" aria-hidden="true">
+                <rect x="4" y="4" width="56" height="40" rx="5" />
+                <path d="M4 13h56" />
+                <path d="M14 22h26M14 29h34M14 36h18" class="ink" />
+              </svg>
+              <h3 id="web-title">Rotli Web</h3>
+              <p class="choice-lede">The same editor in your browser, working in a folder on your computer.</p>
+              <dl class="browsers">
+                <div>
+                  <dt>Opens your folder</dt>
+                  <dd>Chrome, Edge, Arc</dd>
+                </div>
+                <div>
+                  <dt>With Rotli Helper</dt>
+                  <dd>Firefox, Zen, Brave</dd>
+                </div>
+                <div>
+                  <dt>Not yet</dt>
+                  <dd>Safari, phones, tablets</dd>
+                </div>
+              </dl>
+              <div class="choice-actions">
+                <a class="button primary" href={WEB_APP_PATH}>Open Rotli Web</a>
+                <a class="quiet" href="/blog/web-and-mac/">What stays in the Mac app</a>
+              </div>
+              <p class="choice-note">
+                Rotli Helper is a small program for Firefox, Zen, and Brave, and for chat on the web.{' '}
+                <a href="/blog/rotli-helper/">How to install it</a>.
+              </p>
+            </article>
           )
         }
-        {web && <a class="button secondary" href={WEB_APP_PATH}>Or open it in your browser</a>}
       </div>
-    </div>
+    </section>
 
-    {
-      (['windows', 'linux', 'other'] as const).map((os) => (
-        <div class={`pick-panel for-${os}`}>
-          <h2>{os === 'windows' ? 'A Windows app is planned' : os === 'linux' ? 'A Linux app is planned' : 'rotli runs on your computer'}</h2>
-          <p>
-            {web
-              ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account. In Chrome, Edge, or Arc there is nothing to install.'
-              : 'rotli comes to the Mac first. Native apps for Windows and Linux are planned.'}
-          </p>
-          <div class="pick-actions">
-            {web && <a class="button primary" href={WEB_APP_PATH}>Open rotli in your browser</a>}
-            {mac && <a class="button secondary" href={DOWNLOAD_URL} rel="noopener">Download for Mac instead</a>}
-          </div>
-          {web && (
-            <p class="pick-note">
-              Using Firefox, Zen, or Brave? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a small program
-              that lets Rotli Web save into your folder and chat through the AI tools on your computer. Safari and
-              phones aren’t supported yet.
-            </p>
-          )}
-        </div>
-      ))
-    }
-  </section>
+    <section class="wrap soon" aria-labelledby="soon-title">
+      <div class="soon-copy" data-reveal>
+        <h2 class="section-h" id="soon-title">Windows and Linux</h2>
+        <p>
+          {
+            web
+              ? `Native apps are on the way. ${PLATFORMS.meantime}: it runs in your browser today.`
+              : 'Native apps are on the way.'
+          }
+        </p>
+        <p class="soon-more">
+          <a href="/roadmap/">Follow them on the roadmap</a>
+          <a href={SIGNUP}>Hear when they’re ready</a>
+        </p>
+      </div>
+      <ul class="soon-list" data-stagger>
+        {
+          soon.map(({ os, name }) => (
+            <li class={`soon-item soon-${os}`}>
+              <svg class="glyph" viewBox="0 0 64 48" aria-hidden="true">
+                <rect x="8" y="4" width="48" height="32" rx="3" />
+                <path d="M26 36v6M38 36v6M20 44h24" />
+              </svg>
+              <div>
+                <h3>
+                  {name} <span class="status">{PLATFORMS.soon}</span>
+                </h3>
+                <p>A native {name} app, for the same folder of plain files.</p>
+                {web && (
+                  <a class="quiet" href={WEB_APP_PATH}>
+                    {PLATFORMS.meantime} <span aria-hidden="true">→</span>
+                  </a>
+                )}
+              </div>
+              <p class="you">Your system</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
 
-  <section class="all" aria-labelledby="all-title">
-    <h2 id="all-title">Every platform</h2>
-    <ul>
-      {platforms.map((platform) => (
+    <section class="band-warm gets" aria-labelledby="gets-title">
+      <div class="wrap">
+        <h2 class="section-h" id="gets-title">What you get</h2>
+        <ul class="get-list" data-stagger>
+          {
+            gets.map((item) => (
+              <li>
+                <svg class="get-icon" viewBox="0 0 32 32" aria-hidden="true">
+                  {item.icon === 'file' && <path d="M8 3h11l6 6v20H8zM19 3v6h6M12 16h9M12 21h9" />}
+                  {item.icon === 'stack' && <path d="M4 10l12-6 12 6-12 6zM4 16l12 6 12-6M4 22l12 6 12-6" />}
+                  {item.icon === 'spark' && <path d="M16 3v8M16 21v8M3 16h8M21 16h8M7 7l5 5M20 20l5 5M25 7l-5 5M12 20l-5 5" />}
+                  {item.icon === 'key' && <path d="M12 20a6 6 0 1 1 4-10.5L28 10v5h-4v4h-4l-3-3A6 6 0 0 1 12 20zM9 14h.01" />}
+                </svg>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section class="wrap steps" aria-labelledby="steps-title">
+      <div class="steps-head" data-reveal>
+        <h2 class="section-h" id="steps-title">Your first five minutes</h2>
+        <p>
+          A folder and a note is a complete setup. The <a href="/blog/getting-started/">getting started guide</a> has
+          the rest.
+        </p>
+      </div>
+      <ol class="step-list" data-stagger>
         <li>
-          <div>
-            <h3>{platform.name}</h3>
-            <p>{platform.detail}</p>
-          </div>
-          <span class:list={['status', platform.status]}>{platform.status === 'available' ? 'Available' : platform.status === 'planned' ? PLATFORMS.planned : 'Coming soon'}</span>
-          <span class="action">
-            {platform.action && (
-              <a href={platform.action.href} rel={platform.action.external ? 'noopener' : undefined}>
-                {platform.action.label} <span aria-hidden="true">→</span>
-              </a>
-            )}
-          </span>
+          <h3>Install it</h3>
+          <p>
+            Open Rotli.dmg and drag rotli into Applications.{web && ' On Rotli Web there’s nothing to install.'}
+          </p>
         </li>
-      ))}
-    </ul>
-    {mac && (
-      <p class="after">
-        <a href={RELEASES_URL} rel="noopener">Release notes and older versions</a>
-      </p>
-    )}
-  </section>
-</WritingPage>
+        <li>
+          <h3>Pick a folder</h3>
+          <p>That folder is your vault. Start with an empty one, or one that already has Markdown notes.</p>
+        </li>
+        <li>
+          <h3>Try the Welcome folder</h3>
+          <p>Short lessons, each an ordinary note. Edit them, then delete the folder when you’re done.</p>
+        </li>
+        <li>
+          <h3>Turn on more, if you like</h3>
+          <p>
+            Chat and the Librarian are optional. See <a href="/blog/ai-and-your-notes/">what AI sees in rotli</a>.
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="wrap faq" aria-labelledby="faq-title">
+      <h2 class="section-h" id="faq-title">Questions</h2>
+      <div class="faq-list">
+        {
+          faq.map((item) => (
+            <details>
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>
 
 <style>
-  /* One panel shows, chosen by data-os. Without script (no data-os), the Mac panel. */
-  .pick-panel {
-    display: none;
-    max-width: 44rem;
+  .download {
+    padding-bottom: var(--section-space);
   }
-  :root:not([data-os]) .for-mac,
-  :root[data-os='mac'] .for-mac,
-  :root[data-os='windows'] .for-windows,
-  :root[data-os='linux'] .for-linux,
-  :root[data-os='mobile'] .for-other,
-  :root[data-os='other'] .for-other {
-    display: block;
-  }
-  .pick h2 {
-    margin: 0;
-    font-size: var(--step-h2);
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.035em;
-  }
-  .pick p {
-    margin: 1rem 0 0;
-    color: var(--text-muted);
-    font-size: var(--step-lede);
-    line-height: 1.55;
-  }
-  .pick-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1.75rem;
-  }
-  .pick .pick-note {
-    margin-top: 1.5rem;
-    font-size: 0.95rem;
-  }
-  .pick-note a,
-  .after a {
+  .download a:not(.button) {
     color: var(--accent-text);
     text-underline-offset: 0.2em;
   }
 
-  .all {
-    margin-top: var(--section-space);
-  }
-  .all > h2 {
-    margin: 0 0 1.25rem;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-  .all ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .all li {
+  /* The head: the words and the way in for this computer beside the dock scene. */
+  .get-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 8rem 11rem;
-    gap: 0.5rem 2rem;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: center;
+    gap: 2.5rem clamp(2.5rem, 5vw, 5rem);
+    padding-block: clamp(2.5rem, 6vw, 4.5rem) clamp(3rem, 6vw, 5rem);
+  }
+  h1 {
     margin: 0;
-    padding: 1.25rem 0;
+    font-size: var(--step-display);
+    font-weight: 600;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+  }
+  .lede {
+    max-width: 30rem;
+    margin: 1.1rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  @media (max-width: 1000px) {
+    .get-head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* One lead shows, chosen by data-os. Without script (no data-os), the Mac's. */
+  .lead {
+    display: none;
+    margin-top: clamp(1.75rem, 3vw, 2.5rem);
+    padding-top: clamp(1.5rem, 2.5vw, 2rem);
     border-top: 1px solid var(--border-strong);
   }
-  .all li:last-child {
-    border-bottom: 1px solid var(--border-strong);
+  :root:not([data-os]) .lead-mac,
+  :root[data-os='mac'] .lead-mac,
+  :root[data-os='windows'] .lead-windows,
+  :root[data-os='linux'] .lead-linux,
+  :root[data-os='mobile'] .lead-elsewhere,
+  :root[data-os='other'] .lead-elsewhere {
+    display: block;
   }
-  .all h3 {
+  .lead-title {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: var(--step-h3);
     font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
   }
-  .all li p {
-    margin: 0.25rem 0 0;
+  .lead-text {
+    max-width: 30rem;
+    margin: 0.5rem 0 0;
     color: var(--text-muted);
-    line-height: 1.5;
+    line-height: 1.55;
   }
-  .status {
-    justify-self: start;
-    padding: 0.2rem 0.65rem;
+  .lead-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .lead-meta {
+    margin: 0.85rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  /* Section heads on this page: one size, under the page title. */
+  .section-h {
+    margin: 0 0 clamp(1.5rem, 3vw, 2.25rem);
+    font-size: clamp(1.8rem, 3vw, 2.5rem);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+
+  /* The two ways in: two panels, the one for this computer first and marked. */
+  .ways {
+    padding-block: clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem);
+  }
+  .choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1rem, 2.5vw, 2rem);
+  }
+  .choices.single {
+    grid-template-columns: minmax(0, 40rem);
+  }
+  .choice {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(1.5rem, 3.5vw, 2.5rem);
     border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  :root[data-os='windows'] .choice-web,
+  :root[data-os='linux'] .choice-web {
+    order: -1;
+  }
+  .fit {
+    display: none;
+    align-self: flex-start;
+    margin: 0 0 1.25rem;
+    padding: 0.2rem 0.7rem;
+    border: 1px solid var(--accent-text);
     border-radius: 999px;
-    color: var(--text-muted);
+    color: var(--accent-text);
     font-size: 0.82rem;
     font-weight: 600;
   }
-  .status.available {
-    border-color: var(--accent-text);
-    color: var(--accent-text);
+  :root:not([data-os]) .choice-mac .fit,
+  :root[data-os='mac'] .choice-mac .fit,
+  :root[data-os='windows'] .choice-web .fit,
+  :root[data-os='linux'] .choice-web .fit {
+    display: block;
   }
-  .action a {
+  :root:not([data-os]) .choice-mac,
+  :root[data-os='mac'] .choice-mac,
+  :root[data-os='windows'] .choice-web,
+  :root[data-os='linux'] .choice-web {
+    border-color: var(--text);
+  }
+  /* On Windows and Linux the Mac download stays, but steps back to a quiet button. */
+  :root[data-os='windows'] .choice-mac .button.primary,
+  :root[data-os='linux'] .choice-mac .button.primary {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  :root[data-os='windows'] .choice-mac .button.primary:hover,
+  :root[data-os='linux'] .choice-mac .button.primary:hover {
+    background: var(--surface-2);
+  }
+  .glyph {
+    width: 4rem;
+    height: 3rem;
+    margin-bottom: 1.25rem;
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .glyph .ink {
+    stroke: var(--accent);
+  }
+  .choice h3 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.4vw, 2rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+  }
+  .choice-lede {
+    margin: 0.6rem 0 0;
+    color: var(--text-muted);
+    font-size: 1.08rem;
+    line-height: 1.55;
+  }
+  .facts {
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .facts li {
+    position: relative;
+    padding: 0.55rem 0 0.55rem 1.6rem;
+    border-top: 1px solid var(--border);
+    line-height: 1.45;
+  }
+  .facts li::before {
+    content: '';
+    position: absolute;
+    top: 0.95rem;
+    left: 0.15rem;
+    width: 0.7rem;
+    height: 0.4rem;
+    border-left: 2px solid var(--accent-text);
+    border-bottom: 2px solid var(--accent-text);
+    transform: rotate(-45deg);
+  }
+  .browsers {
+    margin: 1.5rem 0 0;
+  }
+  .browsers div {
+    display: grid;
+    grid-template-columns: minmax(8.5rem, auto) minmax(0, 1fr);
+    gap: 0.25rem 1rem;
+    padding: 0.55rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .browsers dt {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+  }
+  .browsers dd {
+    margin: 0;
+    font-weight: 600;
+  }
+  .choice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+    margin-top: auto;
+    padding-top: 1.75rem;
+  }
+  .quiet {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     min-height: 44px;
-    color: var(--accent-text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .action a:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-  }
-  .after {
-    margin-top: 1.25rem;
     font-size: 0.95rem;
+    font-weight: 600;
   }
-  @media (max-width: 700px) {
-    .all li {
-      grid-template-columns: minmax(0, 1fr) auto;
+  .choice-note {
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 860px) {
+    .choices {
+      grid-template-columns: minmax(0, 1fr);
     }
-    .all li > div {
-      grid-column: 1 / -1;
+  }
+  @media (max-width: 420px) {
+    .browsers div {
+      grid-template-columns: minmax(0, 1fr);
     }
+  }
+
+  /* Windows and Linux: the words beside two quiet entries, each with its status. */
+  .soon {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 2rem clamp(2rem, 5vw, 5rem);
+    align-items: start;
+    padding-block: 0 var(--section-space);
+  }
+  .soon-copy p {
+    max-width: 28rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 1.08rem;
+    line-height: 1.6;
+  }
+  .soon-copy .soon-more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 1.5rem;
+    margin-top: 0.75rem;
+    font-size: 1rem;
+  }
+  .soon-more a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+  }
+  .soon-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1rem, 2.5vw, 2rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .soon-item {
+    position: relative;
+    padding: 1.5rem 0 0;
+    border-top: 1px dashed var(--border-strong);
+  }
+  .soon-item .glyph {
+    width: 3.25rem;
+    height: 2.5rem;
+    margin-bottom: 0.9rem;
+    stroke: var(--text-muted);
+  }
+  .soon-item h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.7rem;
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  .status {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .soon-item p {
+    margin: 0.45rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .soon-item .you {
+    display: none;
+    position: absolute;
+    top: 1.5rem;
+    right: 0;
+    margin: 0;
+    color: var(--accent-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  :root[data-os='windows'] .soon-windows,
+  :root[data-os='linux'] .soon-linux {
+    border-top: 2px solid var(--text);
+  }
+  :root[data-os='windows'] .soon-windows .you,
+  :root[data-os='linux'] .soon-linux .you {
+    display: block;
+  }
+  @media (max-width: 860px) {
+    .soon {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (max-width: 520px) {
+    .soon-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* What you get: four plain columns on the warm band, a drawn mark over each. */
+  .gets {
+    padding-block: var(--section-space);
+  }
+  .get-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2rem clamp(1.5rem, 3vw, 2.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .get-list li {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .get-icon {
+    width: 2rem;
+    height: 2rem;
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .get-list h3 {
+    margin: 0.9rem 0 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .get-list p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  @media (max-width: 1000px) {
+    .get-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 520px) {
+    .get-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* The first five minutes: numbered steps in a row on a hairline. */
+  .steps {
+    padding-block: var(--section-space) clamp(2rem, 4vw, 3rem);
+  }
+  .steps-head p {
+    max-width: 34rem;
+    margin: -0.75rem 0 clamp(1.75rem, 3vw, 2.5rem);
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+  .step-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2rem clamp(1.5rem, 3vw, 2.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .step-list li {
+    counter-increment: step;
+  }
+  .step-list li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-bottom: 1rem;
+    border: 1.5px solid var(--text);
+    border-radius: 50%;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-list h3 {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 600;
+  }
+  .step-list p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  @media (max-width: 1000px) {
+    .step-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 520px) {
+    .step-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* The questions: plain disclosures on hairlines. */
+  .faq {
+    padding-top: clamp(3rem, 6vw, 5rem);
+  }
+  .faq-list {
+    max-width: 52rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .faq-list details {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .faq-list summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.5rem;
+    padding-block: 0.6rem;
+    font-size: 1.08rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  .faq-list summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-list summary::after {
+    content: '';
+    flex: none;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-right: 0.3rem;
+    border-right: 1.5px solid var(--text-muted);
+    border-bottom: 1.5px solid var(--text-muted);
+    transform: translateY(-25%) rotate(45deg);
+    transition: transform 140ms ease-out;
+  }
+  .faq-list details[open] summary::after {
+    transform: translateY(25%) rotate(-135deg);
+  }
+  .faq-list details p {
+    max-width: 44rem;
+    margin: 0 0 1.25rem;
+    color: var(--text-muted);
+    line-height: 1.6;
   }
 </style>

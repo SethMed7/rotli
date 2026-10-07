@@ -48,6 +48,7 @@ fix both in the same change.
 | Local-model output quality, speed, and heat — the measured plan | [`design/local-model-quality-and-performance.md`](design/local-model-quality-and-performance.md) |
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
+| rotli.co landing layout: the audit, the section order, cards, tour, closing banner | [`design/landing-layout-2026-10-05.md`](design/landing-layout-2026-10-05.md) |
 | Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
 | Canvas and Graph — exploration (Graph built; JSON Canvas spike) | [`design/canvas-and-graph-2026-10-05.md`](design/canvas-and-graph-2026-10-05.md) |
 | Talk to the Librarian (`/librarian`) — slice 1 plan and the `anchors` key | [`design/librarian-bar.md`](design/librarian-bar.md) |

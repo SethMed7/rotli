@@ -5,38 +5,133 @@
 // passage, not a preference: nothing is stored, and a reload decides afresh from where the
 // page is.
 //
-// The decision is one pure function so it can be tested: a focal line across the middle of
-// the window, and a margin of hysteresis on both edges, so a page resting near a boundary
-// never flickers between the two environments.
+// Why it once read as a hard cut (the owner's three frames, 2026-10-05): the band always
+// paints its own night, while the page only followed once the middle of the window was well
+// inside it, so for most of the way in and out a light page sat on a dark band with a hard
+// edge; and the header, the buttons (their own 140 ms transition, no colour fade at all), the
+// stars, and the ground each faded on a different clock. Now the band's edges are feathered
+// (Base.astro), the page follows as soon as the band fills a good share of the window, and one
+// clock drives every colour: the page's tokens themselves are animated on the root, so
+// everything that reads them (ground, header, menus, buttons) changes in the same frame.
+//
+// The decisions are pure functions so they can be tested: when the passage turns on and off,
+// and how the colours travel so text stays readable in every frame of the crossfade.
 
 export interface Span {
   top: number;
   bottom: number;
 }
 
-/** Where the focal line sits, as a share of the window's height from the top. */
-export const FOCAL_LINE = 0.5;
-/** How far past an edge the line must travel to switch, as a share of the window's height. */
-export const HYSTERESIS = 0.08;
+/** The passage turns on once the section fills this share of the window (or of itself, when
+ * it is shorter than the window)… */
+export const ENTER_SHARE = 0.4;
+/** …and off once it fills less than this. The gap between the two is the hysteresis, so a
+ * page resting near a boundary never flickers between the two environments. */
+export const LEAVE_SHARE = 0.25;
 
 /**
  * Whether the passage should be on, given the section's box (viewport coordinates), the
- * window's height, and whether it is on now. It turns on once the focal line is inside the
- * section by the margin, and off once the line is outside it by the margin; between the two
- * it keeps its current state.
+ * window's height, and whether it is on now.
  */
 export function passageActive(section: Span, viewportHeight: number, active: boolean): boolean {
   if (viewportHeight <= 0 || section.bottom <= section.top) return false;
-  const line = viewportHeight * FOCAL_LINE;
-  const margin = viewportHeight * HYSTERESIS;
-  // A section shorter than both margins together could never satisfy the "on" test.
-  const inset = Math.min(margin, (section.bottom - section.top) / 4);
-  if (active) return !(section.top > line + inset || section.bottom < line - inset);
-  return section.top <= line - inset && section.bottom >= line + inset;
+  const visible = Math.max(0, Math.min(section.bottom, viewportHeight) - Math.max(section.top, 0));
+  const whole = Math.min(viewportHeight, section.bottom - section.top);
+  const share = visible / whole;
+  return active ? share >= LEAVE_SHARE : share >= ENTER_SHARE;
 }
 
-/** How long the page keeps its color transitions on around a switch. */
-const FADE_MS = 900;
+// ——— The crossfade (Base.astro's `:root.passage-fading` rules restate these numbers) ———
+
+/** How long the dusk (or the dawn) takes. Reduced motion switches at once. */
+export const PASSAGE_MS = 900;
+/** The grounds (page, surfaces, borders) ease slowly out, cross quickly, and settle slowly. */
+export const GROUND_EASE = [0.65, 0, 0.35, 1] as const;
+/** Text never fades through the ground (a colour on its way from dark to light must cross a
+ * ground on its way from light to dark, and there it vanishes): it switches whole at this
+ * share of the crossfade, when the grounds are mid-tone and both inks read alike (just past
+ * halfway, where the page ground and the lighter night surfaces balance best). */
+export const INK_AT = 0.51;
+/** Muted and accent text lean all the way onto the main text colour around the switch, so they
+ * hold its contrast while the ground is mid-tone, and settle back after: [share, lean]. */
+export const LEAN_KEYS = [
+  [0, 0],
+  [0.3, 1],
+  [0.7, 1],
+  [1, 0],
+] as const;
+
+/** CSS's cubic-bezier timing function: progress (0–1) for elapsed time share (0–1). */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number {
+  const at = (a: number, b: number, s: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s * s * b + s ** 3;
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (at(x1, x2, mid) < t) lo = mid;
+      else hi = mid;
+    }
+    return at(y1, y2, (lo + hi) / 2);
+  };
+}
+
+/** The lean of muted and accent text toward the main text colour at time share `t`. */
+export function leanAt(t: number): number {
+  for (let i = 1; i < LEAN_KEYS.length; i++) {
+    const [t0, v0] = LEAN_KEYS[i - 1];
+    const [t1, v1] = LEAN_KEYS[i];
+    if (t <= t1) return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0 || 1);
+  }
+  return 0;
+}
+
+type Rgb = readonly [number, number, number];
+
+export function rgb(hex: string): Rgb {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** sRGB interpolation, as browsers transition colours and as `color-mix(in srgb, …)` mixes. */
+export function mix(a: Rgb, b: Rgb, k: number): Rgb {
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+}
+
+/** WCAG 2 contrast ratio between two colours. */
+export function contrast(a: Rgb, b: Rgb): number {
+  const channel = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = (c: Rgb) => 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** A text token and the ground it sits on, in the day and in the night. A text token that
+ * leans onto the main text colour around the switch (muted, accent) names it as `main`. */
+export interface PassagePair {
+  text: readonly [string, string];
+  ground: readonly [string, string];
+  main?: readonly [string, string];
+}
+
+/** The text and ground colours a pair shows at time share `t` of the crossfade into the night
+ * (the way back out is the same path in reverse). */
+export function passageFrame(pair: PassagePair, t: number): { text: Rgb; ground: Rgb } {
+  const ease = cubicBezier(...GROUND_EASE);
+  const night = t >= INK_AT ? 1 : 0;
+  const ground = mix(rgb(pair.ground[0]), rgb(pair.ground[1]), ease(t));
+  const rest = rgb(pair.text[night]);
+  const text = pair.main ? mix(rest, rgb(pair.main[night]), leanAt(t)) : rest;
+  return { text, ground };
+}
+
+/** How long the root keeps its transitions after a switch: the crossfade and a little more. */
+const FADE_MS = PASSAGE_MS + 100;
 
 /**
  * Wires every `[data-passage]` section on the page to the root element. Scroll and resize
@@ -55,6 +150,12 @@ export function watchPassages(doc: Document = document): void {
   const apply = (next: HTMLElement | null) => {
     if (next === current) return;
     current = next;
+    // A switch during a switch starts the lean of muted text over (one forced style read,
+    // only then, never on scroll).
+    if (root.classList.contains('passage-fading')) {
+      root.classList.remove('passage-fading');
+      void root.offsetWidth;
+    }
     root.classList.add('passage-fading');
     window.clearTimeout(fadeTimer);
     fadeTimer = window.setTimeout(() => root.classList.remove('passage-fading'), FADE_MS);
@@ -87,5 +188,6 @@ export function watchPassages(doc: Document = document): void {
   window.addEventListener('resize', schedule);
   // A reload mid-page (or a jump to #privacy) lands in the right environment at once.
   update();
+  window.clearTimeout(fadeTimer);
   root.classList.remove('passage-fading');
 }

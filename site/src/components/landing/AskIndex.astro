@@ -1,0 +1,222 @@
+---
+// Ask, the third step of "Write it down. rotli puts it away." (Overview.astro): a chat that
+// finds the note it needs instead of reading the vault. Between the question and the answer
+// sits the step a visitor never sees: the search runs on the visitor's own computer, and only
+// the notes it found are read. That is the retrieval contract
+// (docs/architecture/memex-data-contract.md, "Master memory retrieval"): the model gets a
+// bounded table of contents, searches (search_memory, over corpus_search_ai, which in the Mac
+// app answers from the derived Tantivy index in .rotli/search/), then reads only the notes it
+// chose (read_memory); it never receives the whole vault. The middle row is drawn as that
+// step, in muted type, not as a control. Beside the chat, the vault it searched: the two notes it
+// read lit among others it left closed, so "not the whole vault" is something you can see (the
+// owner, 2026-10-07: the picture now spans the same width as the other two steps, with no card).
+// Synthetic notes, the same ones the filing step uses. One image to assistive tech.
+import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
+
+// The vault the search ran over: the two notes it found, lit, among others it left closed.
+const vault = [
+  { path: 'wiki/Clients/dana-call.md', read: true },
+  { path: 'wiki/Clients/discount-policy.md', read: true },
+  { path: 'wiki/People/jo-park.md', read: false },
+  { path: 'wiki/Projects/q4-launch-plan.md', read: false },
+  { path: 'wiki/Research/pricing-ideas.md', read: false },
+] as const;
+const read = vault.filter((file) => file.read).length;
+---
+
+<figure
+  class="ask"
+  role="img"
+  aria-label="A chat beside the vault it searched. Asked what Dana wanted, rotli searches the vault on this computer and reads two notes, Call with Dana and Discount policy, then answers from them; the rest of the vault is not read."
+>
+  <div class="state">
+    <div class="state-head">
+      <div>
+        <p class="state-label">You ask</p>
+        <p class="file">chats/dana-follow-up.md</p>
+      </div>
+    </div>
+    <div class="chat">
+      <p class="question">What did Dana want, and what’s left?</p>
+      <p class="lookup">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
+        <span>Searched your vault on this computer and read {read} notes</span>
+      </p>
+      <p class="reply">
+        From <b>Call with Dana</b>: she’s fine with annual pricing and wants the deck on Friday. Still open: ask
+        Jo about the discount; <b>Discount policy</b> has the current terms.
+      </p>
+    </div>
+  </div>
+  <div class="state found">
+    <div class="state-head">
+      <div>
+        <p class="state-label">What it read</p>
+        <p class="file plain">searched on this computer</p>
+      </div>
+      <img class="quokka" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+    </div>
+    <ul class="vault">
+      {
+        vault.map((file) => (
+          <li class:list={['vault-row', { read: file.read }]}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M4 2.5h5.5L12 5v8.5H4z M9.5 2.5V5H12" /></svg>
+            <span>{file.path}</span>
+            {file.read && <span class="tag">read</span>}
+          </li>
+        ))
+      }
+      <li class="vault-rest">…and the rest of your vault, left closed</li>
+    </ul>
+  </div>
+</figure>
+
+<style>
+  /* Two open columns split by one hairline, like the Librarian's before and after
+     (Filing.astro): the chat on the left, the vault it searched on the right, with the two notes
+     it read lit and the rest left closed. No cards (the owner, 2026-10-07). */
+  .ask {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 0;
+    margin: 0;
+  }
+  .state {
+    min-width: 0;
+    padding-right: clamp(1.25rem, 3.5vw, 3rem);
+  }
+  .state.found {
+    padding-right: 0;
+    padding-left: clamp(1.25rem, 3.5vw, 3rem);
+    border-left: 1px solid var(--border-strong);
+  }
+  .state-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: var(--figure-head, 4rem);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .state-head > div {
+    min-width: 0;
+  }
+  .state-label {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  .file {
+    margin: 0.3rem 0 0;
+    color: var(--text-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .file.plain {
+    font-family: inherit;
+  }
+  .quokka {
+    flex: none;
+    width: 56px;
+    height: 56px;
+    margin: 0 0.25rem calc(-0.75rem - 1px) 0;
+  }
+
+  .chat {
+    display: grid;
+    gap: 0.85rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .chat p {
+    margin: 0;
+  }
+  .question {
+    justify-self: end;
+    max-width: 85%;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.8rem;
+    background: var(--tint);
+  }
+  /* The step between question and answer: what happened, in muted type, not a control. */
+  .lookup {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .lookup svg {
+    flex: none;
+    width: 0.9rem;
+    height: 0.9rem;
+    margin-top: 0.2em;
+  }
+
+  .vault {
+    margin: 0 -0.5rem;
+    padding: 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    list-style: none;
+  }
+  .vault-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.15rem;
+    padding: 0 0.5rem;
+    border-radius: 0.4rem;
+    color: var(--text-muted);
+  }
+  .vault-row span:first-of-type {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .vault-row svg {
+    flex: none;
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+  .vault-row.read {
+    background: var(--tint);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .vault-row.read svg {
+    color: var(--accent-text);
+  }
+  .tag {
+    margin-left: auto;
+    color: var(--accent-text);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .vault-rest {
+    padding: 0.5rem 0.5rem 0;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-style: italic;
+  }
+
+  @media (max-width: 800px) {
+    .ask {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .state,
+    .state.found {
+      padding: 0;
+      border-left: 0;
+    }
+  }
+</style>

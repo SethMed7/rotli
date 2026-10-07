@@ -6,9 +6,13 @@
 // and scenery.
 //
 // The sign-up posts to /api/subscribe (site/server/subscribe.ts, behind Caddy). It works
-// without script: a plain form post lands on /subscribed/. With script it stays on the page,
-// and the form is hidden when the list is off (the endpoint's live probe says so, or it is
-// not there at all, as under `astro dev`).
+// without script: a plain form post lands on /subscribed/. With script it stays on the page.
+// It is always there (the owner, 2026-10-05: "a newsletter submission area for you to put your
+// email"): when the list is off (the endpoint's live probe says so, or it is not there at all,
+// as under `astro dev`), a submit says the list isn't open yet and the address is never sent.
+//
+// The maker line carries an X mark to the maker's profile (rel="me", like /about/): a plain
+// drawn X, not the platform's logo artwork.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
 import { footerGroups, footerTagline, type FooterGroup } from '../nav';
 import { site } from '../site';
@@ -36,6 +40,7 @@ const groups: FooterGroup[] = !site.showsFullSite
       ? [{ title: 'Links', links }]
       : [];
 const external = (href: string) => href.startsWith('http');
+const MAKER_X_URL = 'https://x.com/iamsethmedina';
 ---
 
 <footer class="site-footer-shell">
@@ -44,7 +49,7 @@ const external = (href: string) => href.startsWith('http');
       <div class="footer-lead">
         <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
         <p>{tagline}</p>
-        <form class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
+        <form id="newsletter" class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
           <h2 id="subscribe-title">Hear when it’s ready.</h2>
           <p class="subscribe-note" id="subscribe-note">Notes from the workshop, now and then. Unsubscribe anytime.</p>
           <div class="subscribe-row">
@@ -79,6 +84,7 @@ const external = (href: string) => href.startsWith('http');
                     <li>
                       <a href={link.href} rel={external(link.href) ? 'noopener' : undefined}>
                         {link.label}
+                        {link.external && <span class="external-mark" aria-hidden="true">↗</span>}
                       </a>
                     </li>
                   ))}
@@ -90,7 +96,15 @@ const external = (href: string) => href.startsWith('http');
       }
     </div>
     <div class="footer-bottom">
-      <p>Designed and built by Seth Medina.</p>
+      <p class="footer-maker">
+        Designed and built by Seth Medina.
+        <a class="footer-x" href={MAKER_X_URL} rel="me noopener" aria-label="Seth Medina on X">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 4.5 19 19.5" stroke-width="2.6" />
+            <path d="M19 4.5 5 19.5" stroke-width="1.6" />
+          </svg>
+        </a>
+      </p>
       <div class="footer-badges">
         <a
           class="footer-badge"
@@ -121,7 +135,7 @@ const external = (href: string) => href.startsWith('http');
 
   if (form && status && input && button) {
     const label = button.textContent ?? '';
-    const show = (state: 'idle' | 'sending' | 'done' | 'error', message = '') => {
+    const show = (state: 'idle' | 'sending' | 'done' | 'error' | 'closed', message = '') => {
       form.dataset.state = state;
       status.textContent = message;
       button.disabled = state === 'sending';
@@ -131,23 +145,35 @@ const external = (href: string) => href.startsWith('http');
       else input.removeAttribute('aria-invalid');
     };
 
-    // Is the list open here? Off (or no endpoint at all), the sign-up is not offered.
+    // Is the list open here? Off (or no endpoint at all), the form stays, and a submit says so
+    // without sending the address anywhere.
+    let live = false;
     fetch('/api/subscribe', { headers: { accept: 'application/json' }, cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : { live: false }))
       .then((probe: { live?: boolean }) => {
-        if (probe.live !== true) form.hidden = true;
+        live = probe.live === true;
       })
       .catch(() => {
-        form.hidden = true;
+        live = false;
       });
+    const notOpen = 'The list isn’t open yet, so nothing was sent. Check back soon.';
 
     input.addEventListener('input', () => {
-      if (form.dataset.state === 'error') show('idle');
+      if (form.dataset.state === 'error' || form.dataset.state === 'closed') show('idle');
     });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (form.dataset.state === 'sending') return;
+      if (!input.checkValidity()) {
+        show('error', 'That email address does not look right.');
+        input.focus();
+        return;
+      }
+      if (!live) {
+        show('closed', notOpen);
+        return;
+      }
       show('sending');
       const fields = Object.fromEntries(new FormData(form));
       try {
@@ -157,7 +183,9 @@ const external = (href: string) => href.startsWith('http');
           body: JSON.stringify(fields),
         });
         const reply = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (res.ok && reply.ok) {
+        if (res.status === 404 || res.status === 503) {
+          show('closed', notOpen);
+        } else if (res.ok && reply.ok) {
           show('done', 'You’re on the list. We’ll write when there is something worth reading.');
           form.reset();
         } else {

@@ -1,0 +1,299 @@
+---
+// The download page's scene: the film's island by day, with a little dock. On the dock a laptop
+// sits on a crate with a note open (the Mac app) and a quokka waves; a small boat is tied up at
+// the end, its sail a browser window (Rotli Web), and a second quokka cheers from inside it. The
+// two ways in, drawn. No product's logo is drawn: the laptop and the window are generic.
+//
+// It plays once when it comes into view (the site's [data-reveal]): the boat sails in and
+// settles, the quokkas hop up, and the lines on both screens write themselves. Then it rests;
+// nothing loops. Reduced motion and no script show it at rest. Plain CSS on the reveal class
+// (no inline style, so the production CSP allows it). Decoration only: the page says it in
+// words, so the scene is hidden from assistive technology. Colours are Base.astro's film tokens
+// with the art's own --ink.
+import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
+import waving from '../../../src/assets/characters/filled/cocoa/waving.webp';
+---
+
+<div class="dscene" data-reveal aria-hidden="true">
+  <svg viewBox="0 0 960 600" preserveAspectRatio="xMidYMax slice" role="presentation">
+    <g class="clouds">
+      <g class="cloud k1">
+        <ellipse cx="170" cy="96" rx="66" ry="18"></ellipse>
+        <ellipse cx="206" cy="84" rx="40" ry="18"></ellipse>
+      </g>
+      <g class="cloud k2">
+        <ellipse cx="620" cy="70" rx="54" ry="15"></ellipse>
+        <ellipse cx="648" cy="60" rx="32" ry="14"></ellipse>
+      </g>
+    </g>
+
+    <!-- the far island and its lighthouse, between the dock and the boat -->
+    <path class="hill" d="M400 314C450 292 510 262 566 260S660 282 730 314Z"></path>
+    <ellipse class="bush" cx="480" cy="298" rx="20" ry="7"></ellipse>
+    <ellipse class="bush" cx="650" cy="294" rx="18" ry="7"></ellipse>
+    <path class="tower" d="M558 262l5-66h16l5 66z"></path>
+    <rect class="lamp" x="563" y="178" width="16" height="18"></rect>
+    <path class="cap" d="M560 178q11-14 22 0z"></path>
+
+    <!-- the sea -->
+    <rect class="sea" x="-10" y="312" width="980" height="300"></rect>
+    <path class="sea-edge" d="M-10 314H970"></path>
+    <path class="waves" d="M60 470q12-6 24 0M600 360q12-6 24 0M880 520q14-7 28 0M140 560q12-6 24 0M720 560q12-6 24 0M460 520q12-6 24 0"></path>
+
+    <!-- the dock: planks over posts -->
+    <g class="dock">
+      <rect class="post" x="70" y="410" width="12" height="200"></rect>
+      <rect class="post" x="220" y="410" width="12" height="200"></rect>
+      <rect class="post" x="370" y="410" width="12" height="200"></rect>
+      <rect class="post" x="500" y="410" width="12" height="200"></rect>
+      <rect class="deck" x="-10" y="396" width="540" height="18"></rect>
+      <path class="planks" d="M40 396v18M90 396v18M140 396v18M190 396v18M240 396v18M290 396v18M340 396v18M390 396v18M440 396v18M490 396v18"></path>
+    </g>
+
+    <!-- the crate and the laptop with a note open -->
+    <g class="laptop">
+      <rect class="crate" x="92" y="330" width="132" height="66" rx="4"></rect>
+      <path class="crate-line" d="M92 352h132M92 374h132"></path>
+      <rect class="screen-back" x="104" y="232" width="108" height="86" rx="8"></rect>
+      <rect class="screen" x="113" y="241" width="90" height="68" rx="3"></rect>
+      <path class="write w1" d="M124 258h52"></path>
+      <path class="write w2" d="M124 274h66"></path>
+      <path class="write w3" d="M124 290h40"></path>
+      <path class="base" d="M94 318h128l-10 12H104z"></path>
+    </g>
+
+    <image class="quokka q-dock" href={waving.src} x="232" y="222" width="178" height="178"></image>
+
+    <!-- the rope from the last post to the boat -->
+    <path class="rope" d="M506 404C540 440 566 444 590 432"></path>
+
+    <!-- the boat, its sail a browser window, and its passenger -->
+    <g class="boat">
+      <path class="mast" d="M708 432V146"></path>
+      <g class="sail">
+        <rect class="window" x="716" y="152" width="200" height="140" rx="12"></rect>
+        <path class="window-bar" d="M716 180h200"></path>
+        <circle class="dot" cx="734" cy="166" r="4.5"></circle>
+        <circle class="dot" cx="749" cy="166" r="4.5"></circle>
+        <circle class="dot" cx="764" cy="166" r="4.5"></circle>
+        <rect class="address" x="782" y="159" width="116" height="14" rx="7"></rect>
+        <path class="write w4" d="M738 206h110"></path>
+        <path class="write w5" d="M738 228h134"></path>
+        <path class="write w6" d="M738 250h80"></path>
+      </g>
+      <image class="quokka q-boat" href={celebrating.src} x="742" y="306" width="150" height="150"></image>
+      <path class="hull" d="M586 420H936L900 486Q886 498 868 498H644Q626 498 614 486Z"></path>
+      <path class="hull-line" d="M600 440H926"></path>
+    </g>
+  </svg>
+</div>
+
+<style>
+  .dscene {
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .dscene svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 960 / 600;
+  }
+  .cloud ellipse {
+    fill: var(--surface-2);
+  }
+  .hill {
+    fill: var(--limestone);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .bush {
+    fill: var(--olive);
+  }
+  .tower {
+    fill: var(--surface);
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-linejoin: round;
+  }
+  .lamp {
+    fill: var(--lantern);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .cap {
+    fill: var(--ink);
+  }
+  .sea {
+    fill: var(--sea);
+  }
+  .sea-edge {
+    stroke: var(--sea-deep);
+    stroke-width: 4;
+  }
+  .waves {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .deck,
+  .crate {
+    fill: var(--wood);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .post {
+    fill: var(--wood-dark);
+  }
+  .planks,
+  .crate-line {
+    fill: none;
+    stroke: var(--wood-dark);
+    stroke-width: 2;
+  }
+  .screen-back,
+  .base {
+    fill: var(--limestone);
+    stroke: var(--ink);
+    stroke-width: 3.5;
+    stroke-linejoin: round;
+  }
+  .screen,
+  .window {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 3.5;
+    stroke-linejoin: round;
+  }
+  .window-bar {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .dot {
+    fill: var(--accent);
+  }
+  .address {
+    fill: var(--surface-2);
+  }
+  .write {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .rope {
+    fill: none;
+    stroke: var(--wood-dark);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .mast {
+    stroke: var(--ink);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .hull {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 3.5;
+    stroke-linejoin: round;
+  }
+  .hull-line {
+    fill: none;
+    stroke: var(--surface);
+    stroke-width: 4;
+  }
+
+  /* Once, when it comes into view: the boat sails in and settles, the quokkas hop up, and both
+     screens write their lines. Every animation fills backwards only, so it rests on the drawing. */
+  .boat,
+  .quokka,
+  .cloud {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+  .boat {
+    transform-box: view-box;
+  }
+  .write {
+    stroke-dasharray: 140;
+    stroke-dashoffset: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .dscene:global(.is-visible) .cloud {
+      animation: dscene-drift 2200ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    }
+    :global(.js) .dscene:global(.is-visible) .k2 {
+      animation-delay: 180ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .boat {
+      animation: dscene-sail 1700ms cubic-bezier(0.22, 1, 0.36, 1) 200ms backwards;
+    }
+    :global(.js) .dscene:global(.is-visible) .q-dock {
+      animation: dscene-hop 820ms cubic-bezier(0.34, 1.45, 0.64, 1) 350ms backwards;
+    }
+    :global(.js) .dscene:global(.is-visible) .q-boat {
+      animation: dscene-hop 820ms cubic-bezier(0.34, 1.45, 0.64, 1) 1600ms backwards;
+    }
+    :global(.js) .dscene:global(.is-visible) .write {
+      animation: dscene-write 700ms cubic-bezier(0.65, 0, 0.35, 1) backwards;
+    }
+    :global(.js) .dscene:global(.is-visible) .w1 {
+      animation-delay: 700ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .w2 {
+      animation-delay: 900ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .w3 {
+      animation-delay: 1100ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .w4 {
+      animation-delay: 1900ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .w5 {
+      animation-delay: 2100ms;
+    }
+    :global(.js) .dscene:global(.is-visible) .w6 {
+      animation-delay: 2300ms;
+    }
+  }
+  @keyframes dscene-drift {
+    from {
+      transform: translateX(-50px);
+      opacity: 0;
+    }
+  }
+  @keyframes dscene-sail {
+    0% {
+      transform: translate(320px, 0) rotate(2deg);
+    }
+    70% {
+      transform: translate(-10px, 4px) rotate(-1.5deg);
+    }
+    85% {
+      transform: translate(4px, -2px) rotate(0.8deg);
+    }
+  }
+  @keyframes dscene-hop {
+    0% {
+      transform: translateY(60px) scale(0.9, 1.08);
+      opacity: 0;
+    }
+    55% {
+      transform: translateY(-14px);
+      opacity: 1;
+    }
+    80% {
+      transform: translateY(0) scale(1.05, 0.95);
+    }
+  }
+  @keyframes dscene-write {
+    from {
+      stroke-dashoffset: 140;
+    }
+  }
+</style>

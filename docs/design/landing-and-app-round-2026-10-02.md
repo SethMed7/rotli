@@ -41,6 +41,7 @@ site message and structure follow. The story film (#21) comes last.
 - Capture it, cut it in hyperframes, add a poster, and keep the existing `FilmPlayer` behavior (muted autoplay once, reduced-motion poster).
 - Under ~6 MB.
 - Human step: the owner reviews the cut.
+- 2026-10-05: the owner asked for a polished launch cut (no caption bar, cards between cuts). The plan is [launch-video-plan-2026-10-05.md](launch-video-plan-2026-10-05.md).
 
 ### PR 2 — App fixes (#5, #23, #6, #8)
 - **#5:** start with a failing reproduction. Prefer the raw pair on macOS, or choose the candidate inside the editor rect. Update `externalImageDrop.test.ts`. Prove it with native validation (browser can't).
@@ -201,6 +202,35 @@ On top of #165 now sit:
 
 Proof on the tip: `bun run verify` passed in one run (secrets, quality, app
 E2E 275, web E2E 66, Rust 692), and `bun run test:e2e:site` passed 20/20.
+
+### Website prompt pass (2026-10-05)
+
+A fidelity pass on `feat/website-prompt-pass`: each website item in the
+owner's prompt checked against the built site at 390, 768, and 1440, not
+against this log. Committed locally, not pushed.
+
+| Item | Found | Done |
+|---|---|---|
+| 2 | Hero and TwoKinds land the message; the landing never said notes are the foundation of more, or that AI costs nothing extra (only About did) | Overview lede, StatBand close, two FAQ entries (also the FAQPage JSON-LD); the closing lede "Warm enough… Quiet enough… Local enough…" replaced with one plain line |
+| 11, 12 | Both lines gone from pages, `llms.txt`, and the cards; the privacy page still said AI is "a visitor, not the owner" | That sentence cut. `rotli-promo.vtt` (holding page only) still carries "Room to think. Files you keep."; it waits on the promo re-cut |
+| 14 | No quokka carousel anywhere; the only carousel is the theme studio's | A stale comment fixed |
+| 16 | TOC and footer quokka in place; no reading meter on `/privacy/` or posts | Both pass `progress` |
+| 7, 19 | Hidden form leaves no gap at any width; no founder.best anywhere | Nothing |
+| 390/768 | Changelog scrolled sideways (inline code); the island ran under "Make it yours" from 761 to about 1100px; Overview steps sat in one sparse column on tablets; small touch targets | `overflow-wrap: anywhere`; island from 1180px; quokka beside its step 560–900px; coarse-pointer hit areas. `e2e/site/narrow-layout.spec.ts` holds them |
+| Theme captures | No script makes `public/themes/` | Left as is; re-capture by hand when the owner wants |
+
+Owner: accept or reword the new copy (Overview lede, StatBand close, the two
+FAQ answers, the closing line).
+
+### Landing layout (2026-10-05)
+
+The owner found parts of the landing messy. `feat/site-landing-layout`
+restructures it from three reference patterns: three cards with drawn app
+pictures replace the Write/Keep/Ask trio; a tour ("A closer look") absorbs
+the ways-in chapter; and a closing panel sits above the footer beach. The
+audit, the new order, and the banner headline drafts are in
+[landing-layout-2026-10-05.md](landing-layout-2026-10-05.md). It is committed
+locally and not pushed.
 
 ### Owner decisions now
 

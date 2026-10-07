@@ -1,11 +1,12 @@
 ---
 // The landing page's privacy band, staged like the story film's "secure stays home" shot: a
-// night sky (Ocean Dark: the .band-night tokens in Base.astro), and on the right the dome of "on this Mac" with the quokka inside, a locked
-// secure note beside it and the little on-device model that may read it. Two remote-AI
-// clouds drift in, bump the dome, and back off. The scene plays once when the band comes into
-// view; reduced motion shows it at rest. The promise and the link to the full policy
-// (/privacy/) are the page text on the left. While the band is the focal passage, the whole
-// page steps into its Ocean Dark too (data-passage, src/passage.ts) and back out on leaving.
+// night sky (Ocean Dark: the .band-night tokens in Base.astro), and on the right the dome of
+// "on this Mac" with the quokka inside, a locked secure note beside it and the little on-device
+// model that may read it. Two remote-AI clouds drift in, bump the dome, and back off. The scene
+// plays once when the band comes into view; reduced motion shows it at rest. The promise and the
+// link to it (/privacy/#promise, at the top of the full policy; the hero points there too) are
+// the page text on the left. While the band is the focal passage, the whole page steps into its
+// Ocean Dark too (data-passage, src/passage.ts) and back out on leaving.
 import SecureScene from '../SecureScene.astro';
 
 const facts = [
@@ -38,7 +39,7 @@ const facts = [
           </li>
         ))}
       </ul>
-      <a class="button privacy-link" href="/privacy/">How privacy works in rotli</a>
+      <a class="button privacy-link" href="/privacy/#promise">Read our privacy promise</a>
     </div>
 
     <SecureScene />

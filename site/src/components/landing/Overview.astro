@@ -1,150 +1,183 @@
 ---
-// What rotli does, in the three steps the story film takes: write it down, keep it in your
-// folder, ask it anything. Each step is one line and three facts the rest of the site
-// already states; the full tour lives on /features/.
-// The quokkas are the app's own character art, and hop in once when the steps are revealed.
-import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
-import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
-import notes from '../../../../src/assets/characters/filled/cocoa/notes.webp';
+// What rotli does, as one story in three steps (the owner, 2026-10-06: "clarify view vs where
+// it actually lives … you write a note and open it in your view, Librarian puts it in vault
+// accordingly, later ask AI about it and AI has indexing to get to it quick without wasting your
+// tokens"). It also absorbed the former "You write for yourself. AI reads differently." section,
+// whose before and after is now the File step's picture (the owner, the same day: the two were
+// redundant). Each step is a heading and one or two sentences beside one picture drawn in HTML
+// on the site's tokens, with the app's quokka standing on it; no cards, outer or inner (the
+// owner, 2026-10-05 and 2026-10-07). The steps carry no numbers (the owner, 2026-10-07: "why
+// even have them?"): the headings already read in order. Every picture spans the same column
+// and opens on the same head, a label and a line over one hairline, level with the step's
+// heading:
+//   1. Write: the note in your view and its one file in the vault (ViewAndVault.astro);
+//   2. File: the Librarian's before and after, which plays once (Filing.astro);
+//   3. Ask: a chat that searches on your computer and reads only what it found (AskIndex.astro).
+// Every claim is a contract's (docs/design/landing-layout-2026-10-05.md lists them): views are
+// reference projections, never stores, and a note's place in Main never follows its file
+// (memex-data-contract.md, "One physical home, many views"); the Librarian is optional and
+// Mac-only, moves files to wiki/<area>/ and writes only its declared fields, never the body
+// ("Metadata ownership"); the AI searches locally and reads only selected notes, never the
+// whole vault ("Master memory retrieval"); secure notes never reach a remote model
+// (docs/design/ai-visibility-matrix.md).
+// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source.
+// The section no longer ends on "See every feature" or a link to the getting-started guide (the
+// owner, 2026-10-07): Features is in the header, and the guide wants a better place than a
+// trailing link.
+import AskIndex from './AskIndex.astro';
+import Filing from './Filing.astro';
+import ViewAndVault from './ViewAndVault.astro';
 
-const steps = [
-  {
-    art: notes,
-    title: 'Write.',
-    body: 'Press ⌥Space from anywhere and start typing. Markdown renders as you go.',
-    facts: [
-      'Tasks, choices, tables, diagrams, and math',
-      'Aa shows the plain Markdown underneath',
-      '[[Wikilinks]] and ⌘K search across the vault',
-    ],
-  },
-  {
-    art: knowledge,
-    title: 'Keep.',
-    body: 'Every note is a plain file in one folder you choose, and it stays yours.',
-    facts: [
-      'Opens in any editor; back it up your way',
-      'A Librarian files, tags, and links, never rewrites',
-      'Main and named views arrange without copying',
-    ],
-  },
-  {
-    art: aiChat,
-    title: 'Ask.',
-    body: 'Chat answers from your own notes, with a model on your Mac or the tools you already use.',
-    facts: [
-      'Conversation notes kept after every reply',
-      'Secure notes never reach a remote model',
-      'Lock a note and no AI can edit it',
-    ],
-  },
-];
+/** Andrej Karpathy's "LLM Wiki" gist (2026-04-04), the source of the term. */
+const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f';
 ---
 
 <section class="section overview" id="features" aria-labelledby="overview-title">
   <div class="wrap">
     <header class="section-head" data-reveal>
       <h2 class="section-title" id="overview-title">Write it down. <span class="inked">rotli puts it away.</span></h2>
-      <p class="section-lede">Then ask your notes anything.</p>
+      <p class="section-lede">
+        Where a note shows up and where its file lives are two different things. You arrange notes in a view.
+        Each file lives once, in your vault: the folder you chose.
+      </p>
     </header>
-    <ol class="steps" data-stagger>
-      {
-        steps.map((step) => (
-          <li>
-            <img src={step.art.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-            <h3>{step.title}</h3>
-            <p>{step.body}</p>
-            <ul>
-              {step.facts.map((fact) => (
-                <li>{fact}</li>
-              ))}
-            </ul>
-          </li>
-        ))
-      }
+
+    <ol class="steps">
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <h3>Write in your view</h3>
+          <p>
+            Start a note and keep it open in your view: Main, or a named view for a project. A view is your own
+            arrangement of notes, never a copy of them.
+          </p>
+        </div>
+        <ViewAndVault />
+      </li>
+
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <h3>The Librarian files it</h3>
+          <p>
+            When it’s on, the Librarian later moves the file to its area folder in your vault and adds an area, a
+            summary, tags, and links at the top. It never changes your words, and your view still shows the note
+            where you put it.
+          </p>
+        </div>
+        <Filing />
+      </li>
+
+      <li class="step" data-reveal>
+        <div class="step-copy">
+          <h3>Ask, and AI goes straight to it</h3>
+          <p>
+            Later, ask AI about it. rotli searches your vault on your computer, and the AI reads only the few notes
+            that matter, not the whole vault, so your tokens go to the answer. Secure notes never go to a remote
+            model.
+          </p>
+        </div>
+        <AskIndex />
+      </li>
     </ol>
-    <p class="overview-more">
-      <a class="button secondary" href="/features/">See every feature</a>
-    </p>
+
+    <aside class="llm-wiki" aria-labelledby="llm-wiki-title" data-reveal>
+      <h3 id="llm-wiki-title">What is an LLM wiki?</h3>
+      <p>
+        Plain Markdown notes, kept organized and linked so an AI can build on what you already know instead of
+        starting from scratch on every question. Andrej Karpathy described the idea in his{' '}
+        <a href={LLM_WIKI_SOURCE} rel="noopener">LLM Wiki note</a> (April 2026), and your rotli vault works the same
+        way: you write, and the Librarian adds the areas, summaries, tags, and links.
+      </p>
+    </aside>
   </div>
 </section>
 
 <style>
+  /* --figure-head is the one height of every picture's head (a label and a line over one
+     hairline; ViewAndVault, Filing, AskIndex read it), so each step's heading starts level with
+     its picture's first label and every hairline sits at one depth. */
   .steps {
+    --figure-head: 4rem;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2.5rem clamp(1.5rem, 4vw, 3.5rem);
-    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    gap: clamp(4rem, 8vw, 6rem);
+    margin: 0;
     padding: 0;
     list-style: none;
   }
-  .steps > li {
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-strong);
+  /* A step: its words on the left, its picture on the right, both from one top edge; stacked
+     below 1080px. Every picture spans the same column. */
+  .step {
+    display: grid;
+    grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 2rem clamp(2.5rem, 5vw, 4.5rem);
   }
-  img {
-    width: 112px;
-    height: 112px;
-    margin: 0 0 0.75rem -0.5rem;
+  .step > :global(figure) {
+    width: 100%;
+    max-width: 62rem;
   }
-  h3 {
+  .step-copy h3 {
     margin: 0;
     font-size: var(--step-h3);
     font-weight: 600;
     letter-spacing: -0.02em;
+    line-height: 1.2;
   }
-  .steps p {
-    margin: 0.5rem 0 0;
+  .step-copy p {
+    margin: 0.65rem 0 0;
     color: var(--text-muted);
-    line-height: 1.55;
+    line-height: 1.6;
   }
-  .steps ul {
-    display: grid;
-    gap: 0.5rem;
-    margin: 1.1rem 0 0;
-    padding: 0;
-    list-style: none;
+  @media (max-width: 1080px) {
+    .step {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .step-copy {
+      max-width: 38rem;
+    }
   }
-  .steps ul li {
-    padding-left: 0.9rem;
-    border-left: 2px solid var(--accent);
-    font-size: 0.95rem;
-    line-height: 1.4;
+
+  /* What is an LLM wiki: a short aside after the story, under one hairline. */
+  .llm-wiki {
+    max-width: 44rem;
+    margin-top: clamp(4rem, 8vw, 5.5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--border-strong);
   }
-  .overview-more {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 1rem 1.75rem;
-    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+  .llm-wiki h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
   }
-  /* The film's hop: each quokka lands with a small squash as its step comes in. */
+  .llm-wiki p {
+    margin: 0.6rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+  .llm-wiki a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+
+  /* The quokkas hop onto their pictures once, as each step comes in. */
   @media (prefers-reduced-motion: no-preference) {
-    :global(.js) .steps:global(.is-visible) img {
-      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) backwards;
+    :global(.js) .step:global(.is-visible) :global(.quokka) {
+      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 220ms backwards;
       transform-origin: 50% 100%;
-    }
-    :global(.js) .steps:global(.is-visible) > li:nth-child(2) img {
-      animation-delay: 90ms;
-    }
-    :global(.js) .steps:global(.is-visible) > li:nth-child(3) img {
-      animation-delay: 180ms;
     }
   }
   @keyframes hop {
     0% {
-      transform: translateY(28px) scale(0.9, 1.08);
+      transform: translateY(18px) scale(0.9, 1.08);
     }
     60% {
-      transform: translateY(-6px) scale(1, 1);
+      transform: translateY(-5px) scale(1, 1);
     }
     80% {
       transform: translateY(0) scale(1.06, 0.93);
-    }
-  }
-  @media (max-width: 900px) {
-    .steps {
-      grid-template-columns: 1fr;
     }
   }
 </style>

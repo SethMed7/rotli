@@ -1,99 +1,38 @@
 ---
-// /resources/ (the Guides index) and /resources/<article>/. Each article opens on its own
-// scene and pins a reading meter under the header (WritingPage `progress`). The header's
-// Resources dropdown also leads to the Blog, Developers (resources/developers/),
-// and the Changelog; this index lists the guides only.
-import { render } from 'astro:content';
-import { twinPath, writingGraph, writingPath } from '../../agents';
-import ResourceScene, { type SceneKind } from '../../components/ResourceScene.astro';
+// /resources/: the Resources dropdown's entries as a page, for anyone without script (the header
+// label's own link) and for the footer. The list is the dropdown's (src/nav.ts `resourceItems`),
+// so the two never differ. The guides were here until 2026-10-06; they are blog posts tagged Guide
+// now, and their old addresses redirect to them (astro.config.mjs `redirects`, site/Caddyfile).
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { resourceItems } from '../../nav';
 import { ogImage } from '../../og';
 import { site } from '../../site';
-import { publishedWriting, slugOf, type Writing } from '../../writing';
+import { publishedWriting } from '../../writing';
 
 export async function getStaticPaths() {
-  if (!site.showsFullSite) return [];
-  const entries = await publishedWriting('resource');
-  return [
-    { params: { slug: undefined }, props: { entry: null, entries } },
-    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries } })),
-  ];
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
-const items = entries.map((item) => ({
-  href: `/resources/${slugOf(item)}/`,
-  title: item.data.title,
-  description: item.data.description,
-  meta: item.data.draft ? 'Draft · dev site only' : undefined,
+const hasPosts = (await publishedWriting('post')).length > 0;
+const items = resourceItems({ hasPosts }).map((item) => ({
+  href: item.href,
+  title: item.label,
+  description: item.description,
+  meta: item.status,
+  external: item.external,
 }));
-const rendered = entry ? await render(entry) : null;
-const Content = rendered?.Content ?? null;
-const toc = (rendered?.headings ?? [])
-  .filter((heading) => heading.depth === 2)
-  .map((heading) => ({ slug: heading.slug, text: heading.text }));
-const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(entry)}/`) : [];
-/** Each guide's opening scene (ResourceScene.astro); a guide not listed gets the plain beach. */
-const scenes: Record<string, SceneKind> = {
-  'getting-started': 'start',
-  'why-local': 'local',
-  'ai-and-your-notes': 'ai',
-  'rotli-helper': 'helper',
-  'web-and-mac': 'web',
-};
 ---
 
-{
-  entry && Content ? (
-    <WritingPage
-      title={`${entry.data.title} — rotli`}
-      description={entry.data.description}
-      canonicalPath={`/resources/${slugOf(entry)}/`}
-      {...ogImage('resources')}
-      structuredData={writingGraph(entry)}
-      markdownPath={twinPath(writingPath(entry))}
-      section="resources"
-      crumbs={[{ href: '/resources/', label: 'Guides' }]}
-      kicker={entry.data.draft ? 'Draft · dev site only' : undefined}
-      heading={entry.data.title}
-      lede={entry.data.description}
-      toc={toc}
-      progress
-    >
-      <ResourceScene slot="scene" kind={scenes[slugOf(entry)] ?? 'beach'} />
-      <Content />
-      <section slot="after" class="more" aria-labelledby="more-title">
-        <h2 id="more-title">More guides</h2>
-        <WritingList items={more} empty="" />
-      </section>
-    </WritingPage>
-  ) : (
-    <WritingPage
-      title="Guides — rotli"
-      description="Short answers to the questions people ask about rotli: why local, where notes live, and how it works."
-      canonicalPath="/resources/"
-      {...ogImage('resources')}
-      section="resources"
-      heading="Guides"
-      lede="Short answers to the questions people ask about rotli: why local, where notes live, and how the pieces fit."
-      wide
-    >
-      <WritingList items={items} empty="Nothing here yet." />
-    </WritingPage>
-  )
-}
-
-<style>
-  .more {
-    margin-top: var(--section-space);
-    padding-top: 2rem;
-    border-top: 1px solid var(--border-strong);
-  }
-  .more h2 {
-    margin: 0 0 1.5rem;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-</style>
+<WritingPage
+  title="Resources — rotli"
+  description="The blog and its guides, the developer reference, the roadmap, and every release."
+  canonicalPath="/resources/"
+  {...ogImage('resources')}
+  section="resources"
+  heading="Resources"
+  lede="The blog and its guides, the developer reference, the roadmap, and every release."
+  wide
+>
+  <WritingList items={items} empty="" />
+</WritingPage>

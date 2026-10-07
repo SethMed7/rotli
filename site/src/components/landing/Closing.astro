@@ -1,0 +1,149 @@
+---
+// The close, between the questions and the footer's beach (the owner's reference,
+// 2026-10-05): one framed panel with a two-tone headline (the first line in full ink, the
+// second muted), one short line, "Download free" (the hero's one way in), and the writing quokka coming in from the
+// right edge. It asks for one small first step instead of repeating the hero's promise (the
+// earlier closing invitation was cut for that). The headline was picked from three drafts in
+// docs/design/landing-layout-2026-10-05.md. On narrow screens the quokka steps below the
+// words instead of beside them, so it never sits on the text.
+import writing from '../../../../src/assets/characters/filled/cocoa/notes.webp';
+import SiteActions from '../SiteActions.astro';
+---
+
+<section class="section closing" id="start" aria-labelledby="start-title">
+  <div class="wrap">
+    <div class="panel" data-reveal>
+      <div class="copy">
+        <h2 class="section-title" id="start-title">
+          <span class="strong">Start with one note.</span>
+          <span class="soft">It stays in your folder.</span>
+        </h2>
+        <p class="line">Free, with no account to make.</p>
+        <SiteActions />
+      </div>
+      <div class="art" aria-hidden="true">
+        <svg class="sheet s1" viewBox="0 0 88 112"><rect x="2" y="2" width="84" height="108" rx="8" /><path d="M16 30h56M16 50h56M16 70h36" /></svg>
+        <svg class="sheet s2" viewBox="0 0 88 112"><rect x="2" y="2" width="84" height="108" rx="8" /><path d="M16 30h56M16 50h44M16 70h56M16 90h28" /></svg>
+        <img src={writing.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .closing {
+    padding-top: 0;
+  }
+  /* One frame on the plain ground: the warm band's colour, one hairline, the art clipped by it. */
+  .panel {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.5fr);
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .copy {
+    position: relative;
+    padding: clamp(2.5rem, 6vw, 4.75rem) clamp(1.5rem, 5vw, 4.5rem);
+  }
+  /* A closing line, a step under the chapter headlines so both lines fit beside the art. */
+  .section-title {
+    font-size: clamp(2rem, 3.9vw, 3.25rem);
+  }
+  .section-title span {
+    display: block;
+    text-wrap: balance;
+  }
+  .soft {
+    color: var(--text-muted);
+  }
+  .line {
+    margin: 1.1rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  .copy :global(.site-actions) {
+    margin-top: clamp(1.75rem, 3vw, 2.25rem);
+  }
+
+  /* The quokka with its notepad, standing in from the right and cut off by the frame's bottom
+     edge, with two loose pages behind it. */
+  .art {
+    position: relative;
+    min-height: 100%;
+  }
+  .art img {
+    position: absolute;
+    right: clamp(-3.5rem, -4vw, -1rem);
+    bottom: -3.25rem;
+    width: clamp(15rem, 27vw, 22rem);
+    height: auto;
+  }
+  .sheet {
+    position: absolute;
+    width: 5.5rem;
+    height: auto;
+  }
+  .sheet rect {
+    fill: var(--surface);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .sheet path {
+    fill: none;
+    stroke: var(--border-strong);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .s1 {
+    top: 18%;
+    left: 6%;
+    rotate: -8deg;
+  }
+  .s2 {
+    top: 46%;
+    left: 22%;
+    rotate: 6deg;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .panel .sheet {
+      opacity: 0;
+      translate: 0 24px;
+      transition: translate 900ms cubic-bezier(0.16, 1, 0.3, 1) 200ms, opacity 600ms ease-out 200ms;
+    }
+    :global(.js) .panel:global(.is-visible) .sheet {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  /* Narrow: the words first, then the art as a strip along the bottom of the frame. */
+  @media (max-width: 900px) {
+    .panel {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .copy {
+      padding-bottom: 0;
+    }
+    .art {
+      min-height: 13rem;
+    }
+    .art img {
+      right: 50%;
+      bottom: -2.75rem;
+      width: 14rem;
+      transform: translateX(50%);
+    }
+    .s1 {
+      top: 22%;
+      left: calc(50% - 10rem);
+    }
+    .s2 {
+      top: 30%;
+      left: calc(50% + 4.5rem);
+    }
+  }
+</style>

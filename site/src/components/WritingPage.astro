@@ -7,15 +7,34 @@
 // slim rail that fills as you read; below 900px the tree folds into an
 // "On this page" disclosure above the text. The highlight and the rail are
 // script (progressive enhancement); without it the tree is plain links.
-// Pages that pass `progress` (resource articles) also get a reading meter pinned under the
-// header on every width: a bar and "N% through", measured over the article alone
-// (src/reading.ts, the same measure that fills the tree's rail). It shows only when the
-// article is longer than the window, and it is a position, never a record: nothing is kept.
+// Pages that pass `progress` also get a reading meter: a bar and "N% through" pinned under the
+// header, measured over the article alone (src/reading.ts, the same measure that fills the tree's
+// rail). It shows only when the article is longer than the window, and it is a position, never a
+// record: nothing is kept. An `article` carries the same measure in its rail and, narrow, as a
+// slim bar.
+// Blog posts and /privacy/ pass `article` (opt-in), on the site's one 76rem page, so the head has
+// the header's edges: the head (blog/ArticleCover.astro: the words beside the picture on a wide
+// screen; /privacy/ draws its night scene through the `cover` slot), then two columns on named
+// tracks (--article-tracks: the left rail, then the middle with the reading column of about 66
+// characters centred in it, blog/article.css). The rail has the short title, the tree, the meter
+// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro;
+// /privacy/ shares by Copy link alone). After the article, "More from rotli": more posts and
+// rotli's own spots (blog/ArticleAside.astro), which take the place of the article's own Sources
+// list where the rail shows the sources. Under 901px the tree is the disclosure, the meter a slim
+// bar under the header, the article keeps its Sources list, and Share follows the article, all on
+// the text's edges.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
+import type { TocItem } from '../blog';
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
+import type { Banner } from '../og';
+import type { Promo } from '../promos';
+import type { Source } from '../sources';
 import { site } from '../site';
+import ArticleAside, { type MorePost } from './blog/ArticleAside.astro';
+import ArticleCover from './blog/ArticleCover.astro';
+import ArticleRail from './blog/ArticleRail.astro';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 
@@ -25,7 +44,7 @@ interface Props {
   canonicalPath: string;
   /** Which header section to mark current; none for pages outside the nav. */
   section?: NavSection;
-  /** A trail back up, e.g. [{ href: '/resources/', label: 'Resources' }]. */
+  /** A trail back up, e.g. [{ href: '/blog/', label: 'Blog' }]. */
   crumbs?: { href: string; label: string }[];
   /** Small line above the headline: a draft label or a section name. */
   kicker?: string;
@@ -33,14 +52,35 @@ interface Props {
   lede?: string;
   /** The metadata line under the lede: a date, "Updated …", a reading time. */
   meta?: string[];
-  /** Headings for the "On this page" column (depth-2 headings only). */
-  toc?: { slug: string; text: string }[];
+  /** Headings for the "On this page" column: depth 2, and depth 3 under them in an article's tree. */
+  toc?: (Omit<TocItem, 'depth'> & { depth?: number })[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
-  /** Pin a reading meter under the header (resource articles). */
+  /** Pin a reading meter under the header (blog posts, /privacy/). */
   progress?: boolean;
+  /** The article layout (blog posts, /privacy/): the contained picture beside the words, the left
+   * rail, the reading column, "More from rotli". A drawn picture comes through the `cover` slot. */
+  article?: {
+    cover?: Banner;
+    /** The byline's name and mark; without it the meta line stands alone (/privacy/). */
+    author?: string;
+    tags?: string[];
+    /** The page's absolute address, for Share. */
+    url: string;
+    /** The page's Markdown twin, for Copy Markdown (only with `share: 'all'`). */
+    markdown?: string;
+    /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
+    sources?: Source[];
+    /** Every way to share (a post), or Copy link alone (/privacy/). */
+    share?: 'all' | 'link';
+    /** What the rail calls the page in its labels: "About this post", "Position in this page". */
+    noun?: 'post' | 'page';
+    /** Other posts and rotli's own spots, after the article ("More from rotli"). */
+    more: MorePost[];
+    promos: Promo[];
+  };
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
@@ -62,12 +102,18 @@ const {
   wide = false,
   center = false,
   progress = false,
+  article,
   structuredData,
   markdownPath,
   image,
   imageAlt,
 } = Astro.props;
-const hasToc = toc.length > 1;
+const items: TocItem[] = toc.map((item) => ({ ...item, depth: item.depth ?? 2 }));
+// The plain tree lists `##` headings; an article's also its `###`.
+const flatToc = article ? items : items.filter((item) => item.depth === 2);
+const hasToc = flatToc.filter((item) => item.depth === 2).length > 1;
+const sources = article?.sources ?? [];
+const drawnCover = article !== undefined && Astro.slots.has('cover');
 ---
 
 <Base
@@ -81,42 +127,72 @@ const hasToc = toc.length > 1;
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
-  <main id="content" class:list={['wrap writing', { center }]}>
+  <main
+    id="content"
+    class:list={[
+      'wrap writing',
+      {
+        center,
+        'has-progress': progress,
+        'is-article': article,
+        // The rail lists the sources, so on a wide screen the article's own list gives way (article.css).
+        'has-rail-sources': sources.length > 0,
+      },
+    ]}
+  >
+    {article ? (
+      <ArticleCover
+        cover={article.cover}
+        crumbs={crumbs}
+        kicker={kicker}
+        heading={heading}
+        lede={lede}
+        author={article.author}
+        meta={meta}
+        tags={article.tags ?? []}
+        drawn={drawnCover}
+      >
+        {drawnCover && <Fragment slot="art"><slot name="cover" /></Fragment>}
+      </ArticleCover>
+    ) : (
     <header class="writing-head">
-      {
-        crumbs.length > 0 && (
-          <nav class="crumbs" aria-label="Breadcrumb">
-            {crumbs.map((crumb) => (
-              <>
-                <a href={crumb.href}>{crumb.label}</a>
-                <span aria-hidden="true">/</span>
-              </>
-            ))}
-          </nav>
-        )
-      }
-      {kicker && <p class="kicker">{kicker}</p>}
-      <h1>{heading}</h1>
-      {lede && <p class="lede">{lede}</p>}
-      {
-        meta.length > 0 && (
-          <p class="meta">
-            {meta.map((part, index) => (
-              <>
-                {index > 0 && <span aria-hidden="true">·</span>}
-                <span>{part}</span>
-              </>
-            ))}
-          </p>
-        )
-      }
+      <div class="head-copy">
+        {
+          crumbs.length > 0 && (
+            <nav class="crumbs" aria-label="Breadcrumb">
+              {crumbs.map((crumb) => (
+                <>
+                  <a href={crumb.href}>{crumb.label}</a>
+                  <span aria-hidden="true">/</span>
+                </>
+              ))}
+            </nav>
+          )
+        }
+        {kicker && <p class="kicker">{kicker}</p>}
+        <h1>{heading}</h1>
+        {lede && <p class="lede">{lede}</p>}
+        {
+          meta.length > 0 && (
+            <p class="meta">
+              {meta.map((part, index) => (
+                <>
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  <span>{part}</span>
+                </>
+              ))}
+            </p>
+          )
+        }
+      </div>
     </header>
+    )}
     <slot name="scene" />
     {
       progress && (
         <div
-          class="read-progress"
-          data-read-progress
+          class:list={['read-progress', { slim: article }]}
+          data-read-progress="bar"
           role="progressbar"
           aria-label="Position in this article"
           aria-valuemin="0"
@@ -133,26 +209,44 @@ const hasToc = toc.length > 1;
         </div>
       )
     }
-    <div class:list={['writing-body', { 'has-toc': hasToc, wide }]}>
+    <div class:list={['writing-body', { 'has-toc': hasToc && !article, 'has-rail': article, wide }]}>
       {
         hasToc && (
-          <>
-            <details class="toc-compact">
-              <summary>On this page</summary>
-              <ul>
-                {toc.map((item) => (
-                  <li>
-                    <a href={`#${item.slug}`}>{item.text}</a>
-                  </li>
-                ))}
-              </ul>
-            </details>
+          <details class="toc-compact">
+            <summary>On this page</summary>
+            <ul>
+              {flatToc.map((item) => (
+                <li class:list={{ sub: item.depth === 3 }}>
+                  <a href={`#${item.slug}`}>{item.text}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )
+      }
+      {
+        article ? (
+          <ArticleRail
+            title={heading}
+            toc={flatToc}
+            sources={sources}
+            noun={article.noun}
+            share={{
+              url: article.url,
+              title: heading,
+              text: description,
+              markdown: article.markdown,
+              mode: article.share,
+            }}
+          />
+        ) : (
+          hasToc && (
             <nav class="toc" aria-label="On this page" data-toc>
               <p>On this page</p>
               <div class="toc-tree">
                 <span class="toc-rail" aria-hidden="true"><span class="toc-progress" data-toc-progress></span></span>
                 <ul>
-                  {toc.map((item) => (
+                  {flatToc.map((item) => (
                     <li>
                       <a href={`#${item.slug}`}>{item.text}</a>
                     </li>
@@ -160,13 +254,20 @@ const hasToc = toc.length > 1;
                 </ul>
               </div>
             </nav>
-          </>
+          )
         )
       }
       <div class="prose" data-prose>
         <slot />
       </div>
     </div>
+    {
+      article && (
+        <div class="article-after">
+          <ArticleAside posts={article.more} promos={article.promos} />
+        </div>
+      )
+    }
     <slot name="after" />
   </main>
   <SiteFooter />
@@ -182,10 +283,15 @@ const hasToc = toc.length > 1;
   const toc = document.querySelector<HTMLElement>('[data-toc]');
   const prose = document.querySelector<HTMLElement>('[data-prose]');
   const rail = document.querySelector<HTMLElement>('[data-toc-progress]');
-  const meter = document.querySelector<HTMLElement>('[data-read-progress]');
-  const fill = meter?.querySelector<HTMLElement>('[data-read-fill]') ?? null;
-  const percentLabel = meter?.querySelector<HTMLElement>('[data-read-percent]') ?? null;
-  if (prose && (toc || meter)) {
+  // The meters: the bar pinned under the header, and on a blog post the rail's percent too
+  // (only one of them shows at a width; both follow the same measure).
+  const meters = [...document.querySelectorAll<HTMLElement>('[data-read-progress]')].map((meter) => ({
+    meter,
+    fill: meter.querySelector<HTMLElement>('[data-read-fill]'),
+    label: meter.querySelector<HTMLElement>('[data-read-percent]'),
+  }));
+  const pinnedBar = document.querySelector<HTMLElement>('[data-read-progress="bar"]');
+  if (prose && (toc || meters.length > 0)) {
     const links = toc ? [...toc.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')] : [];
     const targets = links
       .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
@@ -195,7 +301,10 @@ const hasToc = toc.length > 1;
     const update = () => {
       frame = 0;
       const header = document.querySelector('.site-header-bar')?.getBoundingClientRect().bottom ?? 0;
-      const line = header + window.innerHeight * 0.2;
+      // The pinned bar covers the top of the reading area while it shows, so it counts as header.
+      const barBottom = pinnedBar && !pinnedBar.hidden ? pinnedBar.getBoundingClientRect().bottom : 0;
+      const top = Math.max(header, barBottom);
+      const line = top + window.innerHeight * 0.2;
       let active = -1;
       targets.forEach((target, index) => {
         if (target.getBoundingClientRect().top <= line) active = index;
@@ -204,17 +313,16 @@ const hasToc = toc.length > 1;
         if (index === active) link.setAttribute('aria-current', 'location');
         else link.removeAttribute('aria-current');
       });
-      // The meter covers the top of the reading area while it is pinned, so it counts as header.
-      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
       const box = prose.getBoundingClientRect();
       const reading = readingProgress({ top: box.top, height: box.height }, window.innerHeight, top);
       if (rail) rail.style.transform = `scaleY(${reading.fraction})`;
-      if (meter && fill && percentLabel) {
+      const changed = reading.percent !== shown;
+      shown = reading.percent;
+      for (const { meter, fill, label } of meters) {
         meter.hidden = reading.fits;
-        fill.style.transform = `scaleX(${reading.fraction})`;
-        if (reading.percent !== shown) {
-          shown = reading.percent;
-          percentLabel.textContent = `${reading.percent}%`;
+        if (fill) fill.style.transform = `scaleX(${reading.fraction})`;
+        if (changed) {
+          if (label) label.textContent = `${reading.percent}%`;
           meter.setAttribute('aria-valuenow', String(reading.percent));
         }
       }
@@ -235,11 +343,22 @@ const hasToc = toc.length > 1;
 </script>
 
 <style>
+  /* What is pinned over the top of an article: the header, and on pages with a reading meter
+     the meter under it (its height is fixed so everything below can clear it). The tree and
+     every jump target sit below that, with the same breathing room. */
   .writing {
+    --meter-height: 0px;
+    --pinned: calc(var(--header-height) + 1px + var(--meter-height));
     padding-block: clamp(3rem, 7vw, 5rem) var(--section-space);
   }
+  .writing.has-progress {
+    --meter-height: 2.5rem;
+  }
+  .writing :global([id]) {
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
+  }
   /* The rule under the head spans the page; the words keep a reading width. */
-  .writing-head > * {
+  .head-copy {
     max-width: 48rem;
   }
   .writing-head {
@@ -261,6 +380,14 @@ const hasToc = toc.length > 1;
   }
   .crumbs a:hover {
     color: var(--text);
+  }
+  /* On touch the trail's links get a 44px-tall hit area; the text does not move. */
+  @media (pointer: coarse) {
+    .crumbs a {
+      display: inline-block;
+      padding: 0.7rem 0;
+      margin: -0.7rem 0;
+    }
   }
   .kicker {
     margin: 0 0 0.9rem;
@@ -301,8 +428,9 @@ const hasToc = toc.length > 1;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 1rem;
+    box-sizing: border-box;
+    height: var(--meter-height);
     margin: calc(-1 * clamp(1.25rem, 3vw, 2rem)) 0 clamp(1.25rem, 3vw, 2rem);
-    padding: 0.6rem 0;
     background: var(--ground);
   }
   .read-progress[hidden] {
@@ -332,6 +460,105 @@ const hasToc = toc.length > 1;
     color: var(--text);
     font-weight: 600;
   }
+  /* A blog post (`article`): no pinned meter on a wide screen (the rail carries it), a slim
+     bar under the header below 900px; the rail beside the reading column, Share after it on
+     narrow screens. The column's type and the figures are blog/article.css. */
+  .writing.is-article {
+    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+  }
+  .writing.is-article.has-progress {
+    --meter-height: 0px;
+  }
+  .read-progress.slim {
+    display: none;
+  }
+  /* The article's grid (the owner, 2026-10-06: "remove the part on right and move blog content
+     more right"). The post is on the site's one 76rem page, the header's width, and the tracks are
+     named so the head (blog/ArticleCover.astro) and the body share them:
+       [rail] the left rail · a gap · [main] the middle, holding [text] the reading column centred
+       in it, so the column sits in the middle of the room right of the rail.
+     The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
+     characters. The rail and the gap are fluid in the page's own width (cqi: main is the
+     container): the rail 10rem at 901px to 16rem from about 1180px (where it stops), the gap 2rem
+     to 2.5rem. At the full 76rem page the middle is 57.5rem: the column and about 7rem a side,
+     room that figures, tables, and code may break out into. Below 901px it is one column (the
+     rail's Share and "More from rotli" follow the article, on the text's edges). */
+  .writing.is-article {
+    container-type: inline-size;
+    --prose-size: 1.125rem;
+    --measure: calc(var(--prose-size) * 38.5);
+    --col-left: clamp(10rem, 35.42cqi - 8.35rem, 16rem);
+    --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 2.5rem);
+    --article-tracks: [main-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr)
+      [main-end];
+  }
+  @media (min-width: 901px) {
+    .writing.is-article {
+      --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
+        [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+    }
+  }
+  .writing-body.has-rail {
+    grid-template-columns: var(--article-tracks);
+    gap: 0;
+  }
+  .writing-body.has-rail > .toc-compact {
+    grid-column: text;
+  }
+  .writing-body.has-rail > .prose {
+    grid-column: main;
+  }
+  .writing-body.has-rail > :global(.rail) {
+    grid-column: text;
+  }
+  @media (min-width: 901px) {
+    .writing-body.has-rail > :global(.rail) {
+      grid-column: rail;
+      grid-row: 1;
+    }
+    .writing-body.has-rail > .prose {
+      grid-row: 1;
+    }
+  }
+  /* After the article, "More from rotli" on the text's edges, outside the rail's grid: the pinned
+     rail stops at the article's end, so it never reaches this section or the footer. */
+  .article-after {
+    display: grid;
+    grid-template-columns: var(--article-tracks);
+  }
+  .article-after > :global([data-article-more]) {
+    grid-column: text;
+  }
+  @media (max-width: 900px) {
+    .writing.is-article.has-progress {
+      --meter-height: 3px;
+    }
+    .read-progress.slim {
+      display: block;
+      height: var(--meter-height);
+      margin: 0 0 1.75rem;
+      background: none;
+    }
+    .read-progress.slim[hidden] {
+      display: none;
+    }
+    /* Only the fill shows: at the top of the post the bar is not there at all. */
+    .read-progress.slim .read-track {
+      display: block;
+      height: 100%;
+      border-radius: 0;
+      background: none;
+    }
+    .read-progress.slim .read-label {
+      display: none;
+    }
+    .writing-body.has-rail > :global(.rail) {
+      order: 2;
+    }
+  }
+  .toc-compact li.sub {
+    padding-left: 1rem;
+  }
   /* The body sits on the grid's left edge; with a table of contents it gets
      a narrow first column that stays in view while reading. */
   .writing-body {
@@ -351,9 +578,9 @@ const hasToc = toc.length > 1;
   }
   .toc {
     position: sticky;
-    top: calc(var(--header-height) + 2rem);
+    top: calc(var(--pinned) + 1.5rem);
     align-self: start;
-    max-height: calc(100dvh - var(--header-height) - 4rem);
+    max-height: calc(100dvh - var(--pinned) - 3rem);
     overflow-y: auto;
     font-size: 0.9rem;
   }
@@ -508,7 +735,7 @@ const hasToc = toc.length > 1;
     font-size: 1.45rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    scroll-margin-top: calc(var(--header-height) + 1.5rem);
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
   .prose :global(h3) {
     margin: 2rem 0 0.6rem;
@@ -533,6 +760,8 @@ const hasToc = toc.length > 1;
     border-radius: 0.35rem;
     background: var(--surface-2);
     font-size: 0.92em;
+    /* A long identifier breaks inside the column on a phone instead of widening the page. */
+    overflow-wrap: anywhere;
   }
   /* Long shell lines (the Helper's install command) wrap at their spaces
      inside the box instead of running past it; newlines are kept. */

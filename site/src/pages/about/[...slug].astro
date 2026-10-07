@@ -1,23 +1,35 @@
 ---
-// /about/: the story of why rotli exists, told by its maker in first person, then the name
-// (#name stays a stable anchor for the name story, though nothing links to it today). One
-// reading column, no table of contents: it is a story, not a reference. The two quokkas are
-// the story film's island (the opening scene, IslandScene.astro) and the app's own "stays
-// local" character beside the vault.
-// Every claim restates something the rest of the site already says (landing, /privacy/,
-// PRODUCT.md); the maker's facts come only from his public portfolio. The longer story is the
-// "creation" post, linked once it is published.
+// /about/: why rotli exists, told by its maker in first person. A wide editorial page with its
+// own layout (not WritingPage's reading column): a head, the story film's island, then rows
+// that alternate words and pictures across the page's full width, two pull quotes lifted from
+// the words themselves, a calm timeline of real releases, what's next, and who makes it.
+// (#name stays a stable anchor for the name story, though nothing links to it today.)
+//
+// Every claim restates something the rest of the site already says (the landing, /privacy/,
+// /download/, PRODUCT.md); the maker's facts come only from his public portfolio. The pictures
+// are real captures from public/ (synthetic vaults) and the app's own quokka art; the filed
+// note is drawn in HTML on the site's tokens, with the same fields the landing's before and
+// after shows. The timeline's dates come from CHANGELOG.md (src/milestones.ts) and fail the
+// build if a release is missing. The longer story is the "creation" post, linked once it is
+// published. Rows rise in once as they reach the window (Base.astro's reveal); reduced motion
+// and no script show everything at rest.
 //
 // [[OWNER: one real moment from your own life that made you start (a note you lost, an app that
 // changed under you, a bill you did not expect). If you add it, put it as one or two sentences
 // at the end of "Notes come first". The page reads true without it.]]
 // [[OWNER: the true reason it is called a quokka and not something else, if there is one beyond
 // "they look happy". Optional; the name section works without it.]]
+import { getEntry } from 'astro:content';
+import celebrating from '../../../../src/assets/characters/filled/cocoa/celebrating.webp';
+import rest from '../../../../src/assets/characters/filled/cocoa/rest.webp';
 import stayLocal from '../../../../src/assets/characters/filled/cocoa/stays_local.webp';
 import IslandScene from '../../components/IslandScene.astro';
-import WritingPage from '../../components/WritingPage.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import Base from '../../layouts/Base.astro';
+import { datedMilestones } from '../../milestones';
 import { ogImage } from '../../og';
-import { GITHUB_URL, site } from '../../site';
+import { DOCS_AND_SHEETS, GITHUB_URL, site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
 
 export function getStaticPaths() {
@@ -27,126 +39,330 @@ export function getStaticPaths() {
 const X_URL = 'https://x.com/iamsethmedina';
 // The same survey the landing page's figure cites (StatBand.astro), checked 2026-10-02.
 const SURVEY_URL = 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/';
+const STUDY_PATH = '/blog/the-ai-you-already-pay-for/';
 
 const posts = await publishedWriting('post');
 const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
+const changelog = await getEntry('changelog', 'changelog');
+const milestones = datedMilestones(changelog?.body ?? '');
+
+// The filed note: what the Librarian adds above the words, and the words as typed (the
+// landing's TwoKinds example, shortened). Synthetic people and text.
+const added = [
+  { key: 'area', value: 'Clients' },
+  { key: 'tags', value: '[pricing, annual, deck]' },
+  { key: 'links', value: '["[[Jo Park]]"]' },
+];
+const typed = ['call w/ dana re pricing', 'deck fri?? ask jo'];
 ---
 
-<WritingPage
+<Base
   title="About — rotli"
-  description="Why Seth Medina is building rotli: a private workspace on notes you own, with AI that works under your rules and costs nothing extra. Also, where the name comes from."
+  description="Why Seth Medina is building rotli: a free workspace on plain Markdown files you own, where you only write and the Librarian does the filing, with AI that uses the plan you already have. Also, where the name comes from."
   canonicalPath="/about/"
+  noindex={!site.indexable}
   {...ogImage('about')}
-  section="about"
-  heading="Why I’m building rotli"
-  lede="Notes are where work starts. They should live somewhere that is yours."
-  center
 >
-  <figure slot="scene" class="island-frame">
-    <IslandScene />
-    <figcaption>Rottnest Island, where the quokkas live, and where rotli gets its name.</figcaption>
-  </figure>
+  <SiteHeader current="about" />
+  <main id="content" class="about">
+    <header class="wrap about-head">
+      <h1>Why I’m building rotli</h1>
+      <div class="head-side">
+        <p class="lede">Notes are where work starts. They should live somewhere that is yours.</p>
+        <p class="byline">Seth Medina, who makes rotli</p>
+      </div>
+    </header>
 
-  <h2 id="notes">Notes come first</h2>
-  <p>
-    Before there is a project, there is a note. A name, a half idea, something someone said on a call. You
-    type a few words so you won’t forget, and everything else gets built on top of them.
-  </p>
-  <p>
-    So I think where your notes live matters more than almost any other choice you make about your tools.
-    It is the foundation. rotli is my attempt to build a private workspace on that foundation, kept in a
-    vault you own. It is a complete workspace on its own, and AI is optional.
-  </p>
+    <figure class="wrap island-frame">
+      <IslandScene />
+      <figcaption>Rottnest Island, where the quokkas live, and where rotli gets its name.</figcaption>
+    </figure>
 
-  <h2 id="two-kinds">People and AI take notes differently</h2>
-  <p>
-    I write in half sentences. <em>call w/ dana re pricing, deck fri??</em>{' '}I know exactly what that means
-    today. An AI reads differently. It wants a clear title, a few tags, and links to related notes, because
-    that is how it finds things again. Neither way is wrong. They are two different jobs.
-  </p>
-  <p>
-    Most tools hand you the second job. Name it properly, tag it, write it so the assistant can follow it.
-    I think that is backwards. Every minute you spend shaping your notes around an AI is a minute taken from
-    the thing you sat down to do, and it breaks your flow. That attention belongs to your creative work.
-  </p>
-  <p>
-    So in rotli you only write. If you turn it on, a Librarian files your notes in the background, adds the
-    tags and links around your words, and never rewrites them.
-  </p>
+    <section class="wrap row lead-row" id="notes" aria-labelledby="notes-title">
+      <div class="copy" data-reveal>
+        <h2 id="notes-title">Notes come first</h2>
+        <p>
+          Before there is a project, there is a note. A name, a half idea, something someone said on a call. You
+          type a few words so you won’t forget, and everything else gets built on top of them.
+        </p>
+        <p>
+          So I think where your notes live matters more than almost any other choice you make about your tools.
+          It is the foundation.
+        </p>
+        <p>
+          rotli is a free workspace built on that foundation. Every note is a plain Markdown file in a folder you
+          own. Notes come first, and Docs and Sheets ({DOCS_AND_SHEETS.inline}), chat, and boards work from the
+          same folder. It is complete on its own. AI is optional.
+        </p>
+      </div>
+      <figure class="art" data-reveal>
+        <img
+          class="shot window"
+          src="/themes/rotli-warm-light@2x.webp"
+          width="2376"
+          height="1485"
+          alt="rotli on the Mac: the Welcome note open beside the sidebar, with Home, Chat, All notes, Tasks, and the Welcome lessons"
+          loading="lazy"
+          decoding="async"
+        />
+        <figcaption>The Mac app, on the Welcome note every new folder starts with.</figcaption>
+      </figure>
+    </section>
 
-  <h2 id="vault">A vault you own</h2>
-  <div class="vault">
-    <img src={stayLocal.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-    <div>
+    <blockquote class="wrap pull" data-reveal>
       <p>
-        Every note is a plain Markdown file in one folder you choose. I call that folder your vault. There is
-        no account to make and no rotli server holding your notes. Delete rotli tomorrow and your files are
-        right where you left them, and any other editor can open them.
+        Every minute you spend shaping your notes around an AI is a minute taken from <span class="inked">the thing you
+        sat down to do.</span>
       </p>
+    </blockquote>
+
+    <section class="wrap row flip" id="two-kinds" aria-labelledby="two-kinds-title">
+      <div class="copy" data-reveal>
+        <h2 id="two-kinds-title">People and AI read notes differently</h2>
+        <p>
+          I write in half sentences. <em>call w/ dana re pricing, deck fri??</em>{' '}I know exactly what that means
+          today. An AI reads differently. It wants a clear title, a few tags, and links to related notes, because
+          that is how it finds things again. Neither way is wrong. They are two different jobs.
+        </p>
+        <p>
+          Most tools hand you the second job. Name it properly, tag it, write it so the assistant can follow it. I
+          think that is backwards. Every minute you spend shaping your notes around an AI is a minute taken from the
+          thing you sat down to do, and it breaks your flow. That attention belongs to your own work.
+        </p>
+        <p>
+          So in rotli you only write. If you turn it on, the Librarian files your notes in the background. It adds
+          the area, tags, and links at the top of the file, and it never touches your words.
+        </p>
+      </div>
+      <figure class="art" data-reveal>
+        <div
+          class="filed"
+          role="img"
+          aria-label="A note called dana-call.md after the Librarian: three added lines at the top (area, tags, links) above the words exactly as typed"
+        >
+          <p class="file">dana-call.md</p>
+          <p class="mark added-mark">Added by the Librarian</p>
+          <pre class="added"><code><span class="line">---</span>{added.map((field) => <span class="line"><b>{field.key}:</b> {field.value}</span>)}<span class="line">---</span></code></pre>
+          <p class="mark kept-mark">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7" /></svg>
+            Your words, unchanged
+          </p>
+          <pre class="kept"><code>{typed.join('\n')}</code></pre>
+        </div>
+        <figcaption>The Librarian writes above the line. Everything under it is what you typed.</figcaption>
+      </figure>
+    </section>
+
+    <section class="wrap row" id="vault" aria-labelledby="vault-title">
+      <div class="copy" data-reveal>
+        <h2 id="vault-title">Yours, and private</h2>
+        <p>
+          Every note is a plain Markdown file in one folder you choose. I call that folder your vault. There is no
+          account to make and no rotli server holding your notes. Delete rotli tomorrow and your files are right
+          where you left them, and any other editor can open them.
+        </p>
+        <p>
+          Search, chat, and the Librarian are all built on top of that folder. When the foundation is yours, the
+          rest can change without you losing anything.
+        </p>
+        <p>
+          AI follows house rules, and you write them. Mark a note secure and only the model on your Mac can read it.
+          Lock a note and no AI can change it. You decide, note by note, what each one may see.
+        </p>
+      </div>
+      <figure class="art raw" data-reveal>
+        <img
+          class="shot"
+          src="/shots/render-raw.webp"
+          width="1510"
+          height="1190"
+          alt="The plain Markdown underneath a note called Launch week: a heading, task lines, choices, and a Mermaid block"
+          loading="lazy"
+          decoding="async"
+        />
+        <img class="raw-quokka" src={stayLocal.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+        <figcaption>What is on disk: the same note, as plain Markdown.</figcaption>
+      </figure>
+    </section>
+
+    <section class="wrap row flip" id="cost" aria-labelledby="cost-title">
+      <div class="copy" data-reveal>
+        <h2 id="cost-title">You shouldn’t pay extra to use your own notes</h2>
+        <p>
+          Many people already pay for an AI tool, and often more than one. One survey found about half of the people
+          paying for ChatGPT hadn’t used it in the past 30 days
+          (<a href={SURVEY_URL} target="_blank" rel="noopener noreferrer">Self Financial</a>). The subscriptions are
+          there, waiting.
+        </p>
+        <p>
+          So rotli doesn’t sell you AI, and it doesn’t add a fee for it. AI is optional. Run a model on your Mac, or
+          use the plan or tool you already pay for, and let it do the filing. rotli never holds your keys.
+        </p>
+        <p>
+          I wrote up the numbers, and what they can’t tell us, in <a href={STUDY_PATH}>a short study on the AI you
+          already pay for</a>.
+        </p>
+      </div>
+      <figure class="art" data-reveal>
+        <img
+          class="shot"
+          src="/shots/chat.webp"
+          width="1800"
+          height="850"
+          alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists from the notes"
+          loading="lazy"
+          decoding="async"
+        />
+        <figcaption>Chat answers from your own notes, with the AI you choose.</figcaption>
+      </figure>
+    </section>
+
+    <blockquote class="wrap pull" data-reveal>
       <p>
-        Search, chat, and the Librarian are all built on top of that folder. When the foundation is yours, the
-        rest can change without you losing anything.
+        When the foundation is yours, <span class="inked">the rest can change</span> without you losing anything.
       </p>
-    </div>
-  </div>
+    </blockquote>
 
-  <h2 id="cost">You shouldn’t pay extra to use your own notes</h2>
-  <p>
-    Many people already pay for an AI tool, and often more than one. One survey found about half of the
-    people paying for ChatGPT hadn’t used it in the past 30 days
-    (<a href={SURVEY_URL} target="_blank" rel="noopener noreferrer">Self Financial</a>). The subscriptions are there, waiting.
-  </p>
-  <p>
-    So rotli doesn’t sell you AI, and it doesn’t add a fee for it. Run a model on your Mac, or connect the
-    AI tools you already have. rotli never holds your keys.
-  </p>
+    <section class="wrap row" id="name" aria-labelledby="name-title">
+      <div class="copy" data-reveal>
+        <h2 id="name-title">Why “rotli”, and why a quokka</h2>
+        <p>
+          rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say, easy
+          to remember. The workspace is the island, and you are the quokka.
+        </p>
+        <p>
+          Quokkas are famous for looking like they can’t stop smiling. That is the feeling I want rotli to have: a
+          workspace that feels good to be in, so getting things done feels good too.
+        </p>
+      </div>
+      <figure class="art name-art" data-reveal aria-hidden="true">
+        <svg class="mound" viewBox="0 0 600 160" preserveAspectRatio="none">
+          <path class="mound-sea" d="M0 60H600V160H0Z" />
+          <path class="mound-sand" d="M40 160C90 92 200 70 300 70S520 98 560 160Z" />
+        </svg>
+        <img src={celebrating.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+      </figure>
+    </section>
 
-  <h2 id="rules">AI is welcome, under rules you set</h2>
-  <p>
-    I like having AI around. I just want it to follow house rules, and I want you to write them. Mark a note
-    secure and only the model on your Mac can read it. Lock a note and no AI can change it. You decide, note
-    by note, what each one may see.
-  </p>
+    <section class="band-warm timeline-band" id="history" aria-labelledby="history-title">
+      <div class="wrap timeline-grid">
+        <div class="timeline-head" data-reveal>
+          <h2 id="history-title">How it got here</h2>
+          <p>
+            rotli 1.0 came out on {milestones[0].label}. These are a few of the releases since. Every one is in the{' '}
+            <a href="/changelog/">changelog</a>.
+          </p>
+          <img src={rest.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+        </div>
+        <ol class="timeline" data-stagger>
+          {
+            milestones.map((milestone) => (
+              <li>
+                <time datetime={milestone.date}>{milestone.label}</time>
+                <div>
+                  <h3>
+                    {milestone.title}
+                    {!milestone.title.includes(milestone.short) && <span class="version">{milestone.short}</span>}
+                  </h3>
+                  <p>{milestone.line}</p>
+                </div>
+              </li>
+            ))
+          }
+          <li class="next" id="next">
+            <span class="when">Next</span>
+            <div>
+              <h3>What’s next</h3>
+              <p>
+                The <a href="/roadmap/">roadmap</a> shows what’s being built, what’s planned, and what’s still an idea.
+                Native Windows and Linux apps are on it. Ask for what you want there.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
 
-  <h2 id="name">Why “rotli”, and why a quokka</h2>
-  <p>
-    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say,
-    easy to remember. The workspace is the island, and you are the quokka.
-  </p>
-  <p>
-    Quokkas are famous for looking like they can’t stop smiling. That is the feeling I want rotli to have: a
-    workspace that feels good to be in, so getting things done feels good too.
-  </p>
-
-  <h2 id="who">Who makes it</h2>
-  <p>
-    I’m Seth Medina, a software engineer in Florida. I taught myself to build software, and I like tools that
-    get out of the way.
-    {
-      story && (
-        <>
-          {' '}The longer story is on the blog:{' '}
-          <a href={`/blog/${slugOf(story)}/`}>{story.data.title}</a>.
-        </>
-      )
-    }
-  </p>
-  <p>
-    Two open-source editors are built in, and both save ordinary files in your folder:{' '}
-    <a href="https://excalidraw.com">Excalidraw</a> draws your boards, and{' '}
-    <a href="https://univer.ai">Univer</a> edits your Word documents.
-  </p>
-  <ul class="elsewhere">
-    <li><a href="/download/">Try rotli</a></li>
-    <li><a href={X_URL} rel="me">Follow along on X · @iamsethmedina</a></li>
-    {site.sourcePublic && <li><a href={GITHUB_URL}>Read the source on GitHub</a></li>}
-    <li><a href="/blog/">Read the blog</a></li>
-  </ul>
-</WritingPage>
+    <section class="wrap row who" id="who" aria-labelledby="who-title">
+      <div class="copy" data-reveal>
+        <h2 id="who-title">Who makes it</h2>
+        <p>
+          I’m Seth Medina, a software engineer in Florida. I taught myself to build software, and I like tools that
+          get out of the way.
+          {
+            story && (
+              <>
+                {' '}The longer story is on the blog:{' '}
+                <a href={`/blog/${slugOf(story)}/`}>{story.data.title}</a>.
+              </>
+            )
+          }
+        </p>
+        <p>
+          Two open-source editors are built in, and both save ordinary files in your folder:{' '}
+          <a href="https://excalidraw.com">Excalidraw</a> draws your boards, and{' '}
+          <a href="https://univer.ai">Univer</a> edits your Docs and Sheets.
+        </p>
+      </div>
+      <ul class="elsewhere" data-stagger>
+        <li><a href="/download/">Try rotli <span aria-hidden="true">→</span></a></li>
+        <li><a href={X_URL} rel="me">Follow along on X · @iamsethmedina <span aria-hidden="true">→</span></a></li>
+        {site.sourcePublic && <li><a href={GITHUB_URL}>Read the source on GitHub <span aria-hidden="true">→</span></a></li>}
+        <li><a href="/blog/">Read the blog <span aria-hidden="true">→</span></a></li>
+      </ul>
+    </section>
+  </main>
+  <SiteFooter />
+</Base>
 
 <style>
+  .about {
+    --row-gap: clamp(2.5rem, 6vw, 6rem);
+    padding-bottom: var(--section-space);
+  }
+  .about :global([id]) {
+    scroll-margin-top: calc(var(--header-height) + 1.5rem);
+  }
+  .about a:not(.button) {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+
+  /* The head: the title across the left, the lede and byline beside it on a wide screen. */
+  .about-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 1.5rem var(--row-gap);
+    padding-block: clamp(3rem, 7vw, 5.5rem) clamp(2rem, 4vw, 3rem);
+  }
+  h1 {
+    margin: 0;
+    font-size: var(--step-display);
+    font-weight: 600;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+  }
+  .lede {
+    max-width: 30rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  .byline {
+    margin: 1rem 0 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  @media (max-width: 900px) {
+    .about-head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .island-frame {
-    margin: 0 0 clamp(2.5rem, 5vw, 4rem);
+    margin-block: 0 clamp(2rem, 5vw, 4rem);
   }
   .island-frame :global(.island) {
     aspect-ratio: 1200 / 420;
@@ -157,40 +373,359 @@ const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
   }
   figcaption {
     margin-top: 0.85rem;
-    text-align: center;
     color: var(--text-muted);
     font-size: 0.9rem;
+    line-height: 1.45;
   }
-  /* The vault: the quokka beside the first paragraphs, stacked above them on narrow screens. */
-  .vault {
+  .island-frame figcaption {
+    text-align: center;
+  }
+
+  /* A row: words on one side, a picture on the other, across the whole page width. Every other
+     row puts the picture first. One column, words first, below 960px. */
+  .row {
     display: grid;
-    grid-template-columns: 7.5rem minmax(0, 1fr);
-    align-items: start;
-    gap: 1.5rem;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: center;
+    gap: 2.5rem var(--row-gap);
+    padding-block: clamp(2.5rem, 4.5vw, 4rem);
   }
-  .vault img {
+  /* The first row gives the app window more of the width, so it reads as the app. */
+  .row.lead-row {
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  }
+  .row.flip {
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  }
+  .row.flip .copy {
+    order: 2;
+  }
+  .copy {
+    max-width: 34rem;
+  }
+  .copy h2,
+  .timeline-head h2 {
+    margin: 0 0 1.1rem;
+    font-size: clamp(1.9rem, 3.2vw, 2.75rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+  }
+  .copy p {
+    margin: 0 0 1.05rem;
+    font-size: 1.1rem;
+    line-height: 1.7;
+  }
+  .copy p:last-child {
+    margin-bottom: 0;
+  }
+  @media (max-width: 960px) {
+    .row,
+    .row.flip,
+    .row.lead-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .row.flip .copy {
+      order: 0;
+    }
+  }
+
+  .art {
+    position: relative;
+    min-width: 0;
+    margin: 0;
+  }
+  .shot {
+    display: block;
     width: 100%;
     height: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--capture-ground);
   }
-  @media (max-width: 560px) {
-    .vault {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 0.5rem;
-    }
-    .vault img {
-      width: 6rem;
-    }
+  /* The app window carries its own rounded corners and frame. */
+  .shot.window {
+    border-color: var(--border-strong);
   }
-  .elsewhere {
+  /* The plain Markdown, with the "stays local" quokka standing at its foot, outside the text. */
+  .raw {
+    --side: clamp(4.5rem, 10vw, 8rem);
+  }
+  .raw .shot {
+    width: calc(100% - var(--side));
+    margin-left: auto;
+  }
+  .raw-quokka {
+    position: absolute;
+    left: 0;
+    bottom: 2.25rem;
+    width: calc(var(--side) - 0.75rem);
+    height: auto;
+  }
+  .raw figcaption {
+    margin-left: var(--side);
+  }
+
+  /* The filed note, drawn on the tokens: added lines tinted with a "+", the words under a tick. */
+  .filed {
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--capture-ground);
+    font-size: 0.95rem;
+  }
+  .file {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .mark {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.6rem 1.5rem;
-    margin: 1.25rem 0 0;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .mark svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .filed pre {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+  .added {
+    margin-bottom: 1.25rem;
+    border-radius: 0.5rem;
+    background: var(--tint);
+  }
+  .added .line {
+    display: block;
+    padding-inline: 2rem 0.75rem;
+    position: relative;
+  }
+  .added .line::before {
+    content: '+';
+    position: absolute;
+    left: 0.75rem;
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .added b {
+    font-weight: 600;
+  }
+  .kept {
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--text);
+  }
+
+  /* The pull quotes: one line from the story, set large across the page. */
+  .pull {
+    margin-block: clamp(1rem, 3vw, 2.5rem);
+    padding-block: clamp(2rem, 5vw, 3.5rem);
+    border-block: 1px solid var(--border);
+  }
+  .pull p {
+    max-width: 54rem;
+    margin: 0 auto;
+    font-size: clamp(1.6rem, 3.4vw, 2.85rem);
+    font-weight: 500;
+    line-height: 1.18;
+    letter-spacing: -0.025em;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  /* The name: the celebrating quokka on a small mound of sand by the sea. */
+  .name-art {
+    display: grid;
+    justify-items: center;
+    align-items: end;
+    min-height: clamp(14rem, 26vw, 20rem);
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .name-art > * {
+    grid-area: 1 / 1;
+  }
+  .mound {
+    width: 100%;
+    height: 45%;
+  }
+  .mound-sea {
+    fill: var(--sea);
+  }
+  .mound-sand {
+    fill: var(--sand);
+    stroke: var(--ink);
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+  }
+  .name-art img {
+    position: relative;
+    width: clamp(10rem, 19vw, 15rem);
+    height: auto;
+    margin-bottom: 4%;
+  }
+
+  /* The timeline: a calm list on the warm band, dates in their own column on a hairline rail. */
+  .timeline-band {
+    margin-block: clamp(2rem, 4vw, 3rem);
+    padding-block: var(--section-space);
+  }
+  .timeline-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 2.5rem var(--row-gap);
+    align-items: start;
+  }
+  .timeline-head p {
+    max-width: 24rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    line-height: 1.6;
+  }
+  .timeline-head img {
+    width: clamp(7rem, 12vw, 10rem);
+    height: auto;
+    margin-top: 2rem;
+  }
+  .timeline {
+    position: relative;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
-  .elsewhere a {
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 0.6rem;
+    bottom: 0.6rem;
+    left: 11.5rem;
+    width: 1px;
+    background: var(--border-strong);
+  }
+  .timeline li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    gap: 0.25rem 2rem;
+    padding-block: 0 1.75rem;
+  }
+  .timeline li:last-child {
+    padding-bottom: 0;
+  }
+  .timeline li::before {
+    content: '';
+    position: absolute;
+    top: 0.45rem;
+    left: calc(11.5rem - 4px);
+    width: 9px;
+    height: 9px;
+    border: 2px solid var(--surface-2);
+    border-radius: 50%;
+    background: var(--text);
+    box-sizing: border-box;
+  }
+  .timeline li.next::before {
+    background: var(--surface-2);
+    border-color: var(--accent-text);
+  }
+  .timeline time,
+  .timeline .when {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.6;
+  }
+  .timeline h3 {
+    margin: 0;
+    font-size: 1.12rem;
     font-weight: 600;
+    line-height: 1.4;
+  }
+  .version {
+    margin-left: 0.3rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .timeline p {
+    margin: 0.2rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  @media (max-width: 960px) {
+    .timeline-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .timeline-head img {
+      display: none;
+    }
+  }
+  /* Narrow: the date sits above each release, on a rail down the left. */
+  @media (max-width: 640px) {
+    .timeline::before {
+      left: 0.25rem;
+    }
+    .timeline li {
+      grid-template-columns: minmax(0, 1fr);
+      padding-left: 1.75rem;
+    }
+    .timeline li::before {
+      left: calc(0.25rem - 4px);
+    }
+  }
+
+  /* Who makes it: the words, and the ways to follow along as plain rows. */
+  .who {
+    align-items: start;
+  }
+  .elsewhere {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border-strong);
+  }
+  .elsewhere li {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .elsewhere a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.75rem;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .about .elsewhere a {
+    color: var(--text);
+  }
+  .elsewhere a:hover {
+    color: var(--accent-text);
+  }
+  .elsewhere a span {
+    transition: transform 160ms ease-out;
+  }
+  .elsewhere a:hover span {
+    transform: translateX(4px);
   }
 </style>
