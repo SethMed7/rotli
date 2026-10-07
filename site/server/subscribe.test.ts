@@ -186,6 +186,76 @@ describe('subscribing', () => {
   });
 });
 
+describe('the signup alert', () => {
+  const ALERT = { ...CONFIG, alertTo: 'owner@example.org', alertFrom: 'rotli <alerts@example.net>' };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test('a new contact emails the owner who joined', async () => {
+    const resend = fakeResend(json({ object: 'contact', id: 'c1' }), json({ id: 'email_1' }));
+    const res = await createSubscribe({ ...ALERT, fetch: resend.fetch })(post({ email: 'Ada@Example.com' }));
+    await settle();
+
+    expect(res.status).toBe(200);
+    expect(resend.calls).toHaveLength(2);
+    const [, sent] = resend.calls;
+    expect(sent.url).toBe('https://api.resend.com/emails');
+    const body = JSON.parse(String(sent.init.body));
+    expect(body.from).toBe('rotli <alerts@example.net>');
+    expect(body.to).toEqual(['owner@example.org']);
+    expect(body.subject).toBe('rotli.co: someone joined the list');
+    expect(body.text).toContain('Ada@example.com joined');
+  });
+
+  test('an existing contact added to the segment is a rejoin; one already in it sends nothing', async () => {
+    const rejoin = fakeResend(json({ message: 'Contact already exists.' }, 422), json({ id: 'seg_123' }), json({ id: 'e' }));
+    await createSubscribe({ ...ALERT, fetch: rejoin.fetch })(post({ email: 'ada@example.com' }));
+    await settle();
+    expect(rejoin.calls).toHaveLength(3);
+    expect(JSON.parse(String(rejoin.calls[2].init.body)).subject).toBe('rotli.co: someone rejoined the list');
+
+    const already = fakeResend(json({ message: 'exists' }, 409), json({ message: 'Contact is already in this segment.' }, 422));
+    const res = await createSubscribe({ ...ALERT, fetch: already.fetch })(post({ email: 'ada@example.com' }));
+    await settle();
+    expect(res.status).toBe(200);
+    expect(already.calls).toHaveLength(2);
+  });
+
+  test('a failed alert never fails the signup and never logs the address', async () => {
+    const lines: string[] = [];
+    const resend = fakeResend(json({ object: 'contact', id: 'c1' }), json({ name: 'validation_error', message: 'domain not verified' }, 403));
+    const res = await createSubscribe({ ...ALERT, fetch: resend.fetch, log: (line) => lines.push(line) })(
+      post({ email: 'secret.person@example.com' }),
+    );
+    await settle();
+
+    expect(res.status).toBe(200);
+    expect(lines).toEqual(['subscribe: the signup alert was refused (403 validation_error)']);
+    expect(lines.join('\n')).not.toContain('secret.person');
+  });
+
+  test('is off unless both the recipient and the sender are set, and a bad recipient turns it off', async () => {
+    for (const config of [
+      { alertTo: 'owner@example.org' },
+      { alertFrom: 'rotli <alerts@example.net>' },
+      { alertTo: 'not an address', alertFrom: 'rotli <alerts@example.net>' },
+    ]) {
+      const resend = fakeResend(json({ object: 'contact', id: 'c1' }));
+      await createSubscribe({ ...CONFIG, ...config, fetch: resend.fetch })(post({ email: 'ada@example.com' }));
+      await settle();
+      expect(resend.calls).toHaveLength(1);
+    }
+  });
+
+  test('a honeypot hit or a refused address sends no alert', async () => {
+    const resend = fakeResend();
+    const handler = createSubscribe({ ...ALERT, fetch: resend.fetch });
+    await handler(post({ email: 'bot@example.com', [HONEYPOT_FIELD]: 'x' }));
+    await handler(post({ email: 'nope' }));
+    await settle();
+    expect(resend.calls).toHaveLength(0);
+  });
+});
+
 describe('without JavaScript', () => {
   test('a form post that succeeds is redirected to /subscribed/', async () => {
     const resend = fakeResend(json({ object: 'contact', id: 'c1' }));

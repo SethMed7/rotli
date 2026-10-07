@@ -11,6 +11,13 @@
 // the probe says { live: false }. Contacts are global in Resend (one per address), so a
 // repeat signup is answered exactly like a new one and only re-checks segment membership.
 // A previous unsubscribe is never overridden. Addresses are never logged.
+//
+// Optional alert (the owner, 2026-10-07): with SUBSCRIBE_ALERT_TO and SUBSCRIBE_ALERT_FROM
+// set, each address that newly joins the list (a new contact, or an existing one added to the
+// segment) is emailed to the owner through the same Resend account (POST /emails). A repeat
+// signup already in the segment sends nothing. The alert never holds up or fails the signup:
+// it is sent after the answer is decided, and a failure is logged without the address. The
+// recipient lives only in the runtime variable, never in this public repository.
 
 import { clientAddress, limiter, NO_STORE, page, readFields, wantsJson } from './http';
 
@@ -27,6 +34,9 @@ export const HONEYPOT_FIELD = 'website';
 export interface SubscribeOptions {
   apiKey?: string;
   segmentId?: string;
+  /** Where to email each new signup, and the verified sender to email it from; both or no alert. */
+  alertTo?: string;
+  alertFrom?: string;
   /** Injected in tests; the real one talks to api.resend.com. */
   fetch?: (input: string, init: RequestInit) => Promise<Response>;
   now?: () => number;
@@ -34,6 +44,8 @@ export interface SubscribeOptions {
 }
 
 type Outcome = { status: number; ok: boolean; error?: string };
+/** How an address reached the segment: newly, back after leaving it, or it was already there. */
+type Joined = 'new' | 'rejoined' | 'already';
 
 const EMAIL =
   /^[^\s@"<>()[\]\\,;:]{1,64}@(?=[^@]{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/i;
@@ -60,6 +72,8 @@ const ALREADY = /already (exists|in|a member|added)|duplicate/i;
 
 export function createSubscribe(options: SubscribeOptions = {}): (req: Request) => Promise<Response> {
   const { apiKey, segmentId, now = Date.now, log = (line) => console.warn(line) } = options;
+  const alertTo = normalizeEmail(options.alertTo);
+  const alertFrom = options.alertFrom?.trim() || null;
   const send = options.fetch ?? ((input: string, init: RequestInit) => fetch(input, init));
   const live = Boolean(apiKey && segmentId);
   const perClient = limiter(PER_CLIENT, now);
@@ -75,20 +89,37 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
   }
 
   /** Create the contact in the segment; an existing contact is only (re)added to it. */
-  async function addContact(email: string): Promise<boolean> {
+  async function addContact(email: string): Promise<Joined | null> {
     const created = await resend('/contacts', { email, unsubscribed: false, segments: [{ id: segmentId }] });
-    if (created.ok) return true;
+    if (created.ok) return 'new';
     const first = await resendError(created);
     if (created.status !== 409 && !ALREADY.test(first.message)) {
       log(`subscribe: resend refused the contact (${created.status} ${first.name || 'error'})`);
-      return false;
+      return null;
     }
     const added = await resend(`/contacts/${encodeURIComponent(email)}/segments/${encodeURIComponent(segmentId ?? '')}`);
-    if (added.ok) return true;
+    if (added.ok) return 'rejoined';
     const second = await resendError(added);
-    if (added.status === 409 || ALREADY.test(second.message)) return true;
+    if (added.status === 409 || ALREADY.test(second.message)) return 'already';
     log(`subscribe: resend refused the segment (${added.status} ${second.name || 'error'})`);
-    return false;
+    return null;
+  }
+
+  /** Tell the owner who joined. Best effort: never awaited by the signup, never logs the address. */
+  async function alert(email: string, joined: Joined): Promise<void> {
+    if (!alertTo || !alertFrom || joined === 'already') return;
+    const how = joined === 'new' ? 'joined' : 'rejoined';
+    try {
+      const sent = await resend('/emails', {
+        from: alertFrom,
+        to: [alertTo],
+        subject: `rotli.co: someone ${how} the list`,
+        text: `${email} ${how} the rotli.co list (“Hear when it’s ready”).\n\nResend → Audience has the full list.`,
+      });
+      if (!sent.ok) log(`subscribe: the signup alert was refused (${sent.status} ${(await resendError(sent)).name || 'error'})`);
+    } catch (error) {
+      log(`subscribe: the signup alert did not send (${error instanceof Error ? error.name : 'error'})`);
+    }
   }
 
   async function subscribe(req: Request, json: boolean): Promise<Outcome> {
@@ -107,9 +138,10 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
     if (!email) return { status: 400, ok: false, error: 'That email address does not look right.' };
     if (!live) return { status: 503, ok: false, error: 'The list is not open yet.' };
     try {
-      return (await addContact(email))
-        ? { status: 200, ok: true }
-        : { status: 502, ok: false, error: 'That did not go through. Try again in a moment.' };
+      const joined = await addContact(email);
+      if (!joined) return { status: 502, ok: false, error: 'That did not go through. Try again in a moment.' };
+      void alert(email, joined);
+      return { status: 200, ok: true };
     } catch (error) {
       log(`subscribe: resend unreachable (${error instanceof Error ? error.name : 'error'})`);
       return { status: 502, ok: false, error: 'That did not go through. Try again in a moment.' };

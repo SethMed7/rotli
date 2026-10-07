@@ -297,7 +297,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where you send it.
 - **rotli.co's "Hear when it's ready" sign-up is always in the footer.** Until
   the list opens, it says so and doesn't send your address anywhere. The
-  footer's maker line links to Seth Medina on X.
+  footer's maker line links to Seth Medina on X. Once it's open, rotli's
+  maker can get an email each time someone joins (set on the server, off by
+  default), and the privacy page says so.
 - **rotli.co's home page reads in a clearer order, and says each thing
   once.** Three cards show what rotli does (write, keep, ask), each with a
   small picture of the app in place of the old list of bullets. The AI

@@ -8,6 +8,7 @@
 // Each half is off on its own when its variables are unset, and the pages read that as
 // "not open yet". Runtime variables only (never Docker build args):
 //   RESEND_API_KEY, RESEND_SEGMENT_ID   the list
+//   SUBSCRIBE_ALERT_TO, SUBSCRIBE_ALERT_FROM   optional; email the owner each new signup
 //   ROADMAP_DB_PATH                     the SQLite file, on a Railway volume
 //   ROADMAP_HASH_SALT                   optional; keys the in-memory rate limits
 //   ROADMAP_FILE                        optional; where ROADMAP.md is (default: the repo root)
@@ -47,8 +48,9 @@ const port = Number(env.SUBSCRIBE_PORT ?? 8787);
 
 if ((import.meta as { main?: boolean }).main) {
   const list = env.RESEND_API_KEY && env.RESEND_SEGMENT_ID ? 'on' : 'off (RESEND_API_KEY or RESEND_SEGMENT_ID unset)';
+  const alerts = env.SUBSCRIBE_ALERT_TO && env.SUBSCRIBE_ALERT_FROM ? 'on' : 'off';
   const votes = roadmap.live ? `on (${ids.length} items)` : 'off (ROADMAP_DB_PATH unset or unopenable)';
-  console.log(`site sidecar on 127.0.0.1:${port} · list ${list} · roadmap ${votes}`);
+  console.log(`site sidecar on 127.0.0.1:${port} · list ${list} (alerts ${alerts}) · roadmap ${votes}`);
 }
 
 export default {
@@ -58,7 +60,12 @@ export default {
   development: false,
   port,
   fetch: createSidecar({
-    subscribe: createSubscribe({ apiKey: env.RESEND_API_KEY, segmentId: env.RESEND_SEGMENT_ID }),
+    subscribe: createSubscribe({
+      apiKey: env.RESEND_API_KEY,
+      segmentId: env.RESEND_SEGMENT_ID,
+      alertTo: env.SUBSCRIBE_ALERT_TO,
+      alertFrom: env.SUBSCRIBE_ALERT_FROM,
+    }),
     roadmap: roadmap.handle,
   }),
 };

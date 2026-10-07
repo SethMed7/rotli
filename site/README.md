@@ -1277,7 +1277,13 @@ contacts to a segment so there is a list to broadcast to.
    set `RESEND_API_KEY` and `RESEND_SEGMENT_ID` as runtime variables, then
    redeploy. `GET https://rotli.co/api/subscribe` answers `{"live":true}` and
    the footer shows the form.
-4. To send an update: Resend → Broadcasts → Create, choose the segment, write
+4. Optional, to get an email for each signup: set `SUBSCRIBE_ALERT_TO` to
+   your inbox and `SUBSCRIBE_ALERT_FROM` to a sender on a verified domain,
+   then redeploy. The sidecar's start line says `alerts on`. Each new
+   address (or one rejoining after leaving the segment) sends one email with
+   the address; a repeat signup sends nothing, and a failed alert never fails
+   the signup.
+5. To send an update: Resend → Broadcasts → Create, choose the segment, write
    it, and keep the unsubscribe link (`{{{RESEND_UNSUBSCRIBE_URL}}}`, which
    Resend's editor inserts) in the footer. The **From** address must be on a
    domain verified in that Resend account (the portfolio's verified domain
@@ -1292,6 +1298,8 @@ Dockerfile does not declare them, so no secret lands in an image layer):
 | ------------------- | ----------------------------------------------------------------------- |
 | `RESEND_API_KEY`    | A Resend API key with full access (contacts need it; a sending-only key is refused). Unset: the list is off. |
 | `RESEND_SEGMENT_ID` | The segment new contacts join (Resend → Audience → Segments; the old Audiences API is deprecated). Unset: the list is off. |
+| `SUBSCRIBE_ALERT_TO` | Optional. The address that gets an email each time someone newly joins the list (the owner's inbox). Set only here, never in the repo. Unset or not an address: no alerts. |
+| `SUBSCRIBE_ALERT_FROM` | Optional, needed with `SUBSCRIBE_ALERT_TO`. The sender, on a domain verified in the same Resend account, e.g. `rotli <alerts@your-verified-domain>`. |
 | `ROADMAP_DB_PATH`   | The roadmap's SQLite file on a Railway volume, e.g. `/data/roadmap.sqlite`. Unset or unwritable: votes and requests are off (503) and the page says they open soon. |
 | `ROADMAP_HASH_SALT` | Optional. A long random string keying the in-memory rate-limit hashes. Unset: a random salt per start (limits reset on restart). It is never stored or logged. |
 | `ROADMAP_FILE`      | Optional. Where the sidecar reads ROADMAP.md (default: the copy in the image, `/opt/rotli/ROADMAP.md`). |
