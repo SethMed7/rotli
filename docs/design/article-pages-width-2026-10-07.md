@@ -1,9 +1,9 @@
 # rotli.co long-form pages: how width works, and one system for it
 
-2026-10-07. An evaluation, not a change: nothing in `site/` moved. It covers the
-three long-form page types the owner sees as one family: blog posts
-(`/blog/<slug>/`), `/privacy/`, and `/roadmap/`. The owner picks a direction
-from "Options" before anything is built.
+2026-10-07. An evaluation of the three long-form page types the owner sees as
+one family: blog posts (`/blog/<slug>/`), `/privacy/`, and `/roadmap/`.
+Sections 1 to 4 describe the layout as it was when measured; "Decision" at the
+end records what the owner picked and what was built.
 
 The trigger was the owner's screenshot of `/privacy/`: the heading and its lede
 start at one left edge, the matrix "Who may read and change a note you wrote"
@@ -332,3 +332,38 @@ The CSS injected for A1 (A2 swaps `100%` for `min(100%, var(--measure) +
 }
 .writing.is-article .prose > .spot { margin-right: max(0px, 100% - var(--measure)); }
 ```
+
+## Decision
+
+The owner, 2026-10-07, picked all three recommendations: **A1** (the column
+starts at the rail; wide blocks run on to the page's right edge) with
+**hanging bullets** from 901px. Built the same day:
+
+- `.longform` in `site/src/components/blog/article.css` holds the tokens and
+  tracks once: `--measure`, `--col-left`, `--col-gap`, and
+  `--article-tracks`, now `[rail] [gap] [main-start text-start] measure
+  [text-end] 1fr [main-end]` (below 901px, the same without the rail).
+  `WritingPage` adds `longform` to an article's `<main>`; `/roadmap/` adds
+  it to its own and imports the stylesheet.
+- Every prose block keeps the measure with `margin-inline: 0`; `.figure`,
+  `table`, `pre`, and `.wide` take `max-width: 100%` behind the same 48.5rem
+  container query. The privacy matrix is `.wide`; its own breakout rule is
+  gone, and its companion float's margin is `100% − measure`.
+- Top-level lists drop their padding from 901px, so the markers hang in the
+  rail's gap.
+- The roadmap's nav sits in the rail track from 901px (it was 11.5rem from
+  1100px), its groups in `main`; section notes and summaries keep the measure.
+- Below 901px the "On this page" disclosure spans the page, on the picture's
+  edges, rather than ending 13px short of it on the column.
+
+Measured after, at 1440: the rail 112 to 368 on all three pages; every
+heading, paragraph, list's words, table, chart, and roadmap group from 408;
+words to 1101; wide blocks to 1328, the header's right edge. At 1024 wide
+blocks keep the measure (277.9 to 970.9). `e2e/site/article-width.spec.ts`
+now asserts one left edge one rail gap past the rail, the list's words on it,
+figures ending on the header's edge when they break out, and the three pages
+sharing the rail and the edge at 901, 1024, 1180, 1440, and 1920.
+
+Left for later (section 5): one head component for the roadmap, one crumbs
+rule, the roadmap's h2 scale, and folding `WritingPage`'s plain `.prose`
+layer out from under article pages.

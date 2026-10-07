@@ -1,13 +1,16 @@
 // The blog's width (the owner, 2026-10-06: first "for blogs let's use more width", then "now the
 // blog width is too much", then "picture matches header width" and "remove the part on right and
-// move blog content more right"). A post sits on the site's one 76rem page, the header's, on named
-// tracks (WritingPage --article-tracks): the left rail, then a middle holding a reading column of
-// about 66 characters centred in it. There is no right rail; "More from rotli" follows the article.
-// Swept from 320 to 2560: no sideways scroll, nothing over the reading column, 60 to 80 characters
-// a line wherever the window is wider than a phone (62 to 70 from 1180px), the head on the
-// header's edges, the left rail at least 16rem from 1440, the rail folding under 901px, figures
-// never over-wide, and the same layout after a live resize as on a fresh load. The index is swept
-// the same way.
+// move blog content more right"; then, 2026-10-07, one left edge, wide blocks to the page's right
+// edge, bullets hung: docs/design/article-pages-width-2026-10-07.md). A post sits on the site's one
+// 76rem page, the header's, on named tracks (`.longform`, blog/article.css): the left rail, its
+// gap, then a reading column of about 66 characters on one left edge, and the room right of it for
+// wide blocks. There is no right rail; "More from rotli" follows the article. Swept from 320 to
+// 2560: no sideways scroll, nothing over the reading column, 60 to 80 characters a line wherever
+// the window is wider than a phone (62 to 70 from 1180px), the head on the header's edges, the left
+// rail at least 16rem from 1440, the rail folding under 901px, one left edge for words, figures,
+// and a list's words, figures ending on the page's right edge where they break out, and the same
+// layout after a live resize as on a fresh load. Posts, /privacy/, and /roadmap/ share the rail
+// and the edge. The index is swept the same way.
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
@@ -47,8 +50,10 @@ const geometry = (page: Page) =>
       const box = figure.getBoundingClientRect();
       return { x: box.x, y: box.y + window.scrollY, width: box.width, height: box.height };
     });
+    const item = document.querySelector("[data-prose] > ul:not(.flow) > li");
     return {
       text: rect("[data-prose] > p")!,
+      listText: item ? item.getBoundingClientRect().x : null,
       middle: rect("[data-prose]")!,
       rail: rect("[data-article-rail] .rail-title"),
       railBox: rect("[data-article-rail]"),
@@ -107,16 +112,23 @@ for (const width of WIDTHS) {
     expect(Math.abs(g.header.x - (width - g.header.width) / 2)).toBeLessThan(2);
 
     // The left rail beside the text from 901px, its Share under the article below that (its tree
-    // is the disclosure). The reading column sits in the middle of the room right of the rail.
+    // is the disclosure). The reading column starts one rail gap (2 to 2.5rem) past the rail: it is
+    // not centred in the room, so the gap is never more than that. The room runs to the page's edge.
     if (width >= 901) {
       expect(g.rail, "the left rail shows").not.toBeNull();
       expect(apart(g.railBox!, g.middle)).toBe(true);
       await expect(page.locator(".toc-compact")).toBeHidden();
-      const leftRoom = g.text.x - g.middle.x;
-      const rightRoom = right(g.middle) - right(g.text);
-      expect(Math.abs(leftRoom - rightRoom)).toBeLessThan(2);
+      expect(Math.abs(g.text.x - g.middle.x)).toBeLessThan(1.5);
+      const gap = g.text.x - right(g.railBox!);
+      expect(gap).toBeGreaterThanOrEqual(2 * REM - 1);
+      expect(gap).toBeLessThanOrEqual(2.5 * REM + 1);
       expect(Math.abs(right(g.middle) - right(g.header))).toBeLessThan(1.5);
+      // A list's markers hang in the gap, so its words are on the column's edge.
+      expect(Math.abs(g.listText! - g.text.x)).toBeLessThan(1.5);
     } else {
+      // No rail: the column starts on the page's left edge, a list's words 1.3rem in.
+      expect(Math.abs(g.text.x - g.header.x)).toBeLessThan(1.5);
+      expect(Math.abs(g.listText! - g.text.x - 1.3 * REM)).toBeLessThan(1.5);
       expect(g.rail, "the left rail folds away").toBeNull();
       await expect(page.locator(".toc-compact")).toBeVisible();
       expect(g.railBox!.y).toBeGreaterThan(g.text.y);
@@ -127,18 +139,21 @@ for (const width of WIDTHS) {
     expect(Math.abs(right(g.more!) - right(g.text))).toBeLessThan(1.5);
     expect(await page.locator("[data-prose] ~ [data-article-more]").count()).toBe(0);
 
-    // Figures stay inside the middle, never in a rail, never narrower than the words, and never
-    // more than 5rem a side wider than them (nothing over-wide).
+    // Figures start on the words' edge, never in a rail, never narrower than the words, and either
+    // keep the measure or run on to the page's right edge, never a sliver past the words.
     expect(g.figures.length).toBeGreaterThan(0);
     for (const figure of g.figures) {
-      expect(figure.x).toBeGreaterThanOrEqual(g.middle.x - 1);
-      expect(figure.x + figure.width).toBeLessThanOrEqual(g.middle.x + g.middle.width + 1);
+      expect(Math.abs(figure.x - g.text.x)).toBeLessThan(1.5);
       expect(figure.width).toBeGreaterThanOrEqual(g.text.width - 1);
-      expect(figure.width).toBeLessThanOrEqual(g.text.width + 10 * REM + 1);
+      const breaksOut = figure.width > g.text.width + 1;
+      if (breaksOut) {
+        expect(Math.abs(right(figure) - right(g.header))).toBeLessThan(1.5);
+        expect(figure.width).toBeGreaterThanOrEqual(g.text.width + 5 * REM - 1);
+      }
       if (g.railBox && width >= 901) expect(overlaps(figure, g.railBox)).toBe(false);
     }
-    // Beside the rail at its full width the middle has room, and a figure breaks out of the words.
-    if (width >= 1180) expect(g.figures[0]!.width).toBeGreaterThan(g.text.width + 64);
+    // Beside the rail at its full width the room is there, and a figure breaks out of the words.
+    if (width >= 1180) expect(g.figures[0]!.width).toBeGreaterThan(g.text.width + 5 * REM);
   });
 }
 
@@ -148,6 +163,38 @@ for (const width of [1440, 1920, 2560]) {
     await page.goto(POST);
     const g = await geometry(page);
     expect(g.railBox!.width).toBeGreaterThanOrEqual(16 * REM - 0.5);
+  });
+}
+
+// The owner, 2026-10-07: the long-form pages are one family on one layout. A post, /privacy/, and
+// /roadmap/ put their rail (or "On this page" nav) and their first words on the same x at every
+// width beside a rail, and the privacy matrix and the roadmap's groups start on that same edge.
+for (const width of [901, 1024, 1180, 1440, 1920]) {
+  test(`posts, privacy, and the roadmap share one rail and one left edge at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const edges = async (path: string, rail: string, text: string, wide: string) => {
+      await page.goto(path);
+      return page.evaluate(
+        (selectors) => {
+          const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+          return {
+            rail: [box(selectors.rail).left, box(selectors.rail).right],
+            text: box(selectors.text).left,
+            wide: box(selectors.wide).left,
+          };
+        },
+        { rail, text, wide },
+      );
+    };
+    const post = await edges(POST, "[data-article-rail]", "[data-prose] > p", "[data-prose] > figure.figure");
+    const privacy = await edges("/privacy/", "[data-article-rail]", "#promise", ".promise-matrix");
+    const roadmap = await edges("/roadmap/", "[data-roadmap-nav]", ".road-body .section-note", ".work-grid");
+    for (const other of [privacy, roadmap]) {
+      expect(Math.abs(other.rail[0]! - post.rail[0]!)).toBeLessThan(1.5);
+      expect(Math.abs(other.rail[1]! - post.rail[1]!)).toBeLessThan(1.5);
+      expect(Math.abs(other.text - post.text)).toBeLessThan(1.5);
+    }
+    for (const page of [post, privacy, roadmap]) expect(Math.abs(page.wide - post.text)).toBeLessThan(1.5);
   });
 }
 

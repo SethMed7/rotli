@@ -1,37 +1,64 @@
-/* A blog post's reading column and its figures (WritingPage `article`). Global, because the
-   post's Markdown and the figures src/figures.ts draws arrive as HTML outside any component's
-   scoped styles; every rule is held under .is-article so other pages are untouched. Tokens only.
-   Measured in the article specs: about 66 characters a line, every text pair at 4.5:1 or more. */
+/* The long-form pages' layout (blog posts and /privacy/ through WritingPage `article`, and
+   /roadmap/), then a post's reading column and its figures. Global, because the post's Markdown
+   and the figures src/figures.ts draws arrive as HTML outside any component's scoped styles;
+   every rule is held under .longform or .is-article so other pages are untouched. Tokens only.
+   Measured in the article specs: about 66 characters a line, every text pair at 4.5:1 or more.
+   The evaluation behind it: docs/design/article-pages-width-2026-10-07.md. */
 
-/* The column: 18px type at every width (--prose-size in WritingPage; it never grows on the widest
-   screens, where the page stops at 76rem), generous leading. .prose fills the grid's middle
-   track; the words keep the measure, about 66 characters a line (60 to 80 at every width, 62 to
-   70 from 1180px, e2e/site/article-width.spec.ts), centred in it, and figures, tables, and code
-   may break out a little into the middle, never into the rail. */
+/* The tracks, one set for every long-form page (the owner, 2026-10-07: one left edge, wide blocks
+   to the page's right edge, bullets hung). On the site's one 76rem page, named so a head and its
+   body share them:
+     [rail] the left rail · [rail-end] its gap · [main] the room right of it, which starts with
+     [text] the reading column; [text-end] to [main-end] is the room a wide block runs on into.
+   The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
+   characters. The rail and the gap are fluid in the page's own width (cqi: the page is the
+   container): the rail 10rem at 901px to 16rem from about 1180px (where it stops), the gap 2rem
+   to 2.5rem. Every block starts on the column's left edge; nothing is centred in the room, so
+   the gap beside the rail is the gap and no more. Below 901px there is no rail, and the column
+   starts on the page's left edge, the header's. */
+.longform {
+  container-type: inline-size;
+  --prose-size: 1.125rem;
+  --measure: calc(var(--prose-size) * 38.5);
+  --col-left: clamp(10rem, 35.42cqi - 8.35rem, 16rem);
+  --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 2.5rem);
+  --article-tracks: [main-start text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+}
+@media (min-width: 901px) {
+  .longform {
+    --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start text-start]
+      minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+  }
+}
+
+/* The column: 18px type at every width (it never grows on the widest screens, where the page
+   stops at 76rem), generous leading. .prose fills the grid's main track; the words keep the
+   measure, about 66 characters a line (60 to 80 at every width, 62 to 70 from 1180px,
+   e2e/site/article-width.spec.ts), and wide blocks may run on to the page's right edge, never
+   into the rail. */
 .writing.is-article .prose {
   font-size: var(--prose-size);
   line-height: 1.72;
   /* A bare address in a citation breaks inside a 320px column instead of widening the page. */
   overflow-wrap: break-word;
 }
-/* Every block of the post keeps the measure, centred in the middle track. `:nth-child(n)` matches
+/* Every block of the post keeps the measure on the column's left edge. `:nth-child(n)` matches
    every child; it is there for its weight, so this outranks the margin shorthands below (0,4,0
-   against 0,3,1) and nothing loses its centring. */
+   against 0,3,1) and a figure's default inline margins. */
 .writing.is-article .prose {
   container: article-prose / inline-size;
 }
 .writing.is-article .prose > :nth-child(n) {
   max-width: var(--measure);
-  margin-inline: auto;
+  margin-inline: 0;
 }
-/* Figures, tables, and code break out of the words, but only where the middle is at least about
-   2rem past them on each side (a sliver wider than the text would read as a mistake), and never by
-   more than 5rem a side, so nothing feels over-wide. Beside the rail the middle is the column and
-   about 7rem a side at the full page, so they spread there; on a narrow middle they keep the
-   measure. */
+/* Wide blocks (figures, tables, code, and anything marked .wide, such as the privacy promise's
+   matrix) start on the words' edge and run on to the page's right edge, the header's and the head
+   picture's, but only where that is at least about 5rem past the words (a sliver wider than the
+   text would read as a mistake); on a narrower main track they keep the measure. */
 @container article-prose (min-width: 48.5rem) {
-  .writing.is-article .prose > :is(.figure, table, pre) {
-    max-width: min(100%, var(--measure) + 10rem);
+  .writing.is-article .prose > :is(.figure, table, pre, .wide) {
+    max-width: 100%;
   }
 }
 .writing.is-article .prose h2 {
@@ -61,6 +88,14 @@
 .writing.is-article .prose ul,
 .writing.is-article .prose ol {
   padding-left: 1.3rem;
+}
+/* Beside the rail a list's markers hang in the rail's gap, so its words start on the column's
+   edge like every paragraph. Below 901px the page's gutter is too narrow to hang into, so lists
+   keep their indent. Nested lists always indent. */
+@media (min-width: 901px) {
+  .writing.is-article .prose > :is(ul, ol) {
+    padding-left: 0;
+  }
 }
 .writing.is-article .prose li + li {
   margin-top: 0.45rem;

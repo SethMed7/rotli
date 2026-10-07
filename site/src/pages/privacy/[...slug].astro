@@ -114,7 +114,7 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     You choose which AI tools rotli uses, and, note by note, what each one may read and what it may change.
     rotli enforces your choice in the app, before anything reaches a model.
   </p>
-  <div class="promise-matrix">
+  <div class="promise-matrix wide">
     <table role="table">
       <caption>Who may read and change a note you wrote</caption>
       <thead role="rowgroup">
@@ -351,8 +351,9 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     font-size: var(--step-lede);
     line-height: 1.5;
   }
-  /* The matrix: its own full-width block below any floated companion, a strong rule over the
-     header and hairlines between rows. A refusal reads in weight and in words; the accent ink on
+  /* The matrix: a wide block (`.wide`, blog/article.css: from the words' edge to the page's right
+     edge where there is room), below any floated companion, a strong rule over the header and
+     hairlines between rows. A refusal reads in weight and in words; the accent ink on
      it measures 5.7:1 on the page ground. */
   .promise-matrix {
     clear: both;
@@ -501,21 +502,13 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     width: 100%;
     max-width: min(100%, calc(min(20rem, 42svh) * 720 / 560));
   }
-  /* The promise's matrix breaks out of the words like a post's table (blog/article.css), only
-     where the middle has room for it; on a narrow middle it keeps the measure. */
-  @container article-prose (min-width: 48.5rem) {
-    :global(.writing.is-article .prose) > .promise-matrix {
-      max-width: min(100%, var(--measure) + 10rem);
-    }
-  }
-  /* The companion beside a section, the way the app shows it. */
-  /* The column's right edge, not the middle track's: every block of the article is centred at the
-     measure (blog/article.css), and a float's auto margins are zero, so it is placed by hand. */
+  /* The companion beside a section, the way the app shows it, on the column's right edge rather
+     than the main track's (the room past the words is for wide blocks), so it is placed by hand. */
   :global(.writing.is-article .prose) > .spot {
     float: right;
     width: 132px;
     height: 132px;
-    margin: 0 max(0px, (100% - var(--measure)) / 2) 1rem 1.5rem;
+    margin: 0 max(0px, 100% - var(--measure)) 1rem 1.5rem;
     shape-outside: circle(48%);
   }
   @media (max-width: 560px) {

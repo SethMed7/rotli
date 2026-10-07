@@ -1,7 +1,8 @@
 ---
 // "On this page" for /roadmap/: a link per group, each with how many items it holds. From
-// 1100px it is a column beside the groups, pinned under the header as you read, with the group
-// in view marked (aria-current, a bar and the text's weight, so colour is never the only sign).
+// 901px it is a column in a post's rail (blog/article.css) beside the groups, pinned under the
+// header as you read, with the group in view marked (aria-current, a bar and the text's weight,
+// so colour is never the only sign).
 // Narrower, the same links wrap as a row of chips under the head, in the flow (a pinned bar
 // would cover the list on a phone). The marking is script; without it the links still jump.
 import { ROADMAP_URL, site } from '../../site';
@@ -146,7 +147,7 @@ const { links } = Astro.props;
   }
 
   /* Wide: a column of plain links on a hairline rail, pinned under the header. */
-  @media (min-width: 1100px) {
+  @media (min-width: 901px) {
     .road-nav {
       position: sticky;
       top: calc(var(--header-height) + 2rem);

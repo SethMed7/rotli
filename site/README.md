@@ -318,10 +318,11 @@ there, and the closing panel, whose art never touches its words from 320 to
   `##` headings, the meter as a percent, no Sources, and Share as **Copy
   link** alone (a policy is pointed to, not posted, and it has no Markdown
   twin; the whole Share block waits for script and a clipboard, so it is
-  never an empty label). The promise's matrix breaks out of the words like a
-  post's table where the middle has room (the same `article-prose`
-  container query, 48.5rem), and the section companions float on the
-  column's right edge, not the middle track's. "More from rotli" closes it:
+  never an empty label). The promise's matrix is a wide block (`.wide`): it
+  starts on the words' edge and runs on to the page's right edge like a
+  post's table where there is room (the same `article-prose` container
+  query, 48.5rem), and the section companions float on the column's right
+  edge, not the main track's. "More from rotli" closes it:
   the published posts tagged **Privacy** (`morePostCard` in `src/writing.ts`,
   shared with the blog) and the Download and Rotli Web spots, each only in
   builds that offer it. `e2e/site/privacy-page.spec.ts` holds the head from
@@ -419,31 +420,44 @@ there, and the closing panel, whose art never touches its words from 320 to
     head has the header's edges (the logo's left, Download's right) at every
     width; there is no wider post page any more. The grid is named tracks,
     `--article-tracks`, shared by the head and the body: `rail`, a gap, and
-    `main` (the middle) holding `text` centred in it. There is no right rail.
+    `main` (the room right of the gap), which starts with `text`, the reading
+    column; the rest of `main` is room for wide blocks. There is no right
+    rail. The tracks and tokens are `.longform` in `blog/article.css`, the
+    one definition the posts, `/privacy/`, and `/roadmap/` share (the owner,
+    2026-10-07; the measured evaluation and the options are
+    `docs/design/article-pages-width-2026-10-07.md`).
     The reading column is a measure, `--measure`: 18px type × 38.5, about 66
     characters, at every width. The rail and the gap are fluid in the
     article's own width (`cqi`; the article is the container). By window
     width:
 
-    | Window     | Page             | Left rail              | Gap        | Middle (column centred) | Line        |
-    | ---------- | ---------------- | ---------------------- | ---------- | ----------------------- | ----------- |
-    | to 900     | window − gutters | (disclosure)           | none       | the column              | to 66 chars |
-    | 901 – 1179 | window − gutters | 10rem → 16rem by ~1180 | 2 → 2.5rem | the rest                | 61 – 66     |
-    | 1180 – 1295 | window − gutters | 16rem                 | 2.5rem     | the rest                | 66          |
-    | 1296 and up | 76rem            | 16rem                 | 2.5rem     | 57.5rem: the column and about 7rem a side | 66 |
+    | Window      | Page             | Left rail              | Gap        | Main (column, then wide room)          | Line        |
+    | ----------- | ---------------- | ---------------------- | ---------- | -------------------------------------- | ----------- |
+    | to 900      | window − gutters | (disclosure)           | none       | the page; the column on its left edge  | to 66 chars |
+    | 901 – 1179  | window − gutters | 10rem → 16rem by ~1180 | 2 → 2.5rem | the rest                               | 61 – 66     |
+    | 1180 – 1295 | window − gutters | 16rem                  | 2.5rem     | the rest                               | 66          |
+    | 1296 and up | 76rem            | 16rem                  | 2.5rem     | 57.5rem: the column, then 14.2rem      | 66          |
 
-    The column sits in the middle of the room right of the rail, so on a wide
-    screen it is further right than the page's centre (the owner: "move blog
-    content more right"). Below 901px the rail folds (its tree the
-    disclosure, its meter the slim bar, its Share after the article).
-    `/privacy/` uses the same layout (see "The privacy head" below).
-  - **What breaks out.** Every block of the post keeps the measure, centred
-    in the middle; figures, tables, and code blocks may break out, but only
-    when the middle is at least 48.5rem (a container query on the prose), so
-    a figure is never a sliver wider than the text, and never by more than
-    5rem a side (`min(100%, --measure + 10rem)`), so nothing is over-wide.
-    Beside the full-width rail (from about 1180px) they spread; on a narrow
-    middle they keep the measure. Nothing reaches into the rail.
+    Every block starts on the column's left edge, one rail gap past the rail;
+    nothing is centred in the room, so the gap is the gap and no more (the
+    owner, 2026-10-07, after the centred column of "move blog content more
+    right" left 153px between the rail and the words at 1440). Below 901px
+    the rail folds (its tree the disclosure, a bar across the page on the
+    picture's edges; its meter the slim bar; its Share after the article)
+    and the column starts on the page's left edge. `/privacy/` uses the
+    same layout (see "The privacy head" below), and `/roadmap/` the same
+    tracks.
+  - **What breaks out.** Every block of the post keeps the measure; figures,
+    tables, code blocks, and anything marked `.wide` start on the words'
+    edge and run on to the page's right edge (the header's, and the head
+    picture's), but only when `main` is at least 48.5rem (a container query
+    on the prose), so a wide block is never a sliver wider than the text.
+    On a narrower `main` (about 901 to 1150px) they keep the measure.
+    Nothing reaches into the rail.
+  - **Lists.** Beside the rail a top-level list's markers hang in the rail's
+    gap, so its words start on the column's edge like every paragraph;
+    below 901px the page's gutter is too narrow to hang into, so lists keep
+    a 1.3rem indent. Nested lists always indent.
   - **The head** (`blog/ArticleCover.astro`) spans the page, the header's
     edges. From 1000px it is two columns, centred on each other so neither
     leaves an empty band: on the left "Blog /" small and quiet, the title
@@ -546,8 +560,10 @@ there, and the closing panel, whose art never touches its words from 320 to
     sideways scroll, the rail and figures never over the text, 60 to 80
     characters a line from 768px and 62 to 70 from 1180px, 18px type, the
     head and picture on the header's edges ±1.5px from 1024 to 2560, the
-    column centred in the middle, figures breaking out and never by more
-    than 5rem a side; the rail 16rem from 1440, a post's page and the index's
+    column one rail gap past the rail with a list's words on its edge,
+    figures on the words' edge ending on the page's right edge when they
+    break out, and posts, `/privacy/`, and `/roadmap/` sharing the rail and
+    the edge from 901px; the rail 16rem from 1440, a post's page and the index's
     both 76rem, a live resize matching a fresh load); `scripts/site-writing.test.ts`
     holds `sourcesOf` against the published post, `railTitle`, `morePosts`,
     and the promos' data and rotation.
@@ -1340,9 +1356,12 @@ The page (`src/pages/roadmap/[...slug].astro`, its parts in
   an open stop, and a signpost pointing three ways. Decorative, so
   `aria-hidden`; nothing is fetched.
 - **On this page** (`RoadmapNav.astro`): a link per group with its item count.
-  From 1100px a column pinned under the header beside the groups, marking the
-  group being read (`aria-current`, a bar and weight); narrower, a wrapping row
-  of chips in the flow.
+  From 901px a column in a post's rail (the `.longform` tracks,
+  `blog/article.css`), pinned under the header beside the groups, marking the
+  group being read (`aria-current`, a bar and weight); narrower, a wrapping
+  row of chips in the flow. The groups start on a post's column edge, one
+  rail gap past it: section notes and summaries keep the reading measure,
+  and the grids and lists run on to the page's right edge.
 - **In the work**: each item under its drawing (`RoadmapMock.astro`, the
   item's one frame; the words sit on the page, never in a card around both).
   **Planned** and **Ideas**: a calm list on hairlines. Every item shows its

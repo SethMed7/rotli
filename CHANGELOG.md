@@ -84,8 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   header: the title, summary, author, and topics sit beside the post's
   picture, shown whole, with "Blog" above the title, and the title is in
   view without scrolling. Below that are two columns: the contents,
-  progress, sources, and Share on the left, and the text in the room to its
-  right, at a comfortable line of about 66 characters on every screen. The
+  progress, sources, and Share on the left, and the text just beside it, at
+  a comfortable line of about 66 characters on every screen. Headings,
+  paragraphs, lists, tables, and charts all start on one edge, with no wide
+  empty gap beside the contents; tables and charts run on to the page's
+  right edge where there's room. The privacy page and the roadmap are laid
+  out the same way, so all three read as one family. The
   sources show four at a time with "Show all", every one whole, and the
   left column stays with you as you read without ever cutting anything off.
   The suggestions that sat on the right now close the post as "More from
