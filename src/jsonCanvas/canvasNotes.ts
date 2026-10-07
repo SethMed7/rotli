@@ -74,17 +74,21 @@ export function useCanvasNotes(paths: readonly string[]) {
   // only notes the projection says are open are read at all; their bodies
   // come through the note cache every save writes, so a card follows edits
   // made elsewhere, and a failed read is tried again when the canvas reopens
+  // one read per note, however many cards show it
   const openIds = useMemo(
-    () =>
-      paths
-        .map((path) => noteAtPath(notes, path))
-        .filter(
-          (note): note is NoteSummary =>
-            note !== null &&
-            (note.kind ?? "note") === "note" &&
-            cardAccess(note, projection, secureById) === "open",
-        )
-        .map((note) => note.id),
+    () => [
+      ...new Set(
+        paths
+          .map((path) => noteAtPath(notes, path))
+          .filter(
+            (note): note is NoteSummary =>
+              note !== null &&
+              (note.kind ?? "note") === "note" &&
+              cardAccess(note, projection, secureById) === "open",
+          )
+          .map((note) => note.id),
+      ),
+    ],
     [paths, notes, projection, secureById],
   );
   const reads = useQueries({

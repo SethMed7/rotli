@@ -349,8 +349,9 @@ export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): P
   // canvas now — secure notes fail closed (ROTLI review, PR 173). A save that
   // only changed what the note links to marks it stale: no walk per keystroke,
   // the next reader refetches (audit 2026-10-06)
-  const secureNow = note.secure === true || looksSecret(note.body);
-  if (before && (before.secure === true || looksSecret(before.body)) !== secureNow) {
+  const secureOf = (each: Note | undefined) => !!each && (each.secure === true || looksSecret(each.body));
+  // a first save with no cached copy counts as "was open": a secret in it refetches too
+  if (secureOf(before) !== secureOf(note)) {
     void queryClient.invalidateQueries({ queryKey: keys.links });
   } else if (!before || bodyLinkTargets(before.body).join("\n") !== bodyLinkTargets(note.body).join("\n")) {
     void queryClient.invalidateQueries({ queryKey: keys.links, refetchType: "none" });

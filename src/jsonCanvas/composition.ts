@@ -25,6 +25,8 @@ export const CANVAS_MAX_BYTES = 8_000_000;
 /** Why a canvas file didn't open — one wording, shared with the tests. */
 export const CANVAS_LOAD_REFUSAL = {
   notHere: "Canvases need a vault folder — connect one to open this canvas.",
+  unsaved:
+    "Your last changes to this canvas haven’t saved yet, so it won’t open over them. Rotli tries again when you reopen it and when you quit.",
   gone: "This canvas isn’t in the vault anymore.",
   tooLarge: "This canvas is too large to open.",
 } as const;
@@ -52,15 +54,36 @@ export async function loadCanvasFile(
   };
 }
 
+/** Saves that failed as their tab closed, by file. Quit retries each one;
+ * reopening the file retries it first, so one file never has two savers
+ * racing at quit (ROTLI re-review, PR 173). */
+const unsaved = new Map<string, { flush: () => Promise<void>; unregister: () => void }>();
+
 /** A canvas tab closing saves now. A save that fails stays registered for
  * quit, which retries it and stops if it still can't land — closing a tab
  * never drops an edit quietly. */
-export function closeCanvasSaver(saver: CanvasSaver | null, unregister: () => void): Promise<void> {
+export function closeCanvasSaver(
+  fileId: string,
+  saver: CanvasSaver | null,
+  unregister: () => void,
+): Promise<void> {
   if (!saver) {
     unregister();
     return Promise.resolve();
   }
-  return saver.flush().then(unregister, () => {});
+  return saver.flush().then(unregister, () => {
+    unsaved.set(fileId, { flush: () => saver.flush(), unregister });
+  });
+}
+
+/** Before a canvas opens, land the save its last tab couldn't. Rejects while
+ * it still can't, so the canvas never opens over an edit it hasn't kept. */
+export async function settleUnsavedCanvas(fileId: string): Promise<void> {
+  const left = unsaved.get(fileId);
+  if (!left) return;
+  await left.flush();
+  left.unregister();
+  unsaved.delete(fileId);
 }
 
 export function useCanvasFile(fileId: string): {
@@ -76,7 +99,17 @@ export function useCanvasFile(fileId: string): {
     let cancelled = false;
     let unregister = () => {};
     const io = canvasFileIo();
-    loadCanvasFile(fileId, io)
+    settleUnsavedCanvas(fileId)
+      .then(
+        () => loadCanvasFile(fileId, io),
+        (err: unknown) => {
+          const reason = err instanceof Error ? err.message : String(err);
+          return {
+            state: { status: "error", error: `${CANVAS_LOAD_REFUSAL.unsaved} (${reason})` } as const,
+            revision: null,
+          };
+        },
+      )
       .then((loaded) => {
         if (cancelled) return;
         if (io && loaded.revision !== null) {
@@ -103,7 +136,7 @@ export function useCanvasFile(fileId: string): {
       });
     return () => {
       cancelled = true;
-      void closeCanvasSaver(saver.current, unregister);
+      void closeCanvasSaver(fileId, saver.current, unregister);
       saver.current = null;
     };
   }, [fileId]);

@@ -49,6 +49,12 @@ done in one follow-up commit:
   - A failed note read says so and is retried when the canvas reopens.
   - Rotli Web runs a canvas's revision check and write under one lock per
     file.
+- **Re-review.** The hold is lifted. One more fix:
+  - A canvas whose close-save failed retries that save before it opens
+    again. Until the save lands it refuses to open, so one file never has
+    two savers racing at quit.
+  - A note's first save that already holds a secret refetches Links.
+  - A note on several cards is read once.
 
 Big vaults: a reduced-motion layout of more than 400 notes runs at most
 60 synchronous ticks, and rebuilds start warm. A worker-thread layout is

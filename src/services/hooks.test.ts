@@ -68,6 +68,10 @@ describe("applyNoteWrite", () => {
     await applyNoteWrite(note("s", { body: "# Card\n\nPay day." }));
     await Promise.resolve();
     expect(fetches).toBe(2);
+    // a first save with nothing cached yet, already holding a secret
+    await applyNoteWrite(note("t", { body: "# Card\n\nPay day: 4111 1111 1111 1111" }));
+    await Promise.resolve();
+    expect(fetches).toBe(3);
     stop();
   });
 

@@ -3,7 +3,13 @@ import { expect, test } from "bun:test";
 import { onQuitFlush, runQuitFlushers } from "../lib/quitFlush";
 import type { CanvasFileIo } from "../services/canvasFiles";
 import { createCanvasSaver } from "./canvasSaver";
-import { CANVAS_LOAD_REFUSAL, CANVAS_MAX_BYTES, closeCanvasSaver, loadCanvasFile } from "./composition";
+import {
+  CANVAS_LOAD_REFUSAL,
+  CANVAS_MAX_BYTES,
+  closeCanvasSaver,
+  loadCanvasFile,
+  settleUnsavedCanvas,
+} from "./composition";
 import { CANVAS_REFUSAL } from "./model";
 
 const stat = (len: number) => ({ len, revision: "r1", writable: true });
@@ -69,7 +75,7 @@ test("closing a canvas whose save fails keeps the edit for quit, which retries i
   });
   const unregister = onQuitFlush(() => saver.flush());
   saver.queue({ nodes: [], edges: [] });
-  await closeCanvasSaver(saver, unregister);
+  await closeCanvasSaver("wiki/Kept.canvas", saver, unregister);
   // the tab is gone, but quit still holds the edit and refuses to lose it
   await expect(runQuitFlushers()).rejects.toThrow("disk full");
   failing = false;
@@ -94,8 +100,38 @@ test("closing a canvas that saved lets go of quit", async () => {
   });
   let registered = true;
   saver.queue({ nodes: [], edges: [] });
-  await closeCanvasSaver(saver, () => {
+  await closeCanvasSaver("wiki/Saved.canvas", saver, () => {
     registered = false;
   });
   expect([calls, registered]).toEqual([1, false]);
+});
+
+test("reopening a canvas whose close-save failed lands that save first, so quit never runs two", async () => {
+  let writes = 0;
+  let failing = true;
+  const saver = createCanvasSaver({
+    revision: "r1",
+    delayMs: 500,
+    schedule: () => null,
+    cancel: () => {},
+    write: async () => {
+      writes += 1;
+      if (failing) throw new Error("disk full");
+      return "r2";
+    },
+    onSaved: () => {},
+    onError: () => {},
+  });
+  const unregister = onQuitFlush(() => saver.flush());
+  saver.queue({ nodes: [], edges: [] });
+  await closeCanvasSaver("wiki/Reopened.canvas", saver, unregister);
+  // still failing: the canvas won't open over the edit it hasn't kept
+  await expect(settleUnsavedCanvas("wiki/Reopened.canvas")).rejects.toThrow("disk full");
+  failing = false;
+  await settleUnsavedCanvas("wiki/Reopened.canvas");
+  const landed = writes;
+  // the old saver is gone from quit; nothing is left to run twice
+  await runQuitFlushers();
+  await settleUnsavedCanvas("wiki/Reopened.canvas");
+  expect(writes).toBe(landed);
 });
