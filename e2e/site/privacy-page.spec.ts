@@ -17,6 +17,7 @@ const SECTIONS = [
   "AI and your notes",
   "How rotli connects to AI",
   "Rotli Web and Rotli Helper",
+  "Keys and logins",
   "This website",
   "Keeping and deleting",
   "Changes to this page",
@@ -309,3 +310,24 @@ for (const width of [320, 360, 390, 414, 600, 660, 768, 900, 901, 999, 1000, 102
     expect(widest).toBeLessThanOrEqual(width + 0.5);
   });
 }
+
+// Keys and logins (the owner, 2026-10-07: "passwords and keys ... work different", so they get a
+// section of their own): no rotli password, AI tools keep their own logins, the one optional key
+// and its rules, the Helper's pairing code, and what rotli can and can't spot in a note.
+test("keys and logins have their own section, linked from where the files are described", async ({
+  page,
+}) => {
+  await page.goto("/privacy/");
+  const link = page.locator("#your-notes ~ p a[href='#keys']").first();
+  await expect(link).toHaveText("Keys and logins");
+  await link.click();
+  await expect(page).toHaveURL(/#keys$/);
+  const section = page.locator("#keys ~ *:not(h2#website ~ *)");
+  await expect(section.filter({ hasText: "no rotli password" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "never reads them" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "lives in the macOS Keychain" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "No AI model ever sees it" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "Brave Search" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "pairing code" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "mark that note secure yourself" })).toHaveCount(1);
+});

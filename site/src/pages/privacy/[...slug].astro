@@ -42,6 +42,7 @@ const toc = [
   { slug: 'ai', text: 'AI and your notes' },
   { slug: 'connect', text: 'How rotli connects to AI' },
   { slug: 'web', text: 'Rotli Web and Rotli Helper' },
+  { slug: 'keys', text: 'Keys and logins' },
   { slug: 'website', text: 'This website' },
   { slug: 'retention', text: 'Keeping and deleting' },
   { slug: 'changes', text: 'Changes to this page' },
@@ -181,10 +182,8 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
     Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
     app's settings on your Mac, and it can rebuild them at any time. Main and named views are arrangements
-    of the same files, not copies. rotli needs no password, and it never holds your AI tools' logins. The
-    one key you might give it is optional: web searches use DuckDuckGo, free and with no account, unless you
-    choose Brave Search in Settings → Connections and paste your own Brave key. That key goes into the
-    macOS Keychain, never into your notes or settings files.
+    of the same files, not copies. No key or login ever sits in these files: see <a href="#keys">Keys and
+    logins</a>.
   </p>
   <p>
     <strong>Why:</strong> a notes app should never be the only way to reach your notes. Because everything is
@@ -282,6 +281,52 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
   <p>
     <strong>Why:</strong> a web app usually means your notes live on someone's server. Rotli Web is built the
     other way around: the page is just the editor, and your folder stays on your computer.
+  </p>
+
+  <h2 id="keys">Keys and logins</h2>
+  <p>
+    rotli has no account, so there's no rotli password to make, forget, or leak. It never asks for the login
+    to your AI tools either: Claude Code, Codex, and Cursor keep their own sign-in, in their own files, and
+    rotli never reads them.
+  </p>
+  <p>
+    A service rotli connects to may need a key of its own. The key is yours: you create it with that
+    service, paste it into Settings → Connections, and can remove it there at any time. Every key follows the
+    same rules:
+  </p>
+  <ul>
+    <li>
+      <strong>It lives in the macOS Keychain,</strong> never in a note, your vault, or a settings file, so it
+      never travels with your notes when you back them up, sync them, or share them.
+    </li>
+    <li><strong>It goes only to its own service,</strong> straight from your Mac.</li>
+    <li><strong>No AI model ever sees it,</strong> on your Mac or connected.</li>
+    <li>
+      <strong>Once saved, it isn't shown again,</strong> not even to you. Settings says the key is saved, and
+      you can replace it or remove it.
+    </li>
+  </ul>
+  <p>
+    Today that's one optional key. Web searches use DuckDuckGo, free and with no account, unless you
+    choose <strong>Brave Search</strong> and paste your own Brave key. Connections still in development, such as
+    remote agents and emailed briefs, keep their keys the same way, and this page will name each one before
+    it ships.
+  </p>
+  <p>
+    <strong>Rotli Helper</strong> has no password either. Its installer hands Rotli Web a pairing code in
+    the part of the address browsers never send to a server. The code stays on your computer, in the
+    Helper's own folder and in your browser, and the Helper answers only Rotli Web's own address.
+  </p>
+  <p>
+    <strong>Secrets in your notes.</strong> A note is a plain file, so a password manager is the better home
+    for passwords. If a note holds something shaped like a key (an API key, a private key, a card or Social
+    Security number), rotli marks it secure on its own, so remote models never see it. An ordinary password
+    looks like any other word, so rotli can't spot it: mark that note secure yourself.
+  </p>
+  <p>
+    <strong>Why:</strong> a key opens an account that can charge you or hold your data. Keeping every key in
+    the Keychain protects it the way your Mac protects your other passwords, and keeps it out of the files
+    you copy, sync, and hand to AI.
   </p>
 
   <h2 id="website">This website</h2>

@@ -267,8 +267,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boards build on, and says there is no extra AI plan to buy: rotli uses the
   one you already have, or a model on your Mac. Two new questions, "Do I
   have to pay for AI?" and "Is rotli just a notes app?", answer both. The
-  privacy page's opening on AI is plainer, and it names the one key rotli
-  may keep: an optional Brave Search key, in the macOS Keychain.
+  privacy page's opening on AI is plainer, and a new "Keys and logins"
+  section says what rotli never asks for (a rotli password, your AI tools'
+  logins), the one optional key it may keep (Brave Search, in the macOS
+  Keychain) and the rules every key follows, how Rotli Helper pairs, and
+  which secrets in a note rotli can spot on its own.
 - **The privacy page and blog posts show how far through you are,** with the
   same "N% through" bar as the guides, so every article reads the same way.
 - **rotli.co's blog shows a picture for every post.** Each post has its own
