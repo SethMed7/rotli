@@ -266,6 +266,8 @@ const vendorSeams = [
   },
   // the ```chart fence's renderer (2026-10-05); chartSpec.ts owns the text
   { vendor: "@tanstack/charts", allowed: ["src/editor/chartRender.ts"] },
+  // the Graph view's force layout (exploration 2026-10-05)
+  { vendor: "d3-force", allowed: ["src/graph/engine/"] },
   {
     vendor: "jszip",
     allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/", "src/lib/vaultZip.ts"],

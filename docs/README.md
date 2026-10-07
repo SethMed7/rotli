@@ -30,6 +30,7 @@ fix both in the same change.
 | Cross-window and host event registry | [`architecture/window-events.md`](architecture/window-events.md) |
 | Code quality, redundancy, and AI-readiness scorecard | [`architecture/code-quality-and-ai-readiness-2026-09-01.md`](architecture/code-quality-and-ai-readiness-2026-09-01.md) |
 | Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
+| Canvas, Graph, and setup round — audit and fix list (2026-10-06) | [`architecture/canvas-graph-audit-2026-10-06.md`](architecture/canvas-graph-audit-2026-10-06.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
 | Bun 1.4 architecture audit and promotion record | [`architecture/bun-1.4-audit-2026-08-21.md`](architecture/bun-1.4-audit-2026-08-21.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
@@ -49,6 +50,7 @@ fix both in the same change.
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
 | rotli.co landing layout: the audit, the section order, cards, tour, closing banner | [`design/landing-layout-2026-10-05.md`](design/landing-layout-2026-10-05.md) |
 | Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
+| Canvas and Graph — exploration (Graph built; JSON Canvas spike) | [`design/canvas-and-graph-2026-10-05.md`](design/canvas-and-graph-2026-10-05.md) |
 | Talk to the Librarian (`/librarian`) — slice 1 plan and the `anchors` key | [`design/librarian-bar.md`](design/librarian-bar.md) |
 | Librarian rules — secure keywords, People groups, filing sentences | [`design/librarian-rules.md`](design/librarian-rules.md) |
 | Ambient audio and the sidebar player — tab media, the studio's tracks | [`design/ambient-audio.md`](design/ambient-audio.md) |

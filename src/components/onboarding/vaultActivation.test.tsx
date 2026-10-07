@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { skipLeadsTo } from "./setupFlow";
 import { keepableVault, openedOrWhy, VaultActivation, vaultPlan } from "./vaultActivation";
+import { VaultNeeded } from "./vaultNeeded";
 
 test("setup offers to keep a vault this install chose, never the one a debug build borrows", () => {
   const corpus = { absPath: "/Users/me/memex-vault", isMemex: true, memexId: "mx_1" } as Parameters<
@@ -38,9 +40,17 @@ test("a new vault outside setup asks about the Librarian; in setup its own scree
   expect(inSetup).not.toContain('aria-label="Vault choice"');
 });
 
-test("after Skip setup the vault screen says it is the one thing left", () => {
-  expect(renderToStaticMarkup(<VaultActivation onboarding skipping />)).toContain(
-    "One thing before you start",
-  );
-  expect(renderToStaticMarkup(<VaultActivation onboarding />)).not.toContain("One thing before you start");
+test("Skip setup opens the app when a vault is chosen, else the one folder prompt", () => {
+  expect(skipLeadsTo("configured")).toBe("app");
+  expect(skipLeadsTo("unconfigured")).toBe("vaultPrompt");
+  expect(skipLeadsTo("checking")).toBe("vaultPrompt");
+});
+
+test("the skip prompt is a dialog with one action, not a setup step", () => {
+  const markup = renderToStaticMarkup(<VaultNeeded onDone={() => {}} />);
+  expect(markup).toContain('role="dialog"');
+  expect(markup).toContain("Rotli needs a folder for your notes");
+  expect(markup).toContain(">Choose a folder<");
+  expect(markup).not.toContain("setup-progress");
+  expect(markup).not.toContain("of 4");
 });

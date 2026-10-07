@@ -45,10 +45,12 @@ import { startTour } from "../state/tour";
 import { ALL_NOTES, SIDEBAR_ZOOM_STEP, TASKS, useUiStore } from "../state/ui";
 import { registerAlignActions } from "./alignActions";
 import { registerAppLinkActions } from "./appLinkActions";
+import { registerCanvasActions } from "./canvasActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
+import { registerGraphActions } from "./graphActions";
 import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
 import { registerNavArrowActions } from "./navArrows";
@@ -365,6 +367,7 @@ export function registerDefaultActions(): void {
     ["items.newDocument", "New document", "document"],
     ["items.newSheet", "New sheet", "sheet"],
     ["items.newMermaid", "New Mermaid diagram", "mermaid"],
+    ["items.newCanvas", "New canvas", "canvas"],
   ] as const) {
     if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({
@@ -443,6 +446,8 @@ export function registerDefaultActions(): void {
   registerNoteProtectionActions();
   registerAlignActions();
   registerLeaderActions();
+  registerGraphActions();
+  if (LAUNCH_FEATURES.jsonCanvas) registerCanvasActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
   //   the configured item default in the workspace and a fresh private sibling

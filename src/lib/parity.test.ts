@@ -20,12 +20,15 @@ import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
+import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
+import { canvasHome } from "../services/folderCanvases";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
@@ -198,6 +201,28 @@ describe("parity.json ↔ TS constants", () => {
         outbound,
         overlaps: false,
       });
+    }
+  });
+
+  test("wikilinkTargets", () => {
+    for (const { body, targets } of entries.wikilinkTargets.value) {
+      expect({ body, targets: bodyLinkTargets(body) }).toEqual({ body, targets });
+    }
+  });
+
+  test("emptyCanvasFile", () => {
+    expect(EMPTY_CANVAS_FILE).toBe(entries.emptyCanvasFile.value);
+  });
+
+  test("canvasHome", () => {
+    for (const { folder, memex, home } of entries.canvasHome.value) {
+      expect({ folder, memex, home: canvasHome(folder, memex) }).toEqual({ folder, memex, home });
+    }
+  });
+
+  test("metadataLinkTargets", () => {
+    for (const { fields, targets } of entries.metadataLinkTargets.value) {
+      expect({ fields, targets: metadataLinkTargets(fields) }).toEqual({ fields, targets });
     }
   });
 

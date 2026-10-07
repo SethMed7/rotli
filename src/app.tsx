@@ -360,10 +360,11 @@ function MainShell() {
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill
   // the pristine startup tab once, never replacing anything the user opened.
+  // A NOTE: a newer board or canvas opened here as a broken note tab.
   useEffect(() => {
     if (!hasDurableCorpus()) return;
     void notesService.listNotes().then((notes) => {
-      const freshest = notes[0];
+      const freshest = notes.find((note) => (note.kind ?? "note") === "note");
       if (!freshest) return;
       const { root, openNote } = usePanesStore.getState();
       const panes = leaves(root);

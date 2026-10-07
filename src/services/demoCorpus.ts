@@ -89,7 +89,9 @@ Apple Notes feel, **markdown underneath**. Local files, one structure the AI can
 
 > The folder of files *is* the product. Every view, every backend, every AI is a reader.
 
-Start with a note. Add context when a conversation would help. Your files stay yours.`,
+Start with a note. Add context when a conversation would help. Your files stay yours.
+
+Where it goes next: [[Pricing decision]] · [[Quokka world — where it lives]]`,
       { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
     );
     firstNoteId = welcome.id;
@@ -118,7 +120,9 @@ Three things must land before Thursday: the settlement mapping, the gateway expo
 
 The demo flows from capture → recall: open with the island story, close with the cited answer.
 
-Maria owns the reconciliation walkthrough; I take pricing.`,
+Maria owns the reconciliation walkthrough; I take pricing.
+
+See [[Q3 priorities — Northstar]], [[Pricing decision]], and [[1-on-1 — Sarah]].`,
       { createdAt: now - DAY, updatedAt: now - DAY },
     );
 
@@ -126,7 +130,9 @@ Maria owns the reconciliation walkthrough; I take pricing.`,
       storageNorthstar.id,
       `# Q3 priorities — Northstar
 
-Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
+Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.
+
+Prep: [[Q3 platform review — prep]]`,
       { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
     );
 
@@ -145,7 +151,9 @@ The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces h
       vaultProjects.id,
       `# rotli — project note
 
-The warm, local-first menu-bar notes app. Lives in its own repo; the Vault is where its long-form thinking is kept.`,
+The warm, local-first menu-bar notes app. Lives in its own repo; the Vault is where its long-form thinking is kept.
+
+Starts from [[rotli — notes first]]; the look is [[Quokka world — where it lives]].`,
       { createdAt: now - 5 * DAY, updatedAt: now - 5 * DAY },
     );
 
@@ -202,7 +210,12 @@ Scrap this. The three-tier idea died; we went free-local + one paid sync line. K
       `# Launch checklist
 
 Filed under **Projects** by the Librarian — same file, reachable from Main and the Library alike.`,
-      { createdAt: now - 2 * DAY, updatedAt: now - DAY },
+      {
+        createdAt: now - 2 * DAY,
+        updatedAt: now - DAY,
+        // the related notes the Librarian found (its frontmatter `links:`)
+        suggestedLinks: ["Pricing decision", "Q3 platform review — prep"],
+      },
     );
 
     // —— Templates: one saved layout, so `/template` has something to insert ——

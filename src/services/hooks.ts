@@ -4,9 +4,14 @@
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { looksSecret } from "../ai/guard";
+import { bodyLinkTargets } from "../graph/linkTargets";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { isCanvasPath } from "../lib/fileKind";
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
   corpusFileStat,
+  corpusLinks,
   corpusMoveFileToSink,
   corpusTasks,
   isTauri,
@@ -24,6 +29,7 @@ import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import { listWebLinks } from "./webLinks";
 import { listWebTasks } from "./webTasks";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
@@ -47,6 +53,7 @@ export const keys = {
   secureRepair: ["secure-repair"] as const,
   secureHints: ["secure-hints"] as const,
   tasks: ["tasks"] as const,
+  links: ["links"] as const,
 };
 
 /** The note universe's whole-corpus fetch rides a reserved folderId sentinel so
@@ -220,7 +227,10 @@ export function useSearchableNotes(): { notes: NoteSummary[]; ready: boolean } {
         // conservative transient (a plain root's chats/ appears a beat later,
         // never flashes in and out)
         const chats = memex ? isChats(n.folderId, memex) : isChatsPath(n.folderId);
-        if (n.kind === "file" || isSink(n.folderId) || chats) continue;
+        // files stay out — except a canvas where this build opens canvases,
+        // listed and linked like a board (owner decision 2026-10-06)
+        const canvas = LAUNCH_FEATURES.jsonCanvas && isCanvasPath(n.id);
+        if ((n.kind === "file" && !canvas) || isSink(n.folderId) || chats) continue;
         seen.set(n.id, n);
       }
     return [...seen.values()];
@@ -299,6 +309,8 @@ export async function invalidateNotes(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["note"] }),
     // a body edit can add/complete checkboxes — the Tasks projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
+    // …and add or drop a wikilink — the Graph's Links projection re-derives
+    queryClient.invalidateQueries({ queryKey: keys.links }),
   ]);
 }
 
@@ -330,7 +342,20 @@ export async function invalidateTasks(): Promise<void> {
  * TabStrip, and the note lists don't re-derive per tick. */
 export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): Promise<void> {
   const { body: _body, ...summary } = note;
+  const before = queryClient.getQueryData<Note>(keys.note(note.id));
   queryClient.setQueryData(keys.note(note.id), note);
+  // the Graph and canvas cards read the Links projection. A save that makes
+  // the note secure, or no longer secure, refetches it for an open Graph or
+  // canvas now — secure notes fail closed (ROTLI review, PR 173). A save that
+  // only changed what the note links to marks it stale: no walk per keystroke,
+  // the next reader refetches (audit 2026-10-06)
+  const secureOf = (each: Note | undefined) => !!each && (each.secure === true || looksSecret(each.body));
+  // a first save with no cached copy counts as "was open": a secret in it refetches too
+  if (secureOf(before) !== secureOf(note)) {
+    void queryClient.invalidateQueries({ queryKey: keys.links });
+  } else if (!before || bodyLinkTargets(before.body).join("\n") !== bodyLinkTargets(note.body).join("\n")) {
+    void queryClient.invalidateQueries({ queryKey: keys.links, refetchType: "none" });
+  }
   const entries = queryClient.getQueriesData<NoteSummary[]>({ queryKey: ["notes"] });
   // judge rowChanged against the FRESHEST cached copy across every list — if
   // caches ever diverged (an interrupted earlier patch), the stalest copy must
@@ -408,6 +433,12 @@ export function useSecureHints() {
 export function useTasks() {
   // the Mac app projects tasks in Rust; the web has the same rules in TS
   return useQuery({ queryKey: keys.tasks, queryFn: isTauri() ? corpusTasks : listWebTasks });
+}
+
+/** The Links projection — every live note's raw wikilinks, for the Graph view.
+ * Same split as Tasks: Rust on the Mac, the TS twin on the web. */
+export function useNoteLinks() {
+  return useQuery({ queryKey: keys.links, queryFn: isTauri() ? corpusLinks : listWebLinks });
 }
 
 export async function invalidateJournal(): Promise<void> {

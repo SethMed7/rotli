@@ -30,6 +30,7 @@ import { WhatsNewDialog } from "./whatsNewDialog";
 
 // Breve is a whole product surface most note sessions never enter — split it
 // off the entry chunk like paneTree's CanvasSurface (perf audit 2026-07-30, #18)
+const GraphSurface = lazy(() => import("./graphSurface").then((m) => ({ default: m.GraphSurface })));
 const BreveSurface = lazy(() => import("./breve/breveSurface").then((m) => ({ default: m.BreveSurface })));
 
 /** Drag grip on the sidebar's right edge — same pointer grammar as the pane
@@ -149,6 +150,10 @@ export function NotesSurface() {
         <AllChatsSurface />
       ) : contentView === "tasks" ? (
         <TasksSurface />
+      ) : contentView === "graph" ? (
+        <Suspense fallback={null}>
+          <GraphSurface />
+        </Suspense>
       ) : contentView === "system" && systemRoot ? (
         <SystemSurface key={systemRoot} rootId={systemRoot} />
       ) : contentView === "recent" ? (

@@ -185,6 +185,7 @@ export type ContentView =
   | "allChats"
   | "recent"
   | "tasks"
+  | "graph"
   | "system";
 
 /** The dashboard deliberately has two non-overlapping lenses. Rotli activity

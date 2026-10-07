@@ -20,6 +20,12 @@ export const IMAGE_EXTS = new Set([
   "tif",
 ]);
 
+/** A JSON Canvas file — a file that lives beside notes, listed and found like
+ * a board (owner decisions 2026-10-06). The twin of Rust `is_canvas_path`. */
+export function isCanvasPath(id: string): boolean {
+  return id.toLowerCase().endsWith(".canvas");
+}
+
 /** The basename of a corpus wire id / path ("a/b/c.png" → "c.png"). */
 export function fileName(id: string): string {
   return id.split("/").pop() ?? id;

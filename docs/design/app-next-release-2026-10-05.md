@@ -267,5 +267,5 @@ The browser twin can't prove these.
 - [ ] **Ask AI: the journal.** `rotli notes history ID` shows the insertion as an `inline` row.
 - [ ] **Setup: your Librarian pick stands.** With Gemini signed in, pick On this Mac on the Librarian screen, then go Back and return: it is still On this Mac.
 - [ ] **Setup: the folder panel.** On the vault screen, Choose a folder opens the macOS panel. New Folder there makes a fresh vault; picking an existing Markdown folder opens it in place. Picking Home itself is refused.
-- [ ] **Setup: Skip.** Skip setup on the first screen, pick a folder, and the app opens with no Librarian or shortcuts screen. On the Librarian screen, Skip the rest finishes setup.
+- [ ] **Setup: Skip.** Skip setup on the first screen: with a vault already chosen the app opens at once; without one, the app shows one prompt, "Rotli needs a folder for your notes" (no step count, no Back), and after the folder it opens with no Librarian or shortcuts screen. Quit at the prompt and relaunch: the same prompt, not setup's vault step. On the Librarian screen, Skip the rest finishes setup.
 - [ ] **Settings and sidebar.** Settings → Location's folder choice and the sidebar vault menu's Connect both open the macOS panel.

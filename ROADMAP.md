@@ -28,6 +28,15 @@ id repeats (`site/src/roadmap.ts`).
 
 ## 1. In the work
 
+- **Canvas** <!-- id: canvas --> · L — cards on an open plane, saved as JSON
+  Canvas `.canvas` files that Obsidian also opens. Development builds: New →
+  Canvas makes one beside your notes, found in ⌘K and All notes, and Archive
+  and Trash take it like a note. Type a card, or put just `[[a note]]` in one
+  to show that note; connect cards with lines and gather them into groups.
+  A note card shows the note and opens it in a tab; lines stay drawings and
+  never become links. A new canvas sits beside your notes. Excalidraw boards
+  stay as they are, for drawing (owner decisions 2026-10-06,
+  [design](docs/design/canvas-and-graph-2026-10-05.md)).
 - **Sheets (Beta)** <!-- id: sheets-beta --> · L — spreadsheets (XLSX and CSV)
   inside Rotli, built for the next release in Beta beside Word documents. Left:
   keep undo across a theme or tab switch, carry dropdowns and colour rules
@@ -187,13 +196,10 @@ id repeats (`site/src/roadmap.ts`).
   links to, and stale tasks, delivered through Breve.
 - **Tags browser** <!-- id: tags-browser --> · M — a place to see every tag and the notes under it. Tags
   already exist in note metadata.
-- **Freeform canvas** <!-- id: freeform-canvas --> · XL — drop notes, sheets, PDFs, and images on one
-  board, connect them, group them into frames, and present the frames as
-  slides, like AFFiNE's Edgeless. Built inside Excalidraw. First slice (M–L, no
-  contract change): real-size images on boards, drops onto a board, frames +
-  Present. File cards and connectors need two
-  owner calls: whether a connector is a link, and what a card may show
-  ([evaluation](docs/design/canvas-tasks-logseq-eval-2026-09-23.md)).
+- **Edit a note inside its canvas card** <!-- id: canvas-card-edit --> · M–L —
+  once the Canvas ships, write in a note card on the canvas instead of opening
+  the note in a tab, the way Obsidian does. Needs one live editor per card
+  that stays in step with the same note open in a tab.
 - **Query fence** <!-- id: query-fence --> · M–L — a `query` code block that shows a live table of
   tasks or notes (`tag:`, `area:`, state, due), using the grammar
   `rotli notes query` already has. With **Export to .xlsx** (S–M) it gives a
