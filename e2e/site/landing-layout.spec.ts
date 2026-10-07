@@ -154,6 +154,14 @@ test("the story ends on the LLM wiki aside, and the FAQ points to Rotli Web", as
   await expect(section.locator('a[href="/blog/getting-started/"]')).toHaveCount(0);
   await expect(section.locator(".wrap > :last-child")).toHaveClass(/llm-wiki/);
   // Rotli Web and the Helper: one FAQ answer with its two links, only while WEB_APP_ENABLED.
+  // The vault, and how to start one, is a FAQ answer that leads to the guide (2026-10-07).
+  const vault = page.locator(".faq-list details", { hasText: "What is a vault, and how do I start one?" });
+  await vault.locator("summary").click();
+  await expect(vault).toContainText("the folder your notes live in");
+  await expect(vault.getByRole("link", { name: "Getting started" })).toHaveAttribute(
+    "href",
+    "/blog/getting-started/",
+  );
   const browser = page.locator(".faq-list details", { hasText: "Can I use rotli in my browser?" });
   if ((await browser.count()) > 0) {
     await browser.locator("summary").click();

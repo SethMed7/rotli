@@ -326,7 +326,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its picture, and the steps drop their numbers. The third picture shows the
   chat beside the vault it searched, with the two notes it read lit and the
   rest left closed. The section no longer ends on "See every feature",
-  since Features is in the header.
+  since Features is in the header, and a new question in the FAQ, "What is
+  a vault, and how do I start one?", leads to the getting-started guide.
 - **rotli.co's About page tells the story across the page.** It's written in
   first person around what rotli is now: a free workspace on plain Markdown
   files, notes first with Docs and Sheets (beta), chat and boards in the same

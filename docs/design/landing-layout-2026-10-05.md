@@ -484,7 +484,9 @@ and "See every feature" repeats the header.
   read" on the right, the vault it searched with the two notes it read lit
   and the rest left closed. That makes "not the whole vault" visible.
 - **No trailing links.** "See every feature" and "Getting started with your
-  vault" are gone; the LLM wiki aside ends the section. Where the
-  getting-started guide should surface on the landing is still open.
+  vault" are gone; the LLM wiki aside ends the section. The vault is
+  explained instead by a FAQ answer, "What is a vault, and how do I start
+  one?", which links to the getting-started guide (the owner's pick, the same
+  day).
 
 Guarded by `e2e/site/landing-layout.spec.ts` ("the three steps line up").
