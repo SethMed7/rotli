@@ -7,94 +7,131 @@
 // bounded table of contents, searches (search_memory, over corpus_search_ai, which in the Mac
 // app answers from the derived Tantivy index in .rotli/search/), then reads only the notes it
 // chose (read_memory); it never receives the whole vault. The middle row is drawn as that
-// step, dashed, not as a control: the app shows no "sources" panel, so none is drawn. Synthetic
-// notes, the same ones the filing step uses. One image to assistive tech.
+// step, in muted type, not as a control. Beside the chat, the vault it searched: the two notes it
+// read lit among others it left closed, so "not the whole vault" is something you can see (the
+// owner, 2026-10-07: the picture now spans the same width as the other two steps, with no card).
+// Synthetic notes, the same ones the filing step uses. One image to assistive tech.
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 
-const found = ['Call with Dana', 'Discount policy'];
+// The vault the search ran over: the two notes it found, lit, among others it left closed.
+const vault = [
+  { path: 'wiki/Clients/dana-call.md', read: true },
+  { path: 'wiki/Clients/discount-policy.md', read: true },
+  { path: 'wiki/People/jo-park.md', read: false },
+  { path: 'wiki/Projects/q4-launch-plan.md', read: false },
+  { path: 'wiki/Research/pricing-ideas.md', read: false },
+] as const;
+const read = vault.filter((file) => file.read).length;
 ---
 
 <figure
   class="ask"
   role="img"
-  aria-label="A chat. Asked what Dana wanted, rotli first searches the vault on this computer and reads two notes, Call with Dana and Discount policy, then answers from them."
+  aria-label="A chat beside the vault it searched. Asked what Dana wanted, rotli searches the vault on this computer and reads two notes, Call with Dana and Discount policy, then answers from them; the rest of the vault is not read."
 >
-  <div class="stage-top">
-    <span class="file">chats/dana-follow-up.md</span>
-    <img class="quokka" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
-  </div>
-  <div class="panel">
-    <div class="panel-head">
-      <span class="panel-title">Dana follow-up</span>
+  <div class="state">
+    <div class="state-head">
+      <div>
+        <p class="state-label">You ask</p>
+        <p class="file">chats/dana-follow-up.md</p>
+      </div>
     </div>
     <div class="chat">
       <p class="question">What did Dana want, and what’s left?</p>
-      <div class="lookup">
-        <p class="lookup-line searched">
-          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
-          <span>Searched your vault, on this computer</span>
-        </p>
-        <p class="lookup-line read">
-          Read {found.length} notes:
-          {found.map((title) => <span class="note-name">{title}</span>)}
-        </p>
-      </div>
+      <p class="lookup">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
+        <span>Searched your vault on this computer and read {read} notes</span>
+      </p>
       <p class="reply">
         From <b>Call with Dana</b>: she’s fine with annual pricing and wants the deck on Friday. Still open: ask
         Jo about the discount; <b>Discount policy</b> has the current terms.
       </p>
     </div>
   </div>
+  <div class="state found">
+    <div class="state-head">
+      <div>
+        <p class="state-label">What it read</p>
+        <p class="file plain">searched on this computer</p>
+      </div>
+      <img class="quokka" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+    </div>
+    <ul class="vault">
+      {
+        vault.map((file) => (
+          <li class:list={['vault-row', { read: file.read }]}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M4 2.5h5.5L12 5v8.5H4z M9.5 2.5V5H12" /></svg>
+            <span>{file.path}</span>
+            {file.read && <span class="tag">read</span>}
+          </li>
+        ))
+      }
+      <li class="vault-rest">…and the rest of your vault, left closed</li>
+    </ul>
+  </div>
 </figure>
 
 <style>
+  /* Two open columns split by one hairline, like the Librarian's before and after
+     (Filing.astro): the chat on the left, the vault it searched on the right, with the two notes
+     it read lit and the rest left closed. No cards (the owner, 2026-10-07). */
   .ask {
-    display: flex;
-    flex-direction: column;
-    max-width: 34rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 0;
     margin: 0;
   }
-  .stage-top {
+  .state {
+    min-width: 0;
+    padding-right: clamp(1.25rem, 3.5vw, 3rem);
+  }
+  .state.found {
+    padding-right: 0;
+    padding-left: clamp(1.25rem, 3.5vw, 3rem);
+    border-left: 1px solid var(--border-strong);
+  }
+  .state-head {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: 64px;
+    min-height: var(--figure-head, 4rem);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .state-head > div {
+    min-width: 0;
+  }
+  .state-label {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
   }
   .file {
-    min-width: 0;
-    padding-bottom: 0.55rem;
-    overflow: hidden;
+    margin: 0.3rem 0 0;
     color: var(--text-muted);
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.78rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .file.plain {
+    font-family: inherit;
   }
   .quokka {
     flex: none;
     width: 56px;
     height: 56px;
-    margin: 0 0.25rem -1px 0;
+    margin: 0 0.25rem calc(-0.75rem - 1px) 0;
   }
-  .panel {
-    border: 1px solid var(--border-strong);
-    border-radius: 0.7rem;
-    background: var(--surface);
-    font-size: 0.86rem;
-    line-height: 1.45;
-  }
-  .panel-head {
-    padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .panel-title {
-    font-weight: 600;
-  }
+
   .chat {
     display: grid;
-    gap: 0.7rem;
-    padding: 0.85rem;
+    gap: 0.85rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
   .chat p {
     margin: 0;
@@ -102,44 +139,84 @@ const found = ['Call with Dana', 'Discount policy'];
   .question {
     justify-self: end;
     max-width: 85%;
-    padding: 0.35rem 0.7rem;
+    padding: 0.4rem 0.75rem;
     border-radius: 0.8rem;
     background: var(--tint);
   }
-  /* The step between question and answer: drawn dashed, as what happens, not as a control. */
+  /* The step between question and answer: what happened, in muted type, not a control. */
   .lookup {
-    display: grid;
-    gap: 0.35rem;
-    padding: 0.55rem 0.7rem;
-    border: 1px dashed var(--border-strong);
-    border-radius: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
-  }
-  .lookup-line {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem 0.45rem;
-  }
-  /* The icon stays with its words at any width. */
-  .lookup-line.searched {
-    flex-wrap: nowrap;
     align-items: flex-start;
+    gap: 0.45rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
   }
-  .lookup-line.searched svg {
-    margin-top: 0.15em;
-  }
-  .lookup-line svg {
+  .lookup svg {
     flex: none;
     width: 0.9rem;
     height: 0.9rem;
+    margin-top: 0.2em;
   }
-  .note-name {
-    color: var(--accent-text);
+
+  .vault {
+    margin: 0 -0.5rem;
+    padding: 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    list-style: none;
+  }
+  .vault-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.15rem;
+    padding: 0 0.5rem;
+    border-radius: 0.4rem;
+    color: var(--text-muted);
+  }
+  .vault-row span:first-of-type {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .vault-row svg {
+    flex: none;
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+  .vault-row.read {
+    background: var(--tint);
+    color: var(--text);
     font-weight: 600;
-    text-decoration: underline;
-    text-decoration-color: var(--accent);
-    text-underline-offset: 0.2em;
+  }
+  .vault-row.read svg {
+    color: var(--accent-text);
+  }
+  .tag {
+    margin-left: auto;
+    color: var(--accent-text);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+  .vault-rest {
+    padding: 0.5rem 0.5rem 0;
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-style: italic;
+  }
+
+  @media (max-width: 800px) {
+    .ask {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    .state,
+    .state.found {
+      padding: 0;
+      border-left: 0;
+    }
   }
 </style>

@@ -451,7 +451,7 @@ to the plain `--ground`, which reads against the band:
 |---|---|---|
 | 1 | Hero + film | plain |
 | 2 | StatBand | warm |
-| 3 | Overview: the three steps, then "See every feature" | plain |
+| 3 | Overview: the three steps, then the LLM wiki aside | plain |
 | — | Experiments | plain, dev only |
 | 4 | Personal | **warm** (was plain) |
 | 5 | PrivacyBrief | night |
@@ -459,3 +459,32 @@ to the plain `--ground`, which reads against the band:
 | 7 | Closing banner | plain, framed |
 
 Only the dev site, with Experiments, shows two plain grounds in a row.
+
+## 2026-10-07: the three steps, tidied
+
+The owner, on "Write it down. rotli puts it away.": "We dont need the cards
+here"; the left words didn't line up with the pictures; "the purpose of the
+numbers why even have them?"; the third picture's width "is so off ... that it
+feels broken"; the trailing "Getting started with your vault" link was unclear,
+and "See every feature" repeats the header.
+
+- **No cards.** Every picture uses the open style the Librarian's before and
+  after already had: a label and a line over one hairline, the step's quokka
+  standing on it, then the content on the band. The view and vault lists lost
+  their panels; the chat lost its panel and its dashed box.
+- **One head, one top edge.** `--figure-head` (4rem, on `.steps` in
+  `Overview.astro`) is the head height all three pictures read, and the
+  step copy no longer has a guessed `padding-top`: the heading's top is the
+  picture's top, and the picture's first label starts within 2px of it.
+  Measured at 1440 and 1100: heading 0, label 2, hairline 64 in all three.
+- **No numbers.** The headings already read in order (Write, the Librarian
+  files it, Ask).
+- **One width.** The third picture was a 34rem chat (544px against 808px).
+  It is now two columns like the second: the chat on the left, and "What it
+  read" on the right, the vault it searched with the two notes it read lit
+  and the rest left closed. That makes "not the whole vault" visible.
+- **No trailing links.** "See every feature" and "Getting started with your
+  vault" are gone; the LLM wiki aside ends the section. Where the
+  getting-started guide should surface on the landing is still open.
+
+Guarded by `e2e/site/landing-layout.spec.ts` ("the three steps line up").

@@ -6,8 +6,9 @@
 // own (docs/architecture/memex-data-contract.md, "One physical home, many views"): Main is a
 // view of references and never owns or copies content, and with the Librarian on a new note's
 // file starts in the Library intake, wiki/_inbox/. Drawn in HTML on the site's tokens, one
-// image to assistive tech. The two panels share one row height, so the two marked rows sit on
-// one line and the dotted line can join them at any width; on a phone the panels stack and the
+// image to assistive tech. No cards (the owner, 2026-10-07): two open lists under the same
+// head as the other two steps' pictures. The two lists share one row height, so the two marked rows sit on
+// one line and the dotted line can join them at any width; on a phone the lists stack and the
 // line runs down between them.
 import notes from '../../../../src/assets/characters/filled/cocoa/notes.webp';
 
@@ -36,23 +37,25 @@ const icon = {
   aria-label="One note seen two ways: in your view, Main, the note Call with Dana sits under the folder This week; in your vault, its file is wiki/_inbox/dana-call.md. A dotted line marks them as the same file."
 >
   <div class="side">
-    <p class="side-label">In your view</p>
-    <div class="panel">
-      <div class="panel-head">
-        <span class="panel-title">Main</span>
-        <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 7.5l3-3" /></svg>
+    <div class="head">
+      <div>
+        <p class="side-label">In your view</p>
+        <p class="path">
+          Main
+          <svg class="chevron" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4.5 6 7.5l3-3" /></svg>
+        </p>
       </div>
-      <ul class="rows">
-        {
-          view.map((row) => (
-            <li class:list={['row', `depth-${row.depth}`, { here: 'here' in row }]}>
-              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d={icon[row.kind]} /></svg>
-              <span>{row.label}</span>
-            </li>
-          ))
-        }
-      </ul>
     </div>
+    <ul class="rows">
+      {
+        view.map((row) => (
+          <li class:list={['row', `depth-${row.depth}`, { here: 'here' in row }]}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d={icon[row.kind]} /></svg>
+            <span>{row.label}</span>
+          </li>
+        ))
+      }
+    </ul>
   </div>
 
   <div class="link" aria-hidden="true">
@@ -61,34 +64,33 @@ const icon = {
   </div>
 
   <div class="side">
-    <div class="side-top">
-      <p class="side-label">In your vault</p>
+    <div class="head">
+      <div>
+        <p class="side-label">In your vault</p>
+        <p class="path"><code>Notes/</code>, the folder you chose</p>
+      </div>
       <img class="quokka" src={notes.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
     </div>
-    <div class="panel">
-      <div class="panel-head">
-        <span class="panel-title">Notes</span>
-        <span class="panel-note">the folder you chose</span>
-      </div>
-      <ul class="rows mono">
-        {
-          vault.map((row) => (
-            <li class:list={['row', `depth-${row.depth}`, { here: 'here' in row }]}>
-              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d={icon[row.kind]} /></svg>
-              <span>{row.label}</span>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
+    <ul class="rows mono">
+      {
+        vault.map((row) => (
+          <li class:list={['row', `depth-${row.depth}`, { here: 'here' in row }]}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d={icon[row.kind]} /></svg>
+            <span>{row.label}</span>
+          </li>
+        ))
+      }
+    </ul>
   </div>
 </figure>
 
 <style>
+  /* Open lists on the band, no card (the owner, 2026-10-07): each side is a label and a line
+     over one hairline, the same head the Librarian's before and after uses (Filing.astro, and
+     --figure-head from Overview.astro), with the vault's quokka standing on its hairline. */
   .where {
     --row: 2.15rem;
-    --head: 2.55rem;
-    --top: 3.4rem;
+    --rows-top: 0.6rem;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 6.5rem) minmax(0, 1fr);
     margin: 0;
@@ -96,61 +98,50 @@ const icon = {
   .side {
     min-width: 0;
   }
-  /* The label row over each panel has one height, so the panels start level. */
-  .side-label {
-    display: flex;
-    align-items: flex-end;
-    min-height: var(--top);
-    margin: 0;
-    padding-bottom: 0.55rem;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
-  .side-top {
+  .head {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: var(--top);
+    box-sizing: border-box;
+    height: var(--figure-head, 4rem);
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-strong);
   }
-  .side-top .side-label {
-    min-height: 0;
+  .head > div {
+    min-width: 0;
   }
-  .panel {
-    border: 1px solid var(--border-strong);
-    border-radius: 0.7rem;
-    background: var(--surface);
-    font-size: 0.86rem;
-    overflow: hidden;
-  }
-  .panel-head {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    height: var(--head);
-    padding: 0 0.85rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .panel-title {
+  .side-label {
+    margin: 0;
+    font-size: 1.2rem;
     font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
   }
-  .panel-note {
-    margin-left: auto;
+  .path {
+    margin: 0.3rem 0 0;
     overflow: hidden;
     color: var(--text-muted);
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .chevron {
-    width: 0.8rem;
-    height: 0.8rem;
-    color: var(--text-muted);
+  .path code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--text);
   }
+  .chevron {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-left: 0.15rem;
+    vertical-align: -0.1em;
+  }
+  /* The rows' icons line up with the label above; a marked row's tint reaches past them. */
   .rows {
-    margin: 0;
-    padding: 0.3rem 0.4rem;
+    margin: var(--rows-top) -0.5rem 0;
+    padding: 0;
+    font-size: 0.9rem;
     list-style: none;
   }
   .row {
@@ -181,7 +172,7 @@ const icon = {
   }
   .mono {
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
   }
   /* The note itself, marked the same on both sides. */
   .here {
@@ -195,18 +186,18 @@ const icon = {
     flex: none;
     width: 56px;
     height: 56px;
-    margin: 0 0.25rem -1px 0;
+    margin: 0 0.25rem calc(-0.75rem - 1px) 0;
   }
 
-  /* The dotted line, level with the marked rows: under the label row, the panel's head, the
-     list's top padding, and two rows, then half a row. */
+  /* The dotted line, level with the marked rows: under the head, the list's top margin, and two
+     rows, then half a row. */
   .link {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    height: calc(var(--top) + 1px + var(--head) + 0.3rem + 2.5 * var(--row));
+    height: calc(var(--figure-head, 4rem) + var(--rows-top) + 2.5 * var(--row));
     padding: 0 0.15rem;
   }
   .link-label {
@@ -217,12 +208,12 @@ const icon = {
     white-space: nowrap;
   }
   .link-line {
-    width: calc(100% + 1.4rem);
-    margin-inline: -0.7rem;
+    width: calc(100% + 0.6rem);
+    margin-inline: -0.3rem;
     border-top: 2px dotted var(--accent);
   }
 
-  /* On a phone the panels stack and the line runs down between them. */
+  /* On a phone the lists stack and the line runs down between them. */
   @media (max-width: 599px) {
     .where {
       grid-template-columns: minmax(0, 1fr);

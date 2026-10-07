@@ -5,8 +5,11 @@
 // tokens"). It also absorbed the former "You write for yourself. AI reads differently." section,
 // whose before and after is now the File step's picture (the owner, the same day: the two were
 // redundant). Each step is a heading and one or two sentences beside one picture drawn in HTML
-// on the site's tokens, with the app's quokka standing on it; no outer cards (the owner,
-// 2026-10-05):
+// on the site's tokens, with the app's quokka standing on it; no cards, outer or inner (the
+// owner, 2026-10-05 and 2026-10-07). The steps carry no numbers (the owner, 2026-10-07: "why
+// even have them?"): the headings already read in order. Every picture spans the same column
+// and opens on the same head, a label and a line over one hairline, level with the step's
+// heading:
 //   1. Write: the note in your view and its one file in the vault (ViewAndVault.astro);
 //   2. File: the Librarian's before and after, which plays once (Filing.astro);
 //   3. Ask: a chat that searches on your computer and reads only what it found (AskIndex.astro).
@@ -17,9 +20,10 @@
 // ("Metadata ownership"); the AI searches locally and reads only selected notes, never the
 // whole vault ("Master memory retrieval"); secure notes never reach a remote model
 // (docs/design/ai-visibility-matrix.md).
-// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source,
-// then the landing's one link to the full catalog, /features/ (it closed the "A closer look."
-// tour until that was removed, the owner, 2026-10-06).
+// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source.
+// The section no longer ends on "See every feature" or a link to the getting-started guide (the
+// owner, 2026-10-07): Features is in the header, and the guide wants a better place than a
+// trailing link.
 import AskIndex from './AskIndex.astro';
 import Filing from './Filing.astro';
 import ViewAndVault from './ViewAndVault.astro';
@@ -41,7 +45,6 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
     <ol class="steps">
       <li class="step" data-reveal>
         <div class="step-copy">
-          <span class="step-number" aria-hidden="true">1</span>
           <h3>Write in your view</h3>
           <p>
             Start a note and keep it open in your view: Main, or a named view for a project. A view is your own
@@ -53,7 +56,6 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
 
       <li class="step" data-reveal>
         <div class="step-copy">
-          <span class="step-number" aria-hidden="true">2</span>
           <h3>The Librarian files it</h3>
           <p>
             When it’s on, the Librarian later moves the file to its area folder in your vault and adds an area, a
@@ -66,7 +68,6 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
 
       <li class="step" data-reveal>
         <div class="step-copy">
-          <span class="step-number" aria-hidden="true">3</span>
           <h3>Ask, and AI goes straight to it</h3>
           <p>
             Later, ask AI about it. rotli searches your vault on your computer, and the AI reads only the few notes
@@ -84,44 +85,38 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
         Plain Markdown notes, kept organized and linked so an AI can build on what you already know instead of
         starting from scratch on every question. Andrej Karpathy described the idea in his{' '}
         <a href={LLM_WIKI_SOURCE} rel="noopener">LLM Wiki note</a> (April 2026), and your rotli vault works the same
-        way: you write, and the Librarian adds the areas, summaries, tags, and links.{' '}
-        <a href="/blog/getting-started/">Getting started with your vault</a>
+        way: you write, and the Librarian adds the areas, summaries, tags, and links.
       </p>
     </aside>
-
-    <p class="overview-more" data-reveal>
-      <a class="button secondary" href="/features/">See every feature</a>
-    </p>
   </div>
 </section>
 
 <style>
+  /* --figure-head is the one height of every picture's head (a label and a line over one
+     hairline; ViewAndVault, Filing, AskIndex read it), so each step's heading starts level with
+     its picture's first label and every hairline sits at one depth. */
   .steps {
+    --figure-head: 4rem;
     display: grid;
     gap: clamp(4rem, 8vw, 6rem);
     margin: 0;
     padding: 0;
     list-style: none;
   }
-  /* A step: its words on the left, its picture on the right; stacked below 1080px. */
+  /* A step: its words on the left, its picture on the right, both from one top edge; stacked
+     below 1080px. Every picture spans the same column. */
   .step {
     display: grid;
     grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
     align-items: start;
     gap: 2rem clamp(2.5rem, 5vw, 4.5rem);
   }
-  .step-copy {
-    padding-top: 3.4rem;
-  }
-  .step-number {
-    display: block;
-    color: var(--text-muted);
-    font-size: 1rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  .step > :global(figure) {
+    width: 100%;
+    max-width: 62rem;
   }
   .step-copy h3 {
-    margin: 0.35rem 0 0;
+    margin: 0;
     font-size: var(--step-h3);
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -138,7 +133,6 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
     }
     .step-copy {
       max-width: 38rem;
-      padding-top: 0;
     }
   }
 
@@ -166,16 +160,6 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
     text-decoration: underline;
     text-decoration-color: var(--accent);
     text-underline-offset: 0.2em;
-  }
-  .llm-wiki a[href^='/'] {
-    display: inline-block;
-  }
-  .llm-wiki a[href^='/']::after {
-    content: ' →';
-  }
-
-  .overview-more {
-    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
   }
 
   /* The quokkas hop onto their pictures once, as each step comes in. */

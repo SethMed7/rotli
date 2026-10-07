@@ -321,7 +321,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vault with a dotted line. The before-and-after that had its own section
   ("You write for yourself. AI reads differently.") is now the second step's
   picture and plays the same way. A short "What is an LLM wiki?" links to
-  Andrej Karpathy's note that named the idea.
+  Andrej Karpathy's note that named the idea. The three pictures now share
+  one open style with no cards and one width, each heading starts level with
+  its picture, and the steps drop their numbers. The third picture shows the
+  chat beside the vault it searched, with the two notes it read lit and the
+  rest left closed. The section no longer ends on "See every feature",
+  since Features is in the header.
 - **rotli.co's About page tells the story across the page.** It's written in
   first person around what rotli is now: a free workspace on plain Markdown
   files, notes first with Docs and Sheets (beta), chat and boards in the same
@@ -834,6 +839,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `/librarian`.
 
   The rules are kept with the vault's settings on this Mac. Mac app.
+
 - **The Librarian, as a chat.** After your first ask, the Librarian pops out
   into the bottom-right corner of the pane you're in, like the chat on a
   website, and the format bar comes back. Keep talking with the model you
@@ -1624,7 +1630,7 @@ either edge or opens on hover, and a day of the owner's fixes.
 
 - **Drag the macOS screenshot thumbnail straight into a note or a chat.** The
   floating preview after ⌘⇧4 / ⌘⇧5 used to land as "Nothing imported": it
-  hands over a *promise* of a file, never a path, and Rotli only read paths.
+  hands over a _promise_ of a file, never a path, and Rotli only read paths.
   Rotli now reads the drag itself — it calls the promise in, waits for the
   screenshot to be written, and then imports it exactly like a file dragged
   from Finder, at the point you dropped it. An image dragged out of Safari,
@@ -1905,7 +1911,6 @@ Three fixes from a computer-use test of the installed 0.94.0.
 - Librarian Activity rows now name the lane and model that filed the note
   ("Claude · Claude Opus"), not only the day and time.
 
-
 ## [0.94.0] - 2026-09-12
 
 The Librarian lane actually works: the choice persists and reaches the
@@ -1930,7 +1935,6 @@ is.
   Librarian choice, so the daemon never used a connected lane and the
   Settings control reverted to On this Mac on relaunch. The choice now
   persists and reaches the daemon.
-
 
 ## [0.93.0] - 2026-09-12
 
@@ -2071,7 +2075,6 @@ wikilinks, typed tables, and placeable choice panels.
 - Repository and deployment-context privacy tripwires, redacted secret-scan
   commands, and owner-only main/dev protection payloads are available. Actual
   branch protection still requires an eligible private-repository GitHub plan.
-
 
 ### Added
 

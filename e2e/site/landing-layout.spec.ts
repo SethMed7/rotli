@@ -68,6 +68,43 @@ test("one story in three steps: write in your view, the Librarian files it, ask"
   }
 });
 
+test("the three steps line up: no numbers, no cards, one picture width, headings level with labels", async ({
+  page,
+}) => {
+  for (const width of [1440, 1100]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const steps = page.locator("#features .steps > li");
+    await expect(steps.locator(".step-number")).toHaveCount(0);
+    const widths = new Set<number>();
+    for (const step of await steps.all()) {
+      const figure = step.locator("> figure");
+      const picture = await box(figure);
+      widths.add(Math.round(picture.width));
+      const heading = await box(step.locator("h3"));
+      const label = await box(figure.locator(".side-label, .state-label").first());
+      expect(Math.abs(heading.y - picture.y), `heading at the picture's top at ${width}`).toBeLessThanOrEqual(
+        1,
+      );
+      expect(Math.abs(label.y - picture.y), `label at the picture's top at ${width}`).toBeLessThanOrEqual(4);
+      // No card: nothing inside the picture draws a box around its content.
+      const boxed = await figure.evaluate(
+        (root) =>
+          [root, ...root.querySelectorAll("*")].filter((el) => {
+            const style = getComputedStyle(el);
+            return (
+              ["Top", "Right", "Bottom", "Left"].every(
+                (side) => style.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none",
+              ) && el.getBoundingClientRect().height > 60
+            );
+          }).length,
+      );
+      expect(boxed, `no boxed panels at ${width}`).toBe(0);
+    }
+    expect(widths.size, `one picture width at ${width}`).toBe(1);
+  }
+});
+
 test("the view and the vault: the same note on both sides, joined by a dotted line", async ({ page }) => {
   await page.goto("/");
   const where = page.locator(".where");
@@ -106,20 +143,16 @@ test("what is an LLM wiki: two sentences beside the story, linked to the term's 
   );
   await expect(source).toHaveAttribute("rel", /noopener/);
   await expect(aside).toContainText("Andrej Karpathy");
-  await expect(aside.getByRole("link", { name: /Getting started/ })).toHaveAttribute(
-    "href",
-    "/blog/getting-started/",
-  );
 });
 
-test("the story ends on the one link to every feature, and the FAQ points to Rotli Web", async ({ page }) => {
+test("the story ends on the LLM wiki aside, and the FAQ points to Rotli Web", async ({ page }) => {
   await page.goto("/");
-  // The tour's "See every feature" moved to the end of the Overview (2026-10-06).
-  const more = page.locator("#features .overview-more a");
-  await expect(more).toHaveText("See every feature");
-  await expect(more).toHaveAttribute("href", "/features/");
-  const llmWiki = await box(page.locator("#features .llm-wiki"));
-  expect((await box(more)).y).toBeGreaterThan(llmWiki.y + llmWiki.height);
+  // No "See every feature" (Features is in the header) and no trailing guide link (the owner,
+  // 2026-10-07): the aside is the section's last word.
+  const section = page.locator("#features");
+  await expect(section.getByRole("link", { name: "See every feature" })).toHaveCount(0);
+  await expect(section.locator('a[href="/blog/getting-started/"]')).toHaveCount(0);
+  await expect(section.locator(".wrap > :last-child")).toHaveClass(/llm-wiki/);
   // Rotli Web and the Helper: one FAQ answer with its two links, only while WEB_APP_ENABLED.
   const browser = page.locator(".faq-list details", { hasText: "Can I use rotli in my browser?" });
   if ((await browser.count()) > 0) {
