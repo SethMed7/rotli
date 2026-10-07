@@ -59,7 +59,7 @@ FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4
 # lands in an image layer); the roadmap database lives on a Railway volume.
 RUN apk add --no-cache libgcc libstdc++
 COPY --from=build /usr/local/bin/bun /usr/local/bin/bun
-COPY site/server/http.ts site/server/main.ts site/server/roadmap.ts site/server/subscribe.ts /opt/rotli/site/server/
+COPY site/server/http.ts site/server/main.ts site/server/roadmap.ts site/server/subscribe.ts site/server/unsubscribed.ts /opt/rotli/site/server/
 COPY site/src/roadmap.ts /opt/rotli/site/src/roadmap.ts
 COPY site/scripts/roadmap-requests.ts /opt/rotli/site/scripts/roadmap-requests.ts
 COPY ROADMAP.md /opt/rotli/ROADMAP.md

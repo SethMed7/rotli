@@ -1282,8 +1282,18 @@ voting opens soon, and every page keeps serving.
   Broadcasts take a `segment_id` (checked against resend.com/docs, 2026-10-05).
 - Consent: one sign-up (single opt-in) with the footer's line ("Unsubscribe
   anytime") and `/privacy/#website`, which says what is kept and how to leave.
-  Unsubscribing is Resend's own Broadcast link. Double opt-in is not built: it
-  needs a verified sending domain and a confirmation email (an owner decision).
+  Unsubscribing is Resend's own Broadcast link, or the one-click Unsubscribe
+  button mail apps draw from the List-Unsubscribe headers Resend adds to every
+  Broadcast. Double opt-in is not built: it needs a verified sending domain
+  and a confirmation email (an owner decision).
+- Unsubscribing erases (the owner, 2026-10-07). Resend keeps an unsubscribed
+  contact, marked; the sidecar's sweep (`server/unsubscribed.ts`) deletes
+  every unsubscribed contact in the segment a minute after start and then
+  daily (`GET /contacts?segment_id=…`, then `DELETE /contacts/{id}`, spaced
+  to stay under Resend's rate limit; resend.com/docs, checked 2026-10-07).
+  It logs counts only, never an address. Contacts are global in Resend, so a
+  deleted address is gone from every segment, and a later signup starts
+  fresh. It runs whenever the list is on; there is no separate switch.
 - Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
 
 **Owner setup: the same Resend account as the portfolio.** The portfolio's

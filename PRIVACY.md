@@ -88,11 +88,14 @@ types to Resend, Rotli's email provider, and only when the visitor submits it.
 Resend keeps it as a contact in Rotli's list (a Resend segment) so the owner
 can email updates about Rotli. When an address joins, the owner also receives
 one email with it, sent through the same Resend account, as a signup alert.
-Every list email carries Resend's unsubscribe link; one click removes the
-address from future sends, and Resend keeps the contact marked unsubscribed
-(the site never overrides that, so it is never emailed again). To have the
-address erased completely, from the list and from the alert, the visitor
-sends a roadmap request giving the address and asking for it. Nothing else is
+Every list email carries Resend's unsubscribe link and the one-click
+List-Unsubscribe headers mail apps show as an Unsubscribe button; either
+removes the address from future sends. Resend keeps such a contact marked
+unsubscribed, so the site's sidecar erases every unsubscribed contact in the
+list's segment once a day (`site/server/unsubscribed.ts`): unsubscribing
+removes the address from Resend within a day. The signup alert's copy stays
+in the owner's inbox; to have it deleted too, the visitor sends a roadmap
+request giving the address and asking for it. Nothing else is
 collected or shared. Until the list opens, the form says so and the address
 is not kept or passed on.
 

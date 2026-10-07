@@ -13,11 +13,13 @@
 //   ROADMAP_HASH_SALT                   optional; keys the in-memory rate limits
 //   ROADMAP_FILE                        optional; where ROADMAP.md is (default: the repo root)
 //   SUBSCRIBE_PORT                      the loopback port Caddy proxies to (default 8787)
+// While the list is on, a daily sweep erases contacts who unsubscribed (unsubscribed.ts).
 import { readFileSync } from 'node:fs';
 
 import { votableIds } from '../src/roadmap';
 import { createRoadmap } from './roadmap';
 import { createSubscribe, normalizeEmail } from './subscribe';
+import { createUnsubscribedSweep, scheduleUnsubscribedSweep } from './unsubscribed';
 
 type Handler = (req: Request) => Promise<Response>;
 
@@ -56,6 +58,9 @@ if ((import.meta as { main?: boolean }).main) {
       : 'off (SUBSCRIBE_ALERT_TO is not an email address)';
   const votes = roadmap.live ? `on (${ids.length} items)` : 'off (ROADMAP_DB_PATH unset or unopenable)';
   console.log(`site sidecar on 127.0.0.1:${port} · list ${list} (alerts ${alerts}) · roadmap ${votes}`);
+  scheduleUnsubscribedSweep(
+    createUnsubscribedSweep({ apiKey: env.RESEND_API_KEY, segmentId: env.RESEND_SEGMENT_ID }),
+  );
 }
 
 export default {

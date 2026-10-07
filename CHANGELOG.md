@@ -274,10 +274,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section says what rotli never asks for (a rotli password, your AI tools'
   logins), the one optional key it may keep (Brave Search, in the macOS
   Keychain) and the rules every key follows, how Rotli Helper pairs, and
-  which secrets in a note rotli can spot on its own. It also says what
-  unsubscribing from the email list leaves behind and how to have an address
-  erased completely, and "Keeping and deleting" now points to what the
-  website keeps.
+  which secrets in a note rotli can spot on its own. "Keeping and deleting"
+  now points to what the website keeps.
+- **Unsubscribing from rotli's email list erases your address.** The
+  unsubscribe link in every email, or your mail app's Unsubscribe button,
+  takes you off the list, and within a day your address is deleted from the
+  list's provider too, not just marked unsubscribed. The privacy page says
+  so, and how to have the one signup notice deleted as well.
 - **The privacy page and blog posts show how far through you are,** with the
   same "N% through" bar as the guides, so every article reads the same way.
 - **rotli.co's blog shows a picture for every post.** Each post has its own
