@@ -28,10 +28,13 @@ id repeats (`site/src/roadmap.ts`).
 
 ## 1. In the work
 
-- **Canvas** <!-- id: canvas --> · L — cards on an open plane, saved as JSON
-  Canvas `.canvas` files that Obsidian also opens. Development builds: New →
-  Canvas makes one beside your notes, found in ⌘K and All notes, and Archive
-  and Trash take it like a note. Type a card, or put just `[[a note]]` in one
+- **Graph and Canvas** <!-- id: canvas --> · L — see how your notes link up as
+  a graph, and lay them out on a canvas saved as `.canvas` files that
+  Obsidian also opens. The graph is built for the next release: ⌘K → Graph
+  shows every note and every `[[link]]`, and Show in graph the notes around
+  one; a secure note shows only its title. The canvas, JSON Canvas cards on an
+  open plane, is in development builds: New → Canvas makes one beside your
+  notes, found in ⌘K and All notes, and Archive and Trash take it like a note. Type a card, or put just `[[a note]]` in one
   to show that note; connect cards with lines and gather them into groups.
   A note card shows the note and opens it in a tab; lines stay drawings and
   never become links. A new canvas sits beside your notes. Excalidraw boards

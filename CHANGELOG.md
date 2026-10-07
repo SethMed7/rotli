@@ -155,7 +155,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page opens on a picture of the quokka at its desk among a note, a chat, and
   a board. The areas are now tabs on one bar beside a smaller search box, each
   showing how many entries it holds (and how many match what you typed), and
-  the page closes on a banner to the roadmap instead of a line of text.
+  the page closes on a banner to the roadmap instead of a line of text. Graph
+  and Canvas joins Organizing as one entry, next to views: the graph of your
+  notes is coming soon, and the canvas is in development. On the roadmap
+  they are one item too, with its own drawing.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the

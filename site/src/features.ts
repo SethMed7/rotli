@@ -174,6 +174,7 @@ const ICON = {
   capture: 'M12 4.5v15M4.5 12h15',
   librarian: 'M3.5 6.5h6l2 2h9v11h-17zM9 14l2.2 2.2L15.5 12',
   views: 'M4 5.5h7v13H4zM13 5.5h7v6h-7zM13 13.5h7v5h-7z',
+  graph: 'M6 4.5a2 2 0 1 0 0.01 0M18 7a2 2 0 1 0 0.01 0M10 16.5a2 2 0 1 0 0.01 0M7.9 6.9l8.2 0.6M6.8 8.4l2.4 6.3M16.7 8.6l-5.3 6.4',
   chat: 'M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z',
   terminal: 'M3.5 5h17v14h-17zM7 9.5l3 2.5-3 2.5M12.5 15h4.5',
   handoff: 'M4.5 12h11M12 7.5l4.5 4.5-4.5 4.5M19.5 5v14',
@@ -560,6 +561,34 @@ const FEATURES: Feature[] = [
     ],
     keywords: 'sidebar main view project',
   },
+  {
+    // One entry for two ways of seeing notes (the owner, 2026-10-07: "condense canvas and graph
+    // into one feature that is like views"). Coming soon is the graph's, built for the next
+    // release; the canvas half of the same ROADMAP.md item is in development builds and is said
+    // in one line, the way the roadmap page says it.
+    id: 'graph',
+    area: 'organizing',
+    name: 'Graph and Canvas',
+    line: 'See how your notes link up as a graph, and lay them out on a canvas.',
+    status: 'Coming soon',
+    runs: 'mac',
+    icon: ICON.graph,
+    body: [
+      'The graph shows every note as a dot and every [[link]] you wrote as a line. Hover a note to see what it links to, or open the graph from one note to see the notes around it, one or two steps out. Links the Librarian found show as dashed lines, and you can hide them.',
+      'Nothing is written into your notes, and a secure note shows only its title.',
+    ],
+    use: [
+      { keys: '⌘K → Graph', text: 'See every note and link.' },
+      { keys: 'Show in graph', text: 'From a note’s menu, the notes around it.' },
+    ],
+    limits: [
+      'Not in a release yet.',
+      'The canvas, cards on an open plane saved as .canvas files that Obsidian also opens, is in development builds.',
+    ],
+    links: [ROADMAP],
+    roadmap: 'canvas',
+    keywords: 'graph links map network canvas json canvas obsidian cards',
+  },
 
   // ─── AI and chat ──────────────────────────────────────────────────────
   {
@@ -754,7 +783,7 @@ const FEATURES: Feature[] = [
         use: [{ keys: 'Drag and drop', text: 'Into a note or a chat.' }],
       },
     ],
-    limits: ['One canvas holding notes, sheets, and frames is an idea on the roadmap.'],
+    limits: ['Cards on an open canvas, beside a graph of your links, are coming as Graph and Canvas.'],
     links: [],
     basis: [
       { file: 'CHANGELOG.md', quote: 'Boards on Rotli Web.' },

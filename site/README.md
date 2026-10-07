@@ -1363,7 +1363,11 @@ The page (`src/pages/roadmap/[...slug].astro`, its parts in
   rail gap past it: section notes and summaries keep the reading measure,
   and the grids and lists run on to the page's right edge.
 - **In the work**: each item under its drawing (`RoadmapMock.astro`, the
-  item's one frame; the words sit on the page, never in a card around both).
+  item's one frame; the words sit on the page, never in a card around both;
+  an id with no drawing yet gets a plain note, so a new In the work item
+  should get one). Graph and Canvas (`canvas`) draws both halves: the graph,
+  its hovered note lit and a secure note a hollow ring, beside a canvas's
+  cards, lines, and group.
   **Planned** and **Ideas**: a calm list on hairlines. Every item shows its
   title, summary, status (In the work, Planned, Idea), size, and vote
   (`VoteButton.astro`).
