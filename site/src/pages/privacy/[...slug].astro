@@ -181,8 +181,10 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
     Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
     app's settings on your Mac, and it can rebuild them at any time. Main and named views are arrangements
-    of the same files, not copies. Passwords and keys you give rotli go into the macOS Keychain, never into
-    your notes or settings files.
+    of the same files, not copies. rotli needs no password, and it never holds your AI tools' logins. The
+    one key you might give it is optional: web searches use DuckDuckGo, free and with no account, unless you
+    choose Brave Search in Settings → Connections and paste your own Brave key. That key goes into the
+    macOS Keychain, never into your notes or settings files.
   </p>
   <p>
     <strong>Why:</strong> a notes app should never be the only way to reach your notes. Because everything is
