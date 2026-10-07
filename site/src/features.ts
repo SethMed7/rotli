@@ -98,7 +98,7 @@ export interface Basis {
 /** A detail page's picture: a real capture from public/, or a drawing (FeatureArt.astro). */
 export type Picture =
   | { kind: 'shot'; src: string; width: number; height: number; alt: string }
-  | { kind: 'tasks' | 'links' | 'filing' | 'menu' | 'tree' | 'doc' | 'sheet' | 'terminal' };
+  | { kind: 'tasks' | 'links' | 'filing' | 'menu' | 'tree' | 'doc' | 'sheet' | 'terminal' | 'graph' };
 
 export interface Step {
   /** Keys, a command, or a path through the app, shown as written. */
@@ -573,6 +573,7 @@ const FEATURES: Feature[] = [
     status: 'Coming soon',
     runs: 'mac',
     icon: ICON.graph,
+    picture: { kind: 'graph' },
     body: [
       'The graph shows every note as a dot and every [[link]] you wrote as a line. Hover a note to see what it links to, or open the graph from one note to see the notes around it, one or two steps out. Links the Librarian found show as dashed lines, and you can hide them.',
       'Nothing is written into your notes, and a secure note shows only its title.',

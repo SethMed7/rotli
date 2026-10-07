@@ -10,6 +10,7 @@
 // lines (src/ai/connectorGuides.ts). Docs and Sheets are drawn, never described further.
 // Captures are 2x, so each is drawn at most at half its pixel size, never upscaled.
 import type { Picture } from '../../features';
+import GraphCanvasArt from '../GraphCanvasArt.astro';
 
 interface Props {
   picture: Picture;
@@ -62,6 +63,23 @@ const tools = [
   {
     picture.kind === 'shot' && (
       <img class="shot" src={picture.src} width={picture.width / 2} height={picture.height / 2} alt={picture.alt} decoding="async" />
+    )
+  }
+  {
+    picture.kind === 'graph' && (
+      <div
+        class="mock narrow"
+        role="img"
+        aria-label="On the left, notes as dots joined by their links, one note and its links lit; on the right, a canvas of cards joined by lines, two of them in a group"
+      >
+        <p class="mock-head graph-head">
+          <span>Graph</span>
+          <span>Canvas</span>
+        </p>
+        <div class="mock-body">
+          <GraphCanvasArt />
+        </div>
+      </div>
     )
   }
   {
@@ -249,6 +267,10 @@ const tools = [
     font-size: 0.8rem;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+  .graph-head {
+    display: flex;
+    justify-content: space-between;
   }
   .mock-head.strong {
     color: var(--text);
