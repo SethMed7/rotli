@@ -19,7 +19,7 @@
 // it is sent after the answer is decided, and a failure is logged without the address. The
 // recipient lives only in the runtime variable, never in this public repository.
 
-import { clientAddress, limiter, NO_STORE, page, readFields, wantsJson } from './http';
+import { clientAddress, fromAnotherSite, limiter, NO_STORE, page, readFields, wantsJson } from './http';
 
 const RESEND_API = 'https://api.resend.com';
 const MAX_BODY_BYTES = 4096;
@@ -123,13 +123,15 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
   }
 
   async function subscribe(req: Request, json: boolean): Promise<Outcome> {
-    if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
-      return { status: 413, ok: false, error: 'That is more than an email address.' };
-    }
+    // Another site's page can't sign someone up (and fire the owner's alert) in their name.
+    if (fromAnotherSite(req)) return { status: 403, ok: false, error: 'Sign up on rotli.co itself.' };
+    const tooBig: Outcome = { status: 413, ok: false, error: 'That is more than an email address.' };
+    if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) return tooBig;
     if (perClient(clientAddress(req)) || overall('*')) {
       return { status: 429, ok: false, error: 'Too many tries in a row. Give it a few minutes.' };
     }
-    const fields = await readFields(req, json);
+    const fields = await readFields(req, json, MAX_BODY_BYTES);
+    if (fields === 'too-big') return tooBig;
     if (!fields) return { status: 400, ok: false, error: 'That could not be read. Try again.' };
     // A filled honeypot is a bot: say yes and keep nothing.
     const trap = fields[HONEYPOT_FIELD];

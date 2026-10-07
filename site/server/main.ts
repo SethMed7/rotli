@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 
 import { votableIds } from '../src/roadmap';
 import { createRoadmap } from './roadmap';
-import { createSubscribe } from './subscribe';
+import { createSubscribe, normalizeEmail } from './subscribe';
 
 type Handler = (req: Request) => Promise<Response>;
 
@@ -48,7 +48,12 @@ const port = Number(env.SUBSCRIBE_PORT ?? 8787);
 
 if ((import.meta as { main?: boolean }).main) {
   const list = env.RESEND_API_KEY && env.RESEND_SEGMENT_ID ? 'on' : 'off (RESEND_API_KEY or RESEND_SEGMENT_ID unset)';
-  const alerts = env.SUBSCRIBE_ALERT_TO && env.SUBSCRIBE_ALERT_FROM ? 'on' : 'off';
+  // The same test createSubscribe applies, so an unusable recipient never reads as "on".
+  const alerts = !env.SUBSCRIBE_ALERT_TO || !env.SUBSCRIBE_ALERT_FROM
+    ? 'off'
+    : normalizeEmail(env.SUBSCRIBE_ALERT_TO)
+      ? 'on'
+      : 'off (SUBSCRIBE_ALERT_TO is not an email address)';
   const votes = roadmap.live ? `on (${ids.length} items)` : 'off (ROADMAP_DB_PATH unset or unopenable)';
   console.log(`site sidecar on 127.0.0.1:${port} · list ${list} (alerts ${alerts}) · roadmap ${votes}`);
 }
@@ -58,6 +63,8 @@ export default {
   hostname: '127.0.0.1',
   // Never Bun's development error page (stack traces) for a visitor.
   development: false,
+  // A ceiling under the routes' own byte caps: no post here is more than a few KB.
+  maxRequestBodySize: 64 * 1024,
   port,
   fetch: createSidecar({
     subscribe: createSubscribe({

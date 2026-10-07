@@ -1247,8 +1247,12 @@ voting opens soon, and every page keeps serving.
 - `POST /api/subscribe` (JSON from the footer's script, or a plain form post
   without JavaScript, which is redirected to `/subscribed/`): validates the
   address, drops a filled honeypot field (`website`) with a fake success,
-  limits each visitor to 5 tries per 10 minutes (keyed on `CF-Connecting-IP`,
-  then `X-Real-IP`; 120 per 10 minutes overall), then calls Resend's
+  refuses (403) a post whose `Origin`, or `Referer` without one, names
+  another site, so no other page can sign someone up in their name, refuses
+  (413) a body past 4 KB as it is read (a missing or understated
+  `Content-Length` changes nothing), limits each visitor to 5 tries per 10
+  minutes (keyed on `CF-Connecting-IP`, then `X-Real-IP`; 120 per 10 minutes
+  overall), then calls Resend's
   `POST https://api.resend.com/contacts` with
   `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
   per address in Resend, so when the contact already exists it calls
@@ -1383,7 +1387,9 @@ Bun; no ORM, no new service):
 - Abuse limits, all in memory: one vote per item per browser (the page's
   localStorage marker), one counted vote per item per visitor per UTC day, 30
   votes per 10 minutes and 5 requests per hour per visitor (600 and 100
-  overall), a honeypot field, and body size limits. The visitor key is an HMAC
+  overall), a honeypot field, body size limits counted as the body is read,
+  and a 403 for a vote or request posted from another site's page (its
+  `Origin`, or `Referer` without one, names another host). The visitor key is an HMAC
   of the IP address and the UTC day under `ROADMAP_HASH_SALT`: never the raw
   address, never on disk, new every day.
 - Off: without `ROADMAP_DB_PATH` (or if the file can't be opened, or

@@ -226,6 +226,25 @@ describe('feature requests', () => {
     }
   });
 
+  test('a body past the cap is refused as it is read, whatever Content-Length says', async () => {
+    const roadmap = live();
+    const long = { ...REQUEST, description: 'x'.repeat(LIMITS.requestBodyBytes) };
+    expect((await roadmap.handle(post('/api/roadmap/request', long))).status).toBe(413);
+    expect((await roadmap.handle(post('/api/roadmap/request', long, { 'content-length': '10' }))).status).toBe(413);
+    const padded = { id: 'charts', pad: 'x'.repeat(LIMITS.voteBodyBytes) };
+    expect((await roadmap.handle(post('/api/roadmap/vote', padded))).status).toBe(413);
+    expect((await votes(roadmap)).votes.charts).toBe(0);
+  });
+
+  test("another site's page can't vote or file a request", async () => {
+    const roadmap = live();
+    const elsewhere = { origin: 'https://elsewhere.example' };
+    expect((await roadmap.handle(post('/api/roadmap/vote', { id: 'charts' }, elsewhere))).status).toBe(403);
+    expect((await roadmap.handle(post('/api/roadmap/request', REQUEST, { referer: 'https://elsewhere.example/' }))).status).toBe(403);
+    expect((await votes(roadmap)).votes.charts).toBe(0);
+    expect((await roadmap.handle(post('/api/roadmap/vote', { id: 'charts' }, { origin: BASE }))).status).toBe(200);
+  });
+
   test('an oversized body is refused before it is read', async () => {
     const res = await live().handle(post('/api/roadmap/request', REQUEST, { 'content-length': String(LIMITS.requestBodyBytes + 1) }));
     expect(res.status).toBe(413);

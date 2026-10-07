@@ -24,7 +24,7 @@ import { Database } from 'bun:sqlite';
 import { createHmac, randomBytes } from 'node:crypto';
 
 import { REQUEST_LIMITS } from '../src/roadmap';
-import { clientAddress, limiter, NO_STORE, page, readFields, wantsJson } from './http';
+import { clientAddress, fromAnotherSite, limiter, NO_STORE, page, readFields, wantsJson } from './http';
 import { normalizeEmail } from './subscribe';
 
 /** The hidden field only bots fill in (the page's request form). */
@@ -119,6 +119,8 @@ export function createRoadmap(options: RoadmapOptions) {
 
   const off: Reply = { status: 503, body: { live: false, ok: false, error: 'Voting and requests open soon.' } };
   const tooBig = (req: Request, limit: number) => Number(req.headers.get('content-length') ?? 0) > limit;
+  // Another site's page can't vote or file a request in a visitor's name.
+  const elsewhere: Reply = { status: 403, body: { ok: false, error: 'Vote and ask on rotli.co itself.' } };
 
   function votes(): Reply {
     if (!db) return off;
@@ -132,12 +134,15 @@ export function createRoadmap(options: RoadmapOptions) {
 
   async function vote(req: Request): Promise<Reply> {
     if (!db) return off;
-    if (tooBig(req, LIMITS.voteBodyBytes)) return { status: 413, body: { ok: false, error: 'That is more than a vote.' } };
+    if (fromAnotherSite(req)) return elsewhere;
+    const voteTooBig: Reply = { status: 413, body: { ok: false, error: 'That is more than a vote.' } };
+    if (tooBig(req, LIMITS.voteBodyBytes)) return voteTooBig;
     const key = visitorKey(req);
     if (votesPerClient(key) || votesOverall('*')) {
       return { status: 429, body: { ok: false, error: 'Too many votes in a row. Give it a few minutes.' } };
     }
-    const fields = await readFields(req, true);
+    const fields = await readFields(req, true, LIMITS.voteBodyBytes);
+    if (fields === 'too-big') return voteTooBig;
     if (!fields) return { status: 400, body: { ok: false, error: 'That could not be read. Try again.' } };
     const trap = fields[HONEYPOT_FIELD];
     if (typeof trap === 'string' && trap.trim()) return { status: 200, body: { ok: true, counted: false } };
@@ -160,14 +165,15 @@ export function createRoadmap(options: RoadmapOptions) {
 
   async function request(req: Request, json: boolean): Promise<Reply> {
     if (!db) return off;
-    if (tooBig(req, LIMITS.requestBodyBytes)) {
-      return { status: 413, body: { ok: false, error: 'That is longer than a request can be.' } };
-    }
+    if (fromAnotherSite(req)) return elsewhere;
+    const requestTooBig: Reply = { status: 413, body: { ok: false, error: 'That is longer than a request can be.' } };
+    if (tooBig(req, LIMITS.requestBodyBytes)) return requestTooBig;
     const key = visitorKey(req);
     if (requestsPerClient(key) || requestsOverall('*')) {
       return { status: 429, body: { ok: false, error: 'Too many requests in a row. Give it an hour.' } };
     }
-    const fields = await readFields(req, json);
+    const fields = await readFields(req, json, LIMITS.requestBodyBytes);
+    if (fields === 'too-big') return requestTooBig;
     if (!fields) return { status: 400, body: { ok: false, error: 'That could not be read. Try again.' } };
     const trap = fields[HONEYPOT_FIELD];
     if (typeof trap === 'string' && trap.trim()) return { status: 200, body: { ok: true } };

@@ -172,6 +172,37 @@ describe('subscribing', () => {
     expect((await handler(broken)).status).toBe(400);
   });
 
+  test('a body past the cap is refused as it is read, whatever Content-Length says', async () => {
+    const resend = fakeResend();
+    const handler = createSubscribe({ ...CONFIG, fetch: resend.fetch });
+    const padded = { email: 'a@b.co', pad: 'x'.repeat(20_000) };
+    expect((await handler(post(padded))).status).toBe(413);
+    expect((await handler(post(padded, { 'content-length': '20' }))).status).toBe(413);
+    expect(resend.calls).toHaveLength(0);
+  });
+
+  test("another site's page can't sign anyone up, and no alert goes out", async () => {
+    const resend = fakeResend(json({ id: 'c_1' }), json({ id: 'e_1' }));
+    const handler = createSubscribe({ ...CONFIG, alertTo: 'owner@example.com', alertFrom: 'rotli <alerts@example.com>', fetch: resend.fetch });
+    for (const headers of [{ origin: 'https://elsewhere.example' }, { origin: 'null' }, { referer: 'https://elsewhere.example/page' }]) {
+      expect((await handler(post({ email: 'a@b.co' }, headers))).status).toBe(403);
+    }
+    const form = await handler(
+      new Request('http://127.0.0.1:8787/api/subscribe', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://elsewhere.example' },
+        body: 'email=a%40b.co',
+      }),
+    );
+    expect(form.status).toBe(403);
+    expect(await form.text()).toContain('Sign up on rotli.co itself.');
+    expect(resend.calls).toHaveLength(0);
+    // The site's own page, by Origin or by Referer, still gets through.
+    expect((await handler(post({ email: 'a@b.co' }, { origin: 'http://127.0.0.1:8787' }))).status).toBe(200);
+    await Bun.sleep(0);
+    expect(resend.calls.map((call) => new URL(call.url).pathname)).toEqual(['/contacts', '/emails']);
+  });
+
   test('rate-limits each visitor, then lets them back in after the window', async () => {
     let now = 1_000_000;
     const handler = createSubscribe({ ...CONFIG, now: () => now, fetch: fakeResend().fetch });
