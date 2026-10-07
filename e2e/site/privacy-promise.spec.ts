@@ -73,6 +73,12 @@ for (const width of [320, 390, 660, 768, 1024, 1440, 1920, 2560]) {
       // On the words' left edge (one edge for the column), and, where it breaks out, on the
       // header's right edge.
       expect(Math.abs(box.x - lede.x)).toBeLessThan(1.5);
+      // The five points' bullets are on that line too (the owner, 2026-10-07: one left line).
+      const bullet = await page
+        .locator(".promise-points > li")
+        .first()
+        .evaluate((li) => li.getBoundingClientRect().x + parseFloat(getComputedStyle(li, "::before").left));
+      expect(Math.abs(bullet - lede.x)).toBeLessThan(1);
       if (width >= 1440) {
         const header = (await page.locator(".site-header").boundingBox())!;
         expect(Math.abs(box.x + box.width - (header.x + header.width))).toBeLessThan(1.5);

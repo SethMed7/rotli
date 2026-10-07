@@ -350,7 +350,10 @@ starts at the rail; wide blocks run on to the page's right edge) with
   container query. The privacy matrix is `.wide`; its own breakout rule is
   gone, and its companion float's margin is `100% − measure`.
 - Top-level lists drop their padding from 901px, so the markers hang in the
-  rail's gap.
+  rail's gap. **Superseded the same day:** the owner saw the bullets sit left
+  of the column's line ("not having a proper left line that everything
+  respects"). Markers are now drawn on the line itself, the words one step
+  in, at every width; nothing sits in the gap.
 - The roadmap's nav sits in the rail track from 901px (it was 11.5rem from
   1100px), its groups in `main`; section notes and summaries keep the measure.
 - Below 901px the "On this page" disclosure spans the page, on the picture's
@@ -358,7 +361,8 @@ starts at the rail; wide blocks run on to the page's right edge) with
 
 Measured after, at 1440: the rail 112 to 368 on all three pages; every
 heading, paragraph, list's words, table, chart, and roadmap group from 408;
-words to 1101; wide blocks to 1328, the header's right edge. At 1024 wide
+words to 1101; wide blocks to 1328, the header's right edge. (After the
+lists change: bullets at 408, their words at 428.) At 1024 wide
 blocks keep the measure (277.9 to 970.9). `e2e/site/article-width.spec.ts`
 now asserts one left edge one rail gap past the rail, the list's words on it,
 figures ending on the header's edge when they break out, and the three pages

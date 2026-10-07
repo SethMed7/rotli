@@ -89,13 +89,40 @@
 .writing.is-article .prose ol {
   padding-left: 1.3rem;
 }
-/* Beside the rail a list's markers hang in the rail's gap, so its words start on the column's
-   edge like every paragraph. Below 901px the page's gutter is too narrow to hang into, so lists
-   keep their indent. Nested lists always indent. */
-@media (min-width: 901px) {
-  .writing.is-article .prose > :is(ul, ol) {
-    padding-left: 0;
-  }
+/* A list respects the column's one left line (the owner, 2026-10-07: "a proper left line that
+   everything respects"): its box, and its bullet or number, start exactly on the edge the words
+   and tables start on, and its words one step in. The markers are drawn, not ::marker, whose
+   place the browser decides; so they sit on the line at every width, never in the gap beside the
+   rail. Nested lists indent from their item as usual. The Sources list and footnotes draw their
+   own numbers on the same line, and the figures' flow keeps its own layout. */
+.writing.is-article .prose > :is(ul, ol):not(.flow) {
+  padding-left: 0;
+  list-style: none;
+}
+.writing.is-article .prose > :is(ul, ol):not(.flow) > li {
+  position: relative;
+  padding-left: 1.25rem;
+}
+.writing.is-article .prose > ul:not(.flow) > li::before {
+  content: '';
+  position: absolute;
+  top: calc(0.5lh - 0.17em);
+  left: 0;
+  width: 0.34em;
+  height: 0.34em;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.writing.is-article .prose > ol:not(.flow) > li {
+  padding-left: 1.75rem;
+}
+.writing.is-article .prose > ol:not(.flow) > li::before {
+  content: counter(list-item) '.';
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 .writing.is-article .prose li + li {
   margin-top: 0.45rem;

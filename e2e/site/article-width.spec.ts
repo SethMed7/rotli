@@ -7,8 +7,9 @@
 // wide blocks. There is no right rail; "More from rotli" follows the article. Swept from 320 to
 // 2560: no sideways scroll, nothing over the reading column, 60 to 80 characters a line wherever
 // the window is wider than a phone (62 to 70 from 1180px), the head on the header's edges, the left
-// rail at least 16rem from 1440, the rail folding under 901px, one left edge for words, figures,
-// and a list's words, figures ending on the page's right edge where they break out, and the same
+// rail at least 16rem from 1440, the rail folding under 901px, one left line for words, figures,
+// and a list's bullets (its words one step in), figures ending on the page's right edge where they
+// break out, and the same
 // layout after a live resize as on a fresh load. Posts, /privacy/, and /roadmap/ share the rail
 // and the edge. The index is swept the same way.
 import { expect, test, type Page } from "@playwright/test";
@@ -53,7 +54,14 @@ const geometry = (page: Page) =>
     const item = document.querySelector("[data-prose] > ul:not(.flow) > li");
     return {
       text: rect("[data-prose] > p")!,
-      listText: item ? item.getBoundingClientRect().x : null,
+      // A drawn bullet (blog/article.css): where it starts, and where the item's words start.
+      list: item
+        ? {
+            marker: item.getBoundingClientRect().x + parseFloat(getComputedStyle(item, "::before").left),
+            position: getComputedStyle(item, "::before").position,
+            words: item.getBoundingClientRect().x + parseFloat(getComputedStyle(item).paddingLeft),
+          }
+        : null,
       middle: rect("[data-prose]")!,
       rail: rect("[data-article-rail] .rail-title"),
       railBox: rect("[data-article-rail]"),
@@ -123,16 +131,18 @@ for (const width of WIDTHS) {
       expect(gap).toBeGreaterThanOrEqual(2 * REM - 1);
       expect(gap).toBeLessThanOrEqual(2.5 * REM + 1);
       expect(Math.abs(right(g.middle) - right(g.header))).toBeLessThan(1.5);
-      // A list's markers hang in the gap, so its words are on the column's edge.
-      expect(Math.abs(g.listText! - g.text.x)).toBeLessThan(1.5);
     } else {
-      // No rail: the column starts on the page's left edge, a list's words 1.3rem in.
+      // No rail: the column starts on the page's left edge.
       expect(Math.abs(g.text.x - g.header.x)).toBeLessThan(1.5);
-      expect(Math.abs(g.listText! - g.text.x - 1.3 * REM)).toBeLessThan(1.5);
       expect(g.rail, "the left rail folds away").toBeNull();
       await expect(page.locator(".toc-compact")).toBeVisible();
       expect(g.railBox!.y).toBeGreaterThan(g.text.y);
     }
+    // One left line at every width: a list's bullet sits on the words' edge, never left of it in
+    // the gap or the gutter, and its words start one step (1.25rem) in.
+    expect(g.list!.position).toBe("absolute");
+    expect(Math.abs(g.list!.marker - g.text.x)).toBeLessThan(1);
+    expect(Math.abs(g.list!.words - g.text.x - 1.25 * REM)).toBeLessThan(1);
     // No right rail at any width: "More from rotli" follows the article on the text's edges.
     expect(g.more!.y).toBeGreaterThan(g.middle.y + g.middle.height);
     expect(Math.abs(g.more!.x - g.text.x)).toBeLessThan(1.5);

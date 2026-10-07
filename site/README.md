@@ -454,10 +454,13 @@ there, and the closing panel, whose art never touches its words from 320 to
     on the prose), so a wide block is never a sliver wider than the text.
     On a narrower `main` (about 901 to 1150px) they keep the measure.
     Nothing reaches into the rail.
-  - **Lists.** Beside the rail a top-level list's markers hang in the rail's
-    gap, so its words start on the column's edge like every paragraph;
-    below 901px the page's gutter is too narrow to hang into, so lists keep
-    a 1.3rem indent. Nested lists always indent.
+  - **Lists.** A top-level list respects the column's one left line (the
+    owner, 2026-10-07): its bullet or number is drawn (`::before`, not
+    `::marker`, whose place the browser decides) exactly on the edge the
+    words and tables start on, and its words start one step in (1.25rem for
+    bullets, 1.75rem for numbers), at every width. Nothing hangs into the
+    rail's gap. Nested lists indent from their item; the Sources list and
+    footnotes draw their numbers on the same line.
   - **The head** (`blog/ArticleCover.astro`) spans the page, the header's
     edges. From 1000px it is two columns, centred on each other so neither
     leaves an empty band: on the left "Blog /" small and quiet, the title
