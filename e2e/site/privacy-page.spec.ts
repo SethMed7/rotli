@@ -331,3 +331,19 @@ test("keys and logins have their own section, linked from where the files are de
   await expect(section.filter({ hasText: "pairing code" })).toHaveCount(1);
   await expect(section.filter({ hasText: "mark that note secure yourself" })).toHaveCount(1);
 });
+
+// What the website keeps (the owner, 2026-10-07): unsubscribing stops the emails but leaves the
+// address marked unsubscribed, the signup alert keeps one copy, and a request erases both;
+// "Keeping and deleting" points to all of it, since its notes line alone read as "nothing kept".
+test("the email list says how to erase an address, and Keeping and deleting points to the website", async ({
+  page,
+}) => {
+  await page.goto("/privacy/");
+  const list = page.locator("#website ~ p", { hasText: "The email list." });
+  await expect(list).toContainText("marked as unsubscribed");
+  await expect(list).toContainText("erased completely");
+  await expect(list.locator("a[href='/roadmap/#request']")).toHaveText("send a request");
+  const retention = page.locator("#retention ~ p", { hasText: "This website keeps a little" });
+  await expect(retention.locator("a[href='#website']")).toHaveText("This website");
+  await expect(page.locator(".meta, [data-article-cover]").first()).toContainText("Updated October 7, 2026");
+});
