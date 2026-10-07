@@ -138,7 +138,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   works ("Available on Mac and Web", "Beta on Mac", "Coming soon to Mac")
   instead of a dot and a status, the icons stand bare without boxes, and the
   page opens on a picture of the quokka at its desk among a note, a chat, and
-  a board.
+  a board. The areas are now tabs on one bar beside a smaller search box, each
+  showing how many entries it holds (and how many match what you typed), and
+  the page closes on a banner to the roadmap instead of a line of text.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the

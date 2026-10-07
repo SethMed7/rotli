@@ -10,6 +10,7 @@
 import { catalog } from '../../features';
 import { POSE_ART } from './areaArt';
 import FeatureTile from './FeatureTile.astro';
+import RoadmapBanner from './RoadmapBanner.astro';
 
 const groups = catalog();
 const total = groups.reduce((sum, group) => sum + group.features.length, 0);
@@ -17,6 +18,22 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
 
 <div class="wrap catalog" data-catalog data-total={total}>
   <div class="tools" data-catalog-tools hidden>
+    <div class="bar">
+    <div class="tabs" role="group" aria-label="Show one area">
+      <button type="button" class="chip" aria-pressed="true" data-chip="" data-name="All">
+        All <span class="tally" aria-hidden="true" data-tally="">{total}</span>
+      </button>
+      {
+        groups.map(({ area, features }) => (
+          <button type="button" class="chip" aria-pressed="false" data-chip={area.id} data-name={area.name}>
+            {area.name}{' '}
+            <span class="tally" aria-hidden="true" data-tally={area.id}>
+              {features.length}
+            </span>
+          </button>
+        ))
+      }
+    </div>
     <label class="search">
       <span class="visually-hidden">Search features</span>
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
@@ -24,15 +41,6 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
       </svg>
       <input type="search" name="q" placeholder="Search features" autocomplete="off" spellcheck="false" data-catalog-search />
     </label>
-    <div class="chips" role="group" aria-label="Show one area">
-      <button type="button" class="chip" aria-pressed="true" data-chip="">All</button>
-      {
-        groups.map(({ area }) => (
-          <button type="button" class="chip" aria-pressed="false" data-chip={area.id}>
-            {area.name}
-          </button>
-        ))
-      }
     </div>
     <p class="count" aria-live="polite" data-catalog-count>{total} features</p>
   </div>
@@ -73,10 +81,7 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
     <button type="button" class="button secondary" data-catalog-reset>Show every feature</button>
   </div>
 
-  <p class="next">
-    Looking for what comes next? <a href="/roadmap/">The roadmap</a> lists what is being built, and you can vote for
-    what you want.
-  </p>
+  <RoadmapBanner />
 </div>
 
 <script>
@@ -88,7 +93,8 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
     const count = root.querySelector<HTMLElement>('[data-catalog-count]')!;
     const empty = root.querySelector<HTMLElement>('[data-catalog-empty]')!;
     const areas = [...root.querySelectorAll<HTMLElement>('[data-catalog-area]')];
-    const names = new Map(chips.map((chip) => [chip.dataset.chip ?? '', chip.textContent?.trim() ?? '']));
+    const names = new Map(chips.map((chip) => [chip.dataset.chip ?? '', chip.dataset.name ?? '']));
+    const tallies = [...root.querySelectorAll<HTMLElement>('[data-tally]')];
     const known = new Set(chips.map((chip) => chip.dataset.chip ?? ''));
 
     const params = new URLSearchParams(location.search);
@@ -106,18 +112,25 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
     const apply = () => {
       const query = words();
       let shown = 0;
+      // Each tab's number counts what the search leaves in that area, whichever tab is picked.
+      const found = new Map<string, number>([['', 0]]);
       for (const section of areas) {
         const inArea = area === '' || section.dataset.catalogArea === area;
+        let hits = 0;
         let left = 0;
         for (const tile of section.querySelectorAll<HTMLElement>('[data-feature]')) {
           const text = tile.dataset.search ?? '';
-          const match = inArea && query.every((word) => text.includes(word));
-          tile.hidden = !match;
-          if (match) left += 1;
+          const hit = query.every((word) => text.includes(word));
+          tile.hidden = !(inArea && hit);
+          if (hit) hits += 1;
+          if (inArea && hit) left += 1;
         }
+        found.set(section.dataset.catalogArea ?? '', hits);
+        found.set('', (found.get('') ?? 0) + hits);
         section.hidden = left === 0;
         shown += left;
       }
+      tallies.forEach((tally) => (tally.textContent = String(found.get(tally.dataset.tally ?? '') ?? 0)));
       chips.forEach((chip) => chip.setAttribute('aria-pressed', String((chip.dataset.chip ?? '') === area)));
       empty.hidden = shown > 0;
       const noun = shown === 1 ? 'feature' : 'features';
@@ -160,27 +173,89 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
     padding-bottom: var(--section-space);
   }
 
-  /* The tools: one search box and a row of chips, wrapping on narrow screens. */
+  /* The tools: one bar on a hairline, the areas as tabs on the left (each with how many it
+     holds, the picked one underlined like the header's current page) and a compact search box
+     on the right; the count under it. Narrower (a tablet, a phone), the tabs become wrapping
+     pills and the search box drops under them. */
   .tools {
-    display: grid;
-    grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
-    align-items: center;
-    gap: 1rem 1.5rem;
-    padding-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
   }
   .tools[hidden] {
     display: none;
   }
-  .search {
+  .bar {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    min-height: 48px;
-    padding: 0 0.9rem;
-    border: 1px solid var(--border-strong);
-    border-radius: 0.7rem;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.2rem;
+    margin-bottom: -1px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 52px;
+    padding: 0 0.55rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.93rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 140ms ease-out, border-color 140ms ease-out;
+  }
+  .chip:hover {
+    color: var(--text);
+  }
+  .chip[aria-pressed='true'] {
+    border-bottom-color: var(--accent-text);
+    color: var(--text);
+  }
+  .chip:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+    border-radius: 0.4rem;
+  }
+  .tally {
+    min-width: 1.6rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .chip[aria-pressed='true'] .tally {
+    background: var(--tint);
+    color: var(--accent-text);
+  }
+  .search {
+    flex: 0 1 15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 42px;
+    padding: 0 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
     background: var(--surface);
     color: var(--text-muted);
+    transition: border-color 140ms ease-out;
+  }
+  .search:hover {
+    border-color: var(--border-strong);
   }
   .search:focus-within {
     border-color: var(--accent);
@@ -189,55 +264,25 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
   }
   .search svg {
     flex: none;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
   .search input {
     flex: 1;
     min-width: 0;
-    min-height: 46px;
+    min-height: 40px;
     border: 0;
     background: none;
     color: var(--text);
     font: inherit;
-    font-size: 1rem;
+    font-size: 0.95rem;
     outline: none;
   }
   .search input::placeholder {
     color: var(--text-muted);
   }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-  .chip {
-    min-height: 44px;
-    padding: 0 1rem;
-    border: 1px solid var(--border-strong);
-    border-radius: 999px;
-    background: none;
-    color: var(--text);
-    font: inherit;
-    font-size: 0.92rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .chip:hover {
-    background: var(--surface-2);
-  }
-  .chip[aria-pressed='true'] {
-    border-color: var(--text);
-    background: var(--text);
-    color: var(--on-text);
-  }
-  .chip:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 2px;
-  }
   .count {
-    grid-column: 1 / -1;
-    margin: 0;
+    margin: 0.85rem 0 0;
     color: var(--text-muted);
     font-size: 0.9rem;
   }
@@ -321,28 +366,48 @@ const total = groups.reduce((sum, group) => sum + group.features.length, 0);
     color: var(--text-muted);
     font-size: var(--step-lede);
   }
-  .next {
-    margin: clamp(3rem, 6vw, 4.5rem) 0 0;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--border-strong);
-    color: var(--text-muted);
-  }
-  .next a {
-    color: var(--accent-text);
-    font-weight: 600;
-  }
-
   @media (max-width: 1080px) {
     .tiles {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
   @media (max-width: 1180px) {
-    .tools {
-      grid-template-columns: minmax(0, 1fr);
+    .bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.85rem;
+      border-bottom: 0;
+    }
+    .tabs {
+      gap: 0.5rem;
+      margin-bottom: 0;
+    }
+    .chip {
+      min-height: 44px;
+      padding: 0 0.6rem 0 0.9rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+    }
+    .chip:hover {
+      background: var(--surface-2);
+    }
+    .chip[aria-pressed='true'] {
+      border-color: var(--text);
+      background: var(--text);
+      color: var(--on-text);
+    }
+    .chip[aria-pressed='true'] .tally {
+      background: var(--on-text);
+      color: var(--text);
+    }
+    .chip:focus-visible {
+      outline-offset: 2px;
+      border-radius: 999px;
     }
     .search {
+      flex: none;
       max-width: 26rem;
+      min-height: 46px;
     }
   }
   @media (max-width: 640px) {

@@ -3,7 +3,8 @@
 // capability that can be linked straight to, keyboard use, the plain grouped list without
 // script, and one column on a phone. Since 2026-10-06: a header picture, bare icons with no box,
 // one plain availability line ("Available on Mac"), and a condensed list whose retired ids
-// redirect to their section on the surviving page. This suite's build has WEB_APP_ENABLED off,
+// redirect to their section on the surviving page. Since 2026-10-07: each area tab shows how many
+// it holds (following the search), and the catalog closes on a banner to the roadmap. This suite's build has WEB_APP_ENABLED off,
 // so the Rotli Web tile is absent and every line names the Mac only; nothing here assumes Web.
 import { expect, test } from "@playwright/test";
 
@@ -80,6 +81,29 @@ test("search narrows the catalog, and says so when nothing matches", async ({ pa
   await search.fill("chat");
   await search.press("Escape");
   await expect(visibleTiles(page)).toHaveCount(all);
+});
+
+test("each tab counts what the search leaves in its area", async ({ page }) => {
+  await page.goto("/features/");
+  const all = await tiles(page).count();
+  const tally = (area: string) => page.locator(`[data-tally="${area}"]`);
+  await expect(tally("")).toHaveText(String(all));
+  const files = await page.locator('[data-catalog-area="files"] [data-feature]').count();
+  await expect(tally("files")).toHaveText(String(files));
+  await page.getByRole("searchbox", { name: "Search features" }).fill("excalidraw");
+  await expect(tally("")).toHaveText("1");
+  await expect(tally("files")).toHaveText("1");
+  await expect(tally("writing")).toHaveText("0");
+  // The number is decoration; the tab's name stays the area's name alone.
+  await expect(page.getByRole("button", { name: "Files", exact: true })).toBeVisible();
+});
+
+test("the catalog closes on a banner to the roadmap", async ({ page }) => {
+  await page.goto("/features/");
+  const banner = page.getByRole("region", { name: /what comes next/i });
+  await expect(banner.getByRole("heading", { level: 2 })).toContainText("Vote for it on the roadmap.");
+  await banner.getByRole("link", { name: "See the roadmap" }).click();
+  await expect(page).toHaveURL(/\/roadmap\/$/);
 });
 
 test("a filtered catalog can be linked, and Back from a feature returns to it", async ({ page }) => {
