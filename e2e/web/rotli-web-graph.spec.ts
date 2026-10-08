@@ -22,4 +22,11 @@ test("a production build offers no Graph", async ({ page }) => {
   await search.fill("Graph");
   await expect(page.locator(".prow", { hasText: "Graph of all notes" })).toHaveCount(0);
   await expect(page.locator(".prow", { hasText: "Show this note in the graph" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // a note's own menu opens, with no way into the graph
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  await page.locator(".recent-row", { hasText: "Pricing" }).click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Show in Library" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Show in graph" })).toHaveCount(0);
 });
