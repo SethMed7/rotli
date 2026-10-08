@@ -318,6 +318,45 @@ const socialImageUrl = new URL(image, siteUrl).href;
         top: 100%;
         background: linear-gradient(to top, transparent, var(--deep));
       }
+      /* With script, nothing of the night shows before the night itself (the owner, 2026-10-08:
+         "I should not see anything from that section till the colors transition", and the same
+         for the section under it). The band paints no ground of its own and no feathers: it is
+         the page's ground, so it turns with everything else. Its words and its scene come in
+         once the inks have switched, and go before they switch back. The sections on either
+         side (data-passage-near, set by src/passage.ts) step out while the night lasts and come
+         back after it; a warm band fades with its ground, so the night is one sky. The band's
+         reveals (the scene's one play) wait for the night too. Without script the band stays its
+         own night, feathered. */
+      .js [data-passage] {
+        background: transparent;
+      }
+      .js [data-passage]::before,
+      .js [data-passage]::after {
+        content: none;
+      }
+      .js [data-passage] > *,
+      .js [data-passage-near] {
+        transition: opacity 260ms ease-out;
+      }
+      .js [data-passage] > * {
+        opacity: 0;
+      }
+      :root[data-passage] [data-passage] > * {
+        opacity: 1;
+        transition: opacity 600ms ease-out var(--passage-ink-at);
+      }
+      :root[data-passage] [data-passage-near] {
+        opacity: 0;
+      }
+      :root:not([data-passage]) [data-passage-near] {
+        transition: opacity 600ms ease-out var(--passage-ink-at);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :root [data-passage] > *,
+        :root [data-passage-near] {
+          transition: none;
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
         :root.passage-fading {
           transition: none;
@@ -1183,7 +1222,10 @@ const socialImageUrl = new URL(image, siteUrl).href;
         .forEach((head) => {
           if (head.getBoundingClientRect().top > window.innerHeight) head.setAttribute('data-reveal', '');
         });
-      const blocks = document.querySelectorAll<HTMLElement>('[data-reveal], [data-stagger]');
+      // A passage's own blocks wait for its night instead (src/passage.ts).
+      const blocks = [...document.querySelectorAll<HTMLElement>('[data-reveal], [data-stagger]')].filter(
+        (block) => !block.closest('[data-passage]'),
+      );
       if (blocks.length > 0 && 'IntersectionObserver' in window) {
         const observer = new IntersectionObserver(
           (entries) => {

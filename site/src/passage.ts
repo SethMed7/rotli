@@ -146,6 +146,25 @@ export function watchPassages(doc: Document = document): void {
   let current: HTMLElement | null = null;
   let frame = 0;
   let fadeTimer = 0;
+  // The sections either side of a passage step out while its night lasts (Base.astro).
+  for (const section of sections) {
+    for (const step of ['previousElementSibling', 'nextElementSibling'] as const) {
+      let near = section[step];
+      while (near && near.tagName !== 'SECTION') near = near[step];
+      near?.setAttribute('data-passage-near', '');
+    }
+  }
+  // A passage's reveals (Base.astro leaves them to it) play the first time its night arrives,
+  // once the inks have switched, so the scene never plays unseen on a day page.
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const revealed = new Set<HTMLElement>();
+  const reveal = (section: HTMLElement, delay: number) => {
+    if (revealed.has(section)) return;
+    revealed.add(section);
+    window.setTimeout(() => {
+      section.querySelectorAll('[data-reveal], [data-stagger]').forEach((block) => block.classList.add('is-visible'));
+    }, delay);
+  };
 
   const apply = (next: HTMLElement | null) => {
     if (next === current) return;
@@ -160,6 +179,7 @@ export function watchPassages(doc: Document = document): void {
     window.clearTimeout(fadeTimer);
     fadeTimer = window.setTimeout(() => root.classList.remove('passage-fading'), FADE_MS);
     if (next) {
+      reveal(next, calm.matches ? 0 : PASSAGE_MS * INK_AT);
       root.dataset.passage = next.dataset.passage ?? '';
       if (themeColor) themeColor.content = next.dataset.passageColor ?? restingThemeColor;
     } else {
@@ -190,4 +210,6 @@ export function watchPassages(doc: Document = document): void {
   update();
   window.clearTimeout(fadeTimer);
   root.classList.remove('passage-fading');
+  // Without IntersectionObserver the page shows everything; so does a passage.
+  if (!('IntersectionObserver' in window)) sections.forEach((section) => reveal(section, 0));
 }

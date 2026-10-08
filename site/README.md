@@ -889,10 +889,18 @@ there, and the closing panel, whose art never touches its words from 320 to
   2026-10-05). The cut the owner saw came from the band always painting its
   own night while the page followed only once the middle of the window was
   well inside it, with the header, buttons, stars, and ground each fading on
-  its own clock. Now the band's top and bottom edges are feathered into the
-  neighbours' empty section padding (`[data-passage]::before/::after`, the
-  band's own night to transparent; in the night they vanish into the ground),
-  and the crossfade runs on the tokens themselves, registered with
+  its own clock. Since 2026-10-08 nothing of the night shows before it (the
+  owner: "I should not see anything from that section till the colors
+  transition", and the same for the section under it): with script the band
+  paints no ground of its own, so it is the page's ground and turns with it;
+  its words and scene fade in once the inks have switched and out before they
+  switch back; the sections on either side (`data-passage-near`, set by
+  `src/passage.ts`, since a component's script can sit between two sections)
+  fade out while the night lasts and back after it; and the band's reveals,
+  the scene's one play included, wait for the night instead of the scroll
+  observer. Without script the band paints its own night, its edges feathered
+  into the neighbours' padding (`[data-passage]::before/::after`). The
+  crossfade runs on the tokens themselves, registered with
   `@property` and transitioned on the root, so everything that reads them
   changes in the same frame. Grounds ease over 900 ms
   (`cubic-bezier(0.65, 0, 0.35, 1)`); text never fades through the ground

@@ -490,3 +490,26 @@ and "See every feature" repeats the header.
   day).
 
 Guarded by `e2e/site/landing-layout.spec.ts` ("the three steps line up").
+
+## 2026-10-08: the night shows only in the night
+
+The owner, on the way from "Make it yours." into "Some notes never leave this
+Mac.": "I should not see anything from that section till the colors
+transition and same thing with under part." Before, the band painted its own
+night with feathered edges, so its words and scene came up the window on a day
+page, and while the night lasted the theme studio above and the questions below
+sat recoloured beside it.
+
+- With script the band paints no ground of its own; it is the page's ground,
+  so it turns with the page. Its words and scene fade in once the inks have
+  switched (459 ms into the 900 ms crossfade) and out before they switch back.
+- The sections either side (Personal and the FAQ) fade out while the night
+  lasts and back in after it; the warm band fades with its ground, so the
+  night is one sky.
+- The scene's one play waits for the night (src/passage.ts reveals the band's
+  blocks) instead of the scroll observer, which used to start it unseen.
+- The thresholds are unchanged (on at 40% of the window, off under 25%).
+  Without script the band keeps its own feathered night.
+
+Guarded by `e2e/site/landing.spec.ts` ("nothing of the night shows before
+it").

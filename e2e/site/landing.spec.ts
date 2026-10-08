@@ -356,7 +356,7 @@ test("the page, its header, and its buttons cross into the night on one clock", 
   await scrollToPrivacy(page, 0.1);
   await expect.poll(() => passage(page)).toBe("ocean-dark");
   // Freeze the crossfade a third of the way in: the header is the page's own ground, and the
-  // night band's feathered edge is there to meet it.
+  // band paints none of its own, so it turns with the page.
   const colours = await page.evaluate(() => {
     const root = document.documentElement;
     for (const animation of document.getAnimations()) {
@@ -367,13 +367,46 @@ test("the page, its header, and its buttons cross into the night on one clock", 
     }
     const header = getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor;
     const body = getComputedStyle(document.body).backgroundColor;
-    const feather = getComputedStyle(document.getElementById("privacy")!, "::before").backgroundImage;
-    return { header, body, feather };
+    const band = getComputedStyle(document.getElementById("privacy")!).backgroundColor;
+    return { header, body, band };
   });
   expect(colours.header).toBe(colours.body);
   expect(colours.header).not.toBe("rgb(248, 242, 233)");
   expect(colours.header).not.toBe("rgb(14, 23, 29)");
-  expect(colours.feather).toContain("linear-gradient");
+  expect(colours.band).toBe("rgba(0, 0, 0, 0)");
+});
+
+test("nothing of the night shows before it, and the sections beside it step out while it lasts", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const opacity = (selector: string) => page.locator(selector).evaluate((el) => getComputedStyle(el).opacity);
+  // The band's top is in the window, but the night has not come: its words and scene are unseen,
+  // and the scene has not played.
+  await page.evaluate(() => {
+    const band = document.getElementById("privacy")!;
+    window.scrollTo({
+      top: band.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.8,
+      behavior: "instant",
+    });
+  });
+  await page.waitForTimeout(300);
+  expect(await passage(page)).toBe("");
+  expect(await opacity("#privacy > .wrap")).toBe("0");
+  expect(await opacity("#personal")).toBe("1");
+  await expect(page.locator("#privacy .scene")).not.toHaveClass(/is-visible/);
+  // In the night: the band is there, the theme studio above and the questions below are not.
+  await scrollToPrivacy(page, 0.5);
+  await expect.poll(() => passage(page)).toBe("ocean-dark");
+  await expect.poll(() => opacity("#privacy > .wrap")).toBe("1");
+  await expect.poll(() => opacity("#personal")).toBe("0");
+  await expect.poll(() => opacity("#faq")).toBe("0");
+  await expect(page.locator("#privacy .scene")).toHaveClass(/is-visible/);
+  // Out through the bottom: the questions come back, the band's words go.
+  await scrollToPrivacy(page, 1.6);
+  await expect.poll(() => passage(page)).toBe("");
+  await expect.poll(() => opacity("#faq")).toBe("1");
+  await expect.poll(() => opacity("#privacy > .wrap")).toBe("0");
 });
 
 test("under reduced motion the page switches to the night at once", async ({ browser }) => {

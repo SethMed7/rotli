@@ -198,7 +198,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Scrolling into "Some notes never leave this Mac" takes the whole of
   rotli.co into the night.** The page, its header, menus, and buttons step
   into Ocean Dark while the privacy section is in view, and step back out
-  when you scroll on or back. With reduced motion the change is immediate.
+  when you scroll on or back. Nothing of the night shows before the colours
+  change, and the sections above and below it step aside while it lasts, so
+  it reads as one scene. With reduced motion the change is immediate.
 - **The quokkas at the bottom of rotli.co each have something to do.** One
   sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
   waves when you arrive and frowns if you reach for the leaves), two play
