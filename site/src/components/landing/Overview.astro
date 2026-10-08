@@ -139,6 +139,7 @@ const steps = [
     // anywhere else was the visitor's.
     let target = 0;
     let sliding = false;
+    let slidAt = 0;
 
     // Where each picture starts in the track (the track has a little padding, so the app's
     // selection rows can reach past the picture's edge), and the picture nearest a scroll.
@@ -150,6 +151,7 @@ const steps = [
     const slideTo = (index: number, smooth: boolean) => {
       target = index;
       sliding = smooth && !calm.matches;
+      slidAt = performance.now();
       track.scrollTo({ left: offset(index), behavior: smooth && !calm.matches ? 'smooth' : 'instant' });
     };
     // Wide, the track is as tall as the tallest picture, so nothing under it moves. Narrow, the
@@ -257,14 +259,14 @@ const steps = [
     });
     // `final`: the browser says the scroll has ended (scrollend), so a slide of ours that is
     // somewhere else was taken over. Without scrollend a pause in the scroll stands in, and a
-    // slide of ours still under way is left alone.
+    // slide of ours still under way (under 800 ms old: a smooth slide takes less) is left alone.
     const settled = (final: boolean) => {
       const index = nearest();
       if (index === target) {
         sliding = false;
         return;
       }
-      if (sliding && !final) return;
+      if (sliding && !final && performance.now() - slidAt < 800) return;
       sliding = false;
       if (index !== cycle.shown) set(pin(cycle, index));
     };
@@ -546,9 +548,10 @@ const steps = [
     text-underline-offset: 0.2em;
   }
 
-  /* The quokka hops onto its picture as the picture opens. */
+  /* The quokka hops onto its picture as the picture opens (the first, once the story is
+     revealed, not while the visitor is still on the hero). */
   @media (prefers-reduced-motion: no-preference) {
-    .story-slide[data-active] :global(.quokka) {
+    .story:global(.is-visible) .story-slide[data-active] :global(.quokka) {
       animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 260ms backwards;
       transform-origin: 50% 100%;
     }

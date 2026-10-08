@@ -353,7 +353,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       @media (prefers-reduced-motion: reduce) {
         :root [data-passage] > *,
-        :root [data-passage-near] {
+        :root [data-passage-near],
+        :root[data-passage] [data-passage] > *,
+        :root:not([data-passage]) [data-passage-near] {
           transition: none;
         }
       }

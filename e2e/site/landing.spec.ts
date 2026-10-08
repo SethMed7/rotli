@@ -424,6 +424,8 @@ test("under reduced motion the page switches to the night at once", async ({ bro
     header: getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor,
   }));
   expect(state).toEqual({ running: 0, header: "rgb(14, 23, 29)" });
+  // The band's words are there at once too, with no wait for the ink switch.
+  expect(await page.locator("#privacy > .wrap").evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   await context.close();
 });
 
