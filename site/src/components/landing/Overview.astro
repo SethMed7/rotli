@@ -12,15 +12,15 @@
 //   2. File: the Librarian's before and after, which plays once (Filing.astro);
 //   3. Ask: a chat that searches on your computer and reads only what it found (AskIndex.astro).
 //
-// One step at a time (the owner, 2026-10-08: the three in one scroll felt "dead and overwhelming
-// with a lot of text … animate the transitions maybe even play with a quick horizontal scroll").
-// The steps are tabs on the left, each a heading and one sentence (only the open one shows its
-// sentence); the pictures sit side by side in a track on the right that slides between them. The
-// track is a real horizontal scroller that snaps, so a trackpad swipe or a touch drag moves it
-// too. Once the section is on screen it plays through the three on its own, once, at each step's
-// own pace (src/themeCycle.ts, STORY_MS); a hover holds it, and a tab, an arrow key, or a swipe
-// takes over for good. Nothing is tied to the vertical scroll. Reduced motion: no autoplay, no
-// slide, the tabs still switch. Without script the three pictures stack, all visible.
+// One step at a time, following the scroll (the owner, 2026-10-08: the three in one scroll felt
+// "dead and overwhelming with a lot of text", and then "make the switches of what I am looking
+// at happen with scroll not manually"). On a wide, tall enough window the story pins under the
+// header while the page scrolls a runway beneath it; each third of the runway is one step
+// (src/storyScroll.ts). The steps are listed on the left, each a heading, the open one with its
+// one sentence; the pictures sit side by side on the right and slide to the open one. A step
+// switches whole: nothing is scrubbed with the scroll. A step's name scrolls the page to it.
+// Elsewhere (narrow or short windows, or without script) the three stack, each with its heading
+// and sentence over its picture. Reduced motion: the steps switch without the slide.
 //
 // Every claim is a contract's (docs/design/landing-layout-2026-10-05.md lists them): views are
 // reference projections, never stores, and a note's place in Main never follows its file
@@ -28,7 +28,8 @@
 // Mac-only, moves files to wiki/<area>/ and writes only its declared fields, never the body
 // ("Metadata ownership"); the AI searches locally and reads only selected notes, never the
 // whole vault ("Master memory retrieval").
-// Under the steps, "What is an LLM wiki?" in two sentences, with Karpathy's gist as the source.
+// Under the lede, "What is an LLM wiki?" is one link, to Andrej Karpathy's gist that named the
+// idea (the owner, 2026-10-08: the two-sentence aside it replaces was too much to read).
 import AskIndex from './AskIndex.astro';
 import Filing from './Filing.astro';
 import ViewAndVault from './ViewAndVault.astro';
@@ -37,16 +38,14 @@ import ViewAndVault from './ViewAndVault.astro';
 const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f';
 
 const steps = [
-  { id: 'write', short: 'Write', title: 'Write in your view', copy: 'A view arranges your notes. It never copies them.' },
+  { id: 'write', title: 'Write in your view', copy: 'A view arranges your notes. It never copies them.' },
   {
     id: 'file',
-    short: 'File',
     title: 'The Librarian files it',
     copy: 'When it’s on, it moves the file and adds tags and links. It never changes your words.',
   },
   {
     id: 'ask',
-    short: 'Ask',
     title: 'Ask, and AI goes straight to it',
     copy: 'rotli searches on your computer, so the AI reads only the few notes that matter.',
   },
@@ -58,269 +57,256 @@ const steps = [
     <header class="section-head" data-reveal>
       <h2 class="section-title" id="overview-title">Write it down. <span class="inked">rotli puts it away.</span></h2>
       <p class="section-lede">You write in a view. Each file lives once, in your vault: the folder you chose.</p>
+      <a class="llm-link" href={LLM_WIKI_SOURCE} rel="noopener">
+        What is an LLM wiki?<span class="external-mark" aria-hidden="true">↗</span>
+      </a>
     </header>
 
-    <div class="story" data-story data-reveal>
-      <div class="story-tabs" role="tablist" aria-label="How rotli works" aria-orientation="vertical">
-        {
-          steps.map((step, index) => (
-            <button
-              type="button"
-              class="story-tab"
-              role="tab"
-              id={`story-tab-${step.id}`}
-              aria-controls={`story-${step.id}`}
-              aria-selected={index === 0 ? 'true' : 'false'}
-              aria-labelledby={`story-title-${step.id}`}
-              aria-describedby={`story-copy-${step.id}`}
-              tabindex={index === 0 ? 0 : -1}
-            >
-              <span class="story-title" id={`story-title-${step.id}`}>
-                <span class="title-long">{step.title}</span>
-                <span class="title-short" aria-hidden="true">
-                  {step.short}
+    <div class="story-pin" data-story-pin>
+      <div class="story" data-story data-reveal>
+        <nav class="story-tabs" aria-label="The three steps">
+          {
+            steps.map((step, index) => (
+              <button
+                type="button"
+                class="story-tab"
+                data-step={index}
+                aria-controls={`story-${step.id}`}
+                aria-current={index === 0 ? 'step' : undefined}
+              >
+                <span class="story-title">{step.title}</span>
+                <span class="story-copy" aria-hidden="true">
+                  <span>{step.copy}</span>
                 </span>
-              </span>
-              <span class="story-copy" id={`story-copy-${step.id}`}>
-                <span>{step.copy}</span>
-              </span>
-              <span class="story-clock" aria-hidden="true" />
-            </button>
-          ))
-        }
+              </button>
+            ))
+          }
+        </nav>
+        <div class="story-track">
+          <div class="story-rail" data-story-rail>
+            {
+              steps.map((step, index) => (
+                <div
+                  class="story-slide"
+                  id={`story-${step.id}`}
+                  role="group"
+                  aria-labelledby={`story-head-${step.id}`}
+                  data-active={index === 0 ? '' : undefined}
+                >
+                  <div class="slide-head">
+                    <h3 id={`story-head-${step.id}`}>{step.title}</h3>
+                    <p>{step.copy}</p>
+                  </div>
+                  {step.id === 'write' && <ViewAndVault />}
+                  {step.id === 'file' && <Filing />}
+                  {step.id === 'ask' && <AskIndex />}
+                </div>
+              ))
+            }
+          </div>
+        </div>
       </div>
-      <!-- Narrow screens: the open step's heading and sentence, across the width under the tabs
-           (the tab already names and describes it to assistive tech). -->
-      <p class="story-now" aria-hidden="true" data-story-now>
-        <b>{steps[0].title}</b>
-        <span>{steps[0].copy}</span>
-      </p>
-      <div class="story-track" data-story-track>
-        <div class="story-slide" role="tabpanel" id="story-write" aria-labelledby="story-tab-write" data-active>
-          <ViewAndVault />
-        </div>
-        <div class="story-slide" role="tabpanel" id="story-file" aria-labelledby="story-tab-file">
-          <Filing />
-        </div>
-        <div class="story-slide" role="tabpanel" id="story-ask" aria-labelledby="story-tab-ask">
-          <AskIndex />
-        </div>
-      </div>
+      <div class="story-runway" aria-hidden="true" data-story-runway></div>
     </div>
-
-    <aside class="llm-wiki" aria-labelledby="llm-wiki-title" data-reveal>
-      <h3 id="llm-wiki-title">What is an LLM wiki?</h3>
-      <p>
-        Plain Markdown notes, kept organized and linked so an AI can build on what you already know instead of
-        starting from scratch on every question. Andrej Karpathy described the idea in his{' '}
-        <a href={LLM_WIKI_SOURCE} rel="noopener">LLM Wiki note</a> (April 2026), and your rotli vault works the same
-        way: you write, and the Librarian adds the areas, summaries, tags, and links.
-      </p>
-    </aside>
   </div>
 </section>
 
 <script>
-  import { createCycle, hover, leave, pin, resume, STORY_MS, tick, wait, type Cycle } from '../../themeCycle';
+  import { progressFor, runwayProgress, stepAt, STEP_RUNWAY } from '../../storyScroll';
 
-  const story = document.querySelector<HTMLElement>('[data-story]');
-  const track = story?.querySelector<HTMLElement>('[data-story-track]');
-  const tabs = story ? [...story.querySelectorAll<HTMLButtonElement>('[role="tab"]')] : [];
-  const slides = track ? [...track.querySelectorAll<HTMLElement>('[role="tabpanel"]')] : [];
-  const now = story?.querySelector<HTMLElement>('[data-story-now]');
+  const pin = document.querySelector<HTMLElement>('[data-story-pin]');
+  const story = pin?.querySelector<HTMLElement>('[data-story]');
+  const rail = pin?.querySelector<HTMLElement>('[data-story-rail]');
+  const runway = pin?.querySelector<HTMLElement>('[data-story-runway]');
+  const tabs = pin ? [...pin.querySelectorAll<HTMLButtonElement>('.story-tab')] : [];
+  const slides = rail ? [...rail.querySelectorAll<HTMLElement>('.story-slide')] : [];
+  // Pinned only where the story fits under the header (the CSS says the same).
+  const pinnable = matchMedia('(min-width: 1081px) and (min-height: 760px)');
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
 
-  if (story && track && tabs.length === slides.length && slides.length > 1) {
-    const calm = matchMedia('(prefers-reduced-motion: reduce)');
-    const narrow = matchMedia('(max-width: 1080px)');
-    story.dataset.live = '';
-    let cycle: Cycle = createCycle(slides.length, performance.now(), false, { every: STORY_MS, loop: false });
+  if (pin && story && rail && runway && slides.length > 1) {
     let shown = -1;
-    // The slide the script is sliding to, and whether it is on its way there; a scroll that ends
-    // anywhere else was the visitor's.
-    let target = 0;
-    let sliding = false;
-    let slidAt = 0;
+    let stickAt = 0;
+    let frame = 0;
 
-    // Where each picture starts in the track (the track has a little padding, so the app's
-    // selection rows can reach past the picture's edge), and the picture nearest a scroll.
-    const offset = (index: number) => slides[index].offsetLeft - slides[0].offsetLeft;
-    const nearest = () => {
-      const width = offset(1) || 1;
-      return Math.min(Math.max(Math.round(track.scrollLeft / width), 0), slides.length - 1);
+    const show = (index: number) => {
+      if (index === shown) return;
+      shown = index;
+      tabs.forEach((tab, k) => {
+        if (k === index) tab.setAttribute('aria-current', 'step');
+        else tab.removeAttribute('aria-current');
+      });
+      slides.forEach((slide, k) => {
+        slide.toggleAttribute('data-active', k === index);
+        // Only the open picture takes focus and clicks, so Tab never lands on one out of sight.
+        slide.inert = k !== index;
+      });
+      rail.style.setProperty('--story-at', String(index));
     };
-    const slideTo = (index: number, smooth: boolean) => {
-      target = index;
-      sliding = smooth && !calm.matches;
-      slidAt = performance.now();
-      track.scrollTo({ left: offset(index), behavior: smooth && !calm.matches ? 'smooth' : 'instant' });
-    };
-    // Wide, the track is as tall as the tallest picture, so nothing under it moves. Narrow, the
-    // pictures differ too much in height for that: the track follows the open one.
-    const fit = () => {
-      track.style.height = narrow.matches ? `${slides[cycle.shown].offsetHeight}px` : '';
-    };
-    const render = (focus = false) => {
-      const index = cycle.shown;
-      if (index !== shown) {
-        const first = shown === -1;
-        shown = index;
-        tabs.forEach((tab, k) => {
-          const on = k === index;
-          tab.setAttribute('aria-selected', String(on));
-          tab.tabIndex = on ? 0 : -1;
-        });
-        slides.forEach((slide, k) => {
-          slide.toggleAttribute('data-active', k === index);
-          // Only the open picture takes focus and clicks, so Tab never scrolls the track sideways.
-          slide.inert = k !== index;
-        });
-        if (nearest() !== index) slideTo(index, !first);
-        else target = index;
-        if (now) {
-          now.firstElementChild!.textContent = tabs[index].querySelector('.title-long')?.textContent ?? '';
-          now.lastElementChild!.textContent = tabs[index].querySelector('.story-copy')?.textContent?.trim() ?? '';
-        }
-        fit();
-      }
-      if (focus) tabs[index]?.focus();
-      story.dataset.cycle = cycle.mode;
+    const unpin = () => {
+      shown = -1;
+      slides.forEach((slide) => {
+        slide.toggleAttribute('data-active', true);
+        slide.inert = false;
+      });
+      rail.style.removeProperty('--story-at');
     };
 
-    // The clock on the open tab runs for exactly the time the step has left.
-    const clock = () => {
-      const due = running() ? wait(cycle, performance.now()) : null;
-      tabs.forEach((tab) => tab.classList.remove('is-timing'));
-      if (due === null) return;
-      const tab = tabs[cycle.shown];
-      tab.style.setProperty('--story-due', `${Math.round(due)}ms`);
-      void tab.offsetWidth; // restart the bar from empty
-      tab.classList.add('is-timing');
-    };
-
-    let timer = 0;
-    let onScreen = false;
-    const running = () => onScreen && !document.hidden;
-    const schedule = () => {
-      window.clearTimeout(timer);
-      timer = 0;
-      clock();
-      if (!running()) return;
-      const due = wait(cycle, performance.now());
-      if (due === null) return;
-      timer = window.setTimeout(() => {
-        cycle = tick(cycle, performance.now());
-        render();
-        schedule();
-      }, due);
-    };
-    const set = (next: Cycle, focus = false) => {
-      cycle = next;
-      render(focus);
-      schedule();
-    };
-
-    let started = false;
-    new IntersectionObserver(
-      ([entry]) => {
-        onScreen = entry.isIntersecting;
-        if (onScreen && !started) {
-          started = true;
-          // It plays the first time it is seen, unless the visitor already chose a step.
-          if (cycle.mode !== 'pinned') {
-            cycle = createCycle(slides.length, performance.now(), !calm.matches, { every: STORY_MS, loop: false });
-          }
-        } else if (onScreen) {
-          cycle = resume(cycle, performance.now());
-        }
-        render();
-        schedule();
-      },
-      { threshold: 0.45 },
-    ).observe(story);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) cycle = resume(cycle, performance.now());
-      schedule();
-    });
-    calm.addEventListener('change', () => {
-      if (calm.matches && (cycle.mode === 'auto' || cycle.mode === 'held')) set({ ...cycle, mode: 'off' });
-    });
-
-    // The visitor's choices: a tab, the arrow keys on the tabs, or a swipe of the track.
-    tabs.forEach((tab, index) => tab.addEventListener('click', () => set(pin(cycle, index))));
-    story.querySelector('[role="tablist"]')?.addEventListener('keydown', (event) => {
-      const key = (event as KeyboardEvent).key;
-      const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[key];
-      let index: number | null = step === undefined ? null : Math.min(Math.max(cycle.shown + step, 0), tabs.length - 1);
-      if (key === 'Home') index = 0;
-      if (key === 'End') index = tabs.length - 1;
-      if (index === null) return;
-      event.preventDefault();
-      set(pin(cycle, index), true);
-    });
-    // `final`: the browser says the scroll has ended (scrollend), so a slide of ours that is
-    // somewhere else was taken over. Without scrollend a pause in the scroll stands in, and a
-    // slide of ours still under way (under 800 ms old: a smooth slide takes less) is left alone.
-    const settled = (final: boolean) => {
-      const index = nearest();
-      if (index === target) {
-        sliding = false;
+    // The story sits in the middle of the window under the header, and the runway gives each
+    // step after the first a share of the window's height to scroll through.
+    const measure = () => {
+      if (!pinnable.matches) {
+        runway.style.height = '';
+        story.style.removeProperty('--stick-top');
         return;
       }
-      if (sliding && !final && performance.now() - slidAt < 800) return;
-      sliding = false;
-      if (index !== cycle.shown) set(pin(cycle, index));
+      const header = document.querySelector<HTMLElement>('.site-header-bar')?.offsetHeight ?? 0;
+      stickAt = header + Math.max(24, (innerHeight - header - story.offsetHeight) / 2);
+      story.style.setProperty('--stick-top', `${Math.round(stickAt)}px`);
+      runway.style.height = `${Math.round((slides.length - 1) * STEP_RUNWAY * innerHeight)}px`;
     };
-    if ('onscrollend' in window) {
-      track.addEventListener('scrollend', () => settled(true));
-    } else {
-      let settle = 0;
-      track.addEventListener('scroll', () => {
-        window.clearTimeout(settle);
-        settle = window.setTimeout(() => settled(false), 120);
-      });
-    }
-    // A hover over the story holds the clock; leaving lets it go on after a pause.
-    story.addEventListener('pointerenter', (event) => {
-      if (event.pointerType === 'mouse' || event.pointerType === 'pen') set(hover(cycle, cycle.shown));
-    });
-    story.addEventListener('pointerleave', () => set(leave(cycle, performance.now())));
-    // A new width moves the snap points: keep the open picture in place.
-    const resized = new ResizeObserver(() => {
-      slideTo(cycle.shown, false);
-      fit();
-    });
-    resized.observe(track);
-    slides.forEach((slide) => resized.observe(slide));
+    const update = () => {
+      frame = 0;
+      if (!pinnable.matches) return unpin();
+      const progress = runwayProgress(pin.getBoundingClientRect().top, stickAt, runway.offsetHeight);
+      show(stepAt(progress, slides.length));
+    };
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    const reflow = () => {
+      measure();
+      update();
+    };
 
-    render();
+    // A step's name scrolls the page to the middle of that step's share.
+    tabs.forEach((tab, index) =>
+      tab.addEventListener('click', () => {
+        const top = pin.getBoundingClientRect().top + scrollY - stickAt;
+        const y = top + progressFor(index, slides.length) * runway.offsetHeight;
+        window.scrollTo({ top: y, behavior: calm.matches ? 'instant' : 'smooth' });
+      }),
+    );
+
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', reflow);
+    pinnable.addEventListener('change', reflow);
+    new ResizeObserver(reflow).observe(story);
+    reflow();
   }
 </script>
 
 <style>
+  .llm-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 0.5rem;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+
   /* --figure-head is the one height of every picture's head (a label and a line over one
-     hairline; ViewAndVault, Filing, AskIndex read it), so the open tab's heading starts level
-     with its picture's first label. */
+     hairline; ViewAndVault, Filing, AskIndex read it). */
   .story {
     --figure-head: 4rem;
     /* The app's selection wash (src/styles/base.css --selected-bg): the open note in the view and
        the vault, and the notes the chat read, are marked the way the app's sidebar marks them. */
     --selected-bg: color-mix(in srgb, var(--accent) 11%, transparent);
-    display: grid;
-    grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
-    align-items: start;
-    gap: 2rem clamp(2.5rem, 5vw, 4.5rem);
   }
 
-  /* The tabs: a heading each, the open one with its sentence and its clock. A line on the left
-     marks them as one list; the open tab's line is the text colour. */
-  .story-tabs {
-    display: grid;
-    gap: 0.35rem;
+  /* Stacked (narrow or short windows, or no script): each step's heading and sentence over its
+     picture, the three one after another. */
+  .story-tabs,
+  .story-runway {
+    display: none;
   }
-  .story-tab {
-    position: relative;
+  .story-rail {
     display: grid;
-    gap: 0;
+    gap: clamp(3.5rem, 8vw, 5rem);
+  }
+  .slide-head {
+    max-width: 38rem;
+    margin-bottom: 1.5rem;
+  }
+  .slide-head h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .slide-head p {
+    margin: 0.55rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .story-slide > :global(figure) {
+    width: 100%;
+    max-width: 62rem;
+  }
+
+  /* Pinned: the story holds still under the header while the runway scrolls by beneath it. */
+  @media (min-width: 1081px) and (min-height: 760px) {
+    :global(.js) .story {
+      position: sticky;
+      top: var(--stick-top, calc(var(--header-height) + 2rem));
+      display: grid;
+      grid-template-columns: minmax(15rem, 21rem) minmax(0, 1fr);
+      align-items: start;
+      gap: clamp(2.5rem, 5vw, 4.5rem);
+    }
+    :global(.js) .story-runway {
+      display: block;
+    }
+    :global(.js) .story-tabs {
+      display: grid;
+      gap: 0.35rem;
+    }
+    /* The heading over each picture is read, not shown: the list on the left shows it. */
+    :global(.js) .slide-head {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    /* The pictures side by side, one in view, sliding to the open one. The track's padding lets
+       the app's selection rows and the quokka's hop reach past the picture's edge. */
+    :global(.js) .story-track {
+      --bleed: 0.75rem;
+      min-width: 0;
+      margin: calc(-1 * var(--bleed));
+      padding: var(--bleed);
+      overflow: hidden;
+    }
+    :global(.js) .story-rail {
+      --gap: calc(2 * var(--bleed));
+      display: flex;
+      align-items: flex-start;
+      gap: var(--gap);
+      transform: translateX(calc(var(--story-at, 0) * (-100% - var(--gap))));
+      transition: transform 700ms cubic-bezier(0.65, 0, 0.35, 1);
+    }
+    :global(.js) .story-slide {
+      position: relative;
+      flex: 0 0 100%;
+      min-width: 0;
+      transition: opacity 500ms ease;
+    }
+    :global(.js) .story-slide:not([data-active]) {
+      opacity: 0.2;
+    }
+  }
+
+  /* The list of steps: a heading each, the open one with its sentence. A line on the left
+     marks them as one list; the open step's line is the accent. */
+  .story-tab {
+    display: grid;
     padding: 0.85rem 0 0.95rem 1.15rem;
     border: 0;
     border-left: 2px solid var(--border);
@@ -329,13 +315,15 @@ const steps = [
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: color 200ms ease, border-color 200ms ease;
+    transition:
+      color 300ms ease,
+      border-color 300ms ease;
   }
   .story-tab:hover {
     color: var(--text);
   }
-  .story-tab[aria-selected='true'] {
-    border-left-color: var(--text);
+  .story-tab[aria-current='step'] {
+    border-left-color: var(--accent);
     color: var(--text);
   }
   .story-tab:focus-visible {
@@ -349,210 +337,42 @@ const steps = [
     line-height: 1.2;
     text-wrap: balance;
   }
-  .title-short,
-  .story-now {
-    display: none;
-  }
-  /* The sentence opens under the open tab's heading (rows from 0fr to 1fr, so it slides open). */
+  /* The sentence opens under the open step's heading (rows from 0fr to 1fr, so it slides open). */
   .story-copy {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition: grid-template-rows 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   .story-copy > span {
     overflow: hidden;
     color: var(--text-muted);
     line-height: 1.6;
     opacity: 0;
-    transition: opacity 240ms ease;
+    transition: opacity 300ms ease;
   }
-  .story-tab[aria-selected='true'] .story-copy {
+  .story-tab[aria-current='step'] .story-copy {
     grid-template-rows: 1fr;
   }
-  .story-tab[aria-selected='true'] .story-copy > span {
+  .story-tab[aria-current='step'] .story-copy > span {
     padding-top: 0.55rem;
     opacity: 1;
-    transition-delay: 80ms;
-  }
-  /* The clock: the open tab's line fills in the accent for the time the step has left, while
-     the story plays on its own. */
-  .story-clock {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -2px;
-    width: 2px;
-    background: var(--accent);
-    transform: scaleY(0);
-    transform-origin: top;
-  }
-  .story-tab.is-timing .story-clock {
-    animation: story-clock var(--story-due, 6s) linear forwards;
-  }
-  .story:not([data-cycle='auto']) .story-clock {
-    animation: none;
-    transform: scaleY(0);
-  }
-  @keyframes story-clock {
-    to {
-      transform: scaleY(1);
-    }
+    transition-delay: 120ms;
   }
 
-  /* The pictures, side by side in one horizontal scroller that snaps to each. Every picture
-     spans the track's width; the track is as tall as the tallest, so nothing under the section
-     moves as the steps change. */
-  .story-track {
-    --bleed: 0.75rem;
-    display: flex;
-    align-items: flex-start;
-    gap: calc(2 * var(--bleed));
-    min-width: 0;
-    margin-inline: calc(-1 * var(--bleed));
-    padding-inline: var(--bleed);
-    scroll-padding-inline: var(--bleed);
-    overflow-x: auto;
-    overflow-y: hidden;
-    transition: height 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
-    overscroll-behavior-x: contain;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-  .story-track::-webkit-scrollbar {
-    display: none;
-  }
-  .story-slide {
-    flex: 0 0 100%;
-    min-width: 0;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    transition: opacity 360ms ease;
-  }
-  .story-slide > :global(figure) {
-    width: 100%;
-    max-width: 62rem;
-  }
-  .story[data-live] .story-slide:not([data-active]) {
-    opacity: 0.25;
-  }
-
-  /* Without script: nothing to press, so every step shows its sentence and the pictures stack. */
-  :global(html:not(.js)) .story-copy {
-    grid-template-rows: 1fr;
-  }
-  :global(html:not(.js)) .story-copy > span {
-    padding-top: 0.55rem;
-    opacity: 1;
-  }
-  :global(html:not(.js)) .story-track {
-    flex-direction: column;
-    gap: clamp(3rem, 6vw, 4.5rem);
-    overflow: visible;
-  }
-
-  @media (max-width: 1080px) {
-    .story {
-      grid-template-columns: minmax(0, 1fr);
+  @media (prefers-reduced-motion: reduce) {
+    .story-rail,
+    .story-slide,
+    .story-copy,
+    .story-copy > span {
+      transition: none;
     }
-    /* Narrow: the tabs run across, the open one's heading and sentence under the row. */
-    :global(.js) .story-tabs {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 0.5rem;
-    }
-    .story-tab {
-      align-content: start;
-      padding: 0.8rem 0 0;
-      border-left: 0;
-      border-top: 2px solid var(--border);
-    }
-    .story-tab[aria-selected='true'] {
-      border-top-color: var(--text);
-    }
-    .story-title {
-      font-size: 1rem;
-    }
-    /* The short names in the row; the long ones stay the tabs' names, read but not shown. */
-    :global(.js) .title-long {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-    :global(.js) .title-short {
-      display: inline;
-    }
-    :global(.js) .story-copy {
-      display: none;
-    }
-    :global(.js) .story-now {
-      display: grid;
-      gap: 0.4rem;
-      max-width: 38rem;
-      margin: 0;
-    }
-    .story-now b {
-      font-size: var(--step-h3);
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-    .story-now span {
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-    .story-clock {
-      top: -2px;
-      bottom: auto;
-      left: 0;
-      right: 0;
-      width: auto;
-      height: 2px;
-      transform: scaleX(0);
-      transform-origin: left;
-    }
-    .story:not([data-cycle='auto']) .story-clock {
-      transform: scaleX(0);
-    }
-    @keyframes story-clock {
-      to {
-        transform: scaleX(1);
-      }
-    }
-  }
-
-  /* What is an LLM wiki: a short aside after the story, under one hairline. */
-  .llm-wiki {
-    max-width: 44rem;
-    margin-top: clamp(4rem, 8vw, 5.5rem);
-    padding-top: 1.75rem;
-    border-top: 1px solid var(--border-strong);
-  }
-  .llm-wiki h3 {
-    margin: 0;
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-  .llm-wiki p {
-    margin: 0.6rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.65;
-  }
-  .llm-wiki a {
-    color: var(--accent-text);
-    font-weight: 600;
-    text-decoration: underline;
-    text-decoration-color: var(--accent);
-    text-underline-offset: 0.2em;
   }
 
   /* The quokka hops onto its picture as the picture opens (the first, once the story is
      revealed, not while the visitor is still on the hero). */
   @media (prefers-reduced-motion: no-preference) {
     .story:global(.is-visible) .story-slide[data-active] :global(.quokka) {
-      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 260ms backwards;
+      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) 300ms backwards;
       transform-origin: 50% 100%;
     }
   }

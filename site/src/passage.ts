@@ -23,11 +23,13 @@ export interface Span {
 }
 
 /** The passage turns on once the section fills this share of the window (or of itself, when
- * it is shorter than the window)… */
-export const ENTER_SHARE = 0.4;
+ * it is shorter than the window)… Half: since the band stopped painting its own night
+ * (2026-10-08) a later switch shows no light page on a dark band, and the section under it is
+ * not held back for most of the window (the owner: "too easy to skip FAQ" at 0.4 and 0.25). */
+export const ENTER_SHARE = 0.5;
 /** …and off once it fills less than this. The gap between the two is the hysteresis, so a
  * page resting near a boundary never flickers between the two environments. */
-export const LEAVE_SHARE = 0.25;
+export const LEAVE_SHARE = 0.4;
 
 /**
  * Whether the passage should be on, given the section's box (viewport coordinates), the

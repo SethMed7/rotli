@@ -48,24 +48,19 @@ for (const width of [768, 1024, 1180, 1440]) {
   });
 }
 
-test("the story's tabs run across above the open picture on a tablet and a phone", async ({ page }) => {
+test("each step of the story puts its words above its picture on a tablet and a phone", async ({ page }) => {
   for (const width of [390, 768]) {
     await page.setViewportSize({ width, height: 1024 });
     await page.goto("/");
-    const story = page.locator("#features .story");
-    const tabs = await Promise.all((await story.getByRole("tab").all()).map((tab) => tab.boundingBox()));
-    // One row of three short names: Write, File, Ask.
-    await expect(story.locator(".title-short")).toHaveText(["Write", "File", "Ask"]);
-    for (const tab of tabs) expect(Math.abs(tab!.y - tabs[0]!.y)).toBeLessThan(2);
-    // The open step's heading and sentence under the row, then its picture, inside the window.
-    const now = (await story.locator(".story-now").boundingBox())!;
-    const picture = (await story.locator("[data-active] > figure").boundingBox())!;
-    expect(now.y).toBeGreaterThanOrEqual(tabs[0]!.y + tabs[0]!.height);
-    expect(picture.y).toBeGreaterThanOrEqual(now.y + now.height);
-    expect(picture.x + picture.width).toBeLessThanOrEqual(width);
-    // The track is as tall as the open picture, not the tallest one.
-    const track = (await story.locator("[data-story-track]").boundingBox())!;
-    expect(Math.abs(track.height - picture.height)).toBeLessThanOrEqual(2);
+    // Stacked, not pinned: no list of steps, every picture open.
+    await expect(page.locator(".story-tabs")).toBeHidden();
+    for (const slide of await page.locator("#features .story-slide").all()) {
+      const words = (await slide.locator(".slide-head").boundingBox())!;
+      const picture = (await slide.locator("> figure").boundingBox())!;
+      expect(picture.y).toBeGreaterThanOrEqual(words.y + words.height);
+      expect(picture.x + picture.width).toBeLessThanOrEqual(width);
+      await expect(slide).toHaveJSProperty("inert", false);
+    }
   }
 });
 

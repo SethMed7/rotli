@@ -336,20 +336,20 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       .js [data-passage] > *,
       .js [data-passage-near] {
-        transition: opacity 260ms ease-out;
+        transition: opacity 400ms ease-out;
       }
       .js [data-passage] > * {
         opacity: 0;
       }
       :root[data-passage] [data-passage] > * {
         opacity: 1;
-        transition: opacity 600ms ease-out var(--passage-ink-at);
+        transition: opacity 800ms ease-out var(--passage-ink-at);
       }
       :root[data-passage] [data-passage-near] {
         opacity: 0;
       }
       :root:not([data-passage]) [data-passage-near] {
-        transition: opacity 600ms ease-out var(--passage-ink-at);
+        transition: opacity 800ms ease-out var(--passage-ink-at);
       }
       @media (prefers-reduced-motion: reduce) {
         :root [data-passage] > *,

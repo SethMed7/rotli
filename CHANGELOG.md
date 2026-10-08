@@ -200,7 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into Ocean Dark while the privacy section is in view, and step back out
   when you scroll on or back. Nothing of the night shows before the colours
   change, and the sections above and below it step aside while it lasts, so
-  it reads as one scene. With reduced motion the change is immediate.
+  it reads as one scene; the questions after it come back as soon as they
+  fill most of the window. With reduced motion the change is immediate.
 - **The quokkas at the bottom of rotli.co each have something to do.** One
   sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
   waves when you arrive and frowns if you reach for the leaves), two play
@@ -352,10 +353,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole vault. A small picture joins the note in your view to its file in the
   vault with a dotted line. The before-and-after that had its own section
   ("You write for yourself. AI reads differently.") is now the second step's
-  picture and plays the same way. The steps show one at a time: pick Write,
-  File, or Ask (or swipe the pictures sideways), and the picture slides in.
-  On its own it plays through the three once while you look, and stops as
-  soon as you choose. A short "What is an LLM wiki?" links to
+  picture and plays the same way. The steps show one at a time and follow
+  your scroll: the section holds still while you scroll through Write, File,
+  and Ask, each picture sliding in, and a step's name takes you to it. On a
+  phone they stack. "What is an LLM wiki?" under the heading links to
   Andrej Karpathy's note that named the idea. The three pictures now share
   one open style with no cards and one width, each heading starts level with
   its picture, and the steps drop their numbers. The third picture shows the

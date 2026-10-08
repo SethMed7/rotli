@@ -55,14 +55,13 @@ Narrow widths are part of that proof: `e2e/site/narrow-layout.spec.ts`
 checks that no page scrolls sideways at 390 and 768, and the landing at 320,
 1024, and 1920 too (inline code in the changelog breaks inside the column).
 It also checks that the theme studio's island never sits under its lede, that
-the Overview's tabs run across above the open picture on a tablet and a phone, and that
+each step of the Overview puts its words above its picture on a tablet and a phone, and that
 the landing's smallest controls (the footnote marks, the 404's other ways in)
 answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
-holds the landing's order and grounds, the Overview's three steps (tabs over one
-sliding track that plays through once on its own and keeps a tab, key, or swipe;
-the view and vault picture's dotted line level with both marked rows from 320 to 1920, the
-LLM wiki source link, the closing "See every feature" link), the before and after's
+holds the landing's order and grounds, the Overview's three steps (pinned, one
+step per third of the scroll, stacked on short windows; the view and vault picture's dotted line level with both marked rows from 320 to 1920, the
+LLM wiki link under the lede), the before and after's
 play (once in view, held off screen, resting marked, Replay, one window at
 1440×900, no script, reduced motion), the FAQ's Rotli Web answer when it is
 there, and the closing panel, whose art never touches its words from 320 to
@@ -164,24 +163,23 @@ there, and the closing panel, whose art never touches its words from 320 to
      as one story in three steps (the owner, 2026-10-06: "clarify view vs
      where it actually lives"). It absorbed the former TwoKinds section ("You
      write for yourself. AI reads differently.") the same day, because the
-     two said the same thing. One step shows at a time (the owner,
-     2026-10-08: the three in one scroll felt "dead and overwhelming"): the
-     steps are tabs on the left, each a heading and one sentence (only the
-     open one shows its sentence), and their pictures sit side by side in one
-     horizontal scroller on the right that slides to the open one and snaps,
-     so a trackpad swipe or a touch drag moves it too. Once on screen it plays
-     through the three once on its own at each step's pace (`STORY_MS` in
-     `src/themeCycle.ts`; File outlasts its filing play), with the open tab's
-     line filling as its clock; a hover holds it, and a tab, the arrow keys,
-     or a swipe pins the choice. Only the open picture is focusable (the
-     others are `inert`). Wide, the track is as tall as the tallest picture,
-     so nothing under it moves; below 1080px the tabs run across as Write,
-     File, Ask, the open step's heading and sentence sit under them, and the
-     track follows the open picture's height. Reduced motion: no autoplay and
-     no slide. Without script the pictures stack under every sentence. Each
-     picture is drawn in HTML on the site's tokens, with the app's quokka
-     standing on it (it hops as its picture opens) and no outer card (the
-     owner, 2026-10-05: no card in a card):
+     two said the same thing. One step shows at a time, following the scroll
+     (the owner, 2026-10-08: the three in one scroll felt "dead and
+     overwhelming"; then "make the switches of what I am looking at happen
+     with scroll not manually"). On a window at least 1081 wide and 760 tall
+     the story pins in the middle of the window under the header while the
+     page scrolls a runway below it (0.7 of a window per step after the
+     first, `src/storyScroll.ts`); each third of the runway is one step. The
+     steps are listed on the left, each a heading, the open one with its one
+     sentence and an accent line; the pictures sit side by side on the right
+     and slide to the open one. A step switches whole (nothing is scrubbed
+     with the scroll), and a step's name scrolls the page to it. Only the open
+     picture is focusable (the others are `inert`). Narrow or short windows,
+     and no script, stack the three, each heading and sentence over its
+     picture. Reduced motion: the steps switch without the slide. Each picture
+     is drawn in HTML on the site's tokens, with the app's quokka standing on
+     it (it hops as its picture opens) and no outer card (the owner,
+     2026-10-05: no card in a card):
      1. Write in your view (`ViewAndVault.astro`): the note in Main under a
         folder, and its one file in the vault at `wiki/_inbox/dana-call.md`,
         the two marked rows joined by a dotted "same file" line. Both panels
@@ -208,14 +206,11 @@ there, and the closing panel, whose art never touches its words from 320 to
         The app has no "sources" control, so none is drawn.
      Every claim is a contract's; `docs/design/landing-layout-2026-10-05.md`
      ("Revised 2026-10-06 (evening)") lists the source of each. Under the
-     steps, "What is an LLM wiki?" is a short aside under one hairline: two
-     sentences, Andrej Karpathy's "LLM Wiki" gist (2026-04-04) as the term's
-     source, and Getting started as rotli's own page. It is an aside, not an
-     FAQ entry, because FAQ answers are plain strings (they are also the
-     FAQPage JSON-LD) and this one needs its source linked inside the
-     sentence. The section ends on the landing's one link to `/features/`,
-     "See every feature" (a secondary button; it closed the tour until that
-     was removed, 2026-10-06). The
+     lede, "What is an LLM wiki? ↗" is one link to Andrej Karpathy's "LLM
+     Wiki" gist (2026-04-04), the term's source; it replaced a two-sentence
+     aside under the steps (the owner, 2026-10-08). The story is the
+     section's last word: no "See every feature" (Features is in the
+     header). The
      "more than notes" message the old lede carried stays in the hero lede
      and the FAQ.
   4. The dev-only Experiments (plain; between the plain Overview and the
@@ -897,9 +892,11 @@ there, and the closing panel, whose art never touches its words from 320 to
   (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
   the night's stars spread over the plain grounds, `color-scheme` and the
   `theme-color` meta follow, and it all fades back out on leaving the band in
-  either direction. It turns on once the band fills 40% of the window (or of
-  itself, if shorter) and off once it fills under 25%, so a page resting near
-  a boundary never flickers; a reload mid-band lands in the night at once.
+  either direction. It turns on once the band fills half the window (or of
+  itself, if shorter) and off once it fills under 40% (it was 40% and 25%
+  until 2026-10-08, when the owner found the questions below too easy to
+  skip), so a page resting near a boundary never flickers; a reload mid-band
+  lands in the night at once.
   It reads as one dusk (the owner's "more smooth and better polished",
   2026-10-05). The cut the owner saw came from the band always painting its
   own night while the page followed only once the middle of the window was

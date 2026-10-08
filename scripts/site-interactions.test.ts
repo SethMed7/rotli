@@ -77,16 +77,16 @@ interface Cycle {
   pinned: number;
   nextAt: number;
 }
+let story: {
+  STEP_RUNWAY: number;
+  runwayProgress(pinTop: number, stickAt: number, runway: number): number;
+  stepAt(progress: number, steps: number): number;
+  progressFor(step: number, steps: number): number;
+};
 let cycle: {
   CYCLE_MS: number;
   RESUME_MS: number;
-  STORY_MS: readonly [number, number, number];
-  createCycle(
-    total: number,
-    now: number,
-    autoplay: boolean,
-    options?: { every?: readonly number[]; loop?: boolean },
-  ): Cycle;
+  createCycle(total: number, now: number, autoplay: boolean): Cycle;
   tick(c: Cycle, now: number): Cycle;
   hover(c: Cycle, index: number): Cycle;
   leave(c: Cycle, now: number): Cycle;
@@ -131,6 +131,7 @@ beforeAll(async () => {
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
   cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
+  story = (await import(site("storyScroll.ts"))) as typeof story;
   human = (await import(site("quokka", "human.ts"))) as typeof human;
 });
 
@@ -139,13 +140,15 @@ describe("the privacy passage", () => {
   // A band taller than the window, its top edge at `top`.
   const band = (top: number, height = 1200) => ({ top, bottom: top + height });
 
-  test("turns on once the band fills a good share of the window, not only its middle", () => {
+  test("turns on once the band fills half the window", () => {
     expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
     const enter = viewport * (1 - passage.ENTER_SHARE);
     expect(passage.passageActive(band(enter + 1), viewport, false)).toBe(false);
     expect(passage.passageActive(band(enter - 1), viewport, false)).toBe(true);
-    // Earlier than the old focal line (the middle of the window, plus a margin).
-    expect(enter).toBeGreaterThan(viewport * 0.5);
+    // No later than the middle of the window, so the band never sits half empty.
+    expect(enter).toBeGreaterThanOrEqual(viewport * 0.5);
+    // The section under it comes back while it still has most of the window.
+    expect(passage.LEAVE_SHARE).toBeGreaterThanOrEqual(0.35);
   });
 
   test("holds near a boundary instead of flickering, then lets go in either direction", () => {
@@ -319,29 +322,26 @@ describe("the theme studio's autoplay", () => {
   });
 });
 
-describe("the landing's three steps", () => {
-  test("each step keeps its own dwell, and the steps play once through", () => {
-    const every = cycle.STORY_MS;
-    const [write, file, ask] = every;
-    let c = cycle.createCycle(3, 0, true, { every, loop: false });
-    expect(cycle.wait(c, 0)).toBe(write);
-    c = cycle.tick(c, write);
-    expect(c.shown).toBe(1);
-    expect(cycle.wait(c, write)).toBe(file);
-    c = cycle.tick(c, write + file);
-    expect(c.shown).toBe(2);
-    // After the last step it stops where it is, rather than going round again.
-    c = cycle.tick(c, write + file + ask);
-    expect(c).toMatchObject({ shown: 2, mode: "off" });
-    expect(cycle.wait(c, 0)).toBeNull();
+describe("the landing's three steps follow the scroll", () => {
+  test("the runway's share picks the step, a third each, held at both ends", () => {
+    const runway = 1000;
+    expect(story.runwayProgress(300, 100, runway)).toBe(0); // not stuck yet
+    expect(story.runwayProgress(-400, 100, runway)).toBe(0.5);
+    expect(story.runwayProgress(-5000, 100, runway)).toBe(1); // past it
+    expect([0, 0.32, 0.34, 0.66, 0.67, 1].map((p) => story.stepAt(p, 3))).toEqual([0, 0, 1, 1, 2, 2]);
   });
 
-  test("the File step outlasts the filing's play, with time to read it at rest", async () => {
-    const filing = (await import(site("filingTimeline.ts"))) as {
-      timeline(chars: number, rows: number): { total: number };
-    };
-    // The typed note is 97 characters with six added lines (Filing.astro); leave room to grow.
-    expect(cycle.STORY_MS[1]).toBeGreaterThanOrEqual(filing.timeline(140, 6).total + 2000);
+  test("a tab lands its step in the middle of its share", () => {
+    for (const step of [0, 1, 2]) expect(story.stepAt(story.progressFor(step, 3), 3)).toBe(step);
+  });
+
+  test("each step gets a good part of a window's scroll, so none is skipped in a flick", () => {
+    expect(story.STEP_RUNWAY).toBeGreaterThanOrEqual(0.5);
+  });
+
+  test("no runway or no steps never throws off the page", () => {
+    expect(story.runwayProgress(0, 100, 0)).toBe(0);
+    expect(story.stepAt(0.5, 0)).toBe(0);
   });
 });
 

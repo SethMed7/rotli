@@ -543,3 +543,27 @@ even play with a quick horizontal scroll."
 
 Guarded by `e2e/site/landing-layout.spec.ts` ("one step at a time", "the
 story lines up", reduced motion) and `e2e/site/narrow-layout.spec.ts`.
+
+## 2026-10-08 (later): the steps follow the scroll, one link for the LLM wiki
+
+The owner, after the first pass: condense the LLM wiki aside to just "What is an
+LLM wiki?" with the link "in a better spot"; "make the switches of what I am
+looking at happen with scroll not manually"; and the night transition made it
+"too easy to skip FAQ".
+
+- **Scroll, not a clock.** The autoplay and the swipe are gone. On a window at
+  least 1081 × 760 the story pins in the middle of the window under the header
+  and the page scrolls a runway beneath it (0.7 of a window for each step after
+  the first); each third of the runway is one step (`src/storyScroll.ts`). The
+  step switches whole with the same slide; nothing follows the scroll
+  continuously, which is the scrub the owner rejected for the story film. A
+  step's name scrolls the page to it. Narrow or short windows stack the three.
+- **The LLM wiki is one link,** "What is an LLM wiki? ↗", under the lede, to
+  Karpathy's gist. The two-sentence aside is gone; the story ends the section.
+- **The night lets go sooner.** The passage turns on at half the window and off
+  under 40% (was 40% and 25%): with the band painting no ground of its own, a
+  later switch no longer shows a light page on a dark band, and the questions
+  come back while they still fill most of the window. The fades are a little
+  longer (out 400 ms, in 800 ms after the ink switch).
+
+This supersedes "It moves on its own, once" and the swipe in the entry above.

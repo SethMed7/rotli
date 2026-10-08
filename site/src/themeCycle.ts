@@ -7,18 +7,12 @@
 // reduced motion there is no autoplay at all. The page pauses the clock while the studio is
 // off screen or the tab is hidden.
 //
-// The landing's three steps (Overview.astro, 2026-10-08) run on the same clock, with a dwell of
-// their own per step and one pass through instead of a loop.
-//
 // No DOM here, so the timing can be tested (scripts/site-interactions.test.ts).
 
 /** How long each environment stays before the next, while it plays on its own. */
 export const CYCLE_MS = 3200;
 /** How long after the pointer (or focus) leaves the swatches the cycle carries on. */
 export const RESUME_MS = 2400;
-/** The landing's three steps: Write, File (long enough for the filing to play and rest, its
- * timeline in src/filingTimeline.ts), and Ask. */
-export const STORY_MS = [6500, 10_000, 8000] as const;
 
 export type CycleMode = 'auto' | 'held' | 'pinned' | 'off';
 
@@ -31,40 +25,19 @@ export interface Cycle {
   pinned: number;
   /** When the next automatic step is due (auto mode), in ms. */
   nextAt: number;
-  /** How long each step stays while it plays on its own (CYCLE_MS where unset). */
-  every: readonly number[];
-  /** After the last step: back to the first, or stop (mode 'off'). */
-  loop: boolean;
-}
-
-export interface CycleOptions {
-  every?: readonly number[];
-  loop?: boolean;
 }
 
 const wrap = (index: number, total: number) => ((index % total) + total) % total;
-const dwell = (cycle: Cycle, index: number) => cycle.every[index] ?? CYCLE_MS;
 
 /** A studio just revealed: it plays unless the visitor asked for reduced motion. */
-export function createCycle(total: number, now: number, autoplay: boolean, options: CycleOptions = {}): Cycle {
-  const every = options.every ?? [];
-  return {
-    total,
-    shown: 0,
-    mode: autoplay ? 'auto' : 'off',
-    pinned: 0,
-    nextAt: now + (every[0] ?? CYCLE_MS),
-    every,
-    loop: options.loop ?? true,
-  };
+export function createCycle(total: number, now: number, autoplay: boolean): Cycle {
+  return { total, shown: 0, mode: autoplay ? 'auto' : 'off', pinned: 0, nextAt: now + CYCLE_MS };
 }
 
 /** The clock: in auto mode, one step once it is due. Anything else stands still. */
 export function tick(cycle: Cycle, now: number): Cycle {
   if (cycle.mode !== 'auto' || now < cycle.nextAt || cycle.total < 2) return cycle;
-  if (!cycle.loop && cycle.shown + 1 >= cycle.total) return { ...cycle, mode: 'off' };
-  const shown = wrap(cycle.shown + 1, cycle.total);
-  return { ...cycle, shown, nextAt: now + dwell(cycle, shown) };
+  return { ...cycle, shown: wrap(cycle.shown + 1, cycle.total), nextAt: now + CYCLE_MS };
 }
 
 /** A swatch under the pointer or the focus: shown at once, and the cycle holds. */
@@ -90,7 +63,7 @@ export function pin(cycle: Cycle, index: number): Cycle {
 /** The studio went off screen or the tab was hidden, then came back: a full step's wait, so
  * nobody returns to a capture changing under their eyes. */
 export function resume(cycle: Cycle, now: number): Cycle {
-  return cycle.mode === 'auto' ? { ...cycle, nextAt: now + dwell(cycle, cycle.shown) } : cycle;
+  return cycle.mode === 'auto' ? { ...cycle, nextAt: now + CYCLE_MS } : cycle;
 }
 
 /** How long until the clock needs to look again, or null when nothing is due. */
