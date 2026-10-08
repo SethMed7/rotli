@@ -120,6 +120,9 @@ test("typing above a chart keeps its drawing and its half-filled form", async ({
 
 // /chart (the owner, 2026-10-05): one command, then a list of the ten kinds
 test("/chart lists ten kinds, and each kind's starter draws", async ({ page }) => {
+  // nine notes and nine charts in one test: CI's runner took 32-34 s against
+  // the 30 s default and failed dev and every PR (2026-10-08)
+  test.slow();
   await gotoApp(page);
   await newMarkdownNote(page);
   await page.keyboard.insertText("/chart");
