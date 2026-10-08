@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { type BoardLinkApi, useBoardLinkOpener } from "../boards/boardLinks";
 import { useBoardLook } from "../boards/boardLook";
 import {
   boardsAvailable,
@@ -24,17 +25,25 @@ import {
   type BoardInitialData,
   BoardCanvas,
 } from "../boards/engine/excalidraw";
-import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
+import {
+  type BoardMeta,
+  EMPTY_BOARD_META,
+  createBoardChangeGate,
+  serializeBoardScene,
+} from "../boards/session";
+import { useWikilinkIndex } from "../editor/useWikilinkIndex";
 import { onQuitFlush } from "../lib/quitFlush";
 import { keepTabsFor } from "../state/panes";
 
 /** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
  * metadata save (a metadata edit isn't an Excalidraw change, so we rebuild it). */
-type ExcaliApi = {
-  getSceneElements: () => readonly unknown[];
+type ExcaliApi = BoardLinkApi & {
   getAppState: () => Record<string, unknown>;
   getFiles: () => Record<string, unknown>;
 };
+
+/** No editor to re-decorate: the board only needs the link index filled. */
+const NO_EDITOR = { current: null };
 
 // Excalidraw's initialData prop is optional (`| undefined`); we never pass
 // undefined — we hold `null` until loaded, then the parsed scene — so strip the
@@ -84,6 +93,10 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // G — board metadata (the maintainer, 2026-06-26): description + tags ride top-level in
   // the .excalidraw (see boards/session.ts BoardMeta).
   const apiRef = useRef<ExcaliApi | null>(null);
+  // a `[[note]]` link on a shape resolves against the same index the editor's
+  // links use — filled here too, for a board opened with no note beside it
+  useWikilinkIndex(NO_EDITOR);
+  const onLinkOpen = useBoardLinkOpener(apiRef);
   const sourceSceneRef = useRef<Record<string, unknown> | null>(null);
   const metaRef = useRef<BoardMeta>(EMPTY_BOARD_META);
   const [meta, setMeta] = useState<BoardMeta>(EMPTY_BOARD_META);
@@ -168,18 +181,23 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       meta: metaRef.current,
     });
   }, []);
+  // a pan, zoom, or selection fires onChange per frame but changes nothing a
+  // save writes — only a real change arms the saver (boards/session.ts)
+  const [changed] = useState(() => createBoardChangeGate());
   const onChange = useCallback(
     (elements: BoardChangeElements, appState: BoardChangeAppState, files: BoardChangeFiles) => {
       // Don't write while still loading (the initialData render fires onChange).
       if (state.status !== "ready") return;
-      sceneRef.current = {
+      const scene = {
         elements,
         appState: appState as unknown as Record<string, unknown>,
         files: files as unknown as Record<string, unknown>,
       };
+      if (!changed(scene.elements, scene.appState, scene.files)) return;
+      sceneRef.current = scene;
       saver.schedule(buildBody);
     },
-    [state.status, saver, buildBody],
+    [state.status, saver, buildBody, changed],
   );
 
   // Persist a metadata edit right away (it doesn't ride the Excalidraw onChange
@@ -303,6 +321,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         // the titlebar sun is the ONE theme owner — the vendor's own toggle
         // was a second authority fighting it (boards slice 2026-07-28)
         UIOptions={{ canvasActions: { toggleTheme: false } }}
+        onLinkOpen={onLinkOpen}
         excalidrawAPI={(api) => {
           apiRef.current = api as unknown as ExcaliApi;
           look.bindApi(api);

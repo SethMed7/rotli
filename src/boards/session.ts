@@ -68,6 +68,50 @@ function durableAppState(appState: Record<string, unknown>): Record<string, unkn
   return out;
 }
 
+/** Every shape's version, folded in order. Excalidraw edits a shape IN PLACE
+ * (same array, bumped version + versionNonce), so the array reference alone
+ * would miss a drag or a typed letter. */
+function elementsFingerprint(elements: readonly unknown[]): number {
+  let hash = 5381;
+  for (const element of elements) {
+    const e = element as { version?: unknown; versionNonce?: unknown };
+    const version = typeof e.version === "number" ? e.version : 0;
+    const nonce = typeof e.versionNonce === "number" ? e.versionNonce : 0;
+    hash = (Math.imul(hash, 33) + version + nonce) | 0;
+  }
+  return (hash ^ elements.length) >>> 0;
+}
+
+/** Answers, per Excalidraw onChange, whether anything a save writes changed.
+ * onChange fires per pointer move while panning; a pan or a selection changes
+ * no shape, file, or durable canvas choice, so it must not arm a save — the
+ * full-scene serialize a paused pan used to trigger was a visible hitch on
+ * big boards (2026-10-08). */
+export function createBoardChangeGate(): (
+  elements: readonly unknown[],
+  appState: Record<string, unknown>,
+  files: Record<string, unknown>,
+) => boolean {
+  let last: { elements: readonly unknown[]; fingerprint: number; files: unknown; appState: string } | null =
+    null;
+  return (elements, appState, files) => {
+    const next = {
+      elements,
+      fingerprint: elementsFingerprint(elements),
+      files,
+      appState: JSON.stringify(durableAppState(appState)),
+    };
+    const changed =
+      last === null ||
+      last.elements !== next.elements ||
+      last.fingerprint !== next.fingerprint ||
+      last.files !== next.files ||
+      last.appState !== next.appState;
+    last = next;
+    return changed;
+  };
+}
+
 /** Canonical on-disk scene JSON. Volatile UI state (collaborators, viewport,
  * selection, tool) is stripped so saves stay diff-friendly; rotliMeta always
  * rides top-level so no save path can drop the board's AI description/tags. */

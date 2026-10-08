@@ -4,6 +4,7 @@ import { EXCALIDRAW_DEFAULT_BACKGROUND } from "../brand/boardBackground";
 import {
   EMPTY_BOARD_META,
   EMPTY_SCENE,
+  createBoardChangeGate,
   createBoardSaver,
   parseBoardBody,
   serializeBoardScene,
@@ -189,6 +190,42 @@ describe("serializeBoardScene", () => {
     expect(
       (JSON.parse(body) as { elements: Array<Record<string, unknown>> }).elements[0]?.futureElementField,
     ).toEqual({ keep: true });
+  });
+});
+
+describe("createBoardChangeGate", () => {
+  const shape = () => ({ id: "a", type: "rectangle", x: 0, y: 0, version: 1, versionNonce: 11 });
+
+  test("panning, zooming, and selecting never arm a save", () => {
+    const changed = createBoardChangeGate();
+    const elements = [shape()];
+    const files = {};
+    expect(changed(elements, { scrollX: 0, zoom: { value: 1 } }, files)).toBe(true);
+    expect(changed(elements, { scrollX: 240, zoom: { value: 1.5 } }, files)).toBe(false);
+    expect(changed(elements, { scrollX: 240, selectedElementIds: { a: true } }, files)).toBe(false);
+  });
+
+  test("a shape edited in place (same array, bumped version) is a change", () => {
+    const changed = createBoardChangeGate();
+    const elements = [shape()];
+    const files = {};
+    changed(elements, {}, files);
+    Object.assign(elements[0]!, { x: 40, version: 2, versionNonce: 98 });
+    expect(changed(elements, {}, files)).toBe(true);
+    expect(changed(elements, {}, files)).toBe(false);
+  });
+
+  test("a new scene array, new files, or a durable canvas choice is a change", () => {
+    const changed = createBoardChangeGate();
+    const files = {};
+    changed([shape()], {}, files);
+    expect(changed([shape()], {}, files)).toBe(true);
+    const elements = [shape()];
+    changed(elements, {}, files);
+    expect(changed(elements, {}, { img: { dataURL: "data:image/png;base64,AA" } })).toBe(true);
+    const next = {};
+    changed(elements, {}, next);
+    expect(changed(elements, { gridModeEnabled: true }, next)).toBe(true);
   });
 });
 
