@@ -6,8 +6,11 @@
 // (docs/architecture/memex-data-contract.md, "Master memory retrieval"): the model gets a
 // bounded table of contents, searches (search_memory, over corpus_search_ai, which in the Mac
 // app answers from the derived Tantivy index in .rotli/search/), then reads only the notes it
-// chose (read_memory); it never receives the whole vault. The middle row is drawn as that
-// step, in muted type, not as a control. Beside the chat, the vault it searched: the two notes it
+// chose (read_memory); it never receives the whole vault. The chat is drawn as a thread, the
+// app's own grammar (src/styles/memex.css .cmsg): your message a tinted bubble on the right,
+// rotli's turn on the left (the owner, 2026-10-07: "a real chat thread with the AI response too
+// on the left"), the search drawn as that turn's first step, in muted type, not as a control,
+// then the reply in a quiet bubble, and the composer under it. Beside the chat, the vault it searched: the two notes it
 // read lit among others it left closed, so "not the whole vault" is something you can see (the
 // owner, 2026-10-07: the picture now spans the same width as the other two steps, with no card).
 // Synthetic notes, the same ones the filing step uses. One image to assistive tech.
@@ -37,14 +40,22 @@ const read = vault.filter((file) => file.read).length;
       </div>
     </div>
     <div class="chat">
-      <p class="question">What did Dana want, and what’s left?</p>
-      <p class="lookup">
-        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
-        <span>Searched your vault on this computer and read {read} notes</span>
-      </p>
-      <p class="reply">
-        From <b>Call with Dana</b>: she’s fine with annual pricing and wants the deck on Friday. Still open: ask
-        Jo about the discount; <b>Discount policy</b> has the current terms.
+      <div class="turn you">
+        <p class="bubble">What did Dana want, and what’s left?</p>
+      </div>
+      <div class="turn ai">
+        <p class="lookup">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.25"></circle><path d="m10.2 10.2 3.3 3.3"></path></svg>
+          <span>Searched your vault on this computer and read {read} notes</span>
+        </p>
+        <p class="bubble">
+          From <b>Call with Dana</b>: she’s fine with annual pricing and wants the deck on Friday. Still open: ask
+          Jo about the discount; <b>Discount policy</b> has the current terms.
+        </p>
+      </div>
+      <p class="composer">
+        <span>Message rotli…</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5v-9M4.5 7 8 3.5 11.5 7" /></svg>
       </p>
     </div>
   </div>
@@ -127,29 +138,73 @@ const read = vault.filter((file) => file.read).length;
     margin: 0 0.25rem calc(-0.75rem - 1px) 0;
   }
 
+  /* A thread, as the app draws it (src/styles/memex.css .cmsg): yours on the right in the
+     accent's bubble with its tail corner, rotli's on the left. */
   .chat {
     display: grid;
-    gap: 0.85rem;
+    gap: 1rem;
     font-size: 0.9rem;
     line-height: 1.5;
   }
   .chat p {
     margin: 0;
   }
-  .question {
-    justify-self: end;
-    max-width: 85%;
-    padding: 0.4rem 0.75rem;
-    border-radius: 0.8rem;
-    background: var(--tint);
+  .turn {
+    display: grid;
+    gap: 0.5rem;
   }
-  /* The step between question and answer: what happened, in muted type, not a control. */
+  .turn.you {
+    justify-items: end;
+  }
+  .turn.ai {
+    justify-items: start;
+  }
+  .bubble {
+    max-width: 85%;
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.9rem;
+  }
+  .you .bubble {
+    border-bottom-right-radius: 0.3rem;
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+  .ai .bubble {
+    max-width: 92%;
+    border-bottom-left-radius: 0.3rem;
+    background: var(--surface-2);
+  }
+  /* The first step of rotli's turn: what happened, in muted type, not a control. */
   .lookup {
     display: flex;
     align-items: flex-start;
     gap: 0.45rem;
+    padding-left: 0.85rem;
     color: var(--text-muted);
     font-size: 0.82rem;
+  }
+  /* The composer under the thread, drawn, not a field. */
+  .composer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.6rem;
+    margin-top: 0.25rem;
+    padding: 0 0.4rem 0 0.85rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .composer svg {
+    flex: none;
+    box-sizing: border-box;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0.35rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
   }
   .lookup svg {
     flex: none;
@@ -185,10 +240,11 @@ const read = vault.filter((file) => file.read).length;
     width: 0.95rem;
     height: 0.95rem;
   }
+  /* The notes it read, marked the way the app's sidebar marks an open note: the quiet wash,
+     the icon in the accent, the words as they were. */
   .vault-row.read {
-    background: var(--tint);
+    background: var(--selected-bg, var(--tint));
     color: var(--text);
-    font-weight: 600;
   }
   .vault-row.read svg {
     color: var(--accent-text);

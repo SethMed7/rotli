@@ -49,7 +49,7 @@ test("one story in three steps: write in your view, the Librarian files it, ask"
   await expect(steps.nth(0)).toContainText("never a copy");
   await expect(steps.nth(1)).toContainText("When it’s on");
   await expect(steps.nth(1)).toContainText("never changes your words");
-  await expect(steps.nth(1)).toContainText("your view still shows the note where you put it");
+  await expect(steps.nth(1)).toContainText("your view stays as you left it");
   await expect(steps.nth(2)).toContainText("on your computer");
   await expect(steps.nth(2)).toContainText("not the whole vault");
   await expect(steps.nth(2)).toContainText("Secure notes never go to a remote model");
@@ -109,6 +109,7 @@ test("the view and the vault: the same note on both sides, joined by a dotted li
   await page.goto("/");
   const where = page.locator(".where");
   await expect(where.locator(".here")).toHaveText(["Call with Dana", "dana-call.md"]);
+  await expect(where.locator(".link-line")).toHaveText("same file");
   await expect(where.locator(".side-label")).toHaveText(["In your view", "In your vault"]);
   for (const width of [320, 390, 768, 1024, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
@@ -120,9 +121,12 @@ test("the view and the vault: the same note on both sides, joined by a dotted li
       // Side by side: the line runs level with both marked rows, from one to the other.
       const middle = (b: Box) => b.y + b.height / 2;
       expect(Math.abs(middle(view) - middle(vault)), `rows level at ${width}`).toBeLessThanOrEqual(1);
-      expect(Math.abs(line.y - middle(view)), `line level at ${width}`).toBeLessThanOrEqual(3);
+      expect(Math.abs(middle(line) - middle(view)), `line level at ${width}`).toBeLessThanOrEqual(3);
+      // The vault's row sits at its depth, as in the app; the dots carry on across the indent.
+      const reach = await box(where.locator(".reach"));
       expect(line.x).toBeLessThanOrEqual(view.x + view.width + 1);
-      expect(line.x + line.width).toBeGreaterThanOrEqual(vault.x - 1);
+      expect(reach.x).toBeLessThanOrEqual(line.x + line.width + 1);
+      expect(reach.x + reach.width).toBeGreaterThanOrEqual(vault.x - 1);
     } else {
       // Stacked: the view above, the vault below, the line running down between them.
       expect(vault.y).toBeGreaterThan(view.y + view.height);

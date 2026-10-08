@@ -46,10 +46,7 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
       <li class="step" data-reveal>
         <div class="step-copy">
           <h3>Write in your view</h3>
-          <p>
-            Start a note and keep it open in your view: Main, or a named view for a project. A view is your own
-            arrangement of notes, never a copy of them.
-          </p>
+          <p>Start a note in Main, or a named view for a project. A view arranges your notes, never a copy of them.</p>
         </div>
         <ViewAndVault />
       </li>
@@ -58,9 +55,8 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
         <div class="step-copy">
           <h3>The Librarian files it</h3>
           <p>
-            When it’s on, the Librarian later moves the file to its area folder in your vault and adds an area, a
-            summary, tags, and links at the top. It never changes your words, and your view still shows the note
-            where you put it.
+            When it’s on, the Librarian moves the file to an area folder and adds a summary, tags, and links. It never
+            changes your words, and your view stays as you left it.
           </p>
         </div>
         <Filing />
@@ -70,9 +66,8 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
         <div class="step-copy">
           <h3>Ask, and AI goes straight to it</h3>
           <p>
-            Later, ask AI about it. rotli searches your vault on your computer, and the AI reads only the few notes
-            that matter, not the whole vault, so your tokens go to the answer. Secure notes never go to a remote
-            model.
+            rotli searches your vault on your computer, so the AI reads the few notes that matter, not the whole
+            vault. Secure notes never go to a remote model.
           </p>
         </div>
         <AskIndex />
@@ -97,6 +92,9 @@ const LLM_WIKI_SOURCE = 'https://gist.github.com/karpathy/442a6bf555914893e9891c
      its picture's first label and every hairline sits at one depth. */
   .steps {
     --figure-head: 4rem;
+    /* The app's selection wash (src/styles/base.css --selected-bg): the open note in the view and
+       the vault, and the notes the chat read, are marked the way the app's sidebar marks them. */
+    --selected-bg: color-mix(in srgb, var(--accent) 11%, transparent);
     display: grid;
     gap: clamp(4rem, 8vw, 6rem);
     margin: 0;
