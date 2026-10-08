@@ -143,7 +143,10 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
         onChange={(els, state, fls) =>
           onChange(els, state as unknown as Record<string, unknown>, fls as Record<string, unknown>)
         }
-        UIOptions={{ canvasActions: { toggleTheme: false, export: false, saveAsImage: false } }}
+        UIOptions={{
+          // no Open: it would load another scene over this board's file
+          canvasActions: { toggleTheme: false, export: false, saveAsImage: false, loadScene: false },
+        }}
       />
       {tabOpen && (
         <div className="rotli-embed-viewonly">Open in its tab — the embed is view-only meanwhile.</div>

@@ -118,6 +118,26 @@ test("opening a new board leaves its file as it was made", async ({ page }) => {
   expect(await readOpfsFile(page, "storage/excalidraw/Untouched.excalidraw")).toBe(EMPTY_SCENE);
 });
 
+// 2026-10-08: Excalidraw's Open (and ⌘O) loads another scene INTO the board,
+// which Rotli then saves over the board's own file. A board is its file.
+test("a board offers no Open that would replace it with another file", async ({ page }) => {
+  await startWithVault(page);
+  await openChooser(page);
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Board/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
+  await dialog.getByRole("textbox", { name: "Board name" }).fill("Kept");
+  await dialog.getByRole("button", { name: "Create board" }).click();
+  await expect(page.locator(".canvas-surface canvas.static")).toBeVisible();
+  await page.locator(".canvas-surface [data-testid='main-menu-trigger']").click();
+  const menu = page.locator(".canvas-surface .dropdown-menu");
+  await expect(menu).toBeVisible();
+  await expect(menu.getByTestId("load-button")).toHaveCount(0);
+  await expect(menu.getByText("Open", { exact: true })).toHaveCount(0);
+});
+
 test("a second board of the same name never replaces the first", async ({ page }) => {
   await startWithVault(page);
   for (let i = 0; i < 2; i += 1) {
