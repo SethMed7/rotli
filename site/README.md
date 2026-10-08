@@ -118,7 +118,8 @@ there, and the closing panel, whose art never touches its words from 320 to
   name; below 560px the star link ("Star rotli on GitHub" and the count) and
   "Download free" move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
-  ready." sign-up, always shown (see "The coming-soon list" below); its
+  ready." sign-up, always shown (see "The coming-soon list" below): one field
+  with an arrow inside it that sends, named "Keep me posted"; its
   closing row holds the maker line, with a drawn X mark (not the platform's
   artwork) linking to `https://x.com/iamsethmedina`, `rel="me"`, in a 44px
   target, and the Launch Llama badge; the quokka scenery runs along its bottom

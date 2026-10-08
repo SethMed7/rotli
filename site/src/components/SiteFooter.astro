@@ -11,6 +11,9 @@
 // email"): when the list is off (the endpoint's live probe says so, or it is not there at all,
 // as under `astro dev`), a submit says the list isn't open yet and the address is never sent.
 //
+// The sign-up is one field with an arrow inside it (the owner, 2026-10-08: "an arrow style submit
+// button and simpler text"); the arrow's name is "Keep me posted".
+//
 // The maker line carries an X mark to the maker's profile (rel="me", like /about/): a plain
 // drawn X, not the platform's logo artwork.
 import { mark } from '../mark';
@@ -51,7 +54,7 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
         <p>{tagline}</p>
         <form id="newsletter" class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
           <h2 id="subscribe-title">Hear when it’s ready.</h2>
-          <p class="subscribe-note" id="subscribe-note">Notes from the workshop, now and then. Unsubscribe anytime.</p>
+          <p class="subscribe-note" id="subscribe-note">Occasional updates. Unsubscribe anytime.</p>
           <div class="subscribe-row">
             <label class="visually-hidden" for="subscribe-email">Email address</label>
             <input
@@ -62,10 +65,12 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
               maxlength="254"
               autocomplete="email"
               spellcheck="false"
-              placeholder="you@example.com"
+              placeholder="Your email"
               aria-describedby="subscribe-note subscribe-status"
             />
-            <button class="button primary" type="submit">Keep me posted</button>
+            <button class="subscribe-send" type="submit" aria-label="Keep me posted" title="Keep me posted">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
+            </button>
           </div>
           <div class="subscribe-trap" aria-hidden="true">
             <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
@@ -134,12 +139,12 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
   const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
 
   if (form && status && input && button) {
-    const label = button.textContent ?? '';
     const show = (state: 'idle' | 'sending' | 'done' | 'error' | 'closed', message = '') => {
       form.dataset.state = state;
       status.textContent = message;
       button.disabled = state === 'sending';
-      button.textContent = state === 'sending' ? 'Adding…' : label;
+      if (state === 'sending') button.setAttribute('aria-busy', 'true');
+      else button.removeAttribute('aria-busy');
       input.readOnly = state === 'sending';
       if (state === 'error') input.setAttribute('aria-invalid', 'true');
       else input.removeAttribute('aria-invalid');

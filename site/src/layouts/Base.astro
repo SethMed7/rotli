@@ -1012,20 +1012,33 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .footer-lead .subscribe-note {
         margin: 0.2rem 0 0.75rem;
       }
+      /* One field with the arrow inside it, the way the app's chat composer sends. */
       .subscribe-row {
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
         gap: 0.5rem;
+        min-height: 52px;
+        padding: 0.25rem 0.25rem 0.25rem 0.95rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.9rem;
+        background: var(--surface);
+      }
+      .subscribe-row:has(input:focus-visible) {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 1px;
+      }
+      .subscribe-row:has(input[aria-invalid='true']) {
+        border-color: var(--accent-text);
       }
       .subscribe input[type='email'] {
-        flex: 1 1 12rem;
+        flex: 1 1 auto;
         min-width: 0;
-        min-height: 44px;
-        padding: 0.55rem 0.8rem;
-        border: 1px solid var(--border-strong);
-        border-radius: 0.6rem;
-        background: var(--surface);
+        min-height: 42px;
+        padding: 0;
+        border: 0;
+        background: transparent;
         color: var(--text);
+        font: inherit;
         font-size: 1rem;
       }
       .subscribe input[type='email']::placeholder {
@@ -1033,22 +1046,41 @@ const socialImageUrl = new URL(image, siteUrl).href;
         opacity: 1;
       }
       .subscribe input[type='email']:focus-visible {
-        outline: 2px solid var(--accent-text);
-        outline-offset: 1px;
+        outline: none;
       }
-      .subscribe input[aria-invalid='true'] {
-        border-color: var(--accent-text);
-      }
-      .subscribe .button {
+      .subscribe-send {
         flex: none;
-        min-height: 44px;
-        padding: 0.45rem 1rem;
-        border-radius: 0.6rem;
-        font-size: 0.92rem;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 0.7rem;
+        background: var(--text);
+        color: var(--on-text);
+        cursor: pointer;
+        transition: background-color 140ms ease;
       }
-      .subscribe .button:disabled {
+      .subscribe-send:hover {
+        background: var(--accent-text);
+        color: var(--on-accent);
+      }
+      .subscribe-send:focus-visible {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 2px;
+      }
+      .subscribe-send svg {
+        width: 18px;
+        height: 18px;
+        transition: transform 140ms ease;
+      }
+      .subscribe-send:hover svg {
+        transform: translateX(2px);
+      }
+      .subscribe-send:disabled {
         cursor: progress;
-        opacity: 0.82;
+        opacity: 0.6;
       }
       .footer-lead .subscribe-status {
         margin: 0.5rem 0 0;

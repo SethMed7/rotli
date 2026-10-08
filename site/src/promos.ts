@@ -52,7 +52,7 @@ export const PROMOS: readonly Promo[] = [
     id: 'newsletter',
     label: PROMO_LABEL,
     title: 'Get the newsletter',
-    text: 'Notes from the workshop, now and then. Unsubscribe anytime.',
+    text: 'Occasional updates. Unsubscribe anytime.',
     // The sign-up at the foot of every page (SiteFooter.astro).
     href: '#newsletter',
     pose: 'inbox',
