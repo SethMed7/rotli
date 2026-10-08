@@ -84,6 +84,15 @@ describe("listing a memex vault", () => {
     expect(note?.body.startsWith("# Weekend project idea")).toBe(true);
     expect(await notes.getNote("no-such-note")).toBeNull();
   });
+
+  test("the frontmatter `links:` line the Librarian writes reads as the note's suggested links", async () => {
+    await dir.writeText(
+      "wiki/checklist.md",
+      "---\nid: checklist\nlinks: [[Pricing]], [[Review]]\n---\n# Checklist\n\nWhat ships.\n",
+    );
+    expect((await notes.getNote("checklist"))?.suggestedLinks).toEqual(["Pricing", "Review"]);
+    expect((await notes.getNote("demo-cap-weekend"))?.suggestedLinks).toEqual([]);
+  });
 });
 
 describe("folders", () => {

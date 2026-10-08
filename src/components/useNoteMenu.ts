@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -265,7 +266,7 @@ export function useNoteMenu() {
             },
           });
         }
-        if ((note.kind ?? "note") === "note" && !isSink(note.folderId)) {
+        if (LAUNCH_FEATURES.graph && (note.kind ?? "note") === "note" && !isSink(note.folderId)) {
           items.push({
             kind: "action" as const,
             label: "Show in graph",

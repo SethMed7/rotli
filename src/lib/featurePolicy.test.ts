@@ -21,6 +21,7 @@ test("public builds keep notes, chat, Sheets (Beta) and the Chat window while ev
     voice: false,
     chatWindow: true,
     jsonCanvas: false,
+    graph: false,
   });
   expect(launchFeatures(true)).toEqual({
     notes: true,
@@ -35,6 +36,7 @@ test("public builds keep notes, chat, Sheets (Beta) and the Chat window while ev
     voice: true,
     chatWindow: true,
     jsonCanvas: true,
+    graph: true,
   });
 });
 
@@ -54,6 +56,8 @@ test("the web platform withholds every capability that needs the desktop shell, 
     expect(web.chatWindow).toBe(false);
     // a canvas opens and saves in the connected folder, as on the Mac
     expect(web.jsonCanvas).toBe(development);
+    // the Graph reads the connected folder's links, as on the Mac
+    expect(web.graph).toBe(development);
     // channel-only gates still follow the channel: nothing about them needs Tauri
     expect(web.mermaidVisualEditing).toBe(development);
     expect(web.mermaidDiagrams).toBe(development);

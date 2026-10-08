@@ -1,29 +1,32 @@
-// The Graph on Rotli Web, proved against a real folder: the links a note's
-// body writes are lines, and the one-line frontmatter `links:` the Librarian
-// writes is read by the folder adapter and drawn as Librarian links
-// (owner decision 2026-10-06). Nothing about a file changes.
+// The Graph is a development-build feature until it ships (the owner,
+// 2026-10-08; lib/featurePolicy.ts `graph`). Rotli Web is a production build,
+// so ⌘K offers no Graph and a note's menu has no "Show in graph". The folder
+// adapter's Librarian links are proved in services/folderNotes.test.ts and the
+// Graph itself in e2e/graph-view.spec.ts (a development build).
 
 import { expect, test } from "@playwright/test";
 
-import { readOpfsFile, startWithFolder } from "./support";
+import { startWithFolder } from "./support";
 
-const CHECKLIST = "---\nlinks: [[Pricing]], [[Review]]\n---\n# Checklist\n\nWhat ships.\n";
-
-test("a folder vault's written links and the Librarian's links both reach the graph", async ({ page }) => {
+test("a production build offers no Graph", async ({ page }) => {
   await startWithFolder(page, {
     "Pricing.md": "# Pricing\n\nSee [[Review]].\n",
     "Review.md": "# Review\n\nNo links back.\n",
-    "Checklist.md": CHECKLIST,
   });
   await page.locator(".main-tree, .sb-notes-tree").first().waitFor();
   await page.getByRole("button", { name: /Search notes and actions/ }).click();
-  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Graph");
-  await page.locator(".prow", { hasText: "Graph of all notes" }).first().click();
+  const search = page.getByPlaceholder("Search notes, files, chats, actions…");
+  // the palette answers first, so the absence below isn't read off an empty list
+  await search.fill("Pricing");
+  await expect(page.locator(".prow", { hasText: "Pricing" }).first()).toBeVisible();
+  await search.fill("Graph");
+  await expect(page.locator(".prow", { hasText: "Graph of all notes" })).toHaveCount(0);
+  await expect(page.locator(".prow", { hasText: "Show this note in the graph" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
-  const count = page.locator(".graph .board-count");
-  await expect(count).toHaveText(/3 notes · 3 links · 2 from the Librarian/);
-  await page.getByRole("button", { name: "Librarian links" }).click();
-  await expect(count).toHaveText(/3 notes · 1 link$/);
-  // the graph read the file; it never wrote it
-  expect(await readOpfsFile(page, "Checklist.md")).toBe(CHECKLIST);
+  // a note's own menu opens, with no way into the graph
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  await page.locator(".recent-row", { hasText: "Pricing" }).click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: "Show in Library" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Show in graph" })).toHaveCount(0);
 });

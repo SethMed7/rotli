@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **A graph of your notes.** Search "Graph" in ⌘K to see every note as a
+- **A graph of your notes** (development builds). Search "Graph" in ⌘K to see every note as a
   dot and every `[[link]]` you wrote as a line, or right-click a note and
   choose **Show in graph** for the notes around it, one or two steps out.
   Hovering a note fades everything it isn't linked to, searching highlights
