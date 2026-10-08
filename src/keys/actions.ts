@@ -446,7 +446,7 @@ export function registerDefaultActions(): void {
   registerNoteProtectionActions();
   registerAlignActions();
   registerLeaderActions();
-  registerGraphActions();
+  if (LAUNCH_FEATURES.graph) registerGraphActions();
   if (LAUNCH_FEATURES.jsonCanvas) registerCanvasActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses

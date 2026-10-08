@@ -44,6 +44,9 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     // JSON Canvas `.canvas` files (2026-10-05): development builds, on the
     // Mac and on Rotli Web's connected folder alike.
     jsonCanvas: development,
+    // The Graph view (2026-10-05): development builds, on the Mac and on Rotli
+    // Web alike, until it ships (the owner, 2026-10-08).
+    graph: development,
   } as const;
 }
 
