@@ -319,8 +319,10 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         onChange={onChange}
         theme={look.theme}
         // the titlebar sun is the ONE theme owner — the vendor's own toggle
-        // was a second authority fighting it (boards slice 2026-07-28)
-        UIOptions={{ canvasActions: { toggleTheme: false } }}
+        // was a second authority fighting it (boards slice 2026-07-28). Open
+        // (and ⌘O) loaded another scene INTO this board, which the saver then
+        // wrote over its file: a board is its file (2026-10-08)
+        UIOptions={{ canvasActions: { toggleTheme: false, loadScene: false } }}
         onLinkOpen={onLinkOpen}
         excalidrawAPI={(api) => {
           apiRef.current = api as unknown as ExcaliApi;
