@@ -100,6 +100,24 @@ test("a board is created from the chooser, drawn on, saved into the vault folder
   expect(requests.failed).toEqual([]);
 });
 
+// 2026-10-08: Excalidraw reports a default grid for every board, and that
+// made a new board's first save differ from its file: opening one rewrote it
+// half a second later. The wait outlasts the save debounce.
+test("opening a new board leaves its file as it was made", async ({ page }) => {
+  await startWithVault(page);
+  await openChooser(page);
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Board/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
+  await dialog.getByRole("textbox", { name: "Board name" }).fill("Untouched");
+  await dialog.getByRole("button", { name: "Create board" }).click();
+  await expect(page.locator(".canvas-surface canvas.static")).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(await readOpfsFile(page, "storage/excalidraw/Untouched.excalidraw")).toBe(EMPTY_SCENE);
+});
+
 test("a second board of the same name never replaces the first", async ({ page }) => {
   await startWithVault(page);
   for (let i = 0; i < 2; i += 1) {

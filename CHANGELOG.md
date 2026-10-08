@@ -511,6 +511,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Your hotkeys work over a board.** With a board focused, ⌘K, ⌘[ and ⌘],
+  ⌘⇧P, ⌘⇧S and the rest of Rotli's chords did nothing, because the board
+  answered them first (⌘K opened its link box, ⌘[ moved a shape back a
+  layer). Rotli's chords now win. A board keeps the few that are about
+  drawing: ⌘D duplicates, ⌘0, ⌘= and ⌘− zoom the board, ⌘F searches its text,
+  ⌘⇧L locks shapes, and ⌘← and ⌘→ grow a flowchart. Its own palette is still
+  on ⌘/, and layer order and links are in its right-click menu.
+- **Links on a board open.** Clicking the link icon on a shape did nothing in
+  the Mac app. A web or mail link now opens in your browser or mail app, a
+  `[[note]]` link opens that note, and a link to another shape scrolls the
+  board to it. A link Rotli can't open says so on the board instead of doing
+  nothing. Text typed inside a shape still isn't a link; add one with the
+  shape's link button.
+- **Boards pan smoothly.** Moving around a board redrew it for every scroll
+  event, faster than the screen could show, so it lagged behind your fingers.
+  It now draws once per frame. Pausing mid-pan also no longer re-saves the
+  whole board when nothing on it changed.
+- **Opening a board leaves its file alone.** A new board was rewritten half
+  a second after it opened, with the canvas's default grid added, even though
+  you hadn't changed anything. Only a grid you set is saved now.
 - **A vault opens on your freshest note.** When the newest file in a vault
   was an Excalidraw board, Rotli opened the board as a broken, empty note tab
   on start. It now opens the most recent note.
