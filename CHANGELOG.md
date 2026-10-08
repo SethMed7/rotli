@@ -352,7 +352,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole vault. A small picture joins the note in your view to its file in the
   vault with a dotted line. The before-and-after that had its own section
   ("You write for yourself. AI reads differently.") is now the second step's
-  picture and plays the same way. A short "What is an LLM wiki?" links to
+  picture and plays the same way. The steps show one at a time: pick Write,
+  File, or Ask (or swipe the pictures sideways), and the picture slides in.
+  On its own it plays through the three once while you look, and stops as
+  soon as you choose. A short "What is an LLM wiki?" links to
   Andrej Karpathy's note that named the idea. The three pictures now share
   one open style with no cards and one width, each heading starts level with
   its picture, and the steps drop their numbers. The third picture shows the

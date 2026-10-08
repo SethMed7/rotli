@@ -80,7 +80,13 @@ interface Cycle {
 let cycle: {
   CYCLE_MS: number;
   RESUME_MS: number;
-  createCycle(total: number, now: number, autoplay: boolean): Cycle;
+  STORY_MS: readonly [number, number, number];
+  createCycle(
+    total: number,
+    now: number,
+    autoplay: boolean,
+    options?: { every?: readonly number[]; loop?: boolean },
+  ): Cycle;
   tick(c: Cycle, now: number): Cycle;
   hover(c: Cycle, index: number): Cycle;
   leave(c: Cycle, now: number): Cycle;
@@ -310,6 +316,32 @@ describe("the theme studio's autoplay", () => {
     const c = cycle.resume(cycle.createCycle(14, 0, true), 50_000);
     expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS - 1).shown).toBe(0);
     expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS).shown).toBe(1);
+  });
+});
+
+describe("the landing's three steps", () => {
+  test("each step keeps its own dwell, and the steps play once through", () => {
+    const every = cycle.STORY_MS;
+    const [write, file, ask] = every;
+    let c = cycle.createCycle(3, 0, true, { every, loop: false });
+    expect(cycle.wait(c, 0)).toBe(write);
+    c = cycle.tick(c, write);
+    expect(c.shown).toBe(1);
+    expect(cycle.wait(c, write)).toBe(file);
+    c = cycle.tick(c, write + file);
+    expect(c.shown).toBe(2);
+    // After the last step it stops where it is, rather than going round again.
+    c = cycle.tick(c, write + file + ask);
+    expect(c).toMatchObject({ shown: 2, mode: "off" });
+    expect(cycle.wait(c, 0)).toBeNull();
+  });
+
+  test("the File step outlasts the filing's play, with time to read it at rest", async () => {
+    const filing = (await import(site("filingTimeline.ts"))) as {
+      timeline(chars: number, rows: number): { total: number };
+    };
+    // The typed note is 97 characters with six added lines (Filing.astro); leave room to grow.
+    expect(cycle.STORY_MS[1]).toBeGreaterThanOrEqual(filing.timeline(140, 6).total + 2000);
   });
 });
 

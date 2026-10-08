@@ -513,3 +513,33 @@ sat recoloured beside it.
 
 Guarded by `e2e/site/landing.spec.ts` ("nothing of the night shows before
 it").
+
+## 2026-10-08: one step at a time
+
+The owner, on "Write it down. rotli puts it away.": "I like the layout but it
+feels dead and overwhelming with a lot of text to read. Instead of all three
+showing in one scroll lets try to clean up and animate the transitions maybe
+even play with a quick horizontal scroll."
+
+- **Words left, picture right, kept.** The three steps are now tabs in the
+  left column: each a heading, with only the open one showing its one
+  sentence. The sentences are shorter, and the lede is one line ("You write in
+  a view. Each file lives once, in your vault: the folder you chose.").
+- **One picture at a time, sliding.** The pictures sit side by side in one
+  horizontal scroller that snaps; a tab slides it to its picture, and a
+  trackpad swipe or touch drag moves it too. The quokka hops as its picture
+  opens; the filing plays when its picture slides in.
+- **It moves on its own, once.** On screen, it plays through the three at each
+  step's pace (6.5 s, 10 s for File so the filing finishes and rests, 8 s),
+  the open tab's line filling as its clock, then rests on Ask. A hover holds
+  it; any choice stops it for good. Nothing is tied to the vertical scroll
+  (the owner rejected scroll-scrub for the story film).
+- **Nothing moves under it.** Wide, the track keeps the tallest picture's
+  height, so the LLM wiki aside never shifts as the steps change (the cost:
+  some empty ground under the shorter pictures). Below 1080px the pictures
+  differ too much for that, so the track follows the open one.
+- Not taken: a pinned section that turns vertical scrolling into a sideways
+  slide (scroll-jacking, and the scrub the owner already rejected).
+
+Guarded by `e2e/site/landing-layout.spec.ts` ("one step at a time", "the
+story lines up", reduced motion) and `e2e/site/narrow-layout.spec.ts`.

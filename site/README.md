@@ -55,12 +55,13 @@ Narrow widths are part of that proof: `e2e/site/narrow-layout.spec.ts`
 checks that no page scrolls sideways at 390 and 768, and the landing at 320,
 1024, and 1920 too (inline code in the changelog breaks inside the column).
 It also checks that the theme studio's island never sits under its lede, that
-each step of the Overview puts its words above its picture on a tablet and a phone, and that
+the Overview's tabs run across above the open picture on a tablet and a phone, and that
 the landing's smallest controls (the footnote marks, the 404's other ways in)
 answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
-holds the landing's order and grounds, the Overview's three steps (the view and
-vault picture's dotted line level with both marked rows from 320 to 1920, the
+holds the landing's order and grounds, the Overview's three steps (tabs over one
+sliding track that plays through once on its own and keeps a tab, key, or swipe;
+the view and vault picture's dotted line level with both marked rows from 320 to 1920, the
 LLM wiki source link, the closing "See every feature" link), the before and after's
 play (once in view, held off screen, resting marked, Replay, one window at
 1440×900, no script, reduced motion), the FAQ's Rotli Web answer when it is
@@ -163,10 +164,24 @@ there, and the closing panel, whose art never touches its words from 320 to
      as one story in three steps (the owner, 2026-10-06: "clarify view vs
      where it actually lives"). It absorbed the former TwoKinds section ("You
      write for yourself. AI reads differently.") the same day, because the
-     two said the same thing. Each step is a number, a heading, and one or two
-     sentences beside one picture drawn in HTML on the site's tokens (words
-     above the picture below 1080px), with the app's quokka standing on it and
-     no outer card (the owner, 2026-10-05: no card in a card):
+     two said the same thing. One step shows at a time (the owner,
+     2026-10-08: the three in one scroll felt "dead and overwhelming"): the
+     steps are tabs on the left, each a heading and one sentence (only the
+     open one shows its sentence), and their pictures sit side by side in one
+     horizontal scroller on the right that slides to the open one and snaps,
+     so a trackpad swipe or a touch drag moves it too. Once on screen it plays
+     through the three once on its own at each step's pace (`STORY_MS` in
+     `src/themeCycle.ts`; File outlasts its filing play), with the open tab's
+     line filling as its clock; a hover holds it, and a tab, the arrow keys,
+     or a swipe pins the choice. Only the open picture is focusable (the
+     others are `inert`). Wide, the track is as tall as the tallest picture,
+     so nothing under it moves; below 1080px the tabs run across as Write,
+     File, Ask, the open step's heading and sentence sit under them, and the
+     track follows the open picture's height. Reduced motion: no autoplay and
+     no slide. Without script the pictures stack under every sentence. Each
+     picture is drawn in HTML on the site's tokens, with the app's quokka
+     standing on it (it hops as its picture opens) and no outer card (the
+     owner, 2026-10-05: no card in a card):
      1. Write in your view (`ViewAndVault.astro`): the note in Main under a
         folder, and its one file in the vault at `wiki/_inbox/dana-call.md`,
         the two marked rows joined by a dotted "same file" line. Both panels

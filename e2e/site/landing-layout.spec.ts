@@ -1,6 +1,6 @@
 // The landing's layout of 2026-10-05 (docs/design/landing-layout-2026-10-05.md): the section
 // order and its grounds, the Overview's three steps (write in your view, the Librarian files it
-// in the vault, ask) with their drawn pictures, the LLM wiki aside, and the one link to
+// in the vault, ask; tabs over one sliding track since 2026-10-08) with their drawn pictures, the LLM wiki aside, and the one link to
 // /features/, the before and after's filing play (the File step's picture: it plays once in
 // view, holds off screen, rests marked, and replays), and the closing banner, whose art never
 // sits on its words. The "A closer look." tour was removed on 2026-10-06; Rotli Web and the
@@ -38,55 +38,129 @@ test("one story in three steps: write in your view, the Librarian files it, ask"
   const section = page.locator("#features");
   await expect(section.locator("h2")).toHaveText("Write it down. rotli puts it away.");
   await expect(section.locator(".section-lede")).toContainText("lives once, in your vault");
-  const steps = section.locator(".steps > li");
-  await expect(steps.locator("h3")).toHaveText([
+  // The steps are tabs, named by their headings and described by their one sentence.
+  const tabs = section.getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+  for (const [index, name] of [
     "Write in your view",
     "The Librarian files it",
     "Ask, and AI goes straight to it",
-  ]);
+  ].entries())
+    await expect(tabs.nth(index)).toHaveAccessibleName(name);
   // The product's own words, and only what its contracts say.
-  await expect(steps.nth(0)).toContainText("Main, or a named view");
-  await expect(steps.nth(0)).toContainText("never a copy");
-  await expect(steps.nth(1)).toContainText("When it’s on");
-  await expect(steps.nth(1)).toContainText("never changes your words");
-  await expect(steps.nth(1)).toContainText("your view stays as you left it");
-  await expect(steps.nth(2)).toContainText("on your computer");
-  await expect(steps.nth(2)).toContainText("not the whole vault");
-  await expect(steps.nth(2)).toContainText("Secure notes never go to a remote model");
-  // Each step has one picture and one quokka; the pictures are HTML, not screenshots.
-  for (const step of await steps.all()) {
-    await expect(step.locator(".quokka")).toHaveCount(1);
-    await expect(step.locator("img:not(.quokka)")).toHaveCount(0);
+  await expect(tabs.nth(0)).toHaveAccessibleDescription(/never copies them/);
+  await expect(tabs.nth(1)).toHaveAccessibleDescription(/When it’s on/);
+  await expect(tabs.nth(1)).toHaveAccessibleDescription(/never changes your words/);
+  await expect(tabs.nth(2)).toHaveAccessibleDescription(/on your computer/);
+  await expect(tabs.nth(2)).toHaveAccessibleDescription(/only the few notes that matter/);
+  // Each picture has one quokka; the pictures are HTML, not screenshots.
+  const panels = section.getByRole("tabpanel", { includeHidden: true });
+  await expect(panels).toHaveCount(3);
+  for (const panel of await panels.all()) {
+    await expect(panel.locator(".quokka")).toHaveCount(1);
+    await expect(panel.locator("img:not(.quokka)")).toHaveCount(0);
   }
-  await expect(steps.nth(0).getByRole("img")).toHaveAttribute("aria-label", /view.*vault/);
-  await expect(steps.nth(2).getByRole("img")).toHaveAttribute("aria-label", /on this computer/);
-  // The words sit left of the picture on a laptop.
-  for (const step of await steps.all()) {
-    const words = await box(step.locator(".step-copy"));
-    const picture = await box(step.locator("> figure"));
-    expect(picture.x).toBeGreaterThanOrEqual(words.x + words.width);
-  }
+  await expect(panels.nth(0).getByRole("img")).toHaveAttribute("aria-label", /view.*vault/);
+  await expect(panels.nth(2).locator('[role="img"][aria-label*="on this computer"]')).toHaveCount(1);
+  // The tabs sit left of the pictures on a laptop.
+  const list = await box(section.getByRole("tablist"));
+  const track = await box(section.locator("[data-story-track]"));
+  expect(track.x).toBeGreaterThanOrEqual(list.x + list.width);
 });
 
-test("the three steps line up: no numbers, no cards, one picture width, headings level with labels", async ({
+test("one step at a time: it plays through once on its own, and a tab, a key, or a swipe takes over", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.clock.install();
+  await page.goto("/");
+  const story = page.locator("#features .story");
+  const tabs = story.getByRole("tab");
+  const open = () =>
+    story.getByRole("tab", { selected: true }).evaluate((tab) => tab.getAttribute("aria-controls"));
+  await expect(tabs.nth(0)).toHaveAttribute("aria-selected", "true");
+  // Only the open picture takes focus and clicks.
+  await expect(story.locator("#story-file")).toHaveJSProperty("inert", true);
+  await story.scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute("data-cycle", "auto");
+  await page.clock.runFor(6600);
+  await expect.poll(open).toBe("story-file");
+  await expect(story.locator("#story-write")).toHaveJSProperty("inert", true);
+  await page.clock.runFor(10_100);
+  await expect.poll(open).toBe("story-ask");
+  // Once through, then it rests on the last step.
+  await page.clock.runFor(8100);
+  await expect(story).toHaveAttribute("data-cycle", "off");
+  await page.clock.runFor(30_000);
+  expect(await open()).toBe("story-ask");
+
+  // A tab is the visitor's choice, kept.
+  await tabs.nth(0).click();
+  await expect(story).toHaveAttribute("data-cycle", "pinned");
+  await expect.poll(open).toBe("story-write");
+  // The arrow keys move between tabs.
+  await tabs.nth(0).press("ArrowDown");
+  await expect.poll(open).toBe("story-file");
+  await expect(tabs.nth(1)).toBeFocused();
+  await tabs.nth(1).press("End");
+  await expect.poll(open).toBe("story-ask");
+  // A swipe of the track opens the picture it lands on.
+  await story.locator("[data-story-track]").evaluate((track) => {
+    track.scrollTo({ left: 0, behavior: "instant" });
+  });
+  await page.clock.runFor(300);
+  await expect.poll(open).toBe("story-write");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("under reduced motion the story never plays on its own, and the tabs still switch", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    reducedMotion: "reduce",
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  await page.clock.install();
+  await page.goto("/");
+  const story = page.locator("#features .story");
+  await story.scrollIntoViewIfNeeded();
+  await page.clock.runFor(30_000);
+  await expect(story).toHaveAttribute("data-cycle", "off");
+  await expect(story.getByRole("tab").nth(0)).toHaveAttribute("aria-selected", "true");
+  await story.getByRole("tab").nth(2).click();
+  await expect(story.locator("#story-ask")).toHaveAttribute("data-active", "");
+  await context.close();
+});
+
+test("the story lines up: no numbers, no cards, one picture width, the open heading level with its labels", async ({
   page,
 }) => {
   for (const width of [1440, 1100]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    const steps = page.locator("#features .steps > li");
-    await expect(steps.locator(".step-number")).toHaveCount(0);
+    const story = page.locator("#features .story");
+    await expect(story.locator(".step-number")).toHaveCount(0);
     const widths = new Set<number>();
-    for (const step of await steps.all()) {
-      const figure = step.locator("> figure");
+    for (const [index, tab] of (await story.getByRole("tab").all()).entries()) {
+      await tab.click();
+      const panel = story.locator(`#${await tab.getAttribute("aria-controls")}`);
+      await expect(panel).toHaveAttribute("data-active", "");
+      const figure = panel.locator("> figure");
+      await expect
+        .poll(async () =>
+          Math.round((await box(figure)).x - (await box(story.locator("[data-story-track]"))).x),
+        )
+        .toBeLessThanOrEqual(13); // slid home (the track's bleed is 0.75rem)
       const picture = await box(figure);
       widths.add(Math.round(picture.width));
-      const heading = await box(step.locator("h3"));
       const label = await box(figure.locator(".side-label, .state-label").first());
-      expect(Math.abs(heading.y - picture.y), `heading at the picture's top at ${width}`).toBeLessThanOrEqual(
-        1,
-      );
       expect(Math.abs(label.y - picture.y), `label at the picture's top at ${width}`).toBeLessThanOrEqual(4);
+      // The tabs start level with the picture's head.
+      if (index === 0) {
+        const heading = await box(tab.locator(".story-title"));
+        expect(Math.abs(heading.y - picture.y), `first heading level at ${width}`).toBeLessThanOrEqual(24);
+      }
       // No card: nothing inside the picture draws a box around its content.
       const boxed = await figure.evaluate(
         (root) =>
