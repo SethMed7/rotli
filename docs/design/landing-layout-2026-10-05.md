@@ -553,7 +553,7 @@ looking at happen with scroll not manually"; and the night transition made it
 
 - **Scroll, not a clock.** The autoplay and the swipe are gone. On a window at
   least 1081 × 760 the story pins in the middle of the window under the header
-  and the page scrolls a runway beneath it (0.7 of a window for each step after
+  and the page scrolls a runway beneath it (half a window for each step after
   the first); each third of the runway is one step (`src/storyScroll.ts`). The
   step switches whole with the same slide; nothing follows the scroll
   continuously, which is the scrub the owner rejected for the story film. A
@@ -567,3 +567,19 @@ looking at happen with scroll not manually"; and the night transition made it
   longer (out 400 ms, in 800 ms after the ink switch).
 
 This supersedes "It moves on its own, once" and the swipe in the entry above.
+
+## 2026-10-08 (evening): the night runs into the questions
+
+The owner, with a screenshot of the night after the dome (half a window of
+empty sky before the questions came back): "still can be faster … this awkward
+point just needs to be smoother".
+
+Hiding the questions while the night lasted meant one side of the switch was
+always blank: before it, empty sky under the dome; after it, an empty day where
+the band's faded words had been. Now the questions stay through the night (they
+are the page's ground, so they take the night's tokens and read), the night
+runs from the dome straight into them, and it ends once the band's end rises
+above 35% of the window, so what is left blank after the switch is small and
+brief. It begins when the band's top passes the middle of the window; the theme
+studio above still steps out. The crossfade is 700 ms (was 900), the fades
+around it shorter, and each story step half a window of scroll (was 0.7).

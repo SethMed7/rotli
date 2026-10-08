@@ -7,7 +7,7 @@
 // No DOM here, so the mapping can be tested (scripts/site-interactions.test.ts).
 
 /** How much page scroll each step after the first gets, as a share of the window's height. */
-export const STEP_RUNWAY = 0.7;
+export const STEP_RUNWAY = 0.5;
 
 /** How far through the runway the page is (0 to 1): the pin's top (viewport coordinates), where
  * the story sticks, and the runway's length. */

@@ -224,7 +224,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       /* The crossfade runs on the tokens themselves, registered so they can be animated on the
          root: every surface that reads them (the ground, the header, menus, buttons, borders)
-         changes in the same frame, on one clock. The grounds ease over 900 ms; the inks switch
+         changes in the same frame, on one clock. The grounds ease over 700 ms; the inks switch
          whole just past halfway, when the ground is mid-tone and both inks read alike (text
          fading through a ground fading the other way vanishes in the middle); muted and accent
          text lean onto --text around the switch. src/passage.ts holds the same numbers and
@@ -251,9 +251,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         /* Also a plain value, so muted and accent text keep their colours in a browser
            without @property (the lean animation then simply never runs). */
         --passage-lean: 0;
-        --passage-ms: 900ms;
+        --passage-ms: 700ms;
         --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
-        --passage-ink-at: 459ms;
+        --passage-ink-at: 357ms;
       }
       :root.passage-fading {
         transition-property:
@@ -322,9 +322,10 @@ const socialImageUrl = new URL(image, siteUrl).href;
          "I should not see anything from that section till the colors transition", and the same
          for the section under it). The band paints no ground of its own and no feathers: it is
          the page's ground, so it turns with everything else. Its words and its scene come in
-         once the inks have switched, and go before they switch back. The sections on either
-         side (data-passage-near, set by src/passage.ts) step out while the night lasts and come
-         back after it; a warm band fades with its ground, so the night is one sky. The band's
+         once the inks have switched, and go before they switch back. The section before it
+         (data-passage-near, set by src/passage.ts) steps out while the night lasts and comes
+         back after it; a warm band fades with its ground, so the night is one sky. The section
+         after it stays, in the night's tokens, so the night runs straight into it. The band's
          reveals (the scene's one play) wait for the night too. Without script the band stays its
          own night, feathered. */
       .js [data-passage] {
@@ -336,20 +337,20 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       .js [data-passage] > *,
       .js [data-passage-near] {
-        transition: opacity 400ms ease-out;
+        transition: opacity 250ms ease-out;
       }
       .js [data-passage] > * {
         opacity: 0;
       }
       :root[data-passage] [data-passage] > * {
         opacity: 1;
-        transition: opacity 800ms ease-out var(--passage-ink-at);
+        transition: opacity 500ms ease-out var(--passage-ink-at);
       }
       :root[data-passage] [data-passage-near] {
         opacity: 0;
       }
       :root:not([data-passage]) [data-passage-near] {
-        transition: opacity 800ms ease-out var(--passage-ink-at);
+        transition: opacity 500ms ease-out var(--passage-ink-at);
       }
       @media (prefers-reduced-motion: reduce) {
         :root [data-passage] > *,

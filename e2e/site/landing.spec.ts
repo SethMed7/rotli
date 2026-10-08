@@ -395,12 +395,13 @@ test("nothing of the night shows before it, and the sections beside it step out 
   expect(await opacity("#privacy > .wrap")).toBe("0");
   expect(await opacity("#personal")).toBe("1");
   await expect(page.locator("#privacy .scene")).not.toHaveClass(/is-visible/);
-  // In the night: the band is there, the theme studio above and the questions below are not.
+  // In the night: the band is there, the theme studio above it is not.
   await scrollToPrivacy(page, 0.5);
   await expect.poll(() => passage(page)).toBe("ocean-dark");
   await expect.poll(() => opacity("#privacy > .wrap")).toBe("1");
   await expect.poll(() => opacity("#personal")).toBe("0");
-  await expect.poll(() => opacity("#faq")).toBe("0");
+  // The questions after it stay, in the night's tokens: no empty sky between the two.
+  expect(await opacity("#faq")).toBe("1");
   await expect(page.locator("#privacy .scene")).toHaveClass(/is-visible/);
   // Out through the bottom: the questions come back, the band's words go.
   await scrollToPrivacy(page, 1.6);

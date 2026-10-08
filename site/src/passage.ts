@@ -22,14 +22,20 @@ export interface Span {
   bottom: number;
 }
 
-/** The passage turns on once the section fills this share of the window (or of itself, when
- * it is shorter than the window)… Half: since the band stopped painting its own night
- * (2026-10-08) a later switch shows no light page on a dark band, and the section under it is
- * not held back for most of the window (the owner: "too easy to skip FAQ" at 0.4 and 0.25). */
-export const ENTER_SHARE = 0.5;
-/** …and off once it fills less than this. The gap between the two is the hysteresis, so a
- * page resting near a boundary never flickers between the two environments. */
-export const LEAVE_SHARE = 0.4;
+/** The passage turns on once the section's top has passed this line (a share of the window's
+ * height from its top) and its bottom is still below ENTER_BOTTOM… Since the band stopped
+ * painting its own night (2026-10-08) a later switch shows no light page on a dark band. */
+export const ENTER_TOP = 0.5;
+export const ENTER_BOTTOM = 0.45;
+/** …and stays on until its top falls back below LEAVE_TOP or its bottom rises above
+ * LEAVE_BOTTOM. The section under the band stays in view through the night (it is the page's
+ * ground, so it takes the night's tokens and reads), so the night runs straight from the band's
+ * last picture into it with no empty sky between (the owner, 2026-10-08: "too easy to skip FAQ",
+ * then "this awkward point just needs to be smoother"), and lets go once the band's end is high
+ * in the window, leaving little of it blank. The gaps between the enter and leave lines are the
+ * hysteresis, so a page resting near a boundary never flickers between the two environments. */
+export const LEAVE_TOP = 0.6;
+export const LEAVE_BOTTOM = 0.35;
 
 /**
  * Whether the passage should be on, given the section's box (viewport coordinates), the
@@ -37,16 +43,15 @@ export const LEAVE_SHARE = 0.4;
  */
 export function passageActive(section: Span, viewportHeight: number, active: boolean): boolean {
   if (viewportHeight <= 0 || section.bottom <= section.top) return false;
-  const visible = Math.max(0, Math.min(section.bottom, viewportHeight) - Math.max(section.top, 0));
-  const whole = Math.min(viewportHeight, section.bottom - section.top);
-  const share = visible / whole;
-  return active ? share >= LEAVE_SHARE : share >= ENTER_SHARE;
+  const top = section.top / viewportHeight;
+  const bottom = section.bottom / viewportHeight;
+  return active ? top < LEAVE_TOP && bottom > LEAVE_BOTTOM : top < ENTER_TOP && bottom > ENTER_BOTTOM;
 }
 
 // ——— The crossfade (Base.astro's `:root.passage-fading` rules restate these numbers) ———
 
 /** How long the dusk (or the dawn) takes. Reduced motion switches at once. */
-export const PASSAGE_MS = 900;
+export const PASSAGE_MS = 700;
 /** The grounds (page, surfaces, borders) ease slowly out, cross quickly, and settle slowly. */
 export const GROUND_EASE = [0.65, 0, 0.35, 1] as const;
 /** Text never fades through the ground (a colour on its way from dark to light must cross a
@@ -148,13 +153,12 @@ export function watchPassages(doc: Document = document): void {
   let current: HTMLElement | null = null;
   let frame = 0;
   let fadeTimer = 0;
-  // The sections either side of a passage step out while its night lasts (Base.astro).
+  // The section before a passage steps out while its night lasts (Base.astro); the one after
+  // stays and takes the night's tokens, so there is no empty sky between them.
   for (const section of sections) {
-    for (const step of ['previousElementSibling', 'nextElementSibling'] as const) {
-      let near = section[step];
-      while (near && near.tagName !== 'SECTION') near = near[step];
-      near?.setAttribute('data-passage-near', '');
-    }
+    let near = section.previousElementSibling;
+    while (near && near.tagName !== 'SECTION') near = near.previousElementSibling;
+    near?.setAttribute('data-passage-near', '');
   }
   // A passage's reveals (Base.astro leaves them to it) play the first time its night arrives,
   // once the inks have switched, so the scene never plays unseen on a day page.

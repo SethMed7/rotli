@@ -29,8 +29,10 @@ interface PassagePair {
 }
 let passage: {
   passageActive(section: { top: number; bottom: number }, viewport: number, active: boolean): boolean;
-  ENTER_SHARE: number;
-  LEAVE_SHARE: number;
+  ENTER_TOP: number;
+  ENTER_BOTTOM: number;
+  LEAVE_TOP: number;
+  LEAVE_BOTTOM: number;
   PASSAGE_MS: number;
   GROUND_EASE: readonly [number, number, number, number];
   INK_AT: number;
@@ -139,35 +141,32 @@ describe("the privacy passage", () => {
   const viewport = 800;
   // A band taller than the window, its top edge at `top`.
   const band = (top: number, height = 1200) => ({ top, bottom: top + height });
+  const end = (bottom: number) => ({ top: bottom - 1200, bottom });
 
-  test("turns on once the band fills half the window", () => {
+  test("turns on once the band's top passes the middle of the window", () => {
     expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
-    const enter = viewport * (1 - passage.ENTER_SHARE);
-    expect(passage.passageActive(band(enter + 1), viewport, false)).toBe(false);
-    expect(passage.passageActive(band(enter - 1), viewport, false)).toBe(true);
-    // No later than the middle of the window, so the band never sits half empty.
-    expect(enter).toBeGreaterThanOrEqual(viewport * 0.5);
-    // The section under it comes back while it still has most of the window.
-    expect(passage.LEAVE_SHARE).toBeGreaterThanOrEqual(0.35);
+    expect(passage.passageActive(band(viewport * passage.ENTER_TOP + 1), viewport, false)).toBe(false);
+    expect(passage.passageActive(band(viewport * passage.ENTER_TOP - 1), viewport, false)).toBe(true);
+    // No later than the middle, so the band never sits half empty.
+    expect(passage.ENTER_TOP).toBeLessThanOrEqual(0.5);
+  });
+
+  test("lets go once the band's end is high in the window, leaving little of it blank", () => {
+    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM + 1), viewport, true)).toBe(true);
+    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM - 1), viewport, true)).toBe(false);
+    // The band's words fade with the night, so what is left of it on screen is empty: under 40%.
+    expect(passage.LEAVE_BOTTOM).toBeLessThanOrEqual(0.4);
   });
 
   test("holds near a boundary instead of flickering, then lets go in either direction", () => {
-    const enter = viewport * (1 - passage.ENTER_SHARE);
-    const leave = viewport * (1 - passage.LEAVE_SHARE);
-    // Scrolling back up a little past the switch point keeps it on.
-    expect(passage.passageActive(band(enter + 20), viewport, true)).toBe(true);
-    // Leaving upward (the band falls back down the window) turns it off.
-    expect(passage.passageActive(band(leave + 1), viewport, true)).toBe(false);
-    // Leaving downward (the band's end rises up the window) turns it off too.
-    const end = (bottom: number) => ({ top: bottom - 1200, bottom });
-    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE + 1), viewport, true)).toBe(true);
-    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE - 1), viewport, true)).toBe(false);
-    expect(passage.LEAVE_SHARE).toBeLessThan(passage.ENTER_SHARE);
-  });
-
-  test("a band shorter than the window counts its own height", () => {
-    // A 300px band wholly in an 800px window fills all of itself.
-    expect(passage.passageActive({ top: 200, bottom: 500 }, viewport, false)).toBe(true);
+    // Scrolling back up a little past the switch point keeps it on…
+    expect(passage.passageActive(band(viewport * passage.ENTER_TOP + 20), viewport, true)).toBe(true);
+    // …until the band falls back down the window.
+    expect(passage.passageActive(band(viewport * passage.LEAVE_TOP + 1), viewport, true)).toBe(false);
+    // Near the bottom edge, coming back up into the band waits for its enter line.
+    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM + 20), viewport, false)).toBe(false);
+    expect(passage.LEAVE_TOP).toBeGreaterThan(passage.ENTER_TOP);
+    expect(passage.LEAVE_BOTTOM).toBeLessThan(passage.ENTER_BOTTOM);
   });
 
   test("a hidden or empty section never turns it on", () => {

@@ -200,8 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into Ocean Dark while the privacy section is in view, and step back out
   when you scroll on or back. Nothing of the night shows before the colours
   change, and the sections above and below it step aside while it lasts, so
-  it reads as one scene; the questions after it come back as soon as they
-  fill most of the window. With reduced motion the change is immediate.
+  it reads as one scene; the questions after it carry on in the night's
+  colours, so nothing is skipped. With reduced motion the change is immediate.
 - **The quokkas at the bottom of rotli.co each have something to do.** One
   sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
   waves when you arrive and frowns if you reach for the leaves), two play

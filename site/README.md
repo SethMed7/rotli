@@ -168,7 +168,7 @@ there, and the closing panel, whose art never touches its words from 320 to
      overwhelming"; then "make the switches of what I am looking at happen
      with scroll not manually"). On a window at least 1081 wide and 760 tall
      the story pins in the middle of the window under the header while the
-     page scrolls a runway below it (0.7 of a window per step after the
+     page scrolls a runway below it (half a window per step after the
      first, `src/storyScroll.ts`); each third of the runway is one step. The
      steps are listed on the left, each a heading, the open one with its one
      sentence and an accent line; the pictures sit side by side on the right
@@ -892,11 +892,13 @@ there, and the closing panel, whose art never touches its words from 320 to
   (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
   the night's stars spread over the plain grounds, `color-scheme` and the
   `theme-color` meta follow, and it all fades back out on leaving the band in
-  either direction. It turns on once the band fills half the window (or of
-  itself, if shorter) and off once it fills under 40% (it was 40% and 25%
-  until 2026-10-08, when the owner found the questions below too easy to
-  skip), so a page resting near a boundary never flickers; a reload mid-band
-  lands in the night at once.
+  either direction. It turns on once the band's top passes the middle of the
+  window (with its end still below 45% of it) and off once its top falls back
+  under 60% or its end rises above 35% (`src/passage.ts`; until 2026-10-08 it
+  was 40% and 25% of the window filled, and the owner found the questions
+  below too easy to skip and the empty sky after the dome awkward), so a page
+  resting near a boundary never flickers; a reload mid-band lands in the night
+  at once. The crossfade is 700 ms.
   It reads as one dusk (the owner's "more smooth and better polished",
   2026-10-05). The cut the owner saw came from the band always painting its
   own night while the page followed only once the middle of the window was
@@ -906,9 +908,11 @@ there, and the closing panel, whose art never touches its words from 320 to
   transition", and the same for the section under it): with script the band
   paints no ground of its own, so it is the page's ground and turns with it;
   its words and scene fade in once the inks have switched and out before they
-  switch back; the sections on either side (`data-passage-near`, set by
+  switch back; the section before it (`data-passage-near`, set by
   `src/passage.ts`, since a component's script can sit between two sections)
-  fade out while the night lasts and back after it; and the band's reveals,
+  fades out while the night lasts and back after it, while the questions after
+  it stay in the night's tokens, so the night runs from the dome straight into
+  them; and the band's reveals,
   the scene's one play included, wait for the night instead of the scroll
   observer. Without script the band paints its own night, its edges feathered
   into the neighbours' padding (`[data-passage]::before/::after`). The
