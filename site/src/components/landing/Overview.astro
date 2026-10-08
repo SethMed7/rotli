@@ -270,7 +270,7 @@ const steps = [
       sliding = false;
       if (index !== cycle.shown) set(pin(cycle, index));
     };
-    if ('onscrollend' in track) {
+    if ('onscrollend' in window) {
       track.addEventListener('scrollend', () => settled(true));
     } else {
       let settle = 0;
