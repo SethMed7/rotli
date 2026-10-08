@@ -55,7 +55,13 @@ export function parseBoardBody(body: string): LoadedBoard {
  * feeding recency). Only the durable canvas choices survive a save. */
 const DURABLE_APP_STATE = ["viewBackgroundColor", "gridSize", "gridModeEnabled", "gridStep"] as const;
 
-function durableAppState(appState: Record<string, unknown>): Record<string, unknown> {
+/** The grid Excalidraw reports for EVERY board, written in the file or not. */
+const DEFAULT_GRID: Record<string, unknown> = { gridSize: 20, gridModeEnabled: false, gridStep: 5 };
+
+function durableAppState(
+  appState: Record<string, unknown>,
+  sourceAppState: Record<string, unknown> = {},
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of DURABLE_APP_STATE) {
     const value =
@@ -64,6 +70,14 @@ function durableAppState(appState: Record<string, unknown>): Record<string, unkn
           durableBoardBackground(typeof appState[key] === "string" ? appState[key] : undefined)
         : appState[key];
     if (value !== undefined) out[key] = value;
+  }
+  // an untouched grid is the vendor's default, not a choice: writing it made
+  // a new board's first save differ from the file it opened, so merely
+  // opening a board rewrote it (2026-10-08). A grid the file carries stays.
+  const gridKeys = Object.keys(DEFAULT_GRID);
+  const untouched = gridKeys.every((key) => out[key] === undefined || out[key] === DEFAULT_GRID[key]);
+  if (untouched && !gridKeys.some((key) => key in sourceAppState)) {
+    for (const key of gridKeys) delete out[key];
   }
   return out;
 }
@@ -149,7 +163,12 @@ export function serializeBoardScene(parts: {
     version: source.version ?? 2,
     source: source.source ?? "rotli",
     elements,
-    appState: durableAppState(parts.appState),
+    appState: durableAppState(
+      parts.appState,
+      source.appState && typeof source.appState === "object"
+        ? (source.appState as Record<string, unknown>)
+        : {},
+    ),
     files: { ...originalFiles, ...parts.files },
     rotliMeta: parts.meta,
   });
