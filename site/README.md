@@ -1551,8 +1551,9 @@ Mac app:
    "Vault — folders as on disk", the file in `_inbox/`.
 3. **On the Mac, the Librarian files it** (the Mac app, the owner's call:
    the Librarian runs only there, so its filing is recorded for real). The
-   script cuts here and splices in `HERO_LIBRARIAN_CLIP`, fitted into the
-   same picture on the app's ground.
+   script cuts here and splices in `HERO_LIBRARIAN_CLIP` (already cropped to
+   the film's picture shape by the take script): `_inbox/` empties and the
+   note lands in `Clients/`, and its location turns "★ Main · Clients".
 4. **Your words untouched. Your view as you left it.** (Rotli Web): the
    Vault view with the file in `Clients/`, the location "★ Main · Clients",
    the words as typed, then Main with the note where it was.
