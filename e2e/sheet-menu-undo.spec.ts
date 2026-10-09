@@ -62,3 +62,66 @@ test("the native Undo and Redo menu commands undo and redo a sheet edit", async 
   await menu("historyRedo");
   await expect.poll(a1).toBe("Lease");
 });
+
+// Since the Edit menu's Undo/Redo carry no keys, ⌘Z / ⇧⌘Z reach the sheet as
+// key presses. Sent as events here — the specs never press ⌘ chords on the
+// keyboard (Linux CI has no Meta key) — they still reach the same listeners.
+test("⌘Z undoes and ⇧⌘Z redoes a sheet edit, and ⇧⌘Z while typing in a cell leaves the workbook alone", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.evaluate(async () => {
+    const ExcelJS = (await import("/node_modules/.vite/deps/exceljs.js" as string)).default;
+    const { workbookToModel } = await import("/src/sheets/engine/bridge.ts" as string);
+    const { mountSheet } = await import("/src/sheets/engine/univer.tsx" as string);
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet("Budget").addRow(["Rent", 1800]);
+    const host = document.createElement("div");
+    host.className = "sheet-keys-probe";
+    host.style.cssText =
+      "position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:white";
+    document.body.append(host);
+    (window as unknown as { sheet: unknown }).sheet = mountSheet(host, {
+      model: workbookToModel(wb, "keys.xlsx"),
+      darkMode: false,
+      themeMode: "themed",
+    });
+  });
+  const a1 = () =>
+    page.evaluate(() => {
+      const handle = (window as unknown as { sheet: { save(): { sheets: Record<string, unknown> } } }).sheet;
+      const sheet = Object.values(handle.save().sheets)[0] as {
+        cellData?: Record<number, Record<number, { v?: unknown }>>;
+      };
+      return sheet.cellData?.[0]?.[0]?.v ?? null;
+    });
+  // the same key event Edit → Undo / Redo replays (keys/editHistoryActions.ts)
+  const chord = (shift: boolean) =>
+    page.evaluate(async (redo) => {
+      const { historyKeyEvent } = await import("/src/keys/editHistoryActions.ts" as string);
+      (document.activeElement ?? document.body).dispatchEvent(historyKeyEvent(redo));
+    }, shift);
+  await expect
+    .poll(() => page.evaluate(() => !!document.activeElement?.closest(".sheet-keys-probe")))
+    .toBe(true);
+  await expect.poll(a1).toBe("Rent");
+
+  await page.keyboard.type("Lease");
+  await page.keyboard.press("Enter");
+  await expect.poll(a1).toBe("Lease");
+  await page.keyboard.press("ArrowUp"); // back on A1, committed
+  await chord(false);
+  await expect.poll(a1).toBe("Rent");
+  await chord(true);
+  await expect.poll(a1).toBe("Lease");
+
+  // undo again, then start typing in A1 without Enter: ⇧⌘Z must not redo the
+  // workbook behind the open cell (that would put "Lease" back into A1)
+  await chord(false);
+  await expect.poll(a1).toBe("Rent");
+  await page.keyboard.type("dra");
+  await chord(true);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  await expect.poll(a1).toBe("Rent");
+});
