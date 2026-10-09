@@ -1569,15 +1569,20 @@ rests on (`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
 Without `HERO_LIBRARIAN_CLIP` the script makes a draft in `_review/hero-video/`
 with a placeholder card at the cut and never replaces the site's film.
 
-**Shooting the Mac clip.** `bun scripts/hero-librarian-vault.mjs
-/tmp/rotli-hero-vault` writes a vault holding the same notes and the same note,
-word for word, waiting in `wiki/_inbox/dana-call.md` (it refuses a folder that
-is not empty). Open that folder in Rotli on the Mac (never a real vault), turn
-on Settings → General → Show file metadata so the Librarian's fields show,
-open the note, then record just the window (⌘⇧5 → Record Selected Window)
-while the Librarian files it: the note moves to `Clients/` and its area,
-summary, tags, and links appear above the unchanged words. 6 to 10 seconds is
-enough; then `HERO_LIBRARIAN_CLIP=<the .mov> bun run capture:hero`.
+**Shooting the Mac clip.** `bun scripts/hero-librarian-vault.mjs "/tmp/Rotli
+Hero Demo"` writes a labeled demo vault (it refuses a folder that is not empty):
+the same notes, and the note written on camera waiting in `wiki/_inbox/`, word
+for word, already in Main, with its own `.rotli/settings.json` letting the
+Librarian file it within about a minute (a 5-second quiet window, the
+on-device model, a filing sentence for Clients, people groups off) and showing
+the file's fields. Open it with Rotli's own vault switcher, never by editing
+the app's settings files (the app rewrites them on launch; 2026-10-09, an
+edited `corpus.json` reverted between launches). Open the note, record just
+the window (⌘⇧5 → Record Selected Window), and leave Rotli visible but not
+focused until the Librarian files it: the note moves to `Clients/` and its
+area, summary, tags, and links fill in above the unchanged words. Trim to the
+8 seconds or so around the move, switch back to your vault the same way, then
+`HERO_LIBRARIAN_CLIP=<the .mov> bun run capture:hero`.
 
 What is fixture, all synthetic:
 
