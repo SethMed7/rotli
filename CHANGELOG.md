@@ -85,9 +85,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gone, and everything they held is under **⋮** at the end of the row. Beta
   sits beside the file's name. The header's actions are plain words rather
   than outlined buttons: Details and Open externally, then **Theme | White**
-  for the sheet's colours (White is the paper look the old Raw button gave),
-  then Save, which is the one filled button and only while you have unsaved
-  edits.
+  for the sheet's colours (White is the paper look the old Raw button gave).
+- **Sheets and documents save themselves.** There's no Save button to
+  remember: a moment after you stop editing a sheet or a Word document, Rotli
+  writes it, and the header says **Saving…**, then **Saved**. If a save
+  can't happen (the file changed on disk, say), it says **Not saved** with
+  the reason, and your next edit tries again. ⌘S still saves at once.
 - **rotli.co's blog posts are calmer to read.** A post lines up with the
   header: the title, summary, author, and topics sit beside the post's
   picture, shown whole, with "Blog" above the title, and the title is in

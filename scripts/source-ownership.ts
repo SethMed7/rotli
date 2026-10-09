@@ -58,6 +58,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "webDialogFrame.tsx":
     "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
   "webChatSetupDialog.tsx": "Rotli Web: the chat-on-the-web walkthrough (helper, connect, sign in to a tool)",
+  "autosave.tsx": "shared autosave timer and Saving… / Saved status for the sheet and document editors",
   "betaBadge.tsx": "shared Beta mark for capabilities that ship but are still being finished",
   "captureCard.tsx": "application-shell quick-capture entry",
   "captureReveal.ts": "capture presentation state shared by shell surfaces",
