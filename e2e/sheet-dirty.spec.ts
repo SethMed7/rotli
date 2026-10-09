@@ -18,6 +18,9 @@ test("selecting cells leaves a sheet clean; typing a value marks it changed", as
     const ws = wb.addWorksheet("Budget");
     ws.addRow(["Month", "Rent"]);
     ws.addRow(["Jan", 1800]);
+    // the formula engine writes results back with a sheet mutation of its own
+    ws.addRow(["Total", { formula: "SUM(B2:B2)" }]);
+    ws.addRow(["Double", { formula: "B2*2" }]);
     const host = document.createElement("div");
     host.className = "sheet-dirty-probe";
     host.style.cssText =
@@ -39,6 +42,9 @@ test("selecting cells leaves a sheet clean; typing a value marks it changed", as
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   if (!box) throw new Error("no sheet canvas");
+  // opening a workbook with formulas is not an edit, once the engine has run
+  await page.waitForTimeout(1500);
+  expect(await edits()).toBe(0);
 
   // click through several cells and move with the arrow keys
   for (const [dx, dy] of [
