@@ -6,7 +6,7 @@
 // (read-only), so a Vault row looks and opens exactly like a Main row.
 
 import type { Folder, NoteSummary } from "../types";
-import { isSink, isVault } from "./destinations";
+import { DEST, isSink, isVault } from "./destinations";
 import type { MainNode } from "./mainTree";
 
 /** A disk path relative to where notes live: a memex's `wiki/` is its root
@@ -22,6 +22,9 @@ interface Dir {
 }
 
 const newDir = (): Dir => ({ folders: new Map(), notes: [] });
+/** The destination rows a folder list may lead with (Rotli Web's does): their ids are names, not
+ * paths, and nothing of theirs sits on disk under that name, so the Vault view leaves them out. */
+const DESTINATION_ROWS: ReadonlySet<string> = new Set([DEST.inbox, DEST.secure, DEST.storage, DEST.board]);
 const byName = (a: string, b: string) =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
@@ -52,7 +55,12 @@ export function vaultTree(notes: Iterable<NoteSummary>, folders: readonly Folder
   };
   for (const folder of folders) {
     const path = pathOf(folder);
-    if (path.split("/").some((part) => part.startsWith(".")) || isSink(folder.id) || isVault(folder.id))
+    if (
+      path.split("/").some((part) => part.startsWith(".")) ||
+      isSink(folder.id) ||
+      isVault(folder.id) ||
+      DESTINATION_ROWS.has(folder.id)
+    )
       continue;
     at(notesRelative(path));
   }

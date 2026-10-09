@@ -538,6 +538,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web's Vault view shows only folders that are on disk.** Choosing
+  "Vault — folders as on disk" listed Inbox, Secure notes, Storage, and Board
+  even where no such folder existed. They are gone; a real folder with one of
+  those names still shows.
 - **A vault opens on your freshest note.** When the newest file in a vault
   was an Excalidraw board, Rotli opened the board as a broken, empty note tab
   on start. It now opens the most recent note.
