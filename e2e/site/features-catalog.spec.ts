@@ -101,7 +101,8 @@ test("each tab counts what the search leaves in its area", async ({ page }) => {
 test("the catalog closes on a banner to the roadmap", async ({ page }) => {
   await page.goto("/features/");
   const banner = page.getByRole("region", { name: /what comes next/i });
-  await expect(banner.getByRole("heading", { level: 2 })).toContainText("Vote for it on the roadmap.");
+  // "Vote for it" while voting is open (site/src/roadmap.ts VOTING_OPEN); off, "See it".
+  await expect(banner.getByRole("heading", { level: 2 })).toContainText(/(Vote for|See) it on the roadmap\./);
   await banner.getByRole("link", { name: "See the roadmap" }).click();
   await expect(page).toHaveURL(/\/roadmap\/$/);
 });

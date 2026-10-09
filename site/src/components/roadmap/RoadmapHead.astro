@@ -1,10 +1,11 @@
 ---
 // The top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro): from 1000px
 // the words on the left and the picture on the right (RoadmapScene.astro, the cover's 1300 × 900
-// shape), centred on each other, on the header's edges; narrower, the words first and the
-// picture under them, so the title is always the first thing read. The words: where the page
-// sits ("Resources /"), the title, what the roadmap is and how to take part, a meta line, the
-// voting state (the page's script keeps it current), and the two ways in.
+// shape), centred on each other, on the header's edges; narrower, the picture first and across
+// the page, then the words, like a post's. The words: where the page sits ("Resources /"), the
+// title, what the roadmap is and how to take part, a meta line, a notice while the roadmap is
+// being reworked, the participation state (the page's script keeps it current), and the two
+// ways in.
 import { ROADMAP_URL, site } from '../../site';
 import RoadmapScene from './RoadmapScene.astro';
 
@@ -12,9 +13,13 @@ interface Props {
   heading: string;
   lede: string;
   meta: string[];
+  /** A short notice under the meta line, its first sentence in bold (the roadmap under rework). */
+  notice?: [string, string];
+  /** The participation line before the page's script has asked the sidecar. */
+  participation: string;
 }
 
-const { heading, lede, meta } = Astro.props;
+const { heading, lede, meta, notice, participation } = Astro.props;
 ---
 
 <header class="road-head" data-roadmap-head>
@@ -35,8 +40,15 @@ const { heading, lede, meta } = Astro.props;
         ))
       }
     </p>
+    {
+      notice && (
+        <p class="notice" data-roadmap-notice>
+          <b>{notice[0]}</b> {notice[1]}
+        </p>
+      )
+    }
     <p class="participation" id="participation-note" role="status" data-roadmap-note>
-      Voting and requests open soon.
+      {participation}
     </p>
     <div class="head-actions">
       <a class="button primary" href="#in-the-work">See what’s in the work</a>
@@ -106,6 +118,20 @@ const { heading, lede, meta } = Astro.props;
     margin: 1rem 0 0;
     color: var(--text-muted);
     font-size: 0.9rem;
+  }
+  /* The rework notice: a quiet line on an accent rule, so it reads as news, not as an error. */
+  .notice {
+    max-width: 36rem;
+    margin: 1rem 0 0;
+    padding: 0.15rem 0 0.15rem 0.85rem;
+    border-left: 3px solid var(--accent);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .notice b {
+    color: var(--text);
+    font-weight: 600;
   }
   .participation {
     margin: 0.4rem 0 0;

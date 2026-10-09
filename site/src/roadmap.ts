@@ -163,6 +163,12 @@ export function publicRoadmap(markdown: string): RoadmapSection[] {
   });
 }
 
+/** Whether /roadmap/ offers votes. Off for now (the owner, 2026-10-09: "for now lets remove it
+ * and say it is in the works"): no vote buttons or "Most votes", and every invitation to vote
+ * (the page, the menu, the promo, the Features banner, the agent files) says voting is coming.
+ * The sidecar's vote endpoints stay; turning this on brings it all back. */
+export const VOTING_OPEN = false;
+
 /** The ids people may vote for: every item on the page. */
 export function votableIds(markdown: string): string[] {
   return publicRoadmap(markdown).flatMap((section) => section.items.map((item) => item.id));

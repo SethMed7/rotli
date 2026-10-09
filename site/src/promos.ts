@@ -8,6 +8,7 @@
 // Pure data and a pure picker, without Astro or image imports, so the root tests can read it
 // (scripts/site-writing.test.ts). The component resolves `pose` to its picture.
 import type { Pose } from './og';
+import { VOTING_OPEN } from './roadmap';
 import { STUDIO_URL, WEB_APP_PATH, site } from './site';
 
 export interface Promo {
@@ -43,8 +44,10 @@ export const PROMOS: readonly Promo[] = [
   {
     id: 'roadmap',
     label: PROMO_LABEL,
-    title: 'Vote on what’s next',
-    text: 'See what we’re building and help choose what comes first.',
+    title: VOTING_OPEN ? 'Vote on what’s next' : 'See what’s next',
+    text: VOTING_OPEN
+      ? 'See what we’re building and help choose what comes first.'
+      : 'See what we’re building and what comes next.',
     href: '/roadmap/',
     pose: 'searching',
   },

@@ -1400,8 +1400,20 @@ The page (`src/pages/roadmap/[...slug].astro`, its parts in
   its hovered note lit and a secure note a hollow ring, beside a canvas's
   cards, lines, and group.
   **Planned** and **Ideas**: a calm list on hairlines. Every item shows its
-  title, summary, status (In the work, Planned, Idea), size, and vote
-  (`VoteButton.astro`).
+  title, summary, status (In the work, Planned, Idea), size, and, while
+  voting is open, its vote (`VoteButton.astro`).
+- **Voting is off for now** (`VOTING_OPEN` in `src/roadmap.ts`; the owner,
+  2026-10-09: "for now lets remove it and say it is in the works"): no vote
+  buttons and no "Most votes", the participation line says "Voting is in the
+  works" (with "and requests open soon" until the request sidecar answers), and
+  every invitation to vote elsewhere (the lede, the page description, the
+  Resources menu, the roadmap promo, the Features banner, `/llms.txt`, and the
+  roadmap's Markdown twin) says what is there instead. The sidecar's vote
+  endpoints and the privacy page's paragraph on votes stay for when it opens;
+  setting the flag brings the whole thing back, and `roadmap.spec.ts` registers
+  the vote tests only then (and the voting-off tests only while it is off). A notice under the head's meta line (`notice`: "Under
+  construction. This roadmap is being reworked and will be updated in the
+  coming week to match where rotli is today.") marks the rework.
 - **Recently shipped** (`RecentlyShipped.astro`): the newest four releases in
   CHANGELOG.md (`src/releases.ts`), each with its version, date, and the bold
   leads of its first three items (Added, then Changed, then Fixed) word for

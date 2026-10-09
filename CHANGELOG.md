@@ -72,7 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beside the item, if it doesn't go through, and Ideas can be ordered by
   votes. Or ask for something new with a short form that needs no account
   and no email; it says what's kept, and requests are read, never published.
-  Until voting opens on the live site, the page says so. "On this page"
+  Voting is switched off for now while the roadmap is reworked: the page
+  says voting is in the works, and a notice says the roadmap will be updated
+  in the coming week to match where rotli is today. "On this page"
   stays beside the list on a wide screen, the page reads well on a phone,
   and "Roadmap source" links the full roadmap on GitHub. It's in the
   Resources menu and the footer, and the privacy page says what votes and
