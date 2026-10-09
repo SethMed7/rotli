@@ -1,30 +1,30 @@
-// The landing hero's product film (site/public/media/hero/), shot from a real
-// Rotli Web session: real controls clicked with a visible pointer, a fresh
-// origin-private vault holding synthetic notes only, never a live vault or the
-// Mac app. Run Rotli Web locally first:
+// The landing hero's product film (site/public/media/hero/), telling the landing's "Write it
+// down" story: write in your view, the file lives once in your vault, the Librarian files it, ask.
+// Shot from a real Rotli Web session (real controls, a visible pointer, a fresh origin-private
+// vault of synthetic notes), around one clip from the Mac app, where the Librarian really runs.
 //
-//   ROTLI_BUILD_CHANNEL=stable bun run dev:web     # serves 127.0.0.1:1437/app/
-//   bun run capture:hero [http://127.0.0.1:1437/app/]
+//   ROTLI_BUILD_CHANNEL=stable bun run dev:web     # serves localhost:1437/app/
+//   HERO_LIBRARIAN_CLIP=/path/to/clip.mov bun run capture:hero [http://localhost:1437/app/]
 //
-// What is fixture, and why (site/README.md, "The hero film"):
-// - The Library's filed notes (wiki/Travel, wiki/People, wiki/Home) are planted
-//   as files carrying the Librarian's own frontmatter fields. The Librarian
-//   runs only in the Mac app, so the film shows its result, never a live run.
-// - Chat runs through a fake Rotli Helper on loopback (the e2e/web/
-//   rotli-helper.spec.ts pattern). The app's real agent loop sends every
-//   prompt; the fake answers with scripted model text, and the search and the
-//   note reads in between are the app's own, over the vault on screen.
-// - The page clock starts at the real time, in a fixed zone (see START below).
-//
-// Output: _review/hero-video/ (frames, raw take, caption plates, contact frames)
-// and the encoded film + poster in site/public/media/hero/.
+// Without HERO_LIBRARIAN_CLIP it makes a draft in _review/hero-video/ (a placeholder card at the
+// cut) and leaves the site's film alone. site/README.md ("The hero film") has the storyboard, how
+// to shoot the Mac clip (scripts/hero-librarian-vault.mjs), and what is fixture and why.
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { chromium } from "@playwright/test";
 
-const app = new URL(process.argv[2] ?? "http://127.0.0.1:1437/app/");
+import {
+  FILED,
+  FILED_FIELDS,
+  NOTE_LINES,
+  POINTER,
+  scriptedModel,
+  withLibrarianFields,
+} from "./hero-film-fixture.mjs";
+
+const app = new URL(process.argv[2] ?? "http://localhost:1437/app/");
 if (!["localhost", "127.0.0.1", "[::1]"].includes(app.hostname) || app.username || app.password)
   throw new Error("The hero film is shot from a local Rotli Web server without credentials");
 const root = join(import.meta.dir, "..");
@@ -45,132 +45,11 @@ const BAND = 1080 - VIEW.height * SCALE;
 const TIMEZONE = "America/New_York"; // START is real: page clock = browser file times
 const START = new Date(Math.floor(Date.now() / 60_000) * 60_000);
 
-// —— the synthetic vault: notes the Librarian filed earlier, by area ——
-const FILED = {
-  "wiki/Travel/Lisbon trip.md": `---
-area: Travel
-summary: Four days in Lisbon with Ana, May 14 to 18.
-tags: [travel, lisbon]
-links: ["[[Ana]]"]
-filed_by: librarian
----
-# Lisbon trip
-
-May 14–18 · staying in Alfama
-
-- [x] Book the apartment in Alfama
-- [ ] Tram 28 tickets
-- [ ] Pick a fado night
-`,
-  "wiki/Travel/Packing list.md": `---
-area: Travel
-tags: [travel]
-filed_by: librarian
----
-# Packing list
-
-- [ ] Plug adapter
-- [ ] Walking shoes
-- [ ] Rain jacket
-`,
-  "wiki/People/Ana.md": `---
-area: People
-tags: [friends]
-filed_by: librarian
----
-# Ana
-
-Friend from the design meetup. Vegetarian. Prefers late flights.
-`,
-  "wiki/Home/Groceries.md": `---
-area: Home
-tags: [errands]
-filed_by: librarian
----
-# Groceries
-
-Olive oil, sourdough, oat milk, blueberries.
-`,
-};
-
-// —— the scripted model behind the fake helper: it asks the app to search and
-// read, then answers only from what those real tool results returned ——
-const ANSWER = [
-  "Three things are still open:",
-  "",
-  "- **Book the tile museum**",
-  "- **Ask Ana about flights**",
-  "- **Tram 28 tickets** (go early, before the crowds)",
-  "",
-  "The apartment in Alfama is already booked for May 14–18.",
-].join("\n");
-function scriptedModel(prompt) {
-  if (prompt.startsWith("System: You name conversations")) return "Lisbon loose ends";
-  if (prompt.startsWith("You maintain the running notes"))
-    return "- Still open for Lisbon: tile museum, flights with Ana, tram 28 tickets";
-  if (!prompt.includes("STEP 1 ACTION"))
-    return JSON.stringify({ tool: "search_notes", args: { query: "Lisbon" } });
-  if (!prompt.includes("STEP 2 ACTION")) {
-    const hits = JSON.parse(prompt.match(/STEP 1 RESULT[^\n]*\n<result>\n(.*)\n<\/result>/)[1]);
-    const capture = hits.find((hit) => hit.title.startsWith("lisbon w/"));
-    if (!capture) throw new Error("search did not return the note written on camera");
-    return JSON.stringify({ tool: "read_note", args: { id: capture.id } });
-  }
-  if (!prompt.includes("STEP 3 ACTION"))
-    return JSON.stringify({ tool: "read_note", args: { id: "wiki/Travel/Lisbon trip.md" } });
-  return JSON.stringify({ final: ANSWER });
-}
-
-// The pointer the film shows (Playwright's own is invisible in captures): an
-// arrow that follows real mouse events, plus a ring on each press.
-const POINTER = `(() => {
-  const mount = () => {
-    const style = document.createElement("style");
-    style.textContent = \`
-      #hero-pointer { position: fixed; left: 0; top: 0; z-index: 2147483647; pointer-events: none;
-        width: 24px; height: 24px; transform: translate(-100px, -100px); transition: opacity 200ms; }
-      .hero-press { position: fixed; z-index: 2147483646; pointer-events: none; width: 34px; height: 34px;
-        margin: -17px 0 0 -17px; border-radius: 50%; border: 2px solid #c97e62;
-        animation: hero-press 420ms ease-out forwards; }
-      @keyframes hero-press { from { transform: scale(0.4); opacity: 0.9; } to { transform: scale(1.2); opacity: 0; } }\`;
-    const pointer = document.createElement("div");
-    pointer.id = "hero-pointer";
-    pointer.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24"><path d="M5 3l13.5 10.2-6 .9 3.6 6.7-2.6 1.4-3.6-6.8L5 19.6z" fill="#3a3028" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
-    document.documentElement.append(style, pointer);
-    addEventListener("mousemove", (e) => { pointer.style.transform = \`translate(\${e.clientX - 5}px, \${e.clientY - 3}px)\`; }, true);
-    addEventListener("mousedown", (e) => {
-      const ring = document.createElement("div");
-      ring.className = "hero-press";
-      ring.style.left = e.clientX + "px";
-      ring.style.top = e.clientY + "px";
-      document.documentElement.append(ring);
-      setTimeout(() => ring.remove(), 500);
-    }, true);
-  };
-  if (document.readyState === "loading") addEventListener("DOMContentLoaded", mount); else mount();
-})();`;
-
 // the flag makes the screencast deliver device pixels, not CSS pixels
 const browser = await chromium.launch({ args: [`--force-device-scale-factor=${SCALE}`] });
-// The image dropped on camera: a drawn panel of blue-and-white tiles.
 await mkdir(join(review, "plates"), { recursive: true });
-{
-  const tilePage = await browser.newPage({ viewport: { width: 440, height: 248 } });
-  const tile = `<g><rect width="80" height="80" fill="#f4efe4"/><rect x="2" y="2" width="76" height="76" fill="none" stroke="#2f5d9b" stroke-width="2"/>
-    <path d="M40 8c8 12 8 20 0 32-8-12-8-20 0-32zM40 72c8-12 8-20 0-32-8 12-8 20 0 32zM8 40c12-8 20-8 32 0-12 8-20 8-32 0zM72 40c-12-8-20-8-32 0 12 8 20 8 32 0z" fill="#2f5d9b"/>
-    <circle cx="40" cy="40" r="6" fill="#e2a33b"/><path d="M0 0h14L0 14zM80 0H66l14 14zM0 80h14L0 66zM80 80H66l14-14z" fill="#2f5d9b"/></g>`;
-  const cells = [];
-  for (let y = 0; y < 5; y++)
-    for (let x = 0; x < 8; x++) cells.push(`<use href="#t" x="${x * 80}" y="${y * 80}"/>`);
-  await tilePage.setContent(
-    `<body style="margin:0"><svg width="440" height="248" viewBox="0 0 640 360"><defs>${tile.replace("<g>", '<g id="t">')}</defs>${cells.join("")}</svg></body>`,
-  );
-  await tilePage.screenshot({ path: join(review, "plates/tiles.png") });
-  await tilePage.close();
-}
 const marks = [];
 const frames = [];
-let filmStart = 0;
 try {
   const context = await browser.newContext({
     viewport: VIEW,
@@ -218,7 +97,7 @@ try {
     return json({ error: "unknown command" }, 404);
   });
 
-  // —— off camera: a fresh vault, the filed notes, chat paired ——
+  // —— off camera: a fresh vault, the filed notes, chat paired, the window tidy ——
   await page.goto(app.href);
   await page.locator(".web-vault-gate h1").waitFor();
   await page.evaluate(async () => {
@@ -237,19 +116,22 @@ try {
   await page.reload();
   await page.getByRole("tab", { selected: true }).filter({ hasText: "Welcome to Rotli" }).waitFor();
   await page.waitForTimeout(1500); // the Welcome lessons finish writing
-  await page.evaluate(async (files) => {
-    const dir = await navigator.storage.getDirectory();
-    for (const [path, text] of Object.entries(files)) {
-      const parts = path.split("/");
-      let at = dir;
-      for (const part of parts.slice(0, -1)) at = await at.getDirectoryHandle(part, { create: true });
-      const writable = await (await at.getFileHandle(parts.at(-1), { create: true })).createWritable();
-      await writable.write(text);
-      await writable.close();
-    }
-  }, FILED);
+  const plant = (files) =>
+    page.evaluate(async (entries) => {
+      const dir = await navigator.storage.getDirectory();
+      for (const [path, text] of Object.entries(entries)) {
+        const parts = path.split("/");
+        let at = dir;
+        for (const part of parts.slice(0, -1)) at = await at.getDirectoryHandle(part, { create: true });
+        const writable = await (await at.getFileHandle(parts.at(-1), { create: true })).createWritable();
+        await writable.write(text);
+        await writable.close();
+      }
+    }, files);
+  await plant(FILED);
   await page.reload();
   await page.getByRole("tab", { selected: true }).filter({ hasText: "Welcome to Rotli" }).waitFor();
+  // Chat paired with the fake helper.
   await page.locator(".sb-switch-seg.desktop-only").click();
   const pairing = page.getByRole("dialog", { name: "Chat on the web" });
   await pairing
@@ -258,28 +140,57 @@ try {
   await pairing.getByRole("button", { name: "Pair" }).click();
   await pairing.getByRole("button", { name: "Use Claude Code in chat" }).click();
   await pairing.getByRole("button", { name: "Done" }).click();
+  // The window tidy, through Settings like anyone would: no ambient player, and Home without
+  // the activity card, All notes, or Tasks, so the sidebar has room for Main and the vault.
+  await page
+    .getByRole("button", { name: /^Settings/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  const ambient = page.getByRole("switch", { name: /^Ambient audio/ });
+  if ((await ambient.getAttribute("aria-checked")) === "true") await ambient.click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  for (const name of ["Activity overview", "All notes", "Tasks"]) {
+    const toggle = page.getByRole("switch", { name: new RegExp(`^${name}`) });
+    if ((await toggle.getAttribute("aria-checked")) === "true") await toggle.click();
+  }
+  await page.getByRole("button", { name: /Back to notes/ }).click();
   await page.getByRole("button", { name: "Home", exact: true }).click();
+  // No note open (a new note joins the open note's folder; with none it is a row of its own in
+  // Main), the Welcome lessons folded, and the System zone folded.
+  const welcomeTab = page.getByRole("tab").filter({ hasText: "Welcome to Rotli" });
+  await welcomeTab.hover();
+  await welcomeTab.locator("button").last().click();
+  const welcome = page
+    .locator('.main-tree button.frow[data-main-folder="1"]', { hasText: "Welcome" })
+    .first();
+  if ((await welcome.getAttribute("aria-expanded")) === "true") await welcome.click();
+  const system = page.locator("button.sb-syshdr");
+  if ((await system.getAttribute("aria-expanded")) === "true") await system.click();
   await page.evaluate(() => document.fonts.ready);
   await page.mouse.move(VIEW.width * 0.62, VIEW.height * 0.55);
   await page.waitForTimeout(800);
 
-  // —— the camera: a CDP screencast at device resolution, every frame timed ——
+  // —— the camera: a CDP screencast at device resolution, every frame timed; it stops at the
+  // cut (the Mac clip goes there) and starts again after it ——
   const cdp = await context.newCDPSession(page);
   let writes = Promise.resolve();
+  let segment = 0;
   cdp.on("Page.screencastFrame", ({ data, metadata, sessionId }) => {
     void cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
     const path = join(frameDir, `${String(frames.length).padStart(5, "0")}.jpg`);
-    frames.push({ path, at: metadata.timestamp });
+    frames.push({ path, at: metadata.timestamp, segment });
     writes = writes.then(() => writeFile(path, Buffer.from(data, "base64")));
   });
-  await cdp.send("Page.startScreencast", {
-    format: "jpeg",
-    quality: 95,
-    maxWidth: VIEW.width * SCALE,
-    maxHeight: VIEW.height * SCALE,
-  });
-  filmStart = Date.now() / 1000;
-  const mark = (name) => marks.push({ name, at: Date.now() / 1000 - filmStart });
+  const camera = () =>
+    cdp.send("Page.startScreencast", {
+      format: "jpeg",
+      quality: 95,
+      maxWidth: VIEW.width * SCALE,
+      maxHeight: VIEW.height * SCALE,
+    });
+  await camera();
+  const mark = (name) => marks.push({ name, at: Date.now() / 1000, segment });
   const hold = (ms) => page.waitForTimeout(ms);
 
   // Glide the pointer to a control, then press it.
@@ -319,101 +230,108 @@ try {
       await page.waitForTimeout(ch === "\n" ? 240 : /[,.?—:]/.test(ch) ? gap + 90 : gap);
     }
   }
+  const centre = async (locator) => {
+    const box = await locator.boundingBox();
+    return [box.x + box.width * 0.45, box.y + box.height / 2];
+  };
+  const viewPicker = () => page.getByRole("button", { name: /^Current view: / });
+  async function pickView(name) {
+    await press(viewPicker());
+    await hold(450);
+    await press(page.getByRole("menuitemcheckbox", { name: new RegExp(`^${name}`) }));
+    await hold(500);
+  }
+  const vaultRow = (folder) => page.locator(`.main-tree [data-main-id="main:${folder}"]`).first();
+  let notePath = "";
 
   try {
-    // 1 — write however you think
+    // 1 — write in your view: a new note in Main
     mark("write");
     await hold(900);
-    await press(page.getByRole("button", { name: /^New…/ }).first());
-    const chooser = page.locator(".ni-surface");
-    await hold(700);
-    await press(chooser.getByRole("button", { name: /New Markdown note/ }));
+    await press(page.getByRole("button", { name: "New note in Main" }));
     const editor = page.locator(".pane.focused .cm-content");
     await editor.waitFor();
     await press(editor.locator(".cm-line").first(), { dx: 0.1 });
     await glide(VIEW.width * 0.78, VIEW.height * 0.34, 420); // out of the writing's way
-    await jot(
-      "lisbon w/ ana — may 14??\ntram 28 early, before the crowds\n- [ ] book the tile museum\nask Ana re: flights\n",
-    );
-    await page.keyboard.press("Enter"); // an empty item ends the list
-    await hold(350);
-    // an image dropped from the desktop: the drop the app receives, from a file
-    const image = await readFile(join(review, "plates/tiles.png"));
-    await editor.evaluate((host, base64) => {
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      const data = new DataTransfer();
-      data.items.add(new File([bytes], "tiles.png", { type: "image/png" }));
-      const line = [...host.querySelectorAll(".cm-line")].at(-1).getBoundingClientRect();
-      host.dispatchEvent(
-        new DragEvent("drop", {
-          bubbles: true,
-          cancelable: true,
-          dataTransfer: data,
-          clientX: line.left + 4,
-          clientY: line.top + line.height / 2,
-        }),
-      );
-    }, image.toString("base64"));
-    await editor.locator('img[src^="blob:"]').first().waitFor();
-    await hold(900);
-    await page.keyboard.press("ControlOrMeta+End");
-    await jot("\nsee [[Lisbon t"); // not "Lis": the newer note being written would rank first
-    await page.locator(".rotli-linkpick").waitFor();
-    await page.locator(".rotli-linkpick-title").first().filter({ hasText: "Lisbon trip" }).waitFor();
-    await hold(800);
-    await page.keyboard.press("Enter");
-    await hold(1600);
-
-    // 2 — captures wait; the Librarian files notes into the Library
-    mark("library");
-    await press(editor.locator(".rotli-wikilink").first());
-    await page.getByRole("tab", { selected: true }).filter({ hasText: "Lisbon trip" }).waitFor();
-    await hold(1900);
-    await press(page.locator("[role=option]", { hasText: "Library" }).first());
-    await hold(1300);
-    await press(page.getByText("Travel", { exact: true }).first(), { double: true });
-    await hold(1900);
-
-    // 3 — find it again
-    mark("find");
-    await press(page.getByRole("button", { name: /Search notes and actions/ }), { dx: 0.3 });
-    await hold(300);
-    await jot("tile");
-    await page.locator(".prow", { hasText: "lisbon w/" }).first().waitFor();
+    await jot(NOTE_LINES.join("\n"));
+    await hold(700);
+    // it is in Main, where you put it: its row in the view
+    const mainRow = page.locator(".main-tree [data-note-id]", { hasText: "call w/ dana" }).first();
+    await mainRow.waitFor({ timeout: 15_000 });
+    await glide(...(await centre(mainRow)), 640);
     await hold(1700);
-    await page.keyboard.press("Enter");
-    await page.getByRole("tab", { selected: true }).filter({ hasText: "lisbon w/" }).waitFor();
-    await hold(1400);
 
-    // 4 — ask your notes
+    // 2 — the same file, once, in your vault
+    mark("vault");
+    await pickView("Vault");
+    await press(vaultRow("_inbox"));
+    await hold(2200);
+
+    // the cut: the Mac clip shows the Librarian filing this note
+    mark("cut");
+    await cdp.send("Page.stopScreencast");
+    segment = 1;
+    notePath = await page.evaluate(async (first) => {
+      const dir = await navigator.storage.getDirectory();
+      const inbox = await (await dir.getDirectoryHandle("wiki")).getDirectoryHandle("_inbox");
+      for await (const [name, handle] of inbox)
+        if (handle.kind === "file" && (await (await handle.getFile()).text()).includes(first))
+          return `wiki/_inbox/${name}`;
+      return "";
+    }, NOTE_LINES[0]);
+    if (!notePath) throw new Error("the note written on camera is not in wiki/_inbox");
+    // what the Librarian did in the clip: its fields on top, the words untouched, into Clients
+    const typed = await page.evaluate(async (path) => {
+      const parts = path.split("/");
+      let at = await navigator.storage.getDirectory();
+      for (const part of parts.slice(0, -1)) at = await at.getDirectoryHandle(part);
+      const text = await (await at.getFileHandle(parts.at(-1))).getFile().then((f) => f.text());
+      await at.removeEntry(parts.at(-1));
+      return text;
+    }, notePath);
+    notePath = notePath.replace("wiki/_inbox/", "wiki/Clients/");
+    await writeFile(join(review, "note-before-filing.md"), typed);
+    await plant({ [notePath]: withLibrarianFields(typed) });
+    await page.reload();
+    await page.locator(".pane.focused .cm-content").waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    await hold(600);
+    await camera();
+
+    // 3 — after the Librarian: the file in Clients (the Mac clip showed its fields), the words
+    // untouched, and Main just as you left it
+    mark("after");
+    if ((await viewPicker().getAttribute("aria-label"))?.includes("Main")) await pickView("Vault");
+    await press(vaultRow("Clients"));
+    await hold(900);
+    await press(page.locator(".main-tree [data-note-id]", { hasText: "call w/ dana" }).first());
+    await hold(600);
+    // filed into Clients (the location says so), the words as typed
+    await glide(...(await centre(page.locator(".status-inline .ed-loc"))), 640);
+    await hold(1600);
+    await glide(VIEW.width * 0.5, VIEW.height * 0.32, 600);
+    await hold(1400);
+    // and Main as you left it
+    await pickView("Main");
+    await glide(
+      ...(await centre(page.locator(".main-tree [data-note-id]", { hasText: "call w/ dana" }).first())),
+      600,
+    );
+    await hold(2000);
+
+    // 4 — ask, and the AI reads only what it needs
     mark("ask");
     await press(page.getByRole("button", { name: "Chat", exact: true }));
     await hold(500);
     await press(page.getByRole("button", { name: "New chat", exact: true }));
     const composer = page.getByPlaceholder(/Message rotli/).first();
     await press(composer, { dx: 0.3 });
-    await jot("What's still open for Lisbon?");
+    await jot("What did Dana want, and what's left?");
     await hold(250);
     await page.keyboard.press("Enter");
-    await page.getByText("Three things are still open").waitFor({ timeout: 20_000 });
+    await page.getByText("Still open: ask Jo about the discount").waitFor({ timeout: 20_000 });
     await glide(VIEW.width * 0.86, VIEW.height * 0.5, 600);
-    await hold(3200);
-
-    // 5 — plain Markdown files, yours to keep
-    mark("files");
-    await press(page.getByRole("button", { name: "Home", exact: true }));
-    await hold(400);
-    await press(page.getByRole("tab").filter({ hasText: "lisbon w/" }).first());
-    await hold(700);
-    await press(page.getByRole("button", { name: "Aa", exact: true }));
-    await hold(600);
-    await press(
-      page.getByRole("dialog", { name: "Typography" }).getByRole("button", { name: "Raw markdown" }),
-    );
-    await hold(250);
-    await page.keyboard.press("Escape");
-    await glide(VIEW.width * 0.9, VIEW.height * 0.62, 600);
-    await hold(3800);
+    await hold(3600);
     mark("end");
   } catch (error) {
     await page.screenshot({ path: join(review, "failure.png") });
@@ -435,61 +353,131 @@ try {
     return out;
   });
   await writeFile(join(review, "vault-after.json"), JSON.stringify(files, null, 2) + "\n");
-  const capture = Object.values(files).find((text) => text.includes("book the tile museum"));
-  if (!capture?.includes("[[Lisbon trip]]") || !capture.includes("![](storage:images/tiles.png)"))
-    throw new Error("the note written on camera is not in the vault as Markdown");
+  const filed = files[notePath];
+  const fields = FILED_FIELDS.split("\n").filter((line) => line && line !== "---");
+  if (
+    !filed ||
+    !fields.every((line) => filed.includes(line)) ||
+    !NOTE_LINES.every((line) => filed.includes(line))
+  )
+    throw new Error("the note written on camera is not filed in wiki/Clients/ with its words untouched");
+  if (
+    Object.keys(files).some((path) => path.startsWith("wiki/_inbox/") && files[path].includes(NOTE_LINES[0]))
+  )
+    throw new Error("the note written on camera was left in wiki/_inbox/ too");
   await context.close();
 } finally {
   await browser.close();
 }
 
-// —— edit: frames → raw take, caption plates over it, web encode, poster ——
+// —— edit: each take's frames → a raw take, the Mac clip between them, caption plates over the
+// whole, web encode, poster ——
 function ffmpeg(args) {
   const run = spawnSync("ffmpeg", ["-y", "-v", "error", ...args], { stdio: "inherit" });
   if (run.status !== 0) throw new Error(`ffmpeg failed: ${args.join(" ")}`);
 }
-const t0 = frames[0].at;
-const end = filmStart + marks.at(-1).at; // wall clock of the last mark
-const concat =
-  frames
-    .map(
-      (frame, i) =>
-        `file '${frame.path}'\nduration ${Math.max(0.001, (frames[i + 1]?.at ?? end) - frame.at).toFixed(4)}`,
-    )
-    .join("\n") + `\nfile '${frames.at(-1).path}'\n`;
-await writeFile(join(frameDir, "frames.ffconcat"), concat);
+const markAt = (name) => marks.find((m) => m.name === name);
+// One take: its frames, each held until the next, ending at `endAt` (wall clock).
+async function take(index, endAt) {
+  const own = frames.filter((frame) => frame.segment === index);
+  if (own.length === 0) throw new Error(`take ${index + 1} has no frames`);
+  const concat =
+    own
+      .map(
+        (frame, i) =>
+          `file '${frame.path}'\nduration ${Math.max(0.001, (own[i + 1]?.at ?? endAt) - frame.at).toFixed(4)}`,
+      )
+      .join("\n") + `\nfile '${own.at(-1).path}'\n`;
+  const list = join(frameDir, `take-${index + 1}.ffconcat`);
+  await writeFile(list, concat);
+  const out = join(review, `take-${index + 1}.mp4`);
+  ffmpeg([
+    "-safe",
+    "0",
+    "-f",
+    "concat",
+    "-i",
+    list,
+    "-vf",
+    "fps=30,format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "12",
+    out,
+  ]);
+  return { path: out, start: own[0].at, length: endAt - own[0].at };
+}
+const takeA = await take(0, markAt("cut").at);
+const takeB = await take(1, markAt("end").at);
+
+// The Mac clip, fitted into the same 1920 × (1080 − band) picture on the app's own ground. Without
+// one, a placeholder card holds the cut and the film stays a draft.
+const clipPath = process.env.HERO_LIBRARIAN_CLIP;
+const draft = !clipPath;
+const PICTURE = { w: VIEW.width * SCALE, h: VIEW.height * SCALE };
+const clip = join(review, "take-mac.mp4");
+if (clipPath) {
+  ffmpeg([
+    "-i",
+    clipPath,
+    "-vf",
+    `scale=${PICTURE.w}:${PICTURE.h}:force_original_aspect_ratio=decrease,pad=${PICTURE.w}:${PICTURE.h}:(ow-iw)/2:(oh-ih)/2:color=0xF8F2E9,fps=30,format=yuv420p`,
+    "-an",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "12",
+    clip,
+  ]);
+} else {
+  ffmpeg([
+    "-f",
+    "lavfi",
+    "-i",
+    `color=c=0xF1E7D8:s=${PICTURE.w}x${PICTURE.h}:d=4:r=30`,
+    "-vf",
+    "format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    clip,
+  ]);
+}
+const clipLength = Number(
+  spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", clip], {
+    encoding: "utf8",
+  }).stdout.trim(),
+);
+const parts = join(review, "takes.ffconcat");
+await writeFile(parts, [takeA.path, clip, takeB.path].map((path) => `file '${path}'`).join("\n") + "\n");
 const raw = join(review, "hero-raw.mp4");
-ffmpeg([
-  "-safe",
-  "0",
-  "-f",
-  "concat",
-  "-i",
-  join(frameDir, "frames.ffconcat"),
-  "-vf",
-  "fps=30,format=yuv420p",
-  "-c:v",
-  "libx264",
-  "-preset",
-  "fast",
-  "-crf",
-  "12",
-  raw,
-]);
-const offset = filmStart - t0; // screencast clock vs. wall clock
-const at = (name) => marks.find((m) => m.name === name).at + offset;
+ffmpeg(["-safe", "0", "-f", "concat", "-i", parts, "-c", "copy", raw]);
+
+// The film's clock: take A, then the clip, then take B.
+const at = (name) => {
+  const m = markAt(name);
+  return m.segment === 0 ? m.at - takeA.start : takeA.length + clipLength + (m.at - takeB.start);
+};
+const clipFrom = takeA.length;
+const clipTo = takeA.length + clipLength;
 const duration = at("end");
 
 const CAPTIONS = [
-  { text: "Write however you think.", from: at("write") + 0.4, to: at("library") - 0.3 },
+  { text: "Write in your view.", from: at("write") + 0.4, to: at("vault") - 0.3 },
+  { text: "The file lives once, in your vault.", from: at("vault") + 0.2, to: clipFrom - 0.2 },
   {
-    text: "The Librarian files notes into your Library.",
-    from: at("library") + 0.2,
-    to: at("find") - 0.3,
+    text: draft ? "[Mac clip: the Librarian files it]" : "On the Mac, the Librarian files it.",
+    from: clipFrom + 0.2,
+    to: clipTo - 0.2,
   },
-  { text: "Find anything again.", from: at("find") + 0.2, to: at("ask") - 0.3 },
-  { text: "Ask your notes.", from: at("ask") + 0.2, to: at("files") - 0.3 },
-  { text: "Plain Markdown files, in a folder you own.", from: at("files") + 0.2, to: duration },
+  { text: "Your words untouched. Your view as you left it.", from: clipTo + 0.2, to: at("ask") - 0.3 },
+  { text: "Ask, and the AI reads only what it needs.", from: at("ask") + 0.2, to: duration },
 ];
 const font = (await readFile(join(root, "site/public/fonts/GeneralSans-Medium.woff2"))).toString("base64");
 const plateBrowser = await chromium.launch();
@@ -532,7 +520,8 @@ for (const [i, c] of CAPTIONS.entries()) {
 // JPEG frames are full range; browsers expect broadcast range
 chain.push(`${last}scale=out_range=tv,format=yuv420p[out]`);
 last = "[out]";
-const film = join(siteOut, "rotli-hero.mp4");
+// A draft (no Mac clip yet) never replaces the site's film.
+const film = draft ? join(review, "rotli-hero-draft.mp4") : join(siteOut, "rotli-hero.mp4");
 ffmpeg([
   ...inputs,
   "-filter_complex",
@@ -562,10 +551,10 @@ ffmpeg([
   "-an",
   film,
 ]);
-// the poster: the written note, image and link in place, before the Library
+// the poster: the note written in Main, before the vault
 const posterPng = join(review, "poster.png");
-ffmpeg(["-ss", (at("library") - 0.6).toFixed(3), "-i", film, "-frames:v", "1", posterPng]);
-const poster = join(siteOut, "rotli-hero-poster.webp");
+ffmpeg(["-ss", (at("vault") - 0.6).toFixed(3), "-i", film, "-frames:v", "1", posterPng]);
+const poster = draft ? join(review, "rotli-hero-poster-draft.webp") : join(siteOut, "rotli-hero-poster.webp");
 const webp = spawnSync("cwebp", ["-quiet", "-q", "82", posterPng, "-o", poster], { stdio: "inherit" });
 if (webp.status !== 0) throw new Error("cwebp failed");
 // six evenly spaced frames for review
@@ -587,12 +576,15 @@ await writeFile(
       synthetic: true,
       duration,
       bytes: size,
-      marks: marks.map((m) => ({ ...m, at: m.at + offset })),
+      draft,
+      marks: marks.map((m) => ({ name: m.name, at: at(m.name) })),
       captions: CAPTIONS.map(({ text, from, to }) => ({ text, from, to })),
     },
     null,
     2,
   ) + "\n",
 );
-console.log(`Hero film: ${duration.toFixed(1)} s, ${(size / 1e6).toFixed(2)} MB → site/public/media/hero/`);
+console.log(
+  `Hero film${draft ? " (draft, no Mac clip)" : ""}: ${duration.toFixed(1)} s, ${(size / 1e6).toFixed(2)} MB → ${draft ? "_review/hero-video/" : "site/public/media/hero/"}`,
+);
 if (size > 6e6) throw new Error("The hero film is over the 6 MB budget; raise HERO_CRF");

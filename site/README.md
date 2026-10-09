@@ -1537,36 +1537,70 @@ docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  
 ## Films
 
 **The hero film** (`public/media/hero/rotli-hero.mp4` and
-`rotli-hero-poster.webp`, `hero` in `src/films.ts`) is the product itself: a
-real Rotli Web session, under a minute, made by `bun run capture:hero` from a
-local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
-tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
-finds the note with search, asks chat what is still open, and ends on the note
-as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
-in a 162 px band under the picture, never over the UI, in 80 px type so they
-still read (about 15 px) when a phone shows the film 350 px wide. Each caption
-is one line (the script refuses one over 1760 px), the last stays on the frame
-the player rests on, and the player keeps Watch again and pause above the band
-(`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
-`+faststart`, no audio, CRF 18 (about 1.75 MB); the poster is a frame of the
-written note. What is fixture, all synthetic:
+`rotli-hero-poster.webp`, `hero` in `src/films.ts`) tells the landing's own
+story (the owner, 2026-10-09: the earlier film "doesn't show the view and the
+image attached makes no sense"): write in your view, the file lives once in your
+vault, the Librarian files it, ask. It is made by `bun run capture:hero` from a
+local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`, around one clip from the
+Mac app:
 
-- **The Library's filed notes** (Travel, People, Home) are planted as files
-  carrying the Librarian's own fields (`area`, `summary`, `tags`, `links`,
-  `filed_by`). The Librarian runs only in the Mac app, so the film shows what
-  it filed, never a live run, and the note written on camera stays a capture.
+1. **Write in your view** (Rotli Web): New note in Main, "call w/ dana re
+   pricing / she's ok w/ annual. wants the deck fri?? / ask jo about the
+   discount thing", its row in Main.
+2. **The file lives once, in your vault** (Rotli Web): the view picker to
+   "Vault — folders as on disk", the file in `_inbox/`.
+3. **On the Mac, the Librarian files it** (the Mac app, the owner's call:
+   the Librarian runs only there, so its filing is recorded for real). The
+   script cuts here and splices in `HERO_LIBRARIAN_CLIP`, fitted into the
+   same picture on the app's ground.
+4. **Your words untouched. Your view as you left it.** (Rotli Web): the
+   Vault view with the file in `Clients/`, the location "★ Main · Clients",
+   the words as typed, then Main with the note where it was.
+5. **Ask, and the AI reads only what it needs** (Rotli Web): a chat asks
+   "What did Dana want, and what's left?" and answers from that note and the
+   Discount policy.
+
+Real controls are clicked with a drawn pointer; captions sit in a 162 px band
+under the picture, never over the UI, in 80 px type so they still read (about
+15 px) when a phone shows the film 350 px wide. Each caption is one line (the
+script refuses one over 1760 px), and the last stays on the frame the player
+rests on (`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18; the poster is a frame of the note in Main.
+Without `HERO_LIBRARIAN_CLIP` the script makes a draft in `_review/hero-video/`
+with a placeholder card at the cut and never replaces the site's film.
+
+**Shooting the Mac clip.** `bun scripts/hero-librarian-vault.mjs
+/tmp/rotli-hero-vault` writes a vault holding the same notes and the same note,
+word for word, waiting in `wiki/_inbox/dana-call.md` (it refuses a folder that
+is not empty). Open that folder in Rotli on the Mac (never a real vault), turn
+on Settings → General → Show file metadata so the Librarian's fields show,
+open the note, then record just the window (⌘⇧5 → Record Selected Window)
+while the Librarian files it: the note moves to `Clients/` and its area,
+summary, tags, and links appear above the unchanged words. 6 to 10 seconds is
+enough; then `HERO_LIBRARIAN_CLIP=<the .mov> bun run capture:hero`.
+
+What is fixture, all synthetic:
+
+- **The vault's other notes** (Clients, People, Projects, Research; shared
+  with the Mac vault through `scripts/hero-film-fixture.mjs`) are planted as
+  files carrying the Librarian's own fields: notes it filed earlier.
+- **After the cut**, the web vault is given the Librarian's real result from
+  the clip: its fields set in the note's own frontmatter and the file moved
+  to `wiki/Clients/`, the words untouched. The script checks that is what is
+  on disk at the end.
 - **Chat** runs through a fake Rotli Helper on loopback (the
   `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
   every prompt and runs the search and both note reads; only the model's text
   is scripted, and it answers from what those reads returned.
 - **The clock** starts at the real time (New York time zone) so the app's
-  clock and the vault's file times, which the browser stamps itself, agree:
-  the note written on camera reads "just now" and the dates are the day it
-  was shot.
+  clock and the vault's file times, which the browser stamps itself, agree.
+- **The window** is tidied through Settings before the camera rolls (no
+  ambient player; Home without the activity card, All notes, or Tasks), the
+  Welcome lessons folded and their tab closed.
 
-The script fails if the note written on camera is not Markdown in the vault
-or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the
-poster before committing a new take.
+The script fails if the note is not filed in `wiki/Clients/` with its words
+untouched at the end, or the film is over 6 MB. Look at
+`_review/hero-video/frame-*.png` and the poster before committing a new take.
 
 `FilmPlayer.astro` plays it muted, once, as soon as it is on screen, then it
 rests on its last frame; it never loops. A silent film (`silent` in

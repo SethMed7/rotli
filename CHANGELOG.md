@@ -165,9 +165,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notes is coming soon, and the canvas is in development. On the roadmap
   they are one item too, with its own drawing.
 - **rotli.co's home page opens on the app itself.** The film under the
-  headline is now a real recording of rotli: a quick note, the Library,
-  search, chat, and the same note as plain Markdown. It has no sound, so the
-  player offers Watch again instead of Click for sound.
+  headline is a real recording of rotli telling the page's own story: a note
+  written in Main, its one file in the vault, the Librarian filing it on the
+  Mac with your words untouched and your view as you left it, then a chat
+  that reads only the notes it needs. It has no sound, so the player offers
+  Watch again instead of Click for sound.
 - **rotli.co says what rotli is for.** The landing page now opens on "Write
   like a person. Let AI do the filing.", explains with a side-by-side note why
   AI reads notes differently from people (and what the Librarian adds around
