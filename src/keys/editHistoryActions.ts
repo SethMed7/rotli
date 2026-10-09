@@ -77,13 +77,17 @@ export function replayHistoryKey(redo: boolean): void {
   target.dispatchEvent(historyKeyEvent(redo));
 }
 
-/** ⌘Z / ⇧⌘Z as a keydown. Univer matches shortcuts on the legacy keyCode,
- * which a constructed KeyboardEvent leaves at 0, so it is set here. */
+/** The platform's undo / redo press as a keydown: ⌘Z / ⇧⌘Z on the Mac,
+ * Ctrl+Z / ⇧Ctrl+Z elsewhere (lib/historyChords). Univer matches shortcuts on
+ * the legacy keyCode, which a constructed KeyboardEvent leaves at 0, so it is
+ * set here. */
 export function historyKeyEvent(redo: boolean): KeyboardEvent {
+  const mac = /Mac/.test(navigator.platform || navigator.userAgent);
   const event = new KeyboardEvent("keydown", {
     key: redo ? "Z" : "z",
     code: "KeyZ",
-    metaKey: true,
+    metaKey: mac,
+    ctrlKey: !mac,
     shiftKey: redo,
     bubbles: true,
     cancelable: true,
