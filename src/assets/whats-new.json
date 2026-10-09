@@ -1,4 +1,29 @@
 {
+  "1.8.0": [
+    {
+      "title": "Spreadsheets, in Beta",
+      "body": "New Sheet makes a real .xlsx, and .xlsx files open to edit. The toolbar is one row, Theme | White picks the sheet's colours, and ⌘C copies a whole column or block as a table.",
+      "platform": "mac"
+    },
+    {
+      "title": "Charts in your notes",
+      "body": "Type /chart and pick one of ten kinds. The chart lives in the note as plain text you can read and edit, and it follows your theme's colours."
+    },
+    {
+      "title": "Ask AI from the note",
+      "body": "Type /ai, say what you want, and read the answer before Insert adds it where you are. It never changes what you wrote, and a secure note never goes to a connected model.",
+      "platform": "mac"
+    },
+    {
+      "title": "Saving and undo just work",
+      "body": "Sheets and Word documents save themselves a moment after you stop: Saving…, then Saved. ⌘Z and ⇧⌘Z undo and redo in notes, sheets, documents, and boards.",
+      "platform": "mac"
+    },
+    {
+      "title": "Boards that behave",
+      "body": "Links on shapes open, app hotkeys work while a board has focus, and panning is smooth. In Main, Remove from folder or a drag below the list takes a note out of its folder."
+    }
+  ],
   "1.7.0": [
     {
       "title": "Rotli opens with a moment of its own",
