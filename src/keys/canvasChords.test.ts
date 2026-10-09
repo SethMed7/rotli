@@ -128,6 +128,13 @@ describe("app chords over a board", () => {
     expect(result.canvasRan).toBe(true);
   });
 
+  test("⌘Z and ⇧⌘Z over a board reach the board's own undo and redo, never an app action", () => {
+    // (off a board they are edit.undo / edit.redo: editHistoryActions.test.ts)
+    expect(press("KeyZ", { meta: true }, onCanvas, true).canvasRan).toBe(true);
+    expect(press("KeyZ", { meta: true, shift: true }, onCanvas, true).canvasRan).toBe(true);
+    expect(ran).toEqual([]);
+  });
+
   test("a kept chord with Shift matches however its modifiers are spelled (⌘⇧L lock)", () => {
     press("KeyL", { meta: true, shift: true }, onCanvas, true);
     expect(ran).toEqual([]);

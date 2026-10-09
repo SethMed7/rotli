@@ -194,6 +194,9 @@ const CANVAS_OWNED_CHORDS: ReadonlySet<string> = new Set(
     "Meta+Shift+L",
     "Meta+ArrowLeft",
     "Meta+ArrowRight",
+    // a board's own undo/redo (edit.undo / edit.redo cover plain text fields)
+    "Meta+Z",
+    "Meta+Shift+Z",
   ].map(normalizeChord), // a pressed chord is canonical (Shift+Meta+L)
 );
 
