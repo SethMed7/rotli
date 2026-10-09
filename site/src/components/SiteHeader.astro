@@ -1,27 +1,12 @@
 ---
-// The one site header: brand, the site's pages (src/nav.ts), GitHub with its star count while
-// the source is public, and the way in (WAY_IN in src/site.ts: "Download free", to /download/,
-// the same label and button as the hero's; the owner, 2026-10-06: "the top right button should
-// align with button on hero for consistency"). /download/ offers the Mac app and Rotli Web and
-// leads with the visitor's system, so the label holds on Windows and Linux too.
-//
-// The star count is read once while the site is built (src/githubStars.ts); the visitor's
-// browser never calls GitHub. The link is plain (the owner, 2026-10-06: "don't put it in a card,
-// just logo and star count"): the GitHub mark in ink, then a star and the count in GitHub's star
-// gold (--github-star, Base.astro), with no border or fill, left of the button. Its name is
-// "Star rotli on GitHub, 1.2k stars" (hidden words around the count); without a count, "Star
-// rotli on GitHub". The mark and the star are Primer Octicons' mark-github and star-fill
-// (MIT, github.com/primer/octicons), inline, unmodified.
-// Below 560px the star link and the button move into Menu. It stays pinned to
-// the top on a solid ground (flat: no blur, no shadow). Resources is a
-// disclosure dropdown (a button with aria-expanded); without script its label
-// is a plain link to /resources/. Below 1080px the sections fold into a Menu
-// disclosure, where the dropdown's pages are listed under its name. Styles
-// live in Base.astro.
+// The one site header: brand, the site's pages (src/nav.ts), the GitHub mark
+// while the source is public, and one Download button that opens /download/,
+// which picks the right download for the visitor's system. It stays pinned to
+// the top on a solid ground (flat: no blur, no shadow). Below 1080px the
+// sections fold into a Menu disclosure. Styles live in Base.astro.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import { isNavGroup, navEntryHolds, primaryNav, type NavSection } from '../nav';
-import { buildStarCount, formatStarCount } from '../githubStars';
-import { GITHUB_URL, WAY_IN, site } from '../site';
+import { primaryNav, type NavSection } from '../nav';
+import { GITHUB_URL, site } from '../site';
 import { publishedWriting } from '../writing';
 
 interface Props {
@@ -34,10 +19,7 @@ const { current } = Astro.props;
 // The holding page (coming-soon) has no other pages to link to, so every page
 // of that build (the 404 included) shows the brand alone.
 const minimal = Astro.props.minimal === true || !site.showsFullSite;
-const github = site.sourcePublic && !minimal;
-const stars = github ? await buildStarCount() : null;
-const starText = stars === null ? null : formatStarCount(stars);
-const starWord = stars === 1 ? 'star' : 'stars';
+const github = site.sourcePublic;
 const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0 });
 ---
 
@@ -51,109 +33,31 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
       !minimal && (
         <>
           <nav class="primary-nav" aria-label="Primary navigation">
-            {links.map((link) =>
-              isNavGroup(link) ? (
-                <div class:list={['nav-dropdown', { 'is-current': navEntryHolds(link, current) }]} data-dropdown>
-                  <a class="nav-dropdown-fallback" href={link.href} aria-current={link.section === current ? 'page' : undefined}>
-                    {link.label}
-                  </a>
-                  <button
-                    class="nav-dropdown-toggle"
-                    type="button"
-                    aria-expanded="false"
-                    aria-controls={`nav-${link.section}`}
-                  >
-                    {link.label}
-                    <svg viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">
-                      <path d="M3 4.5 6 7.5l3-3" />
-                    </svg>
-                  </button>
-                  <div class="nav-dropdown-panel" id={`nav-${link.section}`} hidden>
-                    <ul>
-                      {link.items.map((item) => (
-                        <li>
-                          <a
-                            href={item.href}
-                            aria-current={item.section === current ? 'page' : undefined}
-                            rel={item.external ? 'noopener' : undefined}
-                          >
-                            <b>
-                              {item.label}
-                              {item.external && <span class="external-mark" aria-hidden="true">↗</span>}
-                              {item.status && <small>{item.status}</small>}
-                            </b>
-                            <span>{item.description}</span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <a href={link.href} aria-current={link.section === current ? 'page' : undefined}>
-                  {link.label}
-                </a>
-              ),
-            )}
+            {links.map((link) => (
+              <a href={link.href} aria-current={link.section && link.section === current ? 'page' : undefined}>
+                {link.label}
+              </a>
+            ))}
           </nav>
           <div class="header-actions">
             {github && (
-              <a class="github-link" href={GITHUB_URL} rel="noopener">
-                <svg class="github-mark" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+              <a class="github-link" href={GITHUB_URL} rel="noopener" aria-label="rotli on GitHub">
+                <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
                 </svg>
-                <span class="github-stars">
-                  <svg class="github-star" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
-                    <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
-                  </svg>
-                  <span class="visually-hidden">Star rotli on GitHub{starText !== null ? ', ' : ''}</span>
-                  {starText !== null && (
-                    <>
-                      <span class="github-count">{starText}</span>
-                      <span class="visually-hidden"> {starWord}</span>
-                    </>
-                  )}
-                </span>
               </a>
             )}
-            <a class="button primary header-download" href={WAY_IN.href} aria-current={current === 'download' ? 'page' : undefined}>{WAY_IN.label}</a>
+            <a class="button primary header-download" href="/download/" aria-current={current === 'download' ? 'page' : undefined}>Download</a>
             <details class="nav-menu">
               <summary>Menu</summary>
               <nav class="nav-menu-panel" aria-label="Site sections">
-                {links.map((link) =>
-                  isNavGroup(link) ? (
-                    <div class="nav-menu-group" role="group" aria-labelledby={`menu-${link.section}`}>
-                      <p class="nav-menu-label" id={`menu-${link.section}`}>{link.label}</p>
-                      {link.items.map((item) => (
-                        <a
-                          href={item.href}
-                          aria-current={item.section === current ? 'page' : undefined}
-                          rel={item.external ? 'noopener' : undefined}
-                        >
-                          {item.label}
-                          {item.external && <span class="external-mark" aria-hidden="true">↗</span>}
-                          {item.status && <small>{item.status}</small>}
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <a href={link.href} aria-current={link.section === current ? 'page' : undefined}>
-                      {link.label}
-                    </a>
-                  ),
-                )}
-                {github && (
-                  <a
-                    class="menu-github"
-                    href={GITHUB_URL}
-                    rel="noopener"
-                    aria-label={starText === null ? undefined : `Star rotli on GitHub, ${starText} ${starWord}`}
-                  >
-                    Star rotli on GitHub
-                    {starText !== null && <small>{starText}</small>}
+                {links.map((link) => (
+                  <a href={link.href} aria-current={link.section && link.section === current ? 'page' : undefined}>
+                    {link.label}
                   </a>
-                )}
-                <a class="button primary" href={WAY_IN.href}>{WAY_IN.label}</a>
+                ))}
+                {github && <a href={GITHUB_URL} rel="noopener">GitHub</a>}
+                <a class="button primary" href="/download/">Download</a>
               </nav>
             </details>
           </div>
@@ -183,57 +87,4 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
       });
     });
   }
-
-  // Header dropdowns (the disclosure pattern: a button that shows a list of
-  // links). Without script the button is hidden (Base.astro) and the label is
-  // a plain link. Enter, Space, or a click toggles; ArrowDown opens and moves
-  // into the list; ArrowUp/ArrowDown, Home, and End move between its links;
-  // Escape closes and returns to the button; leaving it (focus or a click
-  // elsewhere) closes it.
-  document.querySelectorAll<HTMLElement>('[data-dropdown]').forEach((dropdown) => {
-    const toggle = dropdown.querySelector<HTMLButtonElement>('.nav-dropdown-toggle');
-    const panel = dropdown.querySelector<HTMLElement>('.nav-dropdown-panel');
-    if (!toggle || !panel) return;
-    const links = [...panel.querySelectorAll<HTMLAnchorElement>('a')];
-    const setOpen = (open: boolean) => {
-      toggle.setAttribute('aria-expanded', String(open));
-      panel.hidden = !open;
-    };
-    const isOpen = () => toggle.getAttribute('aria-expanded') === 'true';
-    const focusAt = (index: number) => links[(index + links.length) % links.length]?.focus();
-
-    toggle.addEventListener('click', () => setOpen(!isOpen()));
-    toggle.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        setOpen(true);
-        focusAt(event.key === 'ArrowDown' ? 0 : -1);
-      }
-    });
-    panel.addEventListener('keydown', (event) => {
-      const index = links.indexOf(document.activeElement as HTMLAnchorElement);
-      if (event.key === 'ArrowDown') focusAt(index + 1);
-      else if (event.key === 'ArrowUp') focusAt(index - 1);
-      else if (event.key === 'Home') focusAt(0);
-      else if (event.key === 'End') focusAt(-1);
-      else return;
-      event.preventDefault();
-    });
-    dropdown.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && isOpen()) {
-        setOpen(false);
-        toggle.focus();
-      }
-    });
-    // Tabbing away closes it. A focusout with no new target is a click on
-    // something unfocusable (Safari does not focus links on click); the
-    // document click handler below decides those, so a link click lands.
-    dropdown.addEventListener('focusout', (event) => {
-      const next = event.relatedTarget as Node | null;
-      if (next && !dropdown.contains(next)) setOpen(false);
-    });
-    document.addEventListener('click', (event) => {
-      if (isOpen() && !dropdown.contains(event.target as Node)) setOpen(false);
-    });
-  });
 </script>

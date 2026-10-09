@@ -10,7 +10,7 @@ import { questions } from '../../faq';
     <header>
       <h2 class="section-title" id="faq-title">Questions, answered.</h2>
       <p class="section-lede">
-        More on <a href="/blog/">the blog</a>, starting with <a href="/blog/getting-started/">Getting started</a>.
+        More in <a href="/resources/">Resources</a>, starting with <a href="/resources/getting-started/">Getting started</a>.
       </p>
       <!-- The quokka with its magnifying glass, and the questions it is looking into. Plays once. -->
       <div class="faq-scene" data-reveal aria-hidden="true">
@@ -41,15 +41,6 @@ import { questions } from '../../faq';
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" /></svg>
           </summary>
           <p>{item.a}</p>
-          {item.links && (
-            <p class="faq-links">
-              {item.links.map((link) => (
-                <a href={link.href}>
-                  {link.label} <span aria-hidden="true">→</span>
-                </a>
-              ))}
-            </p>
-          )}
         </details>
       ))}
     </div>
@@ -57,6 +48,7 @@ import { questions } from '../../faq';
 </section>
 
 <style>
+  /* The sunset band follows, so the questions keep a full section of room below them. */
   .faq-grid {
     display: grid;
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
@@ -167,26 +159,6 @@ import { questions } from '../../faq';
     margin: -0.35rem 2.5rem 1.6rem 0;
     color: var(--text-muted);
     line-height: 1.62;
-  }
-  /* Where an answer goes further: its links on one line under it, each a 44px target. */
-  details .faq-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 1.5rem;
-    margin-top: -1.1rem;
-  }
-  .faq-links a {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    min-height: 44px;
-    color: var(--accent-text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .faq-links a:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
   }
   @media (max-width: 860px) {
     .faq-grid {

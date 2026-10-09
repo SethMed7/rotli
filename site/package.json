@@ -10,7 +10,6 @@
     "check": "astro check",
     "build": "astro build",
     "build:modes": "bun scripts/build-modes.mjs",
-    "test": "bun test server",
     "preview": "astro preview"
   },
   "dependencies": {

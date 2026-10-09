@@ -4,16 +4,13 @@
 // here restates a claim the pages already make; nothing here may promise more.
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
-import { GUIDE } from "./blog";
-import { questions } from "./faq";
-import { figuresToMarkdown } from "./figures";
-import { alsoCovers, availabilityOf, catalog, featurePath } from "./features";
-import type { RoadmapSection } from "./roadmap";
-import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
-import { slugOf, type Writing } from "./writing";
+import { questions } from './faq';
+import { DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, site } from './site';
+import { slugOf, type Writing } from './writing';
 
-const NAME = "rotli";
-const SUMMARY = `rotli is a free workspace built on plain Markdown files you own, with no account. Notes come first; Docs and Sheets (${DOCS_AND_SHEETS.inline}), chat, and Excalidraw boards work from the same folder. The Librarian files, tags, and links notes in the background, using AI on your own computer or the AI tools you already use, and never rewrites your words. ${PLATFORMS.availability}`;
+const NAME = 'rotli';
+const SUMMARY =
+  'rotli is a calm, local-first notes app for the Mac. Every note is a plain Markdown file in a folder you own, with no account, and AI only when you ask for it.';
 
 /**
  * AI crawlers named in robots.txt. Each gets its own group so the policy is
@@ -26,41 +23,41 @@ export const AI_AGENTS: { agent: string; allow: boolean }[] = [
   // Training crawlers. The four `false` rows mirror what Cloudflare's AI-bot
   // blocking refuses today (measured 2026-09-24: 403 for each). Turning that
   // zone setting off is the moment to flip them to true, not before.
-  { agent: "GPTBot", allow: false },
-  { agent: "ClaudeBot", allow: false },
-  { agent: "CCBot", allow: false },
-  { agent: "Bytespider", allow: false },
-  { agent: "Meta-ExternalAgent", allow: true },
-  { agent: "Google-Extended", allow: true },
-  { agent: "Applebot-Extended", allow: true },
+  { agent: 'GPTBot', allow: false },
+  { agent: 'ClaudeBot', allow: false },
+  { agent: 'CCBot', allow: false },
+  { agent: 'Bytespider', allow: false },
+  { agent: 'Meta-ExternalAgent', allow: true },
+  { agent: 'Google-Extended', allow: true },
+  { agent: 'Applebot-Extended', allow: true },
   // AI search indexers
-  { agent: "OAI-SearchBot", allow: true },
-  { agent: "Claude-SearchBot", allow: true },
-  { agent: "PerplexityBot", allow: true },
+  { agent: 'OAI-SearchBot', allow: true },
+  { agent: 'Claude-SearchBot', allow: true },
+  { agent: 'PerplexityBot', allow: true },
   // Assistants fetching a page for a person mid-conversation
-  { agent: "ChatGPT-User", allow: true },
-  { agent: "Claude-User", allow: true },
-  { agent: "Perplexity-User", allow: true },
+  { agent: 'ChatGPT-User', allow: true },
+  { agent: 'Claude-User', allow: true },
+  { agent: 'Perplexity-User', allow: true },
 ];
 
 /** /app/ is Rotli Web, an application shell with nothing to read (and noindex). */
-const PRIVATE_PATHS = ["/app/"];
+const PRIVATE_PATHS = ['/app/'];
 
 export function robotsText(): string {
-  if (!site.indexable) return "User-agent: *\nDisallow: /\n";
+  if (!site.indexable) return 'User-agent: *\nDisallow: /\n';
   const group = (agent: string, allow: boolean) =>
     [
       `User-agent: ${agent}`,
-      allow ? "Allow: /" : "Disallow: /",
+      allow ? 'Allow: /' : 'Disallow: /',
       ...(allow ? PRIVATE_PATHS.map((path) => `Disallow: ${path}`) : []),
-    ].join("\n");
+    ].join('\n');
   return (
     [
       `# ${NAME}: a summary for AI systems is at ${site.url}/llms.txt`,
-      group("*", true),
+      group('*', true),
       ...AI_AGENTS.map(({ agent, allow }) => group(agent, allow)),
       `Sitemap: ${site.url}/sitemap-index.xml`,
-    ].join("\n\n") + "\n"
+    ].join('\n\n') + '\n'
   );
 }
 
@@ -69,131 +66,68 @@ const link = (title: string, path: string, note: string) => `- [${title}](${site
 /** The Markdown twin's address for a writing page at `/<section>/<slug>/`. */
 export const twinPath = (pagePath: string) => `${pagePath}index.md`;
 
-/** Every piece of writing is a blog post (the guides joined the blog on 2026-10-06). */
 export function writingPath(entry: Writing): string {
-  return `/blog/${slugOf(entry)}/`;
+  return `/${entry.data.section === 'post' ? 'blog' : 'resources'}/${slugOf(entry)}/`;
 }
 
-/** A guide: the evergreen how-to posts, tagged GUIDE (src/blog.ts). */
-const isGuide = (entry: Writing) => entry.data.tags.includes(GUIDE);
-
 /** /llms.txt (llmstxt.org): a title, a one-paragraph summary, then links. */
-export function llmsText(writing: { posts: Writing[] }): string {
+export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): string {
   const facts = [
-    site.sourcePublic
-      ? "Free, with no account. The source is open under the MIT license."
-      : "Free, with no account.",
-    "Notes are plain Markdown files in one folder you choose. A hidden .rotli folder holds settings and search indexes that rotli can rebuild at any time.",
-    "Writing, tasks, links, and search work offline. Chat works offline too with an on-device model.",
-    "AI is optional: a model on your Mac, or the AI tools you install yourself, like Claude Code and Codex, with Cursor for code chat, which rotli runs without ever holding your keys. Secure notes never reach a remote model, and no AI can edit a locked note.",
-    "rotli charges nothing for AI and sells no AI plan: it uses a model on your Mac or the AI tools you already pay for.",
-    "No analytics, ads, or crash uploads.",
+    site.sourcePublic ? 'Free, with no account. The source is open under the MIT license.' : 'Free, with no account.',
+    'Notes are plain Markdown files in one folder you choose. A hidden .rotli folder holds settings and search indexes that rotli can rebuild at any time.',
+    'Writing, tasks, links, and search work offline. Chat works offline too with an on-device model.',
+    'AI is optional: a model on your Mac, or the AI tools you install yourself, like Claude Code and Codex, with Cursor for code chat, which rotli runs without ever holding your keys. Secure notes never reach a remote model, and no AI can edit a locked note.',
+    'No analytics, ads, or crash uploads.',
     site.webAppEnabled
-      ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are coming soon; until then, Windows and Linux use Rotli Web."
-      : "Platforms: the Mac app. Native Windows and Linux apps are coming soon.",
+      ? 'Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are planned.'
+      : 'Platforms: the Mac app. Native Windows and Linux apps are planned.',
   ];
-  const lines = [`# ${NAME}`, "", `> ${SUMMARY}`, "", ...facts.map((fact) => `- ${fact}`)];
+  const lines = [`# ${NAME}`, '', `> ${SUMMARY}`, '', ...facts.map((fact) => `- ${fact}`)];
   if (site.showsFullSite) {
     lines.push(
-      "",
-      "## Pages",
-      "",
-      link(
-        "Features",
-        "/features/",
-        `every capability with its status and where it runs, grouped as ${catalog()
-          .map(({ area }) => area.name)
-          .join(", ")}`,
-      ),
-      link("Privacy", "/privacy/", "what connects to the internet, what AI can see, and why"),
-      link(
-        "Download",
-        "/download/",
-        site.webAppEnabled ? "the Mac app, Rotli Web, and Rotli Helper" : "the Mac app",
-      ),
-      link("Changelog", "/changelog/", "every release, newest first"),
-      link(
-        "Roadmap",
-        "/roadmap/index.md",
-        "what is being built, what is planned, and what is still an idea; people vote on items and send requests on the page",
-      ),
-      link("About", "/about/", "why it is being built, where the name comes from, and who makes it"),
+      '',
+      '## Pages',
+      '',
+      link('Features', '/features/', 'the editor, tasks, links, chat, documents and boards, the Librarian, and themes'),
+      link('Privacy', '/privacy/', 'what connects to the internet, what AI can see, and why'),
+      link('Download', '/download/', site.webAppEnabled ? 'the Mac app, Rotli Web, and Rotli Helper' : 'the Mac app'),
+      link('Changelog', '/changelog/', 'every release, newest first'),
+      link('About', '/about/', 'where the name comes from, what rotli believes, and who makes it'),
     );
     const section = (title: string, entries: Writing[]) =>
       entries.length > 0
         ? [
-            "",
+            '',
             `## ${title}`,
-            "",
-            ...entries.map((entry) =>
-              link(entry.data.title, twinPath(writingPath(entry)), entry.data.description),
-            ),
+            '',
+            ...entries.map((entry) => link(entry.data.title, twinPath(writingPath(entry)), entry.data.description)),
           ]
         : [];
-    lines.push(
-      "",
-      "## Features",
-      "",
-      ...catalog().flatMap(({ features }) =>
-        features.map((feature) =>
-          link(feature.name, featurePath(feature), `${availabilityOf(feature)}. ${feature.line}${alsoCovers(feature)}`),
-        ),
-      ),
-    );
-    lines.push(
-      ...section("Guides", writing.posts.filter(isGuide)),
-      ...section(
-        "Blog",
-        writing.posts.filter((entry) => !isGuide(entry)),
-      ),
-    );
+    lines.push(...section('Resources', writing.resources), ...section('Blog', writing.posts));
   }
   const optional = [
     ...(site.sourcePublic ? [`- [Source code](${GITHUB_URL}): the repository`] : []),
-    ...(site.indexable ? [link("Sitemap", "/sitemap-index.xml", "every page on this site")] : []),
+    ...(site.indexable ? [link('Sitemap', '/sitemap-index.xml', 'every page on this site')] : []),
   ];
-  if (optional.length > 0) lines.push("", "## Optional", "", ...optional);
-  return lines.join("\n") + "\n";
+  if (optional.length > 0) lines.push('', '## Optional', '', ...optional);
+  return lines.join('\n') + '\n';
 }
 
-/** /roadmap/'s twin: the three public sections, each item with its size and summary. */
-export function roadmapMarkdown(sections: RoadmapSection[]): string {
-  const lines = [
-    "# What's next for rotli",
-    "",
-    "> Direction, not a promise, and no dates. Sizes: S hours, M days, L 1–3 weeks, XL a month or more.",
-  ];
-  for (const section of sections) {
-    lines.push("", `## ${section.title}`, "");
-    for (const item of section.items) {
-      lines.push(`- **${item.title}**${item.size ? ` (${item.size})` : ""}: ${item.summary}`);
-    }
-  }
-  lines.push(
-    "",
-    "---",
-    "",
-    `Vote for an item, or ask for something new, at ${site.url}/roadmap/`,
-    "",
-  );
-  return lines.join("\n");
-}
-
-/** A writing page as Markdown: its title, summary, and the source body, its figures as tables. */
+/** A writing page as Markdown: its title, summary, and the source body. */
 export function writingMarkdown(entry: Writing): string {
   const url = `${site.url}${writingPath(entry)}`;
   return [
     `# ${entry.data.title}`,
-    "",
+    '',
     `> ${entry.data.description}`,
-    "",
-    figuresToMarkdown((entry.body ?? "").trim()),
-    "",
-    "---",
-    "",
+    '',
+    (entry.body ?? '').trim(),
+    '',
+    '---',
+    '',
     `Source: ${url}`,
-    "",
-  ].join("\n");
+    '',
+  ].join('\n');
 }
 
 // ─── JSON-LD (schema.org) ────────────────────────────────────────────────
@@ -201,7 +135,7 @@ export function writingMarkdown(entry: Writing): string {
 type Ld = Record<string, unknown>;
 
 const organization: Ld = {
-  "@type": "Organization",
+  '@type': 'Organization',
   name: NAME,
   url: site.url,
   logo: `${site.url}/apple-touch-icon.png`,
@@ -210,20 +144,20 @@ const organization: Ld = {
 
 /** Serialized for a `<script type="application/ld+json">`; `<` escaped so text cannot close the tag. */
 export function jsonLd(graph: Ld[]): string {
-  return JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c');
 }
 
 export function application(): Ld {
   return {
-    "@type": "SoftwareApplication",
+    '@type': 'SoftwareApplication',
     name: NAME,
     description: SUMMARY,
     url: site.url,
     image: `${site.url}/social-card.png`,
-    applicationCategory: "ProductivityApplication",
-    operatingSystem: site.webAppEnabled ? "macOS, Web browser" : "macOS",
+    applicationCategory: 'ProductivityApplication',
+    operatingSystem: site.webAppEnabled ? 'macOS, Web browser' : 'macOS',
     isAccessibleForFree: true,
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     ...(site.downloadsEnabled ? { downloadUrl: DOWNLOAD_URL } : {}),
     ...(site.sourcePublic ? { license: LICENSE_URL } : {}),
     publisher: organization,
@@ -232,14 +166,14 @@ export function application(): Ld {
 
 export function landingGraph(): Ld[] {
   return [
-    { "@type": "WebSite", name: NAME, url: site.url, publisher: organization },
+    { '@type': 'WebSite', name: NAME, url: site.url, publisher: organization },
     application(),
     {
-      "@type": "FAQPage",
+      '@type': 'FAQPage',
       mainEntity: questions.map(({ q, a }) => ({
-        "@type": "Question",
+        '@type': 'Question',
         name: q,
-        acceptedAnswer: { "@type": "Answer", text: a },
+        acceptedAnswer: { '@type': 'Answer', text: a },
       })),
     },
   ];
@@ -247,10 +181,11 @@ export function landingGraph(): Ld[] {
 
 export function writingGraph(entry: Writing): Ld[] {
   const path = writingPath(entry);
-  const index = { path: "/blog/", name: "Blog" };
+  const index =
+    entry.data.section === 'post' ? { path: '/blog/', name: 'Blog' } : { path: '/resources/', name: 'Resources' };
   return [
     {
-      "@type": "BlogPosting",
+      '@type': entry.data.section === 'post' ? 'BlogPosting' : 'Article',
       headline: entry.data.title,
       description: entry.data.description,
       datePublished: entry.data.date.toISOString().slice(0, 10),
@@ -261,11 +196,11 @@ export function writingGraph(entry: Writing): Ld[] {
       publisher: organization,
     },
     {
-      "@type": "BreadcrumbList",
+      '@type': 'BreadcrumbList',
       itemListElement: [
-        { "@type": "ListItem", position: 1, name: NAME, item: `${site.url}/` },
-        { "@type": "ListItem", position: 2, name: index.name, item: `${site.url}${index.path}` },
-        { "@type": "ListItem", position: 3, name: entry.data.title, item: `${site.url}${path}` },
+        { '@type': 'ListItem', position: 1, name: NAME, item: `${site.url}/` },
+        { '@type': 'ListItem', position: 2, name: index.name, item: `${site.url}${index.path}` },
+        { '@type': 'ListItem', position: 3, name: entry.data.title, item: `${site.url}${path}` },
       ],
     },
   ];

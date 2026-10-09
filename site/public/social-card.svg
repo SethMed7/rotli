@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
-  <title id="title">Rotli — write like a person, let AI do the filing</title>
+  <title id="title">Rotli — room to think, files you keep</title>
   <desc id="description">The rotli card on Rottnest by day: the headline over a faint file pattern, the lighthouse on its hill, the bay along the bottom, the app tilted in from the right, and the cocoa quokka waving from the sand.</desc>
   <!-- Rendered by scripts/build-social-card.mjs: fonts/ and asset: references are inlined, the network is off. -->
   <style>@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-Semibold.woff2"); font-weight: 700; } @font-face { font-family: "Baloo 2"; src: url("fonts/Baloo2-600.ttf"); font-weight: 600; }</style>
@@ -44,9 +44,9 @@
   <path d="M0 630V574C140 560 320 562 470 590C510 600 540 614 552 630Z" fill="#f1e3c4"/>
     <path d="M0 574C140 560 320 562 470 590C510 600 540 614 552 630" fill="none" stroke="#2b231d" stroke-width="3"/>
   <text x="72" y="100" fill="#3a3028" font-family="'Baloo 2', sans-serif" font-size="40" font-weight="600" letter-spacing="-0.5">rotli</text>
-  <g font-family="'General Sans', Arial, sans-serif" font-size="60" font-weight="700" letter-spacing="-2.4" fill="#3a3028">
-    <text x="68" y="210">Write like a person.</text>
-    <text x="68" y="278">Let AI do the filing.</text>
+  <g font-family="'General Sans', Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3.5" fill="#3a3028">
+    <text x="68" y="219">Room to think.</text>
+    <text x="68" y="295">Files you keep.</text>
   </g>
 
   <!-- The app, tilted in from the right. -->

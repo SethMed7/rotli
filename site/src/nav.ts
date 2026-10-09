@@ -9,112 +9,28 @@ import {
   site,
 } from './site';
 
-export type NavSection =
-  | 'product'
-  | 'features'
-  | 'privacy'
-  | 'download'
-  | 'resources'
-  | 'blog'
-  | 'developers'
-  | 'changelog'
-  | 'roadmap'
-  | 'studio'
-  | 'about';
+export type NavSection = 'product' | 'features' | 'privacy' | 'download' | 'resources' | 'blog' | 'about';
 
 export interface SiteLink {
   href: string;
   label: string;
-  /** Another site (rotli's own studio): drawn with an outward arrow, opened in the same tab. */
-  external?: boolean;
 }
 
 export interface NavLink extends SiteLink {
   section: NavSection;
 }
 
-/** One entry inside a header dropdown: a page, a line about it, and an optional status. */
-export interface NavItem extends NavLink {
-  description: string;
-  /** A short status shown beside the label, e.g. "Coming soon". */
-  status?: string;
-}
-
-/** A header dropdown. `href` is where its label goes without script (and the no-JS fallback). */
-export interface NavGroup extends NavLink {
-  items: NavItem[];
-}
-
-export type NavEntry = NavLink | NavGroup;
-
-export const isNavGroup = (entry: NavEntry): entry is NavGroup => 'items' in entry;
-
-/** True when `current` is the entry's own section or one of its items'. */
-export function navEntryHolds(entry: NavEntry, current: NavSection | undefined): boolean {
-  if (current === undefined) return false;
-  return entry.section === current || (isNavGroup(entry) && entry.items.some((item) => item.section === current));
-}
-
 /**
- * The Resources dropdown, and the /resources/ page that lists the same entries for anyone without
- * script: Blog (the one writing section; the guides are posts tagged Guide since 2026-10-06),
- * Developers, Changelog, Roadmap, and Rotli Studio (studio.rotli.co, its own site, marked
- * `external`). Blog appears only once a post can be read, so nothing leads
- * to an index of nothing but "coming soon". The developer reference (MCP and the CLI) is a
- * development-build feature: the launch site labels it coming soon (src/site.ts
- * `showsExperiments`).
+ * Header links: real pages, never landing-page anchors. Download is not
+ * listed; it is the header's one button (SiteHeader.astro). Blog appears only
+ * once a post is published, so the header never leads to an empty index.
  */
-export function resourceItems(options: { hasPosts: boolean }): NavItem[] {
-  return [
-    ...(options.hasPosts
-      ? [
-          {
-            section: 'blog' as const,
-            href: '/blog/',
-            label: 'Blog',
-            description: 'Guides and notes from building rotli',
-          },
-        ]
-      : []),
-    {
-      section: 'developers',
-      href: '/resources/developers/',
-      label: 'Developers',
-      description: 'MCP and the command line, for agents',
-      ...(site.showsExperiments ? {} : { status: 'Coming soon' }),
-    },
-    {
-      section: 'changelog',
-      href: '/changelog/',
-      label: 'Changelog',
-      description: 'Every release, newest first',
-    },
-    {
-      section: 'roadmap',
-      href: '/roadmap/',
-      label: 'Roadmap',
-      description: 'What’s next, and your vote on it',
-    },
-    {
-      section: 'studio',
-      href: STUDIO_URL,
-      label: 'Rotli Studio',
-      description: 'Wallpapers and films from the quokka’s island',
-      external: true,
-    },
-  ];
-}
-
-/**
- * Header links: real pages, never landing-page anchors. /download/ is not listed; it is the
- * header's one button (SiteHeader.astro). Resources is a dropdown (`resourceItems`) whose label
- * links to /resources/ when script is off.
- */
-export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
+export function primaryNav(options: { hasPosts: boolean }): NavLink[] {
   return [
     { section: 'features', href: '/features/', label: 'Features' },
     { section: 'privacy', href: '/privacy/', label: 'Privacy' },
-    { section: 'resources', href: '/resources/', label: 'Resources', items: resourceItems(options) },
+    { section: 'resources', href: '/resources/', label: 'Resources' },
+    ...(options.hasPosts ? [{ section: 'blog' as const, href: '/blog/', label: 'Blog' }] : []),
     { section: 'about', href: '/about/', label: 'About' },
   ];
 }
@@ -139,13 +55,12 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
     {
       title: 'Learn',
       links: [
-        ...(options.hasPosts ? [{ href: '/blog/', label: 'Blog' }] : []),
-        { href: '/blog/getting-started/', label: 'Getting started' },
         { href: '/resources/', label: 'Resources' },
-        { href: '/roadmap/', label: 'Roadmap' },
+        { href: '/resources/getting-started/', label: 'Getting started' },
+        ...(options.hasPosts ? [{ href: '/blog/', label: 'Blog' }] : []),
         { href: '/about/', label: 'About' },
         // The open motion studio; not gated on the source flag, it is its own site.
-        { href: STUDIO_URL, label: 'Rotli Studio', external: true },
+        { href: STUDIO_URL, label: 'Rotli Studio' },
         { href: '/privacy/', label: 'Privacy' },
       ],
     },
@@ -155,7 +70,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
       title: 'Open source',
       links: [
         { href: GITHUB_URL, label: 'GitHub' },
-        { href: ROADMAP_URL, label: 'Roadmap source' },
+        { href: ROADMAP_URL, label: 'Roadmap' },
         { href: LICENSE_URL, label: 'MIT license' },
       ],
     });

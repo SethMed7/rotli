@@ -1,26 +1,27 @@
 ---
-// The way in, defined once (WAY_IN in src/site.ts): "Download free", to /download/, which
-// offers the Mac app and Rotli Web and leads with the visitor's own system. The header's button
-// says the same (the owner, 2026-10-06). One that offers neither says so instead of linking to an
-// empty page. Direct DMG links live only on /download/. A page may pass a secondary button
-// before it (slot "before": the hero's privacy promise, on the left; the owner, 2026-10-06);
-// it sits in the same row, at the same size. The order in the markup is the order everywhere:
-// left to right on a laptop, top to bottom when they stack, and for the keyboard and screen
-// readers alike.
-import { WAY_IN } from '../site';
+// The site's two ways in, defined once: open Rotli Web, or download the app.
+// Base.astro stamps data-platform on <html>; on anything but a Mac the browser
+// action leads and the download says it is the Mac app (styles in Base.astro).
+import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
+
+interface Props {
+  webLabel?: string;
+  downloadLabel?: string;
+}
+
+const { webLabel = 'Open in browser', downloadLabel = 'Download' } = Astro.props;
 ---
 
 <div class="site-actions">
-  <slot name="before" />
+  {site.webAppEnabled && <a class="button secondary action-web" href={WEB_APP_PATH}>{webLabel}</a>}
   {
-    WAY_IN.offered ? (
-      <a class="button primary action-try" href={WAY_IN.href}>
-        {WAY_IN.label}
+    site.downloadsEnabled ? (
+      <a class="button primary action-download" href={DOWNLOAD_HREF} rel="noopener">
+        <span class="for-mac">{downloadLabel}</span>
+        <span class="for-other">Download for Mac</span>
       </a>
     ) : (
-      <span class="button primary pending" aria-disabled="true">
-        Mac alpha coming soon
-      </span>
+      <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
     )
   }
 </div>

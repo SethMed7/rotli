@@ -1,11 +1,10 @@
 ---
-// Make it yours: the theme studio (fourteen real captures from public/themes/). Once it is
-// on screen it steps through them on its own at a calm pace, and it follows the visitor: a
-// hovered or focused swatch shows at once and holds the cycle, a click pins it (the owner,
-// 2026-10-05; the rules are src/themeCycle.ts). It never plays under reduced motion, off
-// screen, or in a hidden tab, so a background tab does no work.
+// Make it yours: the theme studio (fourteen real captures from public/themes/)
+// and the optional quokka companion. Both move only when the visitor asks:
+// no timers, so a background tab does no work and nothing loops beside text.
 // Behind it, faintly, the story film's island by day (IslandScene.astro).
 import IslandScene from '../IslandScene.astro';
+import showcaseManifest from '../../assets/characters/showcase/showcase.json';
 
 // Swatch colours read the site swatch layer (Base.astro), which mirrors the
 // app's per-environment ground and accent tokens. They are CSS rules keyed by
@@ -29,6 +28,17 @@ const stops = families.flatMap((family) =>
   })),
 );
 const first = stops[0];
+
+// Companion: real, selectable combinations rendered by
+// scripts/build-companion-showcase.ts with the app's own placement rules.
+const showcaseImages = import.meta.glob<{ default: ImageMetadata }>('../../assets/characters/showcase/*.webp', {
+  eager: true,
+});
+const companions = showcaseManifest.map((entry) => {
+  const image = showcaseImages[`../../assets/characters/showcase/${entry.slug}.webp`];
+  if (!image) throw new Error(`Missing companion render for ${entry.slug}; run bun scripts/build-companion-showcase.ts`);
+  return { ...entry, src: image.default.src };
+});
 ---
 
 <section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
@@ -61,12 +71,12 @@ const first = stops[0];
           <b id="theme-environment">{first.environment}</b>
         </figcaption>
       </figure>
-      <!-- Narrow screens: the same fourteen environments as a carousel. -->
+      <!-- Narrow screens: the same fourteen environments as a carousel, like the quokkas below. -->
       <div class="studio-steps">
         <button type="button" class="carousel-step" data-theme-step="-1" aria-label="Previous theme">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
         </button>
-        <p class="carousel-label" aria-live="off">
+        <p class="carousel-label" aria-live="polite">
           <span class="carousel-count" id="theme-count">1 / {stops.length}</span>
           <span class="carousel-name" id="theme-name">{first.family} · {first.environment}</span>
         </p>
@@ -102,126 +112,93 @@ const first = stops[0];
         ))}
       </div>
     </div>
+
+    <div class="companion" data-reveal>
+      <div class="companion-art">
+        <div class="companion-stage">
+          {companions.map((companion, index) => (
+            <img
+              class:list={['companion-slide', { 'is-active': index === 0, 'is-next': index === 1, 'is-prev': index === companions.length - 1 }]}
+              data-companion={index}
+              src={companion.src}
+              width="400"
+              height="400"
+              alt={index === 0 ? companion.alt : ''}
+              data-alt={companion.alt}
+              data-label={companion.label}
+              loading="lazy"
+              decoding="async"
+            />
+          ))}
+        </div>
+        <div class="companion-controls">
+          <button type="button" class="carousel-step companion-step" data-step="-1" aria-label="Previous quokka">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
+          </button>
+          <p class="carousel-label" id="companion-label" aria-live="polite">
+            <span class="carousel-count" id="companion-count">1 / {companions.length}</span>
+            <span class="carousel-name" id="companion-name">{companions[0].label}</span>
+          </p>
+          <button type="button" class="carousel-step companion-step" data-step="1" aria-label="Next quokka">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
+          </button>
+        </div>
+      </div>
+      <div class="companion-copy">
+        <h3>A quokka, when you want one.</h3>
+        <p>
+          Pick a body colour, black or white linework, a mood and pose, and glasses or a bucket hat
+          in any colour. Empty states choose a pose that fits. Turn the companion off and it appears
+          only during onboarding.
+        </p>
+        <p class="companion-name">
+          Why a quokka? rotli is short for Rottnest, the island quokkas call home.{' '}
+          <a href="/about/#name">The story behind the name <span aria-hidden="true">→</span></a>
+        </p>
+      </div>
+    </div>
   </div>
 </section>
 
 <script>
-  // Theme studio: it plays on its own (src/themeCycle.ts), a swatch (wide screens) or the
-  // carousel (narrow screens, with a swipe on the capture) takes over, and the capture and
-  // caption follow. Steps it takes on its own are not announced; the visitor's are.
-  import { createCycle, hover, leave, pin, resume, tick, wait, type Cycle } from '../../themeCycle';
-
-  const studio = document.querySelector<HTMLElement>('.studio');
-  const picker = document.querySelector<HTMLElement>('.studio-picker');
+  // Theme studio: a swatch (wide screens) or the carousel (narrow screens, with a swipe on
+  // the capture) swaps the capture and caption. Nothing cycles on its own.
   const shot = document.querySelector<HTMLImageElement>('#theme-shot');
   const family = document.querySelector<HTMLElement>('#theme-family');
   const environment = document.querySelector<HTMLElement>('#theme-environment');
   const themeCount = document.querySelector<HTMLElement>('#theme-count');
   const themeName = document.querySelector<HTMLElement>('#theme-name');
-  const label = document.querySelector<HTMLElement>('.carousel-label');
   const swatches = [...document.querySelectorAll<HTMLButtonElement>('.swatch-button')];
-  const warmed = new Map<string, Promise<void>>();
-  const warm = (index: number): Promise<void> => {
-    const url = swatches[index]?.dataset.shot;
-    if (!url) return Promise.resolve();
-    let ready = warmed.get(url);
-    if (!ready) {
-      const image = new Image();
-      image.src = url;
-      ready = image.decode().catch(() => undefined);
-      warmed.set(url, ready);
-    }
-    return ready;
+  const warm = (button: HTMLButtonElement | undefined) => {
+    if (!button?.dataset.shot) return;
+    const image = new Image();
+    image.src = button.dataset.shot;
   };
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-  let cycle: Cycle = createCycle(swatches.length, performance.now(), false);
-  let shown = 0;
-
-  const render = (announce: boolean) => {
-    const index = cycle.shown;
-    const button = swatches[index];
-    if (!button || index === shown) return;
-    shown = index;
-    label?.setAttribute('aria-live', announce ? 'polite' : 'off');
+  let theme = 0;
+  const selectTheme = (index: number) => {
+    const total = swatches.length;
+    if (!total) return;
+    theme = ((index % total) + total) % total;
+    const button = swatches[theme];
     if (shot && button.dataset.shot) {
       shot.src = button.dataset.shot;
       shot.alt = `The rotli workspace in the ${button.dataset.environment} environment`;
     }
     if (family) family.textContent = button.dataset.family ?? '';
     if (environment) environment.textContent = button.dataset.environment ?? '';
-    if (themeCount) themeCount.textContent = `${index + 1} / ${swatches.length}`;
+    if (themeCount) themeCount.textContent = `${theme + 1} / ${total}`;
     if (themeName) themeName.textContent = `${button.dataset.family} · ${button.dataset.environment}`;
     swatches.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
-    if (studio) studio.dataset.cycle = cycle.mode;
-    void warm((index + 1) % swatches.length); // the next one is ready before it is asked for
+    warm(swatches[(theme + 1) % total]); // the next one is ready before it is asked for
   };
-  const set = (next: Cycle, announce: boolean) => {
-    cycle = next;
-    if (studio) studio.dataset.cycle = cycle.mode;
-    render(announce);
-    schedule();
-  };
-
-  // One timeout, and only while the studio is on screen in a visible tab.
-  let timer = 0;
-  let onScreen = false;
-  const running = () => onScreen && !document.hidden;
-  function schedule() {
-    window.clearTimeout(timer);
-    timer = 0;
-    if (!running()) return;
-    const due = wait(cycle, performance.now());
-    if (due === null) return;
-    timer = window.setTimeout(async () => {
-      timer = 0;
-      const next = tick(cycle, performance.now());
-      if (next === cycle) return schedule();
-      await warm(next.shown); // never swap to a capture that is not there yet
-      if (cycle.mode === 'auto') set(next, false);
-      else schedule();
-    }, due);
-  }
-  let revealed = false;
-  if (studio && 'IntersectionObserver' in window) {
-    new IntersectionObserver(
-      (entries) => {
-        onScreen = entries.some((entry) => entry.isIntersecting);
-        if (onScreen && !revealed) {
-          revealed = true;
-          // It starts playing the first time it is seen, unless the visitor already chose.
-          if (cycle.mode !== 'pinned') {
-            cycle = { ...createCycle(swatches.length, performance.now(), !reduced.matches), shown: cycle.shown };
-          }
-          studio.dataset.cycle = cycle.mode;
-        } else if (onScreen) {
-          cycle = resume(cycle, performance.now());
-        }
-        schedule();
-      },
-      { threshold: 0.35 },
-    ).observe(studio);
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) cycle = resume(cycle, performance.now());
-    schedule();
-  });
-  reduced.addEventListener('change', () => {
-    if (reduced.matches && (cycle.mode === 'auto' || cycle.mode === 'held')) set({ ...cycle, mode: 'off' }, false);
-  });
-
   swatches.forEach((button, index) => {
-    button.addEventListener('pointerenter', (event) => {
-      if (event.pointerType === 'mouse' || event.pointerType === 'pen') set(hover(cycle, index), false);
-    });
-    button.addEventListener('focus', () => set(hover(cycle, index), true));
-    button.addEventListener('click', () => set(pin(cycle, index), true));
-  });
-  picker?.addEventListener('pointerleave', () => set(leave(cycle, performance.now()), false));
-  picker?.addEventListener('focusout', (event) => {
-    if (!picker.contains(event.relatedTarget as Node | null)) set(leave(cycle, performance.now()), false);
+    // Warm the cache on intent so the swap is instant.
+    button.addEventListener('pointerenter', () => warm(button), { once: true });
+    button.addEventListener('focus', () => warm(button), { once: true });
+    button.addEventListener('click', () => selectTheme(index));
   });
   document.querySelectorAll<HTMLButtonElement>('[data-theme-step]').forEach((button) => {
-    button.addEventListener('click', () => set(pin(cycle, cycle.shown + Number(button.dataset.themeStep)), true));
+    button.addEventListener('click', () => selectTheme(theme + Number(button.dataset.themeStep)));
   });
   let swipeFrom: number | null = null;
   shot?.addEventListener('pointerdown', (event) => (swipeFrom = event.clientX));
@@ -229,7 +206,35 @@ const first = stops[0];
     if (swipeFrom === null) return;
     const dx = event.clientX - swipeFrom;
     swipeFrom = null;
-    if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) set(pin(cycle, cycle.shown + (dx < 0 ? 1 : -1)), true);
+    if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) selectTheme(theme + (dx < 0 ? 1 : -1));
+  });
+
+  // Companion: previous/next buttons and the neighbouring slides step through
+  // the showcase. Only the active slide carries alt text.
+  const slides = [...document.querySelectorAll<HTMLImageElement>('.companion-slide')];
+  const count = document.querySelector<HTMLElement>('#companion-count');
+  const name = document.querySelector<HTMLElement>('#companion-name');
+  let current = 0;
+  const show = (index: number) => {
+    const total = slides.length;
+    if (!total) return;
+    current = ((index % total) + total) % total;
+    slides.forEach((slide, i) => {
+      slide.classList.toggle('is-active', i === current);
+      slide.classList.toggle('is-prev', total > 1 && i === (current - 1 + total) % total);
+      slide.classList.toggle('is-next', total > 2 && i === (current + 1) % total);
+      slide.alt = i === current ? (slide.dataset.alt ?? '') : '';
+    });
+    if (count) count.textContent = `${current + 1} / ${total}`;
+    if (name) name.textContent = slides[current].dataset.label ?? '';
+  };
+  document.querySelectorAll<HTMLButtonElement>('.companion-step').forEach((button) => {
+    button.addEventListener('click', () => show(current + Number(button.dataset.step)));
+  });
+  slides.forEach((slide, i) => {
+    slide.addEventListener('click', () => {
+      if (slide.classList.contains('is-prev') || slide.classList.contains('is-next')) show(i);
+    });
   });
 </script>
 
@@ -251,9 +256,7 @@ const first = stops[0];
   .backdrop :global(.island) {
     height: 100%;
   }
-  /* Below 1180px the backdrop's left edge reaches into the lede's line length (measured
-     2026-10-05: at 768 and 1024 the lede ran over the hill), so the island steps out. */
-  @media (max-width: 1179px) {
+  @media (max-width: 760px) {
     .backdrop {
       display: none;
     }
@@ -363,6 +366,63 @@ const first = stops[0];
   .swatch[data-swatch='midnight-light'] { --swatch-ground: var(--swatch-midnight-light); --swatch-accent: var(--swatch-midnight-light-accent); }
   .swatch[data-swatch='midnight-dark'] { --swatch-ground: var(--swatch-midnight-dark); --swatch-accent: var(--swatch-midnight-dark-accent); }
 
+  .companion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: center;
+    margin-top: clamp(4rem, 8vw, 6rem);
+    padding-top: clamp(3rem, 6vw, 4.5rem);
+    border-top: 1px solid var(--border-strong);
+  }
+  .companion-stage {
+    position: relative;
+    aspect-ratio: 5 / 3;
+    overflow: hidden;
+  }
+  .companion-slide {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 58%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+    transition: opacity 420ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    pointer-events: none;
+  }
+  .companion-slide.is-active {
+    z-index: 2;
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  .companion-slide.is-prev,
+  .companion-slide.is-next {
+    z-index: 1;
+    opacity: 0.4;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .companion-slide.is-prev {
+    transform: translateX(-100%) scale(0.6);
+  }
+  .companion-slide.is-next {
+    transform: translateX(0%) scale(0.6);
+  }
+  .companion-slide.is-prev:hover,
+  .companion-slide.is-next:hover {
+    opacity: 0.7;
+  }
+  .companion-controls,
+  .studio-steps {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 24rem;
+    margin: 1rem auto 0;
+  }
   .carousel-step {
     width: 44px;
     height: 44px;
@@ -375,8 +435,6 @@ const first = stops[0];
     color: var(--text);
     cursor: pointer;
   }
-  /* On the warm band (again since 2026-10-06, when the tour above it was removed): the hover
-     takes the page's plain ground, which reads against the band. */
   .carousel-step:hover {
     background: var(--ground);
   }
@@ -397,12 +455,38 @@ const first = stops[0];
     font-size: 0.95rem;
     font-weight: 600;
   }
+  .companion-copy h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .companion-copy p {
+    margin: 0.8rem 0 0;
+    max-width: 32rem;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .companion-name a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .companion-name a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
   /* The theme carousel shows only where the orb picker would crowd the capture. */
   .studio-steps {
     display: none;
   }
   @media (max-width: 900px) {
-    .studio {
+    .studio,
+    .companion {
       grid-template-columns: 1fr;
     }
     .studio {
@@ -412,15 +496,8 @@ const first = stops[0];
     .studio-shot figcaption {
       display: none;
     }
-    /* Previous, the theme's name, next: one row (the #156 review: without the columns
-       they stacked into three rows at phone widths). */
     .studio-steps {
       display: grid;
-      grid-template-columns: 44px minmax(0, 1fr) 44px;
-      align-items: center;
-      gap: 0.75rem;
-      max-width: 24rem;
-      margin: 1rem auto 0;
     }
     .studio-shot img {
       touch-action: pan-y;
