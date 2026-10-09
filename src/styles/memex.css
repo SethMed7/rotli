@@ -1553,7 +1553,7 @@
   border-bottom: 1px solid var(--border);
 }
 .file-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
@@ -1562,6 +1562,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* the name and its marks (Beta, read-only) sit together on the left; every
+   action sits on the right */
+.file-head-gap {
+  flex: 1 1 0;
+  min-width: 0;
+}
 .file-sheet-chrome,
 .file-document-chrome {
   flex: 0 0 auto;
@@ -1569,15 +1575,22 @@
   align-items: center;
   min-width: 0;
 }
+/* the sheet's own controls close the row, set off from the file's by a hairline */
+.file-sheet-chrome {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
 .sheet-chrome-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
+/* header actions are quiet text that tints on hover — no outlined pills */
 .file-open-ext {
   flex: 0 0 auto;
-  border: 1px solid var(--border);
+  min-height: 24px;
+  border: 0;
   border-radius: var(--r-pill);
   background: none;
   color: var(--text-muted);
@@ -1586,9 +1599,14 @@
   padding: 3px 10px;
   cursor: pointer;
 }
-.file-open-ext:hover {
+.file-open-ext:hover,
+.file-open-ext[aria-expanded="true"] {
   color: var(--text);
-  border-color: var(--text-muted);
+  background: var(--tint);
+}
+.file-open-ext:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .file-open-ext:disabled {
   opacity: 0.55;
@@ -2339,22 +2357,33 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sheet-dirty {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-text);
-}
+/* Saved is a quiet state; unsaved edits make Save the one filled control in
+   the header, its dot inside the button rather than floating beside it */
 .sheet-save {
-  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  border: 0;
   border-radius: var(--r-pill);
-  background: var(--tint);
-  color: var(--text);
+  background: none;
+  color: var(--text-muted);
   font: inherit;
   font-size: 12px;
-  font-weight: 600;
-  padding: 3px 12px;
+  padding: 3px 10px;
   cursor: pointer;
+}
+.sheet-save.dirty {
+  background: var(--tint);
+  color: var(--text);
+  font-weight: 600;
+}
+.sheet-save.dirty::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-text);
 }
 .sheet-save:disabled {
   opacity: 0.5;
@@ -2394,23 +2423,50 @@
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.sheet-view-toggle {
+/* Theme | White: two quiet words split by a hairline, the chosen one in full
+   ink — no fill, so Save stays the header's only filled control */
+.sheet-paper {
   flex: 0 0 auto;
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--accent-text);
-  background: var(--tint);
-  border: 1px solid color-mix(in srgb, var(--accent-text) 35%, var(--border));
+  display: flex;
+  align-items: center;
+}
+.sheet-paper button + button {
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+}
+.sheet-paper button {
+  min-height: 24px;
+  border: 0;
   border-radius: var(--r-pill);
-  padding: 3px 10px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 1px 10px;
   cursor: pointer;
 }
-.sheet-view-toggle.on {
-  color: var(--text-muted);
-  background: none;
-  border-color: var(--border);
-  font-weight: 500;
+.sheet-paper button:hover {
+  color: var(--text);
+}
+/* the bold width is reserved, so choosing a side never shifts its neighbours */
+.sheet-paper button {
+  display: inline-grid;
+}
+.sheet-paper button::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+}
+.sheet-paper button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+.sheet-paper button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 /* raw mode — white paper canvas like Excel; rotli chrome stays light */
 .sheet-raw .sheet-editor-host,
