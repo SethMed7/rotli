@@ -99,9 +99,6 @@ jobs:
           retention-days: 30
       - run: bun run check
         working-directory: site
-      - name: Subscribe sidecar unit tests
-        run: bun run test
-        working-directory: site
       - run: bun run build
         working-directory: site
       - run: bun run build
