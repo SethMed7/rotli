@@ -326,7 +326,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const [deletingView, setDeletingView] = useState<string | null>(null);
   // Enter/Esc unmount the new-folder input, which fires its commit-on-blur —
   // this ref tells the blur the keystroke already settled it (newFolderHandled's law)
-  const mainNewFolderHandled = useRef(false);
   const openContextMenu = useContextMenu((s) => s.open);
 
   // the shell's New-folder toolbar button, while Home is the active front,
@@ -410,6 +409,12 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const mainAnchorRef = useRef<string | null>(null);
   const [mainDrop, setMainDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const didMainDragRef = useRef(false);
+  // the dragged row sits inside a folder, so the space under the list can take it out
+  const dragNested =
+    mainDragId !== null &&
+    (mainDragId.startsWith(MAIN_ROOT)
+      ? mainDragId.includes("/")
+      : (mainParentOfNote(activeTree, mainDragId) ?? MAIN_ROOT) !== MAIN_ROOT);
 
   // ONE pointer-drag for the Main tree: reorder a row, or drop it into a folder.
   // (HTML5 DnD stays dead in the WKWebView shell — pointer events only.) The
@@ -1172,36 +1177,15 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             </p>
           )}
           {mainNewFolder && (
-            <div className="sb-newfolder" style={{ paddingLeft: 44 }}>
-              <FolderGlyph size={14} className="kind-folder" />
-              <input
-                autoFocus
-                type="text"
-                placeholder="Folder name…"
-                aria-label="New folder in Main"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    mainNewFolderHandled.current = true; // the ensuing blur must not re-commit
-                    commitNewFolder(e.currentTarget.value);
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    mainNewFolderHandled.current = true; // …nor override the cancel
-                    setMainNewFolder(false);
-                  }
-                }}
-                onBlur={(e) => {
-                  if (mainNewFolderHandled.current) {
-                    mainNewFolderHandled.current = false;
-                    return;
-                  }
-                  // click-away commits a non-empty name (the corpus new-folder law)
-                  commitNewFolder(e.currentTarget.value);
-                }}
-              />
-            </div>
+            <FolderRenameRow
+              name=""
+              open={false}
+              style={rowInset(10, 10 - ROW_INSET_LEAD / 2)}
+              ariaLabel="New folder in Main"
+              blur="commit"
+              onCommit={commitNewFolder}
+              onCancel={() => setMainNewFolder(false)}
+            />
           )}
           {mainProjection.folders.length === 0 && mainProjection.notes.length === 0 ? (
             <p className="main-empty" data-main-id="main:">
@@ -1229,6 +1213,17 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           ) : (
             <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
               {renderMainTree(MAIN_ROOT, 0, rowProps)}
+              {/* while a row is dragged, the space under the list takes it out
+                  of its folder — even when Main is one open folder with no row
+                  outside it to drop beside (the owner, 2026-10-08) */}
+              {dragNested && (
+                <div
+                  data-main-id="main:"
+                  className={`main-root-drop${mainDrop?.id === MAIN_ROOT ? " over" : ""}`}
+                >
+                  Drop here to take it out of the folder
+                </div>
+              )}
             </div>
           )}
         </div>

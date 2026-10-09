@@ -12,6 +12,7 @@ import {
   mainParentOfNote,
   gcManifest,
   fileItemsInMainFolder,
+  liftToMainRoot,
   mainFolderIds,
   mainItemIdsInFolder,
   mainNoteIds,
@@ -502,4 +503,33 @@ describe("mergeMainTrees", () => {
     const remote = [{ folder: "Work", children: [{ note: "b" }] }, { note: "a" }];
     expect(mergeMainTrees(base, local, remote)).toBeNull();
   });
+});
+
+test("liftToMainRoot takes a note out of its folder to just after that folder's top-level row", () => {
+  const tree: MainNode[] = [
+    { note: "a" },
+    { folder: "Garden", children: [{ note: "w1" }, { folder: "Beds", children: [{ note: "d1" }] }] },
+    { note: "z" },
+  ];
+  expect(liftToMainRoot(tree, "w1")).toEqual([
+    { note: "a" },
+    { folder: "Garden", children: [{ folder: "Beds", children: [{ note: "d1" }] }] },
+    { note: "w1" },
+    { note: "z" },
+  ]);
+  // from any depth, and a nested folder too, by its rendered id
+  expect(liftToMainRoot(tree, "d1")[2]).toEqual({ note: "d1" });
+  expect(liftToMainRoot(tree, "main:Garden/Beds")[2]).toEqual({
+    folder: "Beds",
+    children: [{ note: "d1" }],
+  });
+  // the only folder: the note still gets out (the owner, 2026-10-08)
+  expect(liftToMainRoot([{ folder: "Garden", children: [{ note: "w1" }] }], "w1")).toEqual([
+    { folder: "Garden", children: [] },
+    { note: "w1" },
+  ]);
+  // already at the top level, a top-level folder, or not in Main: unchanged
+  expect(liftToMainRoot(tree, "a")).toBe(tree);
+  expect(liftToMainRoot(tree, "main:Garden")).toBe(tree);
+  expect(liftToMainRoot(tree, "nowhere")).toBe(tree);
 });
