@@ -28,11 +28,7 @@ interface PassagePair {
   main?: readonly [string, string];
 }
 let passage: {
-  passageActive(section: { top: number; bottom: number }, viewport: number, active: boolean): boolean;
-  ENTER_TOP: number;
-  ENTER_BOTTOM: number;
-  LEAVE_TOP: number;
-  LEAVE_BOTTOM: number;
+  passageActive(section: { top: number; bottom: number }, nextTop: number | null, line: number): boolean;
   PASSAGE_MS: number;
   GROUND_EASE: readonly [number, number, number, number];
   INK_AT: number;
@@ -138,40 +134,25 @@ beforeAll(async () => {
 });
 
 describe("the privacy passage", () => {
-  const viewport = 800;
-  // A band taller than the window, its top edge at `top`.
-  const band = (top: number, height = 1200) => ({ top, bottom: top + height });
-  const end = (bottom: number) => ({ top: bottom - 1200, bottom });
+  const line = 68; // the header's bottom edge
+  const band = (top: number, height = 900) => ({ top, bottom: top + height });
 
-  test("turns on once the band's top passes the middle of the window", () => {
-    expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
-    expect(passage.passageActive(band(viewport * passage.ENTER_TOP + 1), viewport, false)).toBe(false);
-    expect(passage.passageActive(band(viewport * passage.ENTER_TOP - 1), viewport, false)).toBe(true);
-    // No later than the middle, so the band never sits half empty.
-    expect(passage.ENTER_TOP).toBeLessThanOrEqual(0.5);
+  test("is on exactly while the header sits over the band", () => {
+    expect(passage.passageActive(band(400), 1300, line)).toBe(false); // still coming up
+    expect(passage.passageActive(band(line + 2), 970, line)).toBe(false);
+    expect(passage.passageActive(band(line), 968, line)).toBe(true); // locked under the header
+    // The next section slides up over the locked band; daylight reaches the header and it ends.
+    expect(passage.passageActive(band(line), line + 2, line)).toBe(true);
+    expect(passage.passageActive(band(line), line, line)).toBe(false);
   });
 
-  test("lets go once the band's end is high in the window, leaving little of it blank", () => {
-    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM + 1), viewport, true)).toBe(true);
-    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM - 1), viewport, true)).toBe(false);
-    // The band's words fade with the night, so what is left of it on screen is empty: under 40%.
-    expect(passage.LEAVE_BOTTOM).toBeLessThanOrEqual(0.4);
-  });
-
-  test("holds near a boundary instead of flickering, then lets go in either direction", () => {
-    // Scrolling back up a little past the switch point keeps it on…
-    expect(passage.passageActive(band(viewport * passage.ENTER_TOP + 20), viewport, true)).toBe(true);
-    // …until the band falls back down the window.
-    expect(passage.passageActive(band(viewport * passage.LEAVE_TOP + 1), viewport, true)).toBe(false);
-    // Near the bottom edge, coming back up into the band waits for its enter line.
-    expect(passage.passageActive(end(viewport * passage.LEAVE_BOTTOM + 20), viewport, false)).toBe(false);
-    expect(passage.LEAVE_TOP).toBeGreaterThan(passage.ENTER_TOP);
-    expect(passage.LEAVE_BOTTOM).toBeLessThan(passage.ENTER_BOTTOM);
+  test("with nothing after it, the band's own end decides", () => {
+    expect(passage.passageActive(band(-800), null, line)).toBe(true);
+    expect(passage.passageActive(band(-900), null, line)).toBe(false);
   });
 
   test("a hidden or empty section never turns it on", () => {
-    expect(passage.passageActive({ top: 0, bottom: 0 }, viewport, false)).toBe(false);
-    expect(passage.passageActive({ top: 0, bottom: 800 }, 0, true)).toBe(false);
+    expect(passage.passageActive({ top: 0, bottom: 0 }, null, line)).toBe(false);
   });
 });
 

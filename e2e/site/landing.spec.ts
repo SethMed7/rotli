@@ -351,63 +351,69 @@ test("the landing says rotli is more than notes and asks no extra AI fee", async
   await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
 });
 
-test("the page, its header, and its buttons cross into the night on one clock", async ({ page }) => {
-  await page.goto("/");
-  await scrollToPrivacy(page, 0.1);
-  await expect.poll(() => passage(page)).toBe("ocean-dark");
-  // Freeze the crossfade a third of the way in: the header is the page's own ground, and the
-  // band paints none of its own, so it turns with the page.
-  const colours = await page.evaluate(() => {
-    const root = document.documentElement;
-    for (const animation of document.getAnimations()) {
-      if (animation.effect instanceof KeyframeEffect && animation.effect.target === root) {
-        animation.pause();
-        animation.currentTime = 300;
-      }
-    }
-    const header = getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor;
-    const body = getComputedStyle(document.body).backgroundColor;
-    const band = getComputedStyle(document.getElementById("privacy")!).backgroundColor;
-    return { header, body, band };
-  });
-  expect(colours.header).toBe(colours.body);
-  expect(colours.header).not.toBe("rgb(248, 242, 233)");
-  expect(colours.header).not.toBe("rgb(14, 23, 29)");
-  expect(colours.band).toBe("rgba(0, 0, 0, 0)");
-});
+// Scroll to `offset` px past the point where the band locks (under the header, or with its end
+// on the window's end when it is taller). The band is sticky, so it is measured from the
+// section after it, which is not.
+const scrollPastLock = (page: Page, offset: number) =>
+  page.evaluate((o) => {
+    const band = document.getElementById("privacy")!;
+    const next = document.getElementById("faq")!;
+    const header = document.querySelector<HTMLElement>(".site-header-bar")!.offsetHeight;
+    const top = next.getBoundingClientRect().top + window.scrollY - band.offsetHeight;
+    const lock = Math.max(-header, band.offsetHeight - window.innerHeight);
+    window.scrollTo({ top: top + lock + o, behavior: "instant" });
+  }, offset);
 
-test("nothing of the night shows before it, and the sections beside it step out while it lasts", async ({
+test("only the header crosses into the night; the band paints its own and nothing else changes", async ({
   page,
 }) => {
   await page.goto("/");
-  const opacity = (selector: string) => page.locator(selector).evaluate((el) => getComputedStyle(el).opacity);
-  // The band's top is in the window, but the night has not come: its words and scene are unseen,
-  // and the scene has not played.
-  await page.evaluate(() => {
-    const band = document.getElementById("privacy")!;
-    window.scrollTo({
-      top: band.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.8,
-      behavior: "instant",
-    });
-  });
-  await page.waitForTimeout(300);
-  expect(await passage(page)).toBe("");
-  expect(await opacity("#privacy > .wrap")).toBe("0");
-  expect(await opacity("#personal")).toBe("1");
-  await expect(page.locator("#privacy .scene")).not.toHaveClass(/is-visible/);
-  // In the night: the band is there, the theme studio above it is not.
-  await scrollToPrivacy(page, 0.5);
+  await scrollPastLock(page, 40);
   await expect.poll(() => passage(page)).toBe("ocean-dark");
-  await expect.poll(() => opacity("#privacy > .wrap")).toBe("1");
-  await expect.poll(() => opacity("#personal")).toBe("0");
-  // The questions after it stay, in the night's tokens: no empty sky between the two.
-  expect(await opacity("#faq")).toBe("1");
-  await expect(page.locator("#privacy .scene")).toHaveClass(/is-visible/);
-  // Out through the bottom: the questions come back, the band's words go.
-  await scrollToPrivacy(page, 1.6);
+  const colour = (selector: string) =>
+    page.locator(selector).evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect.poll(() => colour(".site-header-bar")).toBe("rgb(14, 23, 29)");
+  // The header's words follow its ground, not the page's.
+  await expect(page.locator(".site-header-bar")).toHaveCSS("color", "rgb(231, 240, 244)");
+  expect(await colour("#privacy")).toBe("rgb(14, 23, 29)");
+  // The page and the questions keep the day: no crossfade of the whole page.
+  expect(await colour("body")).toBe("rgb(248, 242, 233)");
+  expect(await colour("#faq")).toBe("rgb(248, 242, 233)");
+});
+
+test("the band locks, the questions slide up over it, and daylight returns as they reach the header", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const top = (selector: string) => page.locator(selector).evaluate((el) => el.getBoundingClientRect().top);
+  // The band's words and scene are there as it comes up the window, in its own night.
+  await scrollPastLock(page, -400);
+  expect(await passage(page)).toBe("");
+  await expect(page.locator("#privacy > .wrap")).toHaveCSS("opacity", "1");
+  // Locked: scrolling on moves the questions, not the band.
+  await scrollPastLock(page, 20);
+  await expect.poll(() => passage(page)).toBe("ocean-dark");
+  const locked = await top("#privacy");
+  const faq = await top("#faq");
+  await scrollPastLock(page, 220);
+  expect(Math.abs((await top("#privacy")) - locked)).toBeLessThanOrEqual(1);
+  expect(Math.abs((await top("#faq")) - (faq - 200))).toBeLessThanOrEqual(1);
+  // The questions sit over the band (their own ground, above it).
+  const over = await page.evaluate(() => {
+    const faqBox = document.getElementById("faq")!.getBoundingClientRect();
+    const hit = document.elementFromPoint(innerWidth / 2, faqBox.top + 10);
+    return hit ? Boolean(hit.closest("#faq")) : false;
+  });
+  expect(over).toBe(true);
+  // Once the questions reach the header, the header is day again.
+  await page.evaluate(() => {
+    const faqBox = document.getElementById("faq")!.getBoundingClientRect();
+    window.scrollTo({ top: window.scrollY + faqBox.top - 40, behavior: "instant" });
+  });
   await expect.poll(() => passage(page)).toBe("");
-  await expect.poll(() => opacity("#faq")).toBe("1");
-  await expect.poll(() => opacity("#privacy > .wrap")).toBe("0");
+  await expect
+    .poll(() => page.locator(".site-header-bar").evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe("rgb(248, 242, 233)");
 });
 
 test("under reduced motion the page switches to the night at once", async ({ browser }) => {

@@ -1,18 +1,16 @@
-// The privacy passage (site/README.md, the owner's call 2026-10-05): while a section marked
-// `data-passage="<environment>"` is the focal passage of the window, the whole page, header
-// and menus included, takes that environment's tokens (Base.astro, `:root[data-passage]`), and
-// it gives them back the moment the visitor leaves the section in either direction. It is a
-// passage, not a preference: nothing is stored, and a reload decides afresh from where the
-// page is.
+// The privacy passage (site/README.md, the owner's call 2026-10-05): a section marked
+// `data-passage="<environment>"` paints that environment itself (the landing's privacy band, its
+// own night), locks once it fills the window, and the next section slides up over it
+// (Base.astro). While the band is under the header, the header and its menus take the
+// environment's tokens (Base.astro, `:root[data-passage] .site-header-bar`), and they give them
+// back as soon as daylight reaches the header again, in either direction. It is a passage, not
+// a preference: nothing is stored, and a reload decides afresh from where the page is.
 //
-// Why it once read as a hard cut (the owner's three frames, 2026-10-05): the band always
-// paints its own night, while the page only followed once the middle of the window was well
-// inside it, so for most of the way in and out a light page sat on a dark band with a hard
-// edge; and the header, the buttons (their own 140 ms transition, no colour fade at all), the
-// stars, and the ground each faded on a different clock. Now the band's edges are feathered
-// (Base.astro), the page follows as soon as the band fills a good share of the window, and one
-// clock drives every colour: the page's tokens themselves are animated on the root, so
-// everything that reads them (ground, header, menus, buttons) changes in the same frame.
+// How it got here (2026-10-05 to 2026-10-08): the whole page once crossfaded into the night
+// when the band filled a share of the window. Every version of that left something wrong on
+// screen at the switch: a neighbour recoloured, or hidden and blank. The owner: "more of like a
+// lock transition not a cross fade". Now nothing but the header changes colour, and the band's
+// own edges, moving, are the transition.
 //
 // The decisions are pure functions so they can be tested: when the passage turns on and off,
 // and how the colours travel so text stays readable in every frame of the crossfade.
@@ -22,30 +20,15 @@ export interface Span {
   bottom: number;
 }
 
-/** The passage turns on once the section's top has passed this line (a share of the window's
- * height from its top) and its bottom is still below ENTER_BOTTOM… Since the band stopped
- * painting its own night (2026-10-08) a later switch shows no light page on a dark band. */
-export const ENTER_TOP = 0.5;
-export const ENTER_BOTTOM = 0.45;
-/** …and stays on until its top falls back below LEAVE_TOP or its bottom rises above
- * LEAVE_BOTTOM. The section under the band stays in view through the night (it is the page's
- * ground, so it takes the night's tokens and reads), so the night runs straight from the band's
- * last picture into it with no empty sky between (the owner, 2026-10-08: "too easy to skip FAQ",
- * then "this awkward point just needs to be smoother"), and lets go once the band's end is high
- * in the window, leaving little of it blank. The gaps between the enter and leave lines are the
- * hysteresis, so a page resting near a boundary never flickers between the two environments. */
-export const LEAVE_TOP = 0.6;
-export const LEAVE_BOTTOM = 0.35;
-
 /**
- * Whether the passage should be on, given the section's box (viewport coordinates), the
- * window's height, and whether it is on now.
+ * Whether the passage should be on: the section's top has reached the header's line (`line`,
+ * viewport coordinates) and the section after it (its top, or null when there is none) has
+ * not. That is exactly while the header sits over the night.
  */
-export function passageActive(section: Span, viewportHeight: number, active: boolean): boolean {
-  if (viewportHeight <= 0 || section.bottom <= section.top) return false;
-  const top = section.top / viewportHeight;
-  const bottom = section.bottom / viewportHeight;
-  return active ? top < LEAVE_TOP && bottom > LEAVE_BOTTOM : top < ENTER_TOP && bottom > ENTER_BOTTOM;
+export function passageActive(section: Span, nextTop: number | null, line: number): boolean {
+  if (section.bottom <= section.top) return false;
+  const end = nextTop ?? section.bottom;
+  return section.top <= line + 1 && end > line + 1;
 }
 
 // ——— The crossfade (Base.astro's `:root.passage-fading` rules restate these numbers) ———
@@ -153,24 +136,22 @@ export function watchPassages(doc: Document = document): void {
   let current: HTMLElement | null = null;
   let frame = 0;
   let fadeTimer = 0;
-  // The section before a passage steps out while its night lasts (Base.astro); the one after
-  // stays and takes the night's tokens, so there is no empty sky between them.
+  const header = doc.querySelector<HTMLElement>('.site-header-bar');
+  // Each passage and the section that slides over it (a component's script can sit between).
+  const after = new Map<HTMLElement, HTMLElement | null>();
   for (const section of sections) {
-    let near = section.previousElementSibling;
-    while (near && near.tagName !== 'SECTION') near = near.previousElementSibling;
-    near?.setAttribute('data-passage-near', '');
+    let next = section.nextElementSibling;
+    while (next && next.tagName !== 'SECTION') next = next.nextElementSibling;
+    after.set(section, next as HTMLElement | null);
   }
-  // A passage's reveals (Base.astro leaves them to it) play the first time its night arrives,
-  // once the inks have switched, so the scene never plays unseen on a day page.
-  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const revealed = new Set<HTMLElement>();
-  const reveal = (section: HTMLElement, delay: number) => {
-    if (revealed.has(section)) return;
-    revealed.add(section);
-    window.setTimeout(() => {
-      section.querySelectorAll('[data-reveal], [data-stagger]').forEach((block) => block.classList.add('is-visible'));
-    }, delay);
-  };
+  // The band locks with its end on the window's end when it is taller than the window, so it
+  // needs its own height (Base.astro, --passage-h).
+  const measure = () => sections.forEach((section) => section.style.setProperty('--passage-h', `${section.offsetHeight}px`));
+  if ('ResizeObserver' in window) {
+    const sizes = new ResizeObserver(measure);
+    sections.forEach((section) => sizes.observe(section));
+  }
+  measure();
 
   const apply = (next: HTMLElement | null) => {
     if (next === current) return;
@@ -185,7 +166,6 @@ export function watchPassages(doc: Document = document): void {
     window.clearTimeout(fadeTimer);
     fadeTimer = window.setTimeout(() => root.classList.remove('passage-fading'), FADE_MS);
     if (next) {
-      reveal(next, calm.matches ? 0 : PASSAGE_MS * INK_AT);
       root.dataset.passage = next.dataset.passage ?? '';
       if (themeColor) themeColor.content = next.dataset.passageColor ?? restingThemeColor;
     } else {
@@ -196,11 +176,12 @@ export function watchPassages(doc: Document = document): void {
 
   const update = () => {
     frame = 0;
-    const height = window.innerHeight;
+    const line = header?.getBoundingClientRect().bottom ?? 0;
     let next: HTMLElement | null = null;
     for (const section of sections) {
       const box = section.getBoundingClientRect();
-      if (passageActive(box, height, section === current)) {
+      const nextTop = after.get(section)?.getBoundingClientRect().top ?? null;
+      if (passageActive(box, nextTop, line)) {
         next = section;
         break;
       }
@@ -216,6 +197,4 @@ export function watchPassages(doc: Document = document): void {
   update();
   window.clearTimeout(fadeTimer);
   root.classList.remove('passage-fading');
-  // Without IntersectionObserver the page shows everything; so does a passage.
-  if (!('IntersectionObserver' in window)) sections.forEach((section) => reveal(section, 0));
 }

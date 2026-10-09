@@ -198,14 +198,16 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         color-scheme: light;
       }
-      /* The privacy passage (src/passage.ts): while the landing's privacy band is the focal
-         passage, the whole page, header, menus, and buttons included, steps into the app's
-         Ocean Dark environment (src/styles/themes.css; border-strong and selection derived the
-         way base.css derives them) and steps back out when the visitor leaves it either way.
-         Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the ground
-         8.60:1). The --deep-* night of .band-night already matches, so the band and the page
-         become one sky. */
-      :root[data-passage='ocean-dark'] {
+      /* The privacy passage (src/passage.ts): the landing's privacy band paints its own night
+         and locks under the header while the next section slides up over it (the owner,
+         2026-10-08: "more of like a lock transition not a cross fade"). While the band is under
+         the header, the header (with its menus) steps into the app's Ocean Dark environment
+         (src/styles/themes.css; border-strong and selection derived the way base.css derives
+         them) and steps back out as daylight reaches it. Nothing else on the page changes
+         colour. Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the
+         ground 8.60:1). The --deep-* night of .band-night matches, so header and band are one
+         sky. */
+      :root[data-passage='ocean-dark'] .site-header-bar {
         color-scheme: dark;
         --ground: #0e171d;
         --surface: #152229;
@@ -255,7 +257,15 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
         --passage-ink-at: 357ms;
       }
-      :root.passage-fading {
+      /* The header reads its own muted, accent, and star colours, so they follow its tokens
+         (registered colours resolve where they are declared). */
+      .site-header-bar {
+        color: var(--text);
+        --text-muted: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--muted-ink));
+        --accent-text: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--accent-ink));
+        --github-star: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--github-star-ink));
+      }
+      :root.passage-fading .site-header-bar {
         transition-property:
           --ground, --surface, --surface-2, --tint, --border, --border-strong, --selection,
           --text, --muted-ink, --accent, --accent-ink, --on-accent, --on-text, --github-star-ink;
@@ -276,24 +286,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       /* While the tokens move, nothing else chases them on its own clock (a button's 140 ms
          hover fade would smear its switch); reveals keep moving. */
-      :root.passage-fading :where(body *) {
+      :root.passage-fading :where(.site-header-bar *) {
         transition-property: opacity, transform, background-size !important;
-      }
-      /* The night sky spreads past the band: the band's own stars, over the whole page while
-         the passage lasts, faded in and out on the same clock (bands with their own ground
-         cover it). */
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        background: url('/night-stars-ocean.svg') 0 0 / 480px 480px;
-        opacity: 0;
-        transition: opacity var(--passage-ms) var(--passage-ease);
-        pointer-events: none;
-      }
-      :root[data-passage='ocean-dark'] body::before {
-        opacity: 1;
       }
       /* The band's edges are feathered into the page's padding above and below it, so a day
          page meets its night as dusk, not a cut. In the night the feather is the ground's own
@@ -318,47 +312,24 @@ const socialImageUrl = new URL(image, siteUrl).href;
         top: 100%;
         background: linear-gradient(to top, transparent, var(--deep));
       }
-      /* With script, nothing of the night shows before the night itself (the owner, 2026-10-08:
-         "I should not see anything from that section till the colors transition", and the same
-         for the section under it). The band paints no ground of its own and no feathers: it is
-         the page's ground, so it turns with everything else. Its words and its scene come in
-         once the inks have switched, and go before they switch back. The section before it
-         (data-passage-near, set by src/passage.ts) steps out while the night lasts and comes
-         back after it; a warm band fades with its ground, so the night is one sky. The section
-         after it stays, in the night's tokens, so the night runs straight into it. The band's
-         reveals (the scene's one play) wait for the night too. Without script the band stays its
-         own night, feathered. */
-      .js [data-passage] {
-        background: transparent;
+      /* The lock (with script): the band holds still once it fills the window (under the header,
+         or with its end on the window's end when it is taller; src/passage.ts measures it as
+         --passage-h), and everything after it slides up over it on the page's own ground, so
+         the night ends on a clean moving edge instead of a fade. The band's feathers go: its
+         edges are the transition. Without script the band scrolls with its feathered night. */
+      :root.js [data-passage] {
+        position: sticky;
+        top: min(var(--header-height), calc(100svh - var(--passage-h, 100svh)));
+        min-height: calc(100svh - var(--header-height));
       }
-      .js [data-passage]::before,
-      .js [data-passage]::after {
+      :root.js [data-passage]::before,
+      :root.js [data-passage]::after {
         content: none;
       }
-      .js [data-passage] > *,
-      .js [data-passage-near] {
-        transition: opacity 250ms ease-out;
-      }
-      .js [data-passage] > * {
-        opacity: 0;
-      }
-      :root[data-passage] [data-passage] > * {
-        opacity: 1;
-        transition: opacity 500ms ease-out var(--passage-ink-at);
-      }
-      :root[data-passage] [data-passage-near] {
-        opacity: 0;
-      }
-      :root:not([data-passage]) [data-passage-near] {
-        transition: opacity 500ms ease-out var(--passage-ink-at);
-      }
-      @media (prefers-reduced-motion: reduce) {
-        :root [data-passage] > *,
-        :root [data-passage-near],
-        :root[data-passage] [data-passage] > *,
-        :root:not([data-passage]) [data-passage-near] {
-          transition: none;
-        }
+      :root.js [data-passage] ~ * {
+        position: relative;
+        z-index: 1;
+        background: var(--ground);
       }
       @media (prefers-reduced-motion: reduce) {
         :root.passage-fading {
@@ -1225,10 +1196,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         .forEach((head) => {
           if (head.getBoundingClientRect().top > window.innerHeight) head.setAttribute('data-reveal', '');
         });
-      // A passage's own blocks wait for its night instead (src/passage.ts).
-      const blocks = [...document.querySelectorAll<HTMLElement>('[data-reveal], [data-stagger]')].filter(
-        (block) => !block.closest('[data-passage]'),
-      );
+      const blocks = document.querySelectorAll<HTMLElement>('[data-reveal], [data-stagger]');
       if (blocks.length > 0 && 'IntersectionObserver' in window) {
         const observer = new IntersectionObserver(
           (entries) => {

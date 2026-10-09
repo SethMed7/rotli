@@ -583,3 +583,32 @@ above 35% of the window, so what is left blank after the switch is small and
 brief. It begins when the band's top passes the middle of the window; the theme
 studio above still steps out. The crossfade is 700 ms (was 900), the fades
 around it shorter, and each story step half a window of scroll (was 0.7).
+
+## 2026-10-08 (night): a lock, not a crossfade
+
+The owner, with the questions in night colours under the dome: "I think it
+should be more of like a lock transition not a cross fade style try different
+style".
+
+The diagnosis after four rounds: the passage recoloured the whole page, so at
+the switch whatever neighbour shared the window was in the wrong environment
+(the theme studio teal, the questions in night), and hiding the neighbours left
+blank sky or blank day instead. No threshold fixes a page-wide switch while two
+sections share the window.
+
+- **The band owns its night again,** with its stars and its words always
+  shown. Nothing else on the page changes colour.
+- **It locks.** Sticky once it fills the window (under the header, or with its
+  end on the window's end when it is taller), and the questions, the closing
+  banner, and the rest of the page slide up over it on their own ground. The
+  moving edge is the transition.
+- **Only the header follows,** into Ocean Dark while the band is under it and
+  back as the questions reach it (`passageActive` is now that geometry: the
+  band's top at the header's line, the next section's top below it). Its own
+  700 ms token crossfade stays.
+- The page-wide stars, the neighbour hiding, and the night-gated reveals are
+  gone; the scene plays when it comes into view, like every other reveal.
+- If the curtain is not what the owner meant by "lock", dropping the sticky
+  rule in Base.astro leaves a hard-edged night band that scrolls by.
+
+This supersedes the three 2026-10-08 entries on the night above.

@@ -195,13 +195,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file sits in two open columns, as you write it and after the Librarian: the
   lines it adds are marked, and your words are marked unchanged. Its example
   files the note in a real area.
-- **Scrolling into "Some notes never leave this Mac" takes the whole of
-  rotli.co into the night.** The page, its header, menus, and buttons step
-  into Ocean Dark while the privacy section is in view, and step back out
-  when you scroll on or back. Nothing of the night shows before the colours
-  change, and the sections above and below it step aside while it lasts, so
-  it reads as one scene; the questions after it carry on in the night's
-  colours, so nothing is skipped. With reduced motion the change is immediate.
+- **"Some notes never leave this Mac" on rotli.co is a night that locks.**
+  The section holds still once it fills the screen, and the questions after
+  it slide up over it. While it's under the header, the header turns to
+  Ocean Dark too, and it's day again as soon as the questions reach it.
+  Nothing else on the page changes colour. With reduced motion the header
+  switches at once.
 - **The quokkas at the bottom of rotli.co each have something to do.** One
   sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
   waves when you arrive and frowns if you reach for the leaves), two play
