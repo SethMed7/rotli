@@ -1,11 +1,15 @@
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import {
   ONBOARDING_STEP_NUMBER,
   ONBOARDING_TOTAL_STEPS,
+  REONBOARD_BEFORE,
+  finishLeadsTo,
   firstRunWindow,
+  isFirstRun,
   onboardingRequired,
+  reonboardingFor,
   resetAndReonboard,
   startingAppearance,
 } from "./onboarding";
@@ -62,4 +66,39 @@ test("a new install is in the Dock and stays open; nothing else has its window c
   expect(firstRunWindow(true, "")).toEqual({});
   // Reset & re-onboard already put the flags back itself
   expect(firstRunWindow(false, "0.94.0")).toEqual({});
+});
+
+// 1.8.0 re-onboarding (the owner, 2026-10-09: everyone sees the new setup
+// once, then what's new): anyone set up before REONBOARD_BEFORE runs it again.
+describe("reonboardingFor", () => {
+  test("someone set up before 1.8.0 goes through setup again, keeping where they were set up", () => {
+    expect(reonboardingFor(true, "1.7.1")).toEqual({
+      onboarded: false,
+      onboardingPhase: "preferences",
+      onboardingVersion: "1.7.1",
+    });
+    expect(reonboardingFor(true, "0.95.1")?.onboardingVersion).toBe("0.95.1");
+  });
+
+  test("an install too old to have recorded a version is returning, not a first run", () => {
+    const due = reonboardingFor(true, "");
+    expect(due?.onboardingVersion).toBe("0.0.0");
+    expect(isFirstRun(false, due?.onboardingVersion ?? "")).toBe(false);
+  });
+
+  test("once is enough: set up on 1.8.0 or later, mid-setup, or a first run is left alone", () => {
+    expect(reonboardingFor(true, "1.8.0")).toBeNull();
+    expect(reonboardingFor(true, "1.9.2")).toBeNull();
+    expect(reonboardingFor(false, "1.7.1")).toBeNull(); // already going through it again
+    expect(reonboardingFor(false, "")).toBeNull(); // a first run
+    expect(REONBOARD_BEFORE).toBe("1.8.0");
+  });
+});
+
+describe("finishLeadsTo", () => {
+  test("a first run ends at the welcome; anyone returning ends at what's new", () => {
+    expect(finishLeadsTo("")).toBe("welcome");
+    expect(finishLeadsTo("1.7.1")).toBe("whatsNew");
+    expect(finishLeadsTo("0.0.0")).toBe("whatsNew");
+  });
 });

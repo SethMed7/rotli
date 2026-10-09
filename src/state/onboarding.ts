@@ -12,8 +12,9 @@ import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
+import { compareVersions } from "../lib/whatsNew";
 import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
-import { FIRST_RUN_WINDOW } from "./onboardingPhase";
+import { FIRST_RUN_WINDOW, type OnboardingPhase } from "./onboardingPhase";
 import { useUiStore } from "./ui";
 
 /** First run's four screens (the owner, 2026-10-01, after testers' "too many
@@ -51,11 +52,44 @@ export function firstRunWindow(
   return isFirstRun(onboarded, onboardingVersion) ? { ...FIRST_RUN_WINDOW } : {};
 }
 
-/** Setup runs only on a true first run (or after Settings → Reset & re-onboard).
- * An app update never re-onboards: the 0.x version gate that did is retired
- * with 1.0.0. `onboardingVersion` still records where setup was completed. */
+/** Setup runs on a true first run, after Settings → Reset & re-onboard, and
+ * once for everyone set up before REONBOARD_BEFORE (reonboardingFor). An app
+ * update otherwise never re-onboards. `onboardingVersion` records where setup
+ * was completed. */
 export function onboardingRequired(native: boolean, onboarded: boolean): boolean {
   return native && !onboarded;
+}
+
+/** 1.8.0 re-onboards everyone once (the owner, 2026-10-09): settings leaked
+ * across earlier setups, and everyone should see the new setup, then what's
+ * new. Bump this to require it again in a later release. */
+export const REONBOARD_BEFORE = "1.8.0";
+
+/** What a launch changes to run setup once more for someone set up before
+ * REONBOARD_BEFORE — or null. Nothing they chose is reset: setup opens on
+ * their own theme and vault, Skip setup keeps everything, and finishing ends
+ * at what's new (finishLeadsTo). An install too old to have recorded a version
+ * is stamped 0.0.0, so it stays returning rather than a first run. Mid-setup
+ * (not onboarded) is left alone, which makes it once. */
+export function reonboardingFor(
+  onboarded: boolean,
+  onboardingVersion: string,
+  before: string = REONBOARD_BEFORE,
+): { onboarded: false; onboardingPhase: OnboardingPhase; onboardingVersion: string } | null {
+  if (!onboarded) return null;
+  if (onboardingVersion !== "" && compareVersions(onboardingVersion, before) >= 0) return null;
+  return {
+    onboarded: false,
+    onboardingPhase: "preferences",
+    onboardingVersion: onboardingVersion || "0.0.0",
+  };
+}
+
+/** Where finishing setup leads: a first run to the welcome note and the
+ * thank-you card; anyone returning (re-onboarded, or Reset & re-onboard) to
+ * this release's what's new. */
+export function finishLeadsTo(onboardingVersion: string): "welcome" | "whatsNew" {
+  return onboardingVersion === "" ? "welcome" : "whatsNew";
 }
 
 export async function resetAndReonboard(): Promise<void> {

@@ -80,6 +80,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Everyone sees setup once more, then what's new.** Rotli 1.8.0 walks
+  everyone set up on an earlier version through the new setup again, once:
+  it opens on your own theme and vault (Continue keeps the vault you have),
+  **Skip setup** keeps everything as it is, and the last step shows what's
+  new in 1.8.0. Earlier setups could leave settings behind that this clears
+  up. A new install still gets the welcome note and the thank-you card.
 - **A sheet's header and toolbar are calmer.** The toolbar is one row from
   the left, like a Word document's: the Start, Formulas, and Data tabs are
   gone, and everything they held is under **⋮** at the end of the row. Beta

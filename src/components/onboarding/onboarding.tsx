@@ -14,7 +14,12 @@ import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
 import { useAmbient } from "../../state/ambient";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
-import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, firstRunWindow } from "../../state/onboarding";
+import {
+  ONBOARDING_STEP_NUMBER,
+  ONBOARDING_TOTAL_STEPS,
+  firstRunWindow,
+  isFirstRun,
+} from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
 import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
@@ -256,7 +261,7 @@ function ShortcutsScreen() {
   );
 }
 
-/** Skip setup: Rotli's defaults, and on a true first run the new-install window. */
+/** Skip setup on a first run: Rotli's defaults and the new-install window. */
 function skipToDefaults(): void {
   const ui = useUiStore.getState();
   useBindingsStore.setState({ overrides: {} });
@@ -360,9 +365,11 @@ export function Onboarding({
               type="button"
               className="setup-skip"
               onClick={() => {
-                // the first screen's choices fall back to the defaults; later
-                // screens keep what was picked and their own defaults
-                if (step === "you") skipToDefaults();
+                // a first run's first screen falls back to the defaults; later
+                // screens keep what was picked and their own defaults. Someone
+                // returning keeps everything they had (1.8.0 re-onboarding)
+                const ui = useUiStore.getState();
+                if (step === "you" && isFirstRun(ui.onboarded, ui.onboardingVersion)) skipToDefaults();
                 onSkip();
               }}
             >
