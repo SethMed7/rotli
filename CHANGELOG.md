@@ -91,6 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writes it, and the header says **Saving…**, then **Saved**. If a save
   can't happen (the file changed on disk, say), it says **Not saved** with
   the reason, and your next edit tries again. ⌘S still saves at once.
+  Clicking around a sheet's cells isn't an edit: only a change to the
+  workbook saves.
 - **rotli.co's blog posts are calmer to read.** A post lines up with the
   header: the title, summary, author, and topics sit beside the post's
   picture, shown whole, with "Blog" above the title, and the title is in

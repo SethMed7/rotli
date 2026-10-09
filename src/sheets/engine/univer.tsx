@@ -19,6 +19,19 @@ interface FUniverApiLike {
   onCommandExecuted?: (cb: (c: CommandInfoLike) => void) => { dispose?: () => void } | void;
 }
 
+/** Univer's CommandType.MUTATION (COMMAND 0, OPERATION 1, MUTATION 2). */
+const MUTATION = 2;
+
+/** Only a sheet MUTATION changes the workbook. Clicking through cells runs
+ * selection OPERATIONs and, around them, mutations that touch no cell — the
+ * formula engine's bookkeeping (formula.mutation.*) and the in-cell editor
+ * priming its text box (doc.mutation.*). Counting those marked the sheet
+ * changed and set autosave writing an unchanged file (the owner, 2026-10-09:
+ * "I am just clicking, nothing changed"). */
+export function isWorkbookEdit(c: CommandInfoLike): boolean {
+  return c.type === MUTATION && (c.id ?? "").startsWith("sheet.mutation.");
+}
+
 interface CommandInfoLike {
   id?: string;
   type?: number;
@@ -89,7 +102,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     },
     onDirty(cb) {
       return api.onCommandExecuted?.((c) => {
-        if (c.type === 1) cb();
+        if (isWorkbookEdit(c)) cb();
       });
     },
     dispose() {
