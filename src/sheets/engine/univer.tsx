@@ -86,6 +86,18 @@ const REDO_ID = "univer.command.redo";
 /** An undo Univer just ran from its own ⌘Z keydown must not run again here. */
 const MENU_DEDUPE_MS = 300;
 
+/** Keys and menu commands act on the WORKBOOK only while its grid has focus:
+ * not in a native field (a toolbar box), not while a cell is being typed in,
+ * and not while a sheet tab is being renamed (a contentEditable span in the
+ * tab bar) — each of those keeps the browser's own text undo, copy, and cut. */
+function workbookFocused(host: HTMLElement, api: FUniverApiLike): boolean {
+  const focused = host.ownerDocument.activeElement;
+  if (!focused || !host.contains(focused)) return false;
+  if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return false;
+  if (focused.closest('[data-u-comp="slide-tab-item"]')) return false;
+  return !api.getActiveWorkbook()?.isCellEditing?.();
+}
+
 /** ⌘Z / ⇧⌘Z in a sheet (the owner, 2026-10-09: "we need the hotkeys for undo
  * and redo to work"). Since the Mac Edit menu's Undo/Redo carry no keys
  * (src-tauri lib.rs), ⌘Z / ⇧⌘Z reach the page as key presses. Univer answers
@@ -98,12 +110,7 @@ const MENU_DEDUPE_MS = 300;
  * would change cells you aren't looking at — and for native text fields. */
 function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void {
   const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
-  const workbookHasFocus = () => {
-    const focused = host.ownerDocument.activeElement;
-    if (!focused || !host.contains(focused)) return false;
-    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return false;
-    return !api.getActiveWorkbook()?.isCellEditing?.();
-  };
+  const workbookHasFocus = () => workbookFocused(host, api);
   const lastRun = new Map<string, number>();
   const watch = api.onCommandExecuted?.((c) => {
     if (c.id === UNDO_ID || c.id === REDO_ID) lastRun.set(c.id, performance.now());
@@ -154,13 +161,11 @@ function installMenuClipboard(
   clipboardService: () => SheetClipboardLike | null,
 ): () => void {
   const onClipboard = (event: ClipboardEvent) => {
-    const focused = host.ownerDocument.activeElement;
-    if (!focused || !host.contains(focused) || !event.clipboardData) return;
-    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
+    if (!event.clipboardData || !workbookFocused(host, api)) return;
     const workbook = api.getActiveWorkbook();
     const range = workbook?.getActiveRange()?.getRange();
     const clipboard = clipboardService();
-    if (!workbook || !range || !clipboard || workbook.isCellEditing?.()) return;
+    if (!workbook || !range || !clipboard) return;
     const copyType = event.type === "cut" ? COPY_TYPE.CUT : COPY_TYPE.COPY;
     const unitId = workbook.getId();
     const subUnitId = workbook.getActiveSheet().getSheetId();

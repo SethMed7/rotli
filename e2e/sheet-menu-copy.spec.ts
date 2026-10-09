@@ -65,4 +65,18 @@ test("the native Copy menu command copies a whole selected column", async ({ pag
   expect(copied.handled).toBe(true);
   expect(copied.plain.split(/\r?\n/).filter(Boolean)).toEqual(["Rent", "1800", "1850"]);
   expect(copied.html).toBeGreaterThan(0);
+
+  // renaming the sheet's tab focuses an editable span in the tab bar: the
+  // menu's Copy belongs to its text there, never the cell selection
+  await page.locator('.sheet-copy-probe [data-u-comp="slide-tab-item"]').first().dblclick();
+  await expect
+    .poll(() => page.evaluate(() => !!document.activeElement?.closest('[data-u-comp="slide-tab-item"]')))
+    .toBe(true);
+  const renaming = await page.evaluate(() => {
+    const data = new DataTransfer();
+    const event = new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true });
+    (document.activeElement ?? document.body).dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(renaming).toBe(false);
 });
