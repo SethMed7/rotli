@@ -29,6 +29,8 @@ interface PassagePair {
 }
 let passage: {
   passageActive(section: { top: number; bottom: number }, nextTop: number | null, line: number): boolean;
+  GROW_SPAN: number;
+  passageGrow(section: { top: number; bottom: number }, viewportHeight: number): number;
   PASSAGE_MS: number;
   GROUND_EASE: readonly [number, number, number, number];
   INK_AT: number;
@@ -153,6 +155,26 @@ describe("the privacy passage", () => {
 
   test("a hidden or empty section never turns it on", () => {
     expect(passage.passageActive({ top: 0, bottom: 0 }, null, line)).toBe(false);
+  });
+
+  test("grows from a card to the full width as it arrives, and narrows as it leaves", () => {
+    const vh = 1000;
+    const tall = (top: number) => ({ top, bottom: top + 1100 });
+    expect(passage.passageGrow(tall(vh), vh)).toBe(0); // just under the window: a card
+    expect(passage.passageGrow(tall(vh - 100), vh)).toBeLessThan(0.1); // holds its shape at first
+    expect(passage.passageGrow(tall(vh * (1 - passage.GROW_SPAN)), vh)).toBe(1); // arrived: full width
+    expect(passage.passageGrow(tall(-100), vh)).toBe(1); // in the middle of it
+    // Leaving, it narrows as its end nears the window's top.
+    expect(passage.passageGrow({ top: -1000, bottom: 300 }, vh)).toBeGreaterThan(0);
+    expect(passage.passageGrow({ top: -1000, bottom: 300 }, vh)).toBeLessThan(0.5);
+    expect(passage.passageGrow({ top: -1300, bottom: 0 }, vh)).toBe(0);
+    // It only ever gets wider as it comes in.
+    let last = -1;
+    for (let top = vh; top >= 0; top -= 25) {
+      const g = passage.passageGrow(tall(top), vh);
+      expect(g).toBeGreaterThanOrEqual(last);
+      last = g;
+    }
   });
 });
 

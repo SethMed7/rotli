@@ -612,3 +612,27 @@ sections share the window.
   rule in Base.astro leaves a hard-edged night band that scrolls by.
 
 This supersedes the three 2026-10-08 entries on the night above.
+
+## 2026-10-08 (late): the night grows out of the page
+
+The owner on the lock: "different I still dont like it analyze how products
+tend to do those transtions across the web and what looks more premium". Two
+patterns were mocked and compared: the night growing out of the page as an
+inset rounded card that widens to the full width (Apple's product pages, Framer's
+"Scale Up"), and a hard-edged band with its contents choreographed inside
+(Apple, Stripe). The crossfade and the curtain were set aside: a page-wide fade
+catches whatever else is on screen in the wrong colours, and a curtain holds the
+reader in place and covers the band before it is read. The owner picked the
+grow.
+
+- With script the band's `clip-path` is an inset rounded rectangle that opens to
+  the full width (corners from 32px to square, sides from up to 64px to 0) over
+  0.7 of a window as it arrives, eased in and out so the card holds its shape a
+  moment, and closes again as its end nears the window's top
+  (`passageGrow`, `--grow`). Only the clip changes, so nothing reflows.
+- The header flips to Ocean Dark while the band is full width under it (grow at
+  least half), in 240 ms, and back as it narrows away.
+- The sticky lock, the FAQ's opaque ground over it, and `--passage-h` are gone.
+- Reduced motion and no script: full width, no clip.
+
+This supersedes "a lock, not a crossfade" above.

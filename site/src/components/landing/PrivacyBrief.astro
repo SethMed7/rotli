@@ -5,9 +5,9 @@
 // model that may read it. Two remote-AI clouds drift in, bump the dome, and back off. The scene
 // plays once when the band comes into view; reduced motion shows it at rest. The promise and the
 // link to it (/privacy/#promise, at the top of the full policy; the hero points there too) are
-// the page text on the left. It locks once it fills the window and the questions slide up over
-// it; while it is under the header, the header steps into its Ocean Dark too (data-passage,
-// src/passage.ts).
+// the page text on the left. It grows out of the page as it arrives, a rounded card widening to
+// the full width, and narrows back as it leaves; while it is under the header, the header steps
+// into its Ocean Dark too (data-passage, src/passage.ts).
 import SecureScene from '../SecureScene.astro';
 
 const facts = [
@@ -49,13 +49,8 @@ const facts = [
 
 <style>
   /* Night: Ocean Dark with a faint field of stars (both from .band-night). */
-  /* At least a window tall when it locks (Base.astro): the words and the scene stay on the
-     band's floor, the moon in the sky above them. */
   .privacy {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
     padding-bottom: 0;
   }
   .privacy-grid {

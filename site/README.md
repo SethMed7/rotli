@@ -886,27 +886,24 @@ there, and the closing panel, whose art never touches its words from 320 to
   its lines in either environment.
 - **The privacy passage** (the owner's call, 2026-10-05; `src/passage.ts`).
   A section marked `data-passage="ocean-dark"` (the landing's privacy band)
-  paints the app's Ocean Dark itself, with its stars, and locks: with script
-  it is sticky once it fills the window (under the header, or with its end on
-  the window's end when it is taller; `src/passage.ts` measures it as
-  `--passage-h`), and every section after it slides up over it on the page's
-  own ground, so the night ends on a moving edge. While the band is under the
-  header, the header with its navigation, dropdown, and Menu takes the Ocean
-  Dark tokens (`:root[data-passage='ocean-dark'] .site-header-bar`, values
-  from `src/styles/themes.css`), as do `color-scheme` there and the
-  `theme-color` meta; as the next section's top reaches the header, it is day
-  again. Nothing else on the page changes colour (the owner, 2026-10-08:
-  "more of like a lock transition not a cross fade"). The header's own
-  crossfade runs on its tokens, registered with `@property`: grounds ease over
-  700 ms (`cubic-bezier(0.65, 0, 0.35, 1)`), the inks switch whole at 357 ms,
-  muted and accent text lean onto `--text` around the switch, and
-  `scripts/site-interactions.test.ts` measures every frame (never under 3:1).
-  How it got here: from 2026-10-05 the whole page crossfaded into the night
-  when the band filled a share of the window, and each version left something
-  wrong at the switch (a neighbour recoloured, or hidden and blank); the lock
-  replaced it. Without script the band scrolls with its feathered night
-  (`[data-passage]::before/::after`). Reduced motion switches the header at
-  once. It is a passage, not a preference: nothing is stored. Lowest night pair:
+  paints the app's Ocean Dark itself, with its stars, and grows out of the
+  page (the owner's pick, 2026-10-08, from the patterns premium product pages
+  use): with script it comes up the window as a rounded card set inside the
+  day page, widens to the full width with square corners over 0.7 of a window
+  as it arrives, and narrows back into a card as it leaves. `passageGrow`
+  sets `--grow` (0 to 1, eased in and out) and only the band's `clip-path`
+  changes, so nothing reflows. While the band is full width under the header,
+  the header with its navigation, dropdown, and Menu takes the Ocean Dark
+  tokens (`:root[data-passage='ocean-dark'] .site-header-bar`, values from
+  `src/styles/themes.css`), as do `color-scheme` there and the `theme-color`
+  meta, in a 240 ms flip on its own registered tokens (the inks switch whole
+  at 122 ms; `scripts/site-interactions.test.ts` measures every frame).
+  Nothing else on the page changes colour. How it got here: from 2026-10-05
+  the whole page crossfaded into the night, and each version left something
+  wrong at the switch (a neighbour recoloured, or hidden and blank); a curtain
+  lock followed, then this. Reduced motion, and no script, keep the band full
+  width (feathered, without script). It is a passage, not a preference:
+  nothing is stored. Lowest night pair:
   muted text on `--surface-2`, 6.75:1. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
   orb swatches (the owner's call, 2026-09-23):

@@ -1,16 +1,15 @@
 // The privacy passage (site/README.md, the owner's call 2026-10-05): a section marked
 // `data-passage="<environment>"` paints that environment itself (the landing's privacy band, its
-// own night), locks once it fills the window, and the next section slides up over it
-// (Base.astro). While the band is under the header, the header and its menus take the
-// environment's tokens (Base.astro, `:root[data-passage] .site-header-bar`), and they give them
-// back as soon as daylight reaches the header again, in either direction. It is a passage, not
-// a preference: nothing is stored, and a reload decides afresh from where the page is.
+// own night) and grows out of the page: it comes up the window as a rounded card inside the day
+// page, widens to the full width as it arrives, and narrows back as it leaves (Base.astro reads
+// --grow). While it is full under the header, the header and its menus take the environment's
+// tokens (Base.astro, `:root[data-passage] .site-header-bar`) and give them back as it narrows
+// away. It is a passage, not a preference: nothing is stored, and a reload decides afresh.
 //
-// How it got here (2026-10-05 to 2026-10-08): the whole page once crossfaded into the night
-// when the band filled a share of the window. Every version of that left something wrong on
-// screen at the switch: a neighbour recoloured, or hidden and blank. The owner: "more of like a
-// lock transition not a cross fade". Now nothing but the header changes colour, and the band's
-// own edges, moving, are the transition.
+// How it got here (2026-10-05 to 2026-10-08): the whole page once crossfaded into the night,
+// and every version left something wrong on screen at the switch (a neighbour recoloured, or
+// hidden and blank); a curtain lock came next. The owner asked what premium product pages do;
+// of the patterns compared, they picked this one. Nothing but the header changes colour.
 //
 // The decisions are pure functions so they can be tested: when the passage turns on and off,
 // and how the colours travel so text stays readable in every frame of the crossfade.
@@ -31,10 +30,27 @@ export function passageActive(section: Span, nextTop: number | null, line: numbe
   return section.top <= line + 1 && end > line + 1;
 }
 
+/** How much of the window's height the band takes to grow to the full width as it arrives,
+ * and to narrow back as it leaves. */
+export const GROW_SPAN = 0.7;
+
+/** How far the band has grown (0: a card inside the page, 1: the full width), from its box in
+ * viewport coordinates and the window's height: the smaller of how far its top has come up the
+ * window and how far its end still is from the window's top, eased in and out so the card
+ * holds its shape a while before it widens. */
+export function passageGrow(section: Span, viewportHeight: number): number {
+  if (viewportHeight <= 0 || section.bottom <= section.top) return 1;
+  const span = viewportHeight * GROW_SPAN;
+  const arriving = (viewportHeight - section.top) / span;
+  const leaving = section.bottom / span;
+  const t = Math.min(1, Math.max(0, Math.min(arriving, leaving)));
+  return t * t * (3 - 2 * t);
+}
+
 // ——— The crossfade (Base.astro's `:root.passage-fading` rules restate these numbers) ———
 
 /** How long the dusk (or the dawn) takes. Reduced motion switches at once. */
-export const PASSAGE_MS = 700;
+export const PASSAGE_MS = 240;
 /** The grounds (page, surfaces, borders) ease slowly out, cross quickly, and settle slowly. */
 export const GROUND_EASE = [0.65, 0, 0.35, 1] as const;
 /** Text never fades through the ground (a colour on its way from dark to light must cross a
@@ -144,14 +160,8 @@ export function watchPassages(doc: Document = document): void {
     while (next && next.tagName !== 'SECTION') next = next.nextElementSibling;
     after.set(section, next as HTMLElement | null);
   }
-  // The band locks with its end on the window's end when it is taller than the window, so it
-  // needs its own height (Base.astro, --passage-h).
-  const measure = () => sections.forEach((section) => section.style.setProperty('--passage-h', `${section.offsetHeight}px`));
-  if ('ResizeObserver' in window) {
-    const sizes = new ResizeObserver(measure);
-    sections.forEach((section) => sizes.observe(section));
-  }
-  measure();
+  // Under reduced motion the band is simply full width (Base.astro); no growing to track.
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const apply = (next: HTMLElement | null) => {
     if (next === current) return;
@@ -181,9 +191,11 @@ export function watchPassages(doc: Document = document): void {
     for (const section of sections) {
       const box = section.getBoundingClientRect();
       const nextTop = after.get(section)?.getBoundingClientRect().top ?? null;
-      if (passageActive(box, nextTop, line)) {
+      const grow = calm.matches ? 1 : passageGrow(box, window.innerHeight);
+      section.style.setProperty('--grow', grow.toFixed(3));
+      // The header goes with the night only while the night is (mostly) full width under it.
+      if (!next && passageActive(box, nextTop, line) && grow >= 0.5) {
         next = section;
-        break;
       }
     }
     apply(next);

@@ -199,9 +199,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         color-scheme: light;
       }
       /* The privacy passage (src/passage.ts): the landing's privacy band paints its own night
-         and locks under the header while the next section slides up over it (the owner,
-         2026-10-08: "more of like a lock transition not a cross fade"). While the band is under
-         the header, the header (with its menus) steps into the app's Ocean Dark environment
+         and grows out of the page as it arrives (the owner,
+         2026-10-08: "more of like a lock transition not a cross fade", then the grow below).
+         While the band is under the header, the header (with its menus) steps into the app's Ocean Dark environment
          (src/styles/themes.css; border-strong and selection derived the way base.css derives
          them) and steps back out as daylight reaches it. Nothing else on the page changes
          colour. Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the
@@ -226,7 +226,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       /* The crossfade runs on the tokens themselves, registered so they can be animated on the
          root: every surface that reads them (the ground, the header, menus, buttons, borders)
-         changes in the same frame, on one clock. The grounds ease over 700 ms; the inks switch
+         changes in the same frame, on one clock. The grounds ease over 240 ms; the inks switch
          whole just past halfway, when the ground is mid-tone and both inks read alike (text
          fading through a ground fading the other way vanishes in the middle); muted and accent
          text lean onto --text around the switch. src/passage.ts holds the same numbers and
@@ -253,9 +253,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         /* Also a plain value, so muted and accent text keep their colours in a browser
            without @property (the lean animation then simply never runs). */
         --passage-lean: 0;
-        --passage-ms: 700ms;
+        --passage-ms: 240ms;
         --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
-        --passage-ink-at: 357ms;
+        --passage-ink-at: 122ms;
       }
       /* The header reads its own muted, accent, and star colours, so they follow its tokens
          (registered colours resolve where they are declared). */
@@ -312,24 +312,26 @@ const socialImageUrl = new URL(image, siteUrl).href;
         top: 100%;
         background: linear-gradient(to top, transparent, var(--deep));
       }
-      /* The lock (with script): the band holds still once it fills the window (under the header,
-         or with its end on the window's end when it is taller; src/passage.ts measures it as
-         --passage-h), and everything after it slides up over it on the page's own ground, so
-         the night ends on a clean moving edge instead of a fade. The band's feathers go: its
-         edges are the transition. Without script the band scrolls with its feathered night. */
+      /* The night grows out of the page (with script; the owner, 2026-10-08, picking it from the
+         patterns premium product pages use): the band comes up the window as a rounded card set
+         inside the day page, widens to the full width with square corners as it arrives, and
+         narrows back into a card as it leaves. src/passage.ts sets --grow (0 to 1) from where
+         the band is; only its clip changes, so nothing reflows. Nothing else on the page changes
+         colour. Under reduced motion, or without script, it is simply full width (feathered,
+         without script). */
       :root.js [data-passage] {
-        position: sticky;
-        top: min(var(--header-height), calc(100svh - var(--passage-h, 100svh)));
-        min-height: calc(100svh - var(--header-height));
+        --grow: 1;
+        --grow-inset: clamp(12px, 4vw, 64px);
+        clip-path: inset(0 calc((1 - var(--grow)) * var(--grow-inset)) round calc((1 - var(--grow)) * 32px));
       }
       :root.js [data-passage]::before,
       :root.js [data-passage]::after {
         content: none;
       }
-      :root.js [data-passage] ~ * {
-        position: relative;
-        z-index: 1;
-        background: var(--ground);
+      @media (prefers-reduced-motion: reduce) {
+        :root.js [data-passage] {
+          clip-path: none;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         :root.passage-fading {
