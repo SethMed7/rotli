@@ -49,8 +49,6 @@ beforeAll(() => {
     ["t.splitRight", "Meta+D"],
     ["t.secure", "Meta+Shift+L"],
     ["t.bare", "F18"],
-    ["t.undo", "Meta+Z"],
-    ["t.redo", "Meta+Shift+Z"],
   ] as const) {
     registerAction({ id, title: id, defaultChord: chord, run: () => ran.push(id) });
   }
@@ -131,8 +129,7 @@ describe("app chords over a board", () => {
   });
 
   test("⌘Z and ⇧⌘Z over a board reach the board's own undo and redo, never an app action", () => {
-    // (off a board they are edit.undo / edit.redo, which other files register
-    // with these real chords — so only the canvas side is asserted here)
+    // (off a board they are edit.undo / edit.redo: editHistoryActions.test.ts)
     expect(press("KeyZ", { meta: true }, onCanvas, true).canvasRan).toBe(true);
     expect(press("KeyZ", { meta: true, shift: true }, onCanvas, true).canvasRan).toBe(true);
     expect(ran).toEqual([]);

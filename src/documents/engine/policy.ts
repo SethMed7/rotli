@@ -99,12 +99,6 @@ interface ChordLike {
   altKey: boolean;
 }
 
-/** ⇧⌘Z (⇧Ctrl+Z off the Mac): redo. Univer binds only ⌘Y / Ctrl+Y. */
-export function isRedoChord(event: ChordLike, isMac: boolean): boolean {
-  if (event.code !== "KeyZ" || !event.shiftKey || event.altKey) return false;
-  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-}
-
 /** ⌘A on a Mac, Ctrl+A elsewhere — the platform's plain Select All chord. */
 export function isSelectAllChord(event: ChordLike, isMac: boolean): boolean {
   if (event.code !== "KeyA" || event.shiftKey || event.altKey) return false;

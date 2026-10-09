@@ -62,18 +62,32 @@ export function registerEditHistoryActions(): void {
   });
 }
 
-/** Edit → Undo / Redo picked with the pointer: replay the key press at what
- * has focus, so the editor there answers it exactly as it answers ⌘Z. */
+/** Edit → Undo / Redo picked with the pointer. A plain text field (board text
+ * included — its textarea sits under the canvas, which owns the ⌘Z chord)
+ * gets the browser's own undo directly: a replayed key press is untrusted and
+ * never triggers it. Anything else hears the press replayed, so the editor
+ * there (a note, a sheet, a document, a board) answers it exactly as it
+ * answers ⌘Z. */
 export function replayHistoryKey(redo: boolean): void {
+  if (plainFieldFocused()) {
+    browserHistory(redo ? "redo" : "undo");
+    return;
+  }
   const target = document.activeElement ?? document.body;
-  target.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key: redo ? "Z" : "z",
-      code: "KeyZ",
-      metaKey: true,
-      shiftKey: redo,
-      bubbles: true,
-      cancelable: true,
-    }),
-  );
+  target.dispatchEvent(historyKeyEvent(redo));
+}
+
+/** ⌘Z / ⇧⌘Z as a keydown. Univer matches shortcuts on the legacy keyCode,
+ * which a constructed KeyboardEvent leaves at 0, so it is set here. */
+export function historyKeyEvent(redo: boolean): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", {
+    key: redo ? "Z" : "z",
+    code: "KeyZ",
+    metaKey: true,
+    shiftKey: redo,
+    bubbles: true,
+    cancelable: true,
+  });
+  for (const legacy of ["keyCode", "which"]) Object.defineProperty(event, legacy, { get: () => 90 });
+  return event;
 }

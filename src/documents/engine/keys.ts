@@ -17,12 +17,14 @@
 // which acted on that hidden element's DOM text. Both routes — Univer's
 // keydown shortcut and the menu — are answered with Univer's own commands.
 // ⌘Z / ⇧⌘Z reach the page as key presses since 2026-10-09 (the Edit menu's
-// Undo/Redo carry no keys; src-tauri lib.rs): Univer answers ⌘Z itself, and
-// ⇧⌘Z — the Mac's redo, which Univer doesn't bind — is answered here.
+// Undo/Redo carry no keys; src-tauri lib.rs): what Univer's own shortcuts leave
+// — ⇧⌘Z, which it binds only as ⌘Y, and any ⌘Z it stands down for — is
+// answered here.
 
 import type { IInsertCommandParams } from "@univerjs/preset-docs-core";
 
-import { documentTableRanges, isRedoChord, isSelectAllChord } from "./policy";
+import { isRedoChord, isUndoChord } from "../../lib/historyChords";
+import { documentTableRanges, isSelectAllChord } from "./policy";
 
 type DocumentBodyLike = {
   dataStream: string;
@@ -164,10 +166,12 @@ export function installDocumentKeys(
     if (isSelectAllChord(event, isMac)) {
       event.preventDefault();
       runFromMenu(ids.selectAll);
-    } else if (isRedoChord(event, isMac)) {
-      // ⇧⌘Z is the Mac's redo; Univer binds only ⌘Y
+    } else if (isUndoChord(event, isMac) || isRedoChord(event, isMac)) {
+      // what Univer's own shortcuts left (they run first): ⇧⌘Z, which it
+      // binds only as ⌘Y, and ⌘Z wherever its editor context stood down —
+      // answered before the browser's default undo touches the hidden input
       event.preventDefault();
-      runFromMenu(ids.redo);
+      runFromMenu(isUndoChord(event, isMac) ? ids.undo : ids.redo);
     }
   };
 
