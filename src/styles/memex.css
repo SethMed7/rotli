@@ -2357,37 +2357,23 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Saved is a quiet state; unsaved edits make Save the one filled control in
-   the header, its dot inside the button rather than floating beside it */
-.sheet-save {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 24px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: none;
-  color: var(--text-muted);
-  font: inherit;
+/* Saving… → Saved (components/autosave.tsx): a status, not a button — the
+   editor saves itself. The hidden sizer holds the longest word's width so the
+   controls beside it never move. */
+.save-status {
+  flex: 0 0 auto;
+  display: inline-grid;
+  padding: 3px 10px 3px 4px;
   font-size: 12px;
-  padding: 3px 10px;
-  cursor: pointer;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
-.sheet-save.dirty {
-  background: var(--tint);
-  color: var(--text);
-  font-weight: 600;
+.save-status > * {
+  grid-area: 1 / 1;
+  text-align: right;
 }
-.sheet-save.dirty::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-text);
-}
-.sheet-save:disabled {
-  opacity: 0.5;
-  cursor: default;
+.save-status-sizer {
+  visibility: hidden;
 }
 /* Edits parked before the file changed on disk: the person chooses, nothing is
    dropped. Wraps on a narrow pane; the safe choice (copy) comes first. */
@@ -2611,27 +2597,6 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.document-dirty {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-text);
-}
-.document-save {
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--tint);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 3px 12px;
-  cursor: pointer;
-}
-.document-save:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 .file-document-fallback {
   display: flex;
   flex: 1 1 auto;
@@ -2692,9 +2657,6 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   }
   .document-preserved {
     max-width: 112px;
-  }
-  .document-save {
-    padding-inline: 9px;
   }
   .file-document-fallback {
     justify-content: flex-start;

@@ -21,6 +21,7 @@ import { registerEditor, unregisterEditor } from "../editor/commands";
 import { corpusFileStat, openUrl } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import { SaveStatus, useAutosave } from "./autosave";
 
 export default function DocumentEditor({
   fileId,
@@ -52,6 +53,32 @@ export default function DocumentEditor({
   useEffect(() => {
     setChromeEl(chromeSlotRef?.current ?? null);
   }, [chromeSlotRef]);
+
+  const save = async () => {
+    const session = sessionRef.current;
+    const handle = handleRef.current;
+    if (!session || !handle || saving || dirtyGenRef.current === 0) return;
+    const generation = dirtyGenRef.current;
+    setSaving(true);
+    setErr(null);
+    try {
+      diskRevisionRef.current = await session.save(handle.save());
+      const stat = await corpusFileStat(fileId).catch(() => null);
+      if (stat) diskLenRef.current = stat.len;
+      if (dirtyGenRef.current === generation) {
+        dirtyGenRef.current = 0;
+        setDirty(false);
+        deleteParkedDocument(fileId);
+        unregisterLiveDocument(fileId);
+      }
+      void invalidateNotes();
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const autosave = useAutosave(save);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -87,6 +114,7 @@ export default function DocumentEditor({
           model = park.document;
           dirtyGenRef.current = Math.max(1, park.dirtyGen);
           setDirty(true);
+          autosave.edited();
           setWarnings(session.warnings);
           diskRevisionRef.current = park.diskRevision;
         } else {
@@ -114,6 +142,7 @@ export default function DocumentEditor({
           markDocumentDraftChanged(fileId);
           dirtyGenRef.current += 1;
           setDirty(true);
+          autosave.edited();
         });
         const structureSubscription = handle.onStructureChange(() => {
           if (!disposed) setEngineRevision((revision) => revision + 1);
@@ -178,7 +207,7 @@ export default function DocumentEditor({
       handleRef.current = null;
       sessionRef.current = null;
     };
-  }, [engineRevision, fileId, paneId]);
+  }, [engineRevision, fileId, paneId, autosave]);
 
   useEffect(() => {
     const session = sessionRef.current;
@@ -208,33 +237,6 @@ export default function DocumentEditor({
     return () => unregisterLiveDocument(fileId);
   }, [dirty, fileId, ready]);
 
-  const save = async () => {
-    const session = sessionRef.current;
-    const handle = handleRef.current;
-    if (!session || !handle || saving || dirtyGenRef.current === 0) return;
-    const generation = dirtyGenRef.current;
-    setSaving(true);
-    setErr(null);
-    try {
-      diskRevisionRef.current = await session.save(handle.save());
-      const stat = await corpusFileStat(fileId).catch(() => null);
-      if (stat) diskLenRef.current = stat.len;
-      if (dirtyGenRef.current === generation) {
-        dirtyGenRef.current = 0;
-        setDirty(false);
-        deleteParkedDocument(fileId);
-        unregisterLiveDocument(fileId);
-      }
-      void invalidateNotes();
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSaving(false);
-    }
-  };
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) return;
@@ -244,11 +246,11 @@ export default function DocumentEditor({
       if (!inThisEmbed && !inThisPane) return;
       event.preventDefault();
       event.stopPropagation();
-      void saveRef.current();
+      autosave.flush();
     };
     window.addEventListener("keydown", onKeyDown, { capture: true });
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
-  }, [compact, paneId]);
+  }, [compact, paneId, autosave]);
 
   const chrome = (
     <div className="document-chrome-actions">
@@ -262,15 +264,7 @@ export default function DocumentEditor({
           {err}
         </span>
       )}
-      {dirty && !saving && <span className="document-dirty" title="Unsaved changes" />}
-      <button
-        type="button"
-        className="document-save"
-        disabled={!ready || saving || !dirty}
-        onClick={() => void save()}
-      >
-        {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
-      </button>
+      {ready && <SaveStatus dirty={dirty} saving={saving} failed={err !== null && dirty} />}
     </div>
   );
 
