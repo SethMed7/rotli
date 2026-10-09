@@ -2,15 +2,18 @@
 // whole gathered selection into a Main folder, or into a new one. Pure over
 // its inputs, like mainFolderMenu.ts, so the order and the labels are
 // unit-tested without the menu. Main only: a named view's folders are its own
-// subset, and files never sit in Main.
+// subset. A file is filed only when it is already in Main (a new sheet or
+// document lands there); this menu never brings a Library file into Main.
 
 import {
   MAIN_ROOT,
   type MainNode,
   addFolderToMain,
   fileItemsInMainFolder,
+  liftToMainRoot,
   mainFolderIds,
   mainNoteIds,
+  mainParentOfNote,
   uniqueRootFolderName,
 } from "../../services/mainTree";
 import type { MenuSpec } from "../../state/contextMenu";
@@ -27,19 +30,24 @@ export interface AddToFolderInput {
   requestRename: (folderId: string) => void;
 }
 
-export function addToFolderMenu(input: AddToFolderInput): MenuSpec | null {
-  const { tree } = input;
-  // items already in Main keep the order Main lists them in; the rest follow
-  const listed = [...mainNoteIds(tree)];
+/** The clicked note, or the gathered selection it belongs to, in the order
+ * Main lists them (items not in Main follow). Files count only once in Main. */
+function itemsToFile(input: Pick<AddToFolderInput, "tree" | "note" | "selection">): string[] {
+  const listed = [...mainNoteIds(input.tree)];
   const rank = (id: string) => (listed.includes(id) ? listed.indexOf(id) : listed.length);
   const gathered =
     input.selection && input.selection.length > 1 && input.selection.some((item) => item.id === input.note.id)
       ? [...new Map(input.selection.map((item) => [item.id, item])).values()]
       : [input.note];
-  const filing = gathered
-    .filter((item) => item.kind !== "file")
+  return gathered
+    .filter((item) => item.kind !== "file" || listed.includes(item.id))
     .map((item) => item.id)
     .sort((a, b) => rank(a) - rank(b));
+}
+
+export function addToFolderMenu(input: AddToFolderInput): MenuSpec | null {
+  const { tree } = input;
+  const filing = itemsToFile(input);
   if (filing.length === 0) return null;
   const fileInto = (from: MainNode[], folderId: string) =>
     input.setTree(fileItemsInMainFolder(from, filing, folderId));
@@ -63,5 +71,24 @@ export function addToFolderMenu(input: AddToFolderInput): MenuSpec | null {
         },
       },
     ],
+  };
+}
+
+/** "Remove from folder" (the owner, 2026-10-08): the note — or the gathered
+ * selection — out of its Main folder to the top level, landing in the order
+ * Main lists them. Null when none of them sits in a folder. */
+export function removeFromFolderItem(
+  input: Pick<AddToFolderInput, "tree" | "note" | "selection" | "setTree">,
+): MenuSpec | null {
+  const nested = itemsToFile(input).filter((id) => {
+    const parent = mainParentOfNote(input.tree, id);
+    return parent !== null && parent !== MAIN_ROOT;
+  });
+  if (nested.length === 0) return null;
+  return {
+    kind: "action",
+    label: nested.length > 1 ? `Remove ${nested.length} items from folder` : "Remove from folder",
+    // each lands just after its folder, so the last listed goes first
+    onClick: () => input.setTree(nested.toReversed().reduce(liftToMainRoot, input.tree)),
   };
 }

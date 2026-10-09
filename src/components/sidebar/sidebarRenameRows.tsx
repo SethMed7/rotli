@@ -15,18 +15,25 @@ import { InlineRenameInput } from "../inlineRenameInput";
 import { glyphForNote } from "../noteGlyph";
 import { useCommitRename } from "../renameDialog";
 
+/** A Main folder row as a text field — renaming a folder, or naming a new one
+ * (`ariaLabel` "New folder in Main", `blur` "commit"), so the new folder's
+ * icon sits in the same column as the folders around it. */
 export function FolderRenameRow({
   name,
   open,
   style,
   onCommit,
   onCancel,
+  ariaLabel = "Rename Main folder",
+  blur,
 }: {
   name: string;
   open: boolean;
   style: CSSProperties;
   onCommit: (value: string) => void;
   onCancel: () => void;
+  ariaLabel?: string;
+  blur?: "cancel" | "commit";
 }) {
   return (
     <div className="frow child main-row renaming" style={style}>
@@ -38,9 +45,10 @@ export function FolderRenameRow({
         className="sb-rename-input"
         defaultValue={name}
         placeholder="Folder name…"
-        ariaLabel="Rename Main folder"
+        ariaLabel={ariaLabel}
         onCommit={onCommit}
         onCancel={onCancel}
+        blur={blur}
       />
     </div>
   );

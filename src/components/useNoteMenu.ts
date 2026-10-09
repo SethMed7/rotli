@@ -45,7 +45,7 @@ import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import type { NoteSummary } from "../types";
-import { addToFolderMenu } from "./sidebar/addToFolderMenu";
+import { addToFolderMenu, removeFromFolderItem } from "./sidebar/addToFolderMenu";
 import { noteProtectionItems } from "./sidebar/noteProtectionItems";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
@@ -423,6 +423,13 @@ export function useNoteMenu() {
             requestRename: (folderId) => useUiStore.getState().setMainRenameRequest(folderId),
           });
           if (filing) items.push(filing);
+          const unfile = removeFromFolderItem({
+            tree: manifest.tree,
+            note,
+            selection: opts?.selectedItems,
+            setTree: (tree) => setTree(tree, liveIds),
+          });
+          if (unfile) items.push(unfile);
         }
         const projectionAction = projectionMenuAction(activeView, currentView, inMain);
         items.push({

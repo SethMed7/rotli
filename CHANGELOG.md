@@ -519,6 +519,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A note can leave a Main folder.** Right-click a note in a folder and
+  choose **Remove from folder**, or drag it below the list, where a space
+  appears that says "Drop here to take it out of the folder". Either way works
+  even when Main is a single folder with nothing beside it, which used to
+  leave no row to drop next to. A sheet or document already in Main can now
+  be filed into a folder and back out like a note.
+- **The new-folder field lines up.** Its folder icon sits in the same column
+  as the folders below it instead of further in.
 - **Your hotkeys work over a board.** With a board focused, ⌘K, ⌘[ and ⌘],
   ⌘⇧P, ⌘⇧S and the rest of Rotli's chords did nothing, because the board
   answered them first (⌘K opened its link box, ⌘[ moved a shape back a
