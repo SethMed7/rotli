@@ -19,13 +19,9 @@ store. Deleting the app does not transfer ownership of the files to Rotli.
 Rotli does not operate an analytics or account endpoint. Network activity is
 limited to declared product capabilities:
 
-- the signed updater checks for a newer version: shortly after the app opens
-  and a few times a day, and whenever you press "Check for updates". It asks
-  rotli.co first, with Rotli's version, macOS, and the chip type in the
-  address (so rotli.co's traffic shows how many Macs run each version), and
-  rotli.co redirects the app to the signed release feed on GitHub; if
-  rotli.co is unreachable the app asks GitHub directly. The request carries no account,
-  identifier, vault, or note data.
+- the signed updater checks the pinned GitHub release feed for a newer version:
+  shortly after the app opens and a few times a day, and whenever you press
+  "Check for updates". The request carries no account, vault, or note data.
   Settings → General → "Check for updates automatically" turns the routine
   check off; nothing is downloaded until you choose Install;
 - a user-enabled connected chat lane launches the already-authenticated official
@@ -71,37 +67,6 @@ Unsaved typing is held briefly in this browser's local storage so a refresh
 can't lose it, then written into the vault and cleared. The one outbound path
 is a chat you start: the helper runs your own AI tool, which contacts its
 provider as above, and secure notes are refused before it runs.
-
-## The rotli.co website
-
-rotli.co sets no cookies and runs no analytics, ads, or third-party scripts.
-Its pages, fonts, images, and films are served from the site itself. The one
-exception is the Launch Llama badge in the footer, an image loaded from Launch
-Llama's own server, which therefore sees a request from the visitor's browser.
-The star count beside the header's GitHub link is read from GitHub's public
-API once, when the site is built; the visitor's browser never contacts GitHub
-to show it. Railway (hosting) and Cloudflare (DNS) process standard request details such
-as the IP address to deliver pages.
-
-The footer's optional "Hear when it's ready" list sends the address a visitor
-types to Resend, Rotli's email provider, and only when the visitor submits it.
-Resend keeps it as a contact in Rotli's list (a Resend segment) so the owner
-can email updates about Rotli. Every such email carries Resend's unsubscribe
-link, and one click removes the address from future sends. When an address
-joins, the owner also receives one email with it, sent through the same
-Resend account, as a signup alert. Nothing else is collected or shared. Until the list opens, the form says so and the address
-is not kept or passed on.
-
-The roadmap page (rotli.co/roadmap/) keeps a vote count per roadmap item and
-nothing about who voted. The visitor's browser remembers its own votes in
-local storage (not a cookie, never sent). Abuse limits use an HMAC of the IP
-address and the UTC day under a secret salt, held in the server's memory only:
-never the raw address, never written to disk, new every day, and gone on
-restart. A feature request stores its title, description, the time it
-arrived, and an email address only if the visitor gives one, in a SQLite file
-on the site's Railway volume. Requests are read only by the owner, never
-published, and never added to the email list; a visitor can ask for theirs to
-be deleted by sending another request.
 
 ## Secure notes and locked notes
 
