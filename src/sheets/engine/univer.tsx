@@ -2,7 +2,7 @@
 // Replace this module (+ drop @univerjs from package.json) to swap engines.
 
 import { LocaleType, createUniver, defaultTheme, merge } from "@univerjs/presets";
-import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
+import { COPY_TYPE, ISheetClipboardService, UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import type { SheetModel, SheetThemeMode } from "./types";
@@ -13,8 +13,16 @@ interface FWorkbookLike {
   setEditable?: (editable: boolean) => FWorkbookLike;
 }
 
+interface FActiveWorkbookLike {
+  getId: () => string;
+  getActiveSheet: () => { getSheetId: () => string };
+  getActiveRange: () => { getRange: () => unknown } | null;
+  isCellEditing?: () => boolean;
+}
+
 interface FUniverApiLike {
   createWorkbook: (data: unknown) => FWorkbookLike;
+  getActiveWorkbook: () => FActiveWorkbookLike | null;
   undo: () => Promise<boolean>;
   redo: () => Promise<boolean>;
   toggleDarkMode: (dark: boolean) => void;
@@ -119,6 +127,56 @@ function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void 
   };
 }
 
+type SheetClipboardLike = Pick<ISheetClipboardService, "generateCopyContent" | "copyContentCache">;
+
+/** ⌘C / ⌘X from the Mac's Edit menu (the owner, 2026-10-09: "cmd+c is not
+ * working in sheets when copying a column"). AppKit takes those keys for the
+ * menu, and WebKit fires `copy` / `cut` at the focused element — Univer's
+ * hidden cell input, holding at most one cell's text — while Univer copies
+ * only from its own ⌘C keydown. So the selection is put on the clipboard here,
+ * exactly as Univer's copy() builds it (and cached, so pasting back into
+ * Rotli keeps formulas and styles; a cut moves the cells on that paste), but
+ * written into the event, the one place WebKit takes it synchronously. In the
+ * browser Univer's own copy listener still runs after this one and wins.
+ * A cell being typed in keeps the browser's copy of its selected text. */
+function installMenuClipboard(
+  host: HTMLElement,
+  api: FUniverApiLike,
+  // looked up per copy: Univer registers it only once the workbook is up
+  clipboardService: () => SheetClipboardLike | null,
+): () => void {
+  const onClipboard = (event: ClipboardEvent) => {
+    const focused = host.ownerDocument.activeElement;
+    if (!focused || !host.contains(focused) || !event.clipboardData) return;
+    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
+    const workbook = api.getActiveWorkbook();
+    const range = workbook?.getActiveRange()?.getRange();
+    const clipboard = clipboardService();
+    if (!workbook || !range || !clipboard || workbook.isCellEditing?.()) return;
+    const copyType = event.type === "cut" ? COPY_TYPE.CUT : COPY_TYPE.COPY;
+    const unitId = workbook.getId();
+    const subUnitId = workbook.getActiveSheet().getSheetId();
+    const content = clipboard.generateCopyContent(unitId, subUnitId, range as never, { copyType });
+    if (!content) return;
+    clipboard.copyContentCache().set(content.copyId, {
+      unitId,
+      subUnitId,
+      range: content.discreteRange,
+      matrix: content.matrixFragment,
+      copyType,
+    });
+    event.clipboardData.setData("text/plain", content.plain);
+    event.clipboardData.setData("text/html", content.html);
+    event.preventDefault();
+  };
+  host.ownerDocument.addEventListener("copy", onClipboard, true);
+  host.ownerDocument.addEventListener("cut", onClipboard, true);
+  return () => {
+    host.ownerDocument.removeEventListener("copy", onClipboard, true);
+    host.ownerDocument.removeEventListener("cut", onClipboard, true);
+  };
+}
+
 /** Mount the spreadsheet engine into a host element. */
 export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHandle {
   const { univer, univerAPI } = createUniver({
@@ -133,6 +191,14 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
 
   const api = univerAPI as unknown as FUniverApiLike;
   const releaseMenuHistory = installMenuHistory(host, api);
+  const injector = univer.__getInjector();
+  const releaseMenuClipboard = installMenuClipboard(host, api, () => {
+    try {
+      return injector.get(ISheetClipboardService);
+    } catch {
+      return null;
+    }
+  });
   const fwb = api.createWorkbook({
     ...opts.model,
     locale: LocaleType.EN_US,
@@ -171,6 +237,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     },
     dispose() {
       releaseMenuHistory();
+      releaseMenuClipboard();
       univer.dispose();
     },
   };
