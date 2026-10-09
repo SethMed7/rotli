@@ -166,7 +166,7 @@ there, and the closing panel, whose art never touches its words from 320 to
      two said the same thing. One step shows at a time, following the scroll
      (the owner, 2026-10-08: the three in one scroll felt "dead and
      overwhelming"; then "make the switches of what I am looking at happen
-     with scroll not manually"). On a window at least 1081 wide and 760 tall
+     with scroll not manually"). On a window at least 1081 wide and 800 tall
      the story pins in the middle of the window under the header while the
      page scrolls a runway below it (half a window per step after the
      first, `src/storyScroll.ts`); each third of the runway is one step. The
@@ -175,8 +175,12 @@ there, and the closing panel, whose art never touches its words from 320 to
      and joins the frame with two concave corners; the pictures slide through
      one framed stage on the right (a warm bezel round a lighter panel, after
      a reference the owner shared, 2026-10-08), each centred in it, the stage
-     keeping the tallest one's height. Stacked, each picture sits in its own
-     matching frame. A step switches whole (nothing is scrubbed
+     keeping the tallest one's height. Along the stage's floor runs a slim,
+     faint stretch of the island's shore (`StageScenery.astro`: the sea's
+     line, a sail, dunes and grass, no clouds behind the words), wider than
+     the stage, panning a little as the pictures slide so the steps read as a
+     walk along the shore; the pictures keep `--shore` of room above it.
+     Stacked, each picture sits in its own matching frame, without the shore. A step switches whole (nothing is scrubbed
      with the scroll), and a step's name scrolls the page to it. Only the open
      picture is focusable (the others are `inert`). Narrow or short windows,
      and no script, stack the three, each heading and sentence over its

@@ -552,7 +552,7 @@ looking at happen with scroll not manually"; and the night transition made it
 "too easy to skip FAQ".
 
 - **Scroll, not a clock.** The autoplay and the swipe are gone. On a window at
-  least 1081 × 760 the story pins in the middle of the window under the header
+  least 1081 × 800 the story pins in the middle of the window under the header
   and the page scrolls a runway beneath it (half a window for each step after
   the first); each third of the runway is one step (`src/storyScroll.ts`). The
   step switches whole with the same slide; nothing follows the scroll
@@ -653,5 +653,9 @@ a framed image, the rest as plain headings.
   corners where it meets the bezel. The accent line is gone.
 - **Still no cards inside the pictures**; the frame is the one surface.
 - Stacked (phones, short windows), each picture gets its own matching frame.
-- Not done yet, offered: scenery in the stage (a faint horizon under the
-  pictures).
+- **Scenery** (the owner's next pick): a slim shore along the stage's floor,
+  64px of room kept under the pictures for it (`--shore`): the sea's line, a
+  sail, low dunes with grass, at half strength in the film's palette, no clouds
+  (they sat behind the words). It is a quarter wider than the stage and pans 8%
+  of its width per step, less than the pictures slide. The pinned layout now
+  wants a window at least 800 tall (was 760), for the extra room.
