@@ -544,6 +544,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Vault — folders as on disk" listed Inbox, Secure notes, Storage, and Board
   even where no such folder existed. They are gone; a real folder with one of
   those names still shows.
+- **The Vault view remembers which folders you opened.** Every folder you
+  opened in "Vault — folders as on disk" was closed again the next time Rotli
+  started. Now they stay as you left them.
 - **A vault opens on your freshest note.** When the newest file in a vault
   was an Excalidraw board, Rotli opened the board as a broken, empty note tab
   on start. It now opens the most recent note.

@@ -73,6 +73,7 @@ import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
 import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
+import { foldStateKeeper } from "./foldState";
 import { landingFront } from "./fronts";
 import { helperLinked } from "./helperLink";
 import { useLibrarianRules } from "./librarianRules";
@@ -1260,29 +1261,11 @@ async function gcPersistedMaps(): Promise<void> {
     // an unreadable chats/ anywhere — keep everything
   }
   try {
-    const folders = await notesService.listFolders();
-    const valid = new Set<string>([
-      "Brain", // the Brain section header keys its accordion here
-      ...RESERVED_DESTS,
-      ...folders.map((f) => f.id),
-      ...mainFolderIds(useMainStore.getState().manifest.tree),
-    ]);
+    const [folders, notes] = await Promise.all([notesService.listFolders(), notesService.listNotes()]);
     const ui = useUiStore.getState();
     const kept = pruneMap(
       ui.expandedDests,
-      // root markers ("vault:", "<rootid>:"), the synthetic Storage grouping
-      // rows, and chat VIRTUAL folders aren't in listFolders — keep them by
-      // shape (chatfolder:* pruning silently re-expanded folded chat folders
-      // on every relaunch — review, 2026-07-31)
-      // "sec:*" zone keys are kept by SHAPE, not by name: sec:system is live,
-      // and the retired sec:chat / sec:notes / sec:inbox keys must survive so a
-      // downgrade (or the parked Inbox front's return) finds its fold state
-      (k) =>
-        valid.has(k) ||
-        k.startsWith("sec:") ||
-        k.endsWith(":") ||
-        k.startsWith("Storage/") ||
-        k.startsWith("chatfolder:"),
+      foldStateKeeper(folders, useMainStore.getState().manifest.tree, notes),
     );
     if (kept !== ui.expandedDests) useUiStore.setState({ expandedDests: kept });
   } catch {
