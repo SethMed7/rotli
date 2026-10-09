@@ -140,9 +140,10 @@ const { heading, lede, meta } = Astro.props;
       margin: -0.7rem 0;
     }
   }
+  /* Below 1000px, like a post's head: the picture first, across the page, then the words. */
   @media (max-width: 999px) {
     .road-head :global([data-roadmap-art]) {
-      max-width: 36rem;
+      order: -1;
     }
   }
   @media (max-width: 480px) {

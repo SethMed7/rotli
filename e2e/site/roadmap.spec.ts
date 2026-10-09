@@ -115,7 +115,7 @@ test.describe("the head", () => {
     await expect(head.locator("[data-roadmap-art]")).toHaveAttribute("aria-hidden", "true");
   });
 
-  test("puts the words left and the picture right on a wide screen, and the words first on a phone", async ({
+  test("puts the words left and the picture right on a wide screen, and the picture first, across the page, below 1000px", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -127,10 +127,20 @@ test.describe("the head", () => {
     expect(a.y).toBeLessThan(t.y + t.height);
     expect(a.y + a.height).toBeLessThanOrEqual(900);
 
-    await page.setViewportSize({ width: 390, height: 844 });
-    [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
-    expect(a.y).toBeGreaterThan(t.y + t.height);
-    expect(t.y + t.height).toBeLessThan(844);
+    // Below 1000px, like a post's head (2026-10-09): the picture first and across the page, the
+    // title under it, still in the first window.
+    for (const [width, height] of [
+      [960, 900],
+      [768, 1024],
+      [390, 844],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
+      const head = (await page.locator("[data-roadmap-head]").boundingBox())!;
+      expect(t.y, `title under the picture at ${width}`).toBeGreaterThan(a.y + a.height);
+      expect(Math.abs(a.width - head.width), `picture across the page at ${width}`).toBeLessThanOrEqual(1);
+      expect(t.y + t.height, `title in the first window at ${width}`).toBeLessThan(height);
+    }
   });
 });
 

@@ -1376,10 +1376,15 @@ The page (`src/pages/roadmap/[...slug].astro`, its parts in
   how to take part, "Direction, not a promise · No dates", the voting state,
   See what's in the work and Ask for something, and "Roadmap source" to
   ROADMAP.md on GitHub while the source is public) and the picture on the
-  right; narrower, the words first. The picture (`RoadmapScene.astro`) is
-  drawn in SVG at a cover's 1300 × 900 with the site's tokens and the quokka's
-  own art (`searching`): a map whose route runs through a done, a current, and
-  an open stop, and a signpost pointing three ways. Decorative, so
+  right; narrower, like a post's head, the picture first and across the page,
+  then the words (2026-10-09: at about 960 it had sat at half the width beside
+  an empty column). The picture (`RoadmapScene.astro`) is drawn in SVG at a
+  cover's 1300 × 900 with the site's tokens and the quokka's own art
+  (`searching`): a map whose route runs through a done, a current, and an open
+  stop, and a signpost pointing three ways. Below 1000px its frame is a
+  banner's (2:1; its own shape again under 560px): the drawing stays whole in
+  the middle on the frame's floor, and its sky, sea, dunes, and sand are drawn
+  on past its edges (`overflow: visible`, the frame clips). Decorative, so
   `aria-hidden`; nothing is fetched.
 - **On this page** (`RoadmapNav.astro`): a link per group with its item count.
   From 901px a column in a post's rail (the `.longform` tracks,
