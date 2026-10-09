@@ -1592,9 +1592,6 @@
   opacity: 1;
   transition-delay: 300ms;
 }
-/* the inline nested new-folder input row (the maintainer, 2026-06-24): a folder glyph +
-   a bare text field that reads like the filter well's input — same .snrow
-   metrics so it sits in the tree where the new folder will land. */
 .filter {
   flex: 1;
   min-width: 0;
@@ -2834,8 +2831,14 @@
   cursor: text;
 }
 /* the space under Main's list while a nested row is dragged: dropping here
-   takes it out of its folder (sidebarHome.tsx) */
+   takes it out of its folder (sidebarHome.tsx). It sticks to the bottom of
+   Main's scrolling area, so it is in reach however long the list is or
+   wherever it is scrolled — it never hides under the System section. */
 .main-root-drop {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--ground);
   margin-top: 4px;
   padding: 10px 12px;
   border: 1px dashed var(--border);
@@ -2847,7 +2850,7 @@
 .main-root-drop.over {
   border-color: var(--accent);
   color: var(--text);
-  background: var(--hov);
+  background: color-mix(in srgb, var(--hov) 100%, var(--ground));
 }
 .sb-rename-input {
   flex: 1;
