@@ -533,3 +533,15 @@ test("liftToMainRoot takes a note out of its folder to just after that folder's 
   expect(liftToMainRoot(tree, "main:Garden")).toBe(tree);
   expect(liftToMainRoot(tree, "nowhere")).toBe(tree);
 });
+
+test("a folder lifted to the top level takes a free name, so two root folders never share an id", () => {
+  const tree: MainNode[] = [
+    { folder: "Beds", children: [] },
+    { folder: "Garden", children: [{ folder: "Beds", children: [{ note: "d1" }] }] },
+  ];
+  expect(liftToMainRoot(tree, "main:Garden/Beds")).toEqual([
+    { folder: "Beds", children: [] },
+    { folder: "Garden", children: [] },
+    { folder: "Beds 2", children: [{ note: "d1" }] },
+  ]);
+});

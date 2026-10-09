@@ -51,6 +51,7 @@ import {
   mainNoteIds,
   mainParentOfNote,
   mainRowSort,
+  liftToMainRoot,
   moveInTree,
   renameFolderInMain,
   type DropPos,
@@ -324,8 +325,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const [editingView, setEditingView] = useState<"create" | "rename" | null>(null);
   const [viewInputError, setViewInputError] = useState<string | null>(null);
   const [deletingView, setDeletingView] = useState<string | null>(null);
-  // Enter/Esc unmount the new-folder input, which fires its commit-on-blur —
-  // this ref tells the blur the keystroke already settled it (newFolderHandled's law)
   const openContextMenu = useContextMenu((s) => s.open);
 
   // the shell's New-folder toolbar button, while Home is the active front,
@@ -431,6 +430,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     const dragIds = mainSel.has(id) && mainSel.size > 1 ? [...mainSel] : [id];
     const dragLabel = dragIds.length > 1 ? `${dragIds.length} items` : label;
     let drop: { id: string; pos: DropPos } | null = null;
+    // the drop space under the list lifts rows out of their folders, landing
+    // where Remove from folder puts them (liftToMainRoot)
+    let lift = false;
     // one NOTE may also land on the panes (lib/paneDropDrag); folders and
     // gathered selections only move within Main
     const paneable = dragIds.length === 1 && !id.startsWith(MAIN_ROOT);
@@ -451,6 +453,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           "[data-main-id]",
         ) as HTMLElement | null;
         const tid = hit?.dataset.mainId;
+        lift = hit?.dataset.mainLift === "1";
         canvasDrop = hit ? null : canvasDropAt(x, y);
         paneDrop = !hit && !canvasDrop && paneable ? panePreviewAt(x, y) : null;
         usePanesStore.getState().setDropPreview(paneDrop);
@@ -486,7 +489,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           (el) => el.dataset.mainId ?? "",
         );
         const listed = [...dragIds].sort((x, y) => shown.indexOf(x) - shown.indexOf(y));
-        for (const moveId of dropOrder(listed, d.id, d.pos)) tree = moveInTree(tree, moveId, d.id, d.pos);
+        if (lift) tree = listed.toReversed().reduce(liftToMainRoot, tree);
+        else
+          for (const moveId of dropOrder(listed, d.id, d.pos)) tree = moveInTree(tree, moveId, d.id, d.pos);
         setActiveTree(tree, liveIds);
         setMainSel(new Set());
       },
@@ -1219,6 +1224,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               {dragNested && (
                 <div
                   data-main-id="main:"
+                  data-main-lift="1"
                   className={`main-root-drop${mainDrop?.id === MAIN_ROOT ? " over" : ""}`}
                 >
                   Drop here to take it out of the folder

@@ -43,8 +43,14 @@ export function InlineRenameInput({
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === "Enter") {
+          // a host that refuses the name keeps the field open: once this
+          // keystroke's own blur (if any) has passed, click-away works again
           settled.current = true;
-          void onCommit(e.currentTarget.value);
+          void Promise.resolve(onCommit(e.currentTarget.value)).finally(() =>
+            setTimeout(() => {
+              settled.current = false;
+            }, 0),
+          );
         } else if (e.key === "Escape") {
           settled.current = true;
           onCancel();
