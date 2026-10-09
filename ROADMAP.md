@@ -154,6 +154,13 @@ id repeats (`site/src/roadmap.ts`).
   edits change the real file. The tab gets its own color so you can tell it is
   an outside file. ⌘S offers to put a copy in the vault, and you pick where it
   goes. Only if wanted.
+- **Work on a roadmap item from the site** <!-- id: roadmap-work-on-this --> · M — each
+  item on rotli.co's roadmap gets a "Work on this" link, beside its vote once
+  voting opens. It starts GitHub's own flow from the visitor's account: rotli is
+  forked, a branch is made for the item, and a draft pull request named after
+  it opens with a starter note, so the work starts against that item. Nothing
+  merges without the owner's review; the site holds no GitHub token, and
+  opening one takes a GitHub account. Comes after voting is back.
 
 ## 3. Ideas
 

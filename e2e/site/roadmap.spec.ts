@@ -195,8 +195,9 @@ if (!votingOpen)
       await expect(page.locator("[data-roadmap-notice]")).toHaveText(
         "Under construction. This roadmap is being reworked and will be updated in the coming week to match where rotli is today.",
       );
-      // Nothing on the page still invites a vote.
-      await expect(page.locator("main")).not.toContainText(/\bvote/i);
+      // Nothing the page says for itself still invites a vote (items may mention voting).
+      for (const part of await page.locator("[data-roadmap-head] .lede, .section-note").all())
+        await expect(part).not.toContainText(/\bvote/i);
       // Requests keep their own state.
       await expect(page.locator("[data-request-status]")).toHaveText("Requests open soon.");
     });
