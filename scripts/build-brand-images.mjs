@@ -7,6 +7,7 @@
 //   site/public/thumbs/blog/<slug>.webp   1200×630  every post's thumbnail (and -600.webp): its scene, no words
 //   site/public/banners/blog/<slug>.webp  2400×1000 every published post's banner (and -1200.webp), the
 //                                         same scene composed wide, and -mobile.webp (1300×900), its phone crop
+//   site/public/banners/<page>.webp       the same for pages that read like a post (PAGE_ART: /privacy/)
 //   brand/assets/banners/*.png            X, LinkedIn, GitHub, YouTube
 //   brand/assets/pfp/*.png                1024×1024 face mark on four theme-family grounds
 //   brand/assets/thumbnails/*.png         1280×720  the title-slot template and one per post
@@ -30,6 +31,9 @@ import sharp from "sharp";
 import {
   bannerPath,
   OG_CARDS,
+  PAGE_ART,
+  pageBannerAlt,
+  pageBannerPath,
   POSES,
   postArt,
   postPose,
@@ -269,6 +273,26 @@ async function buildAll() {
     await render(
       `site/public${bannerPath(post.slug, "mobile")}`,
       scene({ ...wide, label: thumbnailAlt(post.slug), crop: MOBILE_CROP }),
+      { width: MOBILE_CROP[2], height: MOBILE_CROP[3], half: false, ...group },
+    );
+  }
+
+  // Pages that read like a post (/privacy/) get a banner the same way.
+  for (const [name, art] of Object.entries(PAGE_ART)) {
+    const wide = {
+      kind: art.scene,
+      art: await pose(art.pose, quokkaSize(art.scene, "wide")),
+      layout: "wide",
+    };
+    const group = { group: "Page banners (site/public/banners/)" };
+    await render(`site/public${pageBannerPath(name)}`, scene({ ...wide, label: pageBannerAlt(name) }), {
+      width: 2400,
+      height: 1000,
+      ...group,
+    });
+    await render(
+      `site/public${pageBannerPath(name, "mobile")}`,
+      scene({ ...wide, label: pageBannerAlt(name), crop: MOBILE_CROP }),
       { width: MOBILE_CROP[2], height: MOBILE_CROP[3], half: false, ...group },
     );
   }

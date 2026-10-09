@@ -89,7 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paragraphs, lists, tables, and charts all start on one edge, with no wide
   empty gap beside the contents; tables and charts run on to the page's
   right edge where there's room. The privacy page and the roadmap are laid
-  out the same way, so all three read as one family. The
+  out the same way, so all three read as one family; the privacy page now
+  opens like a post too, with a byline, its reading time, topics, and a drawn
+  picture of the quokka guarding a locked note. The
   sources show four at a time with "Show all", every one whole, and the
   left column stays with you as you read without ever cutting anything off.
   The suggestions that sat on the right now close the post as "More from

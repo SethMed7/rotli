@@ -123,6 +123,17 @@ const PROPS = {
       <path d="M-74 -180h10M-69 -185v10M-74 -156h10M-69 -161v10" fill="none" stroke="${C.seaDeep}" stroke-width="${sw * 0.7}" stroke-linecap="round"/>
       <path d="M-64 -96q14-8 28 0t28 0 28 0M-64 -64q20 6 40-2t34 4M-64 -34h44" fill="none" ${stroke(sw * 0.75)}/></g>`,
   },
+  // A secure note with its padlock: a page that stays on this computer (/privacy/).
+  locked: {
+    box: { x: -108, y: -206, w: 216, h: 206 },
+    svg: (
+      sw,
+    ) => `<g transform="rotate(-6 0 -100)"><rect x="-92" y="-176" width="172" height="164" rx="12" fill="${C.paper}" ${stroke(sw)}/>
+      <path d="M-66 -140h96M-66 -114h70M-66 -88h84" fill="none" stroke="${C.accent}" stroke-width="${sw * 0.9}" stroke-linecap="round"/>
+      <path d="M38 -76v-18a26 26 0 0 1 52 0v18" fill="none" ${stroke(sw * 1.1)}/>
+      <rect x="24" y="-80" width="80" height="66" rx="12" fill="${C.lantern}" ${stroke(sw)}/>
+      <circle cx="64" cy="-52" r="8" fill="${ink}"/><path d="M64 -48v14" fill="none" ${stroke(sw * 1.1)}/></g>`,
+  },
   // Sketches pinned out on the sand: the first drawings of something new.
   sketches: {
     box: { x: -140, y: -170, w: 280, h: 170 },
@@ -233,6 +244,24 @@ const SCENES = {
     props: ["sketches"],
     thumb: { quokka: [650, 604, 600], at: [[230, 600, 1.3]], lighthouse: [1080, 0.9], sun: [880, 104] },
     wide: { quokka: [1690, 958, 800], at: [[2230, 950, 1.1]], lighthouse: [2250, 1.15], sun: [2010, 170] },
+  },
+  // /privacy/: a locked note in front, the friendly on-device chip up the beach.
+  privacy: {
+    props: ["locked", "chip"],
+    thumb: {
+      quokka: [790, 604, 560],
+      at: [
+        [300, 594, 1.35],
+        [1050, 520, 0.88],
+      ],
+    },
+    wide: {
+      quokka: [1660, 958, 780],
+      at: [
+        [2110, 950, 1.3],
+        [1280, 782, 0.95],
+      ],
+    },
   },
   beach: {
     props: [],

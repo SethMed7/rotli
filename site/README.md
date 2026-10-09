@@ -331,9 +331,9 @@ there, and the closing panel, whose art never touches its words from 320 to
   It reads like a blog post (the owner, 2026-10-06: "Privacy page design
   should match blog styles"): `WritingPage`'s `article` layout, so the head,
   the rail, the reading column, and the end are a post's (see "The blog
-  post" below). The head is "Privacy", the lede, and "Updated …" (no author,
-  no topics) beside the film's night (`SecureScene.astro` through the
-  `cover` slot, see "The privacy head" below). The rail has the tree from its
+  post" below). The head is a post's: "Privacy", the lede, the byline with
+  "Updated …" and the reading time, and topics, beside a drawn banner (see
+  "The privacy head" below). The rail has the tree from its
   `##` headings, the meter as a percent, no Sources, and Share as **Copy
   link** alone (a policy is pointed to, not posted, and it has no Markdown
   twin; the whole Share block waits for script and a clipboard, so it is
@@ -589,23 +589,20 @@ there, and the closing panel, whose art never touches its words from 320 to
     both 76rem, a live resize matching a fresh load); `scripts/site-writing.test.ts`
     holds `sourcesOf` against the published post, `railTitle`, `morePosts`,
     and the promos' data and rotation.
-- **The privacy head** (`blog/ArticleCover.astro` with `drawn`, through
-  `WritingPage`'s `cover` slot; the owner, 2026-10-06). `/privacy/` once opened
-  on a full-width banner pinned under the header with the head as a panel
-  rising over it; that banner (`WritingPage`'s `banner` prop and slot) is gone,
-  and the page opens like a post: the words on the header's left edge and the
-  night in the post picture's place and frame (rounded, a hairline,
-  `overflow: hidden`), side by side from 1000px and stacked below it, the
-  night first. The night is `.band-night` (Ocean Dark tokens and stars): the
-  caption ("Secure notes stay home. …") on its own `--deep` ground at the
-  top, so the stars never sit under it (8.6:1, the inked phrase 15.7:1), and
-  the dome standing on the frame's floor below it, at most
-  `min(20rem, 42svh)` tall; the remote-AI clouds drift into the sky between
-  them and the frame clips them. The night and the caption are still, like a
-  post's picture; only the scene plays, once (its own `[data-reveal]`).
-  ArticleCover's other options for it: no `author` (the meta line stands
-  alone, no mark), no `tags`; ArticleRail's `noun: 'page'` ("About this
-  page", "Position in this page") and `share.mode: 'link'`.
+- **The privacy head** (`blog/ArticleCover.astro`; the owner, 2026-10-06, and
+  2026-10-09: "compare to this blog [The AI you already pay for] … and then
+  try to match it"). `/privacy/` opens exactly like a post: the title, the
+  lede, a byline (the author's mark and name, "Updated …", and the reading
+  time, `READ_MINUTES`, counted the way a post's is and rechecked against the
+  page's words by `privacy-page.spec.ts`), the topic chips (Privacy, AI,
+  Security), and a banner drawn like a post's: `PAGE_ART.privacy` in
+  `src/og.ts`, rendered by `bun run build:brand-images` into
+  `public/banners/privacy*.webp` (the island by day, the quokka with its
+  padlock shield, a locked note in front, the friendly on-device chip up the
+  beach). It replaced the Ocean Dark night with its caption that stood in the
+  picture's place (2026-10-06 to 2026-10-09); the night stays on the landing's
+  privacy band. Share stays Copy link alone: a policy is pointed to, not
+  posted.
 - **Writing.** Blog posts, the guides among them (tagged Guide), are Markdown
   in one content collection, `src/content/writing/posts/` (schema:
   `src/content.config.ts`; posts may add `tags`, up to four short topics shown
@@ -1057,14 +1054,13 @@ there, and the closing panel, whose art never touches its words from 320 to
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
   stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
-  through `.band-night` (the landing privacy band and the night beside the
-  title on `/privacy/`); `IslandScene.astro` is the island by
+  through `.band-night` (the landing privacy band); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
   the `/about/` story, captioned with where the name comes from); the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
-  closing scene. `/privacy/` places its night through `WritingPage`'s
-  `cover` slot (see "The privacy head"); `/about/` places its scene through
+  closing scene. `/privacy/` opens on a drawn banner like a post's (see "The
+  privacy head"); `/about/` places its scene through
   the `scene` slot and uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/#promise`: the
   promise and three facts on the left, the night scene on the right.

@@ -1,8 +1,8 @@
 // /privacy/ reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
-// styles"): WritingPage's `article` layout on the header's edges. The head is the title, the lede,
-// and "Updated …" beside the night scene from 1000px (stacked, the scene first, below it), the
-// scene rounded and contained, its caption on its own night ground above the dome, the clouds kept
-// inside the frame. The body is the left rail (the short title, the tree, the meter as a percent,
+// styles", and 2026-10-09: match "The AI you already pay for"): WritingPage's `article` layout on
+// the header's edges. The head is a post's: the title, the lede, the byline (the author, "Updated
+// …", the reading time), the topic chips, beside a banner drawn like a post's from 1000px
+// (stacked, the picture first, below it), rounded and contained. The body is the left rail (the short title, the tree, the meter as a percent,
 // and Share as Copy link alone, no Sources) beside the reading column, and "More from rotli" after
 // it with the posts about privacy. On a phone the tree is the disclosure, the meter a slim bar, and
 // Copy link follows the article. The full-width pinned banner is gone. `#promise` (the hero's and
@@ -83,7 +83,7 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 320, height: 640 },
 ]) {
-  test(`/privacy/ opens on its title beside the night scene, or under it when narrow (${viewport.width}px)`, async ({
+  test(`/privacy/ opens like a post: its title beside its banner, or under it when narrow (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -95,10 +95,11 @@ for (const viewport of [
     await expect(head.locator(".lede")).toHaveText(
       "rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way.",
     );
-    // The meta line is the date alone: no author's mark or name, and no topics.
-    await expect(head.locator(".byline")).toHaveText(/^Updated \w+ \d{1,2}, \d{4}$/);
-    await expect(head.locator(".author, .avatar")).toHaveCount(0);
-    await expect(head.locator(".tags")).toHaveCount(0);
+    // A post's byline and topics: the author, the date it was updated, the reading time.
+    await expect(head.locator(".byline")).toContainText("Seth Medina");
+    await expect(head.locator(".byline")).toContainText(/Updated \w+ \d{1,2}, \d{4}/);
+    await expect(head.locator(".byline")).toContainText(/\d+ min read/);
+    await expect(head.locator(".tags li")).toHaveText(["Privacy", "AI", "Security"]);
     const [title, lede, byline] = await Promise.all(
       ["h1", ".lede", ".byline"].map((part) => box(page, `[data-article-cover] .head-copy ${part}`)),
     );
@@ -106,39 +107,16 @@ for (const viewport of [
     expect(byline!.y).toBeGreaterThanOrEqual(lede!.y + lede!.height - 1);
     expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
-    // The scene: contained in the page's width, rounded, under the header, clipping its drifting
-    // clouds, with the caption above the dome and never over it.
-    const scene = page.locator("[data-article-scene]");
-    await expect(scene.locator(".night-caption")).toContainText("Secure notes stay home.");
-    const art = await box(page, "[data-article-scene]");
+    // The banner: a drawn picture like a post's, contained in the page's width, rounded, under the
+    // header, described for assistive tech.
+    const picture = page.locator("[data-article-cover] [data-article-art] img");
+    await expect(picture).toHaveAttribute("alt", /padlock/);
+    const art = await box(page, "[data-article-cover] [data-article-art]");
     const wrap = await box(page, "main.writing");
     expect(art.x).toBeGreaterThanOrEqual(wrap.x - 1);
     expect(art.x + art.width).toBeLessThanOrEqual(wrap.x + wrap.width + 1);
     expect(art.width).toBeLessThan(viewport.width);
     expect(art.y).toBeGreaterThan(await headerBottom(page));
-    const frame = await scene.evaluate((el) => {
-      const style = getComputedStyle(el);
-      return { radius: style.borderTopLeftRadius, overflow: style.overflow };
-    });
-    expect(frame.radius).not.toBe("0px");
-    expect(frame.overflow).toBe("hidden");
-    const caption = await box(page, "[data-article-scene] .night-caption");
-    const dome = await box(page, "[data-article-scene] .dome-frame");
-    expect(caption.y + caption.height).toBeLessThanOrEqual(dome.y + 1);
-    for (const part of [caption, dome]) {
-      expect(part.x).toBeGreaterThanOrEqual(art.x - 1);
-      expect(part.x + part.width).toBeLessThanOrEqual(art.x + art.width + 1);
-      expect(part.y + part.height).toBeLessThanOrEqual(art.y + art.height + 1);
-    }
-    // The caption reads on its own opaque night, and its inked phrase too.
-    for (const text of [".night-caption", ".night-caption .inked"]) {
-      const { fg, bg } = await colours(
-        page,
-        `[data-article-scene] ${text}`,
-        "[data-article-scene] .night-caption",
-      );
-      expect(contrastOf(fg, bg), text).toBeGreaterThanOrEqual(4.5);
-    }
 
     const copy = await box(page, "[data-article-cover] .head-copy");
     if (viewport.width >= SIDE_BY_SIDE) {
@@ -347,4 +325,17 @@ test("the email list says how to erase an address, and Keeping and deleting poin
   const retention = page.locator("#retention ~ p", { hasText: "This website keeps a little" });
   await expect(retention.locator("a[href='#website']")).toHaveText("This website");
   await expect(page.locator(".meta, [data-article-cover]").first()).toContainText("Updated October 7, 2026");
+});
+
+test("/privacy/'s reading time is counted the way a post's is", async ({ page }) => {
+  await page.goto("/privacy/");
+  // src/writing.ts readingMinutes: words / 230, at least 1. The page is written in Astro, not
+  // Markdown, so its constant is checked against the words on the page.
+  const words = await page
+    .locator(".prose")
+    .evaluate((el) => (el as HTMLElement).innerText.split(/\s+/).filter(Boolean).length);
+  const shown = Number(
+    (await page.locator("[data-article-cover] .byline").innerText()).match(/(\d+) min read/)![1],
+  );
+  expect(Math.abs(shown - Math.max(1, Math.round(words / 230)))).toBeLessThanOrEqual(1);
 });
