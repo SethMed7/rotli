@@ -15,6 +15,8 @@ interface FWorkbookLike {
 
 interface FUniverApiLike {
   createWorkbook: (data: unknown) => FWorkbookLike;
+  undo: () => Promise<boolean>;
+  redo: () => Promise<boolean>;
   toggleDarkMode: (dark: boolean) => void;
   onCommandExecuted?: (
     cb: (c: CommandInfoLike, options?: ExecutionOptionsLike) => void,
@@ -70,6 +72,41 @@ function liveTheme(): ReturnType<typeof rotliUniverTheme> {
   return rotliUniverTheme(univerNeutralForTheme(document.documentElement.dataset.theme));
 }
 
+const UNDO_ID = "univer.command.undo";
+const REDO_ID = "univer.command.redo";
+/** An undo Univer just ran from its own ⌘Z keydown must not run again here. */
+const MENU_DEDUPE_MS = 300;
+
+/** ⌘Z / ⇧⌘Z from the Mac's Edit menu (the owner, 2026-10-09: "we need the
+ * hotkeys for undo and redo to work"). AppKit takes those keys for the menu
+ * before the web view sees a keydown, and WebKit turns undo:/redo: into
+ * beforeinput (historyUndo/historyRedo) on the focused element — Univer's
+ * hidden cell input, which has no history of its own, so nothing changed.
+ * Answered with Univer's own undo/redo, as the DOCX adapter does
+ * (documents/engine/keys.ts). Native text fields keep WebKit's undo. */
+function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void {
+  const lastRun = new Map<string, number>();
+  const watch = api.onCommandExecuted?.((c) => {
+    if (c.id === UNDO_ID || c.id === REDO_ID) lastRun.set(c.id, performance.now());
+  });
+  const onBeforeInput = (event: Event) => {
+    const type = (event as InputEvent).inputType;
+    if (type !== "historyUndo" && type !== "historyRedo") return;
+    const focused = host.ownerDocument.activeElement;
+    if (!focused || !host.contains(focused)) return;
+    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
+    event.preventDefault();
+    const id = type === "historyUndo" ? UNDO_ID : REDO_ID;
+    if (performance.now() - (lastRun.get(id) ?? -Infinity) < MENU_DEDUPE_MS) return;
+    void (type === "historyUndo" ? api.undo() : api.redo());
+  };
+  host.ownerDocument.addEventListener("beforeinput", onBeforeInput, true);
+  return () => {
+    host.ownerDocument.removeEventListener("beforeinput", onBeforeInput, true);
+    if (watch && typeof watch === "object") watch.dispose?.();
+  };
+}
+
 /** Mount the spreadsheet engine into a host element. */
 export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHandle {
   const { univer, univerAPI } = createUniver({
@@ -83,6 +120,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
   });
 
   const api = univerAPI as unknown as FUniverApiLike;
+  const releaseMenuHistory = installMenuHistory(host, api);
   const fwb = api.createWorkbook({
     ...opts.model,
     locale: LocaleType.EN_US,
@@ -120,6 +158,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
       });
     },
     dispose() {
+      releaseMenuHistory();
       univer.dispose();
     },
   };
