@@ -25,9 +25,10 @@ test("native development receives onboarding while the browser twin does not", (
   expect(onboardingRequired(false, false)).toBe(false);
 });
 
-test("a completed onboarding never runs again, whatever version the app updates to", () => {
-  // Updates used to re-onboard on every 0.x version change; only a fresh
-  // install (or Settings → Reset & re-onboard) runs setup now.
+test("a completed onboarding doesn't run again by itself: only reonboardingFor reopens it", () => {
+  // Updates used to re-onboard on every 0.x version change; now only a fresh
+  // install, Settings → Reset & re-onboard, or a release that requires it
+  // (REONBOARD_BEFORE) runs setup.
   expect(onboardingRequired(true, true)).toBe(false);
 });
 

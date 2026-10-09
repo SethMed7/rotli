@@ -92,6 +92,21 @@ export function finishLeadsTo(onboardingVersion: string): "welcome" | "whatsNew"
   return onboardingVersion === "" ? "welcome" : "whatsNew";
 }
 
+/** Applies reonboardingFor as settings load (persist.ts hydrate) — the Mac
+ * app's main window only; Rotli Web never runs setup. `markForWrite` tells the
+ * settings writer to save: it starts from this already-changed state, so
+ * without it a quit on setup's first screen left `onboarded: true` on disk.
+ * True when applied. */
+export function applyReonboarding(nativeMain: boolean, markForWrite: () => void): boolean {
+  if (!nativeMain) return false;
+  const ui = useUiStore.getState();
+  const again = reonboardingFor(ui.onboarded, ui.onboardingVersion);
+  if (!again) return false;
+  useUiStore.setState(again);
+  markForWrite();
+  return true;
+}
+
 export async function resetAndReonboard(): Promise<void> {
   // hotkeys → defaults: drop every override, then re-register each GLOBAL action
   // to its default accelerator OS-side (the dispatcher reads defaults for the

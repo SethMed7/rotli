@@ -96,7 +96,7 @@ import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsSto
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
 export { rescopeChatMapKeys } from "./chatMapKeys";
-import { reonboardingFor } from "./onboarding";
+import { applyReonboarding } from "./onboarding";
 import { FIRST_RUN_WINDOW, type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
 import {
   ALL_NOTES,
@@ -1372,15 +1372,11 @@ export async function hydratePersistedState(): Promise<void> {
       themeFamily: DEFAULT_APPEARANCE.themeFamily,
     };
   }
-  // 1.8.0 runs setup once more for everyone set up before it (the Mac app's
-  // main window only; Rotli Web never runs setup) — state/onboarding.ts
-  if (isTauri() && isMainSurface()) {
+  // 1.8.0 re-onboards once (state/onboarding.ts); marked so the writer saves it
+  const markWrite = () => (appSettingsNeedsWrite = true);
+  if (applyReonboarding(isTauri() && isMainSurface(), markWrite)) {
     const ui = useUiStore.getState();
-    const again = reonboardingFor(ui.onboarded, ui.onboardingVersion);
-    if (again) {
-      useUiStore.setState(again);
-      shellSettings = { ...shellSettings, ...again };
-    }
+    shellSettings = { ...shellSettings, onboarded: ui.onboarded, onboardingPhase: ui.onboardingPhase };
   }
   if (isMainSurface()) {
     applyShellSideEffects(shellSettings);
