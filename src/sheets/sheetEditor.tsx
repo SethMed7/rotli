@@ -279,10 +279,6 @@ export default function SheetEditor({
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [paneId]);
 
-  const toggleThemeMode = () => {
-    setThemeMode((m) => (m === "themed" ? "raw" : "themed"));
-  };
-
   const chrome = (
     <div className="sheet-chrome-actions">
       {mode === "csv" && (
@@ -290,17 +286,34 @@ export default function SheetEditor({
           csv · values only
         </span>
       )}
+      <div className="sheet-paper" role="group" aria-label="Sheet colours">
+        <button
+          type="button"
+          data-label="Theme"
+          aria-pressed={themeMode === "themed"}
+          title="The sheet in your theme's colours"
+          onClick={() => setThemeMode("themed")}
+        >
+          Theme
+        </button>
+        <button
+          type="button"
+          data-label="White"
+          aria-pressed={themeMode === "raw"}
+          title="The sheet on white paper, like Excel"
+          onClick={() => setThemeMode("raw")}
+        >
+          White
+        </button>
+      </div>
+      {err && <span className="sheet-save-err">⚠ {err}</span>}
       <button
         type="button"
-        className={themeMode === "raw" ? "sheet-view-toggle on" : "sheet-view-toggle"}
-        title={themeMode === "raw" ? "Show rotli-themed chrome" : "Show the sheet on white paper, like Excel"}
-        onClick={toggleThemeMode}
+        className={dirty && !saving ? "sheet-save dirty" : "sheet-save"}
+        title={dirty && !saving ? "Unsaved changes" : undefined}
+        disabled={saving || !ready}
+        onClick={() => void save()}
       >
-        {themeMode === "raw" ? "Themed" : "Raw"}
-      </button>
-      {err && <span className="sheet-save-err">⚠ {err}</span>}
-      {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
-      <button type="button" className="sheet-save" disabled={saving || !ready} onClick={() => void save()}>
         {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
       </button>
     </div>

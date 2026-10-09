@@ -50,7 +50,9 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     locales: { [LocaleType.EN_US]: merge({}, UniverPresetSheetsCoreEnUS) },
     theme: opts.themeMode === "raw" ? defaultTheme : liveTheme(),
     darkMode: opts.themeMode === "raw" ? false : opts.darkMode,
-    presets: [UniverSheetsCorePreset({ container: host })],
+    // One toolbar row, as the DOCX editor has: Univer's classic ribbon adds a
+    // Start / Formulas / Data tab row above a centred toolbar.
+    presets: [UniverSheetsCorePreset({ container: host, ribbonType: "simple" })],
   });
 
   const api = univerAPI as unknown as FUniverApiLike;

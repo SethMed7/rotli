@@ -80,6 +80,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A sheet's header and toolbar are calmer.** The toolbar is one row from
+  the left, like a Word document's: the Start, Formulas, and Data tabs are
+  gone, and everything they held is under **⋮** at the end of the row. Beta
+  sits beside the file's name. The header's actions are plain words rather
+  than outlined buttons: Details and Open externally, then **Theme | White**
+  for the sheet's colours (White is the paper look the old Raw button gave),
+  then Save, which is the one filled button and only while you have unsaved
+  edits.
 - **rotli.co's blog posts are calmer to read.** A post lines up with the
   header: the title, summary, author, and topics sit beside the post's
   picture, shown whole, with "Blog" above the title, and the title is in
