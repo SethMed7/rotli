@@ -143,7 +143,7 @@ function MainShell() {
   const onboarded = useUiStore((s) => s.onboarded);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
-  // first run only (the real app); an app update never re-onboards
+  // first run, or once after an update that requires it (1.8.0: state/onboarding.ts)
   const onboardingActive = setupShows(isTauri(), import.meta.env.DEV, window.location.search, onboarded);
   // first run's screens, or the vault screen when there is no vault (setupFlow.tsx)
   const setupScreen = useSetupFront(onboardingActive, isTauri());

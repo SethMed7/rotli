@@ -412,6 +412,13 @@ documents, both on Univer, are Beta.
   switch keeps the native shell alive and rebinds vault-owned state in place,
   so the machine-level checkpoint resumes on the Librarian instead of
   repeating or silently finishing setup.
+- Setup runs again only when a release requires it: 1.8.0 re-onboards
+  everyone set up before it, once (`REONBOARD_BEFORE`, state/onboarding.ts;
+  the owner, 2026-10-09). Someone returning is not a first run: setup opens on
+  their own theme and vault (the vault screen offers to keep it), **Skip
+  setup** keeps everything they had, and finishing ends at that release's
+  What's new rather than the welcome and thank-you card. Settings → Reset &
+  re-onboard ends there too.
 - A new install lives in the Dock and stays open like any app (testers lost
   a menu-bar-only app mid-setup); it is in the Dock from the first screen on,
   and the menu-bar visitor remains a choice in Settings → General.
