@@ -3,7 +3,7 @@
 // the header's edges. The head is a post's: the title, the lede, the byline (the author, "Updated
 // …", the reading time), the topic chips, beside a banner drawn like a post's from 1000px
 // (stacked, the picture first, below it), rounded and contained. The body is the left rail (the short title, the tree, the meter as a percent,
-// and Share as Copy link alone, no Sources) beside the reading column, and "More from rotli" after
+// and Share as a post's, Copy Markdown from the page's twin included, no Sources) beside the reading column, and "More from rotli" after
 // it with the posts about privacy. On a phone the tree is the disclosure, the meter a slim bar, and
 // Copy link follows the article. The full-width pinned banner is gone. `#promise` (the hero's and
 // the landing band's link) lands just under the header at every width, and nothing scrolls
@@ -149,7 +149,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1024, height: 768 },
 ]) {
-  test(`/privacy/'s rail: its title, the tree, the meter, and Copy link alone (${viewport.width}px)`, async ({
+  test(`/privacy/'s rail: its title, the tree, the meter, and a post's Share (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -160,12 +160,17 @@ for (const viewport of [
     const tree = rail.getByRole("navigation", { name: "On this page" });
     await expect(tree.getByRole("link")).toHaveText(SECTIONS);
     await expect(tree.getByRole("link").first()).toHaveAttribute("href", "#promise");
-    // No Sources on a policy; Share is Copy link alone (no X, LinkedIn, email, or Markdown).
+    // No Sources on a policy; Share is a post's: X, LinkedIn, Email, Copy link, Copy Markdown.
     await expect(rail.locator("[data-rail-sources]")).toHaveCount(0);
     const share = rail.locator("[data-share]");
     await expect(share).toBeVisible();
-    await expect(share.locator("a")).toHaveCount(0);
-    await expect(share.getByRole("button")).toHaveText(["Copy link"]);
+    await expect(share.locator("a")).toHaveText(["X", "LinkedIn", "Email"]);
+    await expect(share.locator("a").first()).toHaveAttribute("href", /privacy%20promise/);
+    await expect(share.getByRole("button")).toHaveText(["Copy link", "Copy Markdown"]);
+    await expect(share.getByRole("button", { name: "Copy Markdown" })).toHaveAttribute(
+      "data-copy-src",
+      "/privacy/index.md",
+    );
     await expect(share.getByRole("button", { name: "Copy link" })).toHaveAttribute(
       "data-copy-value",
       /\/privacy\/$/,
@@ -223,9 +228,9 @@ test("/privacy/ on a phone: the tree's disclosure, the slim bar, and Copy link a
   expect(target.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
   expect(target.y).toBeLessThan(400);
   expect(Math.abs(barBox.y - (await headerBottom(page)))).toBeLessThan(2);
-  // Copy link follows the article and comes before "More from rotli".
+  // Share follows the article and comes before "More from rotli".
   const share = page.locator("[data-share]");
-  await expect(share.getByRole("button")).toHaveText(["Copy link"]);
+  await expect(share.getByRole("button")).toHaveText(["Copy link", "Copy Markdown"]);
   const prose = await box(page, "[data-prose]");
   const shareBox = (await share.boundingBox())!;
   const more = await box(page, "[data-article-more]");
@@ -338,4 +343,31 @@ test("/privacy/'s reading time is counted the way a post's is", async ({ page })
     (await page.locator("[data-article-cover] .byline").innerText()).match(/(\d+) min read/)![1],
   );
   expect(Math.abs(shown - Math.max(1, Math.round(words / 230)))).toBeLessThanOrEqual(1);
+});
+
+test("/privacy/ has a Markdown twin made from the page, for Copy Markdown and for agents", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/privacy/");
+  await expect(page.locator('link[rel="alternate"][type="text/markdown"]')).toHaveAttribute(
+    "href",
+    "/privacy/index.md",
+  );
+  const twin = await request.get("/privacy/index.md");
+  expect(twin.ok()).toBe(true);
+  const text = await twin.text();
+  expect(text.startsWith("# Privacy\n\n> rotli is built so there is nothing about you to collect.")).toBe(
+    true,
+  );
+  // Every section of the page, in order, as a heading.
+  const headings = [...text.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  expect(headings).toHaveLength(SECTIONS.length);
+  // The promise's table, as a table, its rows the page's.
+  expect(text).toContain("| Note | On-device model (runs on your Mac) |");
+  expect(text).toContain("| **Secure note** (Right-click → Mark secure) |");
+  // Links are whole addresses; nothing decorative slips in.
+  expect(text).not.toMatch(/\]\((?!https?:)/);
+  expect(text).not.toMatch(/<[a-z]/i);
+  expect(text.trimEnd().endsWith("Source: https://rotli.co/privacy/")).toBe(true);
 });

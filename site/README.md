@@ -334,10 +334,11 @@ there, and the closing panel, whose art never touches its words from 320 to
   post" below). The head is a post's: "Privacy", the lede, the byline with
   "Updated …" and the reading time, and topics, beside a drawn banner (see
   "The privacy head" below). The rail has the tree from its
-  `##` headings, the meter as a percent, no Sources, and Share as **Copy
-  link** alone (a policy is pointed to, not posted, and it has no Markdown
-  twin; the whole Share block waits for script and a clipboard, so it is
-  never an empty label). The promise's matrix is a wide block (`.wide`): it
+  `##` headings, the meter as a percent, no Sources, and a post's Share (the
+  owner, 2026-10-09: "Full Share like posts"): X, LinkedIn, and Email, with
+  `shareTitle` ("rotli's privacy promise: …") as their text since "Privacy"
+  alone is thin, then Copy link and Copy Markdown from the page's twin,
+  `/privacy/index.md` (see "Markdown twins"). The promise's matrix is a wide block (`.wide`): it
   starts on the words' edge and runs on to the page's right edge like a
   post's table where there is room (the same `article-prose` container
   query, 48.5rem), and the section companions float on the column's right
@@ -601,8 +602,7 @@ there, and the closing panel, whose art never touches its words from 320 to
   padlock shield, a locked note in front, the friendly on-device chip up the
   beach). It replaced the Ocean Dark night with its caption that stood in the
   picture's place (2026-10-06 to 2026-10-09); the night stays on the landing's
-  privacy band. Share stays Copy link alone: a policy is pointed to, not
-  posted.
+  privacy band. Share is a post's, Copy Markdown included (2026-10-09).
 - **Writing.** Blog posts, the guides among them (tagged Guide), are Markdown
   in one content collection, `src/content/writing/posts/` (schema:
   `src/content.config.ts`; posts may add `tags`, up to four short topics shown
@@ -1176,6 +1176,13 @@ agents; every sentence in it restates a claim the pages already make.
   Cloudflare ignores `Vary` for everything but images; negotiation is safe only
   because it caches no HTML, `.md`, or `.txt` by default. A "Cache Everything"
   rule would hand cached Markdown to browsers: exclude the negotiated paths first.
+  A page written in Astro rather than Markdown gets its twin from the built page
+  (`/privacy/`, listed in `MARKDOWN_TWIN_PAGES` in `astro.config.mjs`):
+  `src/markdownTwin.ts` reads the article (`data-prose`) back into Markdown after
+  the build (headings, paragraphs, lists, emphasis, code, whole links, and tables,
+  a header's small print in parentheses; decoration left out) and writes
+  `index.md` beside the page. No dependency; `scripts/site-markdown-twin.test.ts`
+  holds the rules and `privacy-page.spec.ts` the built twin.
 - **JSON-LD.** The landing page carries `WebSite`, `SoftwareApplication`, and
   `FAQPage` (the FAQ's own list, `src/faq.ts`); `/download/` carries
   `SoftwareApplication`; writing pages carry `Article` or `BlogPosting` with a

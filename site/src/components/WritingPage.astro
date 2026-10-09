@@ -74,7 +74,9 @@ interface Props {
     markdown?: string;
     /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
     sources?: Source[];
-    /** Every way to share (a post), or Copy link alone (/privacy/). */
+    /** What Share calls the page (X's text, Email's subject) when the heading alone is too short. */
+    shareTitle?: string;
+    /** Every way to share, or Copy link alone. */
     share?: 'all' | 'link';
     /** What the rail calls the page in its labels: "About this post", "Position in this page". */
     noun?: 'post' | 'page';
@@ -234,7 +236,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
             noun={article.noun}
             share={{
               url: article.url,
-              title: heading,
+              title: article.shareTitle ?? heading,
               text: description,
               markdown: article.markdown,
               mode: article.share,

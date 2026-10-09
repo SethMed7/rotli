@@ -11,7 +11,9 @@
 // time, topic chips, and a banner drawn like a post's (src/og.ts PAGE_ART: the quokka with its
 // padlock shield beside a locked note, the on-device chip up the beach), the left rail with the
 // tree and the meter, and "More from rotli" at the end, with the posts about privacy and the
-// Download spot. Share is Copy link alone: a policy is pointed to, not posted.
+// Download spot. Share is a post's (the owner, 2026-10-09: "Full Share like posts"), Copy Markdown
+// included: the twin, /privacy/index.md, is made from this page after the build
+// (src/markdownTwin.ts).
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 import { MORE_POSTS } from '../../blog';
@@ -108,12 +110,15 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     author: 'Seth Medina',
     tags: ['Privacy', 'AI', 'Security'],
     url: `${site.url}/privacy/`,
-    share: 'link',
+    markdown: '/privacy/index.md',
+    share: 'all',
+    shareTitle: 'rotli’s privacy promise: what it does with your notes, and why',
     noun: 'page',
     more: related,
     promos,
   }}
   toc={toc}
+  markdownPath="/privacy/index.md"
   progress
 >
   <h2 id="promise">Our privacy promise</h2>
