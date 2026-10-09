@@ -378,16 +378,21 @@ function ffmpeg(args) {
 }
 const markAt = (name) => marks.find((m) => m.name === name);
 // One take: its frames, each held until the next, ending at `endAt` (wall clock).
+// Every segment alike (TV range, square pixels, 30 fps): a mixed join stalled the final pass.
+const SEGMENT = "fps=30,scale=out_range=tv,format=yuv420p,setsar=1";
 async function take(index, endAt) {
   const own = frames.filter((frame) => frame.segment === index);
   if (own.length === 0) throw new Error(`take ${index + 1} has no frames`);
-  const concat =
-    own
-      .map(
-        (frame, i) =>
-          `file '${frame.path}'\nduration ${Math.max(0.001, (own[i + 1]?.at ?? endAt) - frame.at).toFixed(4)}`,
-      )
-      .join("\n") + `\nfile '${own.at(-1).path}'\n`;
+  // On an exact 30 fps grid (the latest frame at each tick): bursts of frames a few ms apart, as
+  // raw concat durations, stretched take A by 1.8 s and slid every caption after it.
+  const count = Math.max(1, Math.round((endAt - own[0].at) * 30));
+  const lines = [];
+  for (let k = 0, i = 0; k < count; k++) {
+    const t = own[0].at + k / 30;
+    while (own[i + 1] && own[i + 1].at <= t) i++;
+    lines.push(`file '${own[i].path}'\nduration ${(1 / 30).toFixed(6)}`);
+  }
+  const concat = `${lines.join("\n")}\nfile '${own.at(-1).path}'\n`;
   const list = join(frameDir, `take-${index + 1}.ffconcat`);
   await writeFile(list, concat);
   const out = join(review, `take-${index + 1}.mp4`);
@@ -399,16 +404,18 @@ async function take(index, endAt) {
     "-i",
     list,
     "-vf",
-    "fps=30,format=yuv420p",
+    SEGMENT,
     "-c:v",
     "libx264",
     "-preset",
     "fast",
     "-crf",
     "12",
+    "-frames:v",
+    String(count),
     out,
   ]);
-  return { path: out, start: own[0].at, length: endAt - own[0].at };
+  return { path: out, start: own[0].at, length: count / 30 };
 }
 const takeA = await take(0, markAt("cut").at);
 const takeB = await take(1, markAt("end").at);
@@ -424,7 +431,7 @@ if (clipPath) {
     "-i",
     clipPath,
     "-vf",
-    `scale=${PICTURE.w}:${PICTURE.h}:force_original_aspect_ratio=decrease,pad=${PICTURE.w}:${PICTURE.h}:(ow-iw)/2:(oh-ih)/2:color=0xF8F2E9,fps=30,format=yuv420p`,
+    `scale=${PICTURE.w}:${PICTURE.h}:force_original_aspect_ratio=decrease,pad=${PICTURE.w}:${PICTURE.h}:(ow-iw)/2:(oh-ih)/2:color=0xF8F2E9,${SEGMENT}`,
     "-an",
     "-c:v",
     "libx264",
@@ -441,7 +448,7 @@ if (clipPath) {
     "-i",
     `color=c=0xF1E7D8:s=${PICTURE.w}x${PICTURE.h}:d=4:r=30`,
     "-vf",
-    "format=yuv420p",
+    SEGMENT,
     "-c:v",
     "libx264",
     "-preset",
@@ -457,7 +464,7 @@ const clipLength = Number(
 const parts = join(review, "takes.ffconcat");
 await writeFile(parts, [takeA.path, clip, takeB.path].map((path) => `file '${path}'`).join("\n") + "\n");
 const raw = join(review, "hero-raw.mp4");
-ffmpeg(["-safe", "0", "-f", "concat", "-i", parts, "-c", "copy", raw]);
+ffmpeg(["-safe", "0", "-f", "concat", "-i", parts, "-c:v", "libx264", "-preset", "fast", "-crf", "12", raw]);
 
 // The film's clock: take A, then the clip, then take B.
 const at = (name) => {

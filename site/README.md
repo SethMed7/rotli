@@ -1569,20 +1569,28 @@ rests on (`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
 Without `HERO_LIBRARIAN_CLIP` the script makes a draft in `_review/hero-video/`
 with a placeholder card at the cut and never replaces the site's film.
 
-**Shooting the Mac clip.** `bun scripts/hero-librarian-vault.mjs "/tmp/Rotli
-Hero Demo"` writes a labeled demo vault (it refuses a folder that is not empty):
-the same notes, and the note written on camera waiting in `wiki/_inbox/`, word
-for word, already in Main, with its own `.rotli/settings.json` letting the
-Librarian file it within about a minute (a 5-second quiet window, the
-on-device model, a filing sentence for Clients, people groups off) and showing
-the file's fields. Open it with Rotli's own vault switcher, never by editing
-the app's settings files (the app rewrites them on launch; 2026-10-09, an
-edited `corpus.json` reverted between launches). Open the note, record just
-the window (⌘⇧5 → Record Selected Window), and leave Rotli visible but not
-focused until the Librarian files it: the note moves to `Clients/` and its
-area, summary, tags, and links fill in above the unchanged words. Trim to the
-8 seconds or so around the move, switch back to your vault the same way, then
-`HERO_LIBRARIAN_CLIP=<the .mov> bun run capture:hero`.
+**Shooting the Mac clip.** `bun scripts/hero-librarian-take.mjs` shoots it in a
+debug build that cannot reach your own Rotli (build it first with the command in
+the script's header): the build's own identifier (`com.rotli.dev`), a sandbox
+home in `/tmp/rotli-hero/home` for its settings, viewstate, and model list, and
+a fresh labeled demo vault from `scripts/hero-librarian-vault.mjs` (the same
+notes, and the note written on camera waiting in `wiki/_inbox/`, word for word,
+already in Main, with its own `.rotli/settings.json` letting the Librarian file
+it within about a minute: a 5-second quiet window, the on-device model at
+`localhost:11435`, a filing sentence for Clients, people groups off). It starts
+the binary itself, never `open`, the `rotli` CLI, or a `rotli://` link (they
+reach the installed app), checks the sandbox still points at the demo vault
+right before launch, and stat-compares your Rotli settings folder and
+`~/memex-vault/.rotli` before and after (2026-10-09: an edited `corpus.json`
+in the installed app reverted to the real vault between launches). It records
+the window alone with ScreenCaptureKit, hands focus back to the app that had it
+so the Librarian may run, waits for the note to land in `Clients/`, and cuts
+`_review/hero-video/librarian-clip.mp4`: 4 seconds of the note waiting, the
+move, 5 seconds after, with macOS's purple "being recorded" badge painted out.
+`--cut` re-cuts the last take. Then
+`HERO_LIBRARIAN_CLIP=_review/hero-video/librarian-clip.mp4 bun run capture:hero`.
+The clip leaves the file's raw fields hidden: an open note does not yet redraw
+them after the Librarian moves its file.
 
 What is fixture, all synthetic:
 

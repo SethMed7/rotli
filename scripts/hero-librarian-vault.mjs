@@ -3,13 +3,14 @@
 // camera waiting in wiki/_inbox for the Librarian, word for word, already in Main. Its own
 // .rotli/settings.json lets the Librarian file it within about a minute of the app opening it
 // (a 5-second quiet window, the on-device model, a filing sentence for Clients, people groups off)
-// and shows the file's fields above the words, so the move and the fields are on camera.
+// and opens the Vault view on Clients, so the note is seen leaving _inbox and landing there.
+// The file's raw fields stay hidden: an open note does not yet redraw them after the move.
 //
-//   bun scripts/hero-librarian-vault.mjs "/tmp/Rotli Hero Demo"
+//   bun scripts/hero-librarian-vault.mjs "/tmp/rotli-hero/Rotli Hero Demo"
 //
-// Open it with the app's own vault switcher (never by editing the app's settings files: the app
-// rewrites them, 2026-10-09), record the window, and switch back the same way. It only writes into
-// an empty or missing folder, so it can never touch a real vault.
+// hero-librarian-take.mjs builds it fresh for every take and opens it in a sandboxed debug build;
+// never point the installed app at it (the app rewrites its settings files, 2026-10-09). It only
+// writes into an empty or missing folder, so it can never touch a real vault.
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -71,7 +72,8 @@ const files = {
       organizerThreshold: 0.3,
       organizerModel: "local",
       brainEnabled: true,
-      fileMetadata: "show",
+      // the Vault view opens on Clients, System folded, as the web take shows it
+      expandedDests: { "main:Clients": true, "sec:system": false },
       librarianRules: {
         people: { mode: "simple" },
         filing: ["Notes about Dana, pricing, deals, or customers go to Clients"],
@@ -88,6 +90,3 @@ for (const [path, text] of Object.entries(files)) {
   await writeFile(out, text);
 }
 console.log(`Hero demo vault: ${root} (the note ${id} waits in wiki/_inbox, in Main)`);
-console.log(
-  "Open it with Rotli's vault switcher, open the note, record the window while the Librarian files it.",
-);
