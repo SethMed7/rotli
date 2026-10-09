@@ -530,6 +530,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **⌘C and ⌘X copy and cut a sheet's selection.** On the Mac only a single
+  cell's text could be copied: a column, a row, or a block of cells copied
+  nothing. The whole selection now goes to the clipboard, so it pastes into
+  another app as a table, and pasting back into a sheet keeps its formulas
+  and styles. A cut moves the cells when you paste.
 - **⌘Z and ⇧⌘Z undo and redo everywhere.** On the Mac, the Edit menu took
   those keys before the page saw them and passed them to whatever text box had
   focus, so undo did nothing in a note, a sheet, or on a board. The keys now
