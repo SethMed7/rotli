@@ -2850,7 +2850,8 @@
 .main-root-drop.over {
   border-color: var(--accent);
   color: var(--text);
-  background: color-mix(in srgb, var(--hov) 100%, var(--ground));
+  /* the hover tint over an opaque ground: rows scrolling under it never show through */
+  background: linear-gradient(var(--hov), var(--hov)), var(--ground);
 }
 .sb-rename-input {
   flex: 1;
