@@ -91,8 +91,11 @@ export default function SheetEditor({
   const save = async () => {
     const wb = wbRef.current;
     const handle = handleRef.current;
-    if (!wb || !handle || saving) return;
-    if (!dirty && dirtyGen.current === 0) return;
+    // no `saving` / `dirty` state check: this closure can be the one rendered
+    // mid-save, and the autosave rerun for edits made then must still write.
+    // useAutosave never runs two saves at once; the generation says if any
+    // edit is unwritten.
+    if (!wb || !handle || dirtyGen.current === 0) return;
     const gen = dirtyGen.current;
     setSaving(true);
     setErr(null);

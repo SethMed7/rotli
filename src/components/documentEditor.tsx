@@ -57,7 +57,10 @@ export default function DocumentEditor({
   const save = async () => {
     const session = sessionRef.current;
     const handle = handleRef.current;
-    if (!session || !handle || saving || dirtyGenRef.current === 0) return;
+    // no `saving` state check: this closure can be the one rendered mid-save,
+    // and the autosave rerun for edits made then must still write (useAutosave
+    // never runs two saves at once)
+    if (!session || !handle || dirtyGenRef.current === 0) return;
     const generation = dirtyGenRef.current;
     setSaving(true);
     setErr(null);
