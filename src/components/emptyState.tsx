@@ -1,6 +1,6 @@
-// The first-run empty state (r1 frame E) — one of the quokka-world placements
-// (placement law: onboarding, empty states, about; never the editor, never
-// notifications). The line-art character tints with the theme. The chord shown
+// The first-run empty state (r1 frame E): a title, the one way in, and the
+// button. No quokka — full-body characters live in Chat, Settings, and setup
+// only (the brand placement law). The chord shown
 // is quick capture's LIVE
 // binding (⌥C by default — the 2026-06-12 summon law: ⌥Space opens the app,
 // capture has its own chord), so a rebind never makes the copy lie.
@@ -9,7 +9,6 @@ import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { dispatch, getAction } from "../keys/registry";
 import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
-import { Character } from "./character";
 import { PlusGlyph } from "./glyphs";
 
 export function EmptyState() {
@@ -21,7 +20,6 @@ export function EmptyState() {
   );
   return (
     <div className="list-empty empty-stage">
-      <Character name="base" size={150} accessorized />
       <div className="et">Your island is ready</div>
       <div className="es">
         {SHOW_HOTKEYS ? (

@@ -82,6 +82,8 @@ export type DocumentEditingOutcome =
       kind: "ready";
       document: EditableDocument;
       warnings: string[];
+      /** The file's revision as read; `save` writes only over it. */
+      revision: string;
       save(next: EditableDocument): Promise<string>;
     };
 
@@ -101,6 +103,7 @@ export async function editDocument<Source>(
     kind: "ready",
     document: decoded.document,
     warnings: decoded.warnings,
+    revision,
     save: async (next) => {
       const encoded = await dependencies.codec.encode(decoded.source, next);
       revision = await dependencies.writer.writeBase64(fileId, encoded, true, revision);

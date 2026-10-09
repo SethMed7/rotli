@@ -26,11 +26,15 @@ export function SettingsBanner({
         {BANNER_BACKDROPS[family] ?? BANNER_BACKDROPS.warm}
         {BANNER_MOTIFS[motif]}
       </svg>
-      <Character name={pose} size={84} className="set-banner-quokka" accessorized alwaysVisible />
+      <Character name={pose} size={84} className="set-banner-quokka" accessorized />
       <h3 className="set-banner-title">{title}</h3>
     </div>
   );
 }
+
+/** A horizon band's frame: wide, its ground on the bottom edge (the page
+ * scenery here, and the sidebar's bottom scene). */
+export const HORIZON_FRAME = { viewBox: "0 0 1200 150", preserveAspectRatio: "xMidYMax slice" } as const;
 
 /** A page's scenery: the theme's sky ornament and its horizon, pinned behind
  * the content. `name` keys both, so a new scene fades in when it changes.
@@ -51,13 +55,7 @@ export function SceneryLayers({
       <svg key={`sky-${name}`} className={`${className}-sky`} viewBox="0 0 320 200" focusable="false">
         {sky}
       </svg>
-      <svg
-        key={name}
-        className={`${className}-horizon`}
-        viewBox="0 0 1200 150"
-        preserveAspectRatio="xMidYMax slice"
-        focusable="false"
-      >
+      <svg key={name} className={`${className}-horizon`} {...HORIZON_FRAME} focusable="false">
         {horizon}
       </svg>
     </div>

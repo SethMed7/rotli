@@ -3,6 +3,7 @@
 
 import type { NoteSummary } from "../types";
 import { createCaretPicker } from "./caretPicker";
+import { noteIdFacet } from "./livePreview";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { wikilinkNotes } from "./wikilinkIndex";
 import { wikilinkChoices, wikilinkPickAt } from "./wikilinkPickState";
@@ -21,7 +22,7 @@ export const wikilinkPicker = createCaretPicker<NoteSummary>({
       anchor: line.from + span.open,
       query: span.query,
       ...(span.closed ? { typedOnly: true } : {}),
-      choices: wikilinkChoices(wikilinkNotes(), span.query),
+      choices: wikilinkChoices(wikilinkNotes(), span.query, { exclude: state.facet(noteIdFacet) }),
     };
   },
   empty: (query) => (query.trim() ? `No note named “${query.trim()}”` : "No notes to link yet"),

@@ -1,7 +1,11 @@
 import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 
 import { formatChord } from "../../keys/chords";
+import { setSetupHandle } from "../../keys/handles";
 import { currentChord } from "../../keys/registry";
+
+/** What the Librarian does, in one line: the same on every screen that asks. */
+export const LIBRARIAN_ON_DESCRIPTION = "It files and tidies for you. Every action is logged and undoable.";
 
 export interface SetupOption<T extends string> {
   value: T;
@@ -156,4 +160,14 @@ export function SetupBack({ onClick, disabled = false }: { onClick: () => void; 
       {chord && <kbd>{formatChord(chord)}</kbd>}
     </button>
   );
+}
+
+/** A setup screen's ⌘↵ and ⌘← (keys/handles.ts): Continue, and Back when
+ * there is somewhere to go back to. Refreshed every render, so it always runs
+ * the screen's current step. */
+export function useSetupHandle(onContinue: () => void, onBack?: () => void): void {
+  useEffect(() => {
+    setSetupHandle({ continue: onContinue, ...(onBack ? { back: onBack } : {}) });
+    return () => setSetupHandle(null);
+  });
 }

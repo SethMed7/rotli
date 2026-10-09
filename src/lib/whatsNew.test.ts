@@ -28,6 +28,12 @@ describe("What's new — when it shows", () => {
     expect(whatsNewDecision({ ...base, lastSeen: "1.6.0" })).toEqual({ version: null, record: false });
   });
 
+  test("never over setup: mid re-onboarding the launch card stays shut (setup's end shows it)", () => {
+    const base = { current: "1.6.0", onboarded: false, onboardingVersion: "1.2.0", notes };
+    expect(whatsNewDecision({ ...base, lastSeen: "1.5.0" }).version).toBeNull();
+    expect(whatsNewDecision({ ...base, lastSeen: "" }).version).toBeNull();
+  });
+
   test("a fresh install records the version quietly; it never opens on first run", () => {
     expect(
       whatsNewDecision({

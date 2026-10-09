@@ -12,8 +12,670 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Update checks go through rotli.co.** The Mac app asks rotli.co first,
+  with its version in the address, and rotli.co passes it to the signed feed
+  on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
+  traffic count Macs per version, with no identifier or personal data; the
+  privacy page and PRIVACY.md say so.
+
+### Added
+
+- **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
+  being built, what's planned, and what's still an idea, straight from the
+  roadmap kept with rotli's source, each with its status and how big it is.
+  It opens like a blog post, the title beside a drawing of the quokka with a
+  map and a signpost, and ends with Recently shipped: the newest releases,
+  their dates, and a few headlines from each, read from this changelog and
+  linked to their notes. Vote for what you want (once per item; your browser
+  remembers): the vote shows at once and is taken back, with the reason
+  beside the item, if it doesn't go through, and Ideas can be ordered by
+  votes. Or ask for something new with a short form that needs no account
+  and no email; it says what's kept, and requests are read, never published.
+  Until voting opens on the live site, the page says so. "On this page"
+  stays beside the list on a wide screen, the page reads well on a phone,
+  and "Roadmap source" links the full roadmap on GitHub. It's in the
+  Resources menu and the footer, and the privacy page says what votes and
+  requests keep.
+
+### Changed
+
+- **rotli.co's blog posts are calmer to read.** A post lines up with the
+  header: the title, summary, author, and topics sit beside the post's
+  picture, shown whole, with "Blog" above the title, and the title is in
+  view without scrolling. Below that are two columns: the contents,
+  progress, sources, and Share on the left, and the text in the room to its
+  right, at a comfortable line of about 66 characters on every screen. The
+  sources show four at a time with "Show all", every one whole, and the
+  left column stays with you as you read without ever cutting anything off.
+  The suggestions that sat on the right now close the post as "More from
+  rotli". On a narrower window the picture goes above the title and the
+  left column folds away, and nothing overlaps or scrolls sideways at any
+  width. The blog page keeps the site's usual width, with a bigger featured
+  post, a row of up to four more, and each line of the post list short
+  enough to scan.
+- **rotli.co's guides are on the blog.** Getting started, Why local?, What
+  does AI see in rotli?, What is Rotli Helper?, and rotli in the browser and
+  on the Mac are blog posts marked Guide, each with its own picture, and the
+  blog can show just the guides. Old guide links still work: they go
+  straight to the new address. The Resources menu lists the Blog,
+  Developers, the Changelog, the Roadmap, and Rotli Studio, the site with
+  rotli's wallpapers and films.
+- **rotli.co's Features page is a catalog.** Every part of rotli is a tile,
+  grouped as Writing, Organizing, AI and chat, Files, Privacy and control,
+  and Rotli Web and agents, each saying whether it has shipped, is in beta,
+  or is coming soon, and where it runs. Search it or pick an area; open a
+  tile for its own page: what it does, how to use it, its limits, and where
+  to read more. The pages can be linked to on their own, and the list works
+  without JavaScript.
+- **rotli.co's Features page is shorter and says where each thing works.**
+  Related entries are now one: Markdown covers tables, code, math, and
+  diagrams; Search covers links; Templates covers slash commands; "Make it
+  yours" covers themes, panes, and your own keys; and the Librarian, your
+  choice of AI, Word and Excel files, boards and pictures, your folder, and
+  what AI may see and change each became a single entry. Every merged part
+  keeps its words and pictures as a section of the page that took it in, and
+  its old address leads straight there. Each entry now says plainly where it
+  works ("Available on Mac and Web", "Beta on Mac", "Coming soon to Mac")
+  instead of a dot and a status, the icons stand bare without boxes, and the
+  page opens on a picture of the quokka at its desk among a note, a chat, and
+  a board. The areas are now tabs on one bar beside a smaller search box, each
+  showing how many entries it holds (and how many match what you typed), and
+  the page closes on a banner to the roadmap instead of a line of text.
+- **rotli.co's home page opens on the app itself.** The film under the
+  headline is now a real recording of rotli: a quick note, the Library,
+  search, chat, and the same note as plain Markdown. It has no sound, so the
+  player offers Watch again instead of Click for sound.
+- **rotli.co says what rotli is for.** The landing page now opens on "Write
+  like a person. Let AI do the filing.", explains with a side-by-side note why
+  AI reads notes differently from people (and what the Librarian adds around
+  your words), cites two figures on unused AI subscriptions, and shows the
+  night privacy band in Ocean Dark. The Rotli Web section explains how Rotli
+  Helper connects the browser to your folder and gives the one-line command to
+  copy. The quokka carousel is gone from the landing and Features pages, and
+  the About page's belief now reads "AI works for you, inside rules you set."
+- **rotli.co leads with free, not the Mac.** The home page now says rotli is
+  a free workspace built on plain Markdown files: notes first, with Docs and
+  Sheets (beta), chat, and boards in the same folder, no account, and AI only
+  if you want it. Under the buttons it reads "Free. No account. Works
+  offline." and then where it runs. Windows and Linux apps are "Coming soon"
+  on the home page, the download page, and the FAQ. The Rotli Web section is
+  now "On your computer. In your browser.", and the closing invitation at the
+  bottom of the home and Features pages is gone, so the questions run
+  straight into the footer.
+- **The before-and-after on rotli.co says it plainly.** The Librarian files
+  the note and fills in the frontmatter at the top of the file; it never
+  changes what you wrote.
+- **The post behind the home page's AI figures is rewritten with new sources.**
+  "Paid AI plans often sit unopened. rotli can put them to work." re-checks
+  Self Financial's March 2026 survey, adds Menlo Ventures' July 2026 survey of
+  daily use among people who pay for AI, and says what the numbers cannot show.
+  Bango's "about four tools, $66 a month" figure came from a report arguing the
+  plans are essential, so it is now context in the post and no longer one of
+  the home page's two figures. The second figure there is Menlo's: half of paying
+  AI users don't use AI every day.
+- **The before-and-after note on rotli.co is no longer two cards.** The same
+  file sits in two open columns, as you write it and after the Librarian: the
+  lines it adds are marked, and your words are marked unchanged. Its example
+  files the note in a real area.
+- **Scrolling into "Some notes never leave this Mac" takes the whole of
+  rotli.co into the night.** The page, its header, menus, and buttons step
+  into Ocean Dark while the privacy section is in view, and step back out
+  when you scroll on or back. With reduced motion the change is immediate.
+- **The quokkas at the bottom of rotli.co each have something to do.** One
+  sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
+  waves when you arrive and frowns if you reach for the leaves), two play
+  catch in the corner, and one strolls the dunes. You can pick up a leaf and
+  hand it to one of them, with the mouse, a finger, or the "Hand the quokkas a
+  leaf" button from the keyboard. The reaching arm is gone.
+- **rotli.co's page-not-found screen has a game.** Press Play and the quokka
+  runs along the beach: jump the rocks, bushes, logs, and sandcastles with
+  Space, ↑, or a tap, and see how far you get. It pauses when you leave it,
+  and "Take me home" works the whole time. Your best run is not saved.
+- **You steer your person on rotli.co's quokka beach.** With the mouse over
+  the beach, the arrow keys walk it, and a click says what to do: click the
+  leaves to pick one up, then a quokka to walk over and feed it (a little
+  heart rises). Holding the ball, or in the game of catch, click any quokka
+  to throw it the ball; it catches it and throws it back. A pointer and a
+  ring on the sand show what a click would act on. Your person no longer
+  follows the mouse around, walks off more briskly, and taps work the same
+  on a phone.
+- **The game on rotli.co's page-not-found screen has more to it.** The
+  quokka can duck now: hold ↓ or S (or swipe down on a phone) to slide under
+  the gulls and low branches that start coming along after the first few
+  metres. The run gets faster a level at a time, and the level shows beside
+  the score. The game is taller, and the page around it says less: the
+  headline, "Take me home", and "Try rotli · Resources".
+- **rotli.co says "Download free" and keeps where it runs on the download
+  page.** The header, the home page's top, and its closing panel each have
+  the same "Download free" button. All three open the download page, which offers the Mac app and Rotli Web and leads with your
+  system: on Windows or Linux it says their apps are coming soon and offers
+  Rotli Web in the meantime. The home page no longer repeats where rotli runs
+  under its buttons, and the Mac download link lives only on the download
+  page.
+- **rotli.co's header shows rotli's GitHub stars.** Left of "Download free",
+  a plain link shows the GitHub mark and a star with the count in GitHub's
+  star gold, with no box around it (in the menu on a phone). The count is
+  read once when the site is built, so your browser never contacts GitHub to
+  show it; if GitHub can't be reached then, the button shows without a
+  number.
+- **rotli.co states its privacy promise.** Left of the download button, an
+  "Our privacy promise" button of the same size, with a lock, opens the
+  promise at the top of the privacy page (on a phone the two stack in the
+  same order): you
+  choose which AI tools rotli uses and, note by note, what each one may read
+  and change. A small table shows who may read and change a note you wrote
+  (the model on your Mac, a connected AI tool, the Librarian) for an everyday,
+  a secure, and a locked note, followed by what "Let AI edit the text" and the
+  Librarian do. The privacy section further down the home page links to the
+  same place.
+- **rotli.co's home page leads with the numbers.** "The AI you already pay
+  for is mostly waiting." now comes right after the film, before what rotli
+  does, and keeps it short: two sourced figures (50.4% of people paying for
+  ChatGPT hadn't used it in 30 days; half of people who pay for AI don't use
+  it every day), each footnoted to its survey, one sentence on putting that
+  idle plan to work, and beside them the blog post's picture with "Read the
+  study", for the full numbers. The film now leads into that section on a ground that shifts
+  softly under it, instead of ending on a gap and a hard edge, and it rises
+  in once on arrival rather than moving with the scroll.
+- **rotli.co's guides open on their own scene and show how far through you
+  are.** Each guide starts with a small island scene about its subject, and a
+  bar with "N% through" stays under the header as you scroll the article.
+- **rotli.co's Features page is shorter and shows the real app first.** It
+  opens on the same screen recording as the home page instead of the eight
+  illustrated episodes. Each section makes one point with one picture: the
+  repeated task and choice pictures, the conversation-notes example, and a
+  second explanation of Rotli Helper are gone. A new part, "You decide what
+  AI may touch", explains notes you wrote, Lock, and Mark secure beside the
+  note menu, replacing a cropped screenshot with text cut off behind it.
+- **rotli.co says plainly that notes are the start, and AI costs nothing
+  extra.** The home page calls notes the foundation that chat, documents, and
+  boards build on, and says there is no extra AI plan to buy: rotli uses the
+  one you already have, or a model on your Mac. Two new questions, "Do I
+  have to pay for AI?" and "Is rotli just a notes app?", answer both. The
+  privacy page's opening on AI is plainer.
+- **The privacy page and blog posts show how far through you are,** with the
+  same "N% through" bar as the guides, so every article reads the same way.
+- **rotli.co's blog shows a picture for every post.** Each post has its own
+  scene: the quokka on the island with what the post is about beside it (idle
+  AI helpers on a bench, a browser and Terminal, notes linked together, a
+  scribbled page and the same page filed). The blog page now leads with the
+  newest post, large, with its summary, date, and reading time, and shows the
+  rest in a grid; posts that are coming soon are labelled on their picture. A
+  post shows the same picture at the top, and its link preview uses the same
+  scene.
+- **rotli.co's privacy page reads like a blog post.** The title, the
+  summary, and the date sit beside the night scene, in a rounded frame like
+  a post's picture, where the full-width banner used to be. Below that the
+  contents and how far through you are stay on the left, with Copy link,
+  and the policy is on the right at a comfortable line; the privacy promise
+  and its table still come first, and the promise button on the home page
+  still lands on it. The page ends with the posts about privacy and where to
+  get rotli. On a phone the scene goes above the title, the contents fold
+  into "On this page", and nothing scrolls sideways at any width. The words
+  of the policy haven't changed.
+- **The blog's pictures are redrawn.** The quokka is larger and crisper, at
+  the same size in every picture, and what it holds (a notepad, a shield, a
+  laptop, a folder of notes, a drawing board) is drawn like the things around
+  it, no longer filled in brown. Those things are drawn with the quokka's own
+  line, in the site's colours, and placed so nothing crowds or touches. The
+  link previews match.
+- **Long commands fit their boxes on rotli.co.** The Rotli Helper install
+  line wraps inside its box in the guide and the blog post instead of being
+  cut off, and the privacy page's night scene sets its words beside the dome.
+- **rotli.co's night falls like dusk.** Scrolling into the privacy section,
+  the page, its header, and its buttons fade into the night together, on one
+  clock, a little sooner, and the section's edges fade into the page instead
+  of cutting across it. Text stays readable all the way through.
+- **"Make it yours" on rotli.co shows the themes on its own.** When you reach
+  it, it steps through every theme. Hover a swatch to see that one; click it
+  to keep it. With reduced motion it waits for you.
+- **The quokka beach at the bottom of rotli.co has a person you walk.** Move
+  the mouse onto the sand (or tap it, or use Walk on the beach and the arrow
+  keys) and your person walks there. Stop at the leaves to pick one up, by a
+  quokka to feed it, or by the two with the ball to join their game. With
+  reduced motion nothing moves on its own, and your person steps straight to
+  where you send it.
+- **rotli.co's "Hear when it's ready" sign-up is always in the footer.** Until
+  the list opens, it says so and doesn't send your address anywhere. The
+  footer's maker line links to Seth Medina on X. Once it's open, rotli's
+  maker can get an email each time someone joins (set on the server, off by
+  default), and the privacy page says so.
+- **rotli.co's home page reads in a clearer order, and says each thing
+  once.** Three cards show what rotli does (write, keep, ask), each with a
+  small picture of the app in place of the old list of bullets. The AI
+  figures and the before-and-after follow. Rotli Web and the Helper no longer
+  have a section of their own: the questions answer "Can I use rotli in my
+  browser?", with links to the Helper guide and why it goes through Terminal.
+  The page ends on one panel, "Start with one note.", with the download, just
+  above the quokka beach.
+- **rotli.co's before-and-after plays.** It shows the note being typed, then
+  the Librarian adding its lines above the same words, ending with "Your
+  words, unchanged" marked; Replay plays it again. It's smaller, so it fits
+  on one laptop screen. Reduced motion keeps it still.
+- **rotli.co shows where a note lives, and what an LLM wiki is.** "Write it
+  down. rotli puts it away." is now one story in three steps. You write in
+  your view (Main, or a named view), which arranges your notes and never
+  copies them. The Librarian, when it's on, later files the file into its
+  area folder in your vault and leaves your words alone, while your view
+  keeps the note where you put it. When you ask AI about it, rotli searches
+  on your computer and the AI reads only the few notes that matter, not the
+  whole vault. A small picture joins the note in your view to its file in the
+  vault with a dotted line. The before-and-after that had its own section
+  ("You write for yourself. AI reads differently.") is now the second step's
+  picture and plays the same way. A short "What is an LLM wiki?" links to
+  Andrej Karpathy's note that named the idea. The three pictures now share
+  one open style with no cards and one width, each heading starts level with
+  its picture, and the steps drop their numbers. The third picture shows the
+  chat beside the vault it searched, with the two notes it read lit and the
+  rest left closed. The section no longer ends on "See every feature",
+  since Features is in the header, and a new question in the FAQ, "What is
+  a vault, and how do I start one?", leads to the getting-started guide.
+- **rotli.co's About page tells the story across the page.** It's written in
+  first person around what rotli is now: a free workspace on plain Markdown
+  files, notes first with Docs and Sheets (beta), chat and boards in the same
+  folder, a Librarian that files and never touches your words, and AI that
+  uses the plan you already pay for. Words and real pictures of the app take
+  turns down the page, with two pull quotes, the island and the name, and a
+  short timeline of releases since 1.0 that ends on the roadmap.
+- **rotli.co's download page has life.** It opens on a little dock where one
+  quokka waves beside a laptop and another sails in under a browser-window
+  sail. The Mac app and Rotli Web each get a panel that says what you need
+  and what you get, and the one for your computer comes first: the Mac
+  download on a Mac, Rotli Web on Windows and Linux, whose own apps are
+  marked "Coming soon" with links to the roadmap and the sign-up. Below are
+  what you get, the first few minutes, and a few answers. Reduced motion
+  keeps the scene still.
+- **Blog posts on rotli.co have a rail for finding your way.** The title,
+  summary, author, date, reading time, and topics sit beside the post's
+  picture. On the left, a rail holds a short title, the sections as a tree,
+  how far through you are, the post's sources (each opening the original in
+  a new tab), and Share: X, LinkedIn, Email, Copy link, and Copy Markdown.
+  Each post ends with "More from rotli": other posts and a couple of things
+  from rotli itself, such as the download and the roadmap. Nothing there
+  tracks you or loads from anywhere else. The text is larger, about 66
+  characters a line, with clearer headings, quotes, and, on phones and in
+  print, a numbered sources list.
+- **Blog posts on rotli.co have charts and diagrams.** The post on unused AI
+  plans shows the Self Financial 30-day figures and Menlo's daily-use
+  comparison as bar charts, each with its source and a table of the numbers,
+  and a diagram of how the Librarian files a note with your plan or a model
+  on your Mac. The Rotli Web post shows how the browser reaches your folder.
+  They're drawn when the site is built, so the page loads no chart code.
+- **rotli.co's blog page shows what's new.** The newest post leads, large,
+  with its topics; the next ones follow in a row; then every post in a dated
+  list you can narrow by topic. Posts from the last two weeks say "New", and
+  posts that are coming soon wait in their own section.
+
+### Added
+
+- **rotli.co has a "hear when it's ready" list and quokkas at the bottom.**
+  The footer takes an email address for occasional workshop notes (sent
+  through Resend; the form is hidden while the list is off, and it works
+  without JavaScript). Below it, and on the page-not-found screen, a strip of
+  Rottnest where the quokkas follow your pointer, reach for it, and guard
+  their leaves; under reduced motion they stand still. The Founder.best
+  badge is gone.
+
+### Changed
+
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
+
+### Fixed
+
+- **The theme studio's previous and next buttons on rotli.co sit on one row
+  on phones** again, beside the theme's name.
+- **"On this page" on rotli.co's articles is no longer cut off.** The reading
+  bar under the header covered the top of the list beside guides, blog
+  posts, and the privacy page. The list now sits below the bar, and jumping
+  to a section lands it below the bar too.
+- **rotli.co fits phones and tablets better.** The changelog no longer
+  scrolls sideways on a phone, the island behind "Make it yours" no longer
+  sits under its words on a tablet, each home-page step puts its quokka
+  beside its words on a tablet, and the film's buttons, the source marks, and
+  the page-not-found links are easier to tap.
+
+## [1.8.0] - 2026-10-09
+
+### Added
+
+- **A graph of your notes** (development builds). Search "Graph" in ⌘K to see every note as a
+  dot and every `[[link]]` you wrote as a line, or right-click a note and
+  choose **Show in graph** for the notes around it, one or two steps out.
+  Hovering a note fades everything it isn't linked to, searching highlights
+  without moving anything, and the arrow keys and Enter reach every note.
+  Related notes the Librarian found draw as dashed lines, on by default;
+  **Librarian links** hides them, and Rotli remembers. A secure note shows
+  its title and never its text. Nothing is written into your notes.
+- **Ask AI from the note.** Type `/ai` (or `/ask`), say what you want ("a bar
+  chart of these hours", "three sources on this", "a closing paragraph"), and
+  the Librarian's model writes it for that spot. You read the answer first;
+  only **Insert** puts it in the note, and only as an addition, never a change
+  to what you wrote. It works on your own notes without turning on "Let AI
+  edit the text", but never on a locked note or one where you turned AI
+  editing off, and a secure note never goes to a connected model. ⌘Z takes it
+  back. Mac app only.
+- **Charts in your notes.** Type `/chart` and pick one of ten kinds (bar,
+  horizontal bar, stacked bar, line, area, pie, donut, scatter, radar, or
+  heatmap): Rotli drops in a small example and opens a form
+  where you set the type, title, unit, and rows. The chart lives in the note
+  as plain text you can read and edit by hand (a `chart` block of options and
+  comma-separated rows), so the file stays portable. If Rotli can't read a
+  chart, it shows why and leaves the text alone. Charts follow your theme's
+  colors.
+- **Images in a chat sit where you mention them.** Attaching an image types
+  its tag, `[Image #1]`, where your cursor is, so you can write "compare
+  [Image #1] with [Image #2]". The sent message shows each tag as a chip
+  with the picture, its file name, and its size. Thumbnails in the composer
+  are bigger, with the remove × inside the corner, and removing one removes
+  its tag. A screenshot you paste into the chat attaches the same way.
+- **Spreadsheets are in Rotli, in Beta.** New Sheet makes a real `.xlsx`, and
+  `.xlsx` files open to edit in the Mac app the way `.csv` files already did.
+  Chat can make a workbook for you, and `/Sheet` embeds one in a note. Undo
+  starts over when you switch themes or tabs, and dropdowns and colour rules
+  aren't editable yet; that's what Beta means here. Rotli Web doesn't open
+  workbooks yet.
+- **Hand to AI brings the note's files along.** Images and files the note
+  links to are listed under Attachments with where they are on your Mac, and
+  the links in the note point there, so the agent can open them. A file that
+  isn't in your vault, or that Rotli Web can't confirm is there, is listed as
+  missing. A note that links to a file in a secure folder, however the link is
+  written, or with a link Rotli can't read safely, isn't handed off at all.
+- **Hand to AI has a Refined mode.** Next to Basic (the prompt built from
+  the note, as before), Refined asks the Librarian's model to rewrite it as a
+  full prompt: the task, the context, the constraints, the files, and how to
+  check it's done. It uses the model on this Mac unless your Librarian is set
+  to a connected model. If it can't help this time, or its rewrite drops a
+  file path, you get Basic and the reason; edits you made to Basic stay. Hand to AI remembers which one you chose last.
+
+### Changed
+
+- **Everyone sees setup once more, then what's new.** Rotli 1.8.0 walks
+  everyone set up on an earlier version through the new setup again, once:
+  it opens on your own theme and vault (Continue keeps the vault you have),
+  **Skip setup** keeps everything as it is, and the last step shows what's
+  new in 1.8.0. Earlier setups could leave settings behind that this clears
+  up. A new install still gets the welcome note and the thank-you card.
+- **A sheet's header and toolbar are calmer.** The toolbar is one row from
+  the left, like a Word document's: the Start, Formulas, and Data tabs are
+  gone, and everything they held is under **⋮** at the end of the row. Beta
+  sits beside the file's name. The header's actions are plain words rather
+  than outlined buttons: Details and Open externally, then **Theme | White**
+  for the sheet's colours (White is the paper look the old Raw button gave).
+- **Sheets and documents save themselves.** There's no Save button to
+  remember: a moment after you stop editing a sheet or a Word document, Rotli
+  writes it, and the header says **Saving…**, then **Saved**. If a save
+  can't happen (the file changed on disk, say), it says **Not saved** with
+  the reason, and your next edit tries again. ⌘S still saves at once.
+  Clicking around a sheet's cells isn't an edit: only a change to the
+  workbook saves.
+- **Choosing where your notes live opens the macOS folder panel.** Setup,
+  Settings, and the sidebar's Connect all use the Finder panel you know, with
+  one button, Choose a folder. Make a new folder there for a fresh vault, or
+  pick the Markdown folder you already use and Rotli works in it as it is.
+  Rotli's own folder browser is gone.
+- **Setup can be skipped; only a folder is needed.** Skip setup on the first
+  screen goes straight to the app. With a vault already chosen it simply
+  opens; without one, the app asks for a folder in one small prompt, the only
+  part of setup that can't be skipped, and asks again the same way if you
+  quit first. After the folder, Skip the rest finishes setup with what you
+  chose so far.
+- **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
+  are still being finished, so the New chooser, the New… menu, Settings, the
+  slash menu, and an open document or sheet say Beta.
+- **The quokka is your chat buddy.** Every chat has its quokka: it waves on a
+  new chat, thinks while a reply is on its way, cheers when it lands, and
+  listens when it's your turn. It picks its own expression; you decorate it
+  in Settings → Appearance → Chat buddy (body color, lines, glasses or a
+  bucket hat and its color), with a live preview. The Quokka companion switch
+  and the idle mood picker are gone. Outside Chat, Settings, and setup, empty
+  states, the empty pane, What's new, and the launch opening no longer show a
+  quokka.
+- **Tab indents.** Tab on a paragraph now moves it in by one visible level,
+  lined up with a bullet's text, instead of two spaces you could barely see.
+  A paragraph stops at one level, because Markdown reads four spaces as a
+  code block. Tab on a bullet, number, or checklist item still nests it, and
+  Shift-Tab brings any line back. Tab on a heading leaves it a heading
+  instead of turning it into plain text. Tab over several lines that include
+  a code block indents the code but leaves its ``` lines in place, so the
+  block stays a code block.
+- **Setup is four screens.** Your name and theme, where your notes live, who
+  files them (the Librarian), and your three shortcuts, which now say plainly
+  that you can change them. Then the thank-you card and the tour, and a small
+  note beside Settings pointing to everything else.
+- **Choosing where notes live is one step.** Pick Create a Rotli vault or Open
+  an existing folder, pick the folder, and you're in: no confirmation screen
+  after it. An existing folder opens in place.
+- **The Librarian screen asks whether first** (Use the Librarian, or Not now),
+  then which provider and model.
+- **The thank-you card has Take the tour and Start now**, so skipping the tour
+  is one click. They sit on their own row now instead of squeezing onto two
+  lines, and the banner is a thank-you with your name and quokka, without
+  badges for your theme and quokka.
+- **The Librarian screen shows what this Mac has.** Each choice (On this Mac,
+  Claude, ChatGPT, Gemini) says whether it's ready, not installed, not signed
+  in, or has no model yet. You can choose one that isn't ready; the
+  Librarian in the sidebar then shows a dot and opens Settings → Librarian
+  with the step left.
+- **The rest waits where you use it.** Your quokka starts plain (dress it in
+  Settings). The music player is in the sidebar from the start, quiet until
+  you press Play; pick music from it or hide it. Chat offers its models,
+  local or connected, the first time it has none.
+- **A new install lives in the Dock** and stays open like any app. Testers
+  lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
+  Settings → General.
+
+### Added
+
+- **Center or right-align a paragraph.** Align center, Align right, and Align
+  left are in the command palette (bind them in Settings → Keybindings), and
+  `/center` and `/align right` start an aligned paragraph. The file keeps
+  ordinary HTML, `<p align="center">…</p>`, with the tags hidden until the
+  caret is in the line; bold, links, and the rest still render inside. Left
+  removes the tags.
+- **Choose what the titlebar sun does.** Settings → Appearance → Theme button:
+  flip light and dark in your family (now the default), walk your own picks of
+  the fourteen environments, or walk all fourteen. Its label says where the
+  next click lands.
+- **Outline images.** An Appearance switch, off by default, draws a quiet line
+  around pictures and videos in a note, so a white image doesn't melt into a
+  light page.
+- **Chat edits the Word documents it made.** After reading one, chat can
+  change a paragraph, add or remove blocks, set a table cell, or change a
+  heading level. Rotli lets it edit only documents its AI created, checks the
+  new text for secrets, keeps a backup of the original, and waits while the
+  document is open.
+- **Agents work in your Word documents, by Rotli's rules** (development
+  builds). `rotli mcp` gains `rotli_read_document`, `rotli_apply_document`, and
+  `rotli_create_document`, for Claude Code, Codex, or a paired cloud agent.
+  They go through the running app, so agents get the same numbered blocks,
+  edits, and refusals as chat: no secure or secret-shaped documents, edits
+  only to documents an AI made, never while one is open, never over a newer
+  version. A document an agent creates is recorded with the agent's name.
+- **Rotli keeps a record of every AI edit.** Each time chat (or its memory)
+  or an agent changes a note's text, Rotli writes who, when, and a diff to
+  `.rotli/ai-edit-journal.jsonl` in the vault. Secure notes are recorded
+  without their text. The app does not show this record yet.
+- **The command line renames, trashes, and lists attachments.** `rotli rename`
+  takes `--revision` to refuse a stale rename; `rotli notes attachments` lists
+  a note's linked files with type and size (small text files on request);
+  `rotli notes trash` moves a note to Rotli's Trash, where you can restore it;
+  `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
+  undoes the last one only while the note is exactly as it left it. Renaming,
+  trashing, and undoing follow the edit rule: only notes an AI made, or ones
+  you let AI edit, never locked or secure ones, checked again at the moment
+  of the move. A linked note an agent may not read (secure, in a secure
+  folder, or holding a secret) is listed with its link only, never its size
+  or where it is on your Mac. `rotli open` and deep links now reach notes in
+  connected vaults: Rotli switches to that vault, then opens the note. A
+  connected folder that isn't a vault is refused with a message saying so.
+- **Agents get the same tools** (development builds). `rotli mcp` gains
+  `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
+  `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
+  also prints Cursor and Gemini CLI setups.
+- **Links in Word documents.** Web and mail links in a .docx now open, edit,
+  and save as real Word links: add one from the document toolbar (or the
+  palette's Link), change its
+  text or address, and it stays a link in Word. A click in a link's text
+  edits it; ⌘-click, or the address on the card that hovering shows, opens it
+  in your browser or mail app. Chat sees links as Markdown links, keeps them
+  when it edits a document it made, and Markdown links in a document it
+  writes stay links.
+- **A living sidebar.** Settings → Appearance → Sidebar adds Scenery (Off,
+  Top, Bottom, or Both): your theme's hills as a faint silhouette behind the
+  header row or the footer, never behind what you read. And Icons: Neutral, where every mark shares one ink,
+  or Color, where each kind of file has its own.
+- **Pinned sites.** Pin up to three sites you sign in to (Settings →
+  Browser). Each gets a button in the title bar, left of the globe, that opens
+  the site in a panel instead of a tab, and you stay signed in. Each site keeps
+  its own sign-in, apart from the others and from private pages; removing one
+  signs you out. Mac app, macOS 14 or later.
+- **`bun run stats`** for maintainers: downloads, installed updates, Macs per
+  version, site visitors, and Rotli Web loads, from GitHub's and Cloudflare's
+  aggregate counts (docs/operations/usage-stats.md).
+- **Your own YouTube stations.** Settings → General → Ambient audio takes up
+  to three YouTube videos, live streams, or playlists of your own. They play
+  like Claude FM, from the sidebar player.
+
+### Changed
+
+- **Chat reads spreadsheets and Word documents by address.** An .xlsx
+  arrives as every cell by its A1 address, with formulas and their results and
+  real row numbers; a Word document arrives as numbered blocks (headings, list
+  items, table cells). Before, sheets came as CSV that dropped blank rows and
+  formulas.
+- **About credits Excalidraw and Univer.** Settings → About Rotli and the
+  site's About page name the two open-source editors built in: Excalidraw for
+  boards and Univer for Word documents.
+- **Home is called Home.** Whichever sidebar section you choose as Home reads
+  "Home" and comes first in the switcher; the others keep their names. Chat
+  as Home stays in the main window.
+- **The Quick Note's ⌘P picker searches what your notes say.** Titles still
+  match as you type, accents and capitals aside ("cafe" finds "Café"); note
+  text follows from full-text search, always below the title matches. The
+  picker says when it is still loading or searching, and a blank note you
+  named can be found by its name.
+- **The scroll-to-top arrow is smaller and quieter.** A muted glyph until you
+  hover or Tab to it, in every theme.
+
+### Fixed
+
+- **The vault menu is on top again.** Opening the menu under your vault's
+  name in the sidebar drew the open note's header, or a board's canvas, over
+  the part of the menu past the sidebar's edge. The menu now sits above
+  everything.
+- **⌘C and ⌘X copy and cut a sheet's selection.** On the Mac only a single
+  cell's text could be copied: a column, a row, or a block of cells copied
+  nothing. The whole selection now goes to the clipboard, so it pastes into
+  another app as a table, and pasting back into a sheet keeps its formulas
+  and styles. A cut moves the cells when you paste.
+- **⌘Z and ⇧⌘Z undo and redo everywhere.** On the Mac, the Edit menu took
+  those keys before the page saw them and passed them to whatever text box had
+  focus, so undo did nothing in a note, a sheet, or on a board. The keys now
+  go to what you're working in: a note, a sheet, a Word document, and a board
+  each undo and redo their own edits, and a plain text box (a title, the chat
+  box, a rename field) undoes its typing. ⇧⌘Z redoes in sheets and documents
+  too. Edit → Undo and Redo still work from the menu; they just no longer show
+  ⌘Z beside them.
+- **A note can leave a Main folder.** Right-click a note in a folder and
+  choose **Remove from folder**, or drag it below the list, where a space
+  appears that says "Drop here to take it out of the folder". Either way works
+  even when Main is a single folder with nothing beside it, which used to
+  leave no row to drop next to. A sheet or document already in Main can now
+  be filed into a folder and back out like a note.
+- **The new-folder field lines up.** Its folder icon sits in the same column
+  as the folders below it instead of further in.
+- **Your hotkeys work over a board.** With a board focused, ⌘K, ⌘[ and ⌘],
+  ⌘⇧P, ⌘⇧S and the rest of Rotli's chords did nothing, because the board
+  answered them first (⌘K opened its link box, ⌘[ moved a shape back a
+  layer). Rotli's chords now win. A board keeps the few that are about
+  drawing: ⌘D duplicates, ⌘0, ⌘= and ⌘− zoom the board, ⌘F searches its text,
+  ⌘⇧L locks shapes, and ⌘← and ⌘→ grow a flowchart. Its own palette is still
+  on ⌘/, and layer order and links are in its right-click menu.
+- **Links on a board open.** Clicking the link icon on a shape did nothing in
+  the Mac app. A web or mail link now opens in your browser or mail app, a
+  `[[note]]` link opens that note, and a link to another shape scrolls the
+  board to it. A link Rotli can't open says so on the board instead of doing
+  nothing. Text typed inside a shape still isn't a link; add one with the
+  shape's link button.
+- **Boards pan smoothly.** Moving around a board redrew it for every scroll
+  event, faster than the screen could show, so it lagged behind your fingers.
+  It now draws once per frame. Pausing mid-pan also no longer re-saves the
+  whole board when nothing on it changed.
+- **A board can't be replaced by opening another file into it.** The
+  board's menu offered **Open** (also ⌘O), which loaded a different drawing
+  into the board, and Rotli then saved it over the board's own file. Boards
+  no longer offer it; open another board from ⌘K or the sidebar instead.
+- **Opening a board leaves its file alone.** A new board was rewritten half
+  a second after it opened, with the canvas's default grid added, even though
+  you hadn't changed anything. Only a grid you set is saved now.
+- **A vault opens on your freshest note.** When the newest file in a vault
+  was an Excalidraw board, Rotli opened the board as a broken, empty note tab
+  on start. It now opens the most recent note.
+- **The window no longer scrolls sideways.** The hover labels on the theme
+  button and on a tab strip's **+** reached past the right edge of the window,
+  so picking something from ⌘K could slide the whole app 50 px to the left.
+  Both labels now open toward the window.
+- **Rotli Web says plainly that chat images need the Mac app.** Choosing a
+  photo, or pasting one, used to attach it and then fail on send. Images in
+  a chat written on the Mac now show when you open it on the web, instead of
+  coming back blank.
+- **Setup keeps the Librarian you picked.** With Gemini signed in, choosing
+  On this Mac could be switched back to Gemini: when Rotli finished checking
+  this Mac after your pick, or when you went Back and returned to the screen.
+  Rotli now suggests Gemini once, and only before you choose.
+- **A spreadsheet that changed on disk keeps your unsaved edits.** Edits you
+  hadn't saved when the file changed outside Rotli used to be set aside and
+  lost. Now the sheet shows the version on disk and offers **Save my edits as
+  a copy** (a new workbook, opened in a tab) or **Discard my edits**.
+- **A spreadsheet that can't save in the background says so.** When Rotli
+  saves your sheet as the window hides and that save fails, you see why,
+  instead of nothing.
+- **A new note in Rotli Web says "just now".** It read hours old (at least
+  4h in New York) because its date was taken as midnight UTC. A
+  note's created and updated dates stay plain days in the file; Rotli Web
+  now uses the file's own time when it falls on that day, and otherwise
+  counts from the start of that day in your time zone. New notes made in
+  Rotli Web are dated with your own calendar day, not New York's.
+- **A note you just edited in the Mac app says "just now".** In a memex
+  vault, an edit read hours old (at least 4h in New York) for the same
+  reason as on the web, and was dated with the UTC day, so an evening edit in
+  the Americas carried tomorrow's date. The Mac app now reads dates the way
+  Rotli Web does and dates edits with your own calendar day. New notes made
+  on the Mac still carry a full UTC timestamp, by design; Rotli Web writes a
+  plain day. Both read correctly everywhere.
+- **The `[[` picker and Link note no longer offer the note you're in.**
+  Picking it linked the note to itself.
+- **Images dropped from Finder land where you drop them.** On Retina
+  screens a dropped image went in about halfway up the note; Rotli now reads
+  the drop position as the Mac reports it.
+- **Tell a friend does something you can see.** It opens a mail draft with
+  the invite (also copied, for Messages or anywhere else).
+- **The Shortcuts screen names the right place**: Settings → Keybindings.
+- **The opening scene can't hold the app any more.** On macOS 27 a window
+  in front could fail to tell Rotli so, and the opening waited forever over a
+  blank app. A click or key now starts it, and unseen it gives way on its own
+  within five seconds.
+- **Numbered lists stay numbered in Word documents.** Editing a numbered
+  list saved it as bullets; Rotli now reads each list's kind from the file
+  and keeps its numbering.
+- **Comments stay attached when you edit a commented paragraph.**
+- **The document toolbar only offers what Rotli can save.** Headers and
+  footers, page setup, horizontal lines, and checklists were lost on save;
+  they're hidden until Rotli can keep them.
+- **Your settings survive updates.** Rotli no longer writes over a settings
+  file it couldn't read or one a newer Rotli saved, keeps a copy of a damaged
+  one before replacing it, and no longer forgets a custom global shortcut
+  another app happened to hold at launch.
+- **Pausing with AirPods pauses the music.** A pause or play from AirPods, a
+  media key, or the Now Playing menu now sticks: the player follows it, and
+  Claude FM is no longer started again a moment later.
+- **No sidebar footer for Settings alone.** With Files, Librarian, and
+  Feedback hidden, the footer goes away; Settings is still in the titlebar.
+- **The "Keep" quokka has its whole body.** The quokka holding the file stack
+  was missing the outline of its side behind the little card tree, so the
+  hip between the cards showed as background in the app and on rotli.co. The
+  side now runs behind the cards and closes at the hip.
 
 ## [1.7.1] - 2026-09-30
 
@@ -285,6 +947,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `/librarian`.
 
   The rules are kept with the vault's settings on this Mac. Mac app.
+
 - **The Librarian, as a chat.** After your first ask, the Librarian pops out
   into the bottom-right corner of the pane you're in, like the chat on a
   website, and the format bar comes back. Keep talking with the model you
@@ -1075,7 +1738,7 @@ either edge or opens on hover, and a day of the owner's fixes.
 
 - **Drag the macOS screenshot thumbnail straight into a note or a chat.** The
   floating preview after ⌘⇧4 / ⌘⇧5 used to land as "Nothing imported": it
-  hands over a *promise* of a file, never a path, and Rotli only read paths.
+  hands over a _promise_ of a file, never a path, and Rotli only read paths.
   Rotli now reads the drag itself — it calls the promise in, waits for the
   screenshot to be written, and then imports it exactly like a file dragged
   from Finder, at the point you dropped it. An image dragged out of Safari,
@@ -1356,7 +2019,6 @@ Three fixes from a computer-use test of the installed 0.94.0.
 - Librarian Activity rows now name the lane and model that filed the note
   ("Claude · Claude Opus"), not only the day and time.
 
-
 ## [0.94.0] - 2026-09-12
 
 The Librarian lane actually works: the choice persists and reaches the
@@ -1381,7 +2043,6 @@ is.
   Librarian choice, so the daemon never used a connected lane and the
   Settings control reverted to On this Mac on relaunch. The choice now
   persists and reaches the daemon.
-
 
 ## [0.93.0] - 2026-09-12
 
@@ -1522,7 +2183,6 @@ wikilinks, typed tables, and placeable choice panels.
 - Repository and deployment-context privacy tripwires, redacted secret-scan
   commands, and owner-only main/dev protection payloads are available. Actual
   branch protection still requires an eligible private-repository GitHub plan.
-
 
 ### Added
 

@@ -15,6 +15,7 @@ export type ToolName =
   | "read_note"
   | "create_note"
   | "create_document"
+  | "edit_document"
   | "update_note"
   | "open_note"
   | "search_memory"
@@ -104,6 +105,9 @@ export interface Host {
    * managed-document workflow. Optional so browser/headless hosts do not
    * pretend to provide native file creation. */
   createDocument?(title: string, body: string): Promise<string>;
+  /** Edit a Word document Rotli's AI created, by the block numbers read_file
+   * gave (src/documents/aiEdit.ts); Rust refuses one a person made. */
+  editDocument?(file: string, actions: unknown[]): Promise<string>;
   /** REWRITE an existing note's editor body (frontmatter preserved). Gated
    * like a read — the model may only edit what it could read — and a
    * secure-context chat may only edit notes that are themselves secure.

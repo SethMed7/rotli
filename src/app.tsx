@@ -19,7 +19,9 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { CaptureCard } from "./components/captureCard";
 import { ContextMenu } from "./components/contextMenu";
 import { FileNotice } from "./components/fileNotice";
+import { useSetupFront } from "./components/onboarding/setupFlow";
 import { GuidedTour } from "./components/tour/guidedTour";
+import { SettingsHint } from "./components/tour/settingsHint";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
@@ -29,11 +31,12 @@ import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
-import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
 import { AppOpening } from "./components/onboarding/appOpening";
+import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
+import { replayHistoryKey } from "./keys/editHistoryActions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
@@ -44,6 +47,7 @@ import {
   onCaptureSave,
   onCorpusChanged,
   onNativeCloseTab,
+  onNativeEditHistory,
   onOpenRequest,
   onOrganizerProgress,
   onQuickCreated,
@@ -53,10 +57,10 @@ import {
   onSummonSearch,
   onVaultChanged,
   setAppIcon,
-  setDockVisible,
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
+import { attachAgentBridge } from "./ai/agentRequests";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
 import { setupShows } from "./lib/reviewMode";
@@ -69,7 +73,6 @@ import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
 import { useMainWindowWork } from "./services/mainWindowWork";
-import { openSeededWelcome } from "./services/welcome";
 import {
   WebVaultGateHost,
   useFreshFolderWelcome,
@@ -81,16 +84,17 @@ import { addFragmentToMain, hydrateMain } from "./state/main";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
+import { switchVault } from "./memex/service";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
-import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
+import { routeOpenRequest } from "./state/openRequest";
+import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
+import { applyImageOutline, useAppearanceLook } from "./state/appearanceLook";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
-import { useOnboardingThanks } from "./state/onboardingThanks";
 import { useUiStore } from "./state/ui";
-import { useVaultStore } from "./state/vault";
 import { hydrateViews } from "./state/views";
 
 // Settings and Onboarding are full-surface fronts most sessions never (or
@@ -101,22 +105,6 @@ const SettingsSurface = lazy(() =>
     default: m.SettingsSurface,
   })),
 );
-const Onboarding = lazy(() =>
-  import("./components/onboarding/onboarding").then((m) => ({
-    default: m.Onboarding,
-  })),
-);
-const VaultActivation = lazy(() =>
-  import("./components/onboarding/vaultActivation").then((m) => ({
-    default: m.VaultActivation,
-  })),
-);
-const ModelSetup = lazy(() =>
-  import("./components/onboarding/modelSetup").then((m) => ({
-    default: m.ModelSetup,
-  })),
-);
-
 registerDefaultActions();
 
 if (import.meta.env.DEV) {
@@ -147,34 +135,21 @@ function surfaceFromUrl(): Surface {
   return "main";
 }
 
-declare const __APP_VERSION__: string;
-const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
-
 function MainShell() {
-  const [resumeAtShortcuts, setResumeAtShortcuts] = useState(false);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const transientCount = useUiStore((s) => s.transients.length);
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
-  const setOnboarded = useUiStore((s) => s.setOnboarded);
-  const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
-  const onboardingPhase = useUiStore((s) => s.onboardingPhase);
-  const [vaultActivationPending, setVaultActivationPending] = useState(false);
-  const setOnboardingPhase = useUiStore((s) => s.setOnboardingPhase);
-  const vaultStatus = useVaultStore((s) => s.status);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
-  // first run only (the real app); an app update never re-onboards
+  // first run, or once after an update that requires it (1.8.0: state/onboarding.ts)
   const onboardingActive = setupShows(isTauri(), import.meta.env.DEV, window.location.search, onboarded);
-  const showOnboarding = onboardingActive && onboardingPhase === "preferences";
-  const showModelSetup = onboardingActive && onboardingPhase === "models" && !vaultActivationPending;
-  const showVaultActivation =
-    vaultActivationPending ||
-    (onboardingActive && onboardingPhase === "vault") ||
-    (isTauri() && vaultStatus === "unconfigured" && !onboardingActive);
+  // first run's screens, or the vault screen when there is no vault (setupFlow.tsx)
+  const setupScreen = useSetupFront(onboardingActive, isTauri());
+  const inSetup = setupScreen !== null;
   const showWebVaultGate = useWebVaultGateShown();
-  const setupFront = showOnboarding || showVaultActivation || showModelSetup || showWebVaultGate;
+  const setupFront = inSetup || showWebVaultGate;
 
   // A lone ⌘ reveals shortcut help immediately in the normal workspace. When
   // a modal/popover owns attention, keep the deliberate hold threshold so a
@@ -302,8 +277,15 @@ function MainShell() {
       void workspaceTakeOpenRequest()
         .then((request) => {
           if (!request || stopped) return;
-          useUiStore.getState().setContentView("panes");
-          usePanesStore.getState().openSummary(request);
+          return routeOpenRequest(request, {
+            switchVault,
+            refreshActiveVault,
+            open: (item) => {
+              useUiStore.getState().setContentView("panes");
+              usePanesStore.getState().openSummary(item);
+            },
+            fail: (message) => useUiStore.getState().setRowActionError(message),
+          });
         })
         .catch(() => {})
         .finally(() => {
@@ -317,6 +299,9 @@ function MainShell() {
       unlisten();
     };
   }, []);
+
+  // Agents reach Word documents through this window (ai/agentRequests.ts).
+  useEffect(() => (LAUNCH_FEATURES.agents ? attachAgentBridge() : undefined), []);
 
   // AppKit owns menu accelerators before WKWebView. Rust replaces the default
   // Close Window ⌘W with Close Tab and forwards it here so native, browser,
@@ -377,10 +362,11 @@ function MainShell() {
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill
   // the pristine startup tab once, never replacing anything the user opened.
+  // A NOTE: a newer board or canvas opened here as a broken note tab.
   useEffect(() => {
     if (!hasDurableCorpus()) return;
     void notesService.listNotes().then((notes) => {
-      const freshest = notes[0];
+      const freshest = notes.find((note) => (note.kind ?? "note") === "note");
       if (!freshest) return;
       const { root, openNote } = usePanesStore.getState();
       const panes = leaves(root);
@@ -396,95 +382,18 @@ function MainShell() {
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
   useEffect(() => {
-    if (showOnboarding || showVaultActivation || showModelSetup) void setHideOnBlur(false);
-  }, [showOnboarding, showVaultActivation, showModelSetup]);
+    if (inSetup) void setHideOnBlur(false);
+  }, [inSetup]);
 
   if (showWebVaultGate) return <WebVaultGateHost />;
 
-  if (showOnboarding) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <Onboarding
-            initialStep={resumeAtShortcuts ? "shortcuts" : "welcome"}
-            onDone={() => {
-              setResumeAtShortcuts(false);
-              setOnboardingPhase("vault");
-              void flushSettingsNow().catch(() => {});
-            }}
-          />
-        </Suspense>
-      </div>
-    );
-  }
-
-  if (showVaultActivation) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <VaultActivation
-            onboarding={onboardingActive}
-            allowCurrent={vaultStatus === "configured"}
-            {...(onboardingActive
-              ? {
-                  onBack: () => {
-                    setResumeAtShortcuts(true);
-                    setOnboardingPhase("preferences");
-                    void flushSettingsNow().catch(() => {});
-                  },
-                  onDone: () => {
-                    setVaultActivationPending(false);
-                    setOnboardingPhase("models");
-                    return flushSettingsNow();
-                  },
-                  onBeforeSwitch: () => {
-                    setVaultActivationPending(true);
-                    setOnboardingPhase("models");
-                    return flushSettingsNow();
-                  },
-                  onSwitchFailed: () => {
-                    setVaultActivationPending(false);
-                    setOnboardingPhase("vault");
-                    return flushSettingsNow();
-                  },
-                }
-              : {})}
-          />
-        </Suspense>
-      </div>
-    );
-  }
-
-  if (showModelSetup) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <ModelSetup
-            onBack={() => {
-              setOnboardingPhase("vault");
-              void flushSettingsNow().catch(() => {});
-            }}
-            onDone={() => {
-              setOnboarded(true);
-              openSeededWelcome();
-              useOnboardingThanks.getState().show(); // the thank-you card, then the tour
-              setOnboardingVersion(APP_VERSION);
-              setOnboardingPhase("preferences");
-              const ui = useUiStore.getState();
-              void setHideOnBlur(!ui.stayOpen);
-              void setDockVisible(ui.showInDock);
-              void flushSettingsNow().catch(() => {});
-            }}
-          />
-        </Suspense>
-      </div>
-    );
-  }
+  if (setupScreen) return setupScreen;
 
   return (
     <div className="app-window">
       {/* the app's opening, once per launch (onboarding/appOpening.tsx) */}
       <AppOpening />
+      <PinPanel />
       <Titlebar />
       <main className="app-content">
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·
@@ -501,6 +410,7 @@ function MainShell() {
       </main>
       <PreviewModal />
       <GuidedTour />
+      <SettingsHint />
       <FileNotice />
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
@@ -517,11 +427,13 @@ export default function App() {
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const accentColor = useUiStore((s) => s.accentColor);
   const accentHue = useUiStore((s) => s.accentHue);
+  const outlineImages = useAppearanceLook((s) => s.outlineImages);
   const surface = surfaceFromUrl();
 
   useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
+  useEffect(() => applyImageOutline(outlineImages), [outlineImages]);
 
   useAppearanceSync(surface);
 
@@ -531,6 +443,8 @@ export default function App() {
 
   // one dispatcher per webview, scoped to its surface
   useEffect(() => attachDispatcher(surface), [surface]);
+  // Edit → Undo / Redo from the menu bar, in whichever window has focus
+  useEffect(() => onNativeEditHistory(replayHistoryKey), []);
 
   // rebinds made in the other webview land here too (one keymap, two webviews)
   useEffect(() => onRebind(({ actionId, chord }) => applyRebind(actionId, chord)), []);
@@ -575,7 +489,6 @@ export default function App() {
   return (
     <>
       <MainShell />
-      <VaultFolderBrowser />
       {isWebVault() && <WebVaultOverlays />}
       {isWebVault() && <WebChatSetupDialog />}
     </>

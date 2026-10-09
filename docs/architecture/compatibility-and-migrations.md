@@ -104,6 +104,32 @@ from the recorded backup; they never guess.
   retain unknown keys owned by another version or tool.
 - Main keeps stable identifiers. Physical filing and title changes cannot
   invalidate or duplicate its references.
+
+### Settings survive updates (2026-10-01)
+
+The owner: "ensure users' settings survive any updates". Both settings files
+(the app's `app-settings.json` and the vault's `.rotli/settings.json`) follow
+four rules. The webview enforces the first two (`src/state/settingsGuard.ts`);
+Rust enforces the third on every settings write (`fsutil.rs`
+`keep_unreadable_settings`, which also refuses to replace a file it couldn't
+read):
+
+- **No write over a file Rotli couldn't read.** A read that fails (a disk
+  error, not a missing file) turns that file's writes off for the session, so
+  the next save can't replace real settings with defaults.
+- **No write down of a newer file.** A file whose `v` is above
+  `SETTINGS_VERSION` loads, and is left as it is for the session (a console
+  warning today; the person sees no message yet, and Rust does not read `v`).
+- **A file that won't parse is kept.** Before it is replaced, Rust copies it
+  to `<name>.unreadable-<unix seconds>` beside it (`keep_unreadable_settings`);
+  if the copy fails, the write is refused.
+- **A refused global shortcut is a session matter.** When the OS refuses a
+  saved chord (another app holds it), Rotli registers the default for this
+  session and keeps the person's choice in the file.
+
+Proof: `src/state/settingsGuard.test.ts` (the blocks; every key the build
+writes is one it reads; a 1.5.0-shaped file loads and a newer build's keys
+ride through), and the `set_aside_tests` in `fsutil.rs`.
 - Named views remain subsets of Main. A view rename updates its Markdown
   `view_tag` values through one rollback-capable write, and deleting a view
   clears those tags without deleting content or Main references. Older builds

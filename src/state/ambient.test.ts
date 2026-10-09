@@ -42,7 +42,13 @@ describe("the saved preference", () => {
   test("loaded from the app settings file's text, tolerantly", () => {
     hydrateAppExtras(JSON.stringify({ v: 1, ambient: { enabled: true, track: "dusk", playing: true } }));
     // a file from before volume existed plays at the default
-    expect(useAmbient.getState().prefs).toEqual({ enabled: true, track: "dusk", playing: true, volume: 0.4 });
+    expect(useAmbient.getState().prefs).toEqual({
+      enabled: true,
+      track: "dusk",
+      playing: true,
+      volume: 0.4,
+      stations: [],
+    });
     hydrateAppExtras("not json");
     expect(useAmbient.getState().prefs).toEqual(DEFAULT_AMBIENT);
     useAmbient.getState().setPrefs({ track: "tide" });

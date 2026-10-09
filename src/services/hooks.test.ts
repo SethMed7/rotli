@@ -6,6 +6,8 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 
+import { QueryObserver } from "@tanstack/react-query";
+
 import type { Note, NoteSummary } from "../types";
 import { UNIVERSE_KEY, applyNoteWrite, invalidateNoteLists, keys } from "./hooks";
 import { queryClient } from "./query";
@@ -34,6 +36,45 @@ afterEach(() => {
 });
 
 describe("applyNoteWrite", () => {
+  test("a save marks the Links projection stale only when what the note links to changed", async () => {
+    queryClient.setQueryData(keys.links, []);
+    const stale = () => queryClient.getQueryState(keys.links)?.isInvalidated === true;
+    queryClient.setQueryData(keys.note("a"), note("a", { body: "# Title a\n\nSee [[B]]." }));
+    // typing that leaves the links alone keeps the projection fresh
+    await applyNoteWrite(note("a", { body: "# Title a\n\nSee [[B]]. More words." }));
+    expect(stale()).toBe(false);
+    // a new link marks it stale for its next reader, with no walk now
+    await applyNoteWrite(note("a", { body: "# Title a\n\nSee [[B]] and [[C]]." }));
+    expect(stale()).toBe(true);
+  });
+
+  test("a save that puts a secret in a note refetches Links for an open Graph or canvas now", async () => {
+    let fetches = 0;
+    queryClient.setQueryData(keys.links, []);
+    const open = new QueryObserver(queryClient, {
+      queryKey: keys.links,
+      queryFn: async () => {
+        fetches += 1;
+        return [];
+      },
+      staleTime: Infinity,
+    });
+    const stop = open.subscribe(() => {});
+    queryClient.setQueryData(keys.note("s"), note("s", { body: "# Card\n\nPay day." }));
+    await applyNoteWrite(note("s", { body: "# Card\n\nPay day: 4111 1111 1111 1111" }));
+    await Promise.resolve();
+    expect(fetches).toBe(1);
+    // and again when the secret leaves, so the card can open back up
+    await applyNoteWrite(note("s", { body: "# Card\n\nPay day." }));
+    await Promise.resolve();
+    expect(fetches).toBe(2);
+    // a first save with nothing cached yet, already holding a secret
+    await applyNoteWrite(note("t", { body: "# Card\n\nPay day: 4111 1111 1111 1111" }));
+    await Promise.resolve();
+    expect(fetches).toBe(3);
+    stop();
+  });
+
   test("mid-body typing (row-invisible change) leaves every list identity untouched", async () => {
     const list = [summary("a"), summary("b")];
     queryClient.setQueryData(keys.notes(undefined), list);

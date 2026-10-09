@@ -15,10 +15,13 @@ import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
+import { useAppearanceLook } from "../state/appearanceLook";
 import { useHidden } from "../state/hidden";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
-import { SOLID_THEMES, useUiStore } from "../state/ui";
+import { useIsDarkTheme } from "../state/theme";
+import { nextTheme, solidThemeLabel } from "../state/themeCycle";
+import { useUiStore } from "../state/ui";
 import { QuokkaMark } from "./character";
 import {
   BrowserGlyph,
@@ -32,6 +35,7 @@ import {
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { Palette } from "./palette";
+import { PinButtons } from "./pinnedSites/pinButtons";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (the maintainer, 2026-06-15). */
@@ -68,10 +72,15 @@ export function Titlebar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const themeLabel =
-    theme === "system"
-      ? "System"
-      : (SOLID_THEMES.find((t) => t.family === themeFamily && t.mode === theme)?.label ?? theme);
+  const themeLabel = theme === "system" ? "System" : solidThemeLabel({ family: themeFamily, mode: theme });
+  // the label says where the next click lands: it follows the cycle setting
+  // and, under System, the mode the Mac shows now (the applied theme)
+  const themeCycle = useAppearanceLook((s) => s.themeCycle);
+  const themeCyclePicks = useAppearanceLook((s) => s.themeCyclePicks);
+  const shownDark = useIsDarkTheme();
+  const nextLabel = solidThemeLabel(
+    nextTheme({ theme, themeFamily }, shownDark, themeCycle, themeCyclePicks),
+  );
 
   return (
     <header className="titlebar">
@@ -215,14 +224,30 @@ export function Titlebar() {
             <span className="tb-sep" aria-hidden="true" />
           </>
         )}
-        {!settingsOpen && !WEB && !hidden.browserButton && (
-          <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
-            <BrowserGlyph size={TB_ICON} />
-          </IconButton>
-        )}
-        {/* The sun cycles the four intentional work environments. */}
+        {/* pinned sites, left of the globe (2026-10-01) */}
+        {!settingsOpen && !WEB && <PinButtons />}
+        {!settingsOpen &&
+          !WEB &&
+          !hidden.browserButton && (
+            // the trailing group's labels open leftward: with the theme button
+            // hidden this one sits second from the edge (audit 2026-10-06)
+            <IconButton
+              className="tb-trail"
+              label="New private browser"
+              onClick={() => usePanesStore.getState().openBrowser()}
+            >
+              <BrowserGlyph size={TB_ICON} />
+            </IconButton>
+          )}
+        {/* The sun steps through environments as Appearance → Theme button says. */}
+        {/* second from the right with the longest label: it anchors right
+            too, or its centred tip reaches past the window (2026-10-06) */}
         {!hidden.themeButton && (
-          <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
+          <IconButton
+            className="tb-trail"
+            label={`Theme — ${themeLabel} · click for ${nextLabel}`}
+            onClick={() => dispatch("theme.cycle")}
+          >
             <SunGlyph size={TB_ICON} />
           </IconButton>
         )}

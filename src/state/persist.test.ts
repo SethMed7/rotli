@@ -7,7 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../brand/quokka";
 import type { Tab } from "../types";
 import {
-  createPersistDrain,
   parseHybridPresets,
   parseSettings,
   pruneMap,
@@ -41,7 +40,12 @@ describe("onboarding checkpoint", () => {
   test("survives a vault-selection relaunch and rejects unknown phases", () => {
     expect(parseSettings("{}").onboardingPhase).toBe("preferences");
     expect(parseSettings('{"onboardingPhase":"vault"}').onboardingPhase).toBe("vault");
-    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("models");
+    expect(parseSettings('{"onboardingPhase":"librarian"}').onboardingPhase).toBe("librarian");
+    expect(parseSettings('{"onboardingPhase":"shortcuts"}').onboardingPhase).toBe("shortcuts");
+    // a skipped setup asks for its folder the same way after a relaunch
+    expect(parseSettings('{"onboardingPhase":"skipped"}').onboardingPhase).toBe("skipped");
+    // setup before 2026-10-01 ended on Models (models + the Librarian): it resumes at the Librarian
+    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("librarian");
     expect(parseSettings('{"onboardingPhase":"workspace"}').onboardingPhase).toBe("preferences");
   });
 });
@@ -84,32 +88,27 @@ describe("custom primary color", () => {
 });
 
 describe("appearance personality", () => {
-  test("defaults to an optional filled quokka and paw navigator", () => {
+  test("defaults to a filled chat buddy and paw navigator", () => {
     const settings = parseSettings("{}");
-    expect(settings.quokkaCompanionEnabled).toBe(false);
     expect(settings.quokkaStyle).toBe("cocoa");
     expect(settings.quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
     expect(settings.quokkaLineColor).toBe("auto");
     expect(settings.quokkaAccessory).toBe("none");
     expect(settings.quokkaAccessoryHue).toBe(DEFAULT_QUOKKA_ACCESSORY_HUE);
-    expect(settings.quokkaIdlePose).toBe("rest");
     expect(settings.chatNavigatorStyle).toBe("paws");
   });
 
   test("round-trips supported treatments and rejects unknown values", () => {
     const settings = parseSettings(
       JSON.stringify({
-        quokkaCompanionEnabled: true,
         quokkaStyle: "custom",
         quokkaCustomHue: 287,
         quokkaLineColor: "white",
         quokkaAccessory: "bucket-hat",
         quokkaAccessoryHue: 128,
-        quokkaIdlePose: "thoughtful",
         chatNavigatorStyle: "dots",
       }),
     );
-    expect(settings.quokkaCompanionEnabled).toBe(true);
     expect(settings.quokkaStyle).toBe("custom");
     expect(settings.quokkaCustomHue).toBe(287);
     expect(settings.quokkaLineColor).toBe("white");
@@ -117,8 +116,6 @@ describe("appearance personality", () => {
     expect(parseSettings('{"quokkaLineColor":"black"}').quokkaLineColor).toBe("black");
     expect(settings.quokkaAccessory).toBe("bucket-hat");
     expect(settings.quokkaAccessoryHue).toBe(128);
-    expect(settings.quokkaIdlePose).toBe("thoughtful");
-    expect(parseSettings('{"quokkaIdlePose":"walking"}').quokkaIdlePose).toBe("walking");
     expect(settings.chatNavigatorStyle).toBe("dots");
     expect(parseSettings('{"quokkaStyle":"redrawn","chatNavigatorStyle":"runes"}').quokkaStyle).toBe("cocoa");
     expect(
@@ -127,7 +124,21 @@ describe("appearance personality", () => {
     expect(parseSettings('{"quokkaCustomColor":"night"}').quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
     expect(parseSettings('{"quokkaAccessory":"crown"}').quokkaAccessory).toBe("none");
     expect(parseSettings('{"quokkaAccessory":"scarf"}').quokkaAccessory).toBe("none");
-    expect(parseSettings('{"quokkaIdlePose":"dancing"}').quokkaIdlePose).toBe("rest");
+  });
+
+  test("the retired companion switch and idle mood are dropped, whatever they held", () => {
+    // the chat buddy is always on and picks its own pose; an older file's
+    // values (well-formed or not) must never crash a parse or ride along
+    for (const raw of [
+      '{"quokkaCompanionEnabled":true,"quokkaIdlePose":"walking","quokkaAccessory":"glasses"}',
+      '{"quokkaCompanionEnabled":"yes","quokkaIdlePose":{"pose":7},"quokkaAccessory":"glasses"}',
+    ]) {
+      const settings = parseSettings(raw);
+      expect(settings.quokkaAccessory).toBe("glasses");
+      expect(Object.keys(settings).filter((key) => /CompanionEnabled|IdlePose/.test(key))).toEqual([]);
+      expect(unknownSettingsKeys(raw)).toEqual({});
+      expect(unknownAppSettingsKeys(raw)).toEqual({});
+    }
   });
 });
 
@@ -248,10 +259,12 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"newTabDefault":"document"}').newTabDefault).toBe("document");
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
     // tests run as the stable channel: withheld kinds and voice never load as on
-    expect(parseSettings('{"newTabDefault":"sheet","readAloud":true}')).toMatchObject({
+    expect(parseSettings('{"newTabDefault":"mermaid","readAloud":true}')).toMatchObject({
       newTabDefault: "markdown",
       readAloud: false,
     });
+    // Sheets ship on the stable desktop channel as Beta (2026-10-05)
+    expect(parseSettings('{"newTabDefault":"sheet"}').newTabDefault).toBe("sheet");
   });
 
   test("tab layout defaults to scroll and only accepts the two visible modes", () => {
@@ -575,55 +588,3 @@ describe("pruneMap — the persisted-map GC primitive (#78)", () => {
 // Correctness #4 from the 2026-07-30 perf audit: the writer used to advance
 // its high-water mark BEFORE the write landed, so one transient failure meant
 // the payload was never retried — theme/keys/panes reverted at next launch.
-describe("createPersistDrain — settings survive a transient write failure", () => {
-  test("a failed write leaves the mark behind, so the next drain retries the payload", async () => {
-    const landed: string[] = [];
-    let fail = true;
-    const drain = createPersistDrain(
-      // oxlint-disable-next-line typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
-      (_key, payload) => (fail ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve())),
-      { settings: () => "A", viewstate: () => "" },
-      { settings: "init", viewstate: "" },
-      () => {},
-    );
-    await drain(); // transient failure — nothing landed
-    expect(landed).toEqual([]);
-    fail = false;
-    await drain(); // no store change since, but the payload MUST retry
-    expect(landed).toEqual(["A"]);
-  });
-
-  test("a landed payload is not rewritten", async () => {
-    let writes = 0;
-    const drain = createPersistDrain(
-      // oxlint-disable-next-line typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
-      () => (writes++, Promise.resolve()),
-      { settings: () => "A", viewstate: () => "" },
-      { settings: "init", viewstate: "" },
-      () => {},
-    );
-    await drain();
-    await drain();
-    expect(writes).toBe(1);
-  });
-
-  test("onFailure fires so the saver can re-arm, and only settled keys advance", async () => {
-    let failures = 0;
-    const landed: string[] = [];
-    const drain = createPersistDrain(
-      // oxlint-disable typescript/no-misused-promises -- tsgolint preview misreads comma-expression arrow bodies as a Promise in a boolean conditional
-      (key, payload) =>
-        key === "viewstate" ? Promise.reject(new Error("io")) : (landed.push(payload), Promise.resolve()),
-      // oxlint-enable typescript/no-misused-promises
-      { settings: () => "S", viewstate: () => "V" },
-      { settings: "init-s", viewstate: "init-v" },
-      () => failures++,
-    );
-    await drain();
-    expect(landed).toEqual(["S"]);
-    expect(failures).toBe(1);
-    await drain(); // settings already landed; only viewstate retries
-    expect(landed).toEqual(["S"]);
-    expect(failures).toBe(2);
-  });
-});

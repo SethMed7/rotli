@@ -58,6 +58,10 @@ export interface NoteSummary {
 
 export interface Note extends NoteSummary {
   body: string; // markdown
+  /** The raw targets of the frontmatter `links:` line (the Librarian's
+   * related notes), set by the browser adapters for the Graph. The Mac app
+   * reports them through `corpus_links_list` instead. */
+  suggestedLinks?: readonly string[];
   /** Opaque complete-file revision returned by the enforcing adapter. */
   revision: string;
 }

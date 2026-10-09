@@ -573,7 +573,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                       <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
                         <ChevronRight size={10} />
                       </span>
-                      <FolderGlyph size={14} />
+                      <FolderGlyph size={14} className="kind-folder" />
                       <span className="fname">{folder.name}</span>
                       {folder.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
                       <span className="sb-chatfolder-n">{folderChats.length}</span>

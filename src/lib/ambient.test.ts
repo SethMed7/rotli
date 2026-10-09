@@ -3,39 +3,85 @@ import { describe, expect, test } from "bun:test";
 import {
   AMBIENT_SOURCES,
   AMBIENT_TRACKS,
+  ambientSources,
   ambientSrc,
   CLAUDE_FM,
   DEFAULT_AMBIENT,
   isStream,
   parseAmbient,
+  nextPausedSince,
   playerView,
   stepTrack,
+  STREAM_HOLD_MS,
+  STREAM_STEP,
+  streamFollow,
+  streamUrl,
   trackForFamily,
   trackTitle,
 } from "./ambient";
 
-const on = { enabled: true, track: "tide", playing: true, volume: 0.4 };
+const on = { enabled: true, track: "tide", playing: true, volume: 0.4, stations: [] };
 const off = { ...on, enabled: false };
 
 describe("the ambient preference", () => {
   test("read tolerantly: anything missing or malformed is the default", () => {
     for (const value of [undefined, null, 3, "on", [], {}])
       expect(parseAmbient(value)).toEqual(DEFAULT_AMBIENT);
+    // a file saved before stations existed reads with none
     expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume: 0.25 })).toEqual({
       enabled: true,
       track: "dusk",
       playing: true,
       volume: 0.25,
+      stations: [],
     });
     // a volume outside 0–1, or not a number, is the default
     for (const volume of [-0.1, 1.5, "loud", Number.NaN])
       expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume }).volume).toBe(
         DEFAULT_AMBIENT.volume,
       );
-    // a track this build doesn't ship falls back; only a real true turns it on
+    // the player shows by default, quiet; a saved "hidden" stays hidden
+    expect(DEFAULT_AMBIENT).toMatchObject({ enabled: true, playing: false });
+    expect(parseAmbient({ enabled: false }).enabled).toBe(false);
+    // a track this build doesn't ship falls back; only a real boolean is a choice
     expect(parseAmbient({ enabled: "yes", track: "../../etc", playing: 1, volume: 0.4 })).toEqual(
       DEFAULT_AMBIENT,
     );
+  });
+
+  test("a saved station is kept, may be the current source, and is checked again on load", () => {
+    const station = {
+      id: "yt-jfKfPfyJRdk",
+      title: "Lofi",
+      url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+    };
+    const prefs = parseAmbient({
+      enabled: true,
+      track: station.id,
+      playing: true,
+      volume: 0.4,
+      stations: [station],
+    });
+    expect(prefs.stations).toEqual([station]);
+    expect(prefs.track).toBe(station.id);
+    expect(isStream(prefs.track)).toBe(true);
+    expect(streamUrl(prefs, prefs.track)).toBe(station.url);
+    expect(trackTitle(prefs.track, prefs)).toBe("Lofi");
+    expect(
+      ambientSources(prefs)
+        .map((source) => source.id)
+        .at(-1),
+    ).toBe(station.id);
+    // a station that no longer parses takes its selection with it
+    const tampered = parseAmbient({
+      enabled: true,
+      track: "yt-jfKfPfyJRdk",
+      playing: true,
+      volume: 0.4,
+      stations: [{ ...station, url: "https://evil.test/watch?v=jfKfPfyJRdk" }],
+    });
+    expect(tampered.stations).toEqual([]);
+    expect(tampered.track).toBe(DEFAULT_AMBIENT.track);
   });
 
   test("six tracks, one per theme family, each a bundled file", () => {
@@ -64,9 +110,9 @@ describe("the ambient preference", () => {
   });
 
   test("Claude FM is a source the preference keeps and the menu offers, last", () => {
-    expect(parseAmbient({ enabled: true, track: "claude-fm", playing: true, volume: 0.4 }).track).toBe(
-      "claude-fm",
-    );
+    expect(
+      parseAmbient({ enabled: true, track: "claude-fm", playing: true, volume: 0.4, stations: [] }).track,
+    ).toBe("claude-fm");
     expect(trackTitle("claude-fm")).toBe("Claude FM");
     expect(isStream("claude-fm")).toBe(true);
     expect(isStream("tide")).toBe(false);
@@ -136,5 +182,56 @@ describe("the player for one moment", () => {
 
   test("Rotli's own audio or video pauses ambient without taking the player", () => {
     expect(playerView(on, {}, null, true)).toMatchObject({ tab: null, ambientPlays: false, visible: true });
+  });
+});
+
+// A stream page (Claude FM, a station) paused from outside Rotli is the
+// person's choice once it holds; Rotli's own pauses never count, and asking it
+// to play again clears the wait (2026-10-01, a review: Play after a long pause
+// used to flip straight back to Pause).
+describe("a stream page and the person's own pause", () => {
+  const T = 1_000_000;
+  const moment = (overrides: Partial<Parameters<typeof streamFollow>[0]>) => ({
+    state: "paused" as const,
+    plays: true,
+    playing: true,
+    pausedSince: null,
+    askedPauseAt: 0,
+    now: T,
+    ...overrides,
+  });
+
+  test("AirPods pause: it holds, then it's theirs; a short stall isn't", () => {
+    const since = nextPausedSince("playing", "paused", null, 0, T);
+    expect(since).toBe(T);
+    expect(streamFollow(moment({ pausedSince: since, now: T + 500 }))).toBe(STREAM_STEP.hold);
+    expect(streamFollow(moment({ pausedSince: since, now: T + STREAM_HOLD_MS }))).toBe(
+      STREAM_STEP.pauseTheirs,
+    );
+    // playing again before the hold: the stall is over
+    expect(nextPausedSince("paused", "playing", since, 0, T + 600)).toBeNull();
+  });
+
+  test("Rotli's own pause (the Pause button, a tab taking over) never counts", () => {
+    const asked = T - 400;
+    expect(nextPausedSince("playing", "paused", null, asked, T)).toBeNull();
+    // a minute later, Play: still paused while the page catches up — that's a nudge, not a pause
+    expect(streamFollow(moment({ pausedSince: null, askedPauseAt: asked, now: T + 60_000 }))).toBe(
+      STREAM_STEP.nudge,
+    );
+  });
+
+  test("a page loading paused (autoplay held) is nudged, not read as a pause", () => {
+    expect(nextPausedSince("none", "paused", null, 0, T)).toBeNull();
+    expect(streamFollow(moment({}))).toBe(STREAM_STEP.nudge);
+  });
+
+  test("played from outside while paused: theirs, once no pause of Rotli's is landing", () => {
+    expect(
+      streamFollow(moment({ state: "playing", plays: false, playing: false, askedPauseAt: T - 10_000 })),
+    ).toBe(STREAM_STEP.playTheirs);
+    expect(
+      streamFollow(moment({ state: "playing", plays: false, playing: false, askedPauseAt: T - 1000 })),
+    ).toBe(STREAM_STEP.nudge);
   });
 });

@@ -65,11 +65,40 @@ maintaining separate file-manipulation implementations.
   selectors, preserves the existing Markdown heading level and managed
   frontmatter, and uses the corpus write path so the physical filename follows
   the new title. Prior human selectors remain in `aliases`; note-list results
-  expose those aliases while stable `id` remains authoritative.
-- External-agent text edits (`update`, `patch`, `rename`) refuse a note a
-  person wrote unless they turned on "Let AI edit the text"; notes an agent
-  creates carry `created_by: agent` and stay editable (2026-09-29,
+  expose those aliases while stable `id` remains authoritative. MCP
+  `rotli_rename {id, title, expectedRevision?}` is the same service call; with
+  `expectedRevision` (CLI `--revision`) a rename of a note changed since the
+  caller's read is refused.
+- External-agent text edits (`update`, `patch`, `rename`) and Trash refuse a
+  note a person wrote unless they turned on "Let AI edit the text"; notes an
+  agent creates carry `created_by: agent` and stay editable (2026-09-29,
   `docs/decisions/2026-09-29-ai-body-edit-permission.md`).
+- `rotli notes trash ID --revision REV` and `rotli_trash_note` move one
+  Markdown note to Rotli's Trash through `CorpusStore::delete`, the soft
+  delete the note menu uses; the person restores it from Trash, and nothing
+  is ever hard-deleted. Order, all under the note's file lock around the move
+  (`CorpusStore::trash_for_remote_agent_if_revision`, mirroring the write
+  seam): remote read gate (secure refuses), body-edit policy (locked,
+  person-written, and revoked refuse), then the revision. A note locked or
+  made secure while the call waits on the lock is refused.
+- `rotli notes attachments ID` and `rotli_note_attachments` list the files a
+  note's Markdown links and images name, resolved as the editor resolves them
+  (`storage:NAME` is `storage/NAME`; a bare relative path is vault-relative;
+  traversal and absolute paths are refused; external URLs are listed, never
+  fetched). The note passes the remote read gate first, so a secure note's
+  attachments are never enumerated. Each file then takes the document lane's
+  records gate (agent-visible surface, no secure keyword in its name) and the
+  secure-home check (nothing under `wiki/_secure/` or `Secure notes/`, any
+  layout, any case); a linked `.md` also takes `read_for_ai` exactly as a
+  remote read of it would (secure flag, chat taint, body detector, name). A
+  refused file is answered with `source`, `path`, `available: false`, and one
+  reason, "not available to agents", even when a linked note is absent, so
+  the answer never tells a present secure note from a missing one; it never
+  carries a size, MIME type, or absolute path. Otherwise results carry the
+  vault-relative path, MIME type, size, and kind; local callers (CLI, stdio,
+  loopback) also get the absolute path, the relay connector does not.
+  `--text`/`includeText` returns text attachments up to 20 KB by default
+  (200 KB max), withholding secret-shaped text. Binaries are never base64.
 - External-agent updates and moves refuse secure and locked notes. Explicit
   user-directed calls may edit or file non-secure `wiki/**` notes through the
   existing filer ownership gate; this is distinct from autonomous organizer
@@ -92,6 +121,35 @@ maintaining separate file-manipulation implementations.
   additional creation context while retaining the ordinary intake and Main
   behavior. Workspace metrics report named-view, reference, and virtual-folder
   counts separately from Main.
+
+## AI edit history
+
+Every successful AI body write, through `write_for_ai_if_revision` (chat and
+chat memory), `insert_for_ai_if_revision` (an Ask AI passage the person
+accepted), and `write_for_remote_agent_if_revision` (CLI, MCP, relay),
+appends one row to `.rotli/ai-edit-journal.jsonl`
+(`src-tauri/src/corpus_ai_journal.rs`). Rows follow the brain journal's
+grammar: JSON per line, `id`, `ts`, `status`, and a same-id re-append is a
+status change (last line wins). A row records the note's id and path, the
+actor (`chat`, `inline`, or `agent` with the MCP client name), the model lane, the
+before and after file revisions, and a one-hunk reversible patch of the
+editor body. A note no remote agent could read at write time (secure, in a
+protected lane, or secret-shaped) is journaled content-free: no patch, no
+text. Hunks over 32 KB are kept without text. The newest 500 rows are kept.
+Journaling is best effort after the write lands; it never fails an edit. The
+file is a deletable sidecar: deleting it loses history, never a note. Trash by
+an agent adds a content-free `trash` row.
+
+`rotli notes history ID` and `rotli_note_history` return the note's rows
+newest first, each with a unified diff when it has a patch (and no
+secret-shaped text), after the same remote read gate as a note read.
+`rotli notes undo-ai-edit ID --revision REV` and `rotli_undo_ai_edit` revert
+the latest applied edit only when the note's current revision is that edit's
+after revision and the caller's revision matches. The revert is written
+through the agent write seam under every body-edit rule, journaled as an
+`undo` row, and the edit is re-appended as `reverted`. An edit that was
+overtaken, or kept without text, cannot be undone. The app does not show this
+journal yet.
 
 The on-device organizer still changes only location and metadata. A Claude or
 Codex body edit is a separate, user-directed workspace action with an explicit
@@ -120,11 +178,46 @@ is never silently replaced.
 Board writes also require the revision returned by the immediately preceding
 read. This is optimistic conflict protection, not a long-lived edit lock.
 
+## Word documents
+
+Word documents (`.docx`, listed by `rotli_list` as files) travel through the
+running app (decision: `docs/decisions/2026-10-01-agent-app-bridge.md`), so
+agents use Rotli's own codec and chat's own edit path. Rotli must be running;
+otherwise the tools answer "Rotli isn't running".
+
+- `rotli_read_document {file}` returns numbered blocks (headings, paragraphs,
+  list items, table cells `r1c1…`, images by alt text; links as Markdown
+  links), warnings, and a revision.
+- `rotli_apply_document {file, expectedRevision, actions}` (destructive) takes
+  at most 40 actions by the read's block numbers, which keep meaning the
+  document as read: `replace`, `insert_after` (0 = top), `delete`, `set_cell`,
+  `set_kind`; text at most 8,000 characters each, Markdown links to https or
+  mailto allowed.
+- `rotli_create_document {title, body}` writes a document from Markdown into
+  managed storage, files it in Main without opening it, and records the
+  agent's `clientInfo.name` as its maker.
+
+Agents count as remote. Refused: a vault other than the one open in Rotli;
+writes to a read-only vault; a document hidden from agents, named with a secure
+keyword, or holding secret-shaped text; an edit to a document no AI created
+(`.rotli/file-grants.json`); an edit while the document is open in a pane; a
+stale revision. Every answer, a refusal included, passes the secret check
+before it leaves Rust. A headless `rotli mcp` reaches the app through
+`agent-bridge/bridge.sock` in Rotli's app-support folder (a 0700 folder, a
+0600 socket); the paired relay runs inside the app.
+
 ## Opening in Rotli
 
 `rotli open` and the MCP `rotli_open` tool write one item ID and kind to the
 default corpus's rebuildable `.rotli/workspace-open.json` mailbox, then activate
-Rotli. The main webview consumes and deletes the request and routes it through
+Rotli. An item in a connected vault (`--root ID`, `rootId`, or an `ID:path`
+wire id) is queued in the same default mailbox under its root-prefixed wire
+id. Panes show only the active vault, so the app switches to that vault first
+(`corpus_switch_vault`, the sidebar switcher's own path) and then opens the
+item by its id there (`src/state/openRequest.ts`); a failed switch opens
+nothing and says why. A connected folder that is not a vault is no switch
+target, so `rotli open` refuses it before anything is queued. The main
+webview consumes and deletes the request and routes it through
 `openSummary`, exactly like a sidebar or palette selection. The mailbox never
 contains note content.
 
@@ -135,8 +228,7 @@ percent-encoded; hostile shapes are ignored), writes the mailbox, surfaces the
 window, and lets the webview consume it. Note/create/query/board results and
 `rotli open` include a ready-made `deepLink` field so agents can print a
 clickable way back into the app alongside the disk path. Items in connected
-(non-default) roots carry no `deepLink` — the open lane serves the default
-workspace only, so a link would be a dead click.
+roots carry their root-prefixed wire id in the link.
 
 ## Context and output limits
 
@@ -161,8 +253,8 @@ workspace only, so a link would be a dead click.
 - Tool schemas are discoverable through standard MCP `tools/list`, so clients
   with deferred tool search need not preload every schema into the prompt.
 - Complete note replacement, physical/reference moves, reference removal, view
-  rename/delete/reassignment, and semantic board application advertise
-  `destructiveHint: true`. MCP hosts should keep write approval enabled; prompt
+  rename/delete/reassignment, semantic board application, Trash, and AI edit
+  undo advertise `destructiveHint: true`. MCP hosts should keep write approval enabled; prompt
   text read from the workspace is never sufficient confirmation.
 - The CLI/MCP compatibility and migration law is
   [`compatibility-and-migrations.md`](compatibility-and-migrations.md).
@@ -173,7 +265,7 @@ The agent surface is deliberately grouped and discoverable:
 
 ```sh
 rotli agent doctor      # read-only root, boundary, policy, and visible metrics
-rotli agent config      # copy-ready Claude/Codex commands and Codex TOML
+rotli agent config      # copy-ready Claude/Codex/Cursor/Gemini setups
 rotli agent self-test   # full workflow in a disposable temporary vault
 rotli rename "Old" "New" # rename one exact note title and its physical file
 rotli notes query 'area:projects tags:payments' # inspectable metadata filters
@@ -183,13 +275,19 @@ rotli mcp               # stdio protocol process used by either client
 
 `rotli agent config` (also available as `rotli mcp config`) prints the exact
 executable path, `claude mcp add` and `codex mcp add` commands, a Codex TOML
-alternative, remote Grok Bot URL/header instructions, and verification commands. Rotli does not silently edit global
+alternative, a Cursor `mcp.json` snippet (`mcpServers` with `type: stdio`,
+for `~/.cursor/mcp.json` or `.cursor/mcp.json`), a Gemini CLI
+`gemini mcp add --scope user` command plus its `settings.json` `mcpServers`
+snippet (`trust: false`, so Gemini keeps confirming calls), remote Grok Bot
+URL/header instructions, and verification commands
+(`workspace_help.rs::mcp_setup`). Rotli does not silently edit global
 agent configuration. Use the packaged app binary; a `target/debug` path is only
 appropriate during development.
 
 `agent doctor` forces the selected root open in read-only mode and counts only
 agent-visible content; it does not reveal how many secure notes were withheld.
-`agent self-test` creates notes, searches, patches, exercises stale-write and
+`agent self-test` creates notes, searches, patches, undoes the journaled
+patch, exercises stale-write and
 secret refusal, edits a board, computes metrics, and initializes MCP entirely in
 a temporary vault that is removed when the command exits. It never targets the
 configured live workspace.

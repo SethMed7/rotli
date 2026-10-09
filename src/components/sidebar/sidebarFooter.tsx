@@ -11,6 +11,7 @@
 
 import { dispatch } from "../../keys/registry";
 import { webVaultName } from "../../lib/browserVault";
+import type { Hidden } from "../../lib/hideable";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
 import { useChatTranscripts, useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
@@ -26,6 +27,7 @@ import { useFocusedChatSlug, useFocusedNoteId, usePanesStore } from "../../state
 import { useUiStore } from "../../state/ui";
 import { ActivityGlyph, FolderGlyph } from "../glyphs";
 import { Icon } from "../icon";
+import { openLibrarianSettings, useLibrarianSetupStep } from "./useLibrarianSetup";
 
 export function SidebarFooter() {
   const updateAvailable = useUiStore((state) => state.updateAvailable);
@@ -48,6 +50,8 @@ export function SidebarFooter() {
   const organizerWorking = useOrganizerLive((s) => s.active);
   const organizerCurrent = useOrganizerLive((s) => s.current);
   const brainEnabled = useUiStore((s) => s.brainEnabled);
+  // on, but its lane isn't set up yet (no model, a client missing or signed out)
+  const setupStep = useLibrarianSetupStep();
   // Files is a shortcut to where you are: Finder on the Mac. On the web the
   // page hands the file to the installed app (rotli://reveal), which opens
   // Finder at it (the owner, 2026-09-17: "it should open the actual finder in
@@ -78,6 +82,9 @@ export function SidebarFooter() {
       else openSystemRoot("Brain");
     });
   };
+  // Settings alone is no footer: the titlebar already has it (the owner,
+  // 2026-10-01: "side bar footer if just settings hide it")
+  if (!footerShown(hidden)) return null;
   return (
     <div className="sb-foot">
       {!hidden.files && (
@@ -103,9 +110,11 @@ export function SidebarFooter() {
               ? `Librarian — ${secureConfirms} waiting`
               : questions > 0
                 ? `Librarian — ${questions} ${questions === 1 ? "question" : "questions"} for you`
-                : pendingProposals > 0
-                  ? `Librarian — ${pendingProposals} suggestions`
-                  : "Librarian"
+                : setupStep
+                  ? "Librarian — finish setting up"
+                  : pendingProposals > 0
+                    ? `Librarian — ${pendingProposals} suggestions`
+                    : "Librarian"
           }
           title={
             organizerWorking
@@ -114,13 +123,21 @@ export function SidebarFooter() {
                 ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
                 : questions > 0
                   ? `The Librarian has ${questions === 1 ? "a question" : `${questions} questions`} for you`
-                  : pendingProposals > 0
-                    ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
-                    : brainEnabled
-                      ? "See and undo the Librarian's work"
-                      : "The Librarian's journal"
+                  : setupStep
+                    ? `Finish setting up the Librarian: ${setupStep}`
+                    : pendingProposals > 0
+                      ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
+                      : brainEnabled
+                        ? "See and undo the Librarian's work"
+                        : "The Librarian's journal"
           }
-          onClick={() => (questions > 0 ? showLibrarianChat() : usePanesStore.getState().openActivity())}
+          onClick={() =>
+            questions > 0
+              ? showLibrarianChat()
+              : setupStep
+                ? openLibrarianSettings()
+                : usePanesStore.getState().openActivity()
+          }
         >
           {/* badges sit on the icon, never beside the label: a count used to
               squeeze "Librarian" to "Libra…" (audit 2026-09-28) */}
@@ -137,6 +154,8 @@ export function SidebarFooter() {
               <span className="count alert">{badgeCount(secureConfirms)}</span>
             ) : questions > 0 ? (
               <span className="count ask">{badgeCount(questions)}</span>
+            ) : setupStep ? (
+              <span className="sb-update-dot" aria-hidden="true" />
             ) : (
               pendingProposals > 0 && <span className="count pill">{badgeCount(pendingProposals)}</span>
             )}
@@ -159,6 +178,11 @@ export function SidebarFooter() {
       )}
     </div>
   );
+}
+
+/** Whether the footer has anything besides Settings to show. */
+export function footerShown(hidden: Hidden): boolean {
+  return !hidden.files || !hidden.librarian || !hidden.feedback;
 }
 
 /** A badge's number, short enough to sit on an icon. */

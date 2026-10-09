@@ -168,7 +168,7 @@ macOS version and exact app build. This list is deliberately not marked passed.
 - [ ] Verify all six theme families in light/dark, system changes, titlebar/menu, summon/capture hotkeys and floating windows.
 - [ ] Edit a long note with tables/code/diagrams; test undo, external edits, conflict errors and disk full/read-only.
 - [ ] Save/reopen Word-authored DOCX with supported/unsupported formatting and compare in Word.
-- [ ] Save/reopen Excel/LibreOffice-authored sheets with formulas/dates/styles and compare in their source app.
+- [ ] Save/reopen Excel/LibreOffice-authored sheets with formulas/dates/styles and compare in their source app. (Owed natively for the Sheets Beta release, 2026-10-05: `docs/design/app-next-release-2026-10-05.md`.)
 - [ ] Save/reopen a real Excalidraw board and Mermaid source; unsupported visual source must remain unchanged.
 - [ ] Attach/drop real images/video; test rename/move/missing file and narrow-window playback.
 - [ ] Confirm PDF/audio/unsupported-format editing or explicit conversion states match the capability contract.
@@ -331,9 +331,10 @@ an experimental preview build. Rust's build script consumes the same variable,
 defaulting debug to dev and optimized release to stable. The release script forces
 stable. Neither persisted settings nor URLs or runtime environment can promote a
 compiled stable build. Off in stable: Breve, Mermaid Visual, agent integrations,
-XLSX workbooks (`sheets`; CSV editing stays), the Mermaid-diagram item kind
-(`mermaidDiagrams`; a Mermaid fence still renders), and read-aloud (`voice`).
-The New-tab chooser keeps the Sheet and Mermaid diagram cards disabled with a
+the Mermaid-diagram item kind (`mermaidDiagrams`; a Mermaid fence still renders),
+and read-aloud (`voice`). XLSX workbooks (`sheets`) ship on the desktop in both
+channels since 2026-10-05, marked Beta beside DOCX documents; Rotli Web still
+withholds them. The New-tab chooser keeps the Mermaid diagram card disabled with a
 "Coming soon" caption, Settings shows Voice and the Grok Bot/MCP connections the
 same way, and every other surface omits the withheld capability. A dev Git branch
 is not itself a runtime security boundary: use the explicit channel for packaged

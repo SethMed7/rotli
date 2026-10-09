@@ -114,4 +114,29 @@ describe("local DOCX creation", () => {
   test("the managed filename follows the central creation extension", () => {
     expect(documentFileName("docx", 42)).toBe("untitled-42.docx");
   });
+
+  test("a linked run is a Word hyperlink that reads back as a link", async () => {
+    const base64 = await createDocxBase64({
+      title: "Linked plan",
+      content: [
+        {
+          kind: "paragraph",
+          paragraph: { runs: [{ text: "Visit " }, { text: "Rotli", link: "https://rotli.co/create" }] },
+        },
+      ],
+    });
+    const zip = await JSZip.loadAsync(base64, { base64: true });
+    expect(await zip.file("word/_rels/document.xml.rels")?.async("string")).toMatch(
+      /Target="https:\/\/rotli\.co\/create" TargetMode="External"/,
+    );
+    expect(await zip.file("word/styles.xml")?.async("string")).toMatch(/styleId="Hyperlink"/);
+    const decoded = await decodeDocx(base64, "storage/rotli/links.docx");
+    const linked = decoded.document.content.find(
+      (content) => content.kind === "paragraph" && content.paragraph.runs[0]?.text === "Visit ",
+    );
+    expect(linked?.kind === "paragraph" && linked.paragraph.runs[1]).toEqual({
+      text: "Rotli",
+      link: "https://rotli.co/create",
+    });
+  });
 });

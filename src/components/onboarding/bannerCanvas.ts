@@ -6,6 +6,7 @@
 // the quokka the app shows, accessory placement included, without a second
 // copy of that geometry. CSS masks can't cross into a canvas any other way.
 
+import { canvasColors } from "../../brand/tokenColors";
 import {
   BANNER_HEIGHT,
   BANNER_WIDTH,
@@ -115,23 +116,8 @@ export async function drawQuokka(
 
 /** Theme colors as the canvas can read them (rgb), resolved through a probe
  * so a token defined with color-mix() or another var() still works. */
-export function themeColors(): Record<"ground" | "accent" | "accentText" | "text" | "muted", string> {
-  const probe = document.createElement("span");
-  probe.style.display = "none";
-  document.body.append(probe);
-  const read = (token: string) => {
-    probe.style.color = `var(${token})`;
-    return getComputedStyle(probe).color;
-  };
-  const colors = {
-    ground: read("--ground"),
-    accent: read("--accent"),
-    accentText: read("--accent-text"),
-    text: read("--text"),
-    muted: read("--text-muted"),
-  };
-  probe.remove();
-  return colors;
+export function themeColors(): Record<"ground" | "accent" | "text" | "muted", string> {
+  return canvasColors();
 }
 
 function fontStack(token: string): string {
@@ -154,17 +140,6 @@ function fitFont(
     ctx.font = `${weight} ${size}px ${family}`;
   }
   return size;
-}
-
-function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-  const r = h / 2;
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
 }
 
 /** The whole banner as a PNG. `quokka` is a rendered <Character> host. */
@@ -210,7 +185,8 @@ export async function composeBanner(quokka: HTMLElement, text: BannerText): Prom
     size = Math.min(...lines.map((line) => fitFont(ctx, line, 700, display, 56, width)));
     ctx.font = `700 ${size}px ${display}`;
   }
-  let y = lines.length > 1 ? 200 : 250;
+  // a thank-you, centered on the sun: the headline and one line under it
+  let y = lines.length > 1 ? 240 : 290;
   for (const line of lines) {
     ctx.fillText(line, left, y);
     y += Math.round(size * 1.15);
@@ -219,22 +195,6 @@ export async function composeBanner(quokka: HTMLElement, text: BannerText): Prom
   ctx.font = `500 26px ${body}`;
   y += 4;
   ctx.fillText(text.subline, left, y, width);
-
-  // the choices, as pills that wrap
-  ctx.font = `600 22px ${body}`;
-  let [cx, cy] = [left, y + 38];
-  for (const chip of text.chips) {
-    const w = ctx.measureText(chip).width + 36;
-    if (cx + w > left + width) [cx, cy] = [left, cy + 56];
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.14;
-    pill(ctx, cx, cy, w, 42);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = colors.accentText;
-    ctx.fillText(chip, cx + 18, cy + 29);
-    cx += w + 12;
-  }
 
   ctx.fillStyle = colors.muted;
   ctx.font = `600 24px ${display}`;

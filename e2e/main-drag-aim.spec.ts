@@ -17,6 +17,8 @@ async function newNote(page: Page, title: string): Promise<void> {
 
 test("the drag chip is centred on the drop line, and the row lands under the pointer", async ({ page }) => {
   await gotoApp(page);
+  // the music player (shown from the first run) takes sidebar room this test measures
+  await page.getByRole("button", { name: "Hide the player" }).click();
   for (const title of ["Aim one", "Aim two", "Aim three"]) await newNote(page, title);
 
   const rows = page.locator(".main-tree .main-row");

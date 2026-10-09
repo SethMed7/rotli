@@ -18,6 +18,7 @@ fix both in the same change.
 | Public beta support boundary | [`../SUPPORT.md`](../SUPPORT.md) |
 | Project-level system architecture | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | Languages, frameworks, libraries, and tools (the stack inventory) | [`architecture/tech-stack.md`](architecture/tech-stack.md) |
+| How AI reads and (next) edits sheets and Word documents; what fits from Univer 1.0 | [`design/univer-ai-integration.md`](design/univer-ai-integration.md) |
 | Product interface and interaction design | [`../DESIGN.md`](../DESIGN.md) |
 | Syntax, naming, and formatting | [`../SYNTAX.md`](../SYNTAX.md) |
 | Clean architecture and dependency direction | [`architecture/clean-architecture.md`](architecture/clean-architecture.md) |
@@ -29,6 +30,7 @@ fix both in the same change.
 | Cross-window and host event registry | [`architecture/window-events.md`](architecture/window-events.md) |
 | Code quality, redundancy, and AI-readiness scorecard | [`architecture/code-quality-and-ai-readiness-2026-09-01.md`](architecture/code-quality-and-ai-readiness-2026-09-01.md) |
 | Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
+| Canvas, Graph, and setup round — audit and fix list (2026-10-06) | [`architecture/canvas-graph-audit-2026-10-06.md`](architecture/canvas-graph-audit-2026-10-06.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
 | Bun 1.4 architecture audit and promotion record | [`architecture/bun-1.4-audit-2026-08-21.md`](architecture/bun-1.4-audit-2026-08-21.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
@@ -46,21 +48,24 @@ fix both in the same change.
 | Local-model output quality, speed, and heat — the measured plan | [`design/local-model-quality-and-performance.md`](design/local-model-quality-and-performance.md) |
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
+| rotli.co landing layout: the audit, the section order, cards, tour, closing banner | [`design/landing-layout-2026-10-05.md`](design/landing-layout-2026-10-05.md) |
 | Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
+| Canvas and Graph — exploration (Graph built; JSON Canvas spike) | [`design/canvas-and-graph-2026-10-05.md`](design/canvas-and-graph-2026-10-05.md) |
 | Talk to the Librarian (`/librarian`) — slice 1 plan and the `anchors` key | [`design/librarian-bar.md`](design/librarian-bar.md) |
 | Librarian rules — secure keywords, People groups, filing sentences | [`design/librarian-rules.md`](design/librarian-rules.md) |
 | Ambient audio and the sidebar player — tab media, the studio's tracks | [`design/ambient-audio.md`](design/ambient-audio.md) |
 | Show in Rotli — hiding parts of the title bar, sidebar and tabs | [`design/show-in-rotli.md`](design/show-in-rotli.md) |
 | Chat as a work surface — tools, rendering, and the path to media (evaluation) | [`design/chat-work-surface-eval-2026-09-27.md`](design/chat-work-surface-eval-2026-09-27.md) |
-| The empty pane's scenes and the Settings banners: one per theme, the person's quokka, where Rotli lives | [`design/empty-pane-scenes.md`](design/empty-pane-scenes.md) |
+| The empty pane's scenes and the Settings banners: one per theme, where Rotli lives (quokkas only in the banners) | [`design/empty-pane-scenes.md`](design/empty-pane-scenes.md) |
 | Chat: live HTML previews and videos made from them (evaluation) | [`design/chat-live-html-video-eval-2026-09-28.md`](design/chat-live-html-video-eval-2026-09-28.md) |
 | Round Three on Rotli Web: what was fixed, what is Mac-only, what is next (evaluation) | [`design/web-parity-round-three-2026-09-28.md`](design/web-parity-round-three-2026-09-28.md) |
-| Quokka emotions — moods from existing art, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
+| Quokka expressions — the chat buddy's moments, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
 | Rotli Web experience review — what a fresh vault walk found and fixed | [`design/web-experience-review-2026-09-27.md`](design/web-experience-review-2026-09-27.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
 | Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
 | Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |
+| Usage stats without tracking (`bun run stats`) | [`operations/usage-stats.md`](operations/usage-stats.md) |
 | Cross-boundary architecture decision records | [`decisions/README.md`](decisions/README.md) |
 | Where new code, dependencies, and shared constants go | [`development/adding-things.md`](development/adding-things.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |

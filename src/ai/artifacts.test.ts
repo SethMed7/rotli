@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { EditableDocument } from "../documents/model";
 import {
   artifactFileName,
-  editableDocumentText,
+  editableDocumentForAi,
   markdownToDocumentDraft,
   offeredArtifactKinds,
 } from "./artifacts";
@@ -15,37 +15,29 @@ describe("chat artifact policy", () => {
     expect(artifactFileName("", "pdf")).toBe("untitled.pdf");
   });
 
-  test("projects the editable DOCX model to readable chat text", () => {
-    expect(
-      editableDocumentText({
-        id: "plan.docx",
-        title: "Plan",
-        content: [
-          { kind: "paragraph", paragraph: { runs: [{ text: "Launch" }, { text: " calmly" }] } },
-          {
-            kind: "table",
-            table: {
-              id: "owners",
-              rows: [
-                {
-                  cells: [
-                    { paragraphs: [{ runs: [{ text: "Owner" }] }] },
-                    { paragraphs: [{ runs: [{ text: "Status" }] }] },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      }),
-    ).toBe("Launch calmly\n\nOwner\tStatus");
-  });
-
-  test("projects embedded image context without treating it as a table", () => {
+  // 2026-10-01: numbered blocks a model can point at, not flat text
+  test("the chat reads a Word document as numbered blocks: headings, lists, table cells, images", () => {
     const document: EditableDocument = {
-      id: "storage/example.docx",
-      title: "Example",
+      id: "plan.docx",
+      title: "Plan",
       content: [
+        { kind: "paragraph", paragraph: { namedStyle: "heading1", runs: [{ text: "Launch" }] } },
+        { kind: "paragraph", paragraph: { runs: [{ text: "Ship" }, { text: " calmly" }] } },
+        { kind: "paragraph", paragraph: { list: "bullet", runs: [{ text: "Design" }] } },
+        {
+          kind: "table",
+          table: {
+            id: "owners",
+            rows: [
+              {
+                cells: [
+                  { paragraphs: [{ runs: [{ text: "Owner" }] }] },
+                  { paragraphs: [{ runs: [{ text: "Status" }] }] },
+                ],
+              },
+            ],
+          },
+        },
         {
           kind: "image",
           image: {
@@ -60,7 +52,17 @@ describe("chat artifact policy", () => {
         },
       ],
     };
-    expect(editableDocumentText(document)).toBe("Architecture overview");
+    expect(editableDocumentForAi(document)).toBe(
+      [
+        "[1] Heading 1: Launch",
+        "[2] paragraph: Ship calmly",
+        "[3] bullet item: Design",
+        "[4] table (1 rows × 2 columns):",
+        "  r1c1: Owner",
+        "  r1c2: Status",
+        "[5] image: Architecture overview",
+      ].join("\n"),
+    );
   });
 
   test("maps ordinary Markdown into the editable DOCX subset", () => {

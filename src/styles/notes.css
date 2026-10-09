@@ -1592,39 +1592,6 @@
   opacity: 1;
   transition-delay: 300ms;
 }
-/* the inline nested new-folder input row (the maintainer, 2026-06-24): a folder glyph +
-   a bare text field that reads like the filter well's input — same .snrow
-   metrics so it sits in the tree where the new folder will land. */
-.sb-newfolder {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  padding-right: 10px;
-}
-.sb-newfolder svg {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-}
-.sb-newfolder input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  padding: 0;
-}
-.sb-newfolder input::placeholder {
-  color: var(--text-muted);
-}
-.sb-newfolder input:focus-visible {
-  outline: none;
-}
-
 .filter {
   flex: 1;
   min-width: 0;
@@ -2261,6 +2228,13 @@
   opacity: 1;
   transition-delay: 300ms;
 }
+/* the + ends its tab strip, so its label opens leftward from its right edge:
+   centred, it reached past the window at the rightmost pane (2026-10-06) */
+.tabplus .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
 
 /* User-selectable crowding rules. Scroll is the readable default and keeps a
    96px floor. Fit lets every tab share the available strip, down to its glyph
@@ -2856,6 +2830,29 @@
 .main-row.renaming {
   cursor: text;
 }
+/* the space under Main's list while a nested row is dragged: dropping here
+   takes it out of its folder (sidebarHome.tsx). It sticks to the bottom of
+   Main's scrolling area, so it is in reach however long the list is or
+   wherever it is scrolled — it never hides under the System section. */
+.main-root-drop {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--ground);
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.main-root-drop.over {
+  border-color: var(--accent);
+  color: var(--text);
+  /* the hover tint over an opaque ground: rows scrolling under it never show through */
+  background: linear-gradient(var(--hov), var(--hov)), var(--ground);
+}
 .sb-rename-input {
   flex: 1;
   min-width: 0;
@@ -2876,4 +2873,76 @@
   font-size: 11px;
   line-height: 1.4;
   color: var(--failure);
+}
+
+/* The sidebar, alive (2026-10-01, sidebarScenery.tsx): the theme's horizon as
+   a one-ink silhouette behind the header row and/or the footer. It must never
+   make anything harder to read (the owner: "more subtle, no visual clutter"):
+   every shape is the text ink at a few percent, no sky objects, no detail
+   strokes, never under the rows' middle. Still, never takes a click;
+   isolation keeps it above the sidebar's ground and under every control. */
+.sidebar {
+  position: relative;
+  isolation: isolate;
+}
+.sb-scene {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  z-index: -1;
+  pointer-events: none;
+  color: var(--text);
+  opacity: 0.06;
+}
+.sb-scene :is(path, circle, ellipse, rect, polygon) {
+  fill: currentColor;
+  stroke: none;
+}
+.sb-scene-top {
+  top: 0;
+  height: 56px;
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
+}
+.sb-scene-bottom {
+  bottom: 0;
+  height: 64px;
+  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
+  mask-image: linear-gradient(to top, black 55%, transparent);
+}
+
+/* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one
+   ink for every mark, the Word badge, the kit's clay, and the provider logos
+   (shown as masks). Color: each kind of file its own semantic color. */
+.model-logo-ink {
+  display: none;
+}
+.sidebar[data-icons="neutral"] {
+  --format-word: currentColor;
+  --on-format-word: var(--ground);
+  --icon-clay: currentColor;
+  --icon-olive: currentColor;
+}
+.sidebar[data-icons="neutral"] .model-logo-color {
+  display: none;
+}
+.sidebar[data-icons="neutral"] .model-logo-ink {
+  display: inline-block;
+  background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+  mask: var(--logo) center / contain no-repeat;
+}
+.sidebar[data-icons="color"] .kind-board,
+.sidebar[data-icons="color"] .kind-folder {
+  color: var(--accent-text);
+}
+.sidebar[data-icons="color"] .kind-pdf {
+  color: var(--danger);
+}
+.sidebar[data-icons="color"] .kind-image {
+  color: var(--success);
+}
+.sidebar[data-icons="color"] .kind-doc,
+.sidebar[data-icons="color"] .kind-svg {
+  color: var(--syntax-blue);
 }

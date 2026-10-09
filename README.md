@@ -95,13 +95,15 @@ on-device models can, unless you turn that off.
 - **The Welcome folder** holds three short lessons, plus a guided tour of the
   real controls. **Settings → General → Show me around** runs it again.
 
-Spreadsheets, Mermaid diagram tabs, and read-aloud are coming soon and are not
-in this release.
+Spreadsheets (XLSX and CSV) and Word documents are in **Beta**: they work and
+save in their own formats, and are still being finished. Mermaid diagram tabs
+and read-aloud are coming soon and are not in this release.
 
 ## Seven families, light and dark
 
 The titlebar sun switches between paired light and dark environments in seven
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight**. Every
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight**
+(Settings → Appearance can make it walk your own picks, or all fourteen). Every
 first run starts in Rotli Light; below is one environment from each family.
 
 <div align="center">
@@ -191,7 +193,8 @@ from the in-repo brand kit (`src/brand/`).
 | ✅ | **Chat** on-device or through your own connected clients, grounded in your notes |
 | ✅ | **Secure notes** kept away from remote AI and the web |
 | ✅ | **Documents and boards** saved in their own formats |
-| ⏳ | Spreadsheets · email Inbox · mobile and tablet · handwriting ([roadmap](ROADMAP.md)) |
+| ✅ | **Spreadsheets** in Beta, saved as real XLSX and CSV |
+| ⏳ | Email Inbox · mobile and tablet · handwriting ([roadmap](ROADMAP.md)) |
 
 ---
 

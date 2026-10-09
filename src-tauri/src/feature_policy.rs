@@ -30,6 +30,21 @@ pub(crate) fn require_agents() -> Result<(), String> {
     if agents_enabled() { Ok(()) } else { Err(AGENTS_UNAVAILABLE.into()) }
 }
 
+/// JSON Canvas `.canvas` files (2026-10-06): development builds only. In the
+/// public binary a `.canvas` stays an ordinary file — listed with its full
+/// name, moved like any file — and Rotli never creates one.
+fn canvas_enabled_for(channel: &str) -> bool {
+    channel == "dev"
+}
+
+pub(crate) fn canvas_enabled() -> bool {
+    canvas_enabled_for(env!("ROTLI_BUILD_CHANNEL"))
+}
+
+pub(crate) fn require_canvas() -> Result<(), String> {
+    if canvas_enabled() { Ok(()) } else { Err("Canvases are available only in development builds".into()) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,6 +64,13 @@ mod tests {
         assert!(!breve_enabled_for(""));
         assert!(!breve_enabled_for("preview"));
         assert!(breve_enabled_for("dev"));
+    }
+
+    #[test]
+    fn public_and_unknown_channels_refuse_canvases() {
+        assert!(!canvas_enabled_for("stable"));
+        assert!(!canvas_enabled_for(""));
+        assert!(canvas_enabled_for("dev"));
     }
 
     #[test]

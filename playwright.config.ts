@@ -17,8 +17,9 @@ const baseURL = `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: "./e2e",
   // e2e/web/ is Rotli Web's lane (playwright.web.config.ts): it needs the web
-  // bundle under /app/, which `vite dev` does not serve.
-  testIgnore: /e2e\/web\//,
+  // bundle under /app/, which `vite dev` does not serve. e2e/site/ is the
+  // website's lane (playwright.site.config.ts), on the built site.
+  testIgnore: /e2e\/(web|site)\//,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

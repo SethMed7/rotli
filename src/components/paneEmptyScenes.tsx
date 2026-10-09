@@ -3,21 +3,17 @@
 // per theme family, drawn in the site's scene language (soft ellipse clouds,
 // hills, a thin outline stroke). Every color is a class that reads the
 // theme's own tokens (styles/app.css `.sc-*`), so a scene follows light and
-// dark on its own and this file holds no color at all. The person's quokka
-// stands on the shared ground line (y 170 of 440×200), drawn over the scene
-// by PaneEmptyState.
+// dark on its own and this file holds no color at all. The ground line sits at
+// y 170 of 440×200; the app's opening reuses these stages.
 
 import type { ReactNode } from "react";
 
-import type { QuokkaPose } from "../brand/quokka";
 import type { ThemeFamily } from "../state/ui";
 import { cloud, star } from "./sceneParts";
 
 export interface PaneScene {
   /** A short name for the scene (tests, and the stage's data attribute). */
   name: string;
-  /** The quokka's pose in this scene. */
-  pose: QuokkaPose;
   art: ReactNode;
 }
 
@@ -26,7 +22,6 @@ const ground = <path className="sc-ground" d="M0 170h440v30H0z" />;
 /** Rotli: Rottnest at golden hour, the lighthouse on the far hill. */
 const warm: PaneScene = {
   name: "island",
-  pose: "base",
   art: (
     <>
       <circle className="sc-sun" cx="330" cy="120" r="30" />
@@ -50,7 +45,6 @@ const warm: PaneScene = {
 /** Paper & Charcoal: a writing desk, drawn the way ink draws it. */
 const mono: PaneScene = {
   name: "desk",
-  pose: "thoughtful",
   art: (
     <>
       <path className="sc-line" d="M20 120h400" strokeDasharray="2 6" />
@@ -76,7 +70,6 @@ const mono: PaneScene = {
 /** Ocean: low tide, a boat on the horizon and gulls overhead. */
 const ocean: PaneScene = {
   name: "tide",
-  pose: "walking",
   art: (
     <>
       <circle className="sc-sun" cx="92" cy="70" r="22" />
@@ -98,7 +91,6 @@ const ocean: PaneScene = {
 /** Grove: an afternoon under the gum trees. */
 const grove: PaneScene = {
   name: "grove",
-  pose: "listening",
   art: (
     <>
       {cloud(220, 30, 0.8)}
@@ -129,7 +121,6 @@ const grove: PaneScene = {
 /** Iris: an iris field at dusk, a crescent moon and fireflies. */
 const iris: PaneScene = {
   name: "dusk",
-  pose: "attention",
   art: (
     <>
       <path className="sc-moon" d="M352 30a22 22 0 1 0 18 34a18 18 0 1 1-18-34z" />
@@ -155,7 +146,6 @@ const iris: PaneScene = {
 /** Blossom: a blossom branch and a paper lantern, petals drifting down. */
 const blossom: PaneScene = {
   name: "blossom",
-  pose: "celebrating",
   art: (
     <>
       <path className="sc-branch" d="M0 30q70 6 110 26t50 14M60 38q10 16 6 34M130 64q18-2 28-16" />
@@ -189,7 +179,6 @@ const blossom: PaneScene = {
 /** Midnight: stargazing from the hill, the telescope beside the quokka. */
 const midnight: PaneScene = {
   name: "stars",
-  pose: "attention",
   art: (
     <>
       <circle className="sc-moon" cx="80" cy="46" r="18" />

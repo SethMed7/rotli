@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isBetaFileExt,
+  isBetaKind,
+  withBetaLabel,
   DEFAULT_NEW_ITEM_KIND,
   NEW_ITEM_DEFINITIONS,
   NEW_ITEM_KINDS,
@@ -20,8 +23,8 @@ describe("new item registry", () => {
     expect(new Set(NEW_ITEM_DEFINITIONS.map((item) => item.label)).size).toBe(NEW_ITEM_KINDS.length);
   });
 
-  test("boards and documents are named before their file exists", () => {
-    expect(NEW_ITEM_KINDS.filter(isNameFirstKind)).toEqual(["document", "board"]);
+  test("boards, canvases, and documents are named before their file exists", () => {
+    expect(NEW_ITEM_KINDS.filter(isNameFirstKind)).toEqual(["document", "board", "canvas"]);
   });
 
   test("persisted values validate and unknown kinds resolve safely", () => {
@@ -32,17 +35,18 @@ describe("new item registry", () => {
 });
 
 describe("launch availability", () => {
-  const stable = { documents: true, sheets: false, mermaidDiagrams: false };
-  const dev = { documents: true, sheets: true, mermaidDiagrams: true };
-  const web = { documents: false, sheets: false, mermaidDiagrams: false };
+  const stable = { documents: true, sheets: false, mermaidDiagrams: false, jsonCanvas: false };
+  const dev = { documents: true, sheets: true, mermaidDiagrams: true, jsonCanvas: true };
+  const web = { documents: false, sheets: false, mermaidDiagrams: false, jsonCanvas: false };
 
-  test("stable keeps Sheet and Mermaid diagram in the chooser as coming soon", () => {
+  test("stable keeps Sheet, Canvas, and Mermaid diagram in the chooser as coming soon", () => {
     expect(newItemChoices(stable).map((item) => [item.kind, item.availability])).toEqual([
       ["markdown", "available"],
       ["document", "available"],
       ["sheet", "comingSoon"],
       ["board", "available"],
       ["mermaid", "comingSoon"],
+      ["canvas", "comingSoon"],
     ]);
     expect(newItemChoices(dev).every((item) => item.availability === "available")).toBe(true);
   });
@@ -57,9 +61,14 @@ describe("launch availability", () => {
     expect(availableNewTabDefault("mermaid", stable)).toBe("markdown");
     expect(availableNewTabDefault("board", stable)).toBe("board");
     expect(availableNewTabDefault("sheet", dev)).toBe("sheet");
-    expect(isNewItemAvailable("sheet", { documents: true, sheets: false, mermaidDiagrams: true })).toBe(
-      false,
-    );
+    expect(
+      isNewItemAvailable("sheet", {
+        documents: true,
+        sheets: false,
+        mermaidDiagrams: true,
+        jsonCanvas: true,
+      }),
+    ).toBe(false);
   });
 
   test("the web names Document as coming soon and keeps it out of every creation list", () => {
@@ -67,5 +76,22 @@ describe("launch availability", () => {
     expect(availableNewItems(web).map((item) => item.kind)).toEqual(["markdown", "board"]);
     expect(availableNewTabDefault("document", web)).toBe("markdown");
     expect(isNewItemAvailable("board", web)).toBe(true);
+  });
+});
+
+describe("the Beta mark", () => {
+  test("Sheet and Document are Beta; every other kind is not", () => {
+    expect(NEW_ITEM_KINDS.filter(isBetaKind)).toEqual(["document", "sheet"]);
+  });
+
+  test("text-only surfaces add the one Beta word", () => {
+    expect(withBetaLabel("Sheet", "sheet")).toBe("Sheet · Beta");
+    expect(withBetaLabel("New document", "document")).toBe("New document · Beta");
+    expect(withBetaLabel("Board", "board")).toBe("Board");
+  });
+
+  test("files that open in a Beta editor read from the same definitions", () => {
+    for (const ext of ["xlsx", "csv", "docx", "XLSX"]) expect(isBetaFileExt(ext)).toBe(true);
+    for (const ext of ["md", "excalidraw", "xlsm", "tsv", "pdf", ""]) expect(isBetaFileExt(ext)).toBe(false);
   });
 });

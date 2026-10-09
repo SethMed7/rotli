@@ -78,6 +78,17 @@ the whole vault in Settings → Security. Nothing turns it on for a remote model
 Locked notes are a separate control: no AI of any kind may edit a locked note,
 cloud or on-device. Locking withholds editing, not reading.
 
+A note a person wrote is theirs. No AI rewrites its text until the person turns
+on "Let AI edit the text" for that note from its menu (`ai_edit: true`). Notes a
+chat, an agent, or `/librarian` created carry `created_by` and stay editable by
+AI unless locked or set to `ai_edit: false`. Ask AI's Insert adds one passage the
+person accepted and cannot remove or change their text; it is refused on locked
+notes and on `ai_edit: false`. The Librarian writes only its own metadata fields
+at the top of a note and may move the file into its area folder; it never
+changes the note's text, and it skips secure and locked notes. The rules are in
+[`docs/decisions/2026-09-29-ai-body-edit-permission.md`](docs/decisions/2026-09-29-ai-body-edit-permission.md)
+and [`docs/design/ai-visibility-matrix.md`](docs/design/ai-visibility-matrix.md).
+
 Secure notes are plain local files in a protected lane, not an encrypted vault.
 Filesystem encryption is provided by macOS/FileVault when enabled. Users should
 not put secrets on an agent-managed Excalidraw board because board scenes do not

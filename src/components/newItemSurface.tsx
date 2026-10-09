@@ -16,10 +16,13 @@ import { createManagedItem, requestNamedItemCreation } from "../newItems/composi
 import { type NewItemFeatures, type NewItemKind, isNameFirstKind, newItemChoices } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import { BetaBadge } from "./betaBadge";
 import { BoardGlyph, BrowserGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
+import { CanvasGlyph } from "./noteGlyph";
 
 function kindGlyph(kind: NewItemKind) {
   if (kind === "board") return <BoardGlyph size={22} />;
+  if (kind === "canvas") return <CanvasGlyph size={22} />;
   if (kind === "document") return <DocumentGlyph size={22} />;
   if (kind === "sheet") return <FileGlyph size={22} />;
   return <NewFileGlyph size={22} />;
@@ -35,6 +38,8 @@ interface ChooserEntry {
   comingSoon?: boolean;
   /** Why it is withheld, when it isn't "coming soon" (a Mac-only surface on the web). */
   caption?: string;
+  /** Ships, but still Beta — the card wears the Beta mark. */
+  beta?: boolean;
 }
 
 /** Item cards keep their slot numbers in every build (Chat 1, Browser 2, then
@@ -101,6 +106,7 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
       glyph: kindGlyph(card.kind),
       run: () => pickKind(card.kind),
       comingSoon: card.comingSoon,
+      beta: card.beta === true,
     })),
   ];
 
@@ -142,11 +148,14 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
                   type="button"
                   className="ni-card"
                   onClick={entry.run}
-                  aria-label={`New ${entry.label} (press ${entry.digit})`}
+                  aria-label={`New ${entry.label}${entry.beta ? ", Beta" : ""} (press ${entry.digit})`}
                 >
                   <kbd className="ni-key">{entry.digit}</kbd>
                   {entry.glyph}
-                  <span className="ni-label">{entry.label}</span>
+                  <span className="ni-label">
+                    {entry.label}
+                    {entry.beta && <BetaBadge />}
+                  </span>
                   <span className="ni-desc">{entry.description}</span>
                 </button>
               )}

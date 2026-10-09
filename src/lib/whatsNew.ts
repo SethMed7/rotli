@@ -93,6 +93,9 @@ export function whatsNewDecision(input: {
   onboardingVersion: string;
   notes: WhatsNew;
 }): { version: string | null; record: boolean } {
+  // never over setup: a re-onboarding ends at the card itself
+  // (services/firstRun.ts), and a first run has nothing "new"
+  if (!input.onboarded) return { version: null, record: input.lastSeen !== input.current };
   // What's new is for an update; onboarding is a first run. Set up on this
   // very version (just now, or a re-run of setup), there is nothing "new" to
   // show — the two never land together (the owner, 2026-09-30)

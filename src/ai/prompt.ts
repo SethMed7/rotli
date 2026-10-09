@@ -186,7 +186,7 @@ export const gemmaAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
     const documentTool = ctx.documentTool
-      ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} → create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat. Its body may use headings, paragraphs, lists, and one table; do not put Markdown image embeds in it.`
+      ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} → create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat. Its body may use headings, paragraphs, lists, and one table; do not put Markdown image embeds in it.\n- {"thought":"…","tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"},{"op":"insert_after","block":2,"kind":"bullet","text":"…"}]}} → edit a Word document Rotli's AI created, after read_file; actions use its block numbers (replace, insert_after with block 0 for the top, delete, set_cell with row and column, set_kind). Rotli refuses a document the user made — say so plainly.`
       : "";
     const artifactTool = ctx.artifactTool
       ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} → create a user-owned work file.${ctx.sheetArtifacts ? " Use valid CSV (including a header row) for a sheet." : ""} PDF always creates an editable Markdown source beside the exported copy. Use create_document, not this tool, for Word files.`
@@ -213,7 +213,7 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} → create a NEW note in the user's memex (it lands in their intake; the organizer files it)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
-- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text, or a spreadsheet as CSV)
+- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text; an .xlsx as A1-addressed cells with formulas; a Word document as numbered blocks)
 ${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
 When you can answer, reply: {"thought":"a concise evidence/decision checkpoint","final":"your answer to the user"}
 When a material choice is missing, reply: {"thought":"…","question":"…","options":["…","…"]}
@@ -345,7 +345,7 @@ export const frontierAdapter: Adapter = {
       ? `\n- {"tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
     const documentTool = ctx.documentTool
-      ? `\n- {"tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} — create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat; headings, paragraphs, lists, and one table are supported, but do not put Markdown image embeds in it`
+      ? `\n- {"tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} — create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat; headings, paragraphs, lists, and one table are supported, but do not put Markdown image embeds in it\n- {"tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"}]}} — edit a Word document Rotli's AI created, after read_file, by its block numbers (replace, insert_after, delete, set_cell, set_kind); Rotli refuses one the user made`
       : "";
     const artifactTool = ctx.artifactTool
       ? `\n- {"tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} — create ${ctx.sheetArtifacts ? "an editable sheet or " : ""}a PDF with an editable Markdown source; use create_document for Word files`
@@ -366,7 +366,7 @@ Tools:
 - {"tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
 - {"tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
-- {"tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
+- {"tool":"read_file","args":{"query":"report.csv"}} — read a file by name (an .xlsx arrives as A1-addressed cells with formulas, a Word document as numbered blocks)${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
 To answer the user: {"final":"your answer"} — the final text ${FRONTIER_ANSWER_STYLE}.
 To ask for a material choice: {"question":"…","options":["…","…"]}.
 

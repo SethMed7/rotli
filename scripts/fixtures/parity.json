@@ -1,6 +1,18 @@
 {
   "_comment": "TS↔Rust shared constants — parity by fixture, never by codegen or source scraping. Each entry declares its source of truth; hand-written tests on BOTH sides (src-tauri/src/parity_tests.rs via include_str!, src/lib/parity.test.ts via the real TS modules) assert their named constants equal these values, so a one-sided edit fails cargo test or bun test. scripts/check-parity.mjs (in the lint chain) validates this file's shape and that every entry key is referenced by both suites. endpointLocality is behavioral: the two implementations stay independent (security policy is never shared across the boundary) and the fixture pins the agreed verdicts.",
   "entries": {
+    "documentEditMaxActions": {
+      "sourceOfTruth": "src/documents/aiEdit.ts MAX_EDIT_ACTIONS ↔ src-tauri/src/workspace_documents.rs MAX_ACTIONS",
+      "value": 40
+    },
+    "documentEditMaxText": {
+      "sourceOfTruth": "src/documents/aiEdit.ts MAX_EDIT_TEXT ↔ src-tauri/src/workspace_documents.rs MAX_TEXT",
+      "value": 8000
+    },
+    "documentEditMaxBytes": {
+      "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_EDIT_MAX_BYTES ↔ src-tauri/src/agent_bridge.rs DOCX_MAX_BYTES",
+      "value": 12000000
+    },
     "sheetEditMaxBytes": {
       "sourceOfTruth": "src/sheets/kinds.ts SHEET_EDIT_MAX_BYTES ↔ src-tauri/src/corpus.rs SHEET_EDIT_MAX_BYTES",
       "value": 8000000
@@ -452,6 +464,257 @@
           "verdict": "locked"
         }
       ]
+    },
+    "consentedInsertCases": {
+      "sourceOfTruth": "src/lib/aiEditPolicy.ts consentedInsertRefusal ↔ src-tauri/src/ai_edit_policy.rs consented_insert_refusal (behavioral: a /ai insertion the person accepted lands under the default, never past a lock or an explicit no)",
+      "value": [
+        {
+          "fields": [],
+          "refused": false
+        },
+        {
+          "fields": [
+            "created_by: chat"
+          ],
+          "refused": false
+        },
+        {
+          "fields": [
+            "ai_edit: true"
+          ],
+          "refused": false
+        },
+        {
+          "fields": [
+            "ai_edit: false"
+          ],
+          "refused": true
+        },
+        {
+          "fields": [
+            "locked: true"
+          ],
+          "refused": true
+        },
+        {
+          "fields": [
+            "locked: true",
+            "ai_edit: true"
+          ],
+          "refused": true
+        }
+      ]
+    },
+    "noteDateStamps": {
+      "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (Metadata ownership) — src/memex/dates.ts stampToMs + today ↔ src-tauri/src/note_dates.rs stamp_to_ms + day_stamp (independent implementations, fixture-aligned answers; localMidnight is each side's own zone)",
+      "value": {
+        "reads": [
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790931600000,
+            "expect": "file"
+          },
+          {
+            "stamp": " 2026-10-02 ",
+            "fileMs": 1790931600000,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790899200000,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790985599999,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790848799999,
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1791028800000,
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-10-02",
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-06-25T12:00:00Z",
+            "fileMs": 1790931600000,
+            "expect": "asWritten",
+            "ms": 1782388800000
+          },
+          {
+            "stamp": "2026-06-25T12:00:00+02:00",
+            "expect": "asWritten",
+            "ms": 1782381600000
+          },
+          {
+            "stamp": "2026-02-30",
+            "fileMs": 1790931600000,
+            "expect": "none"
+          },
+          {
+            "stamp": "2026-13-01",
+            "expect": "none"
+          },
+          {
+            "stamp": "not-a-date",
+            "expect": "none"
+          },
+          {
+            "stamp": "",
+            "expect": "none"
+          }
+        ],
+        "days": [
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": -600,
+            "timeZone": "Etc/GMT+10",
+            "day": "2026-10-02"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": -240,
+            "timeZone": "Etc/GMT+4",
+            "day": "2026-10-02"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": 0,
+            "timeZone": "UTC",
+            "day": "2026-10-03"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": 540,
+            "timeZone": "Etc/GMT-9",
+            "day": "2026-10-03"
+          },
+          {
+            "nowMs": 1791062000000,
+            "offsetMinutes": 840,
+            "timeZone": "Etc/GMT-14",
+            "day": "2026-10-04"
+          }
+        ]
+      }
+    },
+    "wikilinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
+      "value": [
+        {
+          "body": "See [[Books]] and [[Philosophy|phil]].\n`[[not a link]]` but ![[Diagram]] is.\n```\n[[fenced]]\n```\nAgain [[Books]] and [[René Descartes#Life]].\n[[]] [[ ]]",
+          "targets": [
+            "Books",
+            "Philosophy|phil",
+            "Diagram",
+            "René Descartes#Life"
+          ]
+        },
+        {
+          "body": "[[a [[b]] c]] and [[unclosed",
+          "targets": []
+        },
+        {
+          "body": "  ```js\n[[inside]]\n  ```\n[[after]]",
+          "targets": [
+            "after"
+          ]
+        },
+        {
+          "body": "A ``code [[Spanned]] here`` and [[Kept]].",
+          "targets": [
+            "Kept"
+          ]
+        },
+        {
+          "body": "~~~\n[[Tilde fenced]]\n~~~\n[[After tilde]]",
+          "targets": [
+            "After tilde"
+          ]
+        },
+        {
+          "body": "````md\n```\n[[Inside longer]]\n```\n````\n[[After longer]]",
+          "targets": [
+            "After longer"
+          ]
+        },
+        {
+          "body": "a lone ` tick, then [[Still linked]]",
+          "targets": [
+            "Still linked"
+          ]
+        },
+        {
+          "body": "```\n[[Unclosed fence]]",
+          "targets": []
+        },
+        {
+          "body": "`one` and [[Between]] and `two`",
+          "targets": [
+            "Between"
+          ]
+        }
+      ]
+    },
+    "metadataLinkTargets": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs metadata_link_targets ↔ src/graph/linkTargets.ts metadataLinkTargets (independent implementations, fixture-aligned: the Graph view's Librarian links)",
+      "value": [
+        {
+          "fields": "area: work\nlinks: [[Pricing]], [[Q3 plan|plan]]\ntags: [a]",
+          "targets": [
+            "Pricing",
+            "Q3 plan|plan"
+          ]
+        },
+        {
+          "fields": "links: []",
+          "targets": []
+        },
+        {
+          "fields": "summary: see [[Pricing]]",
+          "targets": []
+        },
+        {
+          "fields": " links: [[indented]]",
+          "targets": []
+        },
+        {
+          "fields": "links:[[A]] [[A]] `[[code]]`",
+          "targets": [
+            "A"
+          ]
+        },
+        {
+          "fields": "",
+          "targets": []
+        }
+      ]
+    },
+    "canvasHome": {
+      "sourceOfTruth": "src-tauri/src/corpus_files.rs canvas_home ↔ src/services/folderCanvases.ts canvasHome (where a new canvas is written; a plain vault's reserved lanes are each side's own note rule and stay out)",
+      "value": [
+        { "folder": "wiki", "memex": true, "home": "wiki" },
+        { "folder": "wiki/projects", "memex": true, "home": "wiki/projects" },
+        { "folder": "", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "chats", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "storage", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "wikis", "memex": true, "home": "wiki/_inbox" },
+        { "folder": "", "memex": false, "home": "" },
+        { "folder": "Plans", "memex": false, "home": "Plans" },
+        { "folder": "Plans/Q3", "memex": false, "home": "Plans/Q3" }
+      ]
+    },
+    "emptyCanvasFile": {
+      "sourceOfTruth": "src-tauri/src/corpus_files.rs EMPTY_CANVAS ↔ src/jsonCanvas/model.ts EMPTY_CANVAS_FILE (a new canvas, written the way Obsidian writes one)",
+      "value": "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}"
     }
   }
 }

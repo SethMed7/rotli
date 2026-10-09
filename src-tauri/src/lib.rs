@@ -12,11 +12,14 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
+mod agent_bridge;
+mod agent_bridge_socket;
 mod ai_edit_policy;
 mod app_settings;
 mod board;
 mod breve;
 mod chat;
+mod chat_registry;
 mod chat_window;
 mod clipboard_assets;
 mod compute;
@@ -37,7 +40,7 @@ mod loopback_http;
 mod librarian_rules;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
+mod memex_query; mod native_drag; mod note_dates; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
 /// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
 #[cfg(target_os = "macos")]
 mod native_drag_promise;
@@ -45,6 +48,8 @@ mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
+mod ai_files;
+mod pinned_site;
 mod private_browser;
 mod private_browser_media;
 mod quick_window;
@@ -60,13 +65,13 @@ mod search_index; mod search_match;
 mod secret;
 mod spellcheck;
 mod usage;
-mod vault_browser;
 mod vault_location;
 mod web;
 mod web_page;
 mod web_search;
 mod workspace;
 mod workspace_help;
+mod workspace_documents;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -117,6 +122,16 @@ fn close_tab_from_native_menu(app: &AppHandle) {
         NativeCloseAction::HideWindow => {
             let _ = window.hide();
         }
+    }
+}
+
+/// Edit → Undo / Redo picked with the pointer. The ⌘Z / ⇧⌘Z keys no longer go
+/// through this menu (see the Edit menu swap in setup): the focused webview
+/// replays the press as a key event, so the editor under focus handles it the
+/// way it handles the real key.
+fn edit_history_from_native_menu(app: &AppHandle, redo: bool) {
+    if let Some(window) = focused_webview_window(app) {
+        let _ = window.emit("rotli:edit-history", if redo { "redo" } else { "undo" });
     }
 }
 
@@ -2249,12 +2264,12 @@ pub fn run() {
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
-        .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
         .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
         .manage(remote_agent::RemoteAgentState::default())
+        .manage(agent_bridge::Pending::default())
         // App-menu replacements installed in setup. Tray menu events have their
         // own handler; the ids are distinct so double-dispatch cannot occur.
         .on_menu_event(|app, event| {
@@ -2262,10 +2277,14 @@ pub fn run() {
                 "quit-app" => graceful_quit(app),
                 "close-tab" => close_tab_from_native_menu(app),
                 "close-window" => hide_focused_window(app),
+                "edit-undo" => edit_history_from_native_menu(app, false),
+                "edit-redo" => edit_history_from_native_menu(app, true),
                 _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
+            agent_bridge::agent_bridge_ready,
+            agent_bridge::agent_bridge_reply,
             toggle_main_window,
             quit_flush_done,
             restart_after_flush,
@@ -2278,15 +2297,6 @@ pub fn run() {
             hide_chat_window,
             hide_quick_window,
             corpus_reveal,
-            vault_browser::vault_browser_start,
-            vault_browser::vault_browser_open_child,
-            vault_browser::vault_browser_go_back,
-            vault_browser::vault_browser_refresh,
-            vault_browser::vault_browser_create_folder,
-            vault_browser::vault_browser_select,
-            vault_browser::vault_browser_select_child,
-            vault_browser::vault_browser_cancel,
-            vault_browser::vault_browser_reveal,
             corpus_add_folder,
             corpus_forget_folder,
             corpus_list_config,
@@ -2323,6 +2333,7 @@ pub fn run() {
             corpus::corpus_restore_file,
             corpus::corpus_write_file_bytes,
             corpus::corpus_new_file_bytes,
+            corpus::files::corpus_create_canvas,
             corpus::corpus_create_managed_file,
             corpus::corpus_export_note_pdf,
             corpus::corpus_convert_document,
@@ -2358,6 +2369,7 @@ pub fn run() {
             corpus::corpus_secure_repair_scan,
             corpus::corpus_secure_repair_apply,
             corpus::corpus_tasks,
+            corpus::links::corpus_links_list,
             corpus::corpus_toggle_task,
             corpus::corpus_set_local_ai_access,
             corpus::corpus_read_ai,
@@ -2365,6 +2377,7 @@ pub fn run() {
             corpus::corpus_search_ai,
             corpus::corpus_notes_ai,
             corpus::corpus_write_ai,
+            corpus::ai_edit::corpus_insert_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,
@@ -2431,6 +2444,14 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            ai_files::corpus_create_managed_file_ai,
+            ai_files::corpus_write_file_ai,
+            pinned_site::pinned_sites_supported,
+            pinned_site::pinned_site_open,
+            pinned_site::pinned_site_set_bounds,
+            pinned_site::pinned_site_hide,
+            pinned_site::pinned_site_close,
+            pinned_site::pinned_site_forget,
             private_browser::private_browser_create,
             private_browser::private_browser_set_bounds,
             private_browser::private_browser_set_visible,
@@ -2476,7 +2497,9 @@ pub fn run() {
                     native_drag_promise::dump_drop_targets(&main.as_ref().window());
                 }
             }
-            // The visitor law: never in the dock, never in Cmd-Tab.
+            // Start as a menu-bar app; the person's settings decide the Dock
+            // (persist.ts applies showInDock at boot). A new install is in the
+            // Dock and stays open (2026-10-01); the visitor is a Settings choice.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             #[cfg(all(target_os = "macos", debug_assertions))]
@@ -2604,6 +2627,8 @@ pub fn run() {
                 }
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
+            // agents reach Word documents through this app (agent_bridge.rs)
+            agent_bridge::start(app.handle());
             if let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() {
                 if feature_policy::breve_enabled() && root.join(routines::MANAGED_MARKER).is_file() {
                     if let Err(e) = breve::install_rotli_login_agent() {
@@ -2748,11 +2773,15 @@ pub fn run() {
                 // File → Close Tab remains a pointer-selectable command and
                 // Window keeps an explicit no-shortcut hide.
                 let mut file_sub = None;
+                let mut edit_sub = None;
                 let mut window_sub = None;
                 for item in &menu_items {
                     if let tauri::menu::MenuItemKind::Submenu(submenu) = item {
                         if submenu.text().ok().as_deref() == Some("File") {
                             file_sub = Some(submenu.clone());
+                        }
+                        if submenu.text().ok().as_deref() == Some("Edit") {
+                            edit_sub = Some(submenu.clone());
                         }
                         if submenu.id().as_ref() == tauri::menu::WINDOW_SUBMENU_ID {
                             window_sub = Some(submenu.clone());
@@ -2787,6 +2816,37 @@ pub fn run() {
                 let close_window = MenuItemBuilder::with_id("close-window", "Close Window").build(app)?;
                 file_sub.prepend(&close_tab)?;
                 window_sub.append(&close_window)?;
+
+                // ⌘Z / ⇧⌘Z (the owner, 2026-10-09: "we need the hotkeys for undo
+                // and redo to work — everywhere I try"). The predefined Undo and
+                // Redo take the keys before WKWebView and send undo:/redo:, which
+                // reach only a focused text input: a note's editor ignored it, a
+                // sheet's or document's hidden input had no history, and a board
+                // never heard it. Swapped like Close above: same titles, no
+                // accelerator, so each editor gets the real key press (as in the
+                // browser, where CI proves it) and the registry's edit.undo /
+                // edit.redo cover plain text fields. Fail closed on any other shape.
+                let edit_sub = edit_sub.ok_or("macOS Edit menu changed; Undo and Redo cannot be replaced")?;
+                let edit_items = edit_sub.items()?;
+                let titled = |item: Option<&tauri::menu::MenuItemKind<tauri::Wry>>, title: &str| match item {
+                    Some(kind @ tauri::menu::MenuItemKind::Predefined(predefined))
+                        if predefined.text().ok().as_deref() == Some(title) =>
+                    {
+                        Some(kind.clone())
+                    }
+                    _ => None,
+                };
+                let (Some(default_undo), Some(default_redo)) =
+                    (titled(edit_items.first(), "Undo"), titled(edit_items.get(1), "Redo"))
+                else {
+                    return Err("macOS Edit menu changed; native Undo and Redo cannot be replaced safely".into());
+                };
+                edit_sub.remove(&default_redo)?;
+                edit_sub.remove(&default_undo)?;
+                let undo = MenuItemBuilder::with_id("edit-undo", "Undo").build(app)?;
+                let redo = MenuItemBuilder::with_id("edit-redo", "Redo").build(app)?;
+                edit_sub.insert(&undo, 0)?;
+                edit_sub.insert(&redo, 1)?;
             }
 
             Ok(())

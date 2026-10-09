@@ -860,14 +860,7 @@ span.fdr-col {
   color: var(--text-muted);
 }
 
-/* board/list empty-state voices — the container is the shared .list-empty.
-   The quokka (a quokka-world placement) stays soft ink with a breath of space
-   before the title so it reads as a mascot, not a heavy graphic. */
-.be-quokka {
-  color: var(--text);
-  opacity: 0.9;
-  margin-bottom: 6px;
-}
+/* board/list empty-state voices — the container is the shared .list-empty. */
 .be-title {
   font-family: var(--font-display);
   font-weight: 700;

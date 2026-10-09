@@ -1,52 +1,55 @@
-// First-run setup is intentionally short: app feel first, vault activation
-// second. A user may skip these preferences without silently accepting a notes
-// location; create/open/import remains an explicit next screen.
+// First-run setup (the owner, 2026-10-01, after testers' "too many steps
+// before I can use the app"): four screens. You and your theme first, your
+// vault second (vaultActivation.tsx), then who files your notes and the three
+// shortcuts worth knowing. The window, music, quokka, and chat models wait in
+// the app, where they're used: Settings, the sidebar player, and Chat.
 
-import { type CSSProperties, type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 
-import {
-  DEFAULT_QUOKKA_ACCESSORY_HUE,
-  DEFAULT_QUOKKA_CUSTOM_HUE,
-  QUOKKA_ACCESSORY_PRESENTATIONS,
-  QUOKKA_STYLE_PRESENTATIONS,
-  quokkaAccessoryColor,
-  quokkaCustomColor,
-} from "../../brand/quokka";
+import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../../brand/quokka";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
-import { setSetupHandle } from "../../keys/handles";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
 import { DEFAULT_AMBIENT } from "../../lib/ambient";
-import { setGlobalShortcut } from "../../lib/tauri";
+import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
 import { useAmbient } from "../../state/ambient";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
 import {
   ONBOARDING_STEP_NUMBER,
   ONBOARDING_TOTAL_STEPS,
-  startingAppearance,
-  windowBehaviorOnSkip,
+  firstRunWindow,
+  isFirstRun,
 } from "../../state/onboarding";
+import { flushSettingsNow } from "../../state/persist";
 import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
-
-/** Compact accessory palette for first-run; Settings owns the full hue dial.
- * Amber first — it is the accessory default. */
-const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
+import { LibrarianScreen } from "./librarianStep";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
-import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary, useSetupHandle } from "./setupControls";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
-import { SetupSound } from "./setupSound";
 
-const STEPS = ["welcome", "appearance", "behavior", "sound", "shortcuts"] as const;
-type Step = (typeof STEPS)[number];
+/** The screens this component draws; the vault screen is vaultActivation.tsx. */
+export type SetupScreen = "you" | "librarian" | "shortcuts";
 
 const HOTKEYS = [
   { id: "app.toggleWindow", label: "Open Rotli", hint: "Summon or tuck away the main window." },
   { id: "capture.summon", label: "Quick capture", hint: "Catch a thought without changing apps." },
   { id: "quick.summon", label: "Quick note", hint: "Open a small floating note." },
 ] as const;
+
+const TITLES: Record<SetupScreen, string> = {
+  you: "You",
+  librarian: "Librarian",
+  shortcuts: "Shortcuts",
+};
+
+const COMPANION: Record<SetupScreen, { pose: "waving" | "knowledge" | "listening"; line: string }> = {
+  you: { pose: "waving", line: "Everything here can change later in Settings." },
+  librarian: { pose: "knowledge", line: "I’ll keep the shelves tidy." },
+  shortcuts: { pose: "listening", line: "Click any shortcut to make it yours." },
+};
 
 function ThemeModeChoice({
   value,
@@ -92,6 +95,8 @@ function ThemeModeChoice({
   );
 }
 
+/** One shortcut, plainly changeable: its keys and a Change label on the same
+ * button; recording says how to finish or cancel; a changed one can go back. */
 function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
   const overrides = useBindingsStore((state) => state.overrides);
   const action = getAction(id);
@@ -105,6 +110,7 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
 
   if (!action) return null;
   const chord = resolveChord(overrides, id, action.defaultChord);
+  const changed = chord !== (action.defaultChord ?? null);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -134,122 +140,201 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
         <span>{hint}</span>
         {message && <em>{message}</em>}
       </span>
-      <button
-        type="button"
-        className={recording ? "hkchord recording" : "hkchord"}
-        aria-label={`Change ${label} shortcut`}
-        onClick={(event) => {
-          event.currentTarget.focus();
-          setMessage(null);
-          setRecording(true);
-        }}
-        onKeyDown={recording ? onKeyDown : undefined}
-        onBlur={() => setRecording(false)}
-      >
-        {recording ? "Press keys…" : chord ? <kbd>{formatChord(chord)}</kbd> : "Not set"}
-      </button>
+      <span className="setup-shortcut-actions">
+        {changed && !recording && (
+          <button
+            type="button"
+            className="setup-shortcut-reset"
+            onClick={() => {
+              setMessage(null);
+              void rebind(id, action.defaultChord ?? null).catch(() =>
+                setMessage("macOS kept the previous shortcut."),
+              );
+            }}
+          >
+            Use default
+          </button>
+        )}
+        <button
+          type="button"
+          className={recording ? "hkchord setup-chord recording" : "hkchord setup-chord"}
+          aria-label={recording ? `Press the new ${label} shortcut` : `Change ${label} shortcut`}
+          onClick={(event) => {
+            event.currentTarget.focus();
+            setMessage(null);
+            setRecording(true);
+          }}
+          onKeyDown={recording ? onKeyDown : undefined}
+          onBlur={() => setRecording(false)}
+        >
+          {recording ? (
+            "Press new keys… Esc cancels"
+          ) : (
+            <>
+              {chord ? <kbd>{formatChord(chord)}</kbd> : "Not set"}
+              <span className="setup-chord-change" aria-hidden="true">
+                Change
+              </span>
+            </>
+          )}
+        </button>
+      </span>
     </div>
   );
 }
 
-export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => void; initialStep?: Step }) {
-  const [step, setStep] = useState<Step>(initialStep);
-  // a fresh first run opens on the island (onboardingScenery.tsx)
-  const [intro, setIntro] = useState(() => introWanted(initialStep === "welcome"));
-  const endIntro = () => setIntro(false);
-  // a short window: the step scrolls, and says so
-  const [stageRef, showScrollCue, stageScrolls] = useStageScrollCue();
-  const index = STEPS.indexOf(step);
+function YouScreen({ advance }: { advance: () => void }) {
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
-  const showInDock = useUiStore((state) => state.showInDock);
-  const stayOpen = useUiStore((state) => state.stayOpen);
   const userName = useUiStore((state) => state.userName);
   const setUserName = useUiStore((state) => state.setUserName);
-  const quokkaCompanionEnabled = useUiStore((state) => state.quokkaCompanionEnabled);
-  const setQuokkaCompanionEnabled = useUiStore((state) => state.setQuokkaCompanionEnabled);
-  const quokkaStyle = useUiStore((state) => state.quokkaStyle);
-  const setQuokkaStyle = useUiStore((state) => state.setQuokkaStyle);
-  const quokkaCustomHue = useUiStore((state) => state.quokkaCustomHue);
-  const setQuokkaCustomHue = useUiStore((state) => state.setQuokkaCustomHue);
-  const quokkaAccessory = useUiStore((state) => state.quokkaAccessory);
-  const setQuokkaAccessory = useUiStore((state) => state.setQuokkaAccessory);
-  const quokkaAccessoryHue = useUiStore((state) => state.quokkaAccessoryHue);
-  const setQuokkaAccessoryHue = useUiStore((state) => state.setQuokkaAccessoryHue);
+  return (
+    <>
+      <h1 id="setup-title">Make Rotli yours.</h1>
+      <p className="setup-lede">
+        Your name and a theme now; your notes folder next. Your quokka, music, and the rest wait in Settings.
+      </p>
+      <label className="setup-name-field">
+        <span>
+          What should Rotli call you? <em>Optional</em>
+        </span>
+        <input
+          type="text"
+          value={userName}
+          maxLength={80}
+          autoComplete="name"
+          placeholder="Your first name"
+          onChange={(event) => setUserName(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === "Enter") {
+              event.preventDefault();
+              advance();
+            }
+          }}
+        />
+        <small>Used for greetings only.</small>
+      </label>
+      <SetupChoiceGroup
+        label="Theme"
+        value={family}
+        onChange={(next: ThemeFamily) => useUiStore.getState().setThemeFamily(next)}
+        options={THEME_FAMILY_PRESENTATIONS.map(({ family: optionFamily, label, lightLabel, darkLabel }) => ({
+          value: optionFamily,
+          title: label,
+          // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
+          detail: (
+            <span className="setup-theme-pair" aria-hidden="true">
+              <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
+              <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
+            </span>
+          ),
+        }))}
+      />
+      <div className="setup-mode-row">
+        <span>Mode</span>
+        <ThemeModeChoice value={theme} onChange={(next) => useUiStore.getState().setTheme(next)} />
+        <small>{theme === "system" ? "Follows macOS" : `System is off · ${theme}`}</small>
+      </div>
+      <div className="setup-accent">
+        <span>Accent</span>
+        <AccentRow />
+      </div>
+    </>
+  );
+}
 
-  const move = (delta: -1 | 1) => {
-    const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, index + delta))];
-    if (next) setStep(next);
-  };
-  const advance = () => (step === "shortcuts" ? onDone() : move(1));
+function ShortcutsScreen() {
+  return (
+    <>
+      <h1 id="setup-title">Three shortcuts, yours to change.</h1>
+      <p className="setup-lede">
+        They work from any app. Keep these, or click one and press the keys you’d rather use. You can change
+        them anytime in Settings → Keybindings.
+      </p>
+      <div className="setup-shortcuts">
+        {HOTKEYS.map((hotkey) => (
+          <ChordRow key={hotkey.id} {...hotkey} />
+        ))}
+      </div>
+    </>
+  );
+}
 
-  useEffect(() => {
-    setSetupHandle({ continue: advance, ...(index > 0 ? { back: () => move(-1) } : {}) });
-    return () => setSetupHandle(null);
+/** Skip setup on a first run: Rotli's defaults and the new-install window. */
+function skipToDefaults(): void {
+  const ui = useUiStore.getState();
+  useBindingsStore.setState({ overrides: {} });
+  for (const action of allActions()) {
+    if (!action.global) continue;
+    void setGlobalShortcut(action.id, action.defaultChord ? toAccelerator(action.defaultChord) : null);
+  }
+  useUiStore.setState({
+    ...DEFAULT_APPEARANCE,
+    quokkaStyle: "cocoa",
+    quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
+    quokkaAccessory: "none",
+    quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
+    quokkaLineColor: "auto",
+    ...firstRunWindow(ui.onboarded, ui.onboardingVersion),
   });
-  // First run always opens in Rotli Light with the bare quokka, even when a
-  // version bump re-onboards a personalized install; the appearance step is
-  // where the person chooses again. Coming back from the vault step resumes at
-  // shortcuts and must keep what was just chosen.
+  useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT } });
+}
+
+export function Onboarding({
+  step,
+  onDone,
+  onBack,
+  onSkip,
+  resumed = false,
+}: {
+  step: SetupScreen;
+  onDone: () => void;
+  onBack?: () => void;
+  /** Skip setup from here; only the vault is required (setupFlow.tsx). */
+  onSkip?: () => void;
+  /** Back from a later screen: keep what was chosen, no intro, no reset. */
+  resumed?: boolean;
+}) {
+  // a fresh first run opens on the island (onboardingScenery.tsx)
+  const [intro, setIntro] = useState(() => introWanted(step === "you" && !resumed));
+  // a short window: the step scrolls, and says so
+  const [stageRef, showScrollCue, stageScrolls] = useStageScrollCue();
+  const advance = onDone;
+
+  useSetupHandle(advance, onBack);
+  // A new install is in the Dock from the first frame (persist.ts) and stays
+  // there through setup (testers lost a menu-bar-only app mid-setup); saved at
+  // once, so a quit here relaunches in the Dock too. The appearance isn't
+  // reset here: a fresh install and Reset & re-onboard already start in Rotli
+  // Light with the plain quokka, and a relaunch mid-setup keeps what was picked.
   useEffect(() => {
-    if (initialStep === "welcome") useUiStore.setState(startingAppearance());
-    // the Models step is six screens away: probe local models and signed-in
-    // clients now so it opens already knowing what this Mac has
-    startSetupDetection();
-  }, [initialStep]);
-
-  const pickFamily = (nextFamily: ThemeFamily) => {
-    useUiStore.getState().setThemeFamily(nextFamily);
-  };
-  const pickMode = (nextTheme: ThemeSetting) => {
-    useUiStore.getState().setTheme(nextTheme);
-  };
-  const behavior = showInDock && stayOpen ? "resident" : showInDock ? "dock" : "visitor";
-  const pickBehavior = (value: "visitor" | "dock" | "resident") => {
-    useUiStore.getState().setShowInDock(value !== "visitor");
-    useUiStore.getState().setStayOpen(value === "resident");
-  };
-  const skip = () => {
+    if (step !== "you" || resumed) return;
     const ui = useUiStore.getState();
-    useBindingsStore.setState({ overrides: {} });
-    for (const action of allActions()) {
-      if (!action.global) continue;
-      void setGlobalShortcut(action.id, action.defaultChord ? toAccelerator(action.defaultChord) : null);
+    const firstWindow = firstRunWindow(ui.onboarded, ui.onboardingVersion);
+    useUiStore.setState(firstWindow);
+    if (firstWindow.showInDock) {
+      void setDockVisible(true).catch(() => {});
+      void flushSettingsNow().catch(() => {});
     }
-    useUiStore.setState({
-      ...DEFAULT_APPEARANCE,
-      quokkaCompanionEnabled: false,
-      quokkaStyle: "cocoa",
-      quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
-      quokkaAccessory: "none",
-      quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
-      quokkaLineColor: "auto",
-      quokkaIdlePose: "base",
-      ...windowBehaviorOnSkip(ui.onboarded, ui.onboardingVersion),
-    });
-    useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT } });
-    onDone();
-  };
+    // the Librarian screen is two screens away: probe local models and
+    // signed-in clients now so it opens already knowing what this Mac has
+    startSetupDetection();
+  }, [step, resumed]);
 
-  const titles: Record<Step, string> = {
-    welcome: "Welcome",
-    appearance: "Appearance",
-    behavior: "Window",
-    sound: "Sound",
-    shortcuts: "Shortcuts",
-  };
-
+  const companion = COMPANION[step];
   return (
     <div className="onb" data-intro={intro ? "" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
-      <OnboardingScenery welcome={step === "welcome"} />
+      {/* Rotli's own theme is the island; another pick previews its scenery live */}
+      <OnboardingScenery />
       <section className="setup-shell" aria-labelledby="setup-title">
         <div className="setup-progress">
           <span>
             {ONBOARDING_STEP_NUMBER[step]} of {ONBOARDING_TOTAL_STEPS}
           </span>
           <span aria-hidden="true">·</span>
-          <span>{titles[step]}</span>
+          <span>{TITLES[step]}</span>
         </div>
 
         <div
@@ -261,264 +346,51 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           ref={stageRef}
         >
           <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
-            <Character
-              name={
-                step === "welcome"
-                  ? "waving"
-                  : step === "appearance"
-                    ? "thoughtful"
-                    : step === "behavior"
-                      ? "walking"
-                      : "listening"
-              }
-              size={152}
-              alwaysVisible
-            />
-            <p>
-              {step === "shortcuts"
-                ? "I’ll stay out of the way until you call."
-                : "Everything here can change later."}
-            </p>
+            <Character name={companion.pose} size={152} />
+            <p>{companion.line}</p>
           </aside>
 
           <div className="setup-content">
-            {step === "welcome" && (
-              <>
-                <h1 id="setup-title">Make Rotli feel like yours.</h1>
-                <p className="setup-lede">
-                  Pick a look, choose how the window behaves, and meet the three shortcuts worth remembering.
-                  Your notes folder comes next—and is always an explicit choice.
-                </p>
-                <label className="setup-name-field">
-                  <span>
-                    What should Rotli call you? <em>Optional</em>
-                  </span>
-                  <input
-                    type="text"
-                    value={userName}
-                    maxLength={80}
-                    autoComplete="name"
-                    placeholder="Your first name"
-                    onChange={(event) => setUserName(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      event.stopPropagation();
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        advance();
-                      }
-                    }}
-                  />
-                  <small>Used for greetings only. Enter continues without a name.</small>
-                </label>
-              </>
-            )}
-
-            {step === "appearance" && (
-              <>
-                <h1 id="setup-title">Choose a theme.</h1>
-                <p className="setup-lede">
-                  Pick a theme, then Light, Dark, or follow your Mac. An accent and your quokka come after.
-                </p>
-                <SetupChoiceGroup
-                  label="Theme"
-                  value={family}
-                  onChange={pickFamily}
-                  options={THEME_FAMILY_PRESENTATIONS.map(
-                    ({ family: optionFamily, label, lightLabel, darkLabel }) => ({
-                      value: optionFamily,
-                      title: label,
-                      // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
-                      detail: (
-                        <span className="setup-theme-pair" aria-hidden="true">
-                          <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
-                          <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
-                        </span>
-                      ),
-                    }),
-                  )}
-                />
-                <div className="setup-mode-row">
-                  <span>Mode</span>
-                  <ThemeModeChoice value={theme} onChange={pickMode} />
-                  <small>{theme === "system" ? "Follows macOS" : `System is off · ${theme}`}</small>
-                </div>
-                <div className="setup-accent">
-                  <span>Accent</span>
-                  <AccentRow />
-                </div>
-                <div className="setup-quokka-row">
-                  <span className="setup-quokka-preview" aria-hidden="true">
-                    <Character name="base" size={66} accessory={quokkaAccessory} alwaysVisible />
-                  </span>
-                  <div className="setup-quokka-controls">
-                    <label className="setup-quokka-mode">
-                      <input
-                        type="checkbox"
-                        checked={quokkaCompanionEnabled}
-                        onChange={(event) => setQuokkaCompanionEnabled(event.currentTarget.checked)}
-                      />
-                      <span>Keep my quokka throughout Rotli</span>
-                    </label>
-                    {quokkaCompanionEnabled && (
-                      <>
-                        <div className="setup-quokka-swatches" role="radiogroup" aria-label="Companion color">
-                          {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
-                            <button
-                              type="button"
-                              role="radio"
-                              aria-checked={choice.style === quokkaStyle}
-                              aria-label={`${choice.label}: ${choice.description}`}
-                              className={choice.style === quokkaStyle ? "selected" : ""}
-                              key={choice.style}
-                              onClick={() => setQuokkaStyle(choice.style)}
-                            >
-                              {choice.style === "line" ? (
-                                <span className="setup-quokka-line-swatch" aria-hidden="true" />
-                              ) : (
-                                <span
-                                  aria-hidden="true"
-                                  style={
-                                    {
-                                      backgroundColor: choice.color ?? quokkaCustomColor(quokkaCustomHue),
-                                    } as CSSProperties
-                                  }
-                                />
-                              )}
-                            </button>
-                          ))}
-                          {quokkaStyle === "custom" && (
-                            <input
-                              type="range"
-                              min="0"
-                              max="359"
-                              aria-label="Custom companion color hue"
-                              value={quokkaCustomHue}
-                              onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
-                            />
-                          )}
-                        </div>
-                        <span>Accessory</span>
-                        <div className="setup-quokka-accrow">
-                          <div className="setup-quokka-accs" role="radiogroup" aria-label="Accessory">
-                            {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
-                              <button
-                                type="button"
-                                role="radio"
-                                aria-checked={quokkaAccessory === choice.accessory}
-                                aria-label={`${choice.label}: ${choice.description}`}
-                                title={choice.label}
-                                className={quokkaAccessory === choice.accessory ? "selected" : ""}
-                                key={choice.accessory}
-                                onClick={() => setQuokkaAccessory(choice.accessory)}
-                              >
-                                <Character name="base" size={34} accessory={choice.accessory} alwaysVisible />
-                              </button>
-                            ))}
-                          </div>
-                          {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
-                            <div
-                              className="setup-quokka-swatches"
-                              role="radiogroup"
-                              aria-label="Accessory color"
-                            >
-                              {ACCESSORY_HUE_CHOICES.map((hue) => (
-                                <button
-                                  type="button"
-                                  role="radio"
-                                  aria-checked={quokkaAccessoryHue === hue}
-                                  aria-label={`Accessory hue ${hue}°`}
-                                  className={quokkaAccessoryHue === hue ? "selected" : ""}
-                                  key={hue}
-                                  onClick={() => setQuokkaAccessoryHue(hue)}
-                                >
-                                  <span
-                                    aria-hidden="true"
-                                    style={{ backgroundColor: quokkaAccessoryColor(hue) } as CSSProperties}
-                                  />
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <small>Expressions change with the moment. Your look follows them.</small>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {step === "behavior" && (
-              <>
-                <h1 id="setup-title">How should the window live?</h1>
-                <p className="setup-lede">
-                  The menu-bar icon is always available. This controls the Dock and what happens when you
-                  click away.
-                </p>
-                <SetupChoiceGroup
-                  label="Window behavior"
-                  value={behavior}
-                  onChange={pickBehavior}
-                  options={[
-                    {
-                      value: "dock",
-                      title: "Dock companion",
-                      description: "Appears in the Dock; still tucks away on blur.",
-                    },
-                    {
-                      value: "visitor",
-                      title: "Quiet visitor",
-                      description: "Menu bar only; hides when you click away.",
-                    },
-                    {
-                      value: "resident",
-                      title: "Stay with me",
-                      description: "Dock app that remains open like a normal workspace.",
-                    },
-                  ]}
-                />
-                <p className="setup-arrow-note">
-                  <kbd>←</kbd>
-                  <kbd>→</kbd> moves and selects
-                </p>
-              </>
-            )}
-
-            {step === "sound" && <SetupSound />}
-
-            {step === "shortcuts" && (
-              <>
-                <h1 id="setup-title">Three shortcuts, right where they act.</h1>
-                <p className="setup-lede">Keep these defaults or click a shortcut to record your own.</p>
-                <div className="setup-shortcuts">
-                  {HOTKEYS.map((hotkey) => (
-                    <ChordRow key={hotkey.id} {...hotkey} />
-                  ))}
-                </div>
-              </>
-            )}
+            {step === "you" && <YouScreen advance={advance} />}
+            {step === "librarian" && <LibrarianScreen />}
+            {step === "shortcuts" && <ShortcutsScreen />}
           </div>
         </div>
 
         {showScrollCue && <SetupScrollCue />}
 
         <footer className="setup-footer">
-          <button type="button" className="setup-skip" onClick={skip}>
-            Skip app setup
-          </button>
+          {onSkip ? (
+            <button
+              type="button"
+              className="setup-skip"
+              onClick={() => {
+                // a first run's first screen falls back to the defaults; later
+                // screens keep what was picked and their own defaults. Someone
+                // returning keeps everything they had (1.8.0 re-onboarding)
+                const ui = useUiStore.getState();
+                if (step === "you" && isFirstRun(ui.onboarded, ui.onboardingVersion)) skipToDefaults();
+                onSkip();
+              }}
+            >
+              {step === "you" ? "Skip setup" : "Skip the rest"}
+            </button>
+          ) : (
+            <span />
+          )}
           <div className="setup-actions">
-            {index > 0 && <SetupBack onClick={() => move(-1)} />}
+            {onBack && <SetupBack onClick={onBack} />}
             <SetupPrimary onClick={advance}>
-              {step === "welcome"
-                ? "Get started"
+              {step === "you"
+                ? "Choose where notes live"
                 : step === "shortcuts"
-                  ? "Choose where notes live"
+                  ? "Finish setup"
                   : "Continue"}
             </SetupPrimary>
           </div>
         </footer>
       </section>
-      {intro && <OnboardingIntro onDone={endIntro} />}
+      {intro && <OnboardingIntro onDone={() => setIntro(false)} />}
     </div>
   );
 }

@@ -176,12 +176,29 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-/** The chords Excalidraw owns on its own canvas (boards slice 2026-07-28):
- * ⌘D duplicated an object AND split the pane; ⌘0 reset canvas zoom AND toggled
- * the sidebar; ⌘=/⌘− were dead keys over a board (the app's contextual zoom
- * no-ops on canvas tabs). Inside a board, the canvas vocabulary wins — "zoom
- * where I am" is the house rule. Tab/app chords (⌘W, ⌘T, ⌘1-9…) still pass. */
-const CANVAS_OWNED_CHORDS = new Set(["Meta+D", "Meta+Shift+D", "Meta+0", "Meta+Equal", "Meta+Minus"]);
+/** The chords Excalidraw keeps on its own canvas (boards slice 2026-07-28,
+ * widened 2026-10-08). ⌘D duplicates an object, not a pane split; ⌘0/⌘=/⌘−
+ * zoom where I am; ⌘F searches the board's text (a board has no note find);
+ * ⌘⇧L locks shapes (a board is not a note to secure); ⌘←/⌘→ grow a
+ * flowchart. Every OTHER app chord wins over the canvas — ⌘K, ⌘[ / ⌘], ⌘W,
+ * ⌘⇧P, ⌘⇧D… — even where Excalidraw has its own meaning for it (⌘K link,
+ * ⌘[ ⌘] layer order, ⌘⇧P palette: all still in its menus, and ⌘/ opens its
+ * palette). */
+const CANVAS_OWNED_CHORDS: ReadonlySet<string> = new Set(
+  [
+    "Meta+D",
+    "Meta+0",
+    "Meta+Equal",
+    "Meta+Minus",
+    "Meta+F",
+    "Meta+Shift+L",
+    "Meta+ArrowLeft",
+    "Meta+ArrowRight",
+    // a board's own undo/redo (edit.undo / edit.redo cover plain text fields)
+    "Meta+Z",
+    "Meta+Shift+Z",
+  ].map(normalizeChord), // a pressed chord is canonical (Shift+Meta+L)
+);
 
 function isCanvasTarget(target: EventTarget | null): boolean {
   return (
@@ -207,24 +224,39 @@ export function claimingAction(pressed: string): KeyAction | null {
   return null;
 }
 
-/** Attach the one dispatcher for this webview's surface. Idempotent. */
+/** A chord with a command modifier — the ones a canvas must not swallow. Bare
+ * keys (Esc, Enter, arrows, tool letters) stay the canvas's first. */
+function hasCommandModifier(event: KeyboardEvent): boolean {
+  return event.metaKey || event.ctrlKey || event.altKey;
+}
+
+/** Attach the one dispatcher for this webview's surface. Idempotent.
+ *
+ * It listens twice, with one routing rule. Over a board, Excalidraw answers
+ * every chord it knows on its own container and stops it there (⌘K is its
+ * link editor, ⌘[ its layer order, ⌘⇧P its palette), so a window listener in
+ * the bubble phase never heard them (2026-10-08). Over a canvas the dispatcher
+ * therefore takes modifier chords in the CAPTURE phase, before the canvas, and
+ * stops the ones it runs; everything else routes in the bubble phase as it
+ * always has. */
 export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
   attachedSurface = surface;
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (suspended) return;
+  /** Route one key press; answers whether the dispatcher consumed it. */
+  const route = (event: KeyboardEvent): boolean => {
+    if (suspended) return false;
     // a key the editor already consumed (a picker's Escape, a keymap binding)
     // is not a chord press: Esc must unwind the picker, not hide the window
-    if (event.defaultPrevented) return;
-    if (event.repeat) return; // auto-repeat is not a fresh press — never re-fire a command
+    if (event.defaultPrevented) return false;
+    if (event.repeat) return false; // auto-repeat is not a fresh press — never re-fire a command
     const pressed = chordFromEvent(event);
-    if (!pressed) return;
+    if (!pressed) return false;
     // a modifier-less chord must never swallow typing: inside editable targets
     // only Esc / Enter / F-keys may dispatch bare (the capture card's ⏎ save,
     // Esc everywhere) — a bare-letter rebind stays typable in text fields
-    if (!(event.ctrlKey || event.altKey || event.metaKey) && isEditableTarget(event.target)) {
+    if (!hasCommandModifier(event) && isEditableTarget(event.target)) {
       const key = pressed.split("+").pop() ?? "";
-      if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
+      if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return false;
     }
     // a pending two-step hotkey (keys/leader.ts) is offered the key before any
     // action: for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump.
@@ -232,20 +264,34 @@ export function attachDispatcher(surface: Surface): () => void {
     // filter while a leader is pending is still just a digit.
     if (leaderConsumes(pressed)) {
       event.preventDefault();
-      return;
+      return true;
     }
     // over an Excalidraw canvas the clash chords belong to the canvas
-    if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;
+    if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return false;
     const action = claimingAction(pressed);
-    if (action) {
-      if (action.unlessEditable && isEditableTarget(event.target)) return;
-      event.preventDefault();
-      action.run();
-    }
+    if (!action) return false;
+    if (action.unlessEditable && isEditableTarget(event.target)) return false;
+    event.preventDefault();
+    action.run();
+    return true;
   };
-  window.addEventListener("keydown", onKeyDown);
+  const overCanvas = (event: KeyboardEvent): boolean =>
+    hasCommandModifier(event) && isCanvasTarget(event.target);
+  const onCapture = (event: KeyboardEvent) => {
+    if (!overCanvas(event)) return;
+    // Excalidraw's own palette and search listen on window in the capture
+    // phase too — only stopImmediatePropagation keeps them from also firing
+    if (route(event)) event.stopImmediatePropagation();
+  };
+  const onBubble = (event: KeyboardEvent) => {
+    if (overCanvas(event)) return; // offered in the capture phase already
+    route(event);
+  };
+  window.addEventListener("keydown", onCapture, { capture: true });
+  window.addEventListener("keydown", onBubble);
   detach = () => {
-    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keydown", onCapture, { capture: true });
+    window.removeEventListener("keydown", onBubble);
     detach = null;
   };
   return detach;

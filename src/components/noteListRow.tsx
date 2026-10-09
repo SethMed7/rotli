@@ -9,7 +9,8 @@ import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder } from "../lib/noteLocation";
 import { isChatsPath } from "../services/destinations";
 import type { NoteSummary } from "../types";
-import { ChatGlyph, glyphForNote, PinGlyph } from "./glyphs";
+import { ChatGlyph, PinGlyph } from "./glyphs";
+import { glyphForNote } from "./noteGlyph";
 
 // memo: list surfaces render hundreds of rows and re-render per search
 // keystroke / corpus invalidation — with stable summaries and callbacks the

@@ -1,21 +1,20 @@
 // Thank you (2026-09-28): after setup, a card thanks the person and shows a
-// banner drawn from their own choices, with a GitHub star, an invite, Share on
-// X (a fixed caption; the banner goes on the clipboard), and a download.
-// Closing it starts the guided tour. Uses the development `?onboarding` route.
+// thank-you banner with their name and quokka, with a GitHub star, a mail
+// draft inviting a friend, Share on X (a fixed caption; the banner goes on the
+// clipboard), and a download.
+// Then Take the tour, or Start now (closing the card is Start now). Uses the development `?onboarding` route.
 
 import { expect, type Page, test } from "@playwright/test";
 
 async function onboardAs(page: Page, name: string) {
   await page.goto("/?onboarding");
   await page.getByPlaceholder("Your first name").fill(name);
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Thanks Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
+  // the Librarian, then the shortcuts, then the thank-you card
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
 }
 
 test("setup ends with a thank-you card, a banner of their own, and ways to share", async ({
@@ -36,7 +35,7 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   // the tour waits for the card
   await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
 
-  const banner = card.getByRole("img", { name: "Your Rotli welcome banner" });
+  const banner = card.getByRole("img", { name: "Your Rotli thank-you banner" });
   await expect(banner).toBeVisible({ timeout: 15_000 });
   const drawn = await banner.evaluate(async (image: HTMLImageElement) => {
     await image.decode();
@@ -73,63 +72,86 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   const clip = await page.evaluate(async () => (await navigator.clipboard.read())[0]?.types ?? []);
   expect(clip).toContain("image/png");
 
+  // Tell a friend opens a mail draft (caught here, never a real mail app)
+  await page.evaluate(() => {
+    const opened: string[] = [];
+    const real = window.open;
+    (window as { opened?: string[] }).opened = opened;
+    window.open = (url?: string | URL) => {
+      opened.push(String(url));
+      window.open = real; // just this one: Star's popup below is real
+      return null;
+    };
+  });
   await card.getByRole("button", { name: "Tell a friend" }).click();
-  await expect(card.getByRole("status")).toHaveText("An invite is copied. Send it to a friend.");
+  await expect(card.getByRole("status")).toHaveText(
+    "Opening a mail draft with an invite. It’s on your clipboard too.",
+  );
+  const mail = await page.evaluate(() => (window as { opened?: string[] }).opened?.[0] ?? "");
+  expect(mail.startsWith("mailto:?subject=Try%20Rotli&body=")).toBe(true);
+  expect(mail).not.toContain("Ada");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("https://rotli.co");
 
   const download = page.waitForEvent("download");
   await card.getByRole("button", { name: "Download banner" }).click();
-  expect((await download).suggestedFilename()).toBe("rotli-welcome.png");
+  expect((await download).suggestedFilename()).toBe("rotli-thank-you.png");
 
   const star = page.waitForEvent("popup");
   await card.getByRole("button", { name: "Star on GitHub" }).click();
   expect((await star).url()).toBe("https://github.com/SethMed7/rotli");
+
+  // what's next sits on its own row, each button on one line
+  const startNow = await card.getByRole("button", { name: "Start now" }).boundingBox();
+  const tour = await card.getByRole("button", { name: "Take the tour" }).boundingBox();
+  expect(startNow!.height).toBeLessThan(44);
+  expect(tour!.height).toBeLessThan(44);
+  expect(Math.abs(startNow!.y - tour!.y)).toBeLessThan(2);
 
   await card.getByRole("button", { name: "Take the tour" }).click();
   await expect(card).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
 });
 
-test("Escape closes the card and still starts the tour", async ({ page }) => {
+test("Start now goes straight in: no tour, and the note at Settings at once", async ({ page }) => {
+  await onboardAs(page, "");
+  const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
+  await expect(card.getByRole("button", { name: "Take the tour" })).toBeVisible();
+  await card.getByRole("button", { name: "Start now" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
+});
+
+test("Escape closes the card the way Start now does", async ({ page }) => {
   await onboardAs(page, "");
   const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
   await expect(card).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(card).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
 });
 
-test("the banner wears their choices: a Grove Dark ground and the bucket hat they picked", async ({
+test("the banner wears their theme, Grove Dark, with the plain quokka setup gives everyone", async ({
   page,
 }) => {
   await page.goto("/?onboarding");
   await page.getByPlaceholder("Your first name").fill("Ada");
-  await page.getByRole("button", { name: "Get started" }).click();
   await page
     .getByRole("radiogroup", { name: "Theme" })
     .getByRole("radio", { name: /^Grove/ })
     .click();
   await page.getByRole("radio", { name: "Dark", exact: true }).first().click();
-  await page.getByRole("checkbox", { name: "Keep my quokka throughout Rotli" }).check();
-  await page
-    .getByRole("radiogroup", { name: "Accessory" })
-    .getByRole("radio", { name: /^Bucket hat/ })
-    .click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Hat Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
+  // the Librarian, then the shortcuts, then the thank-you card
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
 
   const banner = page
     .getByRole("dialog", { name: "Thank you for trying Rotli" })
-    .getByRole("img", { name: "Your Rotli welcome banner" });
+    .getByRole("img", { name: "Your Rotli thank-you banner" });
   await expect(banner).toBeVisible({ timeout: 15_000 });
   const [ground, crown] = await banner.evaluate(async (image: HTMLImageElement) => {
     await image.decode();
@@ -139,8 +161,9 @@ test("the banner wears their choices: a Grove Dark ground and the bucket hat the
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(image, 0, 0);
     const pixel = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3));
-    return [pixel(4, 4), pixel(330, 170)]; // a corner, and the hat's crown over the quokka's head
+    return [pixel(4, 4), pixel(330, 170)]; // a corner, and the air above the quokka's head
   });
   expect(ground[0]! + ground[1]! + ground[2]!).toBeLessThan(150); // a dark ground
-  expect(crown[0]!).toBeGreaterThan(crown[1]! + 40); // the warm hat, not the green quokka or ground
+  // no hat: above the plain quokka's head is the same dark ground
+  expect(Math.abs(crown[0]! - ground[0]!) + Math.abs(crown[1]! - ground[1]!)).toBeLessThan(40);
 });

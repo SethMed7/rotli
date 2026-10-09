@@ -214,6 +214,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
       return "creating a note…";
     case "create_document":
       return "creating a Word document…";
+    case "edit_document":
+      return "editing the Word document…";
     case "update_note":
       return "updating the note…";
     case "open_note":
@@ -407,6 +409,13 @@ export async function runTool(
       }
       if (!host.createDocument) return "error: this host cannot create Word documents.";
       return host.createDocument(title, body);
+    }
+    case "edit_document": {
+      const file = argText(args.file ?? args.query ?? args.name).trim();
+      const actions = Array.isArray(args.actions) ? (args.actions as unknown[]) : null;
+      if (file === "" || !actions) return 'error: edit_document needs a "file" name and an "actions" list.';
+      if (!host.editDocument) return "error: this host cannot edit Word documents.";
+      return host.editDocument(file, actions);
     }
     case "update_note": {
       const id = argText(args.id).trim();

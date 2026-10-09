@@ -1,8 +1,8 @@
 // All tabs closed (only possible in the lone pane) — the quokka rest state
 // (the maintainer, 2026-07-28: "close all tabs and have an empty state"). Since
-// 2026-09-29 it's a small scene that matches the theme, with the person's own
-// quokka in it (shown even when the sidebar companion is off), the three ways
-// back in, and, very quietly, where Rotli lives: the site and its source.
+// 2026-09-29 it's a small scene that matches the theme, the three ways back in,
+// and, very quietly, where Rotli lives: the site and its source. No quokka:
+// full-body characters live in Chat, Settings, and setup only.
 
 import { dispatch } from "../keys/registry";
 import { ROTLI_REPO_URL } from "../lib/feedback";
@@ -11,26 +11,26 @@ import { SITE_URL } from "../lib/thanksBanner";
 import { openLink } from "../services/thanksShare";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { Character } from "./character";
 import { PANE_SCENES } from "./paneEmptyScenes";
 
-export function PaneEmptyState() {
+/** The empty pane's small scene in the theme family's own art — also the
+ * backdrop of the vault prompt after a skipped setup. */
+export function PaneScene() {
   const family = useUiStore((s) => s.themeFamily);
   const scene = PANE_SCENES[family] ?? PANE_SCENES.warm;
   return (
+    <div className="pane-scene" data-scene={scene.name}>
+      <svg className="pane-scene-art" viewBox="0 0 440 200" aria-hidden="true" focusable="false">
+        {scene.art}
+      </svg>
+    </div>
+  );
+}
+
+export function PaneEmptyState() {
+  return (
     <div className="list-empty pane-empty">
-      <div className="pane-scene" data-scene={scene.name}>
-        <svg className="pane-scene-art" viewBox="0 0 440 200" aria-hidden="true" focusable="false">
-          {scene.art}
-        </svg>
-        <Character
-          name={scene.pose}
-          size={96}
-          className="be-quokka pane-scene-quokka"
-          accessorized
-          alwaysVisible
-        />
-      </div>
+      <PaneScene />
       <p className="be-title">All clear</p>
       <p className="be-sub">
         <button type="button" className="pane-empty-act" onClick={() => dispatch("tabs.new")}>

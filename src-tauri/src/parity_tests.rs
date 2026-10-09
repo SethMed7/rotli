@@ -24,6 +24,26 @@ fn string_list(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn document_edit_limits_match_fixture() {
+    assert_eq!(
+        entry("documentEditMaxActions").as_u64(),
+        Some(crate::workspace_documents::MAX_ACTIONS as u64)
+    );
+    assert_eq!(
+        entry("documentEditMaxText").as_u64(),
+        Some(crate::workspace_documents::MAX_TEXT as u64)
+    );
+}
+
+#[test]
+fn document_edit_max_bytes_matches_fixture() {
+    assert_eq!(
+        entry("documentEditMaxBytes").as_u64(),
+        Some(crate::agent_bridge::DOCX_MAX_BYTES)
+    );
+}
+
+#[test]
 fn sheet_edit_max_bytes_matches_fixture() {
     assert_eq!(
         entry("sheetEditMaxBytes").as_u64(),
@@ -322,6 +342,120 @@ fn ai_body_edit_cases_match_fixture() {
             crate::ai_edit_policy::body_edit(&fields).as_str(),
             case["verdict"].as_str().unwrap(),
             "{case}"
+        );
+    }
+}
+
+#[test]
+fn consented_insert_cases_match_fixture() {
+    for case in entry("consentedInsertCases").as_array().expect("cases") {
+        let fields = string_list(&case["fields"]);
+        assert_eq!(
+            crate::ai_edit_policy::consented_insert_refusal(&fields).is_some(),
+            case["refused"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
+
+/// A note's date stamps read and write alike in the Mac app and Rotli Web
+/// (docs/architecture/memex-data-contract.md, "Metadata ownership").
+/// `localMidnight` is each side's own zone, so here it is the no-file reading:
+/// a local midnight within UTC−12..UTC+14 of the fixture day's UTC midnight.
+#[test]
+fn note_date_stamps_match_fixture() {
+    const HOUR_MS: i64 = 3_600_000;
+    const FIXTURE_DAY_UTC_MIDNIGHT: i64 = 1_790_899_200_000; // 2026-10-02T00:00:00Z
+    let value = entry("noteDateStamps");
+    for case in value["reads"].as_array().expect("reads") {
+        let stamp = case["stamp"].as_str().expect("stamp");
+        let file = case["fileMs"].as_i64();
+        let read = crate::note_dates::stamp_to_ms(stamp, file);
+        match case["expect"].as_str().expect("expect") {
+            "file" => assert_eq!(read, file, "{case}"),
+            "asWritten" => assert_eq!(read, case["ms"].as_i64(), "{case}"),
+            "none" => assert_eq!(read, None, "{case}"),
+            "localMidnight" => {
+                let midnight = crate::note_dates::stamp_to_ms(stamp, None).expect("a day");
+                assert_eq!(read, Some(midnight), "{case}");
+                let earliest = FIXTURE_DAY_UTC_MIDNIGHT - 14 * HOUR_MS;
+                let latest = FIXTURE_DAY_UTC_MIDNIGHT + 12 * HOUR_MS;
+                assert!((earliest..=latest).contains(&midnight), "{case}");
+            }
+            other => panic!("unknown expectation {other}"),
+        }
+    }
+    for case in value["days"].as_array().expect("days") {
+        let minutes = case["offsetMinutes"].as_i64().expect("offsetMinutes");
+        let now_secs = case["nowMs"].as_i64().expect("nowMs") / 1000;
+        assert_eq!(
+            crate::note_dates::day_stamp(now_secs, move |_| minutes * 60),
+            case["day"].as_str().expect("day"),
+            "{case}"
+        );
+    }
+}
+
+/// The Graph view's edges: both link readers agree on every fixture body.
+#[test]
+fn wikilink_targets_fixtures_agree() {
+    for case in entry("wikilinkTargets")
+        .as_array()
+        .expect("wikilinkTargets is an array")
+    {
+        let body = case["body"].as_str().expect("body is a string");
+        let expected: Vec<String> = case["targets"]
+            .as_array()
+            .expect("targets is an array")
+            .iter()
+            .map(|t| t.as_str().expect("target is a string").to_string())
+            .collect();
+        assert_eq!(
+            crate::corpus::links::body_link_targets(body),
+            expected,
+            "body_link_targets({body:?})"
+        );
+    }
+}
+
+#[test]
+fn empty_canvas_file_agrees() {
+    assert_eq!(
+        crate::corpus::files::EMPTY_CANVAS,
+        entry("emptyCanvasFile").as_str().expect("emptyCanvasFile is a string")
+    );
+}
+
+#[test]
+fn canvas_home_fixtures_agree() {
+    for case in entry("canvasHome").as_array().expect("canvasHome is an array") {
+        let folder = case["folder"].as_str().expect("folder is a string");
+        let memex = case["memex"].as_bool().expect("memex is a bool");
+        assert_eq!(
+            crate::corpus::files::canvas_home(memex, folder),
+            case["home"].as_str().expect("home is a string"),
+            "canvas_home({memex}, {folder:?})"
+        );
+    }
+}
+
+#[test]
+fn metadata_link_targets_fixtures_agree() {
+    for case in entry("metadataLinkTargets")
+        .as_array()
+        .expect("metadataLinkTargets is an array")
+    {
+        let fields = case["fields"].as_str().expect("fields is a string");
+        let expected: Vec<String> = case["targets"]
+            .as_array()
+            .expect("targets is an array")
+            .iter()
+            .map(|t| t.as_str().expect("target is a string").to_string())
+            .collect();
+        assert_eq!(
+            crate::corpus::links::metadata_link_targets(fields),
+            expected,
+            "metadata_link_targets({fields:?})"
         );
     }
 }

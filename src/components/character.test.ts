@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 
 const characterSource = readFileSync(new URL("character.tsx", import.meta.url), "utf8");
 const artSource = readFileSync(new URL("characterArt.ts", import.meta.url), "utf8");
-const settingsSource = readFileSync(new URL("settingsSurface.tsx", import.meta.url), "utf8");
-const chatSource = readFileSync(new URL("chat/chatSurface.tsx", import.meta.url), "utf8");
 const paneSource = readFileSync(new URL("paneEmptyState.tsx", import.meta.url), "utf8");
 const bucketHatFrontInk = readFileSync(
   new URL("../assets/characters/accessories/bucket-hat-ink.svg", import.meta.url),
@@ -49,25 +47,11 @@ describe("quokka personalization", () => {
     expect(characterSource).not.toContain("centerX - 125");
   });
 
-  test("Appearance exposes mode, body, ink, mood, accessory color, and semantic previews", () => {
-    expect(settingsSource).toContain('title={quokkaCompanionEnabled ? "Companion on" : "Companion off"}');
-    expect(settingsSource).toContain('aria-label="Quokka body color"');
-    expect(settingsSource).toContain('aria-label="Quokka line color"');
-    expect(settingsSource).toContain('aria-label="Quokka idle mood and pose"');
-    expect(settingsSource).toContain('aria-label="Quokka accessory"');
-    expect(settingsSource).toContain('aria-label="Quokka accessory color hue"');
-    expect(settingsSource).toContain('aria-label="Automatic quokka expressions"');
-  });
-
-  test("personal idle placements use the chosen mood while empty states retain semantic poses", () => {
-    expect(chatSource).toContain('className="chat-endmark" personalIdle');
-    expect(chatSource).toContain("accessorized={pristineChat}");
-    // Calm = the preferred idle pose; Lively keeps chatWelcomeCharacter's
-    // time-of-day pose (personalIdle used to override it, 2026-09-01)
-    expect(chatSource).toContain('personalIdle={pristineChat && chatWelcomeStyle === "calm"}');
-    // the empty pane's scene always shows the person's own quokka (2026-09-29)
-    expect(paneSource).toContain('className="be-quokka pane-scene-quokka"');
-    expect(paneSource).toMatch(/pane-scene-quokka"\s+accessorized\s+alwaysVisible/);
+  test("the character always renders: no companion switch, no chosen idle mood", () => {
+    expect(characterSource).not.toContain("quokkaCompanionEnabled");
+    expect(characterSource).not.toContain("personalIdle");
+    // the empty pane's scene no longer stages a quokka
+    expect(paneSource).not.toContain("<Character");
   });
 
   test("small ambient characters use one crisp semantic line presentation", () => {

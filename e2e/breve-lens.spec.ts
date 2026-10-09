@@ -16,7 +16,7 @@ test("Breve is a labelled switcher segment and the chrome survives the trip", as
   await breve.click();
   await expect(page.getByRole("main", { name: /^Breve/ })).toBeVisible();
   await expect(breve).toHaveAttribute("aria-pressed", "true");
-  await expect(switcher.getByRole("button", { name: "Notes", exact: true })).toHaveAttribute(
+  await expect(switcher.getByRole("button", { name: "Home", exact: true })).toHaveAttribute(
     "aria-pressed",
     "false",
   );
@@ -27,7 +27,7 @@ test("Breve is a labelled switcher segment and the chrome survives the trip", as
   await expect(page.locator("[data-breve-health='warn']")).toHaveCount(0);
 
   // the way back is the same control
-  await switcher.getByRole("button", { name: "Notes", exact: true }).click();
+  await switcher.getByRole("button", { name: "Home", exact: true }).click();
   await expect(breve).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("main", { name: /^Breve/ })).toHaveCount(0);
 });

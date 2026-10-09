@@ -7,19 +7,21 @@ test("visual diagram editing is unavailable in production and available for deve
   expect(launchFeatures(true).mermaidVisualEditing).toBe(true);
 });
 
-test("public builds keep notes, chat and the Chat window while every experimental capability stays in development", () => {
+test("public builds keep notes, chat, Sheets (Beta) and the Chat window while every experimental capability stays in development", () => {
   expect(launchFeatures(false)).toEqual({
     notes: true,
     chat: true,
     breve: false,
     mermaidVisualEditing: false,
     agents: false,
-    sheets: false,
+    sheets: true,
     documents: true,
     hotkeys: true,
     mermaidDiagrams: false,
     voice: false,
     chatWindow: true,
+    jsonCanvas: false,
+    graph: false,
   });
   expect(launchFeatures(true)).toEqual({
     notes: true,
@@ -33,6 +35,8 @@ test("public builds keep notes, chat and the Chat window while every experimenta
     mermaidDiagrams: true,
     voice: true,
     chatWindow: true,
+    jsonCanvas: true,
+    graph: true,
   });
 });
 
@@ -50,6 +54,10 @@ test("the web platform withholds every capability that needs the desktop shell, 
     expect(web.voice).toBe(false);
     // a second browser tab would be a second writer with no coordination
     expect(web.chatWindow).toBe(false);
+    // a canvas opens and saves in the connected folder, as on the Mac
+    expect(web.jsonCanvas).toBe(development);
+    // the Graph reads the connected folder's links, as on the Mac
+    expect(web.graph).toBe(development);
     // channel-only gates still follow the channel: nothing about them needs Tauri
     expect(web.mermaidVisualEditing).toBe(development);
     expect(web.mermaidDiagrams).toBe(development);

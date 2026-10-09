@@ -231,6 +231,10 @@ const tauriAllowlist = new Set([
   "src/lib/clipboard.ts",
   "src/lib/nativeDrag.ts",
   "src/lib/noteProtection.ts",
+  "src/lib/agentBridge.ts",
+  "src/lib/aiFiles.ts",
+  "src/lib/aiInsert.ts",
+  "src/lib/pinnedSiteShell.ts",
   "src/lib/quitFlush.ts",
   "src/lib/tauri.ts",
   "src/lib/vaultRepair.ts",
@@ -260,6 +264,10 @@ const vendorSeams = [
     vendor: "@univerjs",
     allowed: ["src/sheets/engine/", "src/documents/engine/", "src/brand/univerTheme.ts"],
   },
+  // the ```chart fence's renderer (2026-10-05); chartSpec.ts owns the text
+  { vendor: "@tanstack/charts", allowed: ["src/editor/chartRender.ts"] },
+  // the Graph view's force layout (exploration 2026-10-05)
+  { vendor: "d3-force", allowed: ["src/graph/engine/"] },
   {
     vendor: "jszip",
     allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/", "src/lib/vaultZip.ts"],
@@ -313,6 +321,7 @@ const componentAdapterDebt = new Set([
   "src/components/activitySurface.tsx",
   "src/components/breve/breveSurface.tsx",
   "src/components/breve/breveWatchlist.tsx",
+  "src/components/chat/chatModelChoices.tsx",
   "src/components/breve/useBreve.ts",
   "src/components/browserSurface.tsx",
   "src/components/captureCard.tsx",
@@ -321,7 +330,6 @@ const componentAdapterDebt = new Set([
   "src/components/documentEditor.tsx",
   "src/components/fileSurface.tsx",
   "src/components/modelUsageSummary.ts",
-  "src/components/onboarding/modelSetup.tsx",
   "src/components/onboarding/onboarding.tsx",
   "src/components/onboarding/vaultActivation.tsx",
   "src/components/previewModal.tsx",
@@ -335,7 +343,6 @@ const componentAdapterDebt = new Set([
   "src/components/tasksSurface.tsx",
   "src/components/titlebar.tsx",
   "src/components/useNoteMenu.ts",
-  "src/components/vaultFolderBrowserDialog.tsx",
 ]);
 // Cross-cutting idioms with ONE owner each: the OS colour scheme is read only
 // by the theme owner (everything else reads data-theme through state/theme.ts),

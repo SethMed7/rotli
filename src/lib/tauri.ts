@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
+import type { NoteLinks } from "../graph/model";
 import type {
   BrevePdfPalette,
   BreveConfig,
@@ -16,12 +17,7 @@ import type {
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
-import {
-  type VaultBrowserView,
-  browserEmptyFolders,
-  browserVaultHome,
-  browserVaultPreview,
-} from "./vaultBrowserPreview";
+import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
   currentWebAiBridge,
@@ -463,6 +459,9 @@ export interface ChatModelInfo {
    * since server 0.3 every installed mlx model serves on demand per request.
    * Optional (absent on connected/preset synthetic models). */
   localDefault?: boolean;
+  /** Listed in the registry, so actually installed; false for the built-in
+   * fallback Rust offers before any model exists. */
+  registered?: boolean;
 }
 
 /** The on-device model bridge (chat + web). Same guard+normalize contract as
@@ -973,7 +972,7 @@ export function rootIdOf(id: string): string {
 /** Split a corpus wire id into its root + relative path. The default LOCAL root
  * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
  * where rootid has no slash. Mirrors Rust `split_root_id`. */
-function splitRootId(id: string): { rootId: string; rel: string } {
+export function splitRootId(id: string): { rootId: string; rel: string } {
   const i = id.indexOf(":");
   if (i > 0 && !id.slice(0, i).includes("/")) {
     return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
@@ -988,6 +987,14 @@ export async function fileAssetUrl(id: string): Promise<string> {
   const { rootId, rel } = splitRootId(id);
   const abs = await corpusAbs(rootId, rel);
   return abs ? convertFileSrc(abs) : "";
+}
+
+/** Create an empty JSON Canvas named `name` beside the notes in `folderId`
+ * (a folder that can't hold notes lands it where a new note would). Rotli
+ * Web's twin is services/folderCanvases.ts. */
+export async function corpusCreateCanvas(folderId: string, name: string): Promise<string> {
+  if (!isTauri()) throw new Error("no Mac corpus to create a canvas in");
+  return invoke<string>("corpus_create_canvas", { folderId, name });
 }
 
 /** Read a surfaced FILE's text content (for the in-app text viewer). Capped on
@@ -1373,6 +1380,12 @@ export async function corpusTasks(): Promise<TaskItem[]> {
   return invoke<TaskItem[]>("corpus_tasks");
 }
 
+/** Every live note's raw outgoing wikilinks — the Graph view's projection. */
+export async function corpusLinks(): Promise<NoteLinks[]> {
+  if (!isTauri()) return [];
+  return invoke<NoteLinks[]>("corpus_links_list");
+}
+
 /** Check one task off — Rust re-validates the exact text before flipping. */
 export async function corpusToggleTask(id: string, line: number, expect: string): Promise<void> {
   if (!isTauri()) return;
@@ -1410,17 +1423,21 @@ export function corpusWriteAi(
 export interface CorpusAiRead {
   body: string;
   revision: string;
+  /** The editor's copy of the note, when asked for (desktop only). */
+  editor?: string;
 }
 
 export async function corpusReadAiVersioned(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
+  opts?: { withEditor?: boolean },
 ): Promise<CorpusAiRead> {
   if (!isTauri()) return webCorpus()?.read(id) ?? { body: "", revision: "browser:0" };
   return invoke<CorpusAiRead>("corpus_read_ai", {
     id,
     modelId: model.id,
     endpoint: model.endpoint,
+    withEditor: opts?.withEditor ?? false,
   });
 }
 
@@ -1566,79 +1583,6 @@ export function corpusInspectFolder(path: string): Promise<VaultInspection> {
     });
   }
   return invoke<VaultInspection>("corpus_inspect_folder", { path });
-}
-
-/** Copy a reviewed third-party Markdown tree into an empty destination, then
- * activate the copy. The source is never modified. */
-export async function corpusImportVaultCopy(source: string, destination: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_import_vault_copy", { source, destination });
-}
-
-export type { VaultBrowserView } from "./vaultBrowserPreview";
-
-/** Open Rotli's directory-only, Home-contained vault navigator. Rust owns the
- * session and returns no filenames or file contents. */
-export function vaultBrowserStart(requireEmpty: boolean): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserVaultPreview.view = { ...browserVaultHome, canSelect: false };
-    return Promise.resolve(browserVaultPreview.view);
-  }
-  return invoke<VaultBrowserView>("vault_browser_start", { requireEmpty });
-}
-
-export function vaultBrowserOpenChild(name: string): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserVaultPreview.view = {
-      absolutePath: `${browserVaultPreview.view.absolutePath}/${name}`,
-      displayPath: `${browserVaultPreview.view.displayPath}/${name}`,
-      homePath: browserVaultPreview.view.homePath,
-      directories: [],
-      canGoBack: true,
-      canSelect: true,
-      selectDisabledReason: null,
-    };
-    return Promise.resolve(browserVaultPreview.view);
-  }
-  return invoke<VaultBrowserView>("vault_browser_open_child", { name });
-}
-
-export function vaultBrowserGoBack(): Promise<VaultBrowserView> {
-  if (!isTauri()) return vaultBrowserStart(false);
-  return invoke<VaultBrowserView>("vault_browser_go_back");
-}
-
-export function vaultBrowserRefresh(): Promise<VaultBrowserView> {
-  if (!isTauri()) return Promise.resolve(browserVaultPreview.view);
-  return invoke<VaultBrowserView>("vault_browser_refresh");
-}
-
-export function vaultBrowserCreateFolder(name: string): Promise<VaultBrowserView> {
-  if (!isTauri()) {
-    browserEmptyFolders.add(`${browserVaultPreview.view.absolutePath}/${name}`);
-    return vaultBrowserOpenChild(name);
-  }
-  return invoke<VaultBrowserView>("vault_browser_create_folder", { name });
-}
-
-export function vaultBrowserSelect(): Promise<string> {
-  if (!isTauri()) return Promise.resolve(browserVaultPreview.view.absolutePath);
-  return invoke<string>("vault_browser_select");
-}
-
-export function vaultBrowserSelectChild(name: string): Promise<string> {
-  if (!isTauri()) return Promise.resolve(`${browserVaultPreview.view.absolutePath}/${name}`);
-  return invoke<string>("vault_browser_select_child", { name });
-}
-
-export async function vaultBrowserCancel(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("vault_browser_cancel");
-}
-
-export async function vaultBrowserReveal(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("vault_browser_reveal");
 }
 
 /** The whole Location config; migrates the four legacy files in on first read.
@@ -1821,6 +1765,14 @@ export function onOpenRequest(cb: () => void): () => void {
 export function onNativeCloseTab(cb: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen("rotli:close-tab", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** macOS Edit → Undo / Redo picked with the pointer (⌘Z / ⇧⌘Z reach the page as
+ * key presses instead; keys/editHistoryActions.ts). */
+export function onNativeEditHistory(cb: (redo: boolean) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<string>("rotli:edit-history", (event) => cb(event.payload === "redo"));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -2026,8 +1978,13 @@ export function memexWriteNote(root: string, stem: string, contents: string): Pr
 export function memexValidate(root: string): Promise<MemexValidateReport> {
   return memexInvoke("memex_validate", { root });
 }
-export function memexPickFolder(): Promise<string | null> {
-  return memexInvoke("memex_pick_folder");
+/** The macOS folder panel, the one way a vault folder is chosen (the owner,
+ * 2026-10-05: "people know exactly what to do"); its New Folder makes a fresh
+ * vault. Rust authorizes the pick and refuses privileged roots. The browser
+ * twin picks a fresh empty folder so setup can be walked without a Mac. */
+export function memexPickFolder(title?: string): Promise<string | null> {
+  if (!isTauri()) return Promise.resolve(browserPickFolder());
+  return memexInvoke("memex_pick_folder", { title: title ?? null });
 }
 
 // ——— cross-webview events (the capture card and the main window are separate

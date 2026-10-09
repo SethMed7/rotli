@@ -15,6 +15,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 
 | Event | Direction | Purpose |
 |---|---|---|
+| `rotli:agent-request` | R→W | An agent's Word document request through the agent bridge (`agent_bridge.rs`), already admitted by Rust; the main webview carries it out and answers with `agent_bridge_reply`. |
 | `rotli:appearance` | W→W | Main broadcasts its whole app-settings snapshot (theme, accent, quokka, syntax palette, hotkey peek, rebinds, per-note typography) so the Quick Note and capture webviews apply it live. |
 | `rotli:brain-journal` | R→W | The organizer appended a journal entry; the Activity surface refreshes. |
 | `rotli:capture` | W→W | The capture card hands a typed capture (id, body, open flag) to the main window, which owns the corpus and files it. |
@@ -25,6 +26,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:chat-window-show` | R→W | The chat window was shown; its webview refocuses. |
 | `rotli:close-tab` | R→W | The native Close menu item / ⌘W route asks the focused SHELL webview (main, or the Chat window) to close its focused tab (visitor windows hide instead). |
 | `rotli:corpus-changed` | R→W | The watcher or an internal write changed the vault; listings and the note universe refetch. Sent to every shell window (main and the Chat window): a shell that misses it shows stale content and fails its next save on the revision gate. |
+| `rotli:edit-history` | R→W | Edit → Undo / Redo picked with the pointer (payload `undo` or `redo`): the focused webview replays the press as ⌘Z / ⇧⌘Z at what has focus. The keys themselves no longer go through the menu. |
 | `rotli:flush-before-quit` | R→W | Quit was requested; every webview flushes pending saves before the host exits. |
 | `rotli:local-queue` | R→W | The on-device model queue changed (position, running, prioritized); chat rows update — in both shell windows. |
 | `rotli:native-drag` | R→W | A native drag is hovering (physical pointer, item count) or has left; the editor under the pointer draws its drop line. A pathless drag that promises a file or carries image bytes (the macOS screenshot thumbnail, a browser image) counts as one item so the line still draws. |

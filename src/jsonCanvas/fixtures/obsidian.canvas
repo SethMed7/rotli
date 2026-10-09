@@ -1,0 +1,13 @@
+{
+	"nodes":[
+		{"id":"g1","type":"group","label":"Reading","x":-40,"y":-40,"width":800,"height":500},
+		{"id":"a1","type":"text","text":"# Idea\n\nSomething","x":0,"y":0,"width":250,"height":140,"color":"4"},
+		{"id":"b2","type":"file","file":"wiki/Books.md","subpath":"#Shelf","x":300,"y":0,"width":400,"height":400},
+		{"id":"c3","type":"link","url":"https://jsoncanvas.org","x":0,"y":200,"width":250,"height":120,"color":"#ff8800"},
+		{"id":"d4","type":"widget","x":0,"y":400,"width":100,"height":100,"pluginData":{"k":1}}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"a1","fromSide":"right","toNode":"b2","toSide":"left","label":"cites","styleAttributes":{}}
+	],
+	"metadata":{"version":"1.0"}
+}

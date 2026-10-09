@@ -152,8 +152,15 @@ the switcher."
   are on. The rules live once in `src/lib/sidebarFronts.ts`: at least one
   front stays on (its switch locks), and turning off the home moves home to
   the first front still on.
-- The segment formerly labelled **Home** now reads **Notes**; "home" means
-  where Rotli opens. Internal ids (`sidebarView: "home"`) are unchanged.
+- **Whichever front is home reads Home** (the owner, 2026-10-01: "one needs
+  to be marked as home, and whatever it is is called Home, not its specific
+  one, and that one can't be dragged out"). The home segment wears the house
+  and the word Home and leads the switch (`homeSegment`, `homeFirst`); the
+  others keep their names (Notes with the notes stack, Chat, Breve). Settings
+  marks it too ("Notes · Home"). Chat as home has no pull-out: no tear-off,
+  no corner button, no context menu, and `popOutBlocker` refuses the ⌘K
+  action (`POP_OUT_HOME`); choosing Chat as home while it's out in its own
+  window brings it back. Internal ids (`sidebarView: "home"`) are unchanged.
 - A front that's off has no way in. Its segment is gone, its shortcuts are
   disabled (`modules.notes`, `modules.chat`, `modules.toggleFront`,
   `chat.new`, `chat.summon` and ⌥A, `view.breve`), and anything that lands on
@@ -209,7 +216,8 @@ in the unknown-key passthrough (`#35`), so a downgrade keeps the user's cap.
 ## Chat in its own window (1.3.0, in the work)
 
 Chat can be pulled out of this switch into a window of its own; Home cannot —
-main is where Home lives. Decision and seams:
+main is where Home lives. Since 2026-10-01 Home is whichever front the person
+chose, so Chat as Home stays put too (`POP_OUT_HOME`). Decision and seams:
 [`docs/decisions/2026-09-21-chat-window-same-vault.md`](../decisions/2026-09-21-chat-window-same-vault.md).
 Development builds only until the native checklist passes
 (`LAUNCH_FEATURES.chatWindow`), the Mac app only.
@@ -338,3 +346,28 @@ new IA — each piece owns one front or one zone.
   switcher inside a mode that has its own navigation would be two switchers.
   The shared vault header remains stable: only its Coffee/Quokka mode control
   changes, while New, New folder, and Collapse all stay available.
+
+## The sidebar's look: scenery and icons (2026-10-01)
+
+The owner: "make the left menu alive via scenery … head and footer scenes, and
+both, very subtle", from T3 Code's hill and tree behind its sidebar header;
+"for the icons, allow Neutral, which makes them all fit in, or Color, which
+uses their own color".
+
+- **Scenery** (`sidebar/sidebarScenery.tsx`; Settings → Appearance → Sidebar →
+  Scenery: Off · Top · Bottom · Both, default Top). The theme family's own
+  horizon as a **one-ink silhouette** behind the header row (56px) and/or the
+  footer (64px). The owner, the same day: "it can't make things hard to see …
+  more subtle, no visual clutter", so: no sky objects, no detail strokes,
+  every shape the text ink at 6% (`opacity: 0.06`), never under the rows'
+  middle. `e2e/sidebar-look.spec.ts` holds it there (opacity ≤ 0.08, bands ≤
+  64px). Still, never animated (ROTLI_DESIGN#2), `pointer-events: none`, under
+  the rows through `isolation` on `.sidebar`, faded by a linear mask.
+- **Icons** (`data-icons` on `.sidebar`; Icons: Neutral · Color, default
+  Neutral). Neutral gives every mark one ink: the Word badge, the kit's clay,
+  and the color provider logos (drawn as masks, `model-logo-ink`). Color gives
+  each row's kind its semantic color (`iconKind`, `kind-*`): boards and
+  folders the accent, PDFs `--danger`, images `--success`, documents and SVGs
+  `--syntax-blue`; Word and the provider logos keep their own.
+- Both live in the app settings on this Mac (`sidebarLook`, `state/appExtras.ts`).
+  Proof: `src/lib/sidebarLook.test.ts`, `e2e/sidebar-look.spec.ts`.

@@ -252,6 +252,12 @@
   padding-left: 10px;
   color: var(--text-muted);
 }
+.pv-note p.pv-align-center {
+  text-align: center;
+}
+.pv-note p.pv-align-right {
+  text-align: right;
+}
 .pv-blank {
   height: 0.6em;
 }
@@ -456,8 +462,7 @@
 
 /* — the quokka character set: line-art illustrations whose LINE color follows
    the theme (each SVG is a single currentColor path), shape constant. Used in
-   the quokka-world placements only: empty states, onboarding, the chat connect
-   state (the maintainer, 2026-06-26). — */
+   three places only: Chat (the chat buddy), Settings, and first-run setup. — */
 .quokka,
 .quokka-mark {
   display: inline-flex;
@@ -509,12 +514,6 @@
 .quokka-detail-layer {
   object-fit: contain;
   user-select: none;
-}
-/* the empty-state quokka sits in the warm ink, a touch soft so it reads as a
-   friendly mascot, not a heavy graphic */
-.empty-stage .quokka {
-  color: var(--text);
-  margin-bottom: 18px;
 }
 .empty-stage .et {
   font-family: var(--font-display);
@@ -2018,52 +2017,6 @@
 .quokka-line-choice.white > span {
   background: var(--quokka-line-white);
 }
-.quokka-field-note {
-  margin: -3px 0 8px;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-.quokka-idle-poses {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-.quokka-idle-pose {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 52px 1fr;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.quokka-idle-pose:hover {
-  background: var(--hov);
-}
-.quokka-idle-pose.sel {
-  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
-  background: var(--selected-bg);
-}
-.quokka-idle-pose > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-.quokka-idle-pose strong {
-  font-size: 11px;
-  font-weight: var(--wght-label);
-}
-.quokka-idle-pose small {
-  color: var(--text-muted);
-  font-size: 9.5px;
-}
 .quokka-accessories {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2770,6 +2723,41 @@
   opacity: 0.6;
 }
 
+/* Appearance → Theme button → My picks: the fourteen environments as compact
+   on/off pills, in the order the sun walks them; wraps on a narrow window */
+.theme-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  max-width: 560px;
+  margin-top: 10px;
+}
+.theme-pick {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-pick:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.theme-pick.sel {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+}
+.theme-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ——— storage: the notes-folder location row + ghost buttons ——— */
 .locrow {
   display: flex;
@@ -3163,311 +3151,6 @@
   line-height: 1;
 }
 
-/* — Vault folder browser — Rotli-native, directory-only selection. The flat
-   bordered card follows the same material law as command and rename surfaces;
-   Rust owns containment and authorization beneath this presentation. — */
-.vault-browser-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--scrim);
-  animation: scrim-in var(--motion-enter) var(--motion-ease);
-}
-.vault-browser-card {
-  width: min(700px, 100%);
-  max-height: min(720px, calc(100vh - 48px));
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-card);
-}
-.vault-browser-card:focus {
-  outline: none;
-}
-.vault-browser-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  padding: 20px 22px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.vault-browser-heading {
-  flex: 1;
-  min-width: 0;
-}
-.vault-browser-eyebrow {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--accent-text);
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.vault-browser-heading h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
-  line-height: 1.25;
-}
-.vault-browser-heading p {
-  margin: 5px 0 0;
-  max-width: 58ch;
-  color: var(--text-muted);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-.vault-browser-close,
-.vault-browser-back,
-.vault-browser-refresh {
-  min-height: 30px;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-control);
-  font: inherit;
-  font-size: 11.5px;
-  cursor: pointer;
-}
-.vault-browser-close {
-  padding: 4px 8px;
-  border-color: var(--border);
-}
-.vault-browser-close:hover,
-.vault-browser-back:hover:not(:disabled),
-.vault-browser-refresh:hover:not(:disabled) {
-  color: var(--text);
-  background: var(--hov);
-}
-.vault-browser-back:disabled,
-.vault-browser-refresh:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.vault-browser-location {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 9px 14px;
-  background: var(--ground);
-  border-bottom: 1px solid var(--border);
-}
-.vault-browser-back {
-  width: 32px;
-  flex: 0 0 32px;
-  padding: 0;
-}
-.vault-browser-back svg {
-  transform: rotate(180deg);
-}
-.vault-browser-path {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.vault-browser-path strong,
-.vault-browser-path span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vault-browser-path strong {
-  font-size: 13.5px;
-  font-weight: 650;
-}
-.vault-browser-path span {
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-.vault-browser-refresh {
-  padding: 4px 9px;
-}
-.vault-browser-list {
-  flex: 1;
-  min-height: 230px;
-  max-height: 390px;
-  overflow-y: auto;
-  padding: 7px;
-  background: var(--surface);
-}
-.vault-browser-row {
-  width: 100%;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r-control);
-  font: inherit;
-  font-size: 13.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.vault-browser-row:hover {
-  background: var(--hov);
-}
-.vault-browser-row.selected {
-  color: var(--selected-ink);
-  background: var(--selected-bg);
-  border-color: transparent;
-  font-weight: 600;
-}
-.vault-browser-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.vault-browser-row > span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vault-browser-row > svg:first-child {
-  color: var(--accent-text);
-}
-.vault-browser-row > svg:last-child {
-  color: var(--text-muted);
-}
-.vault-browser-row.selected > svg {
-  color: var(--selected-icon);
-}
-.vault-browser-status {
-  min-height: 210px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  color: var(--text-muted);
-  font-size: 12.5px;
-  text-align: center;
-}
-.vault-browser-status.error,
-.vault-browser-reason.error {
-  color: var(--danger);
-}
-.vault-browser-create {
-  padding: 12px 14px;
-  background: var(--surface-2);
-  border-top: 1px solid var(--border);
-}
-.vault-browser-create label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.vault-browser-create > div {
-  display: flex;
-  gap: 7px;
-}
-.vault-browser-create input {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 10px;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-control);
-  font: inherit;
-  font-size: 13px;
-}
-.vault-browser-create input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.vault-browser-reason {
-  margin: 0;
-  padding: 9px 14px;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border-top: 1px solid var(--border);
-  font-size: 11.5px;
-  line-height: 1.4;
-}
-.vault-browser-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 14px;
-  border-top: 1px solid var(--border);
-}
-.vault-browser-tools,
-.vault-browser-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.vault-browser-tools .ghostbtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.vault-browser-hints {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px 16px;
-  padding: 8px 14px;
-  color: var(--text-muted);
-  background: var(--ground);
-  border-top: 1px solid var(--border);
-  font-size: 10.5px;
-}
-.vault-browser-hints span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.vault-browser-hints kbd {
-  min-width: 18px;
-  text-align: center;
-}
-@media (max-width: 640px), (max-height: 620px) {
-  .vault-browser-overlay {
-    align-items: stretch;
-    padding: 12px;
-  }
-  .vault-browser-card {
-    max-height: calc(100vh - 24px);
-  }
-  .vault-browser-head {
-    padding: 16px;
-  }
-  .vault-browser-list {
-    min-height: 140px;
-  }
-  .vault-browser-foot {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .vault-browser-tools,
-  .vault-browser-actions {
-    justify-content: space-between;
-  }
-  .vault-browser-actions .ghostbtn {
-    flex: 1;
-  }
-  .vault-browser-hints {
-    display: none;
-  }
-}
-
 /* — Rename dialog (opened from the menu's "Rename…") — */
 .rename-overlay {
   position: fixed;
@@ -3583,6 +3266,58 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+/* Basic | Refined: the dashboard range's segmented grammar, sized for a card */
+.hand-to-ai-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.hand-to-ai-head .hand-to-ai-note {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.hand-to-ai-mode {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--tint);
+}
+.hand-to-ai-mode button {
+  min-height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hand-to-ai-mode button:hover:not(:disabled) {
+  color: var(--text);
+}
+.hand-to-ai-mode button.sel {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.hand-to-ai-mode button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.hand-to-ai-mode button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hand-to-ai-working {
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-inner);
+}
 
 /* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —
    each chord pinned to the control it drives, so the eye never leaves the UI.
@@ -3662,6 +3397,32 @@
   color: var(--text);
   pointer-events: auto;
   animation: pop-in var(--motion-enter) var(--motion-ease);
+}
+/* the note at Settings after first run (settingsHint.tsx): the tour's card,
+   alone, beside the Settings button; the app stays live around it */
+.settings-hint {
+  z-index: 17;
+}
+.settings-hint-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+}
+.settings-hint-open {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--r-control);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.settings-hint-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .tour-card h2 {
   margin: 2px 0 6px;
@@ -3780,6 +3541,17 @@
   margin-top: 14px;
   margin-right: 8px;
   text-decoration: none;
+}
+
+/* About → Built in: the editors' names link to their sites, in the accent */
+.about-inline-link {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.about-inline-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 /* Rotli Web's connect-a-folder explanation: the rename card, a little wider,
@@ -3927,6 +3699,10 @@
   border: 1px solid var(--border);
   border-radius: var(--r-control);
   padding: 6px 10px;
+}
+/* an optional name (a station's, a pinned site's) stays narrower than its address */
+.rules-input-name {
+  flex: 0 1 11rem;
 }
 .rules-input:focus-visible {
   outline: none;

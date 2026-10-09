@@ -3452,10 +3452,11 @@ dependencies = [
 
 [[package]]
 name = "rotli"
-version = "1.7.1"
+version = "1.8.0"
 dependencies = [
  "base64 0.22.1",
  "block2",
+ "flate2",
  "libc",
  "notify",
  "objc2",

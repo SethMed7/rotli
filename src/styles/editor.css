@@ -813,47 +813,61 @@
   pointer-events: none;
 }
 
+/* The scroll-to-top arrow (#6, 2026-10-02): a small, quiet control that sits
+   centered in the corner's 42px slot — the Librarian pill and
+   scrollTopLane.ts still measure that slot, so nothing beside it moves. At
+   rest it is a muted glyph on the ground with a faint hairline; hover and
+   keyboard focus bring the full hairline and the text color, and focus keeps
+   the global accent ring. Flat, like every surface: no shadow. */
 .editor-scroll-top {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
+  right: 21px;
+  bottom: 21px;
   z-index: 4;
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: var(--r-control);
   background: var(--ground);
-  color: var(--text);
+  color: var(--text-muted);
   cursor: pointer;
+  transition:
+    color var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease);
 }
-.editor-scroll-top:hover {
+.editor-scroll-top svg {
+  width: 14px;
+  height: 14px;
+}
+.editor-scroll-top:hover,
+.editor-scroll-top:focus-visible {
+  border-color: var(--border);
   background-image: linear-gradient(var(--hov), var(--hov));
+  color: var(--text);
 }
 /* A narrow editor: the centered format bar reaches the arrow's corner, so the
-   arrow rises above the bar (16px slot inset + 42px bar + 8px gap) —
-   scrollTopLane.ts decides. */
+   arrow rises above the bar (16px slot inset + 42px bar + 8px gap, then
+   re-centered in the slot) — scrollTopLane.ts decides. */
 .editor[data-lift-scroll-top] .editor-scroll-top {
-  bottom: 66px;
+  bottom: 71px;
 }
-/* the Quick Note's small window: a compact arrow tucked in the corner beside
-   the bar (scrollTopLane.ts QUICK_LANE_PX), not a big box over the text */
+/* the Quick Note's small window: a smaller arrow tucked in the corner beside
+   the bar (scrollTopLane.ts QUICK_LANE_PX), centered where the 28px one sat */
 .quick-window .editor-scroll-top {
-  right: 10px;
-  bottom: 22px;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-control);
-  color: var(--text-muted);
+  right: 12px;
+  bottom: 24px;
+  width: 24px;
+  height: 24px;
 }
 .quick-window .editor-scroll-top svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 .quick-window .editor[data-lift-scroll-top] .editor-scroll-top {
-  bottom: 58px;
+  bottom: 60px;
 }
 
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.
@@ -947,6 +961,13 @@
   border-left: 3px solid var(--quote-bar);
   padding-left: 14px;
   color: var(--text-muted);
+}
+/* an aligned paragraph — <p align="center|right">…</p> (SYNTAX.md) */
+.rotli-cm-host .cm-line.rotli-align-center {
+  text-align: center;
+}
+.rotli-cm-host .cm-line.rotli-align-right {
+  text-align: right;
 }
 .rotli-cm-host .cm-line.rotli-li,
 .rotli-cm-host .cm-line.rotli-task,
@@ -1533,7 +1554,8 @@
   top: auto;
   bottom: calc(100% + 6px);
 }
-.rotli-imagegen-empty {
+.rotli-imagegen-empty,
+.rotli-inline-ai-empty {
   margin: 0;
   color: var(--text-muted);
   font-size: 12.5px;
@@ -1569,7 +1591,8 @@
   opacity: 0.55;
   cursor: default;
 }
-.rotli-imagegen-prompt {
+.rotli-imagegen-prompt,
+.rotli-inline-ai-prompt {
   display: block;
   width: 100%;
   resize: none;
@@ -1581,23 +1604,27 @@
   padding: 7px 9px;
   line-height: 1.45;
 }
-.rotli-imagegen-prompt:focus {
+.rotli-imagegen-prompt:focus,
+.rotli-inline-ai-prompt:focus {
   outline: none;
   border-color: var(--accent);
 }
-.rotli-imagegen-error {
+.rotli-imagegen-error,
+.rotli-inline-ai-error {
   margin: 7px 0 0;
   color: var(--danger, var(--accent-text));
   font-size: 12px;
   line-height: 1.45;
 }
-.rotli-imagegen-row {
+.rotli-imagegen-row,
+.rotli-inline-ai-row {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 9px;
 }
-.rotli-imagegen-note {
+.rotli-imagegen-note,
+.rotli-inline-ai-note {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -1607,7 +1634,9 @@
   font-size: 11.5px;
 }
 .rotli-imagegen-cancel,
-.rotli-imagegen-go {
+.rotli-imagegen-go,
+.rotli-inline-ai-cancel,
+.rotli-inline-ai-go {
   flex: 0 0 auto;
   border-radius: var(--r-control);
   padding: 5px 11px;
@@ -1615,23 +1644,59 @@
   font-size: 12px;
   cursor: pointer;
 }
-.rotli-imagegen-cancel {
+.rotli-imagegen-cancel,
+.rotli-inline-ai-cancel {
   border: none;
   background: none;
   color: var(--text-muted);
 }
-.rotli-imagegen-cancel:hover {
+.rotli-imagegen-cancel:hover,
+.rotli-inline-ai-cancel:hover {
   background: var(--hov);
   color: var(--text);
 }
-.rotli-imagegen-go {
+.rotli-imagegen-go,
+.rotli-inline-ai-go {
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--on-accent);
 }
-.rotli-imagegen-go:disabled {
+.rotli-imagegen-go:disabled,
+.rotli-inline-ai-go:disabled,
+.rotli-inline-ai-cancel:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.rotli-inline-ai-cancel:focus-visible,
+.rotli-inline-ai-go:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* — Ask AI (`/ai`, 2026-10-05): the same popover voice, a little wider for
+   prose; the answer reads as the Markdown it will be, untouched until Insert — */
+.rotli-inline-ai {
+  width: min(460px, calc(100vw - 24px));
+}
+.rotli-inline-ai-label {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.rotli-inline-ai-answer {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface-2, transparent);
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* — the raw-metadata banner ("Show file metadata"): the frontmatter block as
@@ -1978,6 +2043,23 @@
 }
 .rotli-img:hover .rotli-img-resize {
   opacity: 1;
+}
+/* Appearance → Outline images: a hairline drawn just inside the frame, on its
+   own layer, so it keeps the image's radius, never shifts layout, and never
+   competes with the accent selection outline below (that one sits outside) */
+:root[data-outline-images="true"] .rotli-img::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  pointer-events: none;
+}
+:root[data-outline-images="true"] .rotli-img.missing::after {
+  display: none;
+}
+:root[data-outline-images="true"] .rotli-img-resize {
+  z-index: 1;
 }
 /* click-selected image — the widget stays rendered; the outline marks the object */
 .rotli-img.sel img,

@@ -3,8 +3,12 @@
 // life, never tied to the sidebar (which unmounts when it collapses):
 //
 // - one <audio> element for the ambient track, looped, faded in and out;
-// - Claude FM, when it's the chosen source: a private browser page that never
-//   shows, kept playing or paused to match the rules;
+// - Claude FM or one of the person's own YouTube stations, when it's the
+//   chosen source: a private browser page that never shows, kept playing or
+//   paused to match the rules;
+// - a pause or play from outside Rotli (AirPods, a media key, the page's own
+//   button) taken as the person's choice, never fought (the owner, 2026-10-01:
+//   "if I pause with airpods … it should pause");
 // - a question to each browser tab's page, "are you playing?" (WebKit's own
 //   answer, private_browser_media.rs), kept in memory — often while anything
 //   has media, rarely otherwise, and never two at once;
@@ -13,7 +17,17 @@
 // - the player's buttons, which show their result at once and let the next
 //   answer confirm it (the owner, 2026-09-28: play and pause felt laggy).
 
-import { type AmbientPrefs, ambientSrc, CLAUDE_FM, isStream, playerView, stepTrack } from "../lib/ambient";
+import {
+  type AmbientPrefs,
+  ambientSrc,
+  isStream,
+  nextPausedSince,
+  playerView,
+  stepTrack,
+  STREAM_STEP,
+  streamFollow,
+  streamUrl,
+} from "../lib/ambient";
 import { setupShows } from "../lib/reviewMode";
 import {
   isTauri,
@@ -25,14 +39,7 @@ import {
   type TabMediaAction,
   type TabMediaState,
 } from "../lib/tauri";
-import {
-  forgetTabMedia,
-  setInAppMedia,
-  setTabMedia,
-  useAmbient,
-  useAmbientPreview,
-  useTabMedia,
-} from "../state/ambient";
+import { forgetTabMedia, setInAppMedia, setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
 import { useMediaDock } from "../state/mediaDock";
 import { usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
@@ -46,7 +53,7 @@ const FADE_TICK_MS = 30;
 /** A pause is heard within ~0.1 s; a start ramps up over ~0.3 s. */
 const FADE_OUT_STEP = 0.12;
 const FADE_IN_STEP = 0.05;
-/** Claude FM's hidden page (a private-browser id, never a tab). */
+/** The hidden stream page, Claude FM's or a station's (a private-browser id, never a tab). */
 const FM_PAGE = "ambient-claude-fm";
 /** Ask Claude FM to play or pause at most this often while it disagrees. */
 const FM_NUDGE_MS = 2500;
@@ -59,9 +66,35 @@ const shared = globalThis as { __rotliAmbientAudio?: HTMLAudioElement };
 let audio: HTMLAudioElement | null = shared.__rotliAmbientAudio ?? null;
 let fading: ReturnType<typeof setInterval> | null = null;
 
+/** Rotli's own pause and play on the element, told apart from the Mac's
+ * (AirPods, a media key), which become the person's choice. */
+let ownPause = false;
+let ownPlay = false;
+
+function pauseOwn(): void {
+  if (!audio || audio.paused) return;
+  ownPause = true;
+  audio.pause();
+}
+
+/** Setup is on screen: nothing sounds, and nothing changes the saved choice. */
+const previewing = () =>
+  setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded);
+
 function trackElement(track: string): HTMLAudioElement {
   audio ??= Object.assign(new Audio(), { loop: true, preload: "auto", volume: 0 });
   shared.__rotliAmbientAudio = audio;
+  // properties, not listeners: a hot-reloaded module replaces them
+  audio.onpause = () => {
+    if (ownPause) return void (ownPause = false);
+    if (!previewing() && useAmbient.getState().prefs.playing)
+      useAmbient.getState().setPrefs({ playing: false });
+  };
+  audio.onplay = () => {
+    if (ownPlay) return void (ownPlay = false);
+    if (!previewing() && !useAmbient.getState().prefs.playing)
+      useAmbient.getState().setPrefs({ playing: true });
+  };
   const src = ambientSrc(track);
   if (!audio.src.endsWith(src)) audio.src = src;
   return audio;
@@ -82,31 +115,54 @@ function fadeTo(target: number, then?: () => void): void {
 }
 
 function silenceTrack(): void {
-  if (audio && !audio.paused) fadeTo(0, () => audio?.pause());
+  if (audio && !audio.paused) fadeTo(0, pauseOwn);
 }
+
+/** The hidden stream page's native calls, one seam so tests can stand in for
+ * the Mac app's page (services/ambientStream.test.ts). */
+export const fmPage = {
+  create: (url: string) =>
+    privateBrowserCreate(FM_PAGE, url, { x: 0, y: 0, width: 1, height: 1 }).then(() =>
+      privateBrowserSetVisible(FM_PAGE, false),
+    ),
+  media: (action: "play" | "pause") => privateBrowserMedia(FM_PAGE, action),
+  state: () => privateBrowserMediaState(FM_PAGE),
+  close: () => privateBrowserClose(FM_PAGE),
+};
 
 // ── Claude FM ──────────────────────────────────────────────────────────────
 
 let fmOpen = false;
+let fmUrl: string | null = null;
 let fmState: TabMediaState = "none";
 let fmNudged = 0;
+/** When Rotli last asked the page to pause, and since when it has been paused
+ * after playing (null: it hasn't stopped on its own). */
+let fmAskedPause = 0;
+let fmPausedSince: number | null = null;
 
-function openFm(): void {
-  if (fmOpen) return;
+/** Open the hidden page on `url`; a different stream navigates the same page. */
+function openFm(url: string): void {
+  if (fmOpen && fmUrl === url) return;
   fmOpen = true;
+  fmUrl = url;
   fmNudged = 0;
-  void privateBrowserCreate(FM_PAGE, CLAUDE_FM.url, { x: 0, y: 0, width: 1, height: 1 })
-    .then(() => privateBrowserSetVisible(FM_PAGE, false))
-    .catch(() => {
-      fmOpen = false;
-    });
+  fmState = "none";
+  fmPausedSince = null;
+  void fmPage.create(url).catch(() => {
+    fmOpen = false;
+    fmUrl = null;
+  });
 }
 
 function closeFm(): void {
   if (!fmOpen) return;
   fmOpen = false;
+  fmAskedPause = 0;
+  fmUrl = null;
   fmState = "none";
-  void privateBrowserClose(FM_PAGE).catch(() => {});
+  fmPausedSince = null;
+  void fmPage.close().catch(() => {});
 }
 
 /** Keep Claude FM's page doing what the rules say. The page loads on its own
@@ -118,19 +174,19 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
   const now = Date.now();
   if (!force && now - fmNudged < FM_NUDGE_MS) return;
   fmNudged = now;
-  void privateBrowserMedia(FM_PAGE, wantsPlay ? "play" : "pause").catch(() => {});
+  if (wantsPlay)
+    fmPausedSince = null; // a pause still showing is latency now, not intent
+  else fmAskedPause = now;
+  void fmPage.media(wantsPlay ? "play" : "pause").catch(() => {});
 }
 
 // ── the rules, applied ─────────────────────────────────────────────────────
 
-/** What ambient does right now. Before setup is done only a preview from the
- * Sound step sounds; the chosen music starts once setup finishes. */
+/** What ambient does right now. Nothing sounds during setup; the player
+ * waits in the sidebar for the person to press Play. */
 function ambientNow(): { prefs: AmbientPrefs; plays: boolean } {
   const { prefs } = useAmbient.getState();
-  if (setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded)) {
-    const preview = useAmbientPreview.getState().track;
-    return { prefs: { ...prefs, enabled: !!preview, track: preview ?? prefs.track }, plays: !!preview };
-  }
+  if (previewing()) return { prefs: { ...prefs, enabled: false }, plays: false };
   const { media, recent, inApp } = useTabMedia.getState();
   return { prefs, plays: playerView(prefs, media, recent, inApp).ambientPlays };
 }
@@ -138,11 +194,13 @@ function ambientNow(): { prefs: AmbientPrefs; plays: boolean } {
 /** The ambient source sounds exactly when the rules say it should. */
 export function applyAmbient(): void {
   const { prefs, plays } = ambientNow();
-  if (!prefs.enabled || !isStream(prefs.track)) closeFm();
-  if (isStream(prefs.track) && prefs.enabled) {
+  const stream = isStream(prefs.track) ? streamUrl(prefs, prefs.track) : null;
+  if (!prefs.enabled || !stream) closeFm();
+  if (stream && prefs.enabled) {
     silenceTrack();
-    if (plays) openFm();
-    reconcileFm(plays, true);
+    if (plays) openFm(stream);
+    // an outside pause still settling is the person's to make, not to undo
+    if (!(plays && fmPausedSince !== null)) reconcileFm(plays, true);
     return;
   }
   if (!plays) return silenceTrack();
@@ -150,6 +208,7 @@ export function applyAmbient(): void {
   if (!element.paused) return fadeTo(prefs.volume);
   // start audible at once rather than from silence, then ramp up
   element.volume = FADE_IN_STEP;
+  ownPlay = true;
   // a play the webview refuses (no gesture yet at launch) reads as paused
   element.play().then(
     // the rules may have changed while play() was starting (paused, a
@@ -159,9 +218,10 @@ export function applyAmbient(): void {
     (error: unknown) => {
       // a play paused before it began (AbortError) was interrupted, not
       // refused; and a setup preview never changes the saved preference
+      // a refused play fires no play event: the flag mustn't swallow the next real one
+      ownPlay = false;
       if (error instanceof DOMException && error.name === "AbortError") return;
-      if (setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded))
-        return;
+      if (previewing()) return;
       useAmbient.getState().setPrefs({ playing: false });
     },
   );
@@ -197,8 +257,9 @@ export async function pollTabMedia(): Promise<void> {
       ),
     ),
     fmOpen
-      ? privateBrowserMediaState(FM_PAGE).then(
+      ? fmPage.state().then(
           (state) => {
+            fmPausedSince = nextPausedSince(fmState, state, fmPausedSince, fmAskedPause, Date.now());
             fmState = state;
           },
           () => {
@@ -207,7 +268,29 @@ export async function pollTabMedia(): Promise<void> {
         )
       : Promise.resolve(),
   ]);
-  if (fmOpen) reconcileFm(ambientNow().plays);
+  if (fmOpen) followFm();
+}
+
+/** The hidden page against the rules, letting the person's own pause or play
+ * from outside Rotli stand (a pause still settling is left alone). */
+function followFm(): void {
+  const { plays } = ambientNow();
+  const { prefs, setPrefs } = useAmbient.getState();
+  const step = previewing()
+    ? STREAM_STEP.nudge
+    : streamFollow({
+        state: fmState,
+        plays,
+        playing: prefs.playing,
+        pausedSince: fmPausedSince,
+        askedPauseAt: fmAskedPause,
+        now: Date.now(),
+      });
+  if (step === STREAM_STEP.pauseTheirs) {
+    fmPausedSince = null;
+    setPrefs({ playing: false });
+  } else if (step === STREAM_STEP.playTheirs) setPrefs({ playing: true });
+  else if (step === STREAM_STEP.nudge) reconcileFm(plays);
 }
 
 function busy(): boolean {
@@ -220,7 +303,7 @@ export function stopAllSound(): void {
   useAmbient.getState().setPrefs({ playing: false });
   if (fading) clearInterval(fading);
   fading = null;
-  audio?.pause();
+  pauseOwn();
   forceCloseFm();
   for (const id of browserTabIds()) tabMediaAction(id, "pause");
 }
@@ -229,8 +312,11 @@ export function stopAllSound(): void {
  * from before a reload is still a native view, still playing). */
 function forceCloseFm(): void {
   fmOpen = false;
+  fmAskedPause = 0;
+  fmUrl = null;
   fmState = "none";
-  void privateBrowserClose(FM_PAGE).catch(() => {});
+  fmPausedSince = null;
+  void fmPage.close().catch(() => {});
 }
 
 /** Start the player's machinery (main window, once). */
@@ -238,12 +324,11 @@ export function startAmbient(): () => void {
   // nothing from a previous run keeps sounding unseen
   forceCloseFm();
   closeOrphanedTuck();
-  if (audio && !useAmbient.getState().prefs.playing) audio.pause();
+  if (!useAmbient.getState().prefs.playing) pauseOwn();
   const unsubscribe = [
     useAmbient.subscribe(applyAmbient),
     useTabMedia.subscribe(applyAmbient),
-    useAmbientPreview.subscribe(applyAmbient),
-    // finishing setup starts the music chosen in it
+    // finishing setup lets the player's music be heard
     useUiStore.subscribe((state, prev) => {
       if (state.onboarded !== prev.onboarded) applyAmbient();
     }),
@@ -259,16 +344,15 @@ export function startAmbient(): () => void {
     });
   };
   loop();
-  // the chosen track is ready before the first press
-  const { prefs } = useAmbient.getState();
-  if (prefs.enabled && !isStream(prefs.track)) trackElement(prefs.track).load();
+  // nothing loads until Play: the player shows for everyone from the first
+  // run, and most launches never press it (the bundled track starts fast)
   applyAmbient();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
     for (const name of events) document.removeEventListener(name, checkInApp, true);
     for (const stop of unsubscribe) stop();
-    audio?.pause();
+    pauseOwn();
     closeFm();
   };
 }
@@ -311,22 +395,31 @@ export function stopAmbient(): void {
   if (audio) audio.currentTime = 0;
 }
 
+/** Put the player away (it stays in Settings → General → Ambient audio). */
+export function hideAmbient(): void {
+  stopAmbient();
+  useAmbient.getState().setPrefs({ enabled: false });
+}
+
 export function stepAmbient(step: 1 | -1): void {
   const { prefs, setPrefs } = useAmbient.getState();
   setPrefs({ track: stepTrack(prefs.track, step) });
 }
 
-/** Claude FM out of hiding (the owner, 2026-09-28: "a way for me to open
+/** The stream out of hiding (the owner, 2026-09-28: "a way for me to open
  * that tab in browser since it's coming from YouTube"): an ordinary browser
- * tab on the stream, and ambient steps back so the two never both play. The
- * stream is live, so starting it fresh loses nothing. */
-export function openClaudeFmTab(): void {
-  useAmbient.getState().setPrefs({ playing: false });
+ * tab on Claude FM or the station, and ambient steps back so the two never
+ * both play. */
+export function openStreamTab(): void {
+  const { prefs, setPrefs } = useAmbient.getState();
+  const url = streamUrl(prefs, prefs.track);
+  if (!url) return;
+  setPrefs({ playing: false });
   closeFm();
-  usePanesStore.getState().openBrowser(CLAUDE_FM.url);
+  usePanesStore.getState().openBrowser(url);
 }
 
-/** Pick what ambient plays (the player's menu): a track or Claude FM. */
+/** Pick what ambient plays (the player's menu): a track, Claude FM, or a station. */
 export function chooseAmbient(id: string): void {
   useAmbient.getState().setPrefs({ track: id, playing: true });
 }
@@ -344,7 +437,7 @@ export function openMediaTab(tabId: string): void {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     if (fading) clearInterval(fading);
-    audio?.pause();
+    pauseOwn();
     forceCloseFm();
   });
 }

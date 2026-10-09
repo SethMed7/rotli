@@ -23,13 +23,26 @@ impl CorpusStore {
 
     /// Is this note named with one of the vault's secure keywords? Its title or
     /// file name only — never the body, never a model (Librarian rules).
-    pub(super) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
+    pub(crate) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
         self.layout == Layout::Memex
             && crate::librarian_rules::secure_by_name(
                 title,
                 rel,
                 &self.librarian_rules().secure_keywords,
             )
+    }
+
+    /// Does this path sit in a secure home — the memex's `wiki/_secure/` or
+    /// the legacy `Secure notes/` — in either layout? Notes there carry the
+    /// `secure:` flag `read_for_ai` checks; this covers a FILE beside them
+    /// (a PDF, an image), which carries no frontmatter to say so. Compared
+    /// without case: the Mac's file system doesn't distinguish it either.
+    pub(crate) fn in_secure_home(&self, rel: &str) -> bool {
+        let rel = rel.to_lowercase();
+        ["wiki/_secure", super::SECURE_NOTES_FOLDER].iter().any(|home| {
+            let home = home.to_lowercase();
+            rel == home || rel.starts_with(&format!("{home}/"))
+        })
     }
 
     /// Protect every Library note already named with a secure keyword (the

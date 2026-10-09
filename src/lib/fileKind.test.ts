@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { imageBytesMatchExtension, managedFileNote } from "./fileKind";
+import { imageBytesMatchExtension, isCanvasPath, managedFileNote } from "./fileKind";
 
 describe("managed file details", () => {
   test("only storage/ files carry the not-tracked-by-git fact", () => {
@@ -26,4 +26,11 @@ describe("imageBytesMatchExtension (twin of corpus.rs image_payload_matches_exte
     expect(imageBytesMatchExtension("svg", b("<svg"))).toBe(false);
     expect(imageBytesMatchExtension("png", new Uint8Array())).toBe(false);
   });
+});
+
+test("a JSON Canvas is known by its extension, any case", () => {
+  expect(isCanvasPath("wiki/Q3 plan.canvas")).toBe(true);
+  expect(isCanvasPath("Board.CANVAS")).toBe(true);
+  expect(isCanvasPath("notes/canvas.md")).toBe(false);
+  expect(isCanvasPath("canvas")).toBe(false);
 });

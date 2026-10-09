@@ -16,10 +16,10 @@ const NEW_WINDOW_EVENT: &str = "private-browser-new-window";
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrivateBrowserBounds {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
 }
 
 #[derive(Clone, Serialize)]
@@ -52,7 +52,7 @@ fn webview_label(tab_id: &str) -> Result<String, String> {
     Ok(format!("private-browser-{tab_id}"))
 }
 
-fn private_url(value: &str) -> Result<Url, String> {
+pub(crate) fn private_url(value: &str) -> Result<Url, String> {
     let value = value.trim();
     if crate::secret::blocked_for_remote(value) {
         return Err("blocked: that address carries private content — it won't be opened.".into());
@@ -64,11 +64,11 @@ fn private_url(value: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-fn page_navigation_allowed(url: &Url) -> bool {
+pub(crate) fn page_navigation_allowed(url: &Url) -> bool {
     matches!(url.scheme(), "http" | "https") || url.as_str() == "about:blank"
 }
 
-fn safe_bounds(bounds: PrivateBrowserBounds) -> Result<PrivateBrowserBounds, String> {
+pub(crate) fn safe_bounds(bounds: PrivateBrowserBounds) -> Result<PrivateBrowserBounds, String> {
     if !bounds.x.is_finite()
         || !bounds.y.is_finite()
         || !bounds.width.is_finite()
@@ -85,7 +85,7 @@ fn safe_bounds(bounds: PrivateBrowserBounds) -> Result<PrivateBrowserBounds, Str
     Ok(bounds)
 }
 
-fn set_bounds(webview: &tauri::Webview, bounds: PrivateBrowserBounds) -> Result<(), String> {
+pub(crate) fn set_bounds(webview: &tauri::Webview, bounds: PrivateBrowserBounds) -> Result<(), String> {
     let bounds = safe_bounds(bounds)?;
     webview
         .set_position(LogicalPosition::new(bounds.x, bounds.y))

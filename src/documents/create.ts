@@ -1,5 +1,13 @@
 import JSZip from "jszip";
 
+import {
+  HYPERLINK_RUN_STYLE,
+  NO_HYPERLINKS,
+  type Hyperlinks,
+  hyperlinks,
+  linkedRunsXml,
+  withHyperlinkStyle,
+} from "./codec/hyperlinks";
 import { encodeXml as xml } from "./codec/xml";
 import { DOCUMENT_CREATE_EXTENSION } from "./kinds";
 import {
@@ -19,13 +27,17 @@ export type DocxTemplate = DocumentDraft;
 function run(run: DocumentRun, forceBold = false): string {
   const style = run.style;
   const props =
-    style || forceBold
-      ? `<w:rPr>${style?.fontFamily ? `<w:rFonts w:ascii="${xml(style.fontFamily)}" w:hAnsi="${xml(style.fontFamily)}"/>` : ""}${style?.fontSize ? `<w:sz w:val="${Math.round(style.fontSize * 2)}"/><w:szCs w:val="${Math.round(style.fontSize * 2)}"/>` : ""}${style?.color ? `<w:color w:val="${style.color.replace(/^#/, "")}"/>` : ""}${style?.bold || forceBold ? "<w:b/>" : ""}${style?.italic ? "<w:i/>" : ""}${style?.underline ? '<w:u w:val="single"/>' : ""}${style?.strike ? "<w:strike/>" : ""}</w:rPr>`
+    style || forceBold || run.link
+      ? `<w:rPr>${run.link ? HYPERLINK_RUN_STYLE : ""}${style?.fontFamily ? `<w:rFonts w:ascii="${xml(style.fontFamily)}" w:hAnsi="${xml(style.fontFamily)}"/>` : ""}${style?.fontSize ? `<w:sz w:val="${Math.round(style.fontSize * 2)}"/><w:szCs w:val="${Math.round(style.fontSize * 2)}"/>` : ""}${style?.color ? `<w:color w:val="${style.color.replace(/^#/, "")}"/>` : ""}${style?.bold || forceBold ? "<w:b/>" : ""}${style?.italic ? "<w:i/>" : ""}${style?.underline ? '<w:u w:val="single"/>' : ""}${style?.strike ? "<w:strike/>" : ""}</w:rPr>`
       : "";
   return `<w:r>${props}<w:t xml:space="preserve">${xml(run.text)}</w:t></w:r>`;
 }
 
-function paragraphFromModel(paragraph: DocumentParagraph, forceBold = false): string {
+function paragraphFromModel(
+  paragraph: DocumentParagraph,
+  forceBold = false,
+  links: Hyperlinks = NO_HYPERLINKS,
+): string {
   const styleId =
     paragraph.namedStyle === "title"
       ? "Title"
@@ -42,7 +54,7 @@ function paragraphFromModel(paragraph: DocumentParagraph, forceBold = false): st
       ? `<w:jc w:val="${paragraph.alignment === "justify" ? "both" : paragraph.alignment}"/>`
       : "",
   ].join("");
-  return `<w:p>${props ? `<w:pPr>${props}</w:pPr>` : ""}${paragraph.runs.map((item) => run(item, forceBold)).join("") || run({ text: "" }, forceBold)}</w:p>`;
+  return `<w:p>${props ? `<w:pPr>${props}</w:pPr>` : ""}${linkedRunsXml(paragraph.runs, links, (item) => run(item, forceBold)) || run({ text: "" }, forceBold)}</w:p>`;
 }
 
 function paragraph(text: string, style?: string): string {
@@ -68,7 +80,7 @@ function table(rows: string[][]): string {
   return tableFromModel(modeled);
 }
 
-function tableFromModel(table: DocumentTable): string {
+function tableFromModel(table: DocumentTable, links: Hyperlinks = NO_HYPERLINKS): string {
   if (!table.rows.length) return "";
   const theme = GENERATED_DOCX_THEME;
   const borders = `<w:tblBorders><w:top w:val="single" w:sz="4" w:color="${theme.ruleColor}"/><w:left w:val="single" w:sz="4" w:color="${theme.ruleColor}"/><w:bottom w:val="single" w:sz="4" w:color="${theme.ruleColor}"/><w:right w:val="single" w:sz="4" w:color="${theme.ruleColor}"/><w:insideH w:val="single" w:sz="4" w:color="${theme.ruleColor}"/><w:insideV w:val="single" w:sz="4" w:color="${theme.ruleColor}"/></w:tblBorders>`;
@@ -80,7 +92,7 @@ function tableFromModel(table: DocumentTable): string {
         `<w:tr>${row.cells
           .map(
             (cell) =>
-              `<w:tc><w:tcPr>${rowIndex === 0 ? `<w:shd w:val="clear" w:fill="${theme.tableHeaderFill}"/>` : ""}</w:tcPr>${cell.paragraphs.map((item) => paragraphFromModel(item, rowIndex === 0)).join("") || paragraph("")}</w:tc>`,
+              `<w:tc><w:tcPr>${rowIndex === 0 ? `<w:shd w:val="clear" w:fill="${theme.tableHeaderFill}"/>` : ""}</w:tcPr>${cell.paragraphs.map((item) => paragraphFromModel(item, rowIndex === 0, links)).join("") || paragraph("")}</w:tc>`,
           )
           .join("")}</w:tr>`,
     )
@@ -104,9 +116,9 @@ export function imageParagraphXml(image: DocumentImage, relationshipId: string, 
   return `<w:p><w:pPr><w:spacing w:before="120" w:after="240"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="${numericId}" name="${name}" descr="${alt}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${numericId}" name="${name}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 
-function contentXml(content: DocumentContent): string {
-  if (content.kind === "paragraph") return paragraphFromModel(content.paragraph);
-  if (content.kind === "table") return tableFromModel(content.table);
+function contentXml(content: DocumentContent, links: Hyperlinks): string {
+  if (content.kind === "paragraph") return paragraphFromModel(content.paragraph, false, links);
+  if (content.kind === "table") return tableFromModel(content.table, links);
   throw new Error("image content needs an OOXML relationship");
 }
 
@@ -129,9 +141,9 @@ function generatedImageInsertionIndex(content: readonly DocumentContent[]): numb
   return 1;
 }
 
-function documentXml(template: DocxTemplate): string {
+function documentXml(template: DocxTemplate, links: Hyperlinks): string {
   const structured = template.content
-    ? template.content.map(contentXml)
+    ? template.content.map((content) => contentXml(content, links))
     : [
         ...(template.blocks ?? []).map((block) =>
           paragraph(block.text, block.kind === "heading" ? `Heading${block.level ?? 2}` : undefined),
@@ -221,20 +233,18 @@ export async function createDocxBase64(template: DocxTemplate): Promise<string> 
       `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
     );
   const word = zip.folder("word");
-  word?.file("document.xml", documentXml(template));
   const imageRelationships = (template.images ?? [])
     .map(
       (image, index) =>
         `<Relationship Id="rIdImage${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/rotli-image-${index + 1}.${imageExtension(image)}"/>`,
     )
     .join("");
-  word
-    ?.folder("_rels")
-    ?.file(
-      "document.xml.rels",
-      `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>${imageRelationships}</Relationships>`,
-    );
-  word?.file("styles.xml", styleXml());
+  const relationships = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>${imageRelationships}</Relationships>`;
+  const links = hyperlinks(relationships);
+  word?.file("document.xml", documentXml(template, links));
+  const linked = links.added();
+  word?.folder("_rels")?.file("document.xml.rels", linked ?? relationships);
+  word?.file("styles.xml", (linked && withHyperlinkStyle(styleXml())) || styleXml());
   word?.file("numbering.xml", numberingXml());
   const media = word?.folder("media");
   for (const [index, image] of (template.images ?? []).entries()) {

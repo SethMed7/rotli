@@ -5,6 +5,13 @@ import { ExternalLinkGlyph } from "../glyphs";
 
 export const ROTLI_WEBSITE_URL = "https://sethmedina.com";
 
+/** The open-source editors inside Rotli (the owner, 2026-10-01: "in the about
+ * part mention that we have Excalidraw and Univer integrated in"). */
+export const BUILT_IN = [
+  { name: "Excalidraw", url: "https://excalidraw.com", what: "draws your boards" },
+  { name: "Univer", url: "https://univer.ai", what: "edits your Word documents" },
+] as const;
+
 export function AboutPane({
   version,
   feedbackUrl,
@@ -38,6 +45,26 @@ export function AboutPane({
         <span>Website — sethmedina.com</span>
         <ExternalLinkGlyph size={13} />
       </a>
+      <h4 className="sethead">Built in</h4>
+      <p className="setnote">
+        Two open-source editors live inside Rotli and save to ordinary files in your vault:{" "}
+        {BUILT_IN.map((editor, index) => (
+          <span key={editor.name}>
+            <a
+              className="about-inline-link"
+              href={editor.url}
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenUrl(editor.url);
+              }}
+            >
+              {editor.name}
+            </a>{" "}
+            {editor.what}
+            {index === BUILT_IN.length - 1 ? "." : ", and "}
+          </span>
+        ))}
+      </p>
       <a
         className="ghostbtn about-link"
         href={feedbackUrl}

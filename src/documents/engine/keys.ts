@@ -11,14 +11,19 @@
 // here selects the whole document as a single range, so typing replaces all
 // of it; a document with tables keeps Univer's table-aware ranges instead.
 //
-// The macOS Edit menu owns ⌘A and ⌘Z/⇧⌘Z before the web view sees a keydown
-// (native check, 2026-09-15). WebKit turns its selectAll:, undo:, and redo:
-// into selectstart and beforeinput (historyUndo/historyRedo) on the focused
-// input, which acted on that hidden element's DOM text. Both routes — Univer's
+// The macOS Edit menu owns ⌘A before the web view sees a keydown (native
+// check, 2026-09-15). WebKit turns its selectAll:, undo:, and redo: into
+// selectstart and beforeinput (historyUndo/historyRedo) on the focused input,
+// which acted on that hidden element's DOM text. Both routes — Univer's
 // keydown shortcut and the menu — are answered with Univer's own commands.
+// ⌘Z / ⇧⌘Z reach the page as key presses since 2026-10-09 (the Edit menu's
+// Undo/Redo carry no keys; src-tauri lib.rs): what Univer's own shortcuts leave
+// — ⇧⌘Z, which it binds only as ⌘Y, and any ⌘Z it stands down for — is
+// answered here.
 
 import type { IInsertCommandParams } from "@univerjs/preset-docs-core";
 
+import { isRedoChord, isUndoChord } from "../../lib/historyChords";
 import { documentTableRanges, isSelectAllChord } from "./policy";
 
 type DocumentBodyLike = {
@@ -157,10 +162,17 @@ export function installDocumentKeys(
   // Registered after Univer's own capture listener, so a chord Univer handled
   // arrives here already defaultPrevented.
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || !isSelectAllChord(event, isMac)) return;
-    if (!inDocumentInput(view.activeElement)) return;
-    event.preventDefault();
-    runFromMenu(ids.selectAll);
+    if (event.defaultPrevented || !inDocumentInput(view.activeElement)) return;
+    if (isSelectAllChord(event, isMac)) {
+      event.preventDefault();
+      runFromMenu(ids.selectAll);
+    } else if (isUndoChord(event, isMac) || isRedoChord(event, isMac)) {
+      // what Univer's own shortcuts left (they run first): ⇧⌘Z, which it
+      // binds only as ⌘Y, and ⌘Z wherever its editor context stood down —
+      // answered before the browser's default undo touches the hidden input
+      event.preventDefault();
+      runFromMenu(isUndoChord(event, isMac) ? ids.undo : ids.redo);
+    }
   };
 
   // A mouse drag also starts a selection; only a keyboard/menu Select All counts.

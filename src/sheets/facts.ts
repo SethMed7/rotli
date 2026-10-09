@@ -4,6 +4,7 @@
 // are never written anywhere (boards/binaries stay frontmatter-free, and a
 // copied path would go stale on the first filing move).
 
+import { formatBytes } from "../lib/formatBytes";
 import type { FileStat } from "../lib/tauri";
 import type { SheetTable } from "./view";
 
@@ -57,16 +58,6 @@ export function deriveSheetFacts(ext: string, tables: SheetTable[]): SheetFacts 
 export function describeShape(s: SheetShape): string {
   const rows = `${s.rows.toLocaleString()}${s.truncated ? "+" : ""} ${s.rows === 1 && !s.truncated ? "row" : "rows"}`;
   return `${rows} × ${s.cols.toLocaleString()} ${s.cols === 1 ? "column" : "columns"}`;
-}
-
-/** Human byte size — exact bytes below 1 KB, one decimal above. */
-export function formatBytes(len: number): string {
-  if (!Number.isFinite(len) || len < 0) return "—";
-  if (len < 1024) return `${len} B`;
-  const kb = len / 1024;
-  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
 }
 
 /** A stat timestamp for display ("—" when the filesystem couldn't say). */

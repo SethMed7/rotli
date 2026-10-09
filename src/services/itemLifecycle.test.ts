@@ -5,9 +5,11 @@ import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle, restoreSinkIt
 
 describe("active item lifecycle routing", () => {
   test("boards use their note-native move lane instead of conventional file capabilities", () => {
-    expect(activeItemSinkLane("note")).toBe("note");
-    expect(activeItemSinkLane("board")).toBe("note");
-    expect(activeItemSinkLane("file")).toBe("file");
+    expect(activeItemSinkLane({ id: "a.md", kind: "note" })).toBe("note");
+    expect(activeItemSinkLane({ id: "b.excalidraw", kind: "board" })).toBe("note");
+    expect(activeItemSinkLane({ id: "c.pdf", kind: "file" })).toBe("file");
+    // outside the Mac app a canvas moves through the folder service's note lane
+    expect(activeItemSinkLane({ id: "wiki/Plan.canvas", kind: "file" })).toBe("note");
   });
 });
 

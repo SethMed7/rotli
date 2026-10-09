@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { DEFAULT_AMBIENT } from "../lib/ambient";
-import { setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
+import { setInAppMedia, setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
 import { activeTabOf, usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
 import {
+  applyAmbient,
   chooseAmbient,
   openMediaTab,
   pollTabMedia,
@@ -94,5 +95,59 @@ describe("sound that can't hide", () => {
     stopAllSound();
     expect(useAmbient.getState().prefs.playing).toBe(false);
     expect(useTabMedia.getState().media[tab.id]).toBe("paused");
+  });
+});
+
+// The owner, 2026-10-01: "play and pause isn't being respected … if I pause
+// with airpods it should pause". The Mac pauses or plays the ambient element
+// itself (AirPods, a media key); that becomes the person's choice, while
+// Rotli's own pauses (a tab taking over) never touch it.
+describe("a pause or play from outside Rotli", () => {
+  class FakeAudio {
+    paused = true;
+    volume = 0;
+    loop = false;
+    preload = "";
+    src = "";
+    currentTime = 0;
+    onpause: (() => void) | null = null;
+    onplay: (() => void) | null = null;
+    load() {}
+    play() {
+      this.paused = false;
+      this.onplay?.();
+      return Promise.resolve();
+    }
+    pause() {
+      this.paused = true;
+      this.onpause?.();
+    }
+  }
+  const shared = globalThis as { Audio?: unknown; __rotliAmbientAudio?: FakeAudio };
+  const element = () => shared.__rotliAmbientAudio!;
+
+  test("AirPods pausing the track pauses ambient; playing it again plays", async () => {
+    shared.Audio = FakeAudio;
+    useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT, enabled: true, playing: true } });
+    applyAmbient();
+    expect(element().paused).toBe(false);
+    // the Mac pauses the element, not Rotli
+    element().pause();
+    expect(useAmbient.getState().prefs.playing).toBe(false);
+    void element().play();
+    expect(useAmbient.getState().prefs.playing).toBe(true);
+  });
+
+  test("Rotli's own pause (something else playing) leaves the choice alone", async () => {
+    shared.Audio = FakeAudio;
+    useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT, enabled: true, playing: true } });
+    applyAmbient();
+    expect(element().paused).toBe(false);
+    setInAppMedia(true);
+    applyAmbient();
+    await new Promise((resolve) => setTimeout(resolve, 600)); // the fade-out, then the pause
+    expect(element().paused).toBe(true);
+    expect(useAmbient.getState().prefs.playing).toBe(true);
+    setInAppMedia(false);
   });
 });

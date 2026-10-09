@@ -35,6 +35,8 @@ function fakeHelper(
   page: import("@playwright/test").Page,
   calls: { cmd: string; args: unknown }[],
   models: ModelList | null = null,
+  /** Held until it settles before a reply goes back (a reply in flight). */
+  replyGate: Promise<void> = Promise.resolve(),
 ) {
   return page.route(`${HELPER}/**`, async (route) => {
     const request = route.request();
@@ -69,6 +71,7 @@ function fakeHelper(
       case "cli_detect":
         return reply({ installed: true, version: "2.1.0 (Claude Code)", authenticated: true });
       case "cli_complete":
+        await replyGate;
         return reply("Hello from the fake helper.");
       case "cli_cancel":
         return reply(null);
@@ -282,4 +285,87 @@ test("a helper that refuses the pairing token keeps Chat behind the setup dialog
   await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".sb-switch-seg.desktop-only")).toHaveCount(0);
+});
+
+test("the chat buddy thinks while a reply runs and is happy when it lands", async ({ page }) => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await fakeHelper(page, [], null, gate);
+  await pairAndOpenChat(page);
+  // the welcome is the buddy too, greeting by the time of day
+  await expect(page.locator(".chat-welcome-character")).toHaveAttribute("data-pose", /^(waving|rest)$/);
+
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("Say hello");
+  await composer.press("Enter");
+  const edge = page.locator(".chat-buddy-row");
+  await expect(edge).toHaveAttribute("data-moment", "thinking");
+  await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "thoughtful");
+  // one buddy for the thread, never one per message
+  await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
+
+  release();
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+  await expect(edge).toHaveAttribute("data-moment", "done");
+  await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "celebrating");
+  await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
+});
+
+// Chat images on Rotli Web (the owner, 2026-10-05): Rotli Helper keeps carrying
+// text only, so an image offered to a web chat is refused in words, whether it
+// came from the + menu or a pasted screenshot — never attached and then lost.
+test("on Rotli Web an image offered to a chat says sending images needs the Mac app", async ({ page }) => {
+  await fakeHelper(page, [], [model("default", "Claude Default", true)]);
+  await pairAndOpenChat(page);
+
+  await page.getByRole("button", { name: "Add files or web search" }).click();
+  await page.getByRole("menuitem", { name: /Add files or photos/ }).click();
+  const refusal = page.getByRole("alert").filter({ hasText: "needs the Mac app" });
+  await expect(refusal).toBeVisible();
+  await expect(page.locator(".chat-attachment")).toHaveCount(0);
+
+  // a pasted screenshot is the same offer
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.click();
+  await composer.evaluate((input) => {
+    const data = new DataTransfer();
+    data.items.add(new File([new Uint8Array([137, 80, 78, 71])], "image.png", { type: "image/png" }));
+    input.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+    );
+  });
+  await expect(refusal).toBeVisible();
+  await expect(page.locator(".chat-attachment")).toHaveCount(0);
+  await expect(composer).toHaveValue("");
+});
+
+// A chat the Mac app wrote, with an image in it, opened on Rotli Web: the tag
+// where the image was referenced names the file and shows it once the chat is
+// read back from the vault (sent images used to come back blank on the web).
+test("a sent image's tag names the file and shows it when the chat is opened again", async ({ page }) => {
+  await fakeHelper(page, [], [model("default", "Claude Default", true)]);
+  await pairAndOpenChat(page);
+  // a real 1×1 PNG, written as bytes into the connected vault's image lane
+  await page.evaluate(async (base64) => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ["storage", "images"]) dir = await dir.getDirectoryHandle(part, { create: true });
+    const writable = await (await dir.getFileHandle("dot.png", { create: true })).createWritable();
+    await writable.write(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)));
+    await writable.close();
+  }, "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==");
+
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("what is [Image #1](storage:images/dot.png) about?");
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+
+  // close the chat and open it again from the Chat list: the transcript is
+  // read back from the vault, so the image is known only by its vault id
+  await page.getByRole("tab", { selected: true }).getByRole("button", { name: "Close tab" }).click();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.locator(".sb-chatrow[data-chat-slug]").first().click();
+  const chip = page.locator(".cmsg.you .cmsg-imgref").first();
+  await expect(chip).toContainText("dot.png");
+  await expect(chip).toHaveAttribute("aria-label", /Image 1: dot\.png/);
+  await expect(chip.locator("img")).toHaveAttribute("src", /^blob:/);
 });

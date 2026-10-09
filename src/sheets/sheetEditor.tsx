@@ -4,6 +4,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { SaveStatus, useAutosave } from "../components/autosave";
 import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
@@ -22,8 +23,13 @@ import {
 import { SHEET_EDIT_MAX_BYTES } from "./kinds";
 import {
   deleteParked,
+  deleteSetAside,
   getParked,
+  getSetAside,
+  parkedResume,
   registerLiveDirty,
+  saveSetAsideAsCopy,
+  setAsideParked,
   setParked,
   unregisterLiveDirty,
   writeSheetModel,
@@ -55,7 +61,8 @@ export default function SheetEditor({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  // edits parked before the file changed on disk — offered as a copy, never dropped
+  const [conflict, setConflict] = useState(false);
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,6 +88,44 @@ export default function SheetEditor({
     themeModeMemo.set(fileId, themeMode);
   }, [fileId, themeMode]);
 
+  const save = async () => {
+    const wb = wbRef.current;
+    const handle = handleRef.current;
+    // no `saving` / `dirty` state check: this closure can be the one rendered
+    // mid-save, and the autosave rerun for edits made then must still write.
+    // useAutosave never runs two saves at once; the generation says if any
+    // edit is unwritten.
+    if (!wb || !handle || dirtyGen.current === 0) return;
+    const gen = dirtyGen.current;
+    setSaving(true);
+    setErr(null);
+    try {
+      const model = handle.save();
+      const saved = await writeSheetModel(
+        fileId,
+        modeRef.current,
+        wb,
+        model,
+        idMapRef.current,
+        revisionRef.current,
+      );
+      diskLenRef.current = saved.len;
+      revisionRef.current = saved.revision;
+      if (dirtyGen.current === gen) {
+        dirtyGen.current = 0;
+        setDirty(false);
+        deleteParked(fileId);
+        unregisterLiveDirty(fileId);
+      }
+      void invalidateNotes();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const autosave = useAutosave(save);
+
   // Univer's palette is fixed when createUniver runs. `appTheme` (live from
   // useDataTheme) lets this mount effect rebuild from the preserved workbook
   // snapshot whenever the applied theme changes.
@@ -92,21 +137,21 @@ export default function SheetEditor({
     armedRef.current = false;
     setReady(false);
     setErr(null);
+    setConflict(getSetAside(fileId).length > 0);
 
     void (async () => {
       try {
         const stat = await corpusFileStat(fileId);
         if (!stat) throw new Error("this file is unavailable");
         let park = getParked(fileId);
-        if (park) {
-          const stale = stat.revision !== park.revision;
-          if (stale || park.mode !== mode) {
-            deleteParked(fileId);
-            park = undefined;
-            if (!disposed && stale)
-              setNote("the file changed on disk — unsaved edits from the earlier session were set aside");
-          }
+        const resume = parkedResume(park, stat.revision, mode);
+        if (resume === "conflict") {
+          setAsideParked(fileId);
+          if (!disposed) setConflict(true);
+        } else if (resume === "fresh" && park) {
+          deleteParked(fileId);
         }
+        if (resume !== "resume") park = undefined;
 
         let wb: Workbook;
         let model: SheetModel;
@@ -118,6 +163,7 @@ export default function SheetEditor({
           revisionRef.current = park.revision;
           dirtyGen.current = Math.max(1, dirtyGen.current);
           setDirty(true);
+          autosave.edited();
         } else if (mode === "csv") {
           revisionRef.current = stat.revision;
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
@@ -155,6 +201,7 @@ export default function SheetEditor({
           if (!armedRef.current) return;
           dirtyGen.current += 1;
           setDirty(true);
+          autosave.edited();
         });
         armedRef.current = true;
 
@@ -191,7 +238,7 @@ export default function SheetEditor({
       handleRef.current = null;
       wbRef.current = null;
     };
-  }, [fileId, mode, themeMode, appTheme]);
+  }, [fileId, mode, themeMode, appTheme, autosave]);
 
   useEffect(() => {
     const wb = wbRef.current;
@@ -224,42 +271,6 @@ export default function SheetEditor({
     return () => unregisterLiveDirty(fileId);
   }, [dirty, fileId, ready]);
 
-  const save = async () => {
-    const wb = wbRef.current;
-    const handle = handleRef.current;
-    if (!wb || !handle || saving) return;
-    if (!dirty && dirtyGen.current === 0) return;
-    const gen = dirtyGen.current;
-    setSaving(true);
-    setErr(null);
-    try {
-      const model = handle.save();
-      const saved = await writeSheetModel(
-        fileId,
-        modeRef.current,
-        wb,
-        model,
-        idMapRef.current,
-        revisionRef.current,
-      );
-      diskLenRef.current = saved.len;
-      revisionRef.current = saved.revision;
-      if (dirtyGen.current === gen) {
-        dirtyGen.current = 0;
-        setDirty(false);
-        deleteParked(fileId);
-        unregisterLiveDirty(fileId);
-      }
-      void invalidateNotes();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
@@ -267,15 +278,11 @@ export default function SheetEditor({
       if (usePanesStore.getState().focusedPaneId !== paneId) return;
       e.preventDefault();
       e.stopPropagation();
-      void saveRef.current();
+      autosave.flush();
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [paneId]);
-
-  const toggleThemeMode = () => {
-    setThemeMode((m) => (m === "themed" ? "raw" : "themed"));
-  };
+  }, [paneId, autosave]);
 
   const chrome = (
     <div className="sheet-chrome-actions">
@@ -284,26 +291,62 @@ export default function SheetEditor({
           csv · values only
         </span>
       )}
-      <button
-        type="button"
-        className={themeMode === "raw" ? "sheet-view-toggle on" : "sheet-view-toggle"}
-        title={themeMode === "raw" ? "Show rotli-themed chrome" : "Show the sheet on white paper, like Excel"}
-        onClick={toggleThemeMode}
-      >
-        {themeMode === "raw" ? "Themed" : "Raw"}
-      </button>
+      <div className="sheet-paper" role="group" aria-label="Sheet colours">
+        <button
+          type="button"
+          data-label="Theme"
+          aria-pressed={themeMode === "themed"}
+          title="The sheet in your theme's colours"
+          onClick={() => setThemeMode("themed")}
+        >
+          Theme
+        </button>
+        <button
+          type="button"
+          data-label="White"
+          aria-pressed={themeMode === "raw"}
+          title="The sheet on white paper, like Excel"
+          onClick={() => setThemeMode("raw")}
+        >
+          White
+        </button>
+      </div>
       {err && <span className="sheet-save-err">⚠ {err}</span>}
-      {!err && note && <span className="sheet-save-err">{note}</span>}
-      {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
-      <button type="button" className="sheet-save" disabled={saving || !ready} onClick={() => void save()}>
-        {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
-      </button>
+      {ready && <SaveStatus dirty={dirty} saving={saving} failed={err !== null && dirty} />}
     </div>
   );
+
+  const keepAsCopy = async () => {
+    try {
+      const copyId = await saveSetAsideAsCopy(fileId);
+      setConflict(false);
+      void invalidateNotes();
+      usePanesStore.getState().openFile(copyId, { newTab: true });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const discardSetAside = () => {
+    deleteSetAside(fileId);
+    setConflict(false);
+  };
 
   return (
     <div className={`sheet-editor${themeMode === "raw" ? " sheet-raw" : ""}`}>
       {chromeEl ? createPortal(chrome, chromeEl) : <div className="sheet-editor-bar">{chrome}</div>}
+      {conflict && (
+        <div className="sheet-conflict" role="alert">
+          <span>
+            This file changed on disk after your last unsaved edits. You&rsquo;re seeing the version on disk.
+          </span>
+          <button type="button" className="sheet-conflict-keep" onClick={() => void keepAsCopy()}>
+            Save my edits as a copy
+          </button>
+          <button type="button" className="sheet-conflict-discard" onClick={discardSetAside}>
+            Discard my edits
+          </button>
+        </div>
+      )}
       {!err && !ready && <p className="file-loading">Loading…</p>}
       <div ref={hostRef} className="sheet-editor-host" />
     </div>

@@ -1,12 +1,21 @@
 // Shared fenced-code-block scanner — used by blockRender (renders the target
-// math / mermaid / jsxgraph / svg / html languages as widgets) AND by livePreview (which
+// math / mermaid / jsxgraph / svg / html / chart languages as widgets) AND by livePreview (which
 // skips fenced lines so code is never markdown-styled and never collides with a
 // block widget). Pure + dependency-light on purpose: livePreview must NOT pull
 // katex/mermaid/jsxgraph into its module graph, so the scanner lives here.
 
 import type { Text } from "@codemirror/state";
 
-export type LangKey = "math" | "mermaid" | "jsxgraph" | "svg" | "html" | "board" | "sheet" | "document";
+export type LangKey =
+  | "math"
+  | "mermaid"
+  | "jsxgraph"
+  | "svg"
+  | "html"
+  | "chart"
+  | "board"
+  | "sheet"
+  | "document";
 
 export const TARGET_LANGS = new Set<string>([
   "math",
@@ -14,6 +23,7 @@ export const TARGET_LANGS = new Set<string>([
   "jsxgraph",
   "svg",
   "html",
+  "chart",
   "board",
   "sheet",
   "document",
@@ -86,6 +96,22 @@ export function innerCode(doc: Text, from: number, to: number): string {
   const closeLine = doc.lineAt(to);
   if (closeLine.from <= openLine.to + 1) return ""; // no inner lines
   return doc.sliceString(openLine.to + 1, closeLine.from - 1);
+}
+
+/** Where a fence's body sits, from the fence range a widget captured when it
+ * was built — the span an Apply replaces (only the body, never the ``` lines).
+ * Null when the captured range no longer fits the document. */
+export function fenceBodyRange(
+  doc: Text,
+  sourceFrom: number,
+  sourceTo: number,
+): { from: number; to: number } | null {
+  if (sourceFrom < 0 || sourceTo > doc.length || sourceFrom > sourceTo) return null;
+  const openLine = doc.lineAt(sourceFrom);
+  const closeLine = doc.lineAt(sourceTo);
+  const from = openLine.to + 1;
+  const to = Math.max(from, closeLine.from - 1);
+  return { from, to };
 }
 
 /** The copy a withheld embed fence shows instead of mounting its editor. The

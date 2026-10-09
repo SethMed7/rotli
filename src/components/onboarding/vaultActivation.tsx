@@ -1,32 +1,114 @@
+// Where notes live, as one decision (the owner, 2026-10-01: "you either start
+// fresh or connect a folder, that's it"; 2026-10-05: "always open native …
+// they can do it from there"). One button opens the macOS folder panel; an
+// empty folder (New Folder in the panel) becomes a fresh vault, a folder that
+// already holds notes is used in place with only a hidden .rotli sidecar.
+// Picking the folder is the confirmation.
+
 import { useEffect, useState } from "react";
 
-import { setSetupHandle } from "../../keys/handles";
 import {
-  corpusImportVaultCopy,
   corpusInspectFolder,
+  corpusStatus,
+  type CorpusConfigView,
   corpusListConfig,
   type CorpusRefView,
-  type VaultInspection,
 } from "../../lib/tauri";
-import { chooseFolder, initMemexAsCorpus } from "../../memex/service";
+import { chooseFolder, initMemexAsCorpus, pickVaultFolder } from "../../memex/service";
 import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
-import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
-import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import {
+  LIBRARIAN_ON_DESCRIPTION,
+  SetupBack,
+  SetupChoiceGroup,
+  SetupPrimary,
+  useSetupHandle,
+} from "./setupControls";
 
-type Stage = "choose" | "create" | "scanning" | "review";
+/** The vault setup may offer to keep: the one this install has chosen. A
+ * debug build only borrows production's vault, read-only, to boot; keeping
+ * that would record nothing, so setup would ask again on the next launch. */
+export function keepableVault(
+  config: Pick<CorpusConfigView, "corpus" | "developmentReadOnly">,
+): CorpusRefView | null {
+  return config.developmentReadOnly ? null : config.corpus;
+}
 
-type Intent = "create" | "open" | "current";
-type ImportMode = "in-place" | "copy";
+/** After opening a folder: carry on only when it really is the vault now. A
+ * folder already open here is a no-op, which is fine for a vault this install
+ * chose; a debug build only borrows production's vault read-only, so "opening"
+ * it records nothing, and setup would end on the vault screen again. */
+export function openedOrWhy(opened: boolean, configured: boolean): string | null {
+  if (opened || configured) return null;
+  return "That folder is already open here read-only, so Rotli can't keep it as this build's vault. Pick another folder.";
+}
 
-export function vaultChoiceLabel(intent: Intent): string {
-  if (intent === "create") return "Choose an empty folder";
-  if (intent === "open") return "Choose an existing folder";
-  return "Use this vault";
+/** What a picked folder becomes: an empty one a fresh vault, anything else
+ * the vault it already is, used in place. */
+export function vaultPlan(kind: "memex" | "markdown" | "empty"): "create" | "open" {
+  return kind === "empty" ? "create" : "open";
+}
+
+/** Picking the folder, shared by setup's vault step and the prompt a skipped
+ * setup shows: the folder panel, then a fresh vault or the folder used in
+ * place. `librarian` is whether a NEW vault's Librarian starts on. */
+export function useVaultChoice({
+  librarian,
+  onDone,
+  onBeforeSwitch,
+  onSwitchFailed,
+}: {
+  librarian: () => boolean;
+  onDone?: (() => void | Promise<void>) | undefined;
+  onBeforeSwitch?: (() => void | Promise<void>) | undefined;
+  onSwitchFailed?: (() => void | Promise<void>) | undefined;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const restoreVaultStep = async () => {
+    try {
+      await onSwitchFailed?.();
+    } catch {
+      // Preserve the real vault-operation error below; persistence will retry.
+    }
+  };
+
+  /** Pick the folder, and that's the vault: made fresh, or used in place. */
+  const choose = async () => {
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const path = await pickVaultFolder("Choose a folder for your notes");
+      if (!path) return;
+      // a read-only look first decides what the folder becomes
+      const plan = vaultPlan((await corpusInspectFolder(path)).kind);
+      await onBeforeSwitch?.();
+      await flushSettingsNow();
+      if (plan === "create") {
+        await initMemexAsCorpus(path, librarian());
+        await activateCreatedVault();
+      } else if (await chooseFolder(path)) {
+        await refreshActiveVault();
+      } else {
+        const why = openedOrWhy(false, await corpusStatus());
+        if (why) throw new Error(why);
+      }
+      await onDone?.();
+    } catch (cause) {
+      await restoreVaultStep();
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { choose, busy, setBusy, error, chooseLabel: busy ? "Working…" : "Choose a folder" };
 }
 
 export function VaultActivation({
@@ -44,22 +126,23 @@ export function VaultActivation({
   onBeforeSwitch?: () => void | Promise<void>;
   onSwitchFailed?: () => void | Promise<void>;
 }) {
-  const [stage, setStage] = useState<Stage>("choose");
-  const [intent, setIntent] = useState<Intent>("create");
-  const [createPath, setCreatePath] = useState<string | null>(null);
-  const [inspection, setInspection] = useState<VaultInspection | null>(null);
-  const [importMode, setImportMode] = useState<ImportMode>("in-place");
-  const [brainEnabled, setBrainEnabled] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // outside setup no Librarian screen follows, so a new vault asks here
+  const [librarian, setLibrarian] = useState<"on" | "off">("on");
   const [current, setCurrent] = useState<CorpusRefView | null>(null);
+  // in setup, whether the Librarian works here is the next screen's question
+  const { choose, busy, setBusy, error, chooseLabel } = useVaultChoice({
+    librarian: () => (onboarding ? useUiStore.getState().brainEnabled : librarian === "on"),
+    onDone,
+    onBeforeSwitch,
+    onSwitchFailed,
+  });
 
   useEffect(() => {
     if (!onboarding || !allowCurrent) return;
     let live = true;
     void corpusListConfig()
       .then((config) => {
-        if (live) setCurrent(config.corpus);
+        if (live) setCurrent(keepableVault(config));
       })
       .catch(() => {});
     return () => {
@@ -67,110 +150,19 @@ export function VaultActivation({
     };
   }, [allowCurrent, onboarding]);
 
-  const restoreVaultStep = async () => {
-    try {
-      await onSwitchFailed?.();
-    } catch {
-      // Preserve the real vault-operation error below; persistence will retry.
-    }
-  };
-
-  const chooseIntent = async () => {
-    setError(null);
-    setBusy(true);
-    try {
-      if (intent === "current") {
-        await onDone?.();
-        return;
-      }
-      const path = await requestVaultFolder({
-        title: intent === "create" ? "Create a Rotli vault" : "Open an existing folder",
-        description:
-          intent === "create"
-            ? "Choose an empty folder inside Home, or create one here. Rotli will keep ordinary local files there."
-            : "Choose the folder that already contains the notes and files you want Rotli to use in place.",
-        actionLabel: intent === "create" ? "Use empty folder" : "Review folder",
-        requireEmpty: intent === "create",
-      });
-      if (!path) return;
-      if (intent === "create") {
-        const report = await corpusInspectFolder(path);
-        if (report.kind !== "empty") {
-          throw new Error(
-            "That folder already has files. Choose Open an existing folder so you can review it first.",
-          );
-        }
-        setCreatePath(path);
-        setStage("create");
-      } else {
-        setStage("scanning");
-        setInspection(await corpusInspectFolder(path));
-        setStage("review");
-      }
-    } catch (cause) {
-      await restoreVaultStep();
-      setStage("choose");
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const activate = async () => {
+  /** Re-onboarding with a vault already chosen: keep it, no folder panel. */
+  const keepCurrent = async () => {
     if (busy) return;
     setBusy(true);
-    setError(null);
     try {
-      if (stage === "create" && createPath) {
-        useUiStore.getState().setBrainEnabled(brainEnabled);
-        await onBeforeSwitch?.();
-        await flushSettingsNow();
-        await initMemexAsCorpus(createPath, brainEnabled);
-        await activateCreatedVault();
-        await onDone?.();
-        return;
-      }
-      if (stage === "review" && inspection) {
-        if (importMode === "copy") {
-          const destination = await requestVaultFolder({
-            title: "Choose a destination",
-            description: "Choose an empty folder for the reviewed copy, or create a new folder here.",
-            actionLabel: "Import here",
-            requireEmpty: true,
-          });
-          if (!destination) return;
-          await onBeforeSwitch?.();
-          await flushSettingsNow();
-          await corpusImportVaultCopy(inspection.path, destination);
-          await refreshActiveVault();
-        } else {
-          await onBeforeSwitch?.();
-          await flushSettingsNow();
-          if (await chooseFolder(inspection.path)) await refreshActiveVault();
-        }
-        await onDone?.();
-      }
-    } catch (cause) {
-      await restoreVaultStep();
-      setError(cause instanceof Error ? cause.message : String(cause));
+      await onDone?.();
     } finally {
       setBusy(false);
     }
   };
 
-  const back = () => {
-    setError(null);
-    setInspection(null);
-    setCreatePath(null);
-    setStage("choose");
-  };
-
-  const primary = stage === "choose" ? () => void chooseIntent() : () => void activate();
-  const goBack = stage === "choose" ? onBack : back;
-  useEffect(() => {
-    setSetupHandle({ continue: primary, ...(goBack ? { back: goBack } : {}) });
-    return () => setSetupHandle(null);
-  });
+  const primary = () => void choose();
+  useSetupHandle(primary, onBack);
 
   return (
     <div className="onb vault-activation">
@@ -180,159 +172,42 @@ export function VaultActivation({
         <div className="setup-progress">
           <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>
           <span aria-hidden="true">·</span>
-          <span>
-            {stage === "choose"
-              ? "Choose"
-              : stage === "create"
-                ? "Create"
-                : stage === "scanning"
-                  ? "Scanning"
-                  : "Review"}
-          </span>
+          <span>Vault</span>
         </div>
 
-        <div className="setup-stage" key={stage}>
+        <div className="setup-stage">
           <aside className="setup-companion" aria-hidden="true">
-            <Character
-              name={stage === "scanning" ? "searching" : stage === "review" ? "knowledge" : "notes"}
-              size={152}
-              alwaysVisible
-            />
-            <p>
-              {stage === "review"
-                ? "Your folders stay folders. Main mirrors them as references."
-                : stage === "create"
-                  ? "A fresh home, made of ordinary local files."
-                  : "Nothing is chosen or changed until you confirm."}
-            </p>
+            <Character name={busy ? "searching" : "notes"} size={152} />
+            <p>Your notes stay ordinary files you own.</p>
           </aside>
 
           <div className="setup-content">
-            {stage === "choose" && (
-              <>
-                <h1 id="vault-title">Where should your notes live?</h1>
-                <p className="setup-lede">
-                  Start fresh or bring the Markdown folder you already use. There is one Main view—not a
-                  second copy of your files.
-                </p>
-                <SetupChoiceGroup
-                  label="Vault choice"
-                  value={intent}
-                  onChange={setIntent}
-                  options={[
-                    {
-                      value: "create",
-                      title: "Create a Rotli vault",
-                      description:
-                        "Choose an empty home. Rotli marks the vault and sets up its documented plain-file structure.",
-                    },
-                    {
-                      value: "open",
-                      title: "Open an existing folder",
-                      description:
-                        "Review an Obsidian, ZenNotes, or other Markdown tree before Rotli writes anything.",
-                    },
-                    ...(current
-                      ? [
-                          {
-                            value: "current" as const,
-                            title: `Keep ${current.absPath.split("/").pop() || "current vault"}`,
-                            description: `Explicitly continue with ${current.absPath}.`,
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
-                <p className="setup-arrow-note">
-                  <kbd>←</kbd>
-                  <kbd>→</kbd> moves and selects
-                </p>
-              </>
+            <h1 id="vault-title">Where should your notes live?</h1>
+            <p className="setup-lede">
+              Pick a folder for your notes. Make a new one with New Folder and Rotli starts a fresh vault
+              there, or pick the Markdown folder you already use, like an Obsidian vault: it stays as it is,
+              and Rotli adds only a hidden .rotli folder.
+            </p>
+            {!onboarding && (
+              <SetupChoiceGroup
+                label="Librarian choice"
+                value={librarian}
+                onChange={setLibrarian}
+                options={[
+                  {
+                    value: "on",
+                    title: "A new vault with the Librarian",
+                    description: LIBRARIAN_ON_DESCRIPTION,
+                  },
+                  {
+                    value: "off",
+                    title: "Raw vault",
+                    description:
+                      "You arrange your notes yourself. Turn the Librarian on anytime in Settings.",
+                  },
+                ]}
+              />
             )}
-
-            {stage === "scanning" && (
-              <div className="setup-scanning" role="status">
-                <h1 id="vault-title">Reading the folder map…</h1>
-                <p className="setup-lede">Counting notes and nested folders. No files are being written.</p>
-                <span className="setup-scan-line" aria-hidden="true" />
-              </div>
-            )}
-
-            {stage === "create" && createPath && (
-              <>
-                <h1 id="vault-title">Create {createPath.split("/").pop()}?</h1>
-                <p className="setup-path">{createPath}</p>
-                <SetupChoiceGroup
-                  label="Librarian choice"
-                  value={brainEnabled ? "librarian" : "raw"}
-                  onChange={(value) => setBrainEnabled(value === "librarian")}
-                  options={[
-                    {
-                      value: "librarian",
-                      title: "With the Librarian",
-                      description:
-                        "An on-device helper can file captures and suggest metadata. Actions are logged and undoable.",
-                    },
-                    {
-                      value: "raw",
-                      title: "Raw vault",
-                      description:
-                        "No AI organization. You arrange the same plain files yourself and can opt in later.",
-                    },
-                  ]}
-                />
-              </>
-            )}
-
-            {stage === "review" && inspection && (
-              <>
-                <h1 id="vault-title">Bring in {inspection.label}.</h1>
-                <p className="setup-path">
-                  {inspection.source} · {inspection.path}
-                </p>
-                <div className="vault-stats" aria-label="Vault scan summary">
-                  <span>
-                    <strong>{inspection.markdownFiles}</strong> Markdown notes
-                  </span>
-                  <span>
-                    <strong>{inspection.folders}</strong> nested folders
-                  </span>
-                  <span>
-                    <strong>{inspection.otherFiles}</strong> other files
-                  </span>
-                </div>
-                <SetupChoiceGroup
-                  label="Import method"
-                  value={importMode}
-                  onChange={setImportMode}
-                  options={[
-                    {
-                      value: "in-place",
-                      title: "Open in place",
-                      description:
-                        "Keep using this exact folder. rotli adds only its hidden .rotli sidecar after confirmation.",
-                    },
-                    {
-                      value: "copy",
-                      title: "Import a copy",
-                      description: "Choose an empty destination. The source vault remains untouched.",
-                    },
-                  ]}
-                />
-                <div className="vault-preservation">
-                  <strong>What stays intact</strong>
-                  <span>Folder and nested-folder structure</span>
-                  <span>Markdown files and conventional asset paths</span>
-                  <span>One Main reference tree; no duplicate content store</span>
-                </div>
-                {inspection.warnings.map((warning) => (
-                  <p className="setup-warning" key={warning}>
-                    {warning}
-                  </p>
-                ))}
-              </>
-            )}
-
             {error && (
               <p className="setup-error" role="alert">
                 {error}
@@ -344,23 +219,20 @@ export function VaultActivation({
         <footer className="setup-footer">
           <span className="setup-local-note">Local files remain the durable truth.</span>
           <div className="setup-actions">
-            {stage !== "scanning" && goBack && <SetupBack disabled={busy} onClick={goBack} />}
-            {stage !== "scanning" && (
-              <SetupPrimary
-                disabled={busy || (stage === "review" && inspection?.kind === "empty")}
-                onClick={primary}
+            {onBack && <SetupBack disabled={busy} onClick={onBack} />}
+            {current && (
+              <button
+                type="button"
+                className="setup-button secondary"
+                disabled={busy}
+                onClick={() => void keepCurrent()}
               >
-                {busy
-                  ? "Working…"
-                  : stage === "choose"
-                    ? vaultChoiceLabel(intent)
-                    : stage === "create"
-                      ? "Create vault"
-                      : importMode === "copy"
-                        ? "Choose copy destination"
-                        : "Open this vault"}
-              </SetupPrimary>
+                Keep {current.absPath.split("/").pop() || "this vault"}
+              </button>
             )}
+            <SetupPrimary disabled={busy} onClick={primary}>
+              {chooseLabel}
+            </SetupPrimary>
           </div>
         </footer>
       </section>

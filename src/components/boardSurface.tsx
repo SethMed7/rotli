@@ -28,8 +28,8 @@ import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BackToNotes } from "./backToNotes";
 import { pendingRevealKey } from "./captureReveal";
-import { Character } from "./character";
-import { ArchiveGlyph, CheckGlyph, SearchGlyph, TrashGlyph, glyphForNote } from "./glyphs";
+import { ArchiveGlyph, CheckGlyph, SearchGlyph, TrashGlyph } from "./glyphs";
+import { glyphForNote } from "./noteGlyph";
 import { SurfaceSearch } from "./surfaceSearch";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -322,7 +322,6 @@ export function BoardSurface() {
 
       {captures.length === 0 ? (
         <div className="list-empty">
-          <Character name="listening" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">
             {SHOW_HOTKEYS

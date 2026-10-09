@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -37,13 +38,14 @@ import { copyFilePath } from "../services/notePathCopy";
 import { notesService } from "../services/notes";
 import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { openGraph } from "../state/graph";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import type { NoteSummary } from "../types";
-import { addToFolderMenu } from "./sidebar/addToFolderMenu";
+import { addToFolderMenu, removeFromFolderItem } from "./sidebar/addToFolderMenu";
 import { noteProtectionItems } from "./sidebar/noteProtectionItems";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
@@ -186,7 +188,7 @@ export function useNoteMenu() {
         }
 
         const isNote = !isFile && !isBoard;
-        const sinkLane = activeItemSinkLane(note.kind);
+        const sinkLane = activeItemSinkLane(note);
         const inMain = mainHasNote(manifest.tree, note.id);
         const currentView = assignedView(viewsManifest, note.id);
         const starred = quickIds.includes(note.id);
@@ -262,6 +264,13 @@ export function useNoteMenu() {
               useUiStore.getState().setRowActionError(null);
               void openChatForNote(note, { create: true }).catch(chatError);
             },
+          });
+        }
+        if (LAUNCH_FEATURES.graph && (note.kind ?? "note") === "note" && !isSink(note.folderId)) {
+          items.push({
+            kind: "action" as const,
+            label: "Show in graph",
+            onClick: () => openGraph({ kind: "around", noteId: note.id, depth: 1 }),
           });
         }
         items.push({
@@ -414,6 +423,13 @@ export function useNoteMenu() {
             requestRename: (folderId) => useUiStore.getState().setMainRenameRequest(folderId),
           });
           if (filing) items.push(filing);
+          const unfile = removeFromFolderItem({
+            tree: manifest.tree,
+            note,
+            selection: opts?.selectedItems,
+            setTree: (tree) => setTree(tree, liveIds),
+          });
+          if (unfile) items.push(unfile);
         }
         const projectionAction = projectionMenuAction(activeView, currentView, inMain);
         items.push({

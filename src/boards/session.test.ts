@@ -4,6 +4,7 @@ import { EXCALIDRAW_DEFAULT_BACKGROUND } from "../brand/boardBackground";
 import {
   EMPTY_BOARD_META,
   EMPTY_SCENE,
+  createBoardChangeGate,
   createBoardSaver,
   parseBoardBody,
   serializeBoardScene,
@@ -132,6 +133,41 @@ describe("serializeBoardScene", () => {
     expect(appState).toEqual({ viewBackgroundColor: "linen", gridSize: 20, gridModeEnabled: true });
   });
 
+  // 2026-10-08: Excalidraw reports its default grid for every board, so a
+  // fresh board's first save differed from the file it opened — merely
+  // opening a new board rewrote it
+  test("an untouched grid is not written, so opening a board leaves its file alone", () => {
+    const defaults = { gridSize: 20, gridModeEnabled: false, gridStep: 5, scrollX: 40 };
+    const opened = serializeBoardScene({
+      sourceScene: { ...EMPTY_SCENE },
+      elements: [],
+      appState: defaults,
+      files: {},
+      meta: EMPTY_BOARD_META,
+    });
+    const primed = serializeBoardScene({
+      sourceScene: { ...EMPTY_SCENE },
+      elements: [],
+      appState: {},
+      files: {},
+      meta: EMPTY_BOARD_META,
+    });
+    expect(opened).toBe(primed);
+    // a grid the file already carries keeps riding along, untouched or not
+    const carried = serializeBoardScene({
+      sourceScene: { ...EMPTY_SCENE, appState: { gridSize: 20, gridStep: 5, gridModeEnabled: false } },
+      elements: [],
+      appState: defaults,
+      files: {},
+      meta: EMPTY_BOARD_META,
+    });
+    expect((JSON.parse(carried) as { appState: unknown }).appState).toEqual({
+      gridSize: 20,
+      gridModeEnabled: false,
+      gridStep: 5,
+    });
+  });
+
   // 2026-09-27: an unchosen background follows the app (brand/boardBackground),
   // so it is never written; the default white from older saves heals away.
   test("writes a background only when the person chose one", () => {
@@ -140,15 +176,16 @@ describe("serializeBoardScene", () => {
         JSON.parse(
           serializeBoardScene({
             elements: [],
-            appState: { viewBackgroundColor, gridSize: 20 },
+            // a chosen grid size rides along (an untouched default is never written)
+            appState: { viewBackgroundColor, gridSize: 10 },
             files: {},
             meta: { description: "", tags: "" },
           }),
         ) as { appState: Record<string, unknown> }
       ).appState;
-    expect(saved("transparent")).toEqual({ gridSize: 20 });
-    expect(saved(EXCALIDRAW_DEFAULT_BACKGROUND)).toEqual({ gridSize: 20 });
-    expect(saved("linen")).toEqual({ viewBackgroundColor: "linen", gridSize: 20 });
+    expect(saved("transparent")).toEqual({ gridSize: 10 });
+    expect(saved(EXCALIDRAW_DEFAULT_BACKGROUND)).toEqual({ gridSize: 10 });
+    expect(saved("linen")).toEqual({ viewBackgroundColor: "linen", gridSize: 10 });
   });
 
   test("round-trips meta through parseBoardBody", () => {
@@ -189,6 +226,42 @@ describe("serializeBoardScene", () => {
     expect(
       (JSON.parse(body) as { elements: Array<Record<string, unknown>> }).elements[0]?.futureElementField,
     ).toEqual({ keep: true });
+  });
+});
+
+describe("createBoardChangeGate", () => {
+  const shape = () => ({ id: "a", type: "rectangle", x: 0, y: 0, version: 1, versionNonce: 11 });
+
+  test("panning, zooming, and selecting never arm a save", () => {
+    const changed = createBoardChangeGate();
+    const elements = [shape()];
+    const files = {};
+    expect(changed(elements, { scrollX: 0, zoom: { value: 1 } }, files)).toBe(true);
+    expect(changed(elements, { scrollX: 240, zoom: { value: 1.5 } }, files)).toBe(false);
+    expect(changed(elements, { scrollX: 240, selectedElementIds: { a: true } }, files)).toBe(false);
+  });
+
+  test("a shape edited in place (same array, bumped version) is a change", () => {
+    const changed = createBoardChangeGate();
+    const elements = [shape()];
+    const files = {};
+    changed(elements, {}, files);
+    Object.assign(elements[0]!, { x: 40, version: 2, versionNonce: 98 });
+    expect(changed(elements, {}, files)).toBe(true);
+    expect(changed(elements, {}, files)).toBe(false);
+  });
+
+  test("a new scene array, new files, or a durable canvas choice is a change", () => {
+    const changed = createBoardChangeGate();
+    const files = {};
+    changed([shape()], {}, files);
+    expect(changed([shape()], {}, files)).toBe(true);
+    const elements = [shape()];
+    changed(elements, {}, files);
+    expect(changed(elements, {}, { img: { dataURL: "data:image/png;base64,AA" } })).toBe(true);
+    const next = {};
+    changed(elements, {}, next);
+    expect(changed(elements, { gridModeEnabled: true }, next)).toBe(true);
   });
 });
 

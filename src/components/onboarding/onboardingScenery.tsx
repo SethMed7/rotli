@@ -123,6 +123,8 @@ export function OnboardingScenery({ welcome = false }: { welcome?: boolean }) {
 }
 
 const INTRO_MS = 1700;
+/** The longest an opening waits for its window to come in front. */
+const FRONT_WAIT_MS = 5000;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -136,16 +138,16 @@ export function introWanted(welcome: boolean): boolean {
 }
 
 /** An opening scene over the app (first run's island intro, and the app's
- * opening on every launch, appOpening.tsx): the scene rises, the quokka hops
- * onto its ground, the word appears, then it gives way. Any key or click skips
- * it; it never takes pointer input, so what's underneath is usable. */
+ * opening on every launch, appOpening.tsx): the scene rises, first run's
+ * quokka hops onto its ground, the word appears, then it gives way. Any key or
+ * click skips it; it never takes pointer input, so what's underneath is usable. */
 export function SceneIntro({
   art,
   viewBox,
   onDone,
   testId,
   scene = false,
-  accessorized = false,
+  quokka = true,
   pace = 1,
   waitForFront = false,
 }: {
@@ -155,8 +157,9 @@ export function SceneIntro({
   testId: string;
   /** A theme's small scene (440×200) rather than the wide island. */
   scene?: boolean;
-  /** Wear the person's chosen accessory (the app's opening; first run is bare). */
-  accessorized?: boolean;
+  /** First run's plain quokka hops in. The app's opening is scene and word
+   * only: outside setup, full-body quokkas live in Chat and Settings. */
+  quokka?: boolean;
   /** Stretch every beat by this much (the app's opening is unhurried). */
   pace?: number;
   /** Hold still until the window is in front: a launch can start behind others. */
@@ -167,14 +170,20 @@ export function SceneIntro({
   useEffect(() => {
     if (live) return;
     const front = () => setLive(true);
-    window.addEventListener("focus", front, { once: true });
+    // a click or key means the window is in front, whatever focus says: a web
+    // view can sit in front without ever reporting focus (macOS 27)
+    const signals = ["focus", "pointerdown", "keydown"] as const;
+    for (const signal of signals) window.addEventListener(signal, front, { once: true });
     // focus may have landed between the first render and this effect
     const already = document.hasFocus() ? window.setTimeout(front) : 0;
+    // and it never holds the app: unseen this long, it gives way unplayed
+    const giveUp = window.setTimeout(onDone, FRONT_WAIT_MS);
     return () => {
-      window.removeEventListener("focus", front);
+      for (const signal of signals) window.removeEventListener(signal, front);
       window.clearTimeout(already);
+      window.clearTimeout(giveUp);
     };
-  }, [live]);
+  }, [live, onDone]);
   useEffect(() => {
     if (!live) return;
     const leave = window.setTimeout(() => setLeaving(true), (INTRO_MS - 520) * pace);
@@ -208,9 +217,11 @@ export function SceneIntro({
         <svg className="onb-intro-island" viewBox={viewBox} focusable="false">
           {art}
         </svg>
-        <span className="onb-intro-quokka">
-          <Character name="waving" size={96} accessorized={accessorized} alwaysVisible />
-        </span>
+        {quokka && (
+          <span className="onb-intro-quokka">
+            <Character name="waving" size={96} accessorized={false} />
+          </span>
+        )}
       </div>
       <p className="onb-intro-word">Rotli</p>
     </div>

@@ -21,12 +21,10 @@ import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel 
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import { BOARD_BACKGROUND_MODES, type BoardBackgroundMode } from "../brand/boardBackground";
 import {
-  QUOKKA_IDLE_POSES,
   QUOKKA_ACCESSORIES,
   QUOKKA_LINE_COLORS,
   QUOKKA_STYLES,
   type QuokkaAccessory,
-  type QuokkaIdlePose,
   type QuokkaLineColor,
   type QuokkaStyle,
   normalizeQuokkaAccessoryHue,
@@ -54,6 +52,7 @@ import {
   corpusSettingsWrite,
   corpusStatus,
   hasDurableCorpus,
+  isTauri,
   organizerSetTrust,
   setDockVisible,
   setGlobalShortcut,
@@ -90,11 +89,15 @@ import {
   useNoteStyleStore,
 } from "./noteStyle";
 import { findLeaf, leaves, usePanesStore } from "./panes";
+import { createPersistDrain } from "./persistDrain";
 import { QUICK_MAX } from "./quick";
+import { noteSettingsRead, SETTINGS_VERSION, settingsWritable, unreadable } from "./settingsGuard";
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
 export { rescopeChatMapKeys } from "./chatMapKeys";
+import { applyReonboarding } from "./onboarding";
+import { FIRST_RUN_WINDOW, type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
 import {
   ALL_NOTES,
   type BreveView,
@@ -211,13 +214,11 @@ interface PersistedSettings {
   boardBackground: BoardBackgroundMode;
   accentColor: AccentColor;
   accentHue: number;
-  quokkaCompanionEnabled: boolean;
   quokkaStyle: QuokkaStyle;
   quokkaCustomHue: number;
   quokkaLineColor: QuokkaLineColor;
   quokkaAccessory: QuokkaAccessory;
   quokkaAccessoryHue: number;
-  quokkaIdlePose: QuokkaIdlePose;
   chatNavigatorStyle: ChatNavigatorStyle;
   sidebarSide: SidebarSide;
   sidebarReveal: SidebarReveal;
@@ -336,7 +337,7 @@ interface PersistedSettings {
   /** The version whose What's new the user has seen (lib/whatsNew). */
   lastSeenVersion: string;
   /** First-run checkpoint that survives a vault-selection relaunch. */
-  onboardingPhase: "preferences" | "vault" | "models";
+  onboardingPhase: OnboardingPhase;
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (the maintainer, 2026-06-15). */
   quickNoteIds: string[];
@@ -475,7 +476,7 @@ export function parseSettings(raw: string): PersistedSettings {
   const captureVaultId =
     typeof data.captureVaultId === "string" && data.captureVaultId ? data.captureVaultId : null;
   return {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
@@ -488,7 +489,6 @@ export function parseSettings(raw: string): PersistedSettings {
       data.accentHue <= 359
         ? Math.round(data.accentHue)
         : DEFAULT_ACCENT_HUE,
-    quokkaCompanionEnabled: asBool(data.quokkaCompanionEnabled, false),
     quokkaStyle: asEnum(data.quokkaStyle, QUOKKA_STYLES, "cocoa"),
     quokkaCustomHue:
       data.quokkaCustomHue === undefined
@@ -500,7 +500,6 @@ export function parseSettings(raw: string): PersistedSettings {
     quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "auto"),
     quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
-    quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
     chatNavigatorStyle: asEnum(data.chatNavigatorStyle, CHAT_NAVIGATOR_STYLES, "paws"),
     sidebarSide: asEnum(data.sidebarSide, SIDEBAR_SIDES, "left"),
     sidebarReveal: asEnum(data.sidebarReveal, SIDEBAR_REVEALS, "pinned"),
@@ -649,10 +648,7 @@ export function parseSettings(raw: string): PersistedSettings {
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
     lastSeenVersion: typeof data.lastSeenVersion === "string" ? data.lastSeenVersion : "",
-    onboardingPhase:
-      data.onboardingPhase === "vault" || data.onboardingPhase === "models"
-        ? data.onboardingPhase
-        : "preferences",
+    onboardingPhase: onboardingPhaseOf(data.onboardingPhase),
     quickNoteIds,
     captureOrder,
     quickActiveId,
@@ -710,6 +706,10 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
     "matchLightFamily",
     "matchDarkFamily",
     "imageEngine",
+    // the companion switch and idle mood: the chat buddy is always there and
+    // picks its own pose (2026-10-02)
+    "quokkaCompanionEnabled",
+    "quokkaIdlePose",
   ]);
   return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)));
 }
@@ -722,13 +722,11 @@ function applySettings(s: PersistedSettings): void {
     boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
-    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
     quokkaStyle: s.quokkaStyle,
     quokkaCustomHue: s.quokkaCustomHue,
     quokkaLineColor: s.quokkaLineColor,
     quokkaAccessory: s.quokkaAccessory,
     quokkaAccessoryHue: s.quokkaAccessoryHue,
-    quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
     sidebarSide: s.sidebarSide,
     sidebarReveal: s.sidebarReveal,
@@ -816,13 +814,11 @@ function applyAppSettings(s: PersistedSettings): void {
     boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
-    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
     quokkaStyle: s.quokkaStyle,
     quokkaCustomHue: s.quokkaCustomHue,
     quokkaLineColor: s.quokkaLineColor,
     quokkaAccessory: s.quokkaAccessory,
     quokkaAccessoryHue: s.quokkaAccessoryHue,
-    quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
     sidebarSide: s.sidebarSide,
     sidebarReveal: s.sidebarReveal,
@@ -856,13 +852,11 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     boardBackground: app.boardBackground,
     accentColor: app.accentColor,
     accentHue: app.accentHue,
-    quokkaCompanionEnabled: app.quokkaCompanionEnabled,
     quokkaStyle: app.quokkaStyle,
     quokkaCustomHue: app.quokkaCustomHue,
     quokkaLineColor: app.quokkaLineColor,
     quokkaAccessory: app.quokkaAccessory,
     quokkaAccessoryHue: app.quokkaAccessoryHue,
-    quokkaIdlePose: app.quokkaIdlePose,
     chatNavigatorStyle: app.chatNavigatorStyle,
     sidebarSide: app.sidebarSide,
     sidebarReveal: app.sidebarReveal,
@@ -905,8 +899,12 @@ function applyShellSideEffects(s: PersistedSettings): void {
   for (const action of allActions()) {
     if (!action.global || !(action.id in s.bindings)) continue;
     const chord = s.bindings[action.id] ?? null;
+    // refused (another app holds it): the default for this session only, the choice kept
     setGlobalShortcut(action.id, chord ? toAccelerator(chord) : null).catch(() => {
-      useBindingsStore.getState().setOverride(action.id, action.defaultChord);
+      void setGlobalShortcut(
+        action.id,
+        action.defaultChord ? toAccelerator(action.defaultChord) : null,
+      ).catch(() => {});
     });
   }
 }
@@ -1323,7 +1321,8 @@ export async function hydratePersistedState(): Promise<void> {
   let appSettings = shellSettings;
   let appSettingsPresent = false;
   try {
-    const appRaw = await appSettingsRead();
+    const appRaw = await appSettingsRead().catch(unreadable("app"));
+    noteSettingsRead("app", appRaw);
     appSettingsPresent = Object.keys(record(JSON.parse(appRaw))).length > 0;
     appSettingsPassthrough = unknownAppSettingsKeys(appRaw);
     appSettingsNeedsWrite = !appSettingsPresent;
@@ -1337,7 +1336,8 @@ export async function hydratePersistedState(): Promise<void> {
 
   if (configured) {
     try {
-      const raw = await corpusSettingsRead("settings");
+      const raw = await corpusSettingsRead("settings").catch(unreadable("vault"));
+      noteSettingsRead("vault", raw);
       const settings = parseSettings(raw);
       shellSettings = settings;
       // keys this build doesn't know survive every rewrite (#35) — main window
@@ -1363,16 +1363,20 @@ export async function hydratePersistedState(): Promise<void> {
     // The first-ever paint is Rotli Light. Existing installations are
     // untouched because either their app sidecar or their configured vault
     // supplies the prior choice.
-    useUiStore.setState({
-      ...DEFAULT_APPEARANCE,
-      stayOpen: false,
-      showInDock: false,
-    });
+    // and a new install's window: in the Dock from its very first frame
+    useUiStore.setState({ ...DEFAULT_APPEARANCE, ...FIRST_RUN_WINDOW });
     shellSettings = {
       ...shellSettings,
+      ...FIRST_RUN_WINDOW,
       theme: DEFAULT_APPEARANCE.theme,
       themeFamily: DEFAULT_APPEARANCE.themeFamily,
     };
+  }
+  // 1.8.0 re-onboards once (state/onboarding.ts); marked so the writer saves it
+  const markWrite = () => (appSettingsNeedsWrite = true);
+  if (applyReonboarding(isTauri() && isMainSurface(), markWrite)) {
+    const ui = useUiStore.getState();
+    shellSettings = { ...shellSettings, onboarded: ui.onboarded, onboardingPhase: ui.onboardingPhase };
   }
   if (isMainSurface()) {
     applyShellSideEffects(shellSettings);
@@ -1406,11 +1410,12 @@ export function applyAppearanceBroadcast(payload: AppearanceBroadcast): void {
   useNoteStyleStore.setState({ styles });
 }
 
-function appSettingsSnapshot(): string {
+/** The app settings file as this build writes it (exported for the survival tests). */
+export function appSettingsSnapshot(): string {
   const ui = useUiStore.getState();
   return JSON.stringify({
     ...appSettingsPassthrough,
-    v: 1,
+    v: SETTINGS_VERSION,
     ...appExtrasSnapshot(),
     theme: ui.theme,
     themeFamily: ui.themeFamily,
@@ -1418,13 +1423,11 @@ function appSettingsSnapshot(): string {
     boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
-    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
     quokkaStyle: ui.quokkaStyle,
     quokkaCustomHue: ui.quokkaCustomHue,
     quokkaLineColor: ui.quokkaLineColor,
     quokkaAccessory: ui.quokkaAccessory,
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
-    quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
     sidebarSide: ui.sidebarSide,
     sidebarReveal: ui.sidebarReveal,
@@ -1452,20 +1455,18 @@ function appSettingsSnapshot(): string {
 function settingsSnapshot(): string {
   const ui = useUiStore.getState();
   const snapshot: PersistedSettings = {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
     boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
-    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
     quokkaStyle: ui.quokkaStyle,
     quokkaCustomHue: ui.quokkaCustomHue,
     quokkaLineColor: ui.quokkaLineColor,
     quokkaAccessory: ui.quokkaAccessory,
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
-    quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
     sidebarSide: ui.sidebarSide,
     sidebarReveal: ui.sidebarReveal,
@@ -1547,7 +1548,7 @@ function settingsSnapshot(): string {
 function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
-    v: 1,
+    v: SETTINGS_VERSION,
     root: withDetachedChats(durablePane(panes.root), useChatWindowStore.getState().refs),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
@@ -1563,48 +1564,11 @@ function viewstateSnapshot(): string {
  * before a deliberate relaunch so flags like `onboarded` survive the restart. */
 export async function flushSettingsNow(): Promise<void> {
   if (!hasDurableCorpus()) return;
-  const writes: Array<Promise<void>> = [appSettingsWrite(appSettingsSnapshot())];
-  if (useVaultStore.getState().status === "configured") {
+  const writes = settingsWritable("app") ? [appSettingsWrite(appSettingsSnapshot())] : [];
+  if (useVaultStore.getState().status === "configured" && settingsWritable("vault")) {
     writes.push(corpusSettingsWrite("settings", settingsSnapshot()));
   }
   await Promise.all(writes);
-}
-
-/** One drain of the debounced writer. The high-water marks advance ONLY when
- * a write LANDS — advancing before (the pre-audit shape) meant one transient
- * failure marked the payload written and it never retried: theme/keys/panes
- * silently reverted at next launch (perf audit 2026-07-30, correctness #4).
- * Exported for tests (the shell's corpusSettingsWrite doesn't exist under bun). */
-export function createPersistDrain(
-  write: (key: "settings" | "viewstate", payload: string) => Promise<void>,
-  snapshot: { settings: () => string; viewstate: () => string },
-  seed: { settings: string; viewstate: string },
-  onFailure: () => void,
-): () => Promise<void> {
-  let lastSettings = seed.settings;
-  let lastViewstate = seed.viewstate;
-  return () => {
-    const writes: Array<Promise<void>> = [];
-    const settings = snapshot.settings();
-    if (settings !== lastSettings) {
-      writes.push(
-        write("settings", settings).then(() => {
-          lastSettings = settings;
-        }),
-      );
-    }
-    const viewstate = snapshot.viewstate();
-    if (viewstate !== lastViewstate) {
-      writes.push(
-        write("viewstate", viewstate).then(() => {
-          lastViewstate = viewstate;
-        }),
-      );
-    }
-    return Promise.allSettled(writes).then((results) => {
-      if (results.some((r) => r.status === "rejected")) onFailure();
-    });
-  };
 }
 
 /** Subscribe the one writer to every durable store. Writes are debounced,
@@ -1619,7 +1583,7 @@ export function attachPersistence(): () => void {
   let lastAppSettings = appSettingsNeedsWrite ? "" : appSettingsSnapshot();
   const appDrain = async (): Promise<void> => {
     const next = appSettingsSnapshot();
-    if (next === lastAppSettings) return;
+    if (next === lastAppSettings || !settingsWritable("app")) return;
     await appSettingsWrite(next);
     lastAppSettings = next;
   };
@@ -1630,7 +1594,10 @@ export function attachPersistence(): () => void {
   // configured vault. No command in a skipped first run can create `.rotli/`.
   const corpusDrain = configured
     ? createPersistDrain(
-        corpusSettingsWrite,
+        (key, payload) =>
+          key === "settings" && !settingsWritable("vault")
+            ? Promise.resolve()
+            : corpusSettingsWrite(key, payload),
         { settings: settingsSnapshot, viewstate: viewstateSnapshot },
         { settings: settingsSnapshot(), viewstate: viewstateSnapshot() },
         () => corpusSaver.schedule(),

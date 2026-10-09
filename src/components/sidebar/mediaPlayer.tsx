@@ -8,7 +8,14 @@
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 
-import { AMBIENT_SOURCES, isStream, type PlayerView, playerView, trackTitle } from "../../lib/ambient";
+import {
+  type AmbientPrefs,
+  ambientSources,
+  isStream,
+  type PlayerView,
+  playerView,
+  trackTitle,
+} from "../../lib/ambient";
 import { PLATFORM } from "../../lib/featurePolicy";
 import {
   privateBrowserTabTitle,
@@ -17,9 +24,10 @@ import {
 } from "../../lib/privateBrowser";
 import {
   chooseAmbient,
-  openClaudeFmTab,
   openMediaTab,
+  openStreamTab,
   stepAmbient,
+  hideAmbient,
   stopAmbient,
   tabMediaAction,
   toggleAmbient,
@@ -80,8 +88,10 @@ export const LABELS = {
   open: "Open the tab",
   tuck: "Tuck into the player",
   close: "Close the tab",
+  hide: "Hide the player",
   choose: "Choose the ambient sound",
-  openStream: "Open Claude FM in a tab",
+  /** "Open Claude FM in a tab", or the station's name. */
+  openStream: (title: string) => `Open ${title} in a tab`,
 } as const;
 
 /** A tab folding down into a bar: tuck it into the player. */
@@ -98,19 +108,21 @@ const CloseGlyph = () => (
 
 /** The ambient sources as a menu under the player's title; the one playing
  * is the highlighted row. */
-function openSourceMenu(anchor: HTMLElement, current: string): void {
+function openSourceMenu(anchor: HTMLElement, prefs: AmbientPrefs): void {
   const rect = anchor.getBoundingClientRect();
   useContextMenu.getState().open(
     rect.left,
     rect.bottom + 4,
-    // Claude FM plays in the Mac app's private browser, which Rotli Web hasn't
-    AMBIENT_SOURCES.filter((source) => PLATFORM !== "web" || !isStream(source.id)).map((source) => ({
-      kind: "action" as const,
-      label: source.title,
-      checked: source.id === current,
-      checkedMark: "highlight" as const,
-      onClick: () => chooseAmbient(source.id),
-    })),
+    // streams play in the Mac app's private browser, which Rotli Web hasn't
+    ambientSources(prefs)
+      .filter((source) => PLATFORM !== "web" || !isStream(source.id))
+      .map((source) => ({
+        kind: "action" as const,
+        label: source.title,
+        checked: source.id === prefs.track,
+        checkedMark: "highlight" as const,
+        onClick: () => chooseAmbient(source.id),
+      })),
   );
 }
 
@@ -141,14 +153,14 @@ export function MediaPlayer() {
   return (
     <Player
       view={view}
-      title={view.tab ? privateBrowserTabTitle(view.tab) : trackTitle(prefs.track)}
-      ambientTitle={trackTitle(prefs.track)}
+      title={view.tab ? privateBrowserTabTitle(view.tab) : trackTitle(prefs.track, prefs)}
+      ambientTitle={trackTitle(prefs.track, prefs)}
       ambientWanted={prefs.playing}
       onAmbientPlay={() => setPrefs({ playing: !prefs.playing })}
       tucked={!!view.tab && view.tab === docked}
       canTuck={!docked}
       stream={isStream(prefs.track)}
-      onChooseSource={(anchor) => openSourceMenu(anchor, prefs.track)}
+      onChooseSource={(anchor) => openSourceMenu(anchor, prefs)}
     />
   );
 }
@@ -175,7 +187,7 @@ export function Player({
   /** No tab is tucked yet, so this one may be. */
   canTuck?: boolean;
   onChooseSource?: (anchor: HTMLElement) => void;
-  /** Ambient is Claude FM: offer its page as a tab. */
+  /** Ambient is a stream (Claude FM or a station): offer its page as a tab. */
   stream?: boolean;
 }) {
   const tab = view.tab;
@@ -262,10 +274,13 @@ export function Player({
               <SkipGlyph />
             </Control>
             {stream && (
-              <Control label={LABELS.openStream} onClick={openClaudeFmTab}>
+              <Control label={LABELS.openStream(ambientTitle)} onClick={openStreamTab}>
                 <ExternalLinkGlyph size={13} />
               </Control>
             )}
+            <Control label={LABELS.hide} onClick={hideAmbient}>
+              <CloseGlyph />
+            </Control>
           </div>
         )}
       </div>

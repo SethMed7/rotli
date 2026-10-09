@@ -1,13 +1,14 @@
 // Thank you (2026-09-28): the card after setup, before the guided tour. A
-// short note, a banner made from the person's own choices (their quokka, their
-// theme, their name), and ways to pass Rotli on: a GitHub star, an invite for
-// a friend, a post on X, and the banner to keep. Closing it starts the tour.
+// short note, a thank-you banner with the person's name and quokka, and ways
+// to pass Rotli on: a GitHub star, a mail draft inviting a friend, a post on
+// X, and the banner to keep. Then the tour, or straight in (the owner,
+// 2026-10-01: "Take tour" or "Start now", so skipping the tour is one click);
+// closing the card is Start now.
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 
-import { QUOKKA_ACCESSORY_PRESENTATIONS, QUOKKA_STYLE_PRESENTATIONS } from "../brand/quokka";
 import { ROTLI_REPO_URL } from "../lib/feedback";
-import { bannerText, FRIEND_INVITE, shareOnXUrl } from "../lib/thanksBanner";
+import { bannerText, FRIEND_INVITE, friendInviteMailto, shareOnXUrl } from "../lib/thanksBanner";
 import {
   bannerSavesToAssets,
   copyBannerImage,
@@ -16,8 +17,7 @@ import {
   saveBanner,
 } from "../services/thanksShare";
 import { useOnboardingThanks } from "../state/onboardingThanks";
-import { isDarkDataTheme, readDataTheme } from "../state/theme";
-import { THEME_FAMILY_PRESENTATIONS } from "../state/themeChoices";
+import { showSettingsHintNow } from "../state/settingsHint";
 import { startTour } from "../state/tour";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";
@@ -29,27 +29,6 @@ type Banner = { kind: "drawing" } | { kind: "ready"; blob: Blob; url: string } |
 
 /** Frames to wait for the quokka's art (loaded on demand) to mount. */
 const ART_WAIT_FRAMES = 120;
-
-function themeLabel(): string {
-  const dark = isDarkDataTheme(readDataTheme());
-  const family = useUiStore.getState().themeFamily;
-  const presentation = THEME_FAMILY_PRESENTATIONS.find((entry) => entry.family === family);
-  if (!presentation) return "Rotli";
-  if (family === "warm") return dark ? "Rotli Dark" : "Rotli Light";
-  return dark ? presentation.darkLabel : presentation.lightLabel;
-}
-
-function currentBannerText() {
-  const ui = useUiStore.getState();
-  const style = QUOKKA_STYLE_PRESENTATIONS.find((entry) => entry.style === ui.quokkaStyle);
-  const accessory = QUOKKA_ACCESSORY_PRESENTATIONS.find((entry) => entry.accessory === ui.quokkaAccessory);
-  return bannerText({
-    userName: ui.userName,
-    themeLabel: themeLabel(),
-    quokkaLabel: style && style.style !== "line" ? style.label : null,
-    accessoryLabel: accessory && accessory.accessory !== "none" ? accessory.label : null,
-  });
-}
 
 function waitForArt(host: HTMLElement): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -71,7 +50,7 @@ function useBanner(quokkaHost: RefObject<HTMLSpanElement | null>): Banner {
     let url = "";
     const host = quokkaHost.current?.querySelector<HTMLElement>(".quokka");
     const drawn = host
-      ? waitForArt(host).then(() => composeBanner(host, currentBannerText()))
+      ? waitForArt(host).then(() => composeBanner(host, bannerText(useUiStore.getState().userName)))
       : Promise.reject();
     drawn
       .then((blob) => {
@@ -101,9 +80,13 @@ function ThanksCard() {
   const banner = useBanner(quokkaHost);
   const [status, setStatus] = useState("");
 
-  const close = () => {
+  const takeTour = () => {
     hide();
     startTour();
+  };
+  const startNow = () => {
+    hide();
+    showSettingsHintNow();
   };
 
   const shareOnX = async () => {
@@ -119,12 +102,20 @@ function ThanksCard() {
     );
   };
 
+  // a mail draft with the invite, and the invite on the clipboard for
+  // Messages or anywhere else (copied first, while the click still counts)
   const tellAFriend = async () => {
-    setStatus(
-      (await copyText(FRIEND_INVITE))
-        ? "An invite is copied. Send it to a friend."
-        : "Couldn’t copy the invite.",
-    );
+    const copied = await copyText(FRIEND_INVITE);
+    try {
+      await openLink(friendInviteMailto());
+      setStatus(
+        copied
+          ? "Opening a mail draft with an invite. It’s on your clipboard too."
+          : "Opening a mail draft with an invite.",
+      );
+    } catch {
+      setStatus(copied ? "An invite is copied. Send it to a friend." : "Couldn’t open a mail draft.");
+    }
   };
 
   const keepBanner = async () => {
@@ -143,10 +134,9 @@ function ThanksCard() {
       id="thanks"
       title="Thank you for trying Rotli"
       className="thanks-card"
-      onClose={close}
+      onClose={startNow}
       actions={
         <>
-          {/* the shares and the tour share one row (the owner, 2026-09-30) */}
           <div className="thanks-actions" role="group" aria-label="Share Rotli">
             <button
               type="button"
@@ -176,12 +166,18 @@ function ThanksCard() {
               {bannerSavesToAssets() ? "Save banner" : "Download banner"}
             </button>
           </div>
-          <span className="thanks-status" role="status">
-            {status}
-          </span>
-          <button type="button" className="rename-btn primary" onClick={close}>
-            Take the tour
-          </button>
+          {/* then what's next, on its own row so neither button is squeezed */}
+          <div className="thanks-next">
+            <span className="thanks-status" role="status">
+              {status}
+            </span>
+            <button type="button" className="rename-btn" onClick={startNow}>
+              Start now
+            </button>
+            <button type="button" className="rename-btn primary" onClick={takeTour}>
+              Take the tour
+            </button>
+          </div>
         </>
       }
     >
@@ -190,10 +186,10 @@ function ThanksCard() {
         it, and telling a friend helps even more.
       </p>
       <span ref={quokkaHost} className="thanks-quokka-source" aria-hidden="true">
-        <Character name="celebrating" size={440} alwaysVisible />
+        <Character name="celebrating" size={440} />
       </span>
       <div className="thanks-banner" aria-busy={banner.kind === "drawing"}>
-        {banner.kind === "ready" && <img src={banner.url} alt="Your Rotli welcome banner" />}
+        {banner.kind === "ready" && <img src={banner.url} alt="Your Rotli thank-you banner" />}
         {banner.kind === "drawing" && <p className="thanks-note">Drawing your banner…</p>}
         {banner.kind === "failed" && (
           <p role="alert" className="rename-error">

@@ -17,17 +17,22 @@ import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtim
 import fixture from "../../scripts/fixtures/parity.json";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
-import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
+import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
+import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
+import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS } from "../memex/contract";
+import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
+import { canvasHome } from "../services/folderCanvases";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
-import { AI_CREATORS, type AiBodyEdit, bodyEdit } from "./aiEditPolicy";
+import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
 import { PEOPLE_AREA } from "./librarianActions";
@@ -37,6 +42,18 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("documentEditMaxActions", () => {
+    expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);
+  });
+
+  test("documentEditMaxText", () => {
+    expect(MAX_EDIT_TEXT).toBe(entries.documentEditMaxText.value);
+  });
+
+  test("documentEditMaxBytes", () => {
+    expect(DOCUMENT_EDIT_MAX_BYTES).toBe(entries.documentEditMaxBytes.value);
+  });
+
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
   });
@@ -64,6 +81,12 @@ describe("parity.json ↔ TS constants", () => {
   test("aiBodyEditCases", () => {
     for (const c of entries.aiBodyEditCases.value) {
       expect(bodyEdit(c.fields)).toBe(c.verdict as AiBodyEdit);
+    }
+  });
+
+  test("consentedInsertCases", () => {
+    for (const c of entries.consentedInsertCases.value) {
+      expect(consentedInsertRefusal(bodyEdit(c.fields)) !== null).toBe(c.refused);
     }
   });
 
@@ -181,10 +204,50 @@ describe("parity.json ↔ TS constants", () => {
     }
   });
 
+  test("wikilinkTargets", () => {
+    for (const { body, targets } of entries.wikilinkTargets.value) {
+      expect({ body, targets: bodyLinkTargets(body) }).toEqual({ body, targets });
+    }
+  });
+
+  test("emptyCanvasFile", () => {
+    expect(EMPTY_CANVAS_FILE).toBe(entries.emptyCanvasFile.value);
+  });
+
+  test("canvasHome", () => {
+    for (const { folder, memex, home } of entries.canvasHome.value) {
+      expect({ folder, memex, home: canvasHome(folder, memex) }).toEqual({ folder, memex, home });
+    }
+  });
+
+  test("metadataLinkTargets", () => {
+    for (const { fields, targets } of entries.metadataLinkTargets.value) {
+      expect({ fields, targets: metadataLinkTargets(fields) }).toEqual({ fields, targets });
+    }
+  });
+
   test("endpointLocality", () => {
     for (const { url, local } of entries.endpointLocality.value) {
       // compare {url, verdict} pairs so a failure names the offending URL
       expect({ url, local: endpointIsLocal(url) }).toEqual({ url, local });
+    }
+  });
+
+  // localMidnight is this side's own zone: the stamped day at local 00:00.
+  test("noteDateStamps", () => {
+    type Read = { stamp: string; fileMs?: number; expect: string; ms?: number };
+    const { reads, days } = entries.noteDateStamps.value;
+    for (const { stamp, fileMs, expect: kind, ms } of reads as Read[]) {
+      const [y = 0, m = 1, d = 1] = stamp.trim().split("-").map(Number);
+      const expected = {
+        file: fileMs,
+        asWritten: ms,
+        localMidnight: new Date(y, m - 1, d).getTime(),
+      }[kind];
+      expect({ stamp, read: stampToMs(stamp, fileMs) }).toEqual({ stamp, read: expected ?? null });
+    }
+    for (const { nowMs, timeZone, day } of days) {
+      expect({ timeZone, day: today(new Date(nowMs), timeZone) }).toEqual({ timeZone, day });
     }
   });
 });
