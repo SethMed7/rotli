@@ -1,24 +1,16 @@
 ---
-// The top of a blog post (WritingPage `article`; the owner, 2026-10-06: "the blog page headers, I
-// still needed that cleaned up", then "picture matches header width" and "title beside the
-// picture"). On the site's 76rem page, so its edges are the header's (the logo's and Download's):
-//   - from 1000px, two columns: on the left "Blog /" small and quiet, then the title, the summary,
-//     one meta line (the author's mark and name, the date, the reading time), and the topics as
-//     light outlined labels; on the right the post's illustration, whole (the scene's quokka crop,
-//     src/og.ts `Banner.mobile`, never cropped further, so no ears or feet are cut), rounded, in a
-//     hairline frame. The two are centred on each other, so neither leaves an empty band;
-//   - below 1000px it stacks, as on a phone: the picture across the page (the wide scene, cropped
-//     from the sky and sand; the quokka crop below 700px), then the words;
-//   - a hairline across the page before the article begins.
-// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. A post without
-// art (`cover` undefined) is the same head without the picture. A page may draw its picture instead
-// (`drawn`, the `art` slot: /privacy/'s night scene), in the same rounded frame and the same place;
-// the drawing sizes the frame. Without `author` the meta line stands alone (no mark, no name).
+// The words at the top of a blog post (WritingPage `article`), under its banner
+// (ArticleBanner.astro, straight across the window; the owner, 2026-10-09: "one thing straight
+// across top like an image/banner then the rest under instead of text left illustration right",
+// pointing at deno.com/blog; before that, 2026-10-06 to 2026-10-09, the title sat beside the
+// picture from 1000px). On the reading column, so the title starts where the post's words start
+// (the left rail's room stays empty beside it, as the column's own margin): "Blog /" small and
+// quiet, the title, the summary, one meta line (the author's mark and name, the date, the reading
+// time), and the topics as light outlined labels, then a hairline before the article. Without
+// `author` the meta line stands alone (no mark, no name).
 import { mark } from '../../mark';
-import type { Banner } from '../../og';
 
 interface Props {
-  cover?: Banner;
   crumbs: { href: string; label: string }[];
   kicker?: string;
   heading: string;
@@ -27,46 +19,12 @@ interface Props {
   /** The date and reading time. */
   meta: string[];
   tags: string[];
-  /** The picture is drawn (the `art` slot) rather than a `cover`. */
-  drawn?: boolean;
 }
 
-const { cover, crumbs, kicker, heading, lede, author, meta, tags, drawn = false } = Astro.props;
+const { crumbs, kicker, heading, lede, author, meta, tags } = Astro.props;
 ---
 
-<header class:list={['cover-head', { 'no-cover': !cover && !drawn }]} data-article-cover>
-  {
-    drawn ? (
-      <div class="cover-art drawn" data-article-scene>
-        <slot name="art" />
-      </div>
-    ) : cover && (
-      <picture class="cover-art" data-article-art>
-        <source
-          media="(min-width: 1000px)"
-          srcset={cover.mobile}
-          width={cover.mobileWidth}
-          height={cover.mobileHeight}
-        />
-        <source
-          media="(max-width: 700px)"
-          srcset={cover.mobile}
-          width={cover.mobileWidth}
-          height={cover.mobileHeight}
-        />
-        <img
-          src={cover.src}
-          srcset={cover.srcset}
-          sizes="calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
-          width={cover.width}
-          height={cover.height}
-          alt={cover.alt}
-          fetchpriority="high"
-          decoding="async"
-        />
-      </picture>
-    )
-  }
+<header class="cover-head" data-article-cover>
   <div class="head-copy">
     {
       crumbs.length > 0 && (
@@ -118,13 +76,16 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags, drawn = false 
 </header>
 
 <style>
-  /* Stacked (below 1000px), on the article's named tracks (WritingPage --article-tracks): the
-     picture across all of them, the words from the page's left edge from 901px (the left rail's
-     edge) and on the text's edges below that. */
+  /* On the article's named tracks (WritingPage --article-tracks): the words in the text track,
+     the post's own column, at every width. */
   .cover-head {
     display: grid;
     grid-template-columns: var(--article-tracks);
     margin-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+  }
+  .head-copy {
+    grid-column: text;
+    min-width: 0;
     padding-bottom: clamp(1.5rem, 3vw, 2rem);
     border-bottom: 1px solid var(--border-strong);
   }
@@ -151,32 +112,6 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags, drawn = false 
       padding: 0.7rem 0;
       margin: -0.7rem 0;
     }
-  }
-  /* Stacked, the picture: the page's full width, rounded with a hairline, short enough that the
-     title is in the first window; its quokka and props (the scene's right half) stay in view. */
-  .cover-art {
-    grid-column: 1 / -1;
-    display: block;
-    overflow: hidden;
-    margin-bottom: clamp(1.25rem, 2.5vw, 1.75rem);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-frame);
-    background: var(--surface-2);
-  }
-  .cover-art img {
-    display: block;
-    width: 100%;
-    /* Its height follows its width (cqi: the article's width), about 3.3 to 1 (the art is 2.4 to 1),
-       so a wider page crops no more of the quokka; the window's height caps it (44svh, a little
-       under the old 46svh), leaving the title, summary, and meta line room in the first window. */
-    height: clamp(12rem, min(30cqi, 44svh), 27rem);
-    object-fit: cover;
-    /* Most of the crop comes off the sky, some off the sand: the quokka keeps its ears. */
-    object-position: 100% 70%;
-  }
-  .head-copy {
-    grid-column: text;
-    min-width: 0;
   }
   .kicker {
     margin: 0 0 0.6rem;
@@ -248,58 +183,5 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags, drawn = false 
     font-size: 0.8rem;
     font-weight: 500;
     line-height: 1.4;
-  }
-  /* From 901px the words start on the page's left edge, the picture's and the left rail's, so the
-     head reads as one block under the picture; the title wraps at about 22em and the summary
-     keeps the reading measure. */
-  @media (min-width: 901px) {
-    .head-copy {
-      grid-column: 1 / -1;
-    }
-  }
-  /* From 1000px, the words beside the picture: two columns across the page (the header's edges),
-     the words on the left edge and the picture on the right, centred on each other. The words get
-     a little more room than the picture; the picture is whole (the quokka crop at its own shape),
-     so its height follows its width and never cuts the quokka. */
-  @media (min-width: 1000px) {
-    .cover-head {
-      grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
-      grid-template-areas: 'copy art';
-      align-items: center;
-      column-gap: clamp(2rem, 4.5vw, 4rem);
-    }
-    .cover-head.no-cover {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-areas: 'copy';
-    }
-    .head-copy {
-      grid-area: copy;
-    }
-    .cover-art {
-      grid-area: art;
-      margin-bottom: 0;
-    }
-    .cover-art img {
-      height: auto;
-      aspect-ratio: 1300 / 900;
-      object-fit: contain;
-      object-position: 50% 50%;
-    }
-  }
-  /* Narrow screens: the "On this page" disclosure's own rules close the head. */
-  @media (max-width: 900px) {
-    .cover-head {
-      padding-bottom: 0;
-      border-bottom: 0;
-    }
-  }
-  /* Phones: the phone crop, the quokka and its props centred. */
-  @media (max-width: 700px) {
-    .cover-art img {
-      height: auto;
-      aspect-ratio: 1300 / 900;
-      max-height: 55svh;
-      object-position: 50% 100%;
-    }
   }
 </style>

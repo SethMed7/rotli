@@ -1,13 +1,12 @@
 ---
-// The top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro): from 1000px
-// the words on the left and the picture on the right (RoadmapScene.astro, the cover's 1300 × 900
-// shape), centred on each other, on the header's edges; narrower, the picture first and across
-// the page, then the words, like a post's. The words: where the page sits ("Resources /"), the
-// title, what the roadmap is and how to take part, a meta line, a notice while the roadmap is
-// being reworked, the participation state (the page's script keeps it current), and the two
-// ways in.
+// The words at the top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro):
+// under the page's banner (RoadmapScene.astro straight across the window, rendered by the page
+// above its wrapper; the owner, 2026-10-09: "one thing straight across top like an image/banner
+// then the rest under"), on the reading column of the long-form tracks, so the title starts where
+// the groups' words start. The words: where the page sits ("Resources /"), the title, what the
+// roadmap is and how to take part, a meta line, a notice while the roadmap is being reworked, the
+// participation state (the page's script keeps it current), and the two ways in.
 import { ROADMAP_URL, site } from '../../site';
-import RoadmapScene from './RoadmapScene.astro';
 
 interface Props {
   heading: string;
@@ -65,18 +64,18 @@ const { heading, lede, meta, notice, participation } = Astro.props;
       )
     }
   </div>
-  <RoadmapScene />
 </header>
 
 <style>
   .road-head {
     display: grid;
-    gap: clamp(1.75rem, 4vw, 2.5rem);
-    padding-bottom: clamp(2rem, 4vw, 3rem);
-    border-bottom: 1px solid var(--border-strong);
+    grid-template-columns: var(--article-tracks);
   }
   .head-copy {
+    grid-column: text;
     min-width: 0;
+    padding-bottom: clamp(2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--border-strong);
   }
   .crumbs {
     display: flex;
@@ -166,22 +165,9 @@ const { heading, lede, meta, notice, participation } = Astro.props;
       margin: -0.7rem 0;
     }
   }
-  /* Below 1000px, like a post's head: the picture first, across the page, then the words. */
-  @media (max-width: 999px) {
-    .road-head :global([data-roadmap-art]) {
-      order: -1;
-    }
-  }
   @media (max-width: 480px) {
     .head-actions .button {
       flex: 1 1 100%;
-    }
-  }
-  @media (min-width: 1000px) {
-    .road-head {
-      grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
-      align-items: center;
-      column-gap: clamp(2rem, 4.5vw, 4rem);
     }
   }
 </style>

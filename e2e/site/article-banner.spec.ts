@@ -1,11 +1,12 @@
-// The top of an article (WritingPage `article`, blog/ArticleCover.astro). The full-width pinned
-// banner /privacy/ once opened on is gone: it now opens like a post (privacy-page.spec.ts).
-// Blog posts open on their head, on the header's edges: from 1000px (SIDE_BY_SIDE) "Blog /", the
-// title, the summary, the meta line, and the topics on the left and the post's picture on the
-// right, whole (never cropped), the two centred on each other; below it, stacked as on a phone,
-// the picture across the page and the words under it (on the page's edge from 901px, the reading
-// column's below). Rounded and still, nothing over the picture, contrast measured, the title in the
-// first window.
+// The top of an article (WritingPage `article`, blog/ArticleBanner.astro and blog/ArticleCover.astro;
+// the owner, 2026-10-09, pointing at deno.com/blog: "one thing straight across top like an
+// image/banner then the rest under instead of text left illustration right"). The post's picture
+// is a band straight across the window, directly under the header, edge to edge and square
+// cornered, outside the page's wrapper: from 701px the wide scene cropped off the sky (nothing cut
+// at the sides), at 700px and below the phone crop, whole. Under it, on the reading column (the
+// left rail's room beside it stays empty from 901px), "Blog /", the title, the summary, the meta
+// line, and the topics, then the head's hairline. Still as the page scrolls, contrast measured,
+// the title in the first window. /privacy/ opens the same way (privacy-page.spec.ts).
 import { expect, test, type Page } from "@playwright/test";
 
 const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
@@ -52,35 +53,68 @@ const POST_VIEWPORTS = [
   { width: 999, height: 800 },
   { width: 900, height: 900 },
   { width: 768, height: 1024 },
+  { width: 701, height: 900 },
+  { width: 700, height: 900 },
   { width: 390, height: 844 },
 ];
-/** Where the words and the picture go side by side (blog/ArticleCover.astro). */
-const SIDE_BY_SIDE = 1000;
+/** Where the banner shows the phone crop (blog/ArticleBanner.astro). */
+const PHONE = 700;
+const REM = 16;
 
 for (const path of POSTS) {
   for (const viewport of POST_VIEWPORTS) {
-    test(`${path} opens on its title beside its picture, or under it when narrow (${viewport.width}px)`, async ({
+    test(`${path} opens on its banner straight across the top, the title under it (${viewport.width}px)`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
       await page.goto(path);
-      // No banner, no pinned picture: the cover sits inside the page's width.
-      await expect(page.locator("[data-article-banner]")).toHaveCount(0);
-      const header = await box(page, ".site-header-bar");
-      const wrap = await box(page, "main.writing");
+      // The banner: straight across the window under the header, edge to edge, outside the page's
+      // wrapper, square cornered with a hairline under it.
+      const bar = await box(page, ".site-header-bar");
       const art = await box(page, "[data-article-art]");
-      expect(art.x).toBeGreaterThanOrEqual(wrap.x - 1);
-      expect(art.x + art.width).toBeLessThanOrEqual(wrap.x + wrap.width + 1);
-      expect(art.width).toBeLessThan(viewport.width);
-      expect(art.y).toBeGreaterThan(header.y + header.height);
-      expect(
-        await page.locator("[data-article-art]").evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
-      ).not.toBe("0px");
+      const windowWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(Math.abs(art.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(art.width - windowWidth)).toBeLessThanOrEqual(1);
+      expect(Math.abs(art.y - (bar.y + bar.height))).toBeLessThanOrEqual(1);
+      await expect(page.locator("main [data-article-art]")).toHaveCount(0);
+      await expect(page.locator("[data-article-cover] [data-article-art]")).toHaveCount(0);
+      const frame = await page.locator("[data-article-art]").evaluate((el) => ({
+        radius: getComputedStyle(el).borderTopLeftRadius,
+        rule: getComputedStyle(el).borderBottomWidth,
+      }));
+      expect(frame).toEqual({ radius: "0px", rule: "1px" });
       const img = page.locator("[data-article-art] img");
       await expect
         .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
         .toBe(true);
       expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
+
+      // The right picture for the width, and the quokka never cut.
+      const shape = await img.evaluate((el: HTMLImageElement) => ({
+        src: el.currentSrc,
+        width: el.getBoundingClientRect().width,
+        height: el.getBoundingClientRect().height,
+        natural: el.naturalWidth / el.naturalHeight,
+        fit: getComputedStyle(el).objectFit,
+        position: getComputedStyle(el).objectPosition,
+      }));
+      expect(shape.fit).toBe("cover");
+      // Never taller than the scene at the window's width, so the crop only ever comes off the top
+      // and bottom, never the sides.
+      expect(shape.height).toBeLessThanOrEqual(shape.width / shape.natural + 1);
+      if (viewport.width > PHONE) {
+        // The wide scene, in a band that follows the window's width: clamp(13rem, 36vw, 34rem).
+        expect(shape.src).toMatch(/\.webp$/);
+        expect(shape.src).not.toMatch(/-mobile\.webp$/);
+        const band = Math.min(Math.max(13 * REM, 0.36 * windowWidth), 34 * REM);
+        expect(Math.abs(shape.height - band)).toBeLessThanOrEqual(1.5);
+        // Most of the crop comes off the sky, so the quokka keeps its feet on the sand.
+        expect(parseFloat(shape.position.split(" ")[1]!)).toBeGreaterThanOrEqual(75);
+      } else {
+        // The phone crop, whole: drawn at its own shape.
+        expect(shape.src).toMatch(/-mobile\.webp$/);
+        expect(Math.abs(shape.width / shape.height - shape.natural)).toBeLessThan(0.02);
+      }
 
       // The head: title, then summary, then the meta line (author, date, reading time), then topics.
       const head = page.locator("[data-article-cover] .head-copy");
@@ -108,29 +142,9 @@ for (const path of POSTS) {
       expect(await size("h1")).toBeGreaterThan(await size(".lede"));
       expect(await size(".lede")).toBeGreaterThan(await size(".byline"));
 
-      // Nothing over the picture: beside it on a wide screen, below it on a narrow one.
+      // Nothing over the picture: the words, all of them, under it.
       const copy = await box(page, "[data-article-cover] .head-copy");
-      const beside = viewport.width >= SIDE_BY_SIDE;
-      if (beside) {
-        expect(copy.x + copy.width).toBeLessThan(art.x);
-        // Side by side and balanced: the two overlap in height and are centred on each other, so
-        // neither leaves an empty band.
-        expect(copy.y).toBeLessThan(art.y + art.height);
-        expect(art.y).toBeLessThan(copy.y + copy.height);
-        expect(Math.abs(copy.y + copy.height / 2 - (art.y + art.height / 2))).toBeLessThan(4);
-        expect(Math.abs(copy.height - art.height)).toBeLessThan(Math.max(copy.height, art.height) * 0.25);
-        // The picture is whole: the quokka crop at its own shape, nothing cut off.
-        const shape = await page.locator("[data-article-art] img").evaluate((el: HTMLImageElement) => ({
-          src: el.currentSrc,
-          drawn: el.getBoundingClientRect().width / el.getBoundingClientRect().height,
-          natural: el.naturalWidth / el.naturalHeight,
-          fit: getComputedStyle(el).objectFit,
-        }));
-        expect(shape.src).toMatch(/-mobile\.webp$/);
-        expect(Math.abs(shape.drawn - shape.natural)).toBeLessThan(0.02);
-      } else {
-        expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
-      }
+      expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
       // The title is in the first window.
       expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
@@ -139,22 +153,28 @@ for (const path of POSTS) {
       expect(Math.abs(crumbs.x - title!.x)).toBeLessThan(1.5);
       expect(crumbs.y + crumbs.height).toBeLessThanOrEqual(title!.y + 1);
       expect(title!.y - (crumbs.y + crumbs.height)).toBeLessThan(24);
-      if (!beside) expect(crumbs.y).toBeGreaterThanOrEqual(art.y + art.height);
+      expect(crumbs.y).toBeGreaterThanOrEqual(art.y + art.height);
 
+      // The words are on the reading column at every width: they start where the post's words do.
+      const column = await box(page, "[data-prose] > p");
+      expect(Math.abs(copy.x - column.x)).toBeLessThan(1.5);
+      const header = await box(page, ".site-header");
       if (viewport.width > 900) {
-        // On the header's edges: the words on the left one, which is the left rail's, so the head
-        // is not indented into empty space; the picture ends on the right one.
-        const header = await box(page, ".site-header");
+        // Past the left rail, which is on the header's left edge: its room beside the head stays
+        // empty, as the column's own margin.
         const rail = await box(page, "[data-article-rail]");
-        expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
         expect(Math.abs(rail.x - header.x)).toBeLessThan(1.5);
-        expect(Math.abs(art.x + art.width - (header.x + header.width))).toBeLessThan(1.5);
-        if (!beside) expect(Math.abs(art.x - header.x)).toBeLessThan(1.5);
+        expect(copy.x).toBeGreaterThanOrEqual(rail.x + rail.width);
       } else {
-        // One column: the words on the reading column's edge.
-        const text = await box(page, "[data-prose] > p");
-        expect(Math.abs(copy.x - text.x)).toBeLessThan(1.5);
+        // No rail: the column, and so the words, start on the page's left edge.
+        expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
       }
+      // The hairline under the head is the words' own, not the full header's.
+      const rules = await page.evaluate(() => ({
+        copy: getComputedStyle(document.querySelector("[data-article-cover] .head-copy")!).borderBottomWidth,
+        cover: getComputedStyle(document.querySelector("[data-article-cover]")!).borderBottomWidth,
+      }));
+      expect(rules).toEqual({ copy: "1px", cover: "0px" });
 
       // Read on the page's own ground: measured, at least 4.5:1, topics included.
       for (const text of ["h1", ".byline", ".lede", ".author", ".tags li"]) {

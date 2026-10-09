@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 
-// /roadmap/: the head (words beside the picture, the source link), ROADMAP.md's three public
+// /roadmap/: the banner straight across the top and the head under it on the reading column (the
+// owner, 2026-10-09: "one thing straight across top like an image/banner then the rest under", as
+// a post's), the head's words and the source link, ROADMAP.md's three public
 // sections item for item with each item's status and size, "Recently shipped" read from
 // CHANGELOG.md's newest releases, votes (off while the sidecar is: astro preview has none;
 // live with the API stubbed: optimistic, kept once per browser, taken back on a refusal,
@@ -115,34 +117,51 @@ test.describe("the head", () => {
       "href",
       "https://github.com/SethMed7/rotli/blob/main/ROADMAP.md",
     );
-    await expect(head.locator("[data-roadmap-art]")).toBeVisible();
-    await expect(head.locator("[data-roadmap-art]")).toHaveAttribute("aria-hidden", "true");
+    // The picture is the page's banner, above the head, decorative.
+    const art = page.locator("[data-roadmap-art]");
+    await expect(art).toBeVisible();
+    await expect(art).toHaveAttribute("aria-hidden", "true");
+    await expect(head.locator("[data-roadmap-art]")).toHaveCount(0);
   });
 
-  test("puts the words left and the picture right on a wide screen, and the picture first, across the page, below 1000px", async ({
+  test("puts the banner straight across the top at every width, and the words under it on the reading column", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/roadmap/");
     const title = page.locator("[data-roadmap-head] h1");
+    const copy = page.locator("[data-roadmap-head] .head-copy");
     const art = page.locator("[data-roadmap-art]");
-    let [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
-    expect(a.x).toBeGreaterThan(t.x + t.width - 1);
-    expect(a.y).toBeLessThan(t.y + t.height);
-    expect(a.y + a.height).toBeLessThanOrEqual(900);
-
-    // Below 1000px, like a post's head (2026-10-09): the picture first and across the page, the
-    // title under it, still in the first window.
+    await expect(page.locator("main [data-roadmap-art]")).toHaveCount(0);
+    expect(await art.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("0px");
+    // Like a post's (2026-10-09): the banner from the window's left edge to its right, directly
+    // under the header, in a band that follows the window's width (clamp(13rem, 36vw, 34rem)), the
+    // drawing's own shape on a phone; the words under it, starting where the groups' words start,
+    // the title still in the first window.
     for (const [width, height] of [
+      [1440, 900],
       [960, 900],
       [768, 1024],
       [390, 844],
     ] as const) {
       await page.setViewportSize({ width, height });
-      [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
-      const head = (await page.locator("[data-roadmap-head]").boundingBox())!;
-      expect(t.y, `title under the picture at ${width}`).toBeGreaterThan(a.y + a.height);
-      expect(Math.abs(a.width - head.width), `picture across the page at ${width}`).toBeLessThanOrEqual(1);
+      const [t, a, c] = [
+        (await title.boundingBox())!,
+        (await art.boundingBox())!,
+        (await copy.boundingBox())!,
+      ];
+      const bar = (await page.locator(".site-header-bar").boundingBox())!;
+      const column = (await page.locator(".road-body .section-note").first().boundingBox())!;
+      const windowWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(Math.abs(a.x), `banner from the left edge at ${width}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(a.width - windowWidth), `banner across the window at ${width}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(a.y - (bar.y + bar.height)), `banner under the header at ${width}`).toBeLessThanOrEqual(
+        1,
+      );
+      const band =
+        width > 700 ? Math.min(Math.max(13 * 16, 0.36 * windowWidth), 34 * 16) : (windowWidth * 900) / 1300;
+      expect(Math.abs(a.height - band), `banner's height at ${width}`).toBeLessThanOrEqual(1.5);
+      expect(c.y, `words under the banner at ${width}`).toBeGreaterThanOrEqual(a.y + a.height);
+      expect(Math.abs(c.x - column.x), `words on the reading column at ${width}`).toBeLessThan(1.5);
       expect(t.y + t.height, `title in the first window at ${width}`).toBeLessThan(height);
     }
   });

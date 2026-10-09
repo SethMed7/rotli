@@ -7,16 +7,37 @@
 // being built, what's planned, what's still an idea). Drawn in SVG with the site's tokens and
 // the quokka's own art, so nothing is fetched and it follows the theme's ground. Decorative:
 // the words beside it say what the page is, so it is hidden from assistive technology.
-// Below 1000px it runs the page's width in a wider frame, like a post's banner (the owner,
-// 2026-10-09: at about 960 it sat at half the width): the drawing stays whole in the middle,
-// standing on the frame's floor, and its sky, sea, dunes, and sand run on past its edges.
+// As the roadmap's banner (`banner`; the owner, 2026-10-09, like a post's), it runs straight
+// across the window above the page in a band: the drawing stays whole in the middle, standing on
+// the band's floor, and its sky (with a cloud each side), sea, dunes, and sand run on past its
+// edges.
 import searching from '../../../../src/assets/characters/filled/cocoa/searching.webp';
+
+interface Props {
+  /** Straight across the window above the page (the roadmap's banner), not a framed picture. */
+  banner?: boolean;
+}
+
+const { banner = false } = Astro.props;
 ---
 
-<div class="scene" aria-hidden="true" data-roadmap-art>
+<div class:list={['scene', { banner }]} aria-hidden="true" data-roadmap-art>
   <svg viewBox="0 0 1300 900" preserveAspectRatio="xMidYMax meet" role="presentation" focusable="false">
     <rect class="sky" x="-1300" width="3900" height="900" />
 
+    <!-- past the drawing's edges, for the wide band -->
+    <g class="cloud">
+      <ellipse cx="-420" cy="120" rx="80" ry="22" />
+      <ellipse cx="-466" cy="126" rx="44" ry="17" />
+      <ellipse cx="-384" cy="110" rx="50" ry="21" />
+      <path class="rim" d="M-506 144q78 10 186 2" />
+    </g>
+    <g class="cloud">
+      <ellipse cx="1760" cy="170" rx="88" ry="24" />
+      <ellipse cx="1712" cy="176" rx="50" ry="18" />
+      <ellipse cx="1800" cy="158" rx="54" ry="23" />
+      <path class="rim" d="M1666 194q84 11 200 2" />
+    </g>
     <g class="cloud">
       <ellipse cx="560" cy="150" rx="96" ry="26" />
       <ellipse cx="506" cy="156" rx="54" ry="20" />
@@ -91,14 +112,20 @@ import searching from '../../../../src/assets/characters/filled/cocoa/searching.
     /* The bands drawn past the viewBox show in a wider frame; the frame clips them. */
     overflow: visible;
   }
-  /* Below 1000px, the page's width in a banner's frame; on a phone, its own shape again. */
-  @media (max-width: 999px) {
-    .scene {
-      aspect-ratio: 2 / 1;
-    }
+  /* The banner: the window's width, a band whose height follows it (as a post's banner,
+     blog/ArticleBanner.astro), square-cornered, with a hairline under it; on a phone, the
+     drawing's own shape, capped by the window's height. */
+  .scene.banner {
+    height: clamp(13rem, 36vw, 34rem);
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    aspect-ratio: auto;
   }
-  @media (max-width: 560px) {
-    .scene {
+  @media (max-width: 700px) {
+    .scene.banner {
+      height: auto;
+      max-height: 55svh;
       aspect-ratio: 1300 / 900;
     }
   }

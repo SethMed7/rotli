@@ -481,23 +481,23 @@ there, and the closing panel, whose art never touches its words from 320 to
     bullets, 1.75rem for numbers), at every width. Nothing hangs into the
     rail's gap. Nested lists indent from their item; the Sources list and
     footnotes draw their numbers on the same line.
-  - **The head** (`blog/ArticleCover.astro`) spans the page, the header's
-    edges. From 1000px it is two columns, centred on each other so neither
-    leaves an empty band: on the left "Blog /" small and quiet, the title
-    (wrapping at about 22em), the summary, one meta line (the face mark as
-    avatar, the author, date, reading time), and the `tags` as light outlined
-    labels; on the right the post's picture, whole, rounded, in a hairline
-    frame. The picture beside the title is the banner's quokka crop
-    (`postBanner(slug).mobile`, 1300 × 900) at its own shape (`object-fit:
-    contain`), so no ears or feet are ever cut; the words get a little more
-    room (`1.08fr` to `1fr`). Below 1000px it stacks, as on a phone: the
-    wide scene across the page (`clamp(12rem, min(30cqi, 44svh), 27rem)`
-    tall, `object-position: 100% 70%`), then the words (on the page's left
-    edge from 901px, on the reading column's below); under 700px the picture
-    is the quokka crop again. A hairline closes the head. Nothing overlaps
-    the picture, nothing is pinned, and the title is in the first window at
-    1280 × 800 and 1440 × 900. A post without art gets the same head without
-    the picture.
+  - **The head** opens on a banner straight across the window (the owner,
+    2026-10-09, pointing at deno.com/blog: "one thing straight across top like
+    an image/banner then the rest under instead of text left illustration
+    right"; from 2026-10-06 the title had sat beside the picture from 1000px).
+    `blog/ArticleBanner.astro`, which `WritingPage` renders before the page's
+    centred wrapper so it is the window's width with no negative margin: the
+    wide scene (2400 × 1000) edge to edge under the header, square-cornered
+    with a hairline under it, `clamp(13rem, 36vw, 34rem)` tall (about 86% of
+    the scene's height, so the crop comes off the sky and the quokka keeps its
+    ears and feet, `object-position: 72% 92%`); at 700px and under, the phone
+    crop at its own shape, capped at 55svh. Under it, on the reading column
+    (`blog/ArticleCover.astro`, the `text` track, so the title starts where the
+    post's words start): "Blog /" small and quiet, the title (wrapping at about
+    22em), the summary, one meta line (the face mark as avatar, the author,
+    date, reading time), the `tags` as light outlined labels, and a hairline.
+    Nothing is pinned or overlaps the picture. A post without art gets the same
+    head without the banner. `/privacy/` and `/roadmap/` open the same way.
   - **The left rail** (`blog/ArticleRail.astro`) reads, top to bottom: the
     short title (`railTitle`: a title's first sentence), "On this page" as a
     tree (`###` under `##`, `tocTree`), the reading meter as a bar and a
@@ -565,9 +565,8 @@ there, and the closing panel, whose art never touches its words from 320 to
     list), footnotes, and the figures' styles; long words and bare addresses
     break instead of widening a phone's page.
   - Specs: `e2e/site/article-banner.spec.ts` (the head at 2560 to 390: the
-    words beside the picture from 1000px and centred on it, the picture whole
-    at its own shape, stacked below; its order, alignment to the header,
-    first-window title, and measured contrast), `article-rail.spec.ts` (the
+    banner edge to edge under the header, the words under it on the reading
+    column; their order, alignment, first-window title, and measured contrast), `article-rail.spec.ts` (the
     rail's order, nothing in it clipping, four sources then "Show all"
     opening all nine whole in the window at 1440 × 900, 1440 × 700, 1280 ×
     800, and 1024 × 640, the button from the keyboard, all sources without
@@ -1371,20 +1370,20 @@ the file disagree. `/roadmap/index.md` is its Markdown twin, linked from
 The page (`src/pages/roadmap/[...slug].astro`, its parts in
 `src/components/roadmap/`), top to bottom:
 
-- **Head** (`RoadmapHead.astro`), laid out like a blog post's: from 1000px the
-  words on the left (Resources /, the title, a lede on what the roadmap is and
-  how to take part, "Direction, not a promise · No dates", the voting state,
-  See what's in the work and Ask for something, and "Roadmap source" to
-  ROADMAP.md on GitHub while the source is public) and the picture on the
-  right; narrower, like a post's head, the picture first and across the page,
-  then the words (2026-10-09: at about 960 it had sat at half the width beside
-  an empty column). The picture (`RoadmapScene.astro`) is drawn in SVG at a
-  cover's 1300 × 900 with the site's tokens and the quokka's own art
+- **Head** (`RoadmapHead.astro`), laid out like a blog post's (2026-10-09):
+  the picture is the page's banner, straight across the window above the page
+  (`RoadmapScene.astro` with `banner`, rendered before the wrapper, the same
+  band as a post's), and the words are under it on the reading column
+  (Resources /, the title, a lede on what the roadmap is and how to take part,
+  "Direction, not a promise · No dates", the rework notice, the participation
+  line, See what's in the work and Ask for something, and "Roadmap source" to
+  ROADMAP.md on GitHub while the source is public). The picture is drawn in
+  SVG at a cover's 1300 × 900 with the site's tokens and the quokka's own art
   (`searching`): a map whose route runs through a done, a current, and an open
-  stop, and a signpost pointing three ways. Below 1000px its frame is a
-  banner's (2:1; its own shape again under 560px): the drawing stays whole in
-  the middle on the frame's floor, and its sky, sea, dunes, and sand are drawn
-  on past its edges (`overflow: visible`, the frame clips). Decorative, so
+  stop, and a signpost pointing three ways. In the wide band the drawing stays
+  whole in the middle on the band's floor, and its sky (a cloud each side),
+  sea, dunes, and sand are drawn on past its edges (`overflow: visible`, the
+  band clips); under 700px it is its own shape. Decorative, so
   `aria-hidden`; nothing is fetched.
 - **On this page** (`RoadmapNav.astro`): a link per group with its item count.
   From 901px a column in a post's rail (the `.longform` tracks,

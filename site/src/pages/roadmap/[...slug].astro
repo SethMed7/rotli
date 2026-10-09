@@ -6,8 +6,8 @@
 // "Recently shipped", read from CHANGELOG.md's newest releases (src/releases.ts), and the
 // request form.
 //
-// The page, top to bottom: the head (components/roadmap/RoadmapHead.astro: words left, picture
-// right, as on a blog post), then, from 901px, the long-form pages' tracks (`.longform`,
+// The page, top to bottom: the banner straight across the window (RoadmapScene.astro, as a blog
+// post's), the head under it on the reading column (components/roadmap/RoadmapHead.astro), then, from 901px, the long-form pages' tracks (`.longform`,
 // components/blog/article.css, the same as a post's): "On this page" pinned in the rail
 // (RoadmapNav.astro), the groups from the column's left edge, their notes at the reading measure
 // and the grids and lists running on to the page's right edge. In the work shows each item under its small
@@ -28,6 +28,7 @@ import RequestForm from '../../components/roadmap/RequestForm.astro';
 import RoadmapHead from '../../components/roadmap/RoadmapHead.astro';
 import RoadmapMock from '../../components/roadmap/RoadmapMock.astro';
 import RoadmapNav from '../../components/roadmap/RoadmapNav.astro';
+import RoadmapScene from '../../components/roadmap/RoadmapScene.astro';
 import VoteButton from '../../components/roadmap/VoteButton.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
@@ -72,6 +73,7 @@ const links = [
   markdownPath="/roadmap/index.md"
 >
   <SiteHeader current="roadmap" />
+  <RoadmapScene banner />
   <main id="content" class="wrap roadmap-page longform" data-roadmap data-state="off">
     <RoadmapHead
       heading="What’s next for rotli"

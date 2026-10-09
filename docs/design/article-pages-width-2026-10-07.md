@@ -371,3 +371,24 @@ sharing the rail and the edge at 901, 1024, 1180, 1440, and 1920.
 Left for later (section 5): one head component for the roadmap, one crumbs
 rule, the roadmap's h2 scale, and folding `WritingPage`'s plain `.prose`
 layer out from under article pages.
+
+## 2026-10-09: the banner across the top
+
+The owner, pointing at deno.com/blog: "I like this style one thing straight
+across top like an image/banner then the rest under instead of text left
+illustration right."
+
+- Posts, `/privacy/`, and `/roadmap/` open on their picture as a band straight
+  across the window under the header (`blog/ArticleBanner.astro`; the roadmap's
+  `RoadmapScene.astro` with `banner`), rendered before the page's centred
+  wrapper so it is the window's width without a negative margin (which would
+  scroll sideways wherever scrollbars take room). `clamp(13rem, 36vw, 34rem)`
+  tall, square-cornered, a hairline under it; the crop comes off the sky so the
+  quokka stays whole. At 700px and under, the phone crop at its own shape.
+- The words go under it on the reading column (the `text` track), so the title
+  starts where the article's words start, at 408 at 1440 like every block
+  below; the left rail's room stays empty beside the head. The hairline under
+  the head spans the column, not the page.
+- This replaces the 2026-10-06 head (title beside the picture from 1000px,
+  stacked below it). The roadmap's drawing is drawn on past its viewBox (sky,
+  a cloud each side, sea, dunes, sand) so any band width reads as one shore.

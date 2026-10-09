@@ -13,13 +13,13 @@
 // record: nothing is kept. An `article` carries the same measure in its rail and, narrow, as a
 // slim bar.
 // Blog posts and /privacy/ pass `article` (opt-in), on the site's one 76rem page, so the head has
-// the header's edges: the head (blog/ArticleCover.astro: the words beside the picture on a wide
-// screen; /privacy/ draws its night scene through the `cover` slot), then two columns on named
+// the header's edges: the banner straight across the window above the page (blog/ArticleBanner.astro,
+// or a drawing through the `cover` slot), the head under it on the reading column
+// (blog/ArticleCover.astro), then two columns on named
 // tracks (--article-tracks, `.longform` in blog/article.css: the left rail, its gap, then the
 // reading column of about 66 characters on one left edge, wide blocks running on to the page's
 // right edge). The rail has the short title, the tree, the meter
-// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro;
-// /privacy/ shares by Copy link alone). After the article, "More from rotli": more posts and
+// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro). After the article, "More from rotli": more posts and
 // rotli's own spots (blog/ArticleAside.astro), which take the place of the article's own Sources
 // list where the rail shows the sources. Under 901px the tree is the disclosure, the meter a slim
 // bar under the header, the article keeps its Sources list, and Share follows the article, all on
@@ -34,6 +34,7 @@ import type { Promo } from '../promos';
 import type { Source } from '../sources';
 import { site } from '../site';
 import ArticleAside, { type MorePost } from './blog/ArticleAside.astro';
+import ArticleBanner from './blog/ArticleBanner.astro';
 import ArticleCover from './blog/ArticleCover.astro';
 import ArticleRail from './blog/ArticleRail.astro';
 import SiteFooter from './SiteFooter.astro';
@@ -130,6 +131,13 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
+  {
+    article && (article.cover || drawnCover) && (
+      <ArticleBanner cover={article.cover} drawn={drawnCover}>
+        {drawnCover && <slot name="cover" />}
+      </ArticleBanner>
+    )
+  }
   <main
     id="content"
     class:list={[
@@ -145,7 +153,6 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
   >
     {article ? (
       <ArticleCover
-        cover={article.cover}
         crumbs={crumbs}
         kicker={kicker}
         heading={heading}
@@ -153,10 +160,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
         author={article.author}
         meta={meta}
         tags={article.tags ?? []}
-        drawn={drawnCover}
-      >
-        {drawnCover && <Fragment slot="art"><slot name="cover" /></Fragment>}
-      </ArticleCover>
+      />
     ) : (
     <header class="writing-head">
       <div class="head-copy">
@@ -467,7 +471,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
      bar under the header below 900px; the rail beside the reading column, Share after it on
      narrow screens. The column's type and the figures are blog/article.css. */
   .writing.is-article {
-    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+    padding-top: clamp(2rem, 4vw, 3.25rem);
   }
   .writing.is-article.has-progress {
     --meter-height: 0px;

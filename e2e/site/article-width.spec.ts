@@ -1,23 +1,23 @@
 // The blog's width (the owner, 2026-10-06: first "for blogs let's use more width", then "now the
 // blog width is too much", then "picture matches header width" and "remove the part on right and
 // move blog content more right"; then, 2026-10-07, one left edge, wide blocks to the page's right
-// edge, bullets hung: docs/design/article-pages-width-2026-10-07.md). A post sits on the site's one
-// 76rem page, the header's, on named tracks (`.longform`, blog/article.css): the left rail, its
-// gap, then a reading column of about 66 characters on one left edge, and the room right of it for
-// wide blocks. There is no right rail; "More from rotli" follows the article. Swept from 320 to
-// 2560: no sideways scroll, nothing over the reading column, 60 to 80 characters a line wherever
-// the window is wider than a phone (62 to 70 from 1180px), the head on the header's edges, the left
-// rail at least 16rem from 1440, the rail folding under 901px, one left line for words, figures,
-// and a list's bullets (its words one step in), figures ending on the page's right edge where they
-// break out, and the same
-// layout after a live resize as on a fresh load. Posts, /privacy/, and /roadmap/ share the rail
-// and the edge. The index is swept the same way.
+// edge, bullets hung: docs/design/article-pages-width-2026-10-07.md; then, 2026-10-09, the picture
+// a banner straight across the window above the page, the words under it: "one thing straight
+// across top like an image/banner then the rest under"). A post sits on the site's one 76rem page,
+// the header's, on named tracks (`.longform`, blog/article.css): the left rail, its gap, then a
+// reading column of about 66 characters on one left edge, and the room right of it for wide
+// blocks. There is no right rail; "More from rotli" follows the article. Swept from 320 to 2560:
+// no sideways scroll, nothing over the reading column, 60 to 80 characters a line wherever the
+// window is wider than a phone (62 to 70 from 1180px), the head on the header's edges with its
+// words on the reading column, the banner from the window's left edge to its right, the left rail
+// at least 16rem from 1440, the rail folding under 901px, one left line for words, figures, and a
+// list's bullets (its words one step in), figures ending on the page's right edge where they break
+// out, and the same layout after a live resize as on a fresh load. Posts, /privacy/, and /roadmap/
+// share the rail and the edge. The index is swept the same way.
 import { expect, test, type Page } from "@playwright/test";
 
 const POST = "/blog/the-ai-you-already-pay-for/";
 const WIDTHS = [320, 390, 600, 768, 900, 1024, 1180, 1280, 1359, 1360, 1440, 1680, 1920, 2560];
-/** Where the head's words and picture go side by side (blog/ArticleCover.astro). */
-const SIDE_BY_SIDE = 1000;
 const REM = 16;
 
 type Box = { x: number; y: number; width: number; height: number };
@@ -74,6 +74,7 @@ const geometry = (page: Page) =>
       characters: paragraph.getBoundingClientRect().width / ch,
       fontSize: parseFloat(getComputedStyle(paragraph).fontSize),
       figures,
+      window: document.documentElement.clientWidth,
     };
   });
 
@@ -97,22 +98,18 @@ for (const width of WIDTHS) {
     // 18px at every width: no growth on the widest screens.
     expect(g.fontSize).toBeCloseTo(18, 1);
 
-    // The head is on the header's edges, the page's (the logo's and Download's). Stacked, the
-    // picture spans them and the words start on the left one where there is a rail, on the reading
-    // column's edge where there is not; side by side, the words start on the left edge and the
-    // picture ends on the right one.
+    // The head is on the header's edges, the page's (the logo's and Download's), and its words are
+    // on the reading column at every width: they start and end where the post's words do. The
+    // banner above it runs from the window's left edge to its right, and ends before the words.
     const right = (box: Box) => box.x + box.width;
     expect(Math.abs(g.cover.x - g.header.x)).toBeLessThan(1.5);
     expect(Math.abs(right(g.cover) - right(g.header))).toBeLessThan(1.5);
-    expect(Math.abs(right(g.art) - right(g.header))).toBeLessThan(1.5);
-    if (width >= SIDE_BY_SIDE) {
-      expect(Math.abs(g.copy.x - g.header.x)).toBeLessThan(1.5);
-      expect(right(g.copy)).toBeLessThan(g.art.x);
-    } else {
-      expect(Math.abs(g.art.x - g.header.x)).toBeLessThan(1.5);
-      if (width >= 901) expect(Math.abs(g.copy.x - g.header.x)).toBeLessThan(1.5);
-      else expect(Math.abs(g.copy.x - g.text.x)).toBeLessThan(1.5);
-    }
+    expect(Math.abs(g.copy.x - g.text.x)).toBeLessThan(1.5);
+    expect(Math.abs(right(g.copy) - right(g.text))).toBeLessThan(1.5);
+    expect(Math.abs(g.art.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(right(g.art) - g.window)).toBeLessThanOrEqual(1);
+    expect(g.art.y + g.art.height).toBeLessThanOrEqual(g.copy.y + 1);
+    expect(g.art.y + g.art.height).toBeLessThanOrEqual(g.main.y + 1);
     // The page is the header's: never wider than 76rem, centred, so nothing shifts between pages.
     expect(Math.abs(g.main.x - g.header.x)).toBeLessThan(1.5);
     expect(Math.abs(g.main.width - g.header.width)).toBeLessThan(1.5);
@@ -208,10 +205,15 @@ for (const width of [901, 1024, 1180, 1440, 1920]) {
   });
 }
 
-// The owner, 2026-10-06: "picture matches header width". Every width from 1024 to 2560: the head
-// and its picture end on the header's edges (the logo's left, Download's right), ±1.5px.
+// The owner, 2026-10-06: "picture matches header width"; 2026-10-09: the picture a banner straight
+// across the window, the words under it on the reading column. Every width from 1024 to 2560: the
+// head and the article's room end on the header's edges (the logo's left, Download's right), the
+// rail starts on the logo's edge and the words on the reading column's, and the banner runs from
+// the window's left edge to its right, ±1.5px.
 for (const width of [1024, 1100, 1180, 1280, 1366, 1440, 1536, 1680, 1920, 2240, 2560]) {
-  test(`the head and its picture are on the header's edges at ${width}px`, async ({ page }) => {
+  test(`the head is on the header's edges, its words on the reading column, its banner across the window at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(POST);
     const edges = await page.evaluate(() => {
@@ -220,21 +222,28 @@ for (const width of [1024, 1100, 1180, 1280, 1366, 1440, 1536, 1680, 1920, 2240,
         return { left: rect.left, right: rect.right };
       };
       return {
+        window: document.documentElement.clientWidth,
         header: box(".site-header"),
         logo: box(".site-header .brand"),
         download: box(".site-header .header-download"),
         head: box("[data-article-cover]"),
         copy: box("[data-article-cover] .head-copy"),
+        rail: box("[data-article-rail]"),
+        text: box("[data-prose] > p"),
+        room: box("[data-prose]"),
         art: box("[data-article-art]"),
       };
     });
     expect(Math.abs(edges.head.left - edges.header.left)).toBeLessThanOrEqual(1.5);
     expect(Math.abs(edges.head.right - edges.header.right)).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(edges.copy.left - edges.header.left)).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(edges.copy.left - edges.logo.left)).toBeLessThanOrEqual(1.5);
-    expect(Math.abs(edges.art.right - edges.header.right)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(edges.rail.left - edges.logo.left)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(edges.copy.left - edges.text.left)).toBeLessThanOrEqual(1.5);
+    expect(edges.copy.left).toBeGreaterThanOrEqual(edges.rail.right);
+    expect(Math.abs(edges.room.right - edges.header.right)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(edges.art.left)).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(edges.art.right - edges.window)).toBeLessThanOrEqual(1.5);
     // Where Download is the header's last control (the menu button follows it below 1080px).
-    if (width >= 1100) expect(Math.abs(edges.art.right - edges.download.right)).toBeLessThanOrEqual(1.5);
+    if (width >= 1100) expect(Math.abs(edges.room.right - edges.download.right)).toBeLessThanOrEqual(1.5);
   });
 }
 

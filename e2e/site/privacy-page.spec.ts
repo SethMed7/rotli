@@ -1,13 +1,16 @@
 // /privacy/ reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
 // styles", and 2026-10-09: match "The AI you already pay for"): WritingPage's `article` layout on
-// the header's edges. The head is a post's: the title, the lede, the byline (the author, "Updated
-// …", the reading time), the topic chips, beside a banner drawn like a post's from 1000px
-// (stacked, the picture first, below it), rounded and contained. The body is the left rail (the short title, the tree, the meter as a percent,
-// and Share as a post's, Copy Markdown from the page's twin included, no Sources) beside the reading column, and "More from rotli" after
-// it with the posts about privacy. On a phone the tree is the disclosure, the meter a slim bar, and
-// Copy link follows the article. The full-width pinned banner is gone. `#promise` (the hero's and
-// the landing band's link) lands just under the header at every width, and nothing scrolls
-// sideways from 320 to 2560. The matrix itself: privacy-promise.spec.ts.
+// the header's edges. It opens as a post does since 2026-10-09 ("one thing straight across top like
+// an image/banner then the rest under"): its picture a banner straight across the window under the
+// header, edge to edge and square cornered, scrolling away with the page (the old pinned banner is
+// gone), and under it, on the reading column, the title, the lede, the byline (the author,
+// "Updated …", the reading time), and the topic chips. The body is the left rail (the short title,
+// the tree, the meter as a percent, and Share as a post's, Copy Markdown from the page's twin
+// included, no Sources) beside the reading column, and "More from rotli" after it with the posts
+// about privacy. On a phone the tree is the disclosure, the meter a slim bar, and Copy link
+// follows the article. `#promise` (the hero's and the landing band's link) lands just under the
+// header at every width, and nothing scrolls sideways from 320 to 2560. The matrix itself:
+// privacy-promise.spec.ts.
 import { expect, test, type Page } from "@playwright/test";
 
 const SECTIONS = [
@@ -22,8 +25,8 @@ const SECTIONS = [
   "Keeping and deleting",
   "Changes to this page",
 ];
-/** Where the words and the scene go side by side (blog/ArticleCover.astro). */
-const SIDE_BY_SIDE = 1000;
+/** Where the banner shows the phone crop (blog/ArticleBanner.astro). */
+const PHONE = 700;
 
 /** WCAG contrast of two computed colours (rgb()/rgba() or color(srgb …)); throws on transparency. */
 function contrastOf(fg: string, bg: string): number {
@@ -83,12 +86,12 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 320, height: 640 },
 ]) {
-  test(`/privacy/ opens like a post: its title beside its banner, or under it when narrow (${viewport.width}px)`, async ({
+  test(`/privacy/ opens like a post: its banner straight across the top, its title under it (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto("/privacy/");
-    // The post's head, not the old full-width pinned banner.
+    // Not the old pinned banner: a post's, which scrolls away with the page (article-banner.spec.ts).
     await expect(page.locator("[data-article-banner]")).toHaveCount(0);
     const head = page.locator("[data-article-cover] .head-copy");
     await expect(head.getByRole("heading", { level: 1 })).toHaveText("Privacy");
@@ -107,34 +110,51 @@ for (const viewport of [
     expect(byline!.y).toBeGreaterThanOrEqual(lede!.y + lede!.height - 1);
     expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
-    // The banner: a drawn picture like a post's, contained in the page's width, rounded, under the
-    // header, described for assistive tech.
-    const picture = page.locator("[data-article-cover] [data-article-art] img");
+    // The banner: a post's, straight across the window under the header, outside the page's
+    // wrapper, square cornered, described for assistive tech.
+    await expect(page.locator("main [data-article-art]")).toHaveCount(0);
+    const picture = page.locator("[data-article-art] img");
     await expect(picture).toHaveAttribute("alt", /padlock/);
-    const art = await box(page, "[data-article-cover] [data-article-art]");
-    const wrap = await box(page, "main.writing");
-    expect(art.x).toBeGreaterThanOrEqual(wrap.x - 1);
-    expect(art.x + art.width).toBeLessThanOrEqual(wrap.x + wrap.width + 1);
-    expect(art.width).toBeLessThan(viewport.width);
-    expect(art.y).toBeGreaterThan(await headerBottom(page));
-
-    const copy = await box(page, "[data-article-cover] .head-copy");
-    if (viewport.width >= SIDE_BY_SIDE) {
-      // The words on the left, the scene on the right, overlapping in height, neither over the other.
-      expect(copy.x + copy.width).toBeLessThan(art.x);
-      expect(copy.y).toBeLessThan(art.y + art.height);
-      expect(art.y).toBeLessThan(copy.y + copy.height);
+    await expect
+      .poll(() => picture.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    const art = await box(page, "[data-article-art]");
+    const windowWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(Math.abs(art.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.width - windowWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.y - (await headerBottom(page)))).toBeLessThanOrEqual(1);
+    expect(
+      await page.locator("[data-article-art]").evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
+    ).toBe("0px");
+    // The wide scene, cropped only off the top and bottom; on a phone the quokka crop, whole.
+    const shape = await picture.evaluate((el: HTMLImageElement) => ({
+      src: el.currentSrc,
+      width: el.getBoundingClientRect().width,
+      height: el.getBoundingClientRect().height,
+      natural: el.naturalWidth / el.naturalHeight,
+    }));
+    expect(shape.height).toBeLessThanOrEqual(shape.width / shape.natural + 1);
+    if (viewport.width > PHONE) {
+      expect(shape.src).toMatch(/\.webp$/);
+      expect(shape.src).not.toMatch(/-mobile\.webp$/);
     } else {
-      expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+      expect(shape.src).toMatch(/-mobile\.webp$/);
+      expect(Math.abs(shape.width / shape.height - shape.natural)).toBeLessThan(0.02);
     }
+
+    // The words under the banner, on the reading column: they start where the page's words do,
+    // past the rail (on the header's left edge) from 901px, on the page's left edge below that.
+    const copy = await box(page, "[data-article-cover] .head-copy");
+    expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+    const column = await box(page, "[data-prose] > p");
+    expect(Math.abs(copy.x - column.x)).toBeLessThan(1.5);
+    const header = await box(page, ".site-header");
     if (viewport.width > 900) {
-      // On the header's edges, like a post: the words and the rail on the left one, the scene
-      // ending on the right one.
-      const header = await box(page, ".site-header");
       const rail = await box(page, "[data-article-rail]");
-      expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
       expect(Math.abs(rail.x - header.x)).toBeLessThan(1.5);
-      expect(Math.abs(art.x + art.width - (header.x + header.width))).toBeLessThan(1.5);
+      expect(copy.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+    } else {
+      expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
     }
     for (const text of ["h1", ".lede", ".byline"]) {
       const { fg, bg } = await colours(page, `[data-article-cover] .head-copy ${text}`, "body");

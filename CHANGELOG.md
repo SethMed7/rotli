@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
   being built, what's planned, and what's still an idea, straight from the
   roadmap kept with rotli's source, each with its status and how big it is.
-  It opens like a blog post, the title beside a drawing of the quokka with a
+  It opens like a blog post, under a drawing of the quokka with a
   map and a signpost, and ends with Recently shipped: the newest releases,
   their dates, and a few headlines from each, read from this changelog and
   linked to their notes. Vote for what you want (once per item; your browser
@@ -82,10 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **rotli.co's blog posts are calmer to read.** A post lines up with the
-  header: the title, summary, author, and topics sit beside the post's
-  picture, shown whole, with "Blog" above the title, and the title is in
-  view without scrolling. Below that are two columns: the contents,
+- **rotli.co's blog posts are calmer to read.** A post opens on its
+  picture straight across the top of the window, and under it the title,
+  summary, author, and topics start where the text does, with "Blog" above
+  the title, all in view without scrolling. Below that are two columns: the contents,
   progress, sources, and Share on the left, and the text just beside it, at
   a comfortable line of about 66 characters on every screen. Headings,
   paragraphs, lists, tables, and charts all start on one edge, with no wide
