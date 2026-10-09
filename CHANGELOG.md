@@ -524,10 +524,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **⌘Z and ⇧⌘Z undo and redo in a sheet.** On the Mac the Edit menu's Undo
-  and Redo reached only the sheet's hidden cell input, so nothing changed;
-  they now undo and redo your sheet edits, as they already did in a Word
-  document.
+- **⌘Z and ⇧⌘Z undo and redo everywhere.** On the Mac, the Edit menu took
+  those keys before the page saw them and passed them to whatever text box had
+  focus, so undo did nothing in a note, a sheet, or on a board. The keys now
+  go to what you're working in: a note, a sheet, a Word document, and a board
+  each undo and redo their own edits, and a plain text box (a title, the chat
+  box, a rename field) undoes its typing. ⇧⌘Z redoes in sheets and documents
+  too. Edit → Undo and Redo still work from the menu; they just no longer show
+  ⌘Z beside them.
 - **A note can leave a Main folder.** Right-click a note in a folder and
   choose **Remove from folder**, or drag it below the list, where a space
   appears that says "Drop here to take it out of the folder". Either way works

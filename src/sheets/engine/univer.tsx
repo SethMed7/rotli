@@ -77,7 +77,7 @@ const REDO_ID = "univer.command.redo";
 /** An undo Univer just ran from its own ⌘Z keydown must not run again here. */
 const MENU_DEDUPE_MS = 300;
 
-/** ⌘Z / ⇧⌘Z from the Mac's Edit menu (the owner, 2026-10-09: "we need the
+/** ⌘Z / ⇧⌘Z in a sheet (the owner, 2026-10-09: "we need the
  * hotkeys for undo and redo to work"). AppKit takes those keys for the menu
  * before the web view sees a keydown, and WebKit turns undo:/redo: into
  * beforeinput (historyUndo/historyRedo) on the focused element — Univer's
@@ -100,9 +100,21 @@ function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void 
     if (performance.now() - (lastRun.get(id) ?? -Infinity) < MENU_DEDUPE_MS) return;
     void (type === "historyUndo" ? api.undo() : api.redo());
   };
+  // ⇧⌘Z is the Mac's redo; Univer binds only ⌘Y (it answers ⌘Z itself)
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.code !== "KeyZ" || !event.shiftKey || event.altKey) return;
+    if (!(event.metaKey || event.ctrlKey)) return;
+    const focused = host.ownerDocument.activeElement;
+    if (!focused || !host.contains(focused)) return;
+    if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return;
+    event.preventDefault();
+    void api.redo();
+  };
   host.ownerDocument.addEventListener("beforeinput", onBeforeInput, true);
+  host.ownerDocument.addEventListener("keydown", onKeyDown, true);
   return () => {
     host.ownerDocument.removeEventListener("beforeinput", onBeforeInput, true);
+    host.ownerDocument.removeEventListener("keydown", onKeyDown, true);
     if (watch && typeof watch === "object") watch.dispose?.();
   };
 }

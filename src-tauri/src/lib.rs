@@ -125,6 +125,16 @@ fn close_tab_from_native_menu(app: &AppHandle) {
     }
 }
 
+/// Edit → Undo / Redo picked with the pointer. The ⌘Z / ⇧⌘Z keys no longer go
+/// through this menu (see the Edit menu swap in setup): the focused webview
+/// replays the press as a key event, so the editor under focus handles it the
+/// way it handles the real key.
+fn edit_history_from_native_menu(app: &AppHandle, redo: bool) {
+    if let Some(window) = focused_webview_window(app) {
+        let _ = window.emit("rotli:edit-history", if redo { "redo" } else { "undo" });
+    }
+}
+
 fn hide_focused_window(app: &AppHandle) {
     if let Some(window) = focused_webview_window(app) {
         let _ = window.hide();
@@ -2267,6 +2277,8 @@ pub fn run() {
                 "quit-app" => graceful_quit(app),
                 "close-tab" => close_tab_from_native_menu(app),
                 "close-window" => hide_focused_window(app),
+                "edit-undo" => edit_history_from_native_menu(app, false),
+                "edit-redo" => edit_history_from_native_menu(app, true),
                 _ => {}
             }
         })
@@ -2761,11 +2773,15 @@ pub fn run() {
                 // File → Close Tab remains a pointer-selectable command and
                 // Window keeps an explicit no-shortcut hide.
                 let mut file_sub = None;
+                let mut edit_sub = None;
                 let mut window_sub = None;
                 for item in &menu_items {
                     if let tauri::menu::MenuItemKind::Submenu(submenu) = item {
                         if submenu.text().ok().as_deref() == Some("File") {
                             file_sub = Some(submenu.clone());
+                        }
+                        if submenu.text().ok().as_deref() == Some("Edit") {
+                            edit_sub = Some(submenu.clone());
                         }
                         if submenu.id().as_ref() == tauri::menu::WINDOW_SUBMENU_ID {
                             window_sub = Some(submenu.clone());
@@ -2800,6 +2816,37 @@ pub fn run() {
                 let close_window = MenuItemBuilder::with_id("close-window", "Close Window").build(app)?;
                 file_sub.prepend(&close_tab)?;
                 window_sub.append(&close_window)?;
+
+                // ⌘Z / ⇧⌘Z (the owner, 2026-10-09: "we need the hotkeys for undo
+                // and redo to work — everywhere I try"). The predefined Undo and
+                // Redo take the keys before WKWebView and send undo:/redo:, which
+                // reach only a focused text input: a note's editor ignored it, a
+                // sheet's or document's hidden input had no history, and a board
+                // never heard it. Swapped like Close above: same titles, no
+                // accelerator, so each editor gets the real key press (as in the
+                // browser, where CI proves it) and the registry's edit.undo /
+                // edit.redo cover plain text fields. Fail closed on any other shape.
+                let edit_sub = edit_sub.ok_or("macOS Edit menu changed; Undo and Redo cannot be replaced")?;
+                let edit_items = edit_sub.items()?;
+                let titled = |item: Option<&tauri::menu::MenuItemKind<tauri::Wry>>, title: &str| match item {
+                    Some(kind @ tauri::menu::MenuItemKind::Predefined(predefined))
+                        if predefined.text().ok().as_deref() == Some(title) =>
+                    {
+                        Some(kind.clone())
+                    }
+                    _ => None,
+                };
+                let (Some(default_undo), Some(default_redo)) =
+                    (titled(edit_items.first(), "Undo"), titled(edit_items.get(1), "Redo"))
+                else {
+                    return Err("macOS Edit menu changed; native Undo and Redo cannot be replaced safely".into());
+                };
+                edit_sub.remove(&default_redo)?;
+                edit_sub.remove(&default_undo)?;
+                let undo = MenuItemBuilder::with_id("edit-undo", "Undo").build(app)?;
+                let redo = MenuItemBuilder::with_id("edit-redo", "Redo").build(app)?;
+                edit_sub.insert(&undo, 0)?;
+                edit_sub.insert(&redo, 1)?;
             }
 
             Ok(())

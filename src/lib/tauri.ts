@@ -1768,6 +1768,14 @@ export function onNativeCloseTab(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** macOS Edit → Undo / Redo picked with the pointer (⌘Z / ⇧⌘Z reach the page as
+ * key presses instead; keys/editHistoryActions.ts). */
+export function onNativeEditHistory(cb: (redo: boolean) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<string>("rotli:edit-history", (event) => cb(event.payload === "redo"));
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** Rust → main window: the organizer daemon appended to the brain journal (a
  * new proposal or an auto-applied action) — refetch it so Activity + the
  * sidebar badge update within a beat, no polling. */

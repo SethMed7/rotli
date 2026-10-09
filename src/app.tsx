@@ -36,6 +36,7 @@ import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
+import { replayHistoryKey } from "./keys/editHistoryActions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
@@ -46,6 +47,7 @@ import {
   onCaptureSave,
   onCorpusChanged,
   onNativeCloseTab,
+  onNativeEditHistory,
   onOpenRequest,
   onOrganizerProgress,
   onQuickCreated,
@@ -441,6 +443,8 @@ export default function App() {
 
   // one dispatcher per webview, scoped to its surface
   useEffect(() => attachDispatcher(surface), [surface]);
+  // Edit → Undo / Redo from the menu bar, in whichever window has focus
+  useEffect(() => onNativeEditHistory(replayHistoryKey), []);
 
   // rebinds made in the other webview land here too (one keymap, two webviews)
   useEffect(() => onRebind(({ actionId, chord }) => applyRebind(actionId, chord)), []);
