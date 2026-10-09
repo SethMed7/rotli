@@ -171,8 +171,12 @@ there, and the closing panel, whose art never touches its words from 320 to
      page scrolls a runway below it (half a window per step after the
      first, `src/storyScroll.ts`); each third of the runway is one step. The
      steps are listed on the left, each a heading, the open one with its one
-     sentence and an accent line; the pictures sit side by side on the right
-     and slide to the open one. A step switches whole (nothing is scrubbed
+     sentence on a highlight in the frame's colour that glides between them
+     and joins the frame with two concave corners; the pictures slide through
+     one framed stage on the right (a warm bezel round a lighter panel, after
+     a reference the owner shared, 2026-10-08), each centred in it, the stage
+     keeping the tallest one's height. Stacked, each picture sits in its own
+     matching frame. A step switches whole (nothing is scrubbed
      with the scroll), and a step's name scrolls the page to it. Only the open
      picture is focusable (the others are `inert`). Narrow or short windows,
      and no script, stack the three, each heading and sentence over its

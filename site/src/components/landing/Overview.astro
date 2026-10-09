@@ -64,7 +64,8 @@ const steps = [
 
     <div class="story-pin" data-story-pin>
       <div class="story" data-story data-reveal>
-        <nav class="story-tabs" aria-label="The three steps">
+        <nav class="story-tabs" aria-label="The three steps" data-story-tabs>
+          <span class="story-glider" aria-hidden="true"></span>
           {
             steps.map((step, index) => (
               <button
@@ -117,6 +118,7 @@ const steps = [
   const pin = document.querySelector<HTMLElement>('[data-story-pin]');
   const story = pin?.querySelector<HTMLElement>('[data-story]');
   const rail = pin?.querySelector<HTMLElement>('[data-story-rail]');
+  const list = pin?.querySelector<HTMLElement>('[data-story-tabs]');
   const runway = pin?.querySelector<HTMLElement>('[data-story-runway]');
   const tabs = pin ? [...pin.querySelectorAll<HTMLButtonElement>('.story-tab')] : [];
   const slides = rail ? [...rail.querySelectorAll<HTMLElement>('.story-slide')] : [];
@@ -142,6 +144,14 @@ const steps = [
         slide.inert = k !== index;
       });
       rail.style.setProperty('--story-at', String(index));
+      glide();
+    };
+    // The open step's highlight glides to it and joins the frame (the CSS draws the join).
+    const glide = () => {
+      const tab = tabs[shown];
+      if (!list || !tab) return;
+      list.style.setProperty('--glide-y', `${tab.offsetTop}px`);
+      list.style.setProperty('--glide-h', `${tab.offsetHeight}px`);
     };
     const unpin = () => {
       shown = -1;
@@ -177,6 +187,7 @@ const steps = [
     const reflow = () => {
       measure();
       update();
+      glide();
     };
 
     // A step's name scrolls the page to the middle of that step's share.
@@ -192,6 +203,9 @@ const steps = [
     addEventListener('resize', reflow);
     pinnable.addEventListener('change', reflow);
     new ResizeObserver(reflow).observe(story);
+    // A step's sentence opens and closes over a few hundred ms; the highlight follows each frame.
+    const tabSizes = new ResizeObserver(glide);
+    tabs.forEach((tab) => tabSizes.observe(tab));
     reflow();
   }
 </script>
@@ -212,6 +226,8 @@ const steps = [
   /* --figure-head is the one height of every picture's head (a label and a line over one
      hairline; ViewAndVault, Filing, AskIndex read it). */
   .story {
+    /* The stage's bezel and the open step's highlight. */
+    --frame: var(--surface-2);
     --figure-head: 4rem;
     /* The app's selection wash (src/styles/base.css --selected-bg): the open note in the view and
        the vault, and the notes the chat read, are marked the way the app's sidebar marks them. */
@@ -248,6 +264,14 @@ const steps = [
     width: 100%;
     max-width: 62rem;
   }
+  /* Stacked, each picture sits in its own frame, the same bezel and panel as the stage. */
+  .story-slide > :global(figure) {
+    box-sizing: border-box;
+    padding: clamp(1rem, 4vw, 2rem);
+    border: 8px solid var(--frame);
+    border-radius: 24px;
+    background: var(--surface);
+  }
 
   /* Pinned: the story holds still under the header while the runway scrolls by beneath it. */
   @media (min-width: 1081px) and (min-height: 760px) {
@@ -275,31 +299,87 @@ const steps = [
       clip-path: inset(50%);
       white-space: nowrap;
     }
-    /* The pictures side by side, one in view, sliding to the open one. The track's padding lets
-       the app's selection rows and the quokka's hop reach past the picture's edge. */
+    /* The stage: one frame (a warm bezel round a lighter panel) the pictures slide through,
+       one in view, so every step sits in the same place at the same size (the owner,
+       2026-10-08: "polished and premium", after a reference with a framed stage). Each
+       picture is centred in it; the frame keeps the tallest one's height. */
     :global(.js) .story-track {
-      --bleed: 0.75rem;
       min-width: 0;
-      margin: calc(-1 * var(--bleed));
-      padding: var(--bleed);
+      border: 10px solid var(--frame);
+      border-radius: 26px;
+      background: var(--surface);
       overflow: hidden;
     }
     :global(.js) .story-rail {
-      --gap: calc(2 * var(--bleed));
       display: flex;
-      align-items: flex-start;
-      gap: var(--gap);
-      transform: translateX(calc(var(--story-at, 0) * (-100% - var(--gap))));
+      align-items: center;
+      gap: 0;
+      transform: translateX(calc(var(--story-at, 0) * -100%));
       transition: transform 700ms cubic-bezier(0.65, 0, 0.35, 1);
     }
     :global(.js) .story-slide {
       position: relative;
       flex: 0 0 100%;
       min-width: 0;
+      padding: clamp(1.5rem, 3vw, 2.5rem);
       transition: opacity 500ms ease;
     }
     :global(.js) .story-slide:not([data-active]) {
-      opacity: 0.2;
+      opacity: 0;
+    }
+    /* In the stage the frame is the track's, not each picture's. */
+    :global(.js) .story-slide > :global(figure) {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+    }
+    /* The steps: no line of their own; the open one sits on a highlight in the frame's colour
+       that glides between them and runs into the frame, its two concave corners joining it. */
+    :global(.js) .story {
+      column-gap: 0;
+      align-items: center;
+    }
+    :global(.js) .story-tabs {
+      position: relative;
+      gap: 0.25rem;
+      margin-right: -1px;
+    }
+    :global(.js) .story-tab {
+      position: relative;
+      z-index: 1;
+      padding: 1.1rem 1.75rem 1.2rem 1.5rem;
+      border-left: 0;
+    }
+    :global(.js) .story-glider {
+      --join: 18px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--glide-h, 0);
+      border-radius: var(--join) 0 0 var(--join);
+      background: var(--frame);
+      transform: translateY(var(--glide-y, 0));
+      transition:
+        transform 600ms cubic-bezier(0.65, 0, 0.35, 1),
+        height 600ms cubic-bezier(0.65, 0, 0.35, 1);
+    }
+    :global(.js) .story-glider::before,
+    :global(.js) .story-glider::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      width: var(--join);
+      height: var(--join);
+    }
+    :global(.js) .story-glider::before {
+      bottom: 100%;
+      background: radial-gradient(circle at 0 0, transparent calc(var(--join) - 0.5px), var(--frame) var(--join));
+    }
+    :global(.js) .story-glider::after {
+      top: 100%;
+      background: radial-gradient(circle at 0 100%, transparent calc(var(--join) - 0.5px), var(--frame) var(--join));
     }
   }
 
@@ -323,7 +403,6 @@ const steps = [
     color: var(--text);
   }
   .story-tab[aria-current='step'] {
-    border-left-color: var(--accent);
     color: var(--text);
   }
   .story-tab:focus-visible {
@@ -361,6 +440,7 @@ const steps = [
 
   @media (prefers-reduced-motion: reduce) {
     .story-rail,
+    .story-glider,
     .story-slide,
     .story-copy,
     .story-copy > span {

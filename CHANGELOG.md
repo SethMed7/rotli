@@ -353,7 +353,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ("You write for yourself. AI reads differently.") is now the second step's
   picture and plays the same way. The steps show one at a time and follow
   your scroll: the section holds still while you scroll through Write, File,
-  and Ask, each picture sliding in, and a step's name takes you to it. On a
+  and Ask, each picture sliding through one framed stage, the open step
+  joined to it, and a step's name takes you to it. On a
   phone they stack. "What is an LLM wiki?" under the heading links to
   Andrej Karpathy's note that named the idea. The three pictures now share
   one open style with no cards and one width, each heading starts level with

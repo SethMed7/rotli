@@ -636,3 +636,22 @@ grow.
 - Reduced motion and no script: full width, no clip.
 
 This supersedes "a lock, not a crossfade" above.
+
+## 2026-10-08 (late): the story on a stage
+
+The owner, on the pinned story: "simple in text which is great but now bottom
+part feels dead … I want to minimize cards but also its okay if it is polished
+and premium", with a reference: the open item on a tinted panel that runs into
+a framed image, the rest as plain headings.
+
+- **One stage.** The pictures slide through one frame: a 10px warm bezel
+  (`--surface-2`) round a lighter panel (`--surface`), 26px corners, each
+  picture centred, the frame keeping the tallest one's height. The space round
+  a shorter picture now reads as the stage, not as an empty page.
+- **The open step joins it.** The open step sits on a highlight in the bezel's
+  colour that glides between the steps and runs into the frame, two concave
+  corners where it meets the bezel. The accent line is gone.
+- **Still no cards inside the pictures**; the frame is the one surface.
+- Stacked (phones, short windows), each picture gets its own matching frame.
+- Not done yet, offered: scenery in the stage (a faint horizon under the
+  pictures).

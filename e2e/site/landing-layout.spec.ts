@@ -80,7 +80,8 @@ test("one story in three steps: write in your view, the Librarian files it, ask"
   // The list sits left of the pictures on a laptop.
   const list = await box(section.locator(".story-tabs"));
   const track = await box(section.locator(".story-track"));
-  expect(track.x).toBeGreaterThanOrEqual(list.x + list.width);
+  // (The list tucks 1px under the frame so the open step's highlight joins it without a seam.)
+  expect(track.x).toBeGreaterThanOrEqual(list.x + list.width - 1);
 });
 
 test("the steps follow the scroll: the story pins, and each third of the way is one step", async ({
@@ -115,7 +116,7 @@ test("the steps follow the scroll: the story pins, and each third of the way is 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("the story lines up: no numbers, no cards, one picture width, the open picture home in the track", async ({
+test("the story lines up: no numbers, no cards inside the pictures, one picture width, the open picture in the stage", async ({
   page,
 }) => {
   for (const width of [1440, 1100]) {
@@ -129,12 +130,18 @@ test("the story lines up: no numbers, no cards, one picture width, the open pict
       await expect.poll(() => openStep(page)).toBe(id);
       const figure = story.locator(`#${id} > figure`);
       const track = await box(story.locator(".story-track"));
-      await expect.poll(async () => Math.abs((await box(figure)).x - track.x)).toBeLessThanOrEqual(13); // slid home (the track's bleed is 0.75rem)
+      // Slid home: the open picture sits inside the stage's frame, not half out of it.
+      await expect
+        .poll(async () => {
+          const b = await box(figure);
+          return b.x >= track.x && b.x + b.width <= track.x + track.width + 1;
+        })
+        .toBe(true);
       const picture = await box(figure);
       widths.add(Math.round(picture.width));
       const label = await box(figure.locator(".side-label, .state-label").first());
       expect(Math.abs(label.y - picture.y), `label at the picture's top at ${width}`).toBeLessThanOrEqual(4);
-      // No card: nothing inside the picture draws a box around its content.
+      // No card inside a picture (the stage's one frame is outside them all).
       const boxed = await figure.evaluate(
         (root) =>
           [root, ...root.querySelectorAll("*")].filter((el) => {
