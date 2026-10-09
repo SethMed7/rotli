@@ -557,6 +557,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The vault menu is on top again.** Opening the menu under your vault's
+  name in the sidebar drew the open note's header, or a board's canvas, over
+  the part of the menu past the sidebar's edge. The menu now sits above
+  everything.
 - **⌘C and ⌘X copy and cut a sheet's selection.** On the Mac only a single
   cell's text could be copied: a column, a row, or a block of cells copied
   nothing. The whole selection now goes to the clipboard, so it pastes into
