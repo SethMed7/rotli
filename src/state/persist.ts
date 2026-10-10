@@ -52,6 +52,7 @@ import {
   corpusSettingsWrite,
   corpusStatus,
   hasDurableCorpus,
+  isTauri,
   organizerSetTrust,
   setDockVisible,
   setGlobalShortcut,
@@ -96,6 +97,7 @@ import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsSto
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
 export { rescopeChatMapKeys } from "./chatMapKeys";
+import { applyReonboarding } from "./onboarding";
 import { FIRST_RUN_WINDOW, type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
 import {
   ALL_NOTES,
@@ -1352,6 +1354,12 @@ export async function hydratePersistedState(): Promise<void> {
       theme: DEFAULT_APPEARANCE.theme,
       themeFamily: DEFAULT_APPEARANCE.themeFamily,
     };
+  }
+  // 1.8.0 re-onboards once (state/onboarding.ts); marked so the writer saves it
+  const markWrite = () => (appSettingsNeedsWrite = true);
+  if (applyReonboarding(isTauri() && isMainSurface(), markWrite)) {
+    const ui = useUiStore.getState();
+    shellSettings = { ...shellSettings, onboarded: ui.onboarded, onboardingPhase: ui.onboardingPhase };
   }
   if (isMainSurface()) {
     applyShellSideEffects(shellSettings);

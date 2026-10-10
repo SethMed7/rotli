@@ -340,3 +340,22 @@ test("a Word link survives the live editor and opens through Rotli's opener", as
   expect(await opened()).toEqual(["https://rotli.co"]);
   await page.evaluate(() => (window as unknown as { __linkDoc: { dispose(): void } }).__linkDoc.dispose());
 });
+
+// ⌘Z / ⇧⌘Z reach a document as key presses since the Edit menu's Undo/Redo
+// carry no keys; Edit → Undo / Redo with the pointer replays the same event.
+// Sent as events (the specs never press ⌘ chords on the keyboard).
+test("⌘Z undoes and ⇧⌘Z redoes the last document edit", async ({ page }) => {
+  await mountPlainDocument(page, "key-undo.docx");
+  await page.keyboard.type("oops");
+  await page.waitForTimeout(700);
+  expect((await savedText(page)).join("")).toContain("oops");
+  const chord = (redo: boolean) =>
+    page.evaluate(async (shift) => {
+      const { historyKeyEvent } = await import("/src/keys/editHistoryActions.ts" as string);
+      (document.activeElement ?? document.body).dispatchEvent(historyKeyEvent(shift));
+    }, redo);
+  await chord(false);
+  await expect.poll(async () => (await savedText(page)).join("")).not.toContain("oops");
+  await chord(true);
+  await expect.poll(async () => (await savedText(page)).join("")).toContain("oops");
+});

@@ -1,4 +1,5 @@
 import { type MouseEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 // The sidebar SHELL. It owns the chrome that is true of every front — the vault
 // header row, the create/collapse toolbar, the inline error lane, the front
 // switcher, and the utility footer — then hands the body to whichever front is
@@ -254,91 +255,96 @@ export function Sidebar() {
             <ChevronRight size={9} />
           </span>
         </button>
-        {vaultMenuPosition && (
-          <div
-            ref={vaultMenuRef}
-            className="vault-menu"
-            role="menu"
-            aria-label="Vaults"
-            style={{ left: vaultMenuPosition.left, top: vaultMenuPosition.top }}
-          >
-            <div className="vault-menu-rows">
-              {vaultItems.map(({ instance, active }) => {
-                const label = vaultRowLabel(instance);
-                const refreshing = refreshingVaultId === instance.id;
-                return (
-                  <div key={instance.id} className={active ? "vault-menu-row active" : "vault-menu-row"}>
-                    <button
-                      type="button"
-                      className="vault-menu-target"
-                      role="menuitem"
-                      aria-current={active ? "true" : undefined}
-                      onClick={() => {
-                        setVaultMenuPosition(null);
-                        if (!active)
-                          void switchVaultMut.mutateAsync(instance.id).catch(vaultErr("switch vaults"));
-                      }}
-                    >
-                      <VaultGlyph size={15} />
-                      <span>{label}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="vault-menu-row-action"
-                      role="menuitem"
-                      aria-label={`Refresh ${label}`}
-                      title={`Refresh ${label}`}
-                      disabled={!!refreshingVaultId}
-                      onClick={() =>
-                        void refreshVault(instance.id, active).catch(vaultErr("refresh the vault"))
-                      }
-                    >
-                      <RefreshGlyph size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      className="vault-menu-row-action"
-                      role="menuitem"
-                      aria-label={`More options for ${label}`}
-                      title={`More options for ${label}`}
-                      onClick={(event) => openVaultOverflow(event, instance, active)}
-                    >
-                      <MoreGlyph size={16} />
-                    </button>
-                    {refreshing && <span className="sr-only">Refreshing</span>}
-                  </div>
-                );
-              })}
-            </div>
-            {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
-            {isWebVault() && (
+        {/* drawn at the top of the page, not inside the sidebar: the living
+            sidebar isolates its layers (notes.css), so a menu inside it sat
+            under the panes it overhangs — a note's header, a board's canvas */}
+        {vaultMenuPosition &&
+          createPortal(
+            <div
+              ref={vaultMenuRef}
+              className="vault-menu"
+              role="menu"
+              aria-label="Vaults"
+              style={{ left: vaultMenuPosition.left, top: vaultMenuPosition.top }}
+            >
+              <div className="vault-menu-rows">
+                {vaultItems.map(({ instance, active }) => {
+                  const label = vaultRowLabel(instance);
+                  const refreshing = refreshingVaultId === instance.id;
+                  return (
+                    <div key={instance.id} className={active ? "vault-menu-row active" : "vault-menu-row"}>
+                      <button
+                        type="button"
+                        className="vault-menu-target"
+                        role="menuitem"
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => {
+                          setVaultMenuPosition(null);
+                          if (!active)
+                            void switchVaultMut.mutateAsync(instance.id).catch(vaultErr("switch vaults"));
+                        }}
+                      >
+                        <VaultGlyph size={15} />
+                        <span>{label}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="vault-menu-row-action"
+                        role="menuitem"
+                        aria-label={`Refresh ${label}`}
+                        title={`Refresh ${label}`}
+                        disabled={!!refreshingVaultId}
+                        onClick={() =>
+                          void refreshVault(instance.id, active).catch(vaultErr("refresh the vault"))
+                        }
+                      >
+                        <RefreshGlyph size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="vault-menu-row-action"
+                        role="menuitem"
+                        aria-label={`More options for ${label}`}
+                        title={`More options for ${label}`}
+                        onClick={(event) => openVaultOverflow(event, instance, active)}
+                      >
+                        <MoreGlyph size={16} />
+                      </button>
+                      {refreshing && <span className="sr-only">Refreshing</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
+              {isWebVault() && (
+                <button
+                  type="button"
+                  className="vault-menu-connect"
+                  role="menuitem"
+                  onClick={() => {
+                    setVaultMenuPosition(null);
+                    useWebVaultConnect.getState().show();
+                  }}
+                >
+                  <NewFolderGlyph size={15} />
+                  <span>Change vault…</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="vault-menu-connect"
                 role="menuitem"
                 onClick={() => {
                   setVaultMenuPosition(null);
-                  useWebVaultConnect.getState().show();
+                  void connectVault().catch(vaultErr("connect the vault"));
                 }}
               >
                 <NewFolderGlyph size={15} />
-                <span>Change vault…</span>
+                <span>Connect vault</span>
               </button>
-            )}
-            <button
-              type="button"
-              className="vault-menu-connect"
-              role="menuitem"
-              onClick={() => {
-                setVaultMenuPosition(null);
-                void connectVault().catch(vaultErr("connect the vault"));
-              }}
-            >
-              <NewFolderGlyph size={15} />
-              <span>Connect vault</span>
-            </button>
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
         <span className="nl-mode-sep" aria-hidden="true" />
         {/* IDE-style create icons (the maintainer #7/#13, 2026-07-03): the old "+" dropdown
             became explicit, always-visible actions — New… · New folder — mirroring

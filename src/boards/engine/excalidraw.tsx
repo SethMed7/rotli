@@ -11,6 +11,12 @@ import "@excalidraw/excalidraw/index.css";
 import "../../styles/canvas.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
 
+// Paint the canvas at most once per frame (2026-10-08). Without it Excalidraw
+// redraws the whole scene synchronously for every wheel event, and a trackpad
+// sends those faster than the display refreshes — panning felt laggy and
+// behind the finger. excalidraw.com runs with this on; it needs React 18+.
+(window as unknown as { EXCALIDRAW_THROTTLE_RENDER?: boolean }).EXCALIDRAW_THROTTLE_RENDER = true;
+
 type ExcalidrawProps = Parameters<typeof Excalidraw>[0];
 
 /** The parsed scene fed on mount — held as `null` until loaded, never undefined. */

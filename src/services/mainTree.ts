@@ -314,6 +314,30 @@ export function mainParentOfNote(tree: MainNode[], noteId: string): string | nul
   return walk(tree, MAIN_ROOT);
 }
 
+/** Take a note or folder (by its rendered id) out of the Main folder holding
+ * it, to the top level just after that folder's top-level row — Finder's
+ * "move out", and the way out when Main has one folder and no row to drop
+ * beside (the owner, 2026-10-08). The menu's Remove from folder and the drop
+ * space under the list both land here. Unchanged when the item is already at
+ * the top level or isn't in Main. */
+export function liftToMainRoot(tree: MainNode[], itemId: string): MainNode[] {
+  const parent = itemId.startsWith(MAIN_ROOT)
+    ? itemId.includes("/")
+      ? itemId.slice(0, itemId.lastIndexOf("/"))
+      : MAIN_ROOT
+    : mainParentOfNote(tree, itemId);
+  if (parent === null || parent === MAIN_ROOT) return tree;
+  const topFolder = `${MAIN_ROOT}${parent.slice(MAIN_ROOT.length).split("/")[0]}`;
+  const { tree: without, node } = findAndRemove(tree, itemId, MAIN_ROOT);
+  if (!node) return tree;
+  // a root folder's rendered id IS "main:<name>": a lifted folder takes a free
+  // name ("Beds" → "Beds 2"), as addFolderToMain does
+  const placed: MainNode =
+    "folder" in node ? { folder: uniqueRootFolderName(without, node.folder), children: node.children } : node;
+  const r = insertById(without, placed, topFolder, "after", MAIN_ROOT);
+  return r.found ? r.tree : tree;
+}
+
 /** The uniquified name a new root folder will take — the exact collision law
  * addFolderToMain applies ("New folder" → "New folder 2"), exported so the UI
  * can compute the folder's rendered id ("main:<name>") and scroll/focus the

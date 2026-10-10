@@ -771,7 +771,7 @@ const FEATURES: Feature[] = [
       alt: 'An Excalidraw board in rotli titled Launch map, with Capture, Note, and Library boxes joined by arrows',
     },
     body: [
-      'A board is an Excalidraw canvas in its own .excalidraw file, beside your notes. A board you have not coloured yourself follows your theme, and a [[link]] to a board opens it.',
+      'A board is an Excalidraw canvas in its own .excalidraw file, beside your notes. A board you have not coloured yourself follows your theme, and a [[link]] to a board opens it. A link on a shape opens too: a web page in your browser, a [[note]] in its tab, another shape by scrolling to it.',
     ],
     use: [{ keys: '⌘N → Board', text: 'Make a named board.' }],
     sections: [

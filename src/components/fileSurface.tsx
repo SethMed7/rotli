@@ -55,7 +55,7 @@ const DocumentEditor = lazy(() => import("./documentEditor"));
 
 export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "document" | "text" | "html" | "other";
 
-/** Slot in the file header for sheet chrome (Raw / Save) next to Open externally. */
+/** Slot at the end of the file header for the sheet's own controls (Raw / Save). */
 
 const AUDIO = new Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "oga", "opus"]);
 const VIDEO = VIDEO_EXTS;
@@ -478,6 +478,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           {name}
         </span>
         <FileHeaderMarks {...{ kind, ext, stat, probed, tooLarge, sheetEditable, documentEditable }} />
+        <span className="file-head-gap" aria-hidden="true" />
         {kind === "html" && !tooLarge && (
           <div className="file-mode-tabs" role="tablist" aria-label="View mode">
             <button
@@ -506,7 +507,6 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             {imgNat.w}×{imgNat.h} · {Math.round(imgScale * 100)}%
           </button>
         )}
-        {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
         {kind === "document" && documentEditable && (
           <div ref={documentChromeRef} className="file-document-chrome" />
         )}
@@ -594,6 +594,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         >
           Open externally <span aria-hidden="true">▾</span>
         </button>
+        {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
       </header>
       {kind === "pdf" && conversionError && (
         <div className="file-conversion-banner" role="alert">

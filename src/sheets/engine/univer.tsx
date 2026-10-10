@@ -2,9 +2,10 @@
 // Replace this module (+ drop @univerjs from package.json) to swap engines.
 
 import { LocaleType, createUniver, defaultTheme, merge } from "@univerjs/presets";
-import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
+import { COPY_TYPE, ISheetClipboardService, UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
+import { isRedoChord, isUndoChord } from "../../lib/historyChords";
 import type { SheetModel, SheetThemeMode } from "./types";
 import { rotliUniverTheme, univerNeutralForTheme } from "./theme";
 
@@ -13,15 +14,52 @@ interface FWorkbookLike {
   setEditable?: (editable: boolean) => FWorkbookLike;
 }
 
+interface FActiveWorkbookLike {
+  getId: () => string;
+  getActiveSheet: () => { getSheetId: () => string };
+  getActiveRange: () => { getRange: () => unknown } | null;
+  isCellEditing?: () => boolean;
+}
+
 interface FUniverApiLike {
   createWorkbook: (data: unknown) => FWorkbookLike;
+  getActiveWorkbook: () => FActiveWorkbookLike | null;
+  undo: () => Promise<boolean>;
+  redo: () => Promise<boolean>;
   toggleDarkMode: (dark: boolean) => void;
-  onCommandExecuted?: (cb: (c: CommandInfoLike) => void) => { dispose?: () => void } | void;
+  onCommandExecuted?: (
+    cb: (c: CommandInfoLike, options?: ExecutionOptionsLike) => void,
+  ) => { dispose?: () => void } | void;
+}
+
+/** Univer's CommandType.MUTATION (COMMAND 0, OPERATION 1, MUTATION 2). */
+const MUTATION = 2;
+
+/** Only a sheet MUTATION made by the person changes the workbook. Clicking
+ * through cells runs selection OPERATIONs and, around them, mutations that
+ * touch no cell — the formula engine's bookkeeping (formula.mutation.*) and
+ * the in-cell editor priming its text box (doc.mutation.*). And the formula
+ * engine writes its results back with a sheet.mutation.set-range-values of
+ * its own, marked local (`onlyLocal`, `fromFormula`): a workbook with a =SUM
+ * would mark itself changed on open. Counting any of those set autosave
+ * writing an unchanged file (the owner, 2026-10-09: "I am just clicking,
+ * nothing changed"). */
+export function isWorkbookEdit(c: CommandInfoLike, options?: ExecutionOptionsLike): boolean {
+  if (c.type !== MUTATION || !(c.id ?? "").startsWith("sheet.mutation.")) return false;
+  return !(options?.onlyLocal || options?.fromFormula || options?.applyFormulaCalculationResult);
 }
 
 interface CommandInfoLike {
   id?: string;
   type?: number;
+}
+
+/** The execution options Univer passes beside a command (IExecutionOptions). */
+interface ExecutionOptionsLike {
+  onlyLocal?: boolean;
+  fromFormula?: boolean;
+  applyFormulaCalculationResult?: boolean;
+  [key: string]: unknown;
 }
 
 export interface MountSheetOptions {
@@ -43,6 +81,115 @@ function liveTheme(): ReturnType<typeof rotliUniverTheme> {
   return rotliUniverTheme(univerNeutralForTheme(document.documentElement.dataset.theme));
 }
 
+const UNDO_ID = "univer.command.undo";
+const REDO_ID = "univer.command.redo";
+/** An undo Univer just ran from its own ⌘Z keydown must not run again here. */
+const MENU_DEDUPE_MS = 300;
+
+/** Keys and menu commands act on the WORKBOOK only while its grid has focus:
+ * not in a native field (a toolbar box), not while a cell is being typed in,
+ * and not while a sheet tab is being renamed (a contentEditable span in the
+ * tab bar) — each of those keeps the browser's own text undo, copy, and cut. */
+function workbookFocused(host: HTMLElement, api: FUniverApiLike): boolean {
+  const focused = host.ownerDocument.activeElement;
+  if (!focused || !host.contains(focused)) return false;
+  if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) return false;
+  if (focused.closest('[data-u-comp="slide-tab-item"]')) return false;
+  return !api.getActiveWorkbook()?.isCellEditing?.();
+}
+
+/** ⌘Z / ⇧⌘Z in a sheet (the owner, 2026-10-09: "we need the hotkeys for undo
+ * and redo to work"). Since the Mac Edit menu's Undo/Redo carry no keys
+ * (src-tauri lib.rs), ⌘Z / ⇧⌘Z reach the page as key presses. Univer answers
+ * ⌘Z only while its editor context says so (not while a cell is merely
+ * selected) and binds redo to ⌘Y, so what it leaves is answered here. The beforeinput bridge stays
+ * for any other undo:/redo: sender (WebKit turns those into historyUndo /
+ * historyRedo on Univer's hidden cell input, which has no history), as the
+ * DOCX adapter does (documents/engine/keys.ts). Both act on the WORKBOOK, so
+ * both stand down while a cell is being typed in — a workbook step there
+ * would change cells you aren't looking at — and for native text fields. */
+function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void {
+  const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
+  const workbookHasFocus = () => workbookFocused(host, api);
+  const lastRun = new Map<string, number>();
+  const watch = api.onCommandExecuted?.((c) => {
+    if (c.id === UNDO_ID || c.id === REDO_ID) lastRun.set(c.id, performance.now());
+  });
+  const onBeforeInput = (event: Event) => {
+    const type = (event as InputEvent).inputType;
+    if ((type !== "historyUndo" && type !== "historyRedo") || !workbookHasFocus()) return;
+    event.preventDefault();
+    const id = type === "historyUndo" ? UNDO_ID : REDO_ID;
+    if (performance.now() - (lastRun.get(id) ?? -Infinity) < MENU_DEDUPE_MS) return;
+    void (type === "historyUndo" ? api.undo() : api.redo());
+  };
+  // Univer's own shortcuts run first (a window capture listener); what they
+  // leave unhandled — ⌘Z while a cell is only selected, ⇧⌘Z always — is
+  // answered here, before the browser's default undo can act on the hidden input
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || !workbookHasFocus()) return;
+    const undo = isUndoChord(event, isMac);
+    if (!undo && !isRedoChord(event, isMac)) return;
+    event.preventDefault();
+    void (undo ? api.undo() : api.redo());
+  };
+  host.ownerDocument.addEventListener("beforeinput", onBeforeInput, true);
+  host.ownerDocument.addEventListener("keydown", onKeyDown, true);
+  return () => {
+    host.ownerDocument.removeEventListener("beforeinput", onBeforeInput, true);
+    host.ownerDocument.removeEventListener("keydown", onKeyDown, true);
+    if (watch && typeof watch === "object") watch.dispose?.();
+  };
+}
+
+type SheetClipboardLike = Pick<ISheetClipboardService, "generateCopyContent" | "copyContentCache">;
+
+/** ⌘C / ⌘X from the Mac's Edit menu (the owner, 2026-10-09: "cmd+c is not
+ * working in sheets when copying a column"). AppKit takes those keys for the
+ * menu, and WebKit fires `copy` / `cut` at the focused element — Univer's
+ * hidden cell input, holding at most one cell's text — while Univer copies
+ * only from its own ⌘C keydown. So the selection is put on the clipboard here,
+ * exactly as Univer's copy() builds it (and cached, so pasting back into
+ * Rotli keeps formulas and styles; a cut moves the cells on that paste), but
+ * written into the event, the one place WebKit takes it synchronously. In the
+ * browser Univer's own copy listener still runs after this one and wins.
+ * A cell being typed in keeps the browser's copy of its selected text. */
+function installMenuClipboard(
+  host: HTMLElement,
+  api: FUniverApiLike,
+  // looked up per copy: Univer registers it only once the workbook is up
+  clipboardService: () => SheetClipboardLike | null,
+): () => void {
+  const onClipboard = (event: ClipboardEvent) => {
+    if (!event.clipboardData || !workbookFocused(host, api)) return;
+    const workbook = api.getActiveWorkbook();
+    const range = workbook?.getActiveRange()?.getRange();
+    const clipboard = clipboardService();
+    if (!workbook || !range || !clipboard) return;
+    const copyType = event.type === "cut" ? COPY_TYPE.CUT : COPY_TYPE.COPY;
+    const unitId = workbook.getId();
+    const subUnitId = workbook.getActiveSheet().getSheetId();
+    const content = clipboard.generateCopyContent(unitId, subUnitId, range as never, { copyType });
+    if (!content) return;
+    clipboard.copyContentCache().set(content.copyId, {
+      unitId,
+      subUnitId,
+      range: content.discreteRange,
+      matrix: content.matrixFragment,
+      copyType,
+    });
+    event.clipboardData.setData("text/plain", content.plain);
+    event.clipboardData.setData("text/html", content.html);
+    event.preventDefault();
+  };
+  host.ownerDocument.addEventListener("copy", onClipboard, true);
+  host.ownerDocument.addEventListener("cut", onClipboard, true);
+  return () => {
+    host.ownerDocument.removeEventListener("copy", onClipboard, true);
+    host.ownerDocument.removeEventListener("cut", onClipboard, true);
+  };
+}
+
 /** Mount the spreadsheet engine into a host element. */
 export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHandle {
   const { univer, univerAPI } = createUniver({
@@ -50,10 +197,21 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     locales: { [LocaleType.EN_US]: merge({}, UniverPresetSheetsCoreEnUS) },
     theme: opts.themeMode === "raw" ? defaultTheme : liveTheme(),
     darkMode: opts.themeMode === "raw" ? false : opts.darkMode,
-    presets: [UniverSheetsCorePreset({ container: host })],
+    // One toolbar row, as the DOCX editor has: Univer's classic ribbon adds a
+    // Start / Formulas / Data tab row above a centred toolbar.
+    presets: [UniverSheetsCorePreset({ container: host, ribbonType: "simple" })],
   });
 
   const api = univerAPI as unknown as FUniverApiLike;
+  const releaseMenuHistory = installMenuHistory(host, api);
+  const injector = univer.__getInjector();
+  const releaseMenuClipboard = installMenuClipboard(host, api, () => {
+    try {
+      return injector.get(ISheetClipboardService);
+    } catch {
+      return null;
+    }
+  });
   const fwb = api.createWorkbook({
     ...opts.model,
     locale: LocaleType.EN_US,
@@ -86,11 +244,13 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
       applyThemeMode();
     },
     onDirty(cb) {
-      return api.onCommandExecuted?.((c) => {
-        if (c.type === 1) cb();
+      return api.onCommandExecuted?.((c, options) => {
+        if (isWorkbookEdit(c, options)) cb();
       });
     },
     dispose() {
+      releaseMenuHistory();
+      releaseMenuClipboard();
       univer.dispose();
     },
   };

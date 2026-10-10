@@ -48,6 +48,7 @@ import { registerAppLinkActions } from "./appLinkActions";
 import { registerCanvasActions } from "./canvasActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
+import { registerEditHistoryActions } from "./editHistoryActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
 import { registerGraphActions } from "./graphActions";
@@ -446,7 +447,8 @@ export function registerDefaultActions(): void {
   registerNoteProtectionActions();
   registerAlignActions();
   registerLeaderActions();
-  registerGraphActions();
+  registerEditHistoryActions();
+  if (LAUNCH_FEATURES.graph) registerGraphActions();
   if (LAUNCH_FEATURES.jsonCanvas) registerCanvasActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
