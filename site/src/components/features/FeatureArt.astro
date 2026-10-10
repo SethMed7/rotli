@@ -1,0 +1,540 @@
+---
+// A feature page's picture. A capture from public/ (real app UI on synthetic vaults; site/README.md
+// says how each was made) sits on its editor paper with one hairline. Where no
+// capture is honest or readable, a small drawing in one panel language: a surface, a hairline,
+// a file name on top, and the app's own words inside. Each drawing is one image to assistive tech.
+// Notes and names come from the launch film's synthetic vault (Q4 launch plan, Call with Maya).
+// Labels follow the app: the note menu's protection items (src/components/useNoteMenu.ts,
+// src/components/sidebar/noteProtectionItems.ts), the Librarian's "Filed in" and "Tagged:"
+// (describeAppliedAction), the vault layout in README.md, and each tool's install and sign-in
+// lines (src/ai/connectorGuides.ts). Docs and Sheets are drawn, never described further.
+// Captures are 2x, so each is drawn at most at half its pixel size, never upscaled.
+import type { Picture } from '../../features';
+import GraphCanvasArt from '../GraphCanvasArt.astro';
+
+interface Props {
+  picture: Picture;
+}
+
+const { picture } = Astro.props;
+
+const tasks = [
+  { state: 'done', text: 'Ship the Mac beta' },
+  { state: 'doing', text: 'Record the demo video' },
+  { state: 'open', text: 'Update the pricing page' },
+];
+const filings = [
+  { note: 'Q4 launch plan', area: 'Projects', tags: 'launch, q4' },
+  { note: 'Call with Maya', area: 'People', tags: 'maya, demo' },
+  { note: 'Local-first reading list', area: 'Research', tags: 'reading' },
+];
+const menu: ({ label: string; on?: true } | 'rule')[] = [
+  { label: 'Chat with this note' },
+  { label: 'Hand to AI…' },
+  'rule',
+  { label: 'Lock — no AI may edit or file it' },
+  { label: 'Let AI edit the text' },
+  { label: 'Mark secure — block remote AI', on: true },
+];
+const tree = [
+  { name: 'wiki/', note: 'the Library: People · Projects · Research', depth: 0 },
+  { name: 'q4-launch-plan.md', note: 'plain Markdown', depth: 1 },
+  { name: '_secure/', note: 'kept away from remote AI', depth: 1 },
+  { name: 'chats/', note: 'your conversations', depth: 0 },
+  { name: 'storage/', note: 'documents, boards, images, and files', depth: 0 },
+  { name: '.rotli/', note: 'settings rotli can rebuild', depth: 0 },
+];
+const sheet = [
+  ['', 'A', 'B', 'C'],
+  ['1', 'Item', 'Cost', 'Owner'],
+  ['2', 'Demo video', '1,200', 'Maya'],
+  ['3', 'Pricing page', '400', 'Jo'],
+  ['4', 'Launch ads', '2,000', 'Dana'],
+  ['5', 'Total', '3,600', ''],
+];
+const tools = [
+  { name: 'Claude Code', lines: ['npm install -g @anthropic-ai/claude-code', 'claude auth login'] },
+  { name: 'Codex', lines: ['brew install codex', 'codex login'] },
+  { name: 'Cursor', lines: ['curl https://cursor.com/install -fsS | bash', 'agent login'] },
+];
+---
+
+<div class="art">
+  {
+    picture.kind === 'shot' && (
+      <img class="shot" src={picture.src} width={picture.width / 2} height={picture.height / 2} alt={picture.alt} decoding="async" />
+    )
+  }
+  {
+    picture.kind === 'graph' && (
+      <div
+        class="mock narrow"
+        role="img"
+        aria-label="On the left, notes as dots joined by their links, one note and its links lit; on the right, a canvas of cards joined by lines, two of them in a group"
+      >
+        <p class="mock-head graph-head">
+          <span>Graph</span>
+          <span>Canvas</span>
+        </p>
+        <div class="mock-body">
+          <GraphCanvasArt />
+        </div>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'tasks' && (
+      <div class="mock narrow" role="img" aria-label="A note called Launch week with one finished task, one in progress, and one open">
+        <p class="mock-head">launch-week.md</p>
+        <div class="mock-body">
+          <p class="note-title">Launch week</p>
+          <ul class="tasks">
+            {tasks.map((task) => (
+              <li class={task.state}>
+                <span class="box" />
+                {task.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'links' && (
+      <div class="mock narrow" role="img" aria-label="A note that links to Call with Maya; the pointer rests on the link and the top of that note shows beneath it">
+        <p class="mock-head">q4-launch-plan.md</p>
+        <div class="mock-body">
+          <p class="note-title">Q4 launch plan</p>
+          <p>
+            Demo first, then pricing. Notes from <span class="wikilink">Call with Maya</span> say the video comes before
+            the ads.
+          </p>
+          <div class="peek">
+            <p class="peek-title">Call with Maya</p>
+            <p>Maya records the demo this week. Jo takes the pricing page.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'filing' && (
+      <div class="mock narrow" role="img" aria-label="Three new notes, each filed by the Librarian into a Library area and tagged">
+        <p class="mock-head strong">Library</p>
+        <ol class="filing">
+          {filings.map((filing) => (
+            <li>
+              <span class="filing-note">{filing.note}</span>
+              <span class="filing-what">
+                <span class="pill">Filed in {filing.area}</span>
+                <span class="muted">Tagged: {filing.tags}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p class="mock-foot">Every note keeps its words exactly as you wrote them.</p>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'menu' && (
+      <div class="mock menu" role="img" aria-label="A note's menu: Chat with this note, Hand to AI, then Lock, Let AI edit the text, and Mark secure, which is on">
+        <ul>
+          {menu.map((item) =>
+            item === 'rule' ? (
+              <li class="rule" />
+            ) : (
+              <li class:list={{ on: item.on }}>
+                <span>{item.label}</span>
+                {item.on && <span class="tick">✓</span>}
+              </li>
+            ),
+          )}
+        </ul>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'tree' && (
+      <div class="mock narrow" role="img" aria-label="A vault folder: wiki with plain Markdown notes and a secure folder, chats, storage, and the .rotli folder of settings rotli can rebuild">
+        <p class="mock-head">your vault/</p>
+        <ul class="tree">
+          {tree.map((entry) => (
+            <li class:list={[`depth-${entry.depth}`]}>
+              <code>{entry.name}</code>
+              <span class="muted">{entry.note}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'doc' && (
+      <div class="mock narrow paper" role="img" aria-label="A Word document called Launch brief, open in rotli">
+        <p class="mock-head">launch-brief.docx</p>
+        <div class="mock-body">
+          <p class="note-title">Launch brief</p>
+          <p>The Mac beta is out. Next is the demo video, then the pricing page.</p>
+          <p class="sub">Who does what</p>
+          <p>Maya records the demo. Jo updates pricing.</p>
+        </div>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'sheet' && (
+      <div class="mock narrow sheet" role="img" aria-label="An Excel workbook called Q4 budget, open in rotli, with a total worked out by a formula">
+        <p class="mock-head">q4-budget.xlsx</p>
+        <p class="formula">
+          <b>fx</b> =SUM(B2:B4)
+        </p>
+        <table>
+          <tbody>
+            {sheet.map((row, r) => (
+              <tr class:list={{ total: r === sheet.length - 1 }}>
+                {row.map((cell, c) =>
+                  c === 0 || r === 0 ? (
+                    <th>{cell}</th>
+                  ) : (
+                    <td class:list={{ num: c === 2 && r > 1, picked: c === 2 && r === sheet.length - 1 }}>{cell}</td>
+                  ),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  {
+    picture.kind === 'terminal' && (
+      <figure class="terminal">
+        <figcaption>Terminal: each tool installed and signed in its maker’s way</figcaption>
+        <div class="code">
+          {tools.map((tool) => (
+            <>
+              <code class="comment"># {tool.name}</code>
+              {tool.lines.map((line) => (
+                <code>
+                  <span class="prompt" aria-hidden="true">$ </span>
+                  {line}
+                </code>
+              ))}
+            </>
+          ))}
+        </div>
+      </figure>
+    )
+  }
+</div>
+
+<style>
+  .art {
+    display: flex;
+    justify-content: center;
+  }
+  .shot {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--capture-ground);
+  }
+  .mock {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--capture-ground);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .narrow {
+    max-width: 34rem;
+  }
+  .mock p {
+    margin: 0;
+  }
+  .mock-head {
+    padding: 0.6rem 1rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .graph-head {
+    display: flex;
+    justify-content: space-between;
+  }
+  .mock-head.strong {
+    color: var(--text);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 600;
+  }
+  .mock-body {
+    display: grid;
+    gap: 0.6rem;
+    padding: 1rem 1.15rem 1.2rem;
+  }
+  .note-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  .mock-body .sub {
+    margin-top: 0.4rem;
+    font-weight: 600;
+  }
+  .muted {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+  }
+  .mock-foot {
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.84rem;
+  }
+
+  /* Tasks: the three box states, drawn as the editor draws them. */
+  .tasks {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tasks li {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+  .box {
+    flex: none;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 0.3rem;
+  }
+  .done .box {
+    border-color: var(--accent);
+    background: var(--accent);
+  }
+  .done {
+    color: var(--text-muted);
+    text-decoration: line-through;
+  }
+  .doing .box {
+    border-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent) 50%, transparent 50%);
+  }
+
+  /* Links: a resolved link, and the top of the note it points to under it. */
+  .wikilink {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.2em;
+  }
+  .peek {
+    display: grid;
+    gap: 0.25rem;
+    max-width: 22rem;
+    margin-left: 2rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.6rem;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.86rem;
+  }
+  .peek-title {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* The Librarian's filing. */
+  .filing {
+    margin: 0;
+    padding: 0 1rem;
+    list-style: none;
+  }
+  .filing li {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.8rem 0;
+  }
+  .filing li + li {
+    border-top: 1px solid var(--border);
+  }
+  .filing-note {
+    font-weight: 600;
+  }
+  .filing-what {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+  }
+  .pill {
+    padding: 0.08rem 0.6rem;
+    border-radius: 999px;
+    background: var(--tint);
+    color: var(--accent-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  /* The note menu: its protection items, one of them on. */
+  .menu {
+    max-width: 22rem;
+    padding: 0.4rem;
+    background: var(--surface);
+  }
+  .menu ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .menu li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 0.4rem;
+  }
+  .menu li.on {
+    background: var(--tint);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .menu li.rule {
+    height: 0;
+    margin: 0.3rem 0.5rem;
+    padding: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  /* The vault, as Finder would list it. */
+  .tree {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0.75rem 1rem 1rem;
+    list-style: none;
+  }
+  .tree li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.75rem;
+    padding: 0.2rem 0;
+  }
+  .tree .depth-1 {
+    padding-left: 1.5rem;
+  }
+  .tree code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.88rem;
+  }
+
+  /* Sheets. */
+  .sheet {
+    overflow: hidden;
+  }
+  .formula {
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+  }
+  .formula b {
+    margin-right: 0.5rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  th,
+  td {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+  }
+  tr:first-child th {
+    border-top: 0;
+  }
+  tr > :first-child {
+    border-left: 0;
+  }
+  tr > :last-child {
+    border-right: 0;
+  }
+  tr:last-child > * {
+    border-bottom: 0;
+  }
+  .num {
+    text-align: right;
+  }
+  .total td {
+    font-weight: 600;
+  }
+  td.picked {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* The tools, each signed in its own way, in one terminal. */
+  .terminal {
+    width: 100%;
+    max-width: 40rem;
+    margin: 0;
+    overflow: hidden;
+    border-radius: var(--radius-frame);
+    background: var(--deep);
+    color: var(--deep-text);
+  }
+  .terminal figcaption {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--deep-border);
+    color: var(--deep-muted);
+    font-size: 0.86rem;
+  }
+  .code {
+    display: grid;
+    padding: 0.9rem 1rem 1rem;
+  }
+  .code code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.86rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .code .comment:not(:first-child) {
+    margin-top: 0.6rem;
+  }
+  .comment {
+    color: var(--deep-muted);
+  }
+  .prompt {
+    color: var(--tint);
+    user-select: none;
+  }
+</style>

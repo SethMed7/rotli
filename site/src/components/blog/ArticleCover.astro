@@ -1,0 +1,187 @@
+---
+// The words at the top of a blog post (WritingPage `article`), under its banner
+// (ArticleBanner.astro, straight across the window; the owner, 2026-10-09: "one thing straight
+// across top like an image/banner then the rest under instead of text left illustration right",
+// pointing at deno.com/blog; before that, 2026-10-06 to 2026-10-09, the title sat beside the
+// picture from 1000px). On the reading column, so the title starts where the post's words start
+// (the left rail's room stays empty beside it, as the column's own margin): "Blog /" small and
+// quiet, the title, the summary, one meta line (the author's mark and name, the date, the reading
+// time), and the topics as light outlined labels, then a hairline before the article. Without
+// `author` the meta line stands alone (no mark, no name).
+import { mark } from '../../mark';
+
+interface Props {
+  crumbs: { href: string; label: string }[];
+  kicker?: string;
+  heading: string;
+  lede?: string;
+  author?: string;
+  /** The date and reading time. */
+  meta: string[];
+  tags: string[];
+}
+
+const { crumbs, kicker, heading, lede, author, meta, tags } = Astro.props;
+---
+
+<header class="cover-head" data-article-cover>
+  <div class="head-copy">
+    {
+      crumbs.length > 0 && (
+        <nav class="crumbs" aria-label="Breadcrumb">
+          {crumbs.map((crumb) => (
+            <>
+              <a href={crumb.href}>{crumb.label}</a>
+              <span aria-hidden="true">/</span>
+            </>
+          ))}
+        </nav>
+      )
+    }
+    {kicker && <p class="kicker">{kicker}</p>}
+    <h1>{heading}</h1>
+    {lede && <p class="lede">{lede}</p>}
+    {
+      (author || meta.length > 0) && (
+        <p class="byline">
+          {author && (
+            <>
+              <span class="avatar" set:html={mark} aria-hidden="true" />
+              <span class="author">{author}</span>
+            </>
+          )}
+          {meta.map((part, index) => (
+            <>
+              {(author || index > 0) && (
+                <span class="dot" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              <span>{part}</span>
+            </>
+          ))}
+        </p>
+      )
+    }
+    {
+      tags.length > 0 && (
+        <ul class="tags" aria-label="Topics">
+          {tags.map((tag) => (
+            <li>{tag}</li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</header>
+
+<style>
+  /* On the article's named tracks (WritingPage --article-tracks): the words in the text track,
+     the post's own column, at every width. */
+  .cover-head {
+    display: grid;
+    grid-template-columns: var(--article-tracks);
+    margin-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+  }
+  .head-copy {
+    grid-column: text;
+    min-width: 0;
+    padding-bottom: clamp(1.5rem, 3vw, 2rem);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  /* The trail: small and quiet, straight above the title. */
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+  }
+  .crumbs a {
+    color: var(--text-muted);
+    text-underline-offset: 0.2em;
+  }
+  .crumbs a:hover {
+    color: var(--text);
+  }
+  @media (pointer: coarse) {
+    .crumbs a {
+      display: inline-block;
+      padding: 0.7rem 0;
+      margin: -0.7rem 0;
+    }
+  }
+  .kicker {
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  /* Title, then summary, then the meta line: three steps of size and strength. */
+  h1 {
+    max-width: 22em;
+    margin: 0;
+    font-size: clamp(2.1rem, 3.4vw, 3rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: var(--measure);
+    margin: 0.85rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.55rem;
+    margin: 1.1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    box-sizing: border-box;
+    padding: 0.28rem;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    line-height: 0;
+  }
+  .avatar :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .author {
+    color: var(--text);
+    font-weight: 600;
+  }
+  /* Topics: light outlined labels, not links (the blog index filters by them). */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tags li {
+    padding: 0.14rem 0.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+</style>

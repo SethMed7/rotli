@@ -1,6 +1,6 @@
-// Writing on the site: evergreen resources (question-titled articles) and dated
-// blog posts, all plain Markdown under src/content/writing/. Which entries a
-// deployment publishes is src/writing.ts.
+// Writing on the site: dated blog posts, plain Markdown under src/content/writing/posts/. The
+// guides joined the blog on 2026-10-06 as posts tagged Guide (they were /resources/<slug>/, which
+// now redirects). Which entries a deployment publishes is src/writing.ts.
 import { readFile } from 'node:fs/promises';
 
 import { defineCollection } from 'astro:content';
@@ -14,13 +14,27 @@ const writing = defineCollection({
   schema: z.object({
     title: z.string(),
     description: z.string(),
-    section: z.enum(['resource', 'post']),
-    /** Posts show it; resources use it only to order the index. */
+    /** The blog is the one writing section (the guides are posts tagged Guide). */
+    section: z.enum(['post']),
     date: z.coerce.date(),
     /** Drafts render on the dev site only. */
     draft: z.boolean().default(false),
     /** Describes a capability under review: dev site only, labeled. */
     experiment: z.boolean().default(false),
+    /**
+     * `coming-soon`: listed on its index with a "Coming soon" label and no
+     * link. It has no page, Markdown twin, sitemap entry, or llms.txt line
+     * until it becomes `published` (src/writing.ts).
+     */
+    status: z.enum(['published', 'coming-soon']).default('published'),
+    /**
+     * Topic labels: shown on a post's card and its row on /blog/, where they
+     * filter the list. A few short words, the first one the post's category
+     * ("Guide" for the evergreen how-to pieces, which never lead /blog/).
+     */
+    tags: z.array(z.string().min(1).max(24)).max(4).default([]),
+    /** Leads /blog/ as the featured story instead of the newest post. */
+    featured: z.boolean().default(false),
   }),
 });
 

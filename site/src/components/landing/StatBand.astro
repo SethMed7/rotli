@@ -1,0 +1,305 @@
+---
+// Why rotli exists, right after the hero (the owner, 2026-10-06), kept short (the owner, the same
+// day: "keep it simple, those who want more will read the blog"): the headline, two figures from
+// other people's research, one sentence of ours, and beside them the post's own thumbnail as a
+// teaser, "Read the study →", to the post that sets out both surveys in full. The figures stay
+// plain text with their footnotes: no card, no chart, no count-up.
+//
+// Each figure keeps its exact population. Self Financial (March 2026) surveyed 1,272 U.S. adults
+// "from a range of backgrounds" about subscriptions: among its respondents paying for ChatGPT,
+// 50.4% had not used it in the past 30 days. Menlo Ventures / Morning Consult (July 2026, 5,067
+// U.S. adults, published 2026-09-16): among AI users who pay for AI, 50% use AI daily, so half
+// don't (our arithmetic on Menlo's figure). The rest (59.9% and 2.6 unused subscriptions of any
+// kind, 3.0 assistants per AI user, and Bango as context) lives in the post. Never call any of it
+// "wasted".
+//
+// The text column and the thumbnail share a top and a bottom edge: the picture fills its column's
+// height, cropping only sky (object-position keeps the bottom, where the bench and the quokka
+// are). Below 1180px the picture goes under the words at its own shape. The bench of company
+// logos this replaced left with it, so the band carries no third-party marks.
+import { postThumbnail } from '../../og';
+
+const POST = 'the-ai-you-already-pay-for';
+const postHref = `/blog/${POST}/`;
+const thumbnail = postThumbnail(POST);
+
+const figures = [
+  { value: '50.4%', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
+  { value: 'Half', text: 'of people who pay for AI don’t use it every day.', note: 2 },
+];
+const sources = [
+  {
+    href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
+    text: 'Self Financial, survey of 1,272 U.S. adults about their subscriptions, March 2026. The 50.4% is among respondents paying for ChatGPT.',
+  },
+  {
+    href: 'https://menlovc.com/perspective/2026-the-state-of-consumer-ai/',
+    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often (our arithmetic).',
+  },
+];
+---
+
+<section class="section band-warm stat-band" id="waiting" aria-labelledby="waiting-title">
+  <div class="wrap waiting-grid">
+    <div class="waiting-copy">
+      <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
+      <ul class="figures" data-stagger>
+        {
+          figures.map((figure, i) => (
+            <li>
+              <p class="value">
+                {figure.value}
+                <sup>
+                  <a href={`#fn-${figure.note}`} id={`fnref-${i + 1}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
+                </sup>
+              </p>
+              <p class="text">{figure.text}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="close" data-reveal>
+        rotli puts that idle plan to work keeping your notes in order while you write, with no extra AI plan to buy.
+      </p>
+    </div>
+
+    <a class="study" href={postHref} data-reveal>
+      {
+        thumbnail && (
+          <span class="study-art">
+            <img
+              src={thumbnail.src}
+              srcset={thumbnail.srcset}
+              sizes="(max-width: 1179px) 40rem, 55vw"
+              width={thumbnail.width}
+              height={thumbnail.height}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          </span>
+        )
+      }
+      <span class="study-cta">Read the study <span class="arrow" aria-hidden="true">→</span></span>
+    </a>
+
+    <div class="notes">
+      <ol class="sources">
+        {
+          sources.map((source, index) => (
+            <li id={`fn-${index + 1}`}>
+              <a href={source.href} target="_blank" rel="noopener noreferrer">{source.text}</a>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="marks">Product names belong to their owners.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* The words on the left, the post's picture on the right, sharing one top edge (the headline
+     and the picture) and one bottom edge (the close and the call to action); the sources run
+     under both. One column, words first, below 1180px. */
+  .waiting-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
+    gap: clamp(1.75rem, 3vw, 2.5rem) clamp(2rem, 4vw, 4rem);
+    align-items: stretch;
+  }
+  .section-title {
+    max-width: 16ch;
+  }
+  .waiting-copy {
+    display: flex;
+    flex-direction: column;
+  }
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem clamp(1.5rem, 3vw, 2.5rem);
+    margin: clamp(1.5rem, 2.5vw, 2rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .figures li {
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .value {
+    margin: 0;
+    color: var(--accent-text);
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+  .value sup {
+    margin-left: 0.12em;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: super;
+  }
+  /* A footnote mark is one digit; on touch it answers a 44px area around it. */
+  @media (pointer: coarse) {
+    .value sup a {
+      display: inline-block;
+      min-width: 44px;
+      padding: 1rem 0;
+      margin: -1rem -19px;
+      text-align: center;
+    }
+  }
+  .text {
+    margin: 0.6rem 0 0;
+    color: var(--text);
+    font-size: clamp(0.95rem, 0.6rem + 1vw, 1.08rem);
+    line-height: 1.45;
+  }
+  /* The close sits on the column's bottom edge, level with the call to action beside it. */
+  .close {
+    max-width: 30rem;
+    margin: auto 0 0;
+    padding-top: clamp(1.5rem, 2.5vw, 2rem);
+    font-size: clamp(1.05rem, 0.9rem + 0.4vw, 1.2rem);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  /* The teaser: the post's thumbnail, then the call to action, one link. The picture takes the
+     height the words set (it has none of its own here) within a narrow range around its own
+     shape: up to 13% shorter, which crops only sky (object-position keeps the bottom), or up to
+     8% taller, which crops the margins beside the bench and the calendar. The bench, the
+     quokka, and its notes always stay whole. */
+  .study {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-width: 0;
+    container-type: inline-size;
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+  .study-art {
+    position: relative;
+    flex: 1 1 0;
+    min-height: calc(100cqw * 630 / 1200 * 0.87);
+    max-height: calc(100cqw * 630 / 1200 * 1.08);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .study-art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 80% 100%;
+    transition: scale 300ms ease-out;
+  }
+  .study:hover .study-art img {
+    scale: 1.02;
+  }
+  /* The call to action keeps to the bottom edge, level with the close. */
+  .study-cta {
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 44px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .study:hover .study-cta {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .study .arrow {
+    display: inline-block;
+    transition: translate 160ms ease-out;
+  }
+  .study:hover .arrow {
+    translate: 3px 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .study-art img,
+    .study .arrow {
+      transition: none;
+    }
+  }
+
+  /* The sources and the owners' line run under both columns. */
+  .notes {
+    grid-column: 1 / -1;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .sources {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0 0 0 1.2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .sources a,
+  .value a {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+  .value a {
+    position: relative;
+    display: inline-block;
+    min-width: 1.5ch;
+    text-decoration: none;
+  }
+  .value a::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+  .value a:hover {
+    text-decoration: underline;
+  }
+  /* Footnote targets are small text links; give them room to tap on touch screens. */
+  @media (pointer: coarse) {
+    .sources li {
+      padding-block: 0.6rem;
+    }
+  }
+  .marks {
+    margin: 0.6rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* Narrower, the words would outgrow the picture beside them: the words, then the picture at
+     its own shape under them. */
+  @media (max-width: 1179px) {
+    .waiting-grid {
+      grid-template-columns: 1fr;
+    }
+    .study {
+      max-width: 40rem;
+    }
+    .study-art {
+      flex: none;
+      min-height: 0;
+      max-height: none;
+      aspect-ratio: 1200 / 630;
+    }
+  }
+  /* The two figures side by side down to a small phone. */
+  @media (max-width: 359px) {
+    .figures {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

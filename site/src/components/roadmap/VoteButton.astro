@@ -1,0 +1,112 @@
+---
+// One item's vote on /roadmap/: a quiet pill, the arrow the act and the count the figure. It
+// renders disabled and countless ("opens soon"); the page's script turns it on once the
+// sidecar's probe says votes are live, then paints its state: aria-pressed, the label (Vote or
+// Voted), the glyph (arrow or tick, so the state never rests on colour alone), the count, and
+// an accessible name that says all of it. The error slot under an item is the page's too.
+interface Props {
+  id: string;
+  /** Plain text (no backticks), for the accessible name. */
+  title: string;
+}
+
+const { id, title } = Astro.props;
+---
+
+<button
+  type="button"
+  class="vote"
+  data-vote={id}
+  data-title={title}
+  aria-pressed="false"
+  aria-describedby="participation-note"
+  disabled
+>
+  <svg class="glyph up" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5 13 10.5H3Z"></path></svg>
+  <svg class="glyph done" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.6 11.5 12.5 4.5"></path></svg>
+  <span data-vote-label>Vote</span>
+  <span class="count" data-vote-count></span>
+  <span class="visually-hidden"> for {title}</span>
+</button>
+
+<style>
+  .vote {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-width: 6.75rem;
+    min-height: 44px;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 140ms ease-out,
+      border-color 140ms ease-out,
+      color 140ms ease-out;
+  }
+  .vote:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+  .glyph {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+  .up {
+    fill: currentColor;
+  }
+  .done {
+    display: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .vote:hover:not(:disabled):not([aria-pressed='true']) {
+    border-color: var(--text-muted);
+    background: var(--surface-2);
+  }
+  .vote[aria-pressed='true'] {
+    border-color: var(--accent-text);
+    background: var(--tint);
+    color: var(--accent-text);
+    cursor: default;
+  }
+  .vote[aria-pressed='true'] .up {
+    display: none;
+  }
+  .vote[aria-pressed='true'] .done {
+    display: block;
+  }
+  .vote[aria-busy='true'] {
+    cursor: progress;
+  }
+  .vote:disabled {
+    border-style: dashed;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+  .count {
+    min-width: 1.5ch;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .count:empty {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vote {
+      transition: none;
+    }
+  }
+</style>

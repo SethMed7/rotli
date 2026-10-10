@@ -21,11 +21,6 @@ downloads.
 
 ## The update check through rotli.co
 
-Not in 1.8.0: that release ships the app without the site (Seth,
-2026-10-09), so 1.8.0 asks the GitHub feed directly and the endpoint and its
-route below arrive with the next site release. Until then `bun run stats`
-shows no update checks by version.
-
 The updater's first endpoint (`src-tauri/tauri.conf.json`) is
 `https://rotli.co/update/{{current_version}}/{{target}}/{{arch}}/latest.json`.
 `site/Caddyfile` answers a well-formed path with a 302 to the signed GitHub

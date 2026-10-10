@@ -490,3 +490,172 @@ and "See every feature" repeats the header.
   day).
 
 Guarded by `e2e/site/landing-layout.spec.ts` ("the three steps line up").
+
+## 2026-10-08: the night shows only in the night
+
+The owner, on the way from "Make it yours." into "Some notes never leave this
+Mac.": "I should not see anything from that section till the colors
+transition and same thing with under part." Before, the band painted its own
+night with feathered edges, so its words and scene came up the window on a day
+page, and while the night lasted the theme studio above and the questions below
+sat recoloured beside it.
+
+- With script the band paints no ground of its own; it is the page's ground,
+  so it turns with the page. Its words and scene fade in once the inks have
+  switched (459 ms into the 900 ms crossfade) and out before they switch back.
+- The sections either side (Personal and the FAQ) fade out while the night
+  lasts and back in after it; the warm band fades with its ground, so the
+  night is one sky.
+- The scene's one play waits for the night (src/passage.ts reveals the band's
+  blocks) instead of the scroll observer, which used to start it unseen.
+- The thresholds are unchanged (on at 40% of the window, off under 25%).
+  Without script the band keeps its own feathered night.
+
+Guarded by `e2e/site/landing.spec.ts` ("nothing of the night shows before
+it").
+
+## 2026-10-08: one step at a time
+
+The owner, on "Write it down. rotli puts it away.": "I like the layout but it
+feels dead and overwhelming with a lot of text to read. Instead of all three
+showing in one scroll lets try to clean up and animate the transitions maybe
+even play with a quick horizontal scroll."
+
+- **Words left, picture right, kept.** The three steps are now tabs in the
+  left column: each a heading, with only the open one showing its one
+  sentence. The sentences are shorter, and the lede is one line ("You write in
+  a view. Each file lives once, in your vault: the folder you chose.").
+- **One picture at a time, sliding.** The pictures sit side by side in one
+  horizontal scroller that snaps; a tab slides it to its picture, and a
+  trackpad swipe or touch drag moves it too. The quokka hops as its picture
+  opens; the filing plays when its picture slides in.
+- **It moves on its own, once.** On screen, it plays through the three at each
+  step's pace (6.5 s, 10 s for File so the filing finishes and rests, 8 s),
+  the open tab's line filling as its clock, then rests on Ask. A hover holds
+  it; any choice stops it for good. Nothing is tied to the vertical scroll
+  (the owner rejected scroll-scrub for the story film).
+- **Nothing moves under it.** Wide, the track keeps the tallest picture's
+  height, so the LLM wiki aside never shifts as the steps change (the cost:
+  some empty ground under the shorter pictures). Below 1080px the pictures
+  differ too much for that, so the track follows the open one.
+- Not taken: a pinned section that turns vertical scrolling into a sideways
+  slide (scroll-jacking, and the scrub the owner already rejected).
+
+Guarded by `e2e/site/landing-layout.spec.ts` ("one step at a time", "the
+story lines up", reduced motion) and `e2e/site/narrow-layout.spec.ts`.
+
+## 2026-10-08 (later): the steps follow the scroll, one link for the LLM wiki
+
+The owner, after the first pass: condense the LLM wiki aside to just "What is an
+LLM wiki?" with the link "in a better spot"; "make the switches of what I am
+looking at happen with scroll not manually"; and the night transition made it
+"too easy to skip FAQ".
+
+- **Scroll, not a clock.** The autoplay and the swipe are gone. On a window at
+  least 1081 × 800 the story pins in the middle of the window under the header
+  and the page scrolls a runway beneath it (half a window for each step after
+  the first); each third of the runway is one step (`src/storyScroll.ts`). The
+  step switches whole with the same slide; nothing follows the scroll
+  continuously, which is the scrub the owner rejected for the story film. A
+  step's name scrolls the page to it. Narrow or short windows stack the three.
+- **The LLM wiki is one link,** "What is an LLM wiki? ↗", under the lede, to
+  Karpathy's gist. The two-sentence aside is gone; the story ends the section.
+- **The night lets go sooner.** The passage turns on at half the window and off
+  under 40% (was 40% and 25%): with the band painting no ground of its own, a
+  later switch no longer shows a light page on a dark band, and the questions
+  come back while they still fill most of the window. The fades are a little
+  longer (out 400 ms, in 800 ms after the ink switch).
+
+This supersedes "It moves on its own, once" and the swipe in the entry above.
+
+## 2026-10-08 (evening): the night runs into the questions
+
+The owner, with a screenshot of the night after the dome (half a window of
+empty sky before the questions came back): "still can be faster … this awkward
+point just needs to be smoother".
+
+Hiding the questions while the night lasted meant one side of the switch was
+always blank: before it, empty sky under the dome; after it, an empty day where
+the band's faded words had been. Now the questions stay through the night (they
+are the page's ground, so they take the night's tokens and read), the night
+runs from the dome straight into them, and it ends once the band's end rises
+above 35% of the window, so what is left blank after the switch is small and
+brief. It begins when the band's top passes the middle of the window; the theme
+studio above still steps out. The crossfade is 700 ms (was 900), the fades
+around it shorter, and each story step half a window of scroll (was 0.7).
+
+## 2026-10-08 (night): a lock, not a crossfade
+
+The owner, with the questions in night colours under the dome: "I think it
+should be more of like a lock transition not a cross fade style try different
+style".
+
+The diagnosis after four rounds: the passage recoloured the whole page, so at
+the switch whatever neighbour shared the window was in the wrong environment
+(the theme studio teal, the questions in night), and hiding the neighbours left
+blank sky or blank day instead. No threshold fixes a page-wide switch while two
+sections share the window.
+
+- **The band owns its night again,** with its stars and its words always
+  shown. Nothing else on the page changes colour.
+- **It locks.** Sticky once it fills the window (under the header, or with its
+  end on the window's end when it is taller), and the questions, the closing
+  banner, and the rest of the page slide up over it on their own ground. The
+  moving edge is the transition.
+- **Only the header follows,** into Ocean Dark while the band is under it and
+  back as the questions reach it (`passageActive` is now that geometry: the
+  band's top at the header's line, the next section's top below it). Its own
+  700 ms token crossfade stays.
+- The page-wide stars, the neighbour hiding, and the night-gated reveals are
+  gone; the scene plays when it comes into view, like every other reveal.
+- If the curtain is not what the owner meant by "lock", dropping the sticky
+  rule in Base.astro leaves a hard-edged night band that scrolls by.
+
+This supersedes the three 2026-10-08 entries on the night above.
+
+## 2026-10-08 (late): the night grows out of the page
+
+The owner on the lock: "different I still dont like it analyze how products
+tend to do those transtions across the web and what looks more premium". Two
+patterns were mocked and compared: the night growing out of the page as an
+inset rounded card that widens to the full width (Apple's product pages, Framer's
+"Scale Up"), and a hard-edged band with its contents choreographed inside
+(Apple, Stripe). The crossfade and the curtain were set aside: a page-wide fade
+catches whatever else is on screen in the wrong colours, and a curtain holds the
+reader in place and covers the band before it is read. The owner picked the
+grow.
+
+- With script the band's `clip-path` is an inset rounded rectangle that opens to
+  the full width (corners from 32px to square, sides from up to 64px to 0) over
+  0.7 of a window as it arrives, eased in and out so the card holds its shape a
+  moment, and closes again as its end nears the window's top
+  (`passageGrow`, `--grow`). Only the clip changes, so nothing reflows.
+- The header flips to Ocean Dark while the band is full width under it (grow at
+  least half), in 240 ms, and back as it narrows away.
+- The sticky lock, the FAQ's opaque ground over it, and `--passage-h` are gone.
+- Reduced motion and no script: full width, no clip.
+
+This supersedes "a lock, not a crossfade" above.
+
+## 2026-10-08 (late): the story on a stage
+
+The owner, on the pinned story: "simple in text which is great but now bottom
+part feels dead … I want to minimize cards but also its okay if it is polished
+and premium", with a reference: the open item on a tinted panel that runs into
+a framed image, the rest as plain headings.
+
+- **One stage.** The pictures slide through one frame: a 10px warm bezel
+  (`--surface-2`) round a lighter panel (`--surface`), 26px corners, each
+  picture centred, the frame keeping the tallest one's height. The space round
+  a shorter picture now reads as the stage, not as an empty page.
+- **The open step joins it.** The open step sits on a highlight in the bezel's
+  colour that glides between the steps and runs into the frame, two concave
+  corners where it meets the bezel. The accent line is gone.
+- **Still no cards inside the pictures**; the frame is the one surface.
+- Stacked (phones, short windows), each picture gets its own matching frame.
+- **Scenery** (the owner's next pick): a slim shore along the stage's floor,
+  64px of room kept under the pictures for it (`--shore`): the sea's line, a
+  sail, low dunes with grass, at half strength in the film's palette, no clouds
+  (they sat behind the words). It is a quarter wider than the stage and pans 8%
+  of its width per step, less than the pictures slide. The pinned layout now
+  wants a window at least 800 tall (was 760), for the extra room.

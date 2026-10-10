@@ -1,5 +1,6 @@
 ---
 import { jsonLd } from '../agents';
+import { PLATFORMS } from '../site';
 interface Props {
   title?: string;
   description?: string;
@@ -14,11 +15,11 @@ interface Props {
 }
 
 const {
-  title = 'rotli — room to think, files you keep',
-  description = 'A calm, local-first Mac workspace for notes, tasks, links, and optional AI conversations. One folder you own, with no account required.',
+  title = 'rotli — write like a person, let AI do the filing',
+  description = `A free workspace built on plain Markdown files you own, with no account. Write however you think; the Librarian files, tags, and links your notes in the background. ${PLATFORMS.availability}`,
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
-  imageAlt = 'rotli — room to think, files you keep',
+  imageAlt = 'rotli — write like a person, let AI do the filing',
   noindex = false,
   structuredData,
   markdownPath,
@@ -62,9 +63,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <!-- data-platform: SiteActions leads with the browser on anything but a Mac
-         (iPads report a Mac user agent, so touch points rule them out).
-         data-os: /download/ leads with the visitor's own system. -->
+    <!-- data-os: /download/ leads with the visitor's own system (iPads report a
+         Mac user agent, so touch points rule them out). -->
     <script is:inline>
       (function () {
         var root = document.documentElement;
@@ -72,7 +72,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
         var touch = navigator.maxTouchPoints > 1;
         root.classList.add('js');
         var mac = /Macintosh/.test(ua) && !touch;
-        root.dataset.platform = mac ? 'mac' : 'other';
         root.dataset.os = mac
           ? 'mac'
           : /Windows/.test(ua)
@@ -113,6 +112,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         --font-wordmark: 'Baloo 2', var(--font-body);
+        /* One page width for every page, blog posts included (the owner, 2026-10-06: a post's
+           head lines up with the header's edges, so the post is on the same 76rem as the rest). */
         --page-max: 76rem;
         --copy-max: 68ch;
         --ground: #f8f2e9;
@@ -120,26 +121,32 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --surface-2: #f1e7d8;
         --tint: #f2d6c2;
         --text: #3a3028;
-        --text-muted: #6e6155;
+        --muted-ink: #6e6155;
         --border: #e2d3c1;
         --border-strong: #cdb8a1;
         --accent: #c97e62;
-        --accent-text: #8f4e37;
+        --accent-ink: #8f4e37;
         --on-accent: #ffffff;
+        /* Text on a --text ground (the primary button, the skip link): it switches with the
+           inks in the privacy passage, never fading through the button it sits on. */
+        --on-text: #f8f2e9;
+        /* Muted and accent text read their ink, except in the moment the privacy passage
+           crosses over, when they lean onto --text to keep its contrast (src/passage.ts). */
+        --text-muted: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--muted-ink));
+        --accent-text: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--accent-ink));
+        /* GitHub's star gold, for the header's star and count. GitHub's own (Primer's
+           base.color.yellow.2: #eac54f by day, #e3b341 by night) is 1.5:1 on this ground, so the
+           day value is that gold darkened until its text passes: 5.17:1 on --ground. The night
+           value is GitHub's own, 9.31:1 on the night ground. It leans like accent text. */
+        --github-star-ink: #8a5d00;
+        --github-star: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--github-star-ink));
         --deep: #241d18;
         --deep-surface: #302720;
         --deep-text: #f1e7da;
         --deep-muted: #c6b7a7;
         --deep-border: #4b3c31;
         --selection: #f2d6c2;
-        /* The film's island (rotli-studio/motion kit): the sunset sky, top to horizon, and the
-           shore under it. Only the closing section and the stripe paper use them. */
-        --sunset-1: #e9967a;
-        --sunset-2: #eda683;
-        --sunset-3: #f2b98f;
-        --sunset-4: #f5cba4;
-        --sunset-5: #f8dcbc;
-        --sun: #f9d47f;
+        /* The film's island (rotli-studio/motion kit): the shore and its scenery. */
         --sea: #7fcfc6;
         --sea-deep: #3fa3a6;
         --sea-line: #e9fbf6;
@@ -151,6 +158,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --wood: #b98b62;
         --wood-dark: #8d6547;
         --lantern: #8fb9c9;
+        /* The ink of the drawn scenes: the art's own line colour. Scenes use it instead of --text
+           so a drawing keeps its lines when the page passes into another environment. */
+        --ink: #3a3028;
+        /* The app's Cocoa companion body (scripts/build-character-fills.mjs): the footer quokkas. */
+        --cocoa: #c6845f;
         /* The app's editor paper in Rotli Light: the ground behind product captures. */
         --capture-ground: #ffffff;
         --swatch-rotli-light: #f8f2e9;
@@ -186,6 +198,147 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         color-scheme: light;
       }
+      /* The privacy passage (src/passage.ts): the landing's privacy band paints its own night
+         and grows out of the page as it arrives (the owner,
+         2026-10-08: "more of like a lock transition not a cross fade", then the grow below).
+         While the band is under the header, the header (with its menus) steps into the app's Ocean Dark environment
+         (src/styles/themes.css; border-strong and selection derived the way base.css derives
+         them) and steps back out as daylight reaches it. Nothing else on the page changes
+         colour. Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the
+         ground 8.60:1). The --deep-* night of .band-night matches, so header and band are one
+         sky. */
+      :root[data-passage='ocean-dark'] .site-header-bar {
+        color-scheme: dark;
+        --ground: #0e171d;
+        --surface: #152229;
+        --surface-2: #1c2d35;
+        --tint: #213843;
+        --text: #e7f0f4;
+        --muted-ink: #a1b6c0;
+        --border: #263a43;
+        --border-strong: color-mix(in srgb, #e7f0f4 24%, #263a43);
+        --accent: #70b2d7;
+        --accent-ink: #86c2e0;
+        --github-star-ink: #e3b341;
+        --on-accent: #0e171d;
+        --on-text: #0e171d;
+        --selection: #213843;
+      }
+      /* The crossfade runs on the tokens themselves, registered so they can be animated on the
+         root: every surface that reads them (the ground, the header, menus, buttons, borders)
+         changes in the same frame, on one clock. The grounds ease over 240 ms; the inks switch
+         whole just past halfway, when the ground is mid-tone and both inks read alike (text
+         fading through a ground fading the other way vanishes in the middle); muted and accent
+         text lean onto --text around the switch. src/passage.ts holds the same numbers and
+         scripts/site-interactions.test.ts measures every frame (never under 3:1). */
+      @property --ground { syntax: '<color>'; inherits: true; initial-value: #f8f2e9; }
+      @property --surface { syntax: '<color>'; inherits: true; initial-value: #fbf6ee; }
+      @property --surface-2 { syntax: '<color>'; inherits: true; initial-value: #f1e7d8; }
+      @property --tint { syntax: '<color>'; inherits: true; initial-value: #f2d6c2; }
+      @property --border { syntax: '<color>'; inherits: true; initial-value: #e2d3c1; }
+      @property --border-strong { syntax: '<color>'; inherits: true; initial-value: #cdb8a1; }
+      @property --selection { syntax: '<color>'; inherits: true; initial-value: #f2d6c2; }
+      @property --text { syntax: '<color>'; inherits: true; initial-value: #3a3028; }
+      @property --muted-ink { syntax: '<color>'; inherits: true; initial-value: #6e6155; }
+      @property --accent { syntax: '<color>'; inherits: true; initial-value: #c97e62; }
+      @property --accent-ink { syntax: '<color>'; inherits: true; initial-value: #8f4e37; }
+      @property --github-star-ink { syntax: '<color>'; inherits: true; initial-value: #8a5d00; }
+      @property --on-accent { syntax: '<color>'; inherits: true; initial-value: #ffffff; }
+      @property --on-text { syntax: '<color>'; inherits: true; initial-value: #f8f2e9; }
+      @property --text-muted { syntax: '<color>'; inherits: true; initial-value: #6e6155; }
+      @property --accent-text { syntax: '<color>'; inherits: true; initial-value: #8f4e37; }
+      @property --github-star { syntax: '<color>'; inherits: true; initial-value: #8a5d00; }
+      @property --passage-lean { syntax: '<number>'; inherits: true; initial-value: 0; }
+      :root {
+        /* Also a plain value, so muted and accent text keep their colours in a browser
+           without @property (the lean animation then simply never runs). */
+        --passage-lean: 0;
+        --passage-ms: 240ms;
+        --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
+        --passage-ink-at: 122ms;
+      }
+      /* The header reads its own muted, accent, and star colours, so they follow its tokens
+         (registered colours resolve where they are declared). */
+      .site-header-bar {
+        color: var(--text);
+        --text-muted: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--muted-ink));
+        --accent-text: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--accent-ink));
+        --github-star: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--github-star-ink));
+      }
+      :root.passage-fading .site-header-bar {
+        transition-property:
+          --ground, --surface, --surface-2, --tint, --border, --border-strong, --selection,
+          --text, --muted-ink, --accent, --accent-ink, --on-accent, --on-text, --github-star-ink;
+        transition-duration:
+          var(--passage-ms), var(--passage-ms), var(--passage-ms), var(--passage-ms), var(--passage-ms),
+          var(--passage-ms), var(--passage-ms), 0s, 0s, 0s, 0s, 0s, 0s, 0s;
+        transition-delay:
+          0s, 0s, 0s, 0s, 0s, 0s, 0s, var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at),
+          var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at), var(--passage-ink-at);
+        transition-timing-function: var(--passage-ease);
+        animation: passage-lean var(--passage-ms) linear;
+      }
+      @keyframes passage-lean {
+        0% { --passage-lean: 0; }
+        30% { --passage-lean: 1; }
+        70% { --passage-lean: 1; }
+        100% { --passage-lean: 0; }
+      }
+      /* While the tokens move, nothing else chases them on its own clock (a button's 140 ms
+         hover fade would smear its switch); reveals keep moving. */
+      :root.passage-fading :where(.site-header-bar *) {
+        transition-property: opacity, transform, background-size !important;
+      }
+      /* The band's edges are feathered into the page's padding above and below it, so a day
+         page meets its night as dusk, not a cut. In the night the feather is the ground's own
+         colour and disappears. It covers only the neighbours' empty section padding. */
+      [data-passage] {
+        position: relative;
+      }
+      [data-passage]::before,
+      [data-passage]::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: calc(var(--section-space) * 0.75);
+        pointer-events: none;
+      }
+      [data-passage]::before {
+        bottom: 100%;
+        background: linear-gradient(to bottom, transparent, var(--deep));
+      }
+      [data-passage]::after {
+        top: 100%;
+        background: linear-gradient(to top, transparent, var(--deep));
+      }
+      /* The night grows out of the page (with script; the owner, 2026-10-08, picking it from the
+         patterns premium product pages use): the band comes up the window as a rounded card set
+         inside the day page, widens to the full width with square corners as it arrives, and
+         narrows back into a card as it leaves. src/passage.ts sets --grow (0 to 1) from where
+         the band is; only its clip changes, so nothing reflows. Nothing else on the page changes
+         colour. Under reduced motion, or without script, it is simply full width (feathered,
+         without script). */
+      :root.js [data-passage] {
+        --grow: 1;
+        --grow-inset: clamp(12px, 4vw, 64px);
+        clip-path: inset(0 calc((1 - var(--grow)) * var(--grow-inset)) round calc((1 - var(--grow)) * 32px));
+      }
+      :root.js [data-passage]::before,
+      :root.js [data-passage]::after {
+        content: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :root.js [data-passage] {
+          clip-path: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :root.passage-fading {
+          transition: none;
+          animation: none;
+        }
+      }
       * {
         box-sizing: border-box;
       }
@@ -202,7 +355,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
         font-family: var(--font-body);
         font-size: 17px;
         line-height: 1.62;
-        transition: background-color 180ms ease-out, color 180ms ease-out;
       }
       a {
         color: inherit;
@@ -280,7 +432,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         padding: 0.65rem 0.9rem;
         border-radius: 0.5rem;
         background: var(--text);
-        color: var(--ground);
+        color: var(--on-text);
         text-decoration: none;
         transform: translateY(-160%);
       }
@@ -335,6 +487,27 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .band-deep {
         background: var(--deep);
         color: var(--deep-text);
+      }
+      /* Night, in the app's Ocean Dark environment (src/styles/themes.css): add it beside
+         .band-deep and the --deep-* tokens, and the colours the night scene borrows
+         (SecureScene.astro) take Ocean's values. Stars and the underline get blue twins. */
+      .band-night {
+        --deep: #0e171d;
+        --deep-surface: #152229;
+        --deep-text: #e7f0f4;
+        --deep-muted: #a1b6c0;
+        --deep-border: #263a43;
+        --tint: #213843;
+        --accent: #70b2d7;
+        --accent-text: #86c2e0;
+        --olive: #8cc4a5;
+        --olive-bright: #8cc4a5;
+        --text: #0e171d;
+        background-image: url('/night-stars-ocean.svg');
+        background-size: 480px 480px;
+      }
+      .band-night .inked {
+        background-image: url('/ink-underline-ocean.svg');
       }
       .section-title {
         margin: 0;
@@ -394,6 +567,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
         width: 28px;
         line-height: 0;
       }
+      .brand-mark svg,
+      .footer-brand span svg {
+        width: 100%;
+        height: auto;
+      }
       .wordmark,
       .footer-brand b {
         font-family: var(--font-wordmark);
@@ -408,8 +586,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         gap: clamp(1rem, 2.2vw, 2rem);
         margin-inline: auto;
       }
-      .primary-nav a,
-      .github-link {
+      .primary-nav > a,
+      .nav-dropdown-fallback,
+      .nav-dropdown-toggle {
         min-height: 44px;
         display: inline-flex;
         align-items: center;
@@ -417,16 +596,117 @@ const socialImageUrl = new URL(image, siteUrl).href;
         font-size: 0.92rem;
         text-decoration: none;
       }
-      .primary-nav a:hover,
-      .primary-nav a[aria-current='page'],
-      .github-link:hover {
+      .primary-nav > a:hover,
+      .primary-nav > a[aria-current='page'],
+      .nav-dropdown-fallback:hover,
+      .nav-dropdown-toggle:hover,
+      .nav-dropdown-toggle[aria-expanded='true'],
+      .nav-dropdown.is-current > * {
         color: var(--text);
       }
-      .primary-nav a[aria-current='page'] {
+      .primary-nav > a[aria-current='page'],
+      .nav-dropdown.is-current > .nav-dropdown-fallback,
+      .nav-dropdown.is-current > .nav-dropdown-toggle {
         text-decoration: underline;
         text-decoration-color: var(--accent-text);
         text-decoration-thickness: 2px;
         text-underline-offset: 0.5rem;
+      }
+      /* Resources: a disclosure (SiteHeader.astro). The fallback link shows
+         without script; with it (the `js` class) the button takes its place. */
+      .nav-dropdown {
+        position: relative;
+      }
+      .nav-dropdown-toggle {
+        display: none;
+        gap: 0.3rem;
+        padding: 0;
+        border: 0;
+        background: none;
+        cursor: pointer;
+      }
+      .js .nav-dropdown-fallback {
+        display: none;
+      }
+      .js .nav-dropdown-toggle {
+        display: inline-flex;
+      }
+      .nav-dropdown-toggle svg {
+        width: 0.75rem;
+        height: 0.75rem;
+        transition: transform 140ms ease-out;
+      }
+      .nav-dropdown-toggle[aria-expanded='true'] svg {
+        transform: rotate(180deg);
+      }
+      .nav-dropdown-panel {
+        position: absolute;
+        top: calc(100% + 1rem);
+        left: 50%;
+        z-index: 40;
+        width: 19rem;
+        padding: 0.45rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.8rem;
+        background: var(--surface);
+        transform: translateX(-50%);
+      }
+      .nav-dropdown-panel[hidden] {
+        display: none;
+      }
+      .nav-dropdown-panel ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .nav-dropdown-panel a {
+        display: grid;
+        gap: 0.1rem;
+        min-height: 44px;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.5rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .nav-dropdown-panel a:hover,
+      .nav-dropdown-panel a:focus-visible {
+        background: var(--surface-2);
+      }
+      .nav-dropdown-panel a:focus-visible {
+        outline-offset: -2px;
+      }
+      .nav-dropdown-panel a[aria-current='page'] {
+        background: var(--tint);
+      }
+      .nav-dropdown-panel b {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.94rem;
+        font-weight: 600;
+      }
+      .nav-dropdown-panel span {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.4;
+      }
+      /* Another site (rotli's studio): an outward arrow after its name, in the dropdown, the
+         Menu, and the footer (src/nav.ts `external`). */
+      .external-mark {
+        margin-left: 0.3em;
+        color: var(--text-muted);
+        font-size: 0.85em;
+        font-weight: 500;
+      }
+      .nav-dropdown-panel b .external-mark {
+        margin-left: -0.25rem;
+      }
+      /* A status beside a page's name, in the dropdown and the Menu. Text, not a chip. */
+      .nav-dropdown-panel small,
+      .nav-menu-group small {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 500;
       }
       .header-actions {
         display: flex;
@@ -437,13 +717,55 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .primary-nav + .header-actions {
         margin-left: 0;
       }
+      /* GitHub with its star count (SiteHeader.astro): a plain link, no border or fill. The
+         mark in ink, the star and the count in GitHub's star gold, at the header button's
+         height so the hit area is generous; hover underlines the count. */
       .github-link {
-        width: 44px;
-        justify-content: center;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0 0.25rem;
+        border-radius: 0.5rem;
+        color: var(--text);
+        font-size: 0.9rem;
+        font-weight: 600;
+        line-height: 1;
+        text-decoration: none;
+        white-space: nowrap;
       }
-      .github-link svg {
+      .github-mark {
+        flex: none;
         width: 20px;
         height: 20px;
+      }
+      .github-stars {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        color: var(--github-star);
+      }
+      .github-star {
+        flex: none;
+        width: 15px;
+        height: 15px;
+      }
+      .github-count {
+        font-variant-numeric: tabular-nums;
+        text-decoration: underline transparent 1.5px;
+        text-underline-offset: 0.25em;
+        transition: text-decoration-color 140ms ease-out;
+      }
+      .github-link:hover .github-count {
+        text-decoration-color: currentColor;
+      }
+      .header-actions > .github-link {
+        margin-right: 0.45rem;
+      }
+      .nav-menu-panel > .menu-github small {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 500;
       }
       .button {
         min-height: 50px;
@@ -463,7 +785,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       .button.primary {
         background: var(--text);
-        color: var(--ground);
+        color: var(--on-text);
         border: 1px solid var(--text);
       }
       .button.primary:hover {
@@ -486,38 +808,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
         cursor: default;
         opacity: 0.82;
       }
-      /* The two ways in (SiteActions.astro). Off a Mac the browser leads and the
-         download names the Mac; without script the Mac order stays. */
+      /* The way in (SiteActions.astro): one primary button, or the pending label. */
       .site-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
-      }
-      .action-download .for-other,
-      :root[data-platform='other'] .action-download .for-mac {
-        display: none;
-      }
-      :root[data-platform='other'] .action-download .for-other {
-        display: inline;
-      }
-      :root[data-platform='other'] .action-web {
-        order: -1;
-        background: var(--text);
-        color: var(--ground);
-        border-color: var(--text);
-      }
-      :root[data-platform='other'] .action-web:hover {
-        background: var(--accent-text);
-        border-color: var(--accent-text);
-        color: var(--on-accent);
-      }
-      :root[data-platform='other'] .action-download {
-        background: transparent;
-        color: var(--text);
-        border-color: var(--border-strong);
-      }
-      :root[data-platform='other'] .action-download:hover {
-        background: var(--surface-2);
       }
       .site-header .button {
         min-height: 40px;
@@ -556,6 +851,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
         top: calc(100% + 0.5rem);
         right: 0;
         min-width: 15rem;
+        max-height: calc(100dvh - var(--header-height) - 1rem);
+        overflow-y: auto;
         display: grid;
         gap: 0.15rem;
         padding: 0.5rem;
@@ -563,23 +860,48 @@ const socialImageUrl = new URL(image, siteUrl).href;
         border-radius: 0.8rem;
         background: var(--surface);
       }
-      .nav-menu-panel > a {
+      .nav-menu-panel > a,
+      .nav-menu-group > a {
         min-height: 44px;
         display: flex;
         align-items: center;
+        gap: 0.5rem;
         padding-inline: 0.75rem;
         border-radius: 0.5rem;
         color: var(--text);
         text-decoration: none;
       }
-      .nav-menu-panel > a:hover {
+      .nav-menu-panel > a:hover,
+      .nav-menu-group > a:hover {
         background: var(--surface-2);
       }
-      .nav-menu-panel > a[aria-current='page'] {
+      .nav-menu-panel > a[aria-current='page'],
+      .nav-menu-group > a[aria-current='page'] {
         background: var(--tint);
       }
-      .nav-menu-panel > .button {
+      /* The dropdown's pages, listed under its name and set in from the rail. */
+      .nav-menu-group {
+        display: grid;
+        gap: 0.15rem;
+        margin: 0.2rem 0;
+        padding: 0.35rem 0;
+        border-block: 1px solid var(--border);
+      }
+      .nav-menu-label {
+        margin: 0;
+        padding: 0.2rem 0.75rem 0.1rem;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .nav-menu-group > a {
+        padding-left: 1.4rem;
+      }
+      .nav-menu-panel > .button,
+      .nav-menu-panel > .menu-github {
         display: none;
+      }
+      .nav-menu-panel > .button {
         margin-top: 0.4rem;
       }
 
@@ -648,6 +970,33 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .footer-bottom p {
         margin: 0;
       }
+      .footer-maker {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      /* The maker's X mark: a drawn X (not the platform's artwork) in a 44px target. */
+      .footer-x {
+        display: inline-grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        margin-block: -12px;
+        border-radius: 0.5rem;
+        color: var(--text-muted);
+      }
+      .footer-x:hover {
+        color: var(--text);
+        background: var(--surface-2);
+      }
+      .footer-x svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+      }
       .footer-badges {
         display: flex;
         flex-wrap: wrap;
@@ -662,6 +1011,126 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .footer-badge img {
         width: auto;
         height: 44px;
+      }
+      /* The "coming soon" list's sign-up, under the tagline: one field and one button. */
+      .subscribe {
+        max-width: 26rem;
+        margin-top: 1.75rem;
+      }
+      .subscribe h2 {
+        margin: 0;
+        color: var(--text);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0;
+      }
+      .footer-lead .subscribe-note {
+        margin: 0.2rem 0 0.75rem;
+      }
+      /* One field with the arrow inside it, the way the app's chat composer sends. */
+      .subscribe-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 52px;
+        padding: 0.25rem 0.25rem 0.25rem 0.95rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.9rem;
+        background: var(--surface);
+      }
+      .subscribe-row:has(input:focus-visible) {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 1px;
+      }
+      .subscribe-row:has(input[aria-invalid='true']) {
+        border-color: var(--accent-text);
+      }
+      .subscribe input[type='email'] {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 42px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 1rem;
+      }
+      .subscribe input[type='email']::placeholder {
+        color: var(--text-muted);
+        opacity: 1;
+      }
+      .subscribe input[type='email']:focus-visible {
+        outline: none;
+      }
+      .subscribe-send {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 0.7rem;
+        background: var(--text);
+        color: var(--on-text);
+        cursor: pointer;
+        transition: background-color 140ms ease;
+      }
+      .subscribe-send:hover {
+        background: var(--accent-text);
+        color: var(--on-accent);
+      }
+      .subscribe-send:focus-visible {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 2px;
+      }
+      .subscribe-send svg {
+        width: 18px;
+        height: 18px;
+        transition: transform 140ms ease;
+      }
+      .subscribe-send:hover svg {
+        transform: translateX(2px);
+      }
+      .subscribe-send:disabled {
+        cursor: progress;
+        opacity: 0.6;
+      }
+      .footer-lead .subscribe-status {
+        margin: 0.5rem 0 0;
+        color: var(--text);
+      }
+      .footer-lead .subscribe-status:empty {
+        display: none;
+      }
+      .subscribe[data-state='closed'] .subscribe-status {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .subscribe[data-state='error'] .subscribe-status {
+        color: var(--accent-text);
+        font-weight: 500;
+      }
+      .subscribe[data-state='done'] .subscribe-row {
+        display: none;
+      }
+      /* Only bots fill this in (site/server/subscribe.ts); people never see it. */
+      .subscribe-trap {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
       }
       @media (max-width: 1080px) {
         .primary-nav {
@@ -689,7 +1158,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
         .header-actions > .github-link {
           display: none;
         }
-        .nav-menu-panel > .button {
+        .nav-menu-panel > .button,
+        .nav-menu-panel > .menu-github {
           display: flex;
         }
         .footer-groups {
@@ -715,6 +1185,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <a class="skip-link" href="#content">Skip to content</a>
     <slot />
     <script>
+      import { watchPassages } from '../passage';
+      watchPassages();
       // Scroll reveal (the [data-reveal] and [data-stagger] styles above): a
       // block rises in once as it enters the viewport, then rests; a staggered
       // list brings its items in one after another. Section heads below the

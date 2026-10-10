@@ -1,10 +1,15 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { movedFeatures } from "./src/features";
+import { figurePlugin } from "./src/figures";
+import { pageMarkdown } from "./src/markdownTwin";
+import { votableIds } from "./src/roadmap";
+import { readRoadmapFile } from "./src/roadmap-file";
 import { site } from "./src/site";
 
 /**
@@ -52,6 +57,50 @@ function cspInlineStyleGuard() {
           throw new Error(
             `Built styles would break in production:\n  ${offenders.join("\n  ")}\nInline styles are blocked by the Content-Security-Policy (style-src 'self'): move them into component <style> rules. A literal :global( left in built CSS is dropped by the browser: move that rule into <style is:global>.`,
           );
+        }
+      },
+    },
+  };
+}
+
+/**
+ * A ```figure fence in a post is a chart or a small diagram, drawn at build time
+ * (src/figures.ts): no chart library and no inline style reach the page. Astro's
+ * Markdown processor (Sätteri) takes its plugins on the processor's own options,
+ * which integrations may extend; anything else fails here instead of shipping
+ * the fence as a code block.
+ */
+function figures() {
+  return {
+    name: "rotli-figures",
+    hooks: {
+      "astro:config:setup": ({ config }) => {
+        const processor = config.markdown.processor;
+        if (processor?.name !== "satteri" || !Array.isArray(processor.options?.mdastPlugins))
+          throw new Error(`rotli-figures expects Astro's Sätteri Markdown processor, found ${processor?.name}`);
+        processor.options.mdastPlugins.push(figurePlugin);
+      },
+    },
+  };
+}
+
+/**
+ * Pages written in Astro rather than Markdown that still offer Copy Markdown and answer
+ * `Accept: text/markdown` like a post (/privacy/): their twin is made from the built page's
+ * article (src/markdownTwin.ts) and written beside it as index.md. A page that lost its
+ * article fails the build instead of shipping an empty twin.
+ */
+const MARKDOWN_TWIN_PAGES = ["/privacy/"];
+function markdownTwins() {
+  return {
+    name: "rotli-markdown-twins",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        const root = fileURLToPath(dir);
+        for (const path of MARKDOWN_TWIN_PAGES) {
+          const html = join(root, path, "index.html");
+          if (!existsSync(html)) continue; // a coming-soon build has no such page
+          writeFileSync(join(root, path, "index.md"), pageMarkdown(readFileSync(html, "utf8"), `${site.url}${path}`));
         }
       },
     },
@@ -112,6 +161,34 @@ function agentFilesGuard() {
 }
 
 /**
+ * /roadmap/ is ROADMAP.md rendered (src/roadmap.ts), and votes attach to item ids,
+ * so the built page must carry every votable id from the file exactly once, and
+ * nothing else. Parsing the file already fails on a missing or repeated id; this
+ * catches a page that drops, repeats, or invents an item.
+ */
+function roadmapGuard() {
+  return {
+    name: "rotli-roadmap-guard",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        if (!site.showsFullSite) return;
+        const page = join(fileURLToPath(dir), "roadmap", "index.html");
+        if (!existsSync(page)) throw new Error("The roadmap page was not emitted (src/pages/roadmap/).");
+        const html = readFileSync(page, "utf8");
+        const onPage = [...html.matchAll(/data-roadmap-item="([^"]+)"/g)].map((match) => match[1]);
+        const inFile = votableIds(readRoadmapFile());
+        const problems = [
+          ...inFile.filter((id) => !onPage.includes(id)).map((id) => `"${id}" is in ROADMAP.md but not on the page`),
+          ...onPage.filter((id) => !inFile.includes(id)).map((id) => `"${id}" is on the page but not in ROADMAP.md`),
+          ...onPage.filter((id, index) => onPage.indexOf(id) !== index).map((id) => `"${id}" appears twice on the page`),
+        ];
+        if (problems.length > 0) throw new Error(`/roadmap/ and ROADMAP.md disagree:\n  ${problems.join("\n  ")}`);
+      },
+    },
+  };
+}
+
+/**
  * Locally there is no Caddy and no Docker `app` stage, so `/app/` (Rotli Web)
  * has nothing behind it and "Open in browser" landed on the 404 page. Dev and
  * preview pass `/app/` through to the web app's own dev server
@@ -142,6 +219,10 @@ const localWebApp = {
   },
 };
 
+/** The guides that lived at /resources/<slug>/ until 2026-10-06, now /blog/<slug>/. The
+ * Caddyfile's `movedGuide` matcher lists the same slugs (scripts/site-agents.test.ts holds both). */
+export const MOVED_GUIDES = ["getting-started", "why-local", "ai-and-your-notes", "rotli-helper", "web-and-mac"];
+
 // Minimal static build. Which pages exist, whether downloads are offered, and
 // the canonical origin all come from src/site.ts (SITE_MODE + SITE_URL).
 export default defineConfig({
@@ -153,10 +234,27 @@ export default defineConfig({
   // only external stylesheets, and Astro's default inlines small ones (the 404
   // page shipped unstyled that way). The guard below proves it.
   build: { inlineStylesheets: "never" },
+  // The MCP guide folded into /resources/developers/ (2026-10-02), and the
+  // guides joined the blog as posts tagged Guide (2026-10-06). The static build
+  // writes a small refresh page at each old address (any host, `astro
+  // preview`, the e2e lane); in production the Caddyfile answers the same
+  // addresses, Markdown twins included, with a permanent redirect first. The
+  // feature catalog was condensed the same day: each entry folded into another
+  // redirects to its section there (src/features.ts movedFeatures).
+  redirects: site.showsFullSite
+    ? {
+        "/resources/mcp": "/resources/developers/",
+        ...Object.fromEntries(MOVED_GUIDES.map((slug) => [`/resources/${slug}`, `/blog/${slug}/`])),
+        ...movedFeatures(),
+      }
+    : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
-    ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` })] : []),
+    figures(),
+    ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),
+    markdownTwins(),
     cspInlineStyleGuard(),
     agentFilesGuard(),
+    roadmapGuard(),
   ],
 });

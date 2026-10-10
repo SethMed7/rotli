@@ -28,10 +28,13 @@ id repeats (`site/src/roadmap.ts`).
 
 ## 1. In the work
 
-- **Canvas** <!-- id: canvas --> · L — cards on an open plane, saved as JSON
-  Canvas `.canvas` files that Obsidian also opens. Development builds: New →
-  Canvas makes one beside your notes, found in ⌘K and All notes, and Archive
-  and Trash take it like a note. Type a card, or put just `[[a note]]` in one
+- **Graph and Canvas** <!-- id: canvas --> · L — see how your notes link up as
+  a graph, and lay them out on a canvas saved as `.canvas` files that
+  Obsidian also opens. The graph is built for the next release: ⌘K → Graph
+  shows every note and every `[[link]]`, and Show in graph the notes around
+  one; a secure note shows only its title. The canvas, JSON Canvas cards on an
+  open plane, is in development builds: New → Canvas makes one beside your
+  notes, found in ⌘K and All notes, and Archive and Trash take it like a note. Type a card, or put just `[[a note]]` in one
   to show that note; connect cards with lines and gather them into groups.
   A note card shows the note and opens it in a tab; lines stay drawings and
   never become links. A new canvas sits beside your notes. Excalidraw boards
@@ -151,6 +154,13 @@ id repeats (`site/src/roadmap.ts`).
   edits change the real file. The tab gets its own color so you can tell it is
   an outside file. ⌘S offers to put a copy in the vault, and you pick where it
   goes. Only if wanted.
+- **Work on a roadmap item from the site** <!-- id: roadmap-work-on-this --> · M — each
+  item on rotli.co's roadmap gets a "Work on this" link, beside its vote once
+  voting opens. It starts GitHub's own flow from the visitor's account: rotli is
+  forked, a branch is made for the item, and a draft pull request named after
+  it opens with a starter note, so the work starts against that item. Nothing
+  merges without the owner's review; the site holds no GitHub token, and
+  opening one takes a GitHub account. Comes after voting is back.
 
 ## 3. Ideas
 

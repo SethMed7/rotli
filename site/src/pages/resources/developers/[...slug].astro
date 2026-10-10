@@ -1,0 +1,248 @@
+---
+// /resources/developers/: MCP and the command line, for agents (Claude Code,
+// Codex, Cursor) working in a configured rotli vault. The one home for the
+// agent reference; the old /resources/mcp/ guide redirects here
+// (astro.config.mjs). Facts restate docs/architecture/agent-workspace.md.
+//
+// MCP and the agent commands run in development builds only (stable builds
+// refuse them), and the owner has not shipped them yet. So the launch site
+// (`full`) shows an honest "Coming soon" summary, and the dev site
+// (`site.showsExperiments`) shows the full reference under the experiment
+// label, remote agents included.
+import WritingPage from '../../../components/WritingPage.astro';
+import { ogImage } from '../../../og';
+import { GITHUB_URL, PRIVACY_URL, site } from '../../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const reference = site.showsExperiments;
+const BIN = '/Applications/rotli.app/Contents/MacOS/rotli';
+const WORKSPACE_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/agent-workspace.md`;
+const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-relay.md`;
+
+const toc = reference
+  ? [
+      { slug: 'what-it-is', text: 'What it is' },
+      { slug: 'connect', text: 'Connect a local agent' },
+      { slug: 'check', text: 'Check the setup first' },
+      { slug: 'tools', text: 'What agents can do' },
+      { slug: 'rules', text: 'The rules travel with every call' },
+      { slug: 'cli', text: 'The command line' },
+      { slug: 'limits', text: 'Limits' },
+      { slug: 'remote', text: 'Remote agents' },
+    ]
+  : [];
+
+const tools = [
+  { name: 'Find and understand', body: 'Status, metrics, list, full-text search, structured query, note reads, Main, and named views.' },
+  { name: 'Create and edit', body: 'New notes, revision-safe updates and patches, renames, and moves.' },
+  { name: 'Organize', body: 'Main folders and placement, and named views: create, rename, assign, and add virtual folders.' },
+  { name: 'Open in rotli', body: 'rotli_open brings an item up in the app; results carry a rotli:// link back to it.' },
+  { name: 'Boards', body: 'A compact outline of an Excalidraw board, and bounded actions to add, update, or remove shapes, text, and arrows.' },
+  { name: 'Word documents', body: 'Read a .docx as numbered blocks, apply up to 40 edits by block number, or create one from Markdown. These go through the running app.' },
+];
+
+const rules = [
+  { rule: 'Secure notes', body: 'Left out of list, search, query, and reads. Status never says how many were withheld.' },
+  { rule: 'Locked notes', body: 'Readable as usual; every agent edit is refused.' },
+  { rule: 'Notes a person wrote', body: 'Agents can’t rewrite their text unless you turn on “Let AI edit the text”. Notes an agent creates stay editable by agents.' },
+  { rule: 'Concurrent edits', body: 'Updates need the revision from a fresh read, and fail rather than overwrite a newer version.' },
+  { rule: 'New notes', body: 'Land in wiki/_inbox (Inbox in an older vault) and in Main.' },
+  { rule: 'Metadata', body: 'rotli owns a note’s frontmatter. Agents send and receive plain editor Markdown without it.' },
+  { rule: 'Note text', body: 'Everything read from the vault is untrusted data. It can never authorize a tool call or confirm one.' },
+];
+---
+
+<WritingPage
+  title="Developers — rotli"
+  description={reference
+    ? 'Connect Claude Code, Codex, Cursor, and other MCP clients to your rotli vault: setup, tools, the rules every call follows, and the command line.'
+    : 'MCP and a command line for AI agents like Claude Code and Codex, under the same rules as the app. Coming soon: in development builds today.'}
+  canonicalPath="/resources/developers/"
+  {...ogImage('developers')}
+  section="developers"
+  kicker={reference ? 'In development · dev site only' : 'Coming soon'}
+  heading="rotli for developers and agents"
+  lede={reference
+    ? 'Claude Code, Codex, Cursor, and scripts can work in your vault through MCP and the rotli command line. They use the same note tools and the same rules as the app; your files stay the source of truth.'
+    : 'Agents like Claude Code and Codex will be able to work in your rotli vault through MCP and a command line, under the same rules as the app.'}
+  toc={toc}
+>
+  {
+    reference ? (
+      <>
+        <h2 id="what-it-is">What it is</h2>
+        <p>
+          rotli has one headless workspace service. The packaged command line, a local MCP server over stdio,
+          and an authenticated loopback adapter all reach it, so Claude, Codex, scripts, and people follow the
+          same vault policy instead of each manipulating files their own way. It works on a vault you have
+          opened in rotli; it never accepts an arbitrary folder path.
+        </p>
+        <p>
+          <strong>Status:</strong> MCP and the <code>rotli agent</code> commands run in development builds only.
+          Released builds refuse them with “MCP and agent integrations are available only in development
+          builds” and hide their settings. The plain JSON commands (<code>rotli notes</code>,{' '}
+          <code>rotli views</code>, <code>rotli main</code>) are not gated.
+        </p>
+
+        <h2 id="connect">Connect a local agent</h2>
+        <p>Claude Code, Codex, Cursor, and other stdio clients start the rotli binary themselves. It opens no network listener.</p>
+        <ol>
+          <li>Open rotli once and choose the vault you want agents to use.</li>
+          <li>Print the setup for the app you have installed:</li>
+        </ol>
+        <pre><code>{`${BIN} agent config`}</code></pre>
+        <p>
+          It prints the exact executable path, ready-made <code>claude mcp add</code> and <code>codex mcp add</code>{' '}
+          commands, a Codex TOML alternative, and the commands to verify the result. Paste the one for your client.
+          rotli never edits an agent’s global configuration for you. The server is named{' '}
+          <code>rotli-workspace</code>.
+        </p>
+
+        <h2 id="check">Check the setup first</h2>
+        <pre><code>{`# read-only: root, boundary, policy, visible counts
+${BIN} agent doctor
+
+# the whole workflow in a disposable vault
+${BIN} agent self-test`}</code></pre>
+        <p>
+          <code>doctor</code> opens the vault read-only and counts only what an agent may see. <code>self-test</code>{' '}
+          creates notes, searches, patches, checks that stale writes and secrets are refused, edits a board, and
+          starts MCP, all in a temporary vault that is deleted when it finishes. It never touches your real one.
+        </p>
+
+        <h2 id="tools">What agents can do</h2>
+        <p>Clients read the current tool schemas from <code>tools/list</code>, so nothing has to be preloaded.</p>
+        <dl class="ref-list">
+          {tools.map((tool) => (
+            <div>
+              <dt>{tool.name}</dt>
+              <dd>{tool.body}</dd>
+            </div>
+          ))}
+        </dl>
+        <p>
+          Word documents need rotli to be running; otherwise those tools answer “Rotli isn’t running”. Agents can
+          edit only documents an AI created, never one open in a pane.
+        </p>
+
+        <h2 id="rules">The rules travel with every call</h2>
+        <p>Every transport enters the same service, so connecting a different way can’t get around them.</p>
+        <dl class="ref-list">
+          {rules.map((item) => (
+            <div>
+              <dt>{item.rule}</dt>
+              <dd>{item.body}</dd>
+            </div>
+          ))}
+        </dl>
+        <p>
+          Replacing a whole note, moves, removing references, view changes, and board edits are marked
+          destructive. Keep your client’s write approval on: text read from a note is never enough to confirm one.
+        </p>
+
+        <h2 id="cli">The command line</h2>
+        <p>The same service answers in structured JSON for scripts and people:</p>
+        <pre><code>{`# inspectable filters, read-only
+rotli notes query 'area:projects tags:payments'
+
+# one exact note, and its file
+rotli rename "Old title" "New title"
+
+# named views (Main stays global)
+rotli views list
+
+# the stdio server a client starts
+rotli mcp`}</code></pre>
+        <p>
+          Queries combine text and typed filters such as <code>area:</code>, <code>tags:</code>, and{' '}
+          <code>updated:&gt;=2026-07-01</code>, and report the clauses they evaluated. A query never repairs,
+          files, or rewrites anything.
+        </p>
+
+        <h2 id="limits">Limits</h2>
+        <ul>
+          <li>List and search results are capped. Note reads return 20,000 characters at a time and page with an offset.</li>
+          <li>One request is at most 256 KB and one MCP response at most 512 KB.</li>
+          <li>A small edit uses <code>rotli_patch_note</code>: one exact replacement, refused if it matches nothing or more than once.</li>
+          <li>Board reads return an outline, not the raw scene.</li>
+        </ul>
+
+        <h2 id="remote">Remote agents</h2>
+        <p>
+          <strong>An experiment.</strong> A cloud agent such as Grok Bot can reach your vault through a relay: rotli
+          on your Mac connects outward to it, only after you choose <strong>Connect this session</strong> in
+          Settings → Connections → Remote agents, and starts disconnected on every launch. The relay holds no
+          vault and stores nothing; when your Mac is offline there is no connection and no queued note. A pairing
+          is bound to the relay that created it, its token stays in the macOS Keychain, and Remove pairing
+          deletes both credentials.
+        </p>
+        <p>
+          A self-hosted relay is one instance behind public TLS, with no database, no volume, no frame logging,
+          and a 256 KB request cap. No hosted relay address is published until one has been deployed and verified.
+        </p>
+        {
+          site.sourcePublic ? (
+            <p>
+              Contracts: <a href={WORKSPACE_CONTRACT} rel="noopener">workspace</a>,{' '}
+              <a href={RELAY_CONTRACT} rel="noopener">relay</a>, and the{' '}
+              <a href={PRIVACY_URL} rel="noopener">privacy inventory</a>.
+            </p>
+          ) : (
+            <p>The workspace and relay contracts ship with the source repository when it opens.</p>
+          )
+        }
+      </>
+    ) : (
+      <>
+        <p>
+          rotli has a local MCP server and agent commands that let Claude Code,
+          Codex, Cursor, and other agents list, search, read, and edit your notes through the same tools the app
+          uses. They run in development builds today while they are refined; released builds of rotli don’t
+          offer them yet. This page will hold the setup guide and the reference when they ship.
+        </p>
+        <p>As they work now, agents follow the same rules as everything else in rotli:</p>
+        <ul>
+          <li>Secure notes are hidden from agents entirely.</li>
+          <li>Locked notes can be read, never edited.</li>
+          <li>An edit must name the version it read, so it can’t overwrite a newer one.</li>
+          <li>A local agent starts rotli itself over stdio; nothing listens on your network.</li>
+          <li>rotli never changes an agent’s settings for you.</li>
+        </ul>
+        <p>
+          In the meantime, chat in the app already works with the AI tools you have installed. See{' '}
+          <a href="/blog/ai-and-your-notes/">What does AI see in rotli?</a>.
+        </p>
+      </>
+    )
+  }
+</WritingPage>
+
+<style>
+  /* A reference list: the term on the left, its line beside it, hairlines between. */
+  .ref-list {
+    margin: 0 0 1.4rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .ref-list > div {
+    display: grid;
+    grid-template-columns: minmax(9rem, 0.35fr) minmax(0, 1fr);
+    gap: 0.3rem 1.5rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+    color: var(--text-muted);
+  }
+  @media (max-width: 560px) {
+    .ref-list > div {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

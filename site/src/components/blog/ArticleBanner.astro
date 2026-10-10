@@ -1,0 +1,80 @@
+---
+// The banner across the top of a post (and /privacy/, which reads like one): the post's
+// illustration straight across the window under the header, edge to edge, with the title, the
+// summary, the byline, and the topics under it (ArticleCover.astro) on the reading column (the
+// owner, 2026-10-09, pointing at deno.com/blog: "one thing straight across top like an
+// image/banner then the rest under instead of text left illustration right"). WritingPage
+// renders it before the page's centred wrapper, so it is the window's width without a negative
+// margin (which would scroll sideways wherever scrollbars take room).
+//   - From 701px, the wide scene (2400 × 1000), cropped to a band whose height follows the
+//     window's width (about 86% of the scene's) and stops at 34rem; the crop comes off the sky,
+//     so the quokka (78% of the scene's height) stays whole, feet on the sand.
+//   - Up to 700px, the scene's phone crop (the quokka and its props), at its own shape, capped
+//     by the window's height so the title still shows.
+// A page may draw its banner instead (`drawn`, the default slot), in the same band.
+import type { Banner } from '../../og';
+
+interface Props {
+  cover?: Banner;
+  drawn?: boolean;
+}
+
+const { cover, drawn = false } = Astro.props;
+---
+
+{
+  drawn ? (
+    <div class="article-banner drawn" data-article-banner-art data-article-scene>
+      <slot />
+    </div>
+  ) : (
+    cover && (
+      <picture class="article-banner" data-article-banner-art data-article-art>
+        <source
+          media="(max-width: 700px)"
+          srcset={cover.mobile}
+          width={cover.mobileWidth}
+          height={cover.mobileHeight}
+        />
+        <img
+          src={cover.src}
+          srcset={cover.srcset}
+          sizes="100vw"
+          width={cover.width}
+          height={cover.height}
+          alt={cover.alt}
+          fetchpriority="high"
+          decoding="async"
+        />
+      </picture>
+    )
+  )
+}
+
+<style>
+  .article-banner {
+    display: block;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .article-banner img {
+    display: block;
+    width: 100%;
+    height: clamp(13rem, 36vw, 34rem);
+    object-fit: cover;
+    /* The crop comes off the sky: the quokka keeps its ears and its feet. */
+    object-position: 72% 92%;
+  }
+  .article-banner.drawn {
+    height: clamp(13rem, 36vw, 34rem);
+  }
+  @media (max-width: 700px) {
+    .article-banner img {
+      height: auto;
+      aspect-ratio: 1300 / 900;
+      max-height: 55svh;
+      object-position: 50% 100%;
+    }
+  }
+</style>

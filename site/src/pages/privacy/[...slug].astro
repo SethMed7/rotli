@@ -5,65 +5,187 @@
 // this page restates it for visitors and adds this website's own practices.
 // When PRIVACY.md changes (a new data class, destination, retention behavior,
 // or control), update this page in the same change.
+// It reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
+// styles", and 2026-10-09, beside "The AI you already pay for": "try to match it"):
+// WritingPage's `article` layout with a post's head, a byline, the updated date and the reading
+// time, topic chips, and a banner drawn like a post's (src/og.ts PAGE_ART: the quokka with its
+// padlock shield beside a locked note, the on-device chip up the beach), the left rail with the
+// tree and the meter, and "More from rotli" at the end, with the posts about privacy and the
+// Download spot. Share is a post's (the owner, 2026-10-09: "Full Share like posts"), Copy Markdown
+// included: the twin, /privacy/index.md, is made from this page after the build
+// (src/markdownTwin.ts).
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
-import SecureScene from '../../components/SecureScene.astro';
+import { MORE_POSTS } from '../../blog';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage, pageBanner } from '../../og';
+import { availablePromos, RAIL_PROMOS } from '../../promos';
 import { GITHUB_URL, site } from '../../site';
+import { morePostCard, publishedWriting } from '../../writing';
 
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const UPDATED = 'September 23, 2026';
+const UPDATED = 'October 7, 2026';
+/** The reading time, as a post counts it (src/writing.ts readingMinutes: words / 230); the page is
+ * written here rather than in Markdown, so e2e/site/privacy.spec.ts recounts it from the page. */
+const READ_MINUTES = 10;
+
+// The end of the page: the posts about privacy, newest first, and the spots for the two things this
+// page describes, the Mac app and Rotli Web (each only in builds that offer it).
+const related = (await publishedWriting('post'))
+  .filter((post) => post.data.tags.includes('Privacy'))
+  .slice(0, MORE_POSTS)
+  .map((post) => morePostCard(post, false));
+const promos = availablePromos()
+  .filter((promo) => promo.id === 'download' || promo.id === 'web')
+  .slice(0, RAIL_PROMOS);
 
 const toc = [
-  { slug: 'short-version', text: 'The short version' },
+  { slug: 'promise', text: 'Our privacy promise' },
   { slug: 'your-notes', text: 'Your notes stay yours' },
   { slug: 'network', text: 'What connects to the internet' },
   { slug: 'ai', text: 'AI and your notes' },
   { slug: 'connect', text: 'How rotli connects to AI' },
   { slug: 'web', text: 'Rotli Web and Rotli Helper' },
+  { slug: 'keys', text: 'Keys and logins' },
   { slug: 'website', text: 'This website' },
   { slug: 'retention', text: 'Keeping and deleting' },
   { slug: 'changes', text: 'Changes to this page' },
 ];
 
-type Access = 'full' | 'read' | 'none';
-const access: { kind: string; how: string; onDevice: Access; connected: Access }[] = [
-  { kind: 'Everyday note', how: 'The default', onDevice: 'full', connected: 'full' },
-  { kind: 'Secure note', how: 'Right-click → Mark secure', onDevice: 'full', connected: 'none' },
-  { kind: 'Locked note', how: 'Right-click → Lock', onDevice: 'read', connected: 'read' },
+// The promise's matrix (the owner, 2026-10-06: "you choose who and what sees anything and what
+// they see"): who may read and who may change a note you wrote, by kind of note. It restates
+// docs/design/ai-visibility-matrix.md and docs/decisions/2026-09-29-ai-body-edit-permission.md
+// for a visitor, and PRIVACY.md stays the product's source of truth. Every row is a note a
+// person wrote, the default for every note; a note a chat or agent made is editable by AI and is
+// said once in the text below. `no` cells are the refusals, marked in words and weight, never by
+// colour alone. On a phone each row becomes a block that names its column in every cell.
+type Cell = { text: string; no?: boolean };
+const who = ['On-device model', 'Connected AI', 'The Librarian'] as const;
+const whoNote = ['runs on your Mac', 'Claude Code, Codex, Cursor', 'files notes in the background'] as const;
+const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
+  {
+    kind: 'A note you wrote',
+    how: 'Every note, by default',
+    cells: [
+      { text: 'Reads it. Rewrites it only if you allow it' },
+      { text: 'Reads it. Rewrites it only if you allow it' },
+      { text: 'Fills in the details at the top. Never your words' },
+    ],
+  },
+  {
+    kind: 'Secure note',
+    how: 'Right-click → Mark secure',
+    cells: [
+      { text: 'Reads it, unless you turn that off. Rewrites it only if you allow it' },
+      { text: 'Never sees it, not even the title', no: true },
+      { text: 'Leaves it alone', no: true },
+    ],
+  },
+  {
+    kind: 'Locked note',
+    how: 'Right-click → Lock',
+    cells: [
+      { text: 'Reads it. Never changes it', no: true },
+      { text: 'Reads it. Never changes it', no: true },
+      { text: 'Leaves it alone', no: true },
+    ],
+  },
 ];
-const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads only', none: 'Never sees it' };
 ---
 
 <WritingPage
   title="Privacy — rotli"
   description="How rotli handles your notes: no account, no analytics, files on your computer, and AI only on your terms. What connects to the internet, and why."
   canonicalPath="/privacy/"
+  {...ogImage('privacy')}
   section="privacy"
-  kicker={`Updated ${UPDATED}`}
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
+  meta={[`Updated ${UPDATED}`, `${READ_MINUTES} min read`]}
+  article={{
+    cover: pageBanner('privacy'),
+    author: 'Seth Medina',
+    tags: ['Privacy', 'AI', 'Security'],
+    url: `${site.url}/privacy/`,
+    markdown: '/privacy/index.md',
+    share: 'all',
+    shareTitle: 'rotli’s privacy promise: what it does with your notes, and why',
+    noun: 'page',
+    more: related,
+    promos,
+  }}
   toc={toc}
+  markdownPath="/privacy/index.md"
+  progress
 >
-  <div slot="scene" class="night" data-reveal>
-    <p class="night-caption">
-      <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
-      the clouds outside, never see them, and no model can edit a note you lock.
-    </p>
-    <SecureScene />
+  <h2 id="promise">Our privacy promise</h2>
+  <p class="promise-lede">
+    You choose which AI tools rotli uses, and, note by note, what each one may read and what it may change.
+    rotli enforces your choice in the app, before anything reaches a model.
+  </p>
+  <div class="promise-matrix wide">
+    <table role="table">
+      <caption>Who may read and change a note you wrote</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th scope="col" role="columnheader">Note</th>
+          {who.map((name, i) => (
+            <th scope="col" role="columnheader">
+              {name}
+              <small>{whoNote[i]}</small>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody role="rowgroup">
+        {matrix.map((row) => (
+          <tr role="row">
+            <th scope="row" role="rowheader">
+              <b>{row.kind}</b>
+              <small>{row.how}</small>
+            </th>
+            {row.cells.map((cell, i) => (
+              <td role="cell" data-who={who[i]} data-no={cell.no ? '' : undefined}>
+                {cell.text}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
-
-  <h2 id="short-version">The short version</h2>
-  <ul>
-    <li><strong>No account.</strong> There is nothing to sign up for, and no rotli server that holds your notes.</li>
-    <li><strong>No tracking.</strong> No product analytics, no advertising, and no automatic crash reports.</li>
-    <li><strong>Your notes are files.</strong> They live in one folder you choose, on your computer, as plain Markdown.</li>
-    <li><strong>AI is optional and yours to limit.</strong> You choose where it runs and, note by note, what it may read or change.</li>
-    <li><strong>Nothing leaves without a reason you can see.</strong> Updates, a chat you start, or a web search you ask for.</li>
+  <ul class="promise-points">
+    <li>
+      <strong>Secure notes.</strong> A remote model never sees them: not the title, a snippet, or a word of the
+      text. A model on your Mac can read them, since it can't send anything anywhere. You can turn that off for
+      one note from its menu, or for the whole vault in Settings → Security. Nothing turns it on for a remote model.
+    </li>
+    <li>
+      <strong>Locked notes.</strong> No AI of any kind changes them, on your Mac or connected. Every model can
+      still read them: locking protects the words, it doesn't hide them.
+    </li>
+    <li>
+      <strong>Notes you write.</strong> AI can't rewrite a note you wrote until you turn on <em>Let AI edit the
+      text</em> for that note, from its menu. Ask AI adds a passage only when you click Insert, and leaves your
+      words as they were. Notes a chat makes for you stay open to AI.
+    </li>
+    <li>
+      <strong>The Librarian.</strong> It fills in the details at the top of a note (an area, a summary, tags,
+      and links) and may move the file into its area's folder. It never changes your words, and it skips secure
+      and locked notes.
+    </li>
+    <li>
+      <strong>Everything else.</strong> There's no account and no analytics. Your notes are files in a folder you
+      choose, on your computer. You choose which AI tools connect, and rotli never holds their logins. Nothing
+      leaves without a reason you can see: an update check, a chat you start, or a web search you ask for.
+    </li>
   </ul>
+  <p class="promise-note">
+    Secure and locked are rules for AI, not encryption. <a href="#ai">How they work</a>.
+  </p>
 
   <h2 id="your-notes">Your notes stay yours</h2>
   <img class="spot" src={knowledge.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
@@ -71,8 +193,8 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
     Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
     app's settings on your Mac, and it can rebuild them at any time. Main and named views are arrangements
-    of the same files, not copies. Passwords and keys you give rotli go into the macOS Keychain, never into
-    your notes or settings files.
+    of the same files, not copies. No key or login ever sits in these files: see <a href="#keys">Keys and
+    logins</a>.
   </p>
   <p>
     <strong>Why:</strong> a notes app should never be the only way to reach your notes. Because everything is
@@ -84,10 +206,12 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <p>rotli has no analytics or account server to talk to. It goes online only for things you can see:</p>
   <ul>
     <li>
-      <strong>Updates.</strong> The Mac app checks rotli's release page on GitHub for a new version shortly
-      after it opens, a few times a day, and when you press Check for updates. The request carries no
-      account, vault, or note data. Nothing downloads until you choose Install, and Settings → General turns
-      the automatic check off.
+      <strong>Updates.</strong> The Mac app checks for a new version shortly after it opens, a few times a
+      day, and when you press Check for updates. It asks rotli.co first, with its version, macOS, and chip
+      type in the address, which is how we count Macs per version; rotli.co redirects the app to the release
+      page on GitHub, and the app asks GitHub directly if rotli.co doesn't answer. The request carries no account,
+      identifier, vault, or note data. Nothing downloads until you choose Install, and Settings → General
+      turns the automatic check off.
     </li>
     <li>
       <strong>A chat you start with connected AI.</strong> rotli runs the Claude Code, Codex, or Cursor app you
@@ -111,43 +235,13 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <h2 id="ai">AI and your notes</h2>
   <img class="spot" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
   <p>
-    AI in rotli is a visitor, not the owner of your workspace. You can leave it off entirely. If you use it,
-    an <strong>on-device model</strong> runs on your Mac and works without a network. <strong>Connected AI</strong>
-    means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
-  </p>
-  <div class="access">
-    <table>
-      <caption>What each kind of AI may do with a note</caption>
-      <thead>
-        <tr>
-          <th scope="col">Note</th>
-          <th scope="col">On-device model</th>
-          <th scope="col">Connected AI</th>
-        </tr>
-      </thead>
-      <tbody>
-        {access.map((row) => (
-          <tr>
-            <th scope="row">
-              <b>{row.kind}</b>
-              <small>{row.how}</small>
-            </th>
-            <td data-access={row.onDevice}>{label[row.onDevice]}</td>
-            <td data-access={row.connected}>{label[row.connected]}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-  <p>
-    <strong>Secure notes</strong> are never sent to a remote model, not even their titles, and the Librarian
-    leaves them alone. An on-device model reads them by default, since it cannot send anything anywhere; you
-    can turn that off for one note from its menu, or for the whole vault in Settings → Security. Nothing
-    turns it on for a remote model.
+    AI in rotli is optional, and you can leave it off entirely. If you use it,
+    an <strong>on-device model</strong> runs on your Mac and works without a network.{' '}
+    <strong>Connected AI</strong> means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
   </p>
   <p>
-    <strong>Locked notes</strong> can be read by any model, and edited by none. Locking protects the words;
-    it doesn't hide them.
+    What each one may read and change, note by note, is in <a href="#promise">the table at the top of this
+    page</a>, with secure notes, locked notes, and the switch that lets AI edit a note you wrote.
   </p>
   <p>
     Secure is an AI access rule, not encryption. A secure note is still a plain file on your disk, protected
@@ -157,7 +251,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <p>
     <strong>Why:</strong> AI is useful with context and risky with the wrong context. Deciding per note means
     you can let a model help with your plans without ever handing it your salary review. The rule is enforced
-    in the app itself before anything reaches a model, not left to the model to respect.
+    by the app, not left to the model to respect.
   </p>
 
   <h2 id="connect">How rotli connects to AI tools</h2>
@@ -176,7 +270,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <p>
     <strong>Why:</strong> using each company's own published tool keeps your plan working the way it was
     sold to you, and keeps rotli out of the middle. rotli can switch between tools without ever holding a key
-    to any of them. The install commands are on the <a href="/features/#connect">Features page</a>.
+    to any of them. The install commands are on <a href="/features/connected-ai/">the AI tools’ feature page</a>.
   </p>
 
   <h2 id="web">Rotli Web and Rotli Helper</h2>
@@ -200,13 +294,87 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     other way around: the page is just the editor, and your folder stays on your computer.
   </p>
 
+  <h2 id="keys">Keys and logins</h2>
+  <p>
+    rotli has no account, so there's no rotli password to make, forget, or leak. It never asks for the login
+    to your AI tools either: Claude Code, Codex, and Cursor keep their own sign-in, in their own files, and
+    rotli never reads them.
+  </p>
+  <p>
+    A service rotli connects to may need a key of its own. The key is yours: you create it with that
+    service, paste it into Settings → Connections, and can remove it there at any time. Every key follows the
+    same rules:
+  </p>
+  <ul>
+    <li>
+      <strong>It lives in the macOS Keychain,</strong> never in a note, your vault, or a settings file, so it
+      never travels with your notes when you back them up, sync them, or share them.
+    </li>
+    <li><strong>It goes only to its own service,</strong> straight from your Mac.</li>
+    <li><strong>No AI model ever sees it,</strong> on your Mac or connected.</li>
+    <li>
+      <strong>Once saved, it isn't shown again,</strong> not even to you. Settings says the key is saved, and
+      you can replace it or remove it.
+    </li>
+  </ul>
+  <p>
+    Today that's one optional key. Web searches use DuckDuckGo, free and with no account, unless you
+    choose <strong>Brave Search</strong> and paste your own Brave key. Connections still in development, such as
+    remote agents and emailed briefs, keep their keys the same way, and this page will name each one before
+    it ships.
+  </p>
+  <p>
+    <strong>Rotli Helper</strong> has no password either. Its installer hands Rotli Web a pairing code in
+    the part of the address browsers never send to a server. The code stays on your computer, in the
+    Helper's own folder and in your browser, and the Helper answers only Rotli Web's own address.
+  </p>
+  <p>
+    <strong>Secrets in your notes.</strong> A note is a plain file, so a password manager is the better home
+    for passwords. If a note holds something shaped like a key (an API key, a private key, a card or Social
+    Security number), rotli marks it secure on its own, so remote models never see it. An ordinary password
+    looks like any other word, so rotli can't spot it: mark that note secure yourself.
+  </p>
+  <p>
+    <strong>Why:</strong> a key opens an account that can charge you or hold your data. Keeping every key in
+    the Keychain protects it the way your Mac protects your other passwords, and keeps it out of the files
+    you copy, sync, and hand to AI.
+  </p>
+
   <h2 id="website">This website</h2>
   <p>
     rotli.co sets no cookies and runs no analytics, ads, or third-party scripts. Fonts, images, and the film
-    are served from this site. Two badges in the footer, from Launch Llama and Founder.best, are images loaded
-    from their own servers, so those services see a request from your browser when a page shows them. Our
-    hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
+    are served from this site. The one exception is the Launch Llama badge in the footer, an image loaded
+    from Launch Llama's own server, so that service sees a request from your browser when a page shows it.
+    The star count beside the GitHub link is read from GitHub once, when the site is built, so your browser
+    never contacts GitHub to show it; GitHub sees you only if you follow the link.
+    Our hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
     address to deliver pages.
+  </p>
+  <p>
+    <strong>The email list.</strong> The footer's “Hear when it’s ready” list is optional. Only when you
+    submit it, the address you type is sent to Resend, our email provider, and kept there as a contact on
+    rotli's list, so we can email you when there's news about rotli. When you join, the person building rotli
+    also gets one email with your address, sent the same way, so they know someone signed up. Every email
+    has an unsubscribe link, and your mail app's own Unsubscribe button works too: one click takes you off
+    the list, and within a day your address is erased from Resend as well. The one email sent when you
+    joined stays in that inbox; to have it deleted too, <a href="/roadmap/#request">send a request</a> that
+    gives the address and asks us to. Your address isn't used for anything else, and nothing else is collected
+    or shared. Until the list opens, the form says so and the address is not kept or passed on.
+  </p>
+  <p>
+    <strong>Roadmap votes.</strong> A vote on the <a href="/roadmap/">roadmap</a> adds one to that item's
+    count, and the count is all we keep: no record of who voted, or when. So that you vote once per item, your
+    browser remembers which items you voted for in its own storage on your computer (local storage, not a
+    cookie, and never sent anywhere); clearing this site's data forgets it. To stop repeat votes and spam,
+    the site briefly holds a scrambled key made from your IP address and the day, never the address itself.
+    It lives only in the server's memory, changes every day, and is gone when the server restarts.
+  </p>
+  <p>
+    <strong>Feature requests.</strong> A request keeps what you type in the form: a title, a description,
+    and an email address only if you give one, so we can follow up, plus when it arrived. It's stored in a small database on our
+    host, Railway, read only by the person building rotli, and never published; if an idea makes the
+    roadmap, it's written there in our own words. Your email is never added to the list above. To have a
+    request deleted, send another one saying so.
   </p>
   <p>
     <strong>Why:</strong> a site about keeping your work private shouldn't watch you read it.
@@ -214,9 +382,14 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
 
   <h2 id="retention">Keeping and deleting</h2>
   <p>
-    There is no rotli server holding your notes, so there is nothing for us to keep or delete. You decide how
-    long your files exist and where they are backed up. Services you deliberately send something to, like
-    an AI provider or a website you search, keep it under their own policies.
+    There is no rotli server holding your notes, so there is nothing of them for us to keep or delete. You
+    decide how long your files exist and where they are backed up. Services you deliberately send something
+    to, like an AI provider or a website you search, keep it under their own policies.
+  </p>
+  <p>
+    This website keeps a little, only what you choose to send it: an address you add to the email list, a
+    request you send, and the count of votes on the roadmap. <a href="#website">This website</a> says what
+    each one keeps and how to have it deleted.
   </p>
 
   <h2 id="changes">Changes to this page</h2>
@@ -235,90 +408,132 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
 </WritingPage>
 
 <style>
-  .access {
-    margin: 1.5rem 0 1.75rem;
-    overflow-x: auto;
+  /* The promise: a lead line, the matrix, five plain points, and one note. It opens the article,
+     so its heading starts at the top of the column, level with the rail's title. */
+  :global(.writing.is-article .prose) > #promise {
+    margin-top: 0;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.98rem;
-  }
-  caption {
-    padding-bottom: 0.75rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    text-align: left;
-  }
-  th,
-  td {
-    padding: 0.9rem 1rem 0.9rem 0;
-    border-bottom: 1px solid var(--border-strong);
-    text-align: left;
-    vertical-align: top;
-  }
-  thead th {
-    color: var(--text-muted);
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
-  tbody th b {
-    display: block;
-    font-weight: 600;
-  }
-  tbody th small {
-    display: block;
-    color: var(--text-muted);
-    font-size: 0.84rem;
-    font-weight: 400;
-  }
-  td[data-access='none'] {
-    color: var(--accent-text);
-    font-weight: 600;
-  }
-  td[data-access='read'] {
-    color: var(--text-muted);
-  }
-  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
-  .night {
-    display: grid;
-    gap: 1.5rem 2rem;
-    align-items: end;
-    margin-bottom: clamp(2.5rem, 5vw, 4rem);
-    padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
-    overflow: hidden;
-    border-radius: var(--radius-frame);
-    background: var(--deep) url('/night-stars.svg');
-    background-size: 480px 480px;
-    color: var(--deep-text);
-  }
-  .night-caption {
-    max-width: 26rem;
-    margin: 0;
-    padding-bottom: clamp(1.5rem, 4vw, 3rem);
-    color: var(--deep-muted);
+  .promise-lede {
     font-size: var(--step-lede);
     line-height: 1.5;
   }
-  .night-caption .inked {
-    color: var(--deep-text);
+  /* The matrix: a wide block (`.wide`, blog/article.css: from the words' edge to the page's right
+     edge where there is room), below any floated companion, a strong rule over the header and
+     hairlines between rows. A refusal reads in weight and in words; the accent ink on
+     it measures 5.7:1 on the page ground. */
+  .promise-matrix {
+    clear: both;
+    margin: 1.75rem 0 1.5rem;
+  }
+  .promise-matrix table {
+    width: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  .promise-matrix caption {
+    padding-bottom: 0.75rem;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-align: left;
+  }
+  .promise-matrix th,
+  .promise-matrix td {
+    padding: 0.8rem 0.9rem 0.8rem 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .promise-matrix thead th {
+    border-top: 1px solid var(--border-strong);
+    border-bottom-color: var(--border-strong);
+    color: var(--text);
+    font-size: 0.86rem;
     font-weight: 600;
   }
-  @media (min-width: 900px) {
-    .night {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  .promise-matrix th small {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
+  .promise-matrix tbody th {
+    width: 24%;
+    color: var(--text);
+  }
+  .promise-matrix tbody th b {
+    display: block;
+    font-weight: 600;
+  }
+  .promise-matrix td[data-no] {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  /* On a phone each note is a block: its name, then one line per reader, each naming its
+     column (the label comes from the cell's data-who; the table keeps its roles). */
+  @media (max-width: 640px) {
+    .promise-matrix thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .promise-matrix tr {
+      display: block;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .promise-matrix tbody tr:first-child {
+      border-top: 1px solid var(--border-strong);
+    }
+    .promise-matrix th,
+    .promise-matrix td {
+      display: block;
+      width: auto;
+      padding: 0;
+      border: 0;
+    }
+    .promise-matrix tbody th {
+      width: auto;
+      margin-bottom: 0.5rem;
+    }
+    .promise-matrix td {
+      display: grid;
+      grid-template-columns: 8.5rem minmax(0, 1fr);
+      gap: 0.75rem;
+      padding: 0.3rem 0;
+    }
+    .promise-matrix td::before {
+      content: attr(data-who);
+      color: var(--text-muted);
+      font-weight: 400;
     }
   }
-  /* The companion beside a section, the way the app shows it. */
-  .spot {
+  .promise-points {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .promise-note {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+
+  /* The companion beside a section, the way the app shows it, on the column's right edge rather
+     than the main track's (the room past the words is for wide blocks), so it is placed by hand. */
+  :global(.writing.is-article .prose) > .spot {
     float: right;
     width: 132px;
     height: 132px;
-    margin: 0 0 1rem 1.5rem;
+    margin: 0 max(0px, 100% - var(--measure)) 1rem 1.5rem;
     shape-outside: circle(48%);
   }
   @media (max-width: 560px) {
-    .spot {
+    :global(.writing.is-article .prose) > .spot {
       width: 96px;
       height: 96px;
     }

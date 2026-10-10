@@ -1,12 +1,26 @@
 ---
-// The one site footer: brand and tagline, link columns from src/nav.ts, and a
-// quiet closing row for the maker line and the two directory badges. The
-// holding page passes its own tagline and an empty link list, which leaves the
-// brand, tagline, and closing row.
-import mark from '../../../src/assets/characters/_logo.svg?raw';
+// The one site footer: brand, tagline, and the "coming soon" list's sign-up; link columns
+// from src/nav.ts; a quiet closing row for the maker line and the directory badge; and the
+// quokka scenery along the bottom edge (QuokkaScene.astro). The holding page passes its own
+// tagline and an empty link list, which leaves the brand, tagline, sign-up, closing row,
+// and scenery.
+//
+// The sign-up posts to /api/subscribe (site/server/subscribe.ts, behind Caddy). It works
+// without script: a plain form post lands on /subscribed/. With script it stays on the page.
+// It is always there (the owner, 2026-10-05: "a newsletter submission area for you to put your
+// email"): when the list is off (the endpoint's live probe says so, or it is not there at all,
+// as under `astro dev`), a submit says the list isn't open yet and the address is never sent.
+//
+// The sign-up is one field with an arrow inside it (the owner, 2026-10-08: "an arrow style submit
+// button and simpler text"); the arrow's name is "Keep me posted".
+//
+// The maker line carries an X mark to the maker's profile (rel="me", like /about/): a plain
+// drawn X, not the platform's logo artwork.
+import { mark } from '../mark';
 import { footerGroups, footerTagline, type FooterGroup } from '../nav';
 import { site } from '../site';
 import { publishedWriting } from '../writing';
+import QuokkaScene from './QuokkaScene.astro';
 
 interface FooterLink {
   href: string;
@@ -29,68 +43,163 @@ const groups: FooterGroup[] = !site.showsFullSite
       ? [{ title: 'Links', links }]
       : [];
 const external = (href: string) => href.startsWith('http');
+const MAKER_X_URL = 'https://x.com/iamsethmedina';
 ---
 
-<footer class="site-footer">
-  <div class="footer-top">
-    <div class="footer-lead">
-      <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-      <p>{tagline}</p>
+<footer class="site-footer-shell">
+  <div class="site-footer">
+    <div class="footer-top">
+      <div class="footer-lead">
+        <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+        <p>{tagline}</p>
+        <form id="newsletter" class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
+          <h2 id="subscribe-title">Hear when it’s ready.</h2>
+          <p class="subscribe-note" id="subscribe-note">Occasional updates. Unsubscribe anytime.</p>
+          <div class="subscribe-row">
+            <label class="visually-hidden" for="subscribe-email">Email address</label>
+            <input
+              id="subscribe-email"
+              type="email"
+              name="email"
+              required
+              maxlength="254"
+              autocomplete="email"
+              spellcheck="false"
+              placeholder="Your email"
+              aria-describedby="subscribe-note subscribe-status"
+            />
+            <button class="subscribe-send" type="submit" aria-label="Keep me posted" title="Keep me posted">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
+            </button>
+          </div>
+          <div class="subscribe-trap" aria-hidden="true">
+            <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+          </div>
+          <p class="subscribe-status" id="subscribe-status" role="status" data-subscribe-status></p>
+        </form>
+      </div>
+      {
+        groups.length > 0 && (
+          <nav class="footer-groups" aria-label="Footer navigation">
+            {groups.map((group) => (
+              <div class="footer-group">
+                <h2>{group.title}</h2>
+                <ul>
+                  {group.links.map((link) => (
+                    <li>
+                      <a href={link.href} rel={external(link.href) ? 'noopener' : undefined}>
+                        {link.label}
+                        {link.external && <span class="external-mark" aria-hidden="true">↗</span>}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        )
+      }
     </div>
-    {
-      groups.length > 0 && (
-        <nav class="footer-groups" aria-label="Footer navigation">
-          {groups.map((group) => (
-            <div class="footer-group">
-              <h2>{group.title}</h2>
-              <ul>
-                {group.links.map((link) => (
-                  <li>
-                    <a href={link.href} rel={external(link.href) ? 'noopener' : undefined}>
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-      )
-    }
-  </div>
-  <div class="footer-bottom">
-    <p>Designed and built by Seth Medina.</p>
-    <div class="footer-badges">
-      <a
-        class="footer-badge"
-        href="https://tools.launchllama.co?utm_source=badge&utm_medium=referral"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <img
-          src="https://tools.launchllama.co/featured-badge.png?v=2"
-          alt="Featured on Launch Llama Tools"
-          width="200"
-          height="52"
-          loading="lazy"
-          decoding="async"
-        />
-      </a>
-      <a
-        class="footer-badge"
-        href="https://www.founder.best/products/rotli?ref=founderbest"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <img
-          src="https://www.founder.best/api/badge/rotli/light"
-          alt="Rotli - Featured on Founder.best"
-          width="250"
-          height="54"
-          loading="lazy"
-          decoding="async"
-        />
-      </a>
+    <div class="footer-bottom">
+      <p class="footer-maker">
+        Designed and built by Seth Medina.
+        <a class="footer-x" href={MAKER_X_URL} rel="me noopener" aria-label="Seth Medina on X">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M5 4.5 19 19.5" stroke-width="2.6" />
+            <path d="M19 4.5 5 19.5" stroke-width="1.6" />
+          </svg>
+        </a>
+      </p>
+      <div class="footer-badges">
+        <a
+          class="footer-badge"
+          href="https://tools.launchllama.co?utm_source=badge&utm_medium=referral"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="https://tools.launchllama.co/featured-badge.png?v=2"
+            alt="Featured on Launch Llama Tools"
+            width="200"
+            height="52"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+      </div>
     </div>
   </div>
+  <QuokkaScene />
 </footer>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('[data-subscribe]');
+  const status = form?.querySelector<HTMLElement>('[data-subscribe-status]');
+  const input = form?.querySelector<HTMLInputElement>('input[name="email"]');
+  const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+  if (form && status && input && button) {
+    const show = (state: 'idle' | 'sending' | 'done' | 'error' | 'closed', message = '') => {
+      form.dataset.state = state;
+      status.textContent = message;
+      button.disabled = state === 'sending';
+      if (state === 'sending') button.setAttribute('aria-busy', 'true');
+      else button.removeAttribute('aria-busy');
+      input.readOnly = state === 'sending';
+      if (state === 'error') input.setAttribute('aria-invalid', 'true');
+      else input.removeAttribute('aria-invalid');
+    };
+
+    // Is the list open here? Off (or no endpoint at all), the form stays, and a submit says so
+    // without sending the address anywhere.
+    let live = false;
+    fetch('/api/subscribe', { headers: { accept: 'application/json' }, cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { live: false }))
+      .then((probe: { live?: boolean }) => {
+        live = probe.live === true;
+      })
+      .catch(() => {
+        live = false;
+      });
+    const notOpen = 'The list isn’t open yet, so nothing was sent. Check back soon.';
+
+    input.addEventListener('input', () => {
+      if (form.dataset.state === 'error' || form.dataset.state === 'closed') show('idle');
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (form.dataset.state === 'sending') return;
+      if (!input.checkValidity()) {
+        show('error', 'That email address does not look right.');
+        input.focus();
+        return;
+      }
+      if (!live) {
+        show('closed', notOpen);
+        return;
+      }
+      show('sending');
+      const fields = Object.fromEntries(new FormData(form));
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify(fields),
+        });
+        const reply = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (res.status === 404 || res.status === 503) {
+          show('closed', notOpen);
+        } else if (res.ok && reply.ok) {
+          show('done', 'You’re on the list. We’ll write when there is something worth reading.');
+          form.reset();
+        } else {
+          show('error', reply.error ?? 'That did not go through. Try again in a moment.');
+          input.focus();
+        }
+      } catch {
+        show('error', 'That did not go through. Check your connection and try again.');
+      }
+    });
+  }
+</script>

@@ -32,11 +32,8 @@ export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
+// Only /download/ links it: every other call to action (WAY_IN below) goes to that page.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
-/** Where the hero's and closing card's "Download for Mac" buttons go: the
- * newest Mac DMG, fetched directly. The header's Download button always opens
- * /download/, which picks by the visitor's system (SiteHeader.astro). */
-export const DOWNLOAD_HREF = DOWNLOAD_URL;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is
  * the WEB_APP_ENABLED knob below. */
@@ -50,7 +47,7 @@ export const STUDIO_URL = 'https://studio.rotli.co/';
 /**
  * The earlier launch film. The reviewed export lives in `public/media/`; the
  * holding page plays it on request (PromoFilm.astro). The launch page plays the
- * studio's story film instead (src/films.ts).
+ * hero's product film instead (src/films.ts).
  */
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';
@@ -116,6 +113,11 @@ function publicFileExists(publicDir: string | null, path: string): boolean {
   if (publicDir === null) return false;
   const file = join(publicDir, path.replace(/^\//, ''));
   return existsSync(file) && statSync(file).isFile() && statSync(file).size > 0;
+}
+
+/** Whether a generated file (a post's link card, say) is in `public/` for this build. */
+export function hasPublicFile(path: string): boolean {
+  return publicFileExists(findPublicDir(), path);
 }
 
 /**
@@ -186,4 +188,52 @@ export const site = {
   webAppEnabled: readWebAppEnabled(),
   /** The launch film, when its artifacts are present. */
   promo: readPromo(),
+} as const;
+
+/**
+ * The site's one way in, said the same everywhere a primary button appears: the header, the
+ * hero, and the closing banner (the owner, 2026-10-06: "the top right button should align with
+ * button on hero for consistency"). It opens /download/, which offers the Mac app and Rotli Web
+ * and leads with the visitor's system, so it is true on Windows and Linux too. A deployment
+ * without the Mac download says "Try now" instead, so no button promises a download that isn't
+ * there; `offered` is false when there is neither a download nor Rotli Web.
+ */
+export const WAY_IN = {
+  href: '/download/',
+  label: site.downloadsEnabled ? 'Download free' : 'Try now',
+  offered: site.downloadsEnabled || site.webAppEnabled,
+} as const;
+
+/**
+ * Where rotli runs, said one way everywhere it is said (the owner, 2026-10-05).
+ * The promise is a free workspace, not a Mac app, so the landing page says what
+ * it is and what it costs and leaves availability to /download/, the FAQ, the
+ * meta description, and llms.txt. The Mac app and Rotli Web are the two real
+ * options today; native Windows and Linux apps are "Coming soon", and until
+ * then Rotli Web is the way in on those systems. Never imply the Mac is the
+ * only platform rotli will have, or that Windows or Linux apps exist today.
+ * Sentences about what the Mac app alone does (the on-device model, the
+ * Keychain) stay about the Mac.
+ */
+export const PLATFORMS = {
+  /** One sentence for summaries (llms.txt, the meta description). */
+  availability: site.webAppEnabled
+    ? 'On the Mac and in your browser today. Windows and Linux apps are coming soon; use Rotli Web in the meantime.'
+    : 'On the Mac today. Windows and Linux apps are coming soon.',
+  /** The status of a platform whose app is not out yet. */
+  soon: 'Coming soon',
+  /** Where a Windows or Linux visitor goes for now (only while Rotli Web is offered). */
+  meantime: 'Use Rotli Web in the meantime',
+} as const;
+
+/**
+ * Docs (Word, .docx) and Sheets (Excel, .xlsx), both edited with Univer in the
+ * Mac app, ship as beta (the owner, 2026-10-05; Sheets leaves development
+ * builds in the same release, src/lib/featurePolicy.ts). Every page that
+ * names them takes the word from here: `status` as a label, `inline` inside a
+ * sentence. Say no more about them than that they open and edit.
+ */
+export const DOCS_AND_SHEETS = {
+  status: 'Beta',
+  inline: 'beta',
 } as const;

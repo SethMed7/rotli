@@ -1,31 +1,74 @@
 ---
-// /blog/ (the index, newest first) and /blog/<post>/.
+// /blog/ (the index, after anthropic.com/news: the featured story, the next posts in a
+// row, every post in a dated list with topic filters, and the announced ones apart under
+// "Coming soon"; components/blog/BlogIndex.astro, arranged by src/blog.ts) and
+// /blog/<post>/, an article (WritingPage `article`): the title beside the post's scene on the
+// site's 76rem page, a left rail with the tree, the reading meter, Sources, and Share, its
+// figures (src/figures.ts), and "More from rotli" at its end.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
-import WritingList from '../../components/WritingList.astro';
+import { arrangeBlog, GUIDE, isNew, morePosts } from '../../blog';
+import type { MorePost } from '../../components/blog/ArticleAside.astro';
+import BlogIndex, { type BlogPost, type UpcomingPost } from '../../components/blog/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
+import { promosFor } from '../../promos';
 import { site } from '../../site';
-import { publishedWriting, slugOf, type Writing } from '../../writing';
+import { sourcesOf } from '../../sources';
+import { morePostCard, publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
 export async function getStaticPaths() {
   if (!site.showsFullSite) return [];
   const entries = await publishedWriting('post');
+  const upcoming = await upcomingWriting('post');
   return [
-    { params: { slug: undefined }, props: { entry: null, entries } },
-    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries } })),
+    { params: { slug: undefined }, props: { entry: null, entries, upcoming } },
+    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries, upcoming } })),
   ];
 }
 
-const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
+const { entry, entries, upcoming } = Astro.props as {
+  entry: Writing | null;
+  entries: Writing[];
+  upcoming: Writing[];
+};
+/** Who writes the blog, on each post's card. */
+const AUTHOR = 'Seth Medina';
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-const items = entries.map((item) => ({
+// "New" is decided when the site is built: a post wears it for 14 days after its date.
+const builtAt = new Date();
+const arranged = arrangeBlog(
+  entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured, guide: item.data.tags.includes(GUIDE) })),
+);
+const toPost = ({ item }: { item: Writing }): BlogPost => ({
   href: `/blog/${slugOf(item)}/`,
   title: item.data.title,
   description: item.data.description,
-  meta: item.data.draft ? 'Draft · dev site only' : formatDate(item.data.date),
+  date: formatDate(item.data.date),
+  dateTime: item.data.date.toISOString().slice(0, 10),
+  readTime: `${readingMinutes(item)} min read`,
+  draft: item.data.draft,
+  tags: item.data.tags,
+  isNew: isNew(item.data.date, builtAt),
+  thumbnail: postThumbnail(slugOf(item)),
+});
+const announced: UpcomingPost[] = upcoming.map((item) => ({
+  title: item.data.title,
+  description: item.data.description,
+  thumbnail: postThumbnail(slugOf(item)),
 }));
-const { Content } = entry ? await render(entry) : { Content: null };
+// After a post: the other posts (announced ones only to fill in) and rotli's own spots, which
+// rotate through the blog by the post's place in it (src/promos.ts).
+const more: MorePost[] = entry
+  ? morePosts(entry, entries, upcoming).map(({ item, soon }) => morePostCard(item, soon))
+  : [];
+const promos = entry ? promosFor(entries.indexOf(entry)) : [];
+const rendered = entry ? await render(entry) : null;
+const Content = rendered?.Content ?? null;
+const toc = (rendered?.headings ?? [])
+  .filter((heading) => heading.depth === 2 || heading.depth === 3)
+  .map((heading) => ({ slug: heading.slug, text: heading.text, depth: heading.depth }));
 ---
 
 {
@@ -34,13 +77,27 @@ const { Content } = entry ? await render(entry) : { Content: null };
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/blog/${slugOf(entry)}/`}
+      {...postOgImage(slugOf(entry), entry.data.title)}
       structuredData={writingGraph(entry)}
       markdownPath={twinPath(writingPath(entry))}
       section="blog"
       crumbs={[{ href: '/blog/', label: 'Blog' }]}
-      kicker={entry.data.draft ? 'Draft · dev site only' : formatDate(entry.data.date)}
+      kicker={entry.data.draft ? 'Draft · dev site only' : undefined}
       heading={entry.data.title}
       lede={entry.data.description}
+      meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
+      article={{
+        cover: postBanner(slugOf(entry)),
+        author: AUTHOR,
+        tags: entry.data.tags,
+        url: `${site.url}/blog/${slugOf(entry)}/`,
+        markdown: twinPath(writingPath(entry)),
+        sources: sourcesOf(entry.body ?? ''),
+        more,
+        promos,
+      }}
+      toc={toc}
+      progress
     >
       <Content />
     </WritingPage>
@@ -49,12 +106,19 @@ const { Content } = entry ? await render(entry) : { Content: null };
       title="Blog — rotli"
       description="Notes from building rotli."
       canonicalPath="/blog/"
+      {...ogImage('blog')}
       section="blog"
       heading="Blog"
-      lede="Notes from building rotli."
+      lede="Notes from building rotli: how it works, and why it works that way."
       wide
     >
-      <WritingList items={items} empty="The first post is on its way." />
+      <BlogIndex
+        featured={arranged.featured && toPost(arranged.featured)}
+        secondary={arranged.secondary.map(toPost)}
+        all={arranged.all.map(toPost)}
+        upcoming={announced}
+        empty="The first post is on its way."
+      />
     </WritingPage>
   )
 }

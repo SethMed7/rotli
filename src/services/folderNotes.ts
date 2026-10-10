@@ -27,7 +27,16 @@ import { composeNote, noteSlugify, noteStem, stampToMs, today, ulid } from "../m
 import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
-import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
+import {
+  DEST,
+  RESERVED_FOLDERS,
+  isChats,
+  isHidden,
+  isRootMarker,
+  isSink,
+  isTrash,
+  isVault,
+} from "./destinations";
 import { BOARD_LANE, boardTitle, isBoardPath } from "./folderBoards";
 import { canvasTitle, isCanvasFile } from "./folderCanvases";
 import {
@@ -62,10 +71,6 @@ const SINK_DIRS: { dir: string; dest: string }[] = [
   { dir: "archive", dest: DEST.archive },
   { dir: "trash", dest: DEST.trash },
 ];
-/** Reserved destination rows: id === name, no parent — the same grammar the
- * in-memory service seeds, so `DEST.inbox === folder.id` holds in every mode. */
-const RESERVED_FOLDERS = [DEST.inbox, DEST.secure, DEST.storage, DEST.board, DEST.archive, DEST.trash];
-
 const under = (path: string, root: string): boolean => path === root || path.startsWith(`${root}/`);
 
 /** Cached bytes for one file, keyed by the revision they were read at. */

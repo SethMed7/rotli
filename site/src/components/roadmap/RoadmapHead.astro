@@ -1,0 +1,173 @@
+---
+// The words at the top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro):
+// under the page's banner (RoadmapScene.astro straight across the window, rendered by the page
+// above its wrapper; the owner, 2026-10-09: "one thing straight across top like an image/banner
+// then the rest under"), on the reading column of the long-form tracks, so the title starts where
+// the groups' words start. The words: where the page sits ("Resources /"), the title, what the
+// roadmap is and how to take part, a meta line, a notice while the roadmap is being reworked, the
+// participation state (the page's script keeps it current), and the two ways in.
+import { ROADMAP_URL, site } from '../../site';
+
+interface Props {
+  heading: string;
+  lede: string;
+  meta: string[];
+  /** A short notice under the meta line, its first sentence in bold (the roadmap under rework). */
+  notice?: [string, string];
+  /** The participation line before the page's script has asked the sidecar. */
+  participation: string;
+}
+
+const { heading, lede, meta, notice, participation } = Astro.props;
+---
+
+<header class="road-head" data-roadmap-head>
+  <div class="head-copy">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="/resources/">Resources</a>
+      <span aria-hidden="true">/</span>
+    </nav>
+    <h1>{heading}</h1>
+    <p class="lede">{lede}</p>
+    <p class="meta">
+      {
+        meta.map((part, index) => (
+          <>
+            {index > 0 && <span aria-hidden="true">·</span>}
+            <span>{part}</span>
+          </>
+        ))
+      }
+    </p>
+    {
+      notice && (
+        <p class="notice" data-roadmap-notice>
+          <b>{notice[0]}</b> {notice[1]}
+        </p>
+      )
+    }
+    <p class="participation" id="participation-note" role="status" data-roadmap-note>
+      {participation}
+    </p>
+    <div class="head-actions">
+      <a class="button primary" href="#in-the-work">See what’s in the work</a>
+      <a class="button secondary" href="#request">Ask for something</a>
+    </div>
+    {
+      site.sourcePublic && (
+        <p class="source-link">
+          <a href={ROADMAP_URL} rel="noopener" data-roadmap-source>
+            Roadmap source
+          </a>
+          <span> on GitHub, with the detail behind every item</span>
+        </p>
+      )
+    }
+  </div>
+</header>
+
+<style>
+  .road-head {
+    display: grid;
+    grid-template-columns: var(--article-tracks);
+  }
+  .head-copy {
+    grid-column: text;
+    min-width: 0;
+    padding-bottom: clamp(2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+  }
+  .crumbs a {
+    color: var(--text-muted);
+    text-underline-offset: 0.2em;
+  }
+  .crumbs a:hover {
+    color: var(--text);
+  }
+  h1 {
+    max-width: 16em;
+    margin: 0;
+    font-size: clamp(2.1rem, 3.6vw, 3.2rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 36rem;
+    margin: 0.85rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.55rem;
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  /* The rework notice: a quiet line on an accent rule, so it reads as news, not as an error. */
+  .notice {
+    max-width: 36rem;
+    margin: 1rem 0 0;
+    padding: 0.15rem 0 0.15rem 0.85rem;
+    border-left: 3px solid var(--accent);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .notice b {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .participation {
+    margin: 0.4rem 0 0;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+  .participation:empty {
+    display: none;
+  }
+  .head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+  .source-link {
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .source-link a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-underline-offset: 0.2em;
+  }
+  @media (pointer: coarse) {
+    .crumbs a,
+    .source-link a {
+      display: inline-block;
+      padding: 0.7rem 0;
+      margin: -0.7rem 0;
+    }
+  }
+  @media (max-width: 480px) {
+    .head-actions .button {
+      flex: 1 1 100%;
+    }
+  }
+</style>

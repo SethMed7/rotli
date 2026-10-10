@@ -1,0 +1,568 @@
+---
+// /roadmap/: ROADMAP.md at the repository root, rendered at build time (src/roadmap.ts), so the
+// page and the file can never disagree: the build fails on a missing or repeated id, and
+// astro.config.mjs checks the built page's items (data-roadmap-item) against the file. Only the
+// three public sections show (In the work, Planned, Ideas); the rest stays in the file. Then
+// "Recently shipped", read from CHANGELOG.md's newest releases (src/releases.ts), and the
+// request form.
+//
+// The page, top to bottom: the banner straight across the window (RoadmapScene.astro, as a blog
+// post's), the head under it on the reading column (components/roadmap/RoadmapHead.astro), then, from 901px, the long-form pages' tracks (`.longform`,
+// components/blog/article.css, the same as a post's): "On this page" pinned in the rail
+// (RoadmapNav.astro), the groups from the column's left edge, their notes at the reading measure
+// and the grids and lists running on to the page's right edge. In the work shows each item under its small
+// drawing (RoadmapMock.astro); Planned and Ideas are a calm list on hairlines. Every item says
+// its status and size, and a vote while voting is open (src/roadmap.ts VOTING_OPEN; off for now,
+// the page says voting is in the works, and a notice says the roadmap is being reworked).
+//
+// People take part through the site's sidecar (site/server/roadmap.ts): a vote per item (one per
+// browser, remembered in localStorage) and a request. Until the sidecar's database is
+// configured the probe answers 503 (or astro preview's 404) and the page says voting and
+// requests open soon, with every control disabled. Live, a vote shows at once (optimistic) and is
+// taken back, with the reason beside the item, if the sidecar refuses it; Ideas can be ordered by
+// votes.
+import '../../components/blog/article.css';
+import Base from '../../layouts/Base.astro';
+import RecentlyShipped from '../../components/roadmap/RecentlyShipped.astro';
+import RequestForm from '../../components/roadmap/RequestForm.astro';
+import RoadmapHead from '../../components/roadmap/RoadmapHead.astro';
+import RoadmapMock from '../../components/roadmap/RoadmapMock.astro';
+import RoadmapNav from '../../components/roadmap/RoadmapNav.astro';
+import RoadmapScene from '../../components/roadmap/RoadmapScene.astro';
+import VoteButton from '../../components/roadmap/VoteButton.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import { recentReleases } from '../../releases';
+import { codeParts, publicRoadmap, SIZES, VOTING_OPEN } from '../../roadmap';
+import { readChangelogFile, readRoadmapFile } from '../../roadmap-file';
+import { site } from '../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const [work, planned, ideas] = publicRoadmap(readRoadmapFile());
+const shipped = recentReleases(readChangelogFile());
+const ledes: Record<string, string> = {
+  [work.slug]: 'Being built now, in development builds. Not released, so not done.',
+  [planned.slug]: 'Decided, not started.',
+  [ideas.slug]: VOTING_OPEN ? 'Not decided yet. Votes here help decide what comes next.' : 'Not decided yet.',
+};
+/** What an item in each group is, said on the item itself. */
+const statusOf: Record<string, string> = { [work.slug]: 'In the work', [planned.slug]: 'Planned', [ideas.slug]: 'Idea' };
+const meaning = Object.fromEntries(SIZES.map(({ size, meaning }) => [size, meaning]));
+const sizeTitle = (size: string) =>
+  size
+    .split(/[–-]/)
+    .map((part) => meaning[part])
+    .filter(Boolean)
+    .join(' to ');
+const plain = (text: string) => text.replaceAll('`', '');
+const links = [
+  ...[work, planned, ideas].map((section) => ({ slug: section.slug, label: section.title, count: section.items.length })),
+  { slug: 'recently-shipped', label: 'Recently shipped' },
+  { slug: 'request', label: 'Ask for something' },
+];
+---
+
+<Base
+  title="Roadmap — rotli"
+  description={`What is being built for rotli, what is planned, what is still an idea, and what shipped lately. ${VOTING_OPEN ? 'Vote for what you want, or ask for something new.' : 'Ask for something new.'}`}
+  canonicalPath="/roadmap/"
+  noindex={!site.indexable}
+  markdownPath="/roadmap/index.md"
+>
+  <SiteHeader current="roadmap" />
+  <RoadmapScene banner />
+  <main id="content" class="wrap roadmap-page longform" data-roadmap data-state="off">
+    <RoadmapHead
+      heading="What’s next for rotli"
+      lede={`What’s being built, what’s decided, and what’s still an idea, straight from the roadmap kept with rotli’s source. ${VOTING_OPEN ? 'Vote for the things you’d use, or ask for something new.' : 'Ask for something new.'} No account, and no email needed.`}
+      meta={['Direction, not a promise', 'No dates']}
+      notice={[
+        'Under construction.',
+        'This roadmap is being reworked and will be updated in the coming week to match where rotli is today.',
+      ]}
+      participation={VOTING_OPEN ? 'Voting and requests open soon.' : 'Voting is in the works, and requests open soon.'}
+    />
+
+    <div class="road-layout">
+      <RoadmapNav links={links} />
+
+      <div class="road-body">
+        <p class="sizes">
+          <span class="key-label">Size</span>
+          {
+            SIZES.map(({ size, meaning }) => (
+              <span>
+                <b>{size}</b> {meaning}
+              </span>
+            ))
+          }
+        </p>
+        <p class="visually-hidden" aria-live="polite" data-roadmap-announce></p>
+
+        <section class="road-section" id={work.slug} aria-labelledby={`${work.slug}-title`}>
+          <h2 id={`${work.slug}-title`}>{work.title}</h2>
+          <p class="section-note">{ledes[work.slug]}</p>
+          <ul class="work-grid">
+            {
+              work.items.map((item) => (
+                <li class="work-item" data-roadmap-item={item.id}>
+                  <RoadmapMock id={item.id} />
+                  <h3>{codeParts(item.title).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</h3>
+                  <p class="summary">
+                    {codeParts(item.summary).map((part) => (part.code ? <code>{part.text}</code> : part.text))}
+                  </p>
+                  <div class="item-foot">
+                    <p class="item-meta">
+                      <span>{statusOf[work.slug]}</span>
+                      {item.size && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span title={sizeTitle(item.size)}>Size {item.size}</span>
+                        </>
+                      )}
+                    </p>
+                    {VOTING_OPEN && <VoteButton id={item.id} title={plain(item.title)} />}
+                  </div>
+                  {VOTING_OPEN && <p class="vote-error" data-vote-error={item.id} />}
+                </li>
+              ))
+            }
+          </ul>
+        </section>
+
+        {
+          [planned, ideas].map((section) => (
+            <section class="road-section" id={section.slug} aria-labelledby={`${section.slug}-title`}>
+              <div class="section-top">
+                <div>
+                  <h2 id={`${section.slug}-title`}>{section.title}</h2>
+                  <p class="section-note">{ledes[section.slug]}</p>
+                </div>
+                {VOTING_OPEN && section === ideas && (
+                  <div class="sort" role="group" aria-label="Order the ideas" data-sort hidden>
+                    <span class="sort-label" aria-hidden="true">
+                      Order
+                    </span>
+                    <button type="button" aria-pressed="true" data-sort-by="file">
+                      Roadmap order
+                    </button>
+                    <button type="button" aria-pressed="false" data-sort-by="votes">
+                      Most votes
+                    </button>
+                  </div>
+                )}
+              </div>
+              <ul class="calm-list" data-list={section.slug}>
+                {section.items.map((item, index) => (
+                  <li data-roadmap-item={item.id} data-order={index}>
+                    <div class="calm-text">
+                      <h3>{codeParts(item.title).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</h3>
+                      <p class="summary">
+                        {codeParts(item.summary).map((part) => (part.code ? <code>{part.text}</code> : part.text))}
+                      </p>
+                      <p class="item-meta">
+                        <span>{statusOf[section.slug]}</span>
+                        {item.size && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span title={sizeTitle(item.size)}>Size {item.size}</span>
+                          </>
+                        )}
+                      </p>
+                      {VOTING_OPEN && <p class="vote-error" data-vote-error={item.id} />}
+                    </div>
+                    {VOTING_OPEN && <VoteButton id={item.id} title={plain(item.title)} />}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
+        }
+
+        <section class="road-section" id="recently-shipped" aria-labelledby="recently-shipped-title">
+          <h2 id="recently-shipped-title">Recently shipped</h2>
+          <p class="section-note">
+            The newest releases, from the changelog: a few headlines from each, in the words of its release notes.
+          </p>
+          <RecentlyShipped releases={shipped} />
+        </section>
+
+        <section class="road-section request" id="request" aria-labelledby="request-title">
+          <h2 id="request-title">Ask for something</h2>
+          <p class="section-note">
+            Missing something? Say what you want rotli to do and what you’d use it for. It takes a minute, and you
+            don’t need an account or an email.
+          </p>
+          <RequestForm />
+        </section>
+      </div>
+    </div>
+  </main>
+  <SiteFooter />
+</Base>
+
+<script>
+  // Votes (site/server/roadmap.ts). Off until the probe answers 200 with { live: true }: astro
+  // preview (404), a stopped sidecar (Caddy's plain 503), and an unconfigured one (503 JSON)
+  // all leave the page in its "opens soon" state. A browser votes once per item; the marker is
+  // the list of ids in localStorage, nothing else. The request form listens for `roadmap:live`.
+  const STORE = 'rotli.roadmap.voted';
+  const FAILED = 'That vote did not go through. Try again in a moment.';
+  const root = document.querySelector<HTMLElement>('[data-roadmap]');
+  const note = document.querySelector<HTMLElement>('[data-roadmap-note]');
+  const announcer = document.querySelector<HTMLElement>('[data-roadmap-announce]');
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('button[data-vote]')];
+  const sort = document.querySelector<HTMLElement>('[data-sort]');
+  const ideasList = document.querySelector<HTMLElement>('[data-list="ideas"]');
+
+  function readVoted(): Set<string> {
+    try {
+      const raw: unknown = JSON.parse(localStorage.getItem(STORE) ?? '[]');
+      return new Set(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
+    } catch {
+      return new Set();
+    }
+  }
+  function saveVoted(voted: Set<string>) {
+    try {
+      if (voted.size === 0) localStorage.removeItem(STORE);
+      else localStorage.setItem(STORE, JSON.stringify([...voted]));
+    } catch {
+      // Private windows may refuse storage; the vote still counted on the server.
+    }
+  }
+  const voted = readVoted();
+  const counts = new Map<string, number>();
+
+  function paint(button: HTMLButtonElement) {
+    const id = button.dataset.vote ?? '';
+    const title = button.dataset.title ?? '';
+    const mine = voted.has(id);
+    const count = counts.get(id) ?? 0;
+    button.setAttribute('aria-pressed', String(mine));
+    const label = button.querySelector('[data-vote-label]');
+    if (label) label.textContent = mine ? 'Voted' : 'Vote';
+    const shown = button.querySelector('[data-vote-count]');
+    if (shown) shown.textContent = String(count);
+    const votes = `${count} ${count === 1 ? 'vote' : 'votes'}`;
+    button.setAttribute('aria-label', mine ? `You voted for ${title}, ${votes}` : `Vote for ${title}, ${votes}`);
+  }
+
+  function itemError(id: string, text: string) {
+    const slot = document.querySelector<HTMLElement>(`[data-vote-error="${id}"]`);
+    if (slot) slot.textContent = text;
+  }
+
+  function announce(text: string) {
+    if (!announcer) return;
+    announcer.textContent = '';
+    requestAnimationFrame(() => (announcer.textContent = text));
+  }
+
+  function setLive(live: boolean) {
+    root?.setAttribute('data-state', live ? 'live' : 'off');
+    for (const button of buttons) {
+      button.disabled = !live;
+      if (live) {
+        button.removeAttribute('aria-describedby');
+        paint(button);
+      }
+    }
+    // With voting off (src/roadmap.ts VOTING_OPEN) there are no buttons, and the line says so.
+    const voting = buttons.length > 0;
+    if (note)
+      note.textContent = voting
+        ? live
+          ? 'Voting is open: one vote per item, remembered by this browser.'
+          : 'Voting and requests open soon.'
+        : live
+          ? 'Requests are open. Voting is in the works.'
+          : 'Voting is in the works, and requests open soon.';
+    if (sort) sort.hidden = !live;
+    document.dispatchEvent(new CustomEvent('roadmap:live', { detail: { live } }));
+  }
+
+  // Optimistic: the vote shows at once, then the sidecar's count replaces the guess; a refusal
+  // takes it back and says why beside the item.
+  async function vote(button: HTMLButtonElement) {
+    const id = button.dataset.vote ?? '';
+    if (voted.has(id) || button.getAttribute('aria-busy') === 'true') return;
+    const before = counts.get(id) ?? 0;
+    voted.add(id);
+    counts.set(id, before + 1);
+    saveVoted(voted);
+    itemError(id, '');
+    button.setAttribute('aria-busy', 'true');
+    paint(button);
+    try {
+      const res = await fetch('/api/roadmap/vote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; count?: number; error?: string };
+      if (!res.ok || body.ok !== true) throw new Error(body.error || FAILED);
+      if (typeof body.count === 'number') counts.set(id, body.count);
+      announce(`Voted for ${button.dataset.title ?? 'this item'}.`);
+    } catch (error) {
+      voted.delete(id);
+      counts.set(id, before);
+      saveVoted(voted);
+      const message = error instanceof Error ? error.message : FAILED;
+      itemError(id, message);
+      announce(message);
+    } finally {
+      button.removeAttribute('aria-busy');
+      paint(button);
+    }
+  }
+
+  for (const button of buttons) button.addEventListener('click', () => void vote(button));
+
+  // Ideas in the file's order, or by votes (ties keep the file's order). The list is reordered
+  // only when asked, never under a vote, so nothing jumps while you read.
+  sort?.addEventListener('click', (event) => {
+    const choice = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-sort-by]');
+    if (!choice || !ideasList) return;
+    const byVotes = choice.dataset.sortBy === 'votes';
+    for (const option of sort.querySelectorAll('button')) option.setAttribute('aria-pressed', String(option === choice));
+    const rows = [...ideasList.querySelectorAll<HTMLElement>(':scope > li')];
+    const order = (row: HTMLElement) => Number(row.dataset.order ?? 0);
+    const votesOf = (row: HTMLElement) => counts.get(row.dataset.roadmapItem ?? '') ?? 0;
+    rows.sort((a, b) => (byVotes ? votesOf(b) - votesOf(a) : 0) || order(a) - order(b));
+    ideasList.append(...rows);
+    announce(byVotes ? 'Ideas ordered by votes.' : 'Ideas in roadmap order.');
+  });
+
+  fetch('/api/roadmap/votes', { headers: { accept: 'application/json' }, cache: 'no-store' })
+    .then(async (res) => (res.ok ? ((await res.json()) as { live?: boolean; votes?: Record<string, number> }) : { live: false }))
+    .then((probe) => {
+      if (probe.live !== true) return setLive(false);
+      for (const [id, count] of Object.entries(probe.votes ?? {})) if (typeof count === 'number') counts.set(id, count);
+      setLive(true);
+    })
+    .catch(() => setLive(false));
+</script>
+
+<style>
+  .roadmap-page {
+    padding-block: clamp(2.5rem, 6vw, 4.5rem) var(--section-space);
+  }
+  .road-layout {
+    display: grid;
+    gap: 2rem;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  /* Beside the rail from 901px, on a post's tracks: the rail and its gap, then everything from
+     the column's left edge (the notes keep its measure; the grids and lists are wide). */
+  @media (min-width: 901px) {
+    .road-layout {
+      grid-template-columns: var(--article-tracks);
+      column-gap: 0;
+    }
+    .road-layout > :global(.road-nav) {
+      grid-column: rail;
+    }
+    .road-body {
+      grid-column: main;
+    }
+  }
+  .road-body {
+    min-width: 0;
+  }
+
+  /* The size key: one quiet line above the groups. */
+  .sizes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+  }
+  .sizes b,
+  .key-label {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .road-section {
+    margin-top: clamp(3rem, 6vw, 4.5rem);
+    scroll-margin-top: calc(var(--header-height) + 1.5rem);
+  }
+  .road-section:first-of-type {
+    margin-top: clamp(2rem, 4vw, 2.75rem);
+  }
+  .road-section h2 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .section-note {
+    max-width: var(--measure);
+    margin: 0.35rem 0 1.5rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .roadmap-page h3 {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .roadmap-page code {
+    padding: 0.05em 0.3em;
+    border-radius: 0.3rem;
+    background: var(--surface-2);
+    font-size: 0.92em;
+    overflow-wrap: anywhere;
+  }
+  .summary {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.45rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .item-meta span:first-child {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .vote-error {
+    margin: 0;
+    color: var(--accent-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .vote-error:empty {
+    display: none;
+  }
+
+  /* In the work: each item under its drawing, the drawing its one frame; no box around the words. */
+  .work-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    gap: 2.5rem clamp(1.5rem, 3vw, 2.25rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .work-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+  }
+  .work-item h3 {
+    margin-top: 0.6rem;
+  }
+  .work-item .summary {
+    flex: 1;
+  }
+  .item-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.4rem;
+  }
+
+  /* Planned and Ideas: a calm list, hairlines between rows, the vote on the right. */
+  .section-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0 1.5rem;
+  }
+  .calm-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .calm-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem 1.5rem;
+    align-items: center;
+    margin: 0;
+    padding: 1.1rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .calm-list li:last-child {
+    border-bottom: 1px solid var(--border);
+  }
+  .calm-text {
+    display: grid;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+  .calm-text .summary {
+    max-width: var(--measure);
+  }
+
+  /* Ideas' order: two joined buttons, the current one filled. Shown only while votes are live. */
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.88rem;
+  }
+  .sort[hidden] {
+    display: none;
+  }
+  .sort-label {
+    color: var(--text-muted);
+  }
+  .sort button {
+    min-height: 40px;
+    margin: 0;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .sort button:first-of-type {
+    border-radius: 999px 0 0 999px;
+  }
+  .sort button:last-of-type {
+    margin-left: -1px;
+    border-radius: 0 999px 999px 0;
+  }
+  .sort button[aria-pressed='true'] {
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .sort button:focus-visible {
+    position: relative;
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 640px) {
+    .calm-list li {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+    .calm-list li :global(.vote) {
+      justify-self: start;
+    }
+  }
+</style>

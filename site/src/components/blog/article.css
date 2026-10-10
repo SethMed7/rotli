@@ -1,0 +1,377 @@
+/* The long-form pages' layout (blog posts and /privacy/ through WritingPage `article`, and
+   /roadmap/), then a post's reading column and its figures. Global, because the post's Markdown
+   and the figures src/figures.ts draws arrive as HTML outside any component's scoped styles;
+   every rule is held under .longform or .is-article so other pages are untouched. Tokens only.
+   Measured in the article specs: about 66 characters a line, every text pair at 4.5:1 or more.
+   The evaluation behind it: docs/design/article-pages-width-2026-10-07.md. */
+
+/* The tracks, one set for every long-form page (the owner, 2026-10-07: one left edge, wide blocks
+   to the page's right edge, bullets hung). On the site's one 76rem page, named so a head and its
+   body share them:
+     [rail] the left rail · [rail-end] its gap · [main] the room right of it, which starts with
+     [text] the reading column; [text-end] to [main-end] is the room a wide block runs on into.
+   The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
+   characters. The rail and the gap are fluid in the page's own width (cqi: the page is the
+   container): the rail 10rem at 901px to 16rem from about 1180px (where it stops), the gap 2rem
+   to 2.5rem. Every block starts on the column's left edge; nothing is centred in the room, so
+   the gap beside the rail is the gap and no more. Below 901px there is no rail, and the column
+   starts on the page's left edge, the header's. */
+.longform {
+  container-type: inline-size;
+  --prose-size: 1.125rem;
+  --measure: calc(var(--prose-size) * 38.5);
+  --col-left: clamp(10rem, 35.42cqi - 8.35rem, 16rem);
+  --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 2.5rem);
+  --article-tracks: [main-start text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+}
+@media (min-width: 901px) {
+  .longform {
+    --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start text-start]
+      minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
+  }
+}
+
+/* The column: 18px type at every width (it never grows on the widest screens, where the page
+   stops at 76rem), generous leading. .prose fills the grid's main track; the words keep the
+   measure, about 66 characters a line (60 to 80 at every width, 62 to 70 from 1180px,
+   e2e/site/article-width.spec.ts), and wide blocks may run on to the page's right edge, never
+   into the rail. */
+.writing.is-article .prose {
+  font-size: var(--prose-size);
+  line-height: 1.72;
+  /* A bare address in a citation breaks inside a 320px column instead of widening the page. */
+  overflow-wrap: break-word;
+}
+/* Every block of the post keeps the measure on the column's left edge. `:nth-child(n)` matches
+   every child; it is there for its weight, so this outranks the margin shorthands below (0,4,0
+   against 0,3,1) and a figure's default inline margins. */
+.writing.is-article .prose {
+  container: article-prose / inline-size;
+}
+.writing.is-article .prose > :nth-child(n) {
+  max-width: var(--measure);
+  margin-inline: 0;
+}
+/* Wide blocks (figures, tables, code, and anything marked .wide, such as the privacy promise's
+   matrix) start on the words' edge and run on to the page's right edge, the header's and the head
+   picture's, but only where that is at least about 5rem past the words (a sliver wider than the
+   text would read as a mistake); on a narrower main track they keep the measure. */
+@container article-prose (min-width: 48.5rem) {
+  .writing.is-article .prose > :is(.figure, table, pre, .wide) {
+    max-width: 100%;
+  }
+}
+.writing.is-article .prose h2 {
+  margin: 3.4rem 0 0.9rem;
+  font-size: clamp(1.5rem, 2.2vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.writing.is-article .prose h3 {
+  margin: 2.4rem 0 0.6rem;
+  font-size: 1.22rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.012em;
+}
+.writing.is-article .prose h2 + p,
+.writing.is-article .prose h3 + p {
+  margin-top: 0;
+}
+.writing.is-article .prose p,
+.writing.is-article .prose ul,
+.writing.is-article .prose ol {
+  margin: 0 0 1.25rem;
+}
+.writing.is-article .prose ul,
+.writing.is-article .prose ol {
+  padding-left: 1.3rem;
+}
+/* A list respects the column's one left line (the owner, 2026-10-07: "a proper left line that
+   everything respects"): its box, and its bullet or number, start exactly on the edge the words
+   and tables start on, and its words one step in. The markers are drawn, not ::marker, whose
+   place the browser decides; so they sit on the line at every width, never in the gap beside the
+   rail. Nested lists indent from their item as usual. The Sources list and footnotes draw their
+   own numbers on the same line, and the figures' flow keeps its own layout. */
+.writing.is-article .prose > :is(ul, ol):not(.flow) {
+  padding-left: 0;
+  list-style: none;
+}
+.writing.is-article .prose > :is(ul, ol):not(.flow) > li {
+  position: relative;
+  padding-left: 1.25rem;
+}
+.writing.is-article .prose > ul:not(.flow) > li::before {
+  content: '';
+  position: absolute;
+  top: calc(0.5lh - 0.17em);
+  left: 0;
+  width: 0.34em;
+  height: 0.34em;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.writing.is-article .prose > ol:not(.flow) > li {
+  padding-left: 1.75rem;
+}
+.writing.is-article .prose > ol:not(.flow) > li::before {
+  content: counter(list-item) '.';
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.writing.is-article .prose li + li {
+  margin-top: 0.45rem;
+}
+.writing.is-article .prose li::marker {
+  color: var(--text-muted);
+}
+.writing.is-article .prose strong {
+  font-weight: 600;
+}
+.writing.is-article .prose hr {
+  margin: 3rem 0;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+/* A pull quote or a note: a tinted panel with the accent rule, the words at full strength. */
+.writing.is-article .prose blockquote {
+  margin: 2rem 0;
+  padding: 1.1rem 1.4rem;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-frame) var(--radius-frame) 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.2rem;
+  line-height: 1.55;
+}
+.writing.is-article .prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* Tables: hairlines, figures right where they line up. */
+.writing.is-article .prose table {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sources (a "## Sources" list) and footnotes: a smaller, numbered list with hairlines between,
+   so a citation reads as a reference, not as more of the argument. */
+/* Where the left rail lists the sources (from 901px, when the post's list parsed:
+   .has-rail-sources), the article's own list gives way to "More from rotli" after it (the owner,
+   2026-10-06: "in replace of sources since sources is already on left side"). Screens only: print
+   keeps the full citations, as do phones and tablets (no rail there) and the Markdown twin. It is
+   the post's last section (src/sources.ts reads it to the next heading), so nothing else hides. */
+@media screen and (min-width: 901px) {
+  .writing.is-article.has-rail-sources .prose h2#sources,
+  .writing.is-article.has-rail-sources .prose h2#sources + ol {
+    display: none;
+  }
+}
+.writing.is-article .prose h2#sources {
+  margin-top: 4rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--border-strong);
+  font-size: 1.15rem;
+}
+.writing.is-article .prose h2#sources + ol,
+.writing.is-article .prose .footnotes ol {
+  padding: 0;
+  list-style: none;
+  counter-reset: source;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.writing.is-article .prose h2#sources + ol > li,
+.writing.is-article .prose .footnotes li {
+  position: relative;
+  margin: 0;
+  padding: 0.85rem 0 0.85rem 2.2rem;
+  border-bottom: 1px solid var(--border);
+  counter-increment: source;
+}
+.writing.is-article .prose h2#sources + ol > li::before,
+.writing.is-article .prose .footnotes li::before {
+  content: counter(source);
+  position: absolute;
+  top: 0.85rem;
+  left: 0;
+  min-width: 1.5rem;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.writing.is-article .prose .footnotes {
+  margin-top: 3rem;
+  font-size: 0.95rem;
+}
+
+/* ─── Figures (src/figures.ts) ─────────────────────────────────────────────
+   A figure sits a little apart from the text: its title, the chart or the diagram, a caption
+   that cites the source, and for charts the numbers as a table behind a disclosure. */
+.writing.is-article .prose .figure {
+  margin-block: 2.4rem 2.6rem;
+  padding: 1.4rem 0 0;
+  border-top: 1px solid var(--border-strong);
+}
+.writing.is-article .prose .figure-title {
+  margin: 0 0 1.1rem;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-wrap: balance;
+}
+.writing.is-article .prose .figure-caption {
+  margin-top: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* The bar chart: label over its bar, the value just past the bar's end. SVG text takes the
+   page's font and tokens through classes (presentation attributes cannot read var()). */
+.writing.is-article .prose .chart {
+  display: block;
+  overflow: visible;
+  font-family: var(--font-body);
+}
+.writing.is-article .prose .chart-label {
+  fill: var(--text);
+  font-size: 0.95rem;
+}
+.writing.is-article .prose .chart-value {
+  fill: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.writing.is-article .prose .chart-track {
+  fill: var(--surface-2);
+}
+.writing.is-article .prose .chart-bar {
+  fill: var(--accent);
+}
+
+/* The numbers behind a chart, as a table: closed until asked for. */
+.writing.is-article .prose .figure-data {
+  margin-top: 0.75rem;
+  font-size: 0.92rem;
+}
+.writing.is-article .prose .figure-data summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  color: var(--accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.writing.is-article .prose .figure-data table {
+  margin: 0.5rem 0 0;
+  font-size: 0.92rem;
+}
+.writing.is-article .prose .figure-data td {
+  text-align: right;
+}
+@media (pointer: coarse) {
+  .writing.is-article .prose .figure-data summary {
+    min-height: 44px;
+  }
+}
+
+/* The flow: steps left to right with an arrow between, a step's alternatives under it
+   ("either"); one column with arrows down on a narrow column. Lists, so it reads as text. */
+.writing.is-article .prose .flow {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  align-items: start;
+  gap: 2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.writing.is-article .prose .flow > li {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.9rem 1rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-frame);
+  background: var(--surface);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.writing.is-article .prose .flow > li > b {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+.writing.is-article .prose .flow > li > span {
+  color: var(--text-muted);
+}
+/* The arrow to the next step, in the gap. */
+.writing.is-article .prose .flow > li + li::before {
+  content: '→';
+  position: absolute;
+  top: 0.85rem;
+  left: -1.55rem;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.writing.is-article .prose .flow-options {
+  display: grid;
+  gap: 1.35rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.writing.is-article .prose .flow-options li {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: calc(var(--radius-frame) - 0.3rem);
+  background: var(--surface-2);
+}
+.writing.is-article .prose .flow-options li + li {
+  margin-top: 0;
+}
+.writing.is-article .prose .flow-options b {
+  color: var(--text);
+  font-weight: 600;
+}
+.writing.is-article .prose .flow-options span {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+.writing.is-article .prose .flow-options li + li::before {
+  content: 'or';
+  position: absolute;
+  top: -1.2rem;
+  left: 0.7rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.1rem;
+}
+@media (max-width: 640px) {
+  .writing.is-article .prose .flow {
+    grid-auto-flow: row;
+    gap: 1.9rem;
+  }
+  .writing.is-article .prose .flow > li + li::before {
+    content: '↓';
+    top: -1.55rem;
+    left: 1rem;
+  }
+}
