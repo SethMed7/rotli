@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { createSubscribe, HONEYPOT_FIELD, normalizeEmail } from './subscribe';
+import { createUnsubscribedSweep } from './unsubscribed';
 
 type Call = { url: string; init: RequestInit };
 
@@ -91,10 +92,11 @@ describe('subscribing', () => {
     });
   });
 
-  test('a repeat signup only adds the existing contact to the segment, and answers the same', async () => {
+  test('a repeat signup adds the existing contact to the segment and subscribes it again, and answers the same', async () => {
     const resend = fakeResend(
       json({ name: 'validation_error', message: 'Contact already exists.' }, 422),
       json({ id: 'seg_123' }),
+      json({ object: 'contact', id: 'c1' }),
     );
     const res = await createSubscribe({ ...CONFIG, fetch: resend.fetch })(post({ email: 'ada@example.com' }));
 
@@ -102,12 +104,32 @@ describe('subscribing', () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(resend.calls[1].url).toBe('https://api.resend.com/contacts/ada%40example.com/segments/seg_123');
     expect(resend.calls[1].init.body).toBeUndefined();
+    // a person who unsubscribed and signs up again is subscribed again, so the daily
+    // unsubscribed sweep (unsubscribed.ts) leaves them on the list
+    expect(resend.calls[2].url).toBe('https://api.resend.com/contacts/ada%40example.com');
+    expect(resend.calls[2].init.method).toBe('PATCH');
+    expect(JSON.parse(String(resend.calls[2].init.body))).toEqual({ unsubscribed: false });
+  });
+
+  test('a repeat signup Resend will not subscribe again is a 502, so it never says yes and then vanishes', async () => {
+    const lines: string[] = [];
+    const resend = fakeResend(
+      json({ message: 'Contact already exists.' }, 422),
+      json({ id: 'seg_123' }),
+      json({ name: 'internal_server_error', message: 'nope' }, 500),
+    );
+    const res = await createSubscribe({ ...CONFIG, fetch: resend.fetch, log: (line) => lines.push(line) })(
+      post({ email: 'ada@example.com' }),
+    );
+    expect(res.status).toBe(502);
+    expect(lines.join('\n')).not.toContain('ada');
   });
 
   test('a contact already in the segment is still a success (idempotent)', async () => {
     const resend = fakeResend(
       json({ name: 'conflict', message: 'exists' }, 409),
       json({ name: 'validation_error', message: 'Contact is already in this segment.' }, 422),
+      json({ object: 'contact', id: 'c1' }),
     );
     const res = await createSubscribe({ ...CONFIG, fetch: resend.fetch })(post({ email: 'ada@example.com' }));
     expect(res.status).toBe(200);
@@ -238,17 +260,26 @@ describe('the signup alert', () => {
   });
 
   test('an existing contact added to the segment is a rejoin; one already in it sends nothing', async () => {
-    const rejoin = fakeResend(json({ message: 'Contact already exists.' }, 422), json({ id: 'seg_123' }), json({ id: 'e' }));
+    const rejoin = fakeResend(
+      json({ message: 'Contact already exists.' }, 422),
+      json({ id: 'seg_123' }),
+      json({ object: 'contact', id: 'c1' }),
+      json({ id: 'e' }),
+    );
     await createSubscribe({ ...ALERT, fetch: rejoin.fetch })(post({ email: 'ada@example.com' }));
     await settle();
-    expect(rejoin.calls).toHaveLength(3);
-    expect(JSON.parse(String(rejoin.calls[2].init.body)).subject).toBe('rotli.co: someone rejoined the list');
+    expect(rejoin.calls).toHaveLength(4);
+    expect(JSON.parse(String(rejoin.calls[3].init.body)).subject).toBe('rotli.co: someone rejoined the list');
 
-    const already = fakeResend(json({ message: 'exists' }, 409), json({ message: 'Contact is already in this segment.' }, 422));
+    const already = fakeResend(
+      json({ message: 'exists' }, 409),
+      json({ message: 'Contact is already in this segment.' }, 422),
+      json({ object: 'contact', id: 'c1' }),
+    );
     const res = await createSubscribe({ ...ALERT, fetch: already.fetch })(post({ email: 'ada@example.com' }));
     await settle();
     expect(res.status).toBe(200);
-    expect(already.calls).toHaveLength(2);
+    expect(already.calls).toHaveLength(3);
   });
 
   test('a failed alert never fails the signup and never logs the address', async () => {
@@ -303,5 +334,70 @@ describe('without JavaScript', () => {
     expect(html).toContain('does not look right');
     expect(html).toContain('href="/"');
     expect(html).not.toContain('style');
+  });
+});
+
+describe('leaving and joining again', () => {
+  /** A Resend that keeps state: contacts by address, each with its unsubscribed flag and segments. */
+  function statefulResend() {
+    const contacts = new Map<string, { id: string; unsubscribed: boolean; segments: Set<string> }>();
+    const fetch = async (url: string, init: RequestInit) => {
+      const { pathname, searchParams } = new URL(url);
+      const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
+      const method = init.method ?? 'GET';
+      if (method === 'POST' && parts.length === 1) {
+        const body = JSON.parse(String(init.body)) as { email: string; unsubscribed: boolean };
+        if (contacts.has(body.email)) return json({ name: 'validation_error', message: 'Contact already exists.' }, 422);
+        contacts.set(body.email, { id: `c_${contacts.size + 1}`, unsubscribed: body.unsubscribed, segments: new Set(['seg_123']) });
+        return json({ object: 'contact' });
+      }
+      const byKey = (key: string) => contacts.get(key) ?? [...contacts.values()].find((c) => c.id === key);
+      if (method === 'POST' && parts[2] === 'segments') {
+        const contact = byKey(parts[1]);
+        if (contact?.segments.has(parts[3])) return json({ message: 'Contact is already in this segment.' }, 422);
+        contact?.segments.add(parts[3]);
+        return json({ id: parts[3] });
+      }
+      if (method === 'PATCH') {
+        const contact = byKey(parts[1]);
+        if (!contact) return json({ message: 'not found' }, 404);
+        Object.assign(contact, JSON.parse(String(init.body)));
+        return json({ object: 'contact' });
+      }
+      if (method === 'GET') {
+        const segment = searchParams.get('segment_id') ?? '';
+        const data = [...contacts.values()].filter((c) => c.segments.has(segment)).map(({ id, unsubscribed }) => ({ id, unsubscribed }));
+        return json({ has_more: false, data });
+      }
+      if (method === 'DELETE') {
+        for (const [email, contact] of contacts) if (contact.id === parts[1]) contacts.delete(email);
+        return json({ deleted: true });
+      }
+      throw new Error(`unexpected Resend call: ${method} ${url}`);
+    };
+    return { contacts, fetch };
+  }
+
+  test('someone who unsubscribes and signs up again stays on the list through the daily sweep', async () => {
+    const resend = statefulResend();
+    const subscribe = createSubscribe({ ...CONFIG, fetch: resend.fetch });
+    const sweep = createUnsubscribedSweep({ ...CONFIG, fetch: resend.fetch, sleep: async () => {}, log: () => {} });
+    if (!sweep) throw new Error('the sweep should be on');
+
+    expect((await subscribe(post({ email: 'ada@example.com' }))).status).toBe(200);
+    resend.contacts.get('ada@example.com')!.unsubscribed = true; // a Broadcast's unsubscribe link
+    expect((await subscribe(post({ email: 'ada@example.com' }, { 'cf-connecting-ip': '203.0.113.9' }))).status).toBe(200);
+    await sweep();
+
+    expect(resend.contacts.get('ada@example.com')).toMatchObject({ unsubscribed: false });
+  });
+
+  test('someone who unsubscribes and does not come back is erased by the sweep', async () => {
+    const resend = statefulResend();
+    const sweep = createUnsubscribedSweep({ ...CONFIG, fetch: resend.fetch, sleep: async () => {}, log: () => {} });
+    expect((await createSubscribe({ ...CONFIG, fetch: resend.fetch })(post({ email: 'ada@example.com' }))).status).toBe(200);
+    resend.contacts.get('ada@example.com')!.unsubscribed = true;
+    await sweep!();
+    expect(resend.contacts.has('ada@example.com')).toBe(false);
   });
 });

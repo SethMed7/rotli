@@ -1287,9 +1287,12 @@ voting opens soon, and every page keeps serving.
   `POST https://api.resend.com/contacts` with
   `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
   per address in Resend, so when the contact already exists it calls
-  `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
-  answered exactly like a new one, and an earlier unsubscribe is never
-  overridden. Addresses are never logged (only Resend's status and error name).
+  `POST /contacts/{email}/segments/{segment_id}` and then
+  `PATCH /contacts/{email}` with `{ unsubscribed: false }` instead: a repeat
+  signup is answered exactly like a new one, and someone who left and signs up
+  again is subscribed again (otherwise the unsubscribed sweep below would erase
+  the address a day after the signup said yes). Addresses are never logged
+  (only Resend's status and error name).
   This is Resend's current Contacts API: Audiences are now Segments, and
   Broadcasts take a `segment_id` (checked against resend.com/docs, 2026-10-05).
 - Consent: one sign-up (single opt-in) with the footer's line ("Unsubscribe

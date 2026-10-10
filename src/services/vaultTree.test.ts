@@ -77,3 +77,40 @@ test("the reserved destination rows a folder list carries are not folders on dis
     { folder: "Inbox", children: [] },
   ]);
 });
+
+test("a plain folder vault's real top-level Inbox, Storage, or Board folder shows, empty or not", () => {
+  // the Mac app lists a plain vault's folders by their bare names
+  expect(
+    vaultTree(
+      [],
+      [
+        { id: "Inbox", name: "Inbox", parentId: null },
+        { id: "Work", name: "Work", parentId: null },
+      ],
+    ),
+  ).toEqual([
+    { folder: "Inbox", children: [] },
+    { folder: "Work", children: [] },
+  ]);
+  // Rotli Web leads with its six destination rows, then the real folders
+  const web = ["Inbox", "Secure notes", "Storage", "Board", "Archive", "Trash"].map((id) => ({
+    id,
+    name: id,
+    parentId: null,
+  }));
+  expect(vaultTree([], [...web, { id: "Board", name: "Board", parentId: null }])).toEqual([
+    { folder: "Board", children: [] },
+  ]);
+});
+
+test("in a memex, a shelf the Mac app lists as a bare Inbox is not a folder on disk", () => {
+  expect(
+    vaultTree(
+      [note("n1", "call w/ dana", "wiki/_inbox", "Inbox")],
+      [
+        { id: "wiki", name: "wiki", parentId: null },
+        { id: "Inbox", name: "Inbox", parentId: null },
+      ],
+    ),
+  ).toEqual([{ folder: "_inbox", children: [{ note: "n1" }] }]);
+});

@@ -1263,7 +1263,9 @@ async function gcPersistedMaps(): Promise<void> {
     // an unreadable chats/ anywhere — keep everything
   }
   try {
-    const [folders, notes] = await Promise.all([notesService.listFolders(), notesService.listNotes()]);
+    const folders = await notesService.listFolders();
+    // a failed note read still prunes against the folders (foldState.ts)
+    const notes = await notesService.listAll().catch(() => null);
     const ui = useUiStore.getState();
     const kept = pruneMap(
       ui.expandedDests,

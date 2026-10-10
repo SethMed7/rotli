@@ -36,3 +36,17 @@ test("a Main folder, a reserved row, and a zone keep their state; a gone folder'
   expect(keep("wiki/Clients")).toBe(true);
   expect(keep("main:Gone")).toBe(false);
 });
+
+test("an inbox capture's Vault view folder stays open: captures count though All notes leaves them out", () => {
+  const capture = { ...note("c1", "wiki/_inbox"), folderId: "Board" };
+  expect(foldStateKeeper([{ id: "wiki", name: "wiki", parentId: null }], [], [capture])("main:_inbox")).toBe(
+    true,
+  );
+});
+
+test("when the notes can't be read, folder state is still pruned against the folders, and Vault view keys are kept", () => {
+  const keep = foldStateKeeper(folders, [], null);
+  expect(keep("main:_inbox")).toBe(true);
+  expect(keep("wiki/Clients")).toBe(true);
+  expect(keep("wiki/Gone")).toBe(false);
+});

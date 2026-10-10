@@ -115,12 +115,14 @@ async function shoot() {
   }).catch(() => null);
   if (!probe?.ok) throw new Error("The on-device model at localhost:11435 is not answering");
 
-  /** mtime of every file directly in the owner's Rotli folders; compared after the take. */
+  /** Size and mtime of everything in the owner's Rotli folders, all the way down; compared after the take. */
   async function snapshot() {
     const seen = {};
     for (const dir of REAL)
-      for (const name of await readdir(dir).catch(() => []))
-        seen[join(dir, name)] = (await stat(join(dir, name)).catch(() => null))?.mtimeMs ?? null;
+      for (const name of await readdir(dir, { recursive: true }).catch(() => [])) {
+        const info = await stat(join(dir, name)).catch(() => null);
+        seen[join(dir, name)] = info ? `${info.size}:${info.mtimeMs}` : null;
+      }
     return seen;
   }
 

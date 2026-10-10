@@ -9,8 +9,10 @@
 //
 // Off unless both RESEND_API_KEY and RESEND_SEGMENT_ID are set: then POST answers 503 and
 // the probe says { live: false }. Contacts are global in Resend (one per address), so a
-// repeat signup is answered exactly like a new one and only re-checks segment membership.
-// A previous unsubscribe is never overridden. Addresses are never logged.
+// repeat signup is answered exactly like a new one: it re-checks segment membership and clears a
+// previous unsubscribe, since the person asked again (without that, the daily unsubscribed sweep,
+// unsubscribed.ts, would erase the address a day after the signup said yes). Addresses are never
+// logged.
 //
 // Optional alert (the owner, 2026-10-07): with SUBSCRIBE_ALERT_TO and SUBSCRIBE_ALERT_FROM
 // set, each address that newly joins the list (a new contact, or an existing one added to the
@@ -79,16 +81,16 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
   const perClient = limiter(PER_CLIENT, now);
   const overall = limiter(OVERALL, now);
 
-  async function resend(path: string, body?: unknown): Promise<Response> {
+  async function resend(path: string, body?: unknown, method: 'POST' | 'PATCH' = 'POST'): Promise<Response> {
     return send(`${RESEND_API}${path}`, {
-      method: 'POST',
+      method,
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
     });
   }
 
-  /** Create the contact in the segment; an existing contact is only (re)added to it. */
+  /** Create the contact in the segment; an existing contact is (re)added to it and subscribed again. */
   async function addContact(email: string): Promise<Joined | null> {
     const created = await resend('/contacts', { email, unsubscribed: false, segments: [{ id: segmentId }] });
     if (created.ok) return 'new';
@@ -98,10 +100,20 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
       return null;
     }
     const added = await resend(`/contacts/${encodeURIComponent(email)}/segments/${encodeURIComponent(segmentId ?? '')}`);
-    if (added.ok) return 'rejoined';
-    const second = await resendError(added);
-    if (added.status === 409 || ALREADY.test(second.message)) return 'already';
-    log(`subscribe: resend refused the segment (${added.status} ${second.name || 'error'})`);
+    let joined: Joined;
+    if (added.ok) joined = 'rejoined';
+    else {
+      const second = await resendError(added);
+      if (added.status !== 409 && !ALREADY.test(second.message)) {
+        log(`subscribe: resend refused the segment (${added.status} ${second.name || 'error'})`);
+        return null;
+      }
+      joined = 'already';
+    }
+    const resubscribed = await resend(`/contacts/${encodeURIComponent(email)}`, { unsubscribed: false }, 'PATCH');
+    if (resubscribed.ok) return joined;
+    const third = await resendError(resubscribed);
+    log(`subscribe: resend refused to subscribe the contact again (${resubscribed.status} ${third.name || 'error'})`);
     return null;
   }
 
