@@ -19,18 +19,21 @@ const media = (slug: string) => ({
   poster: `/media/story/${slug}-poster.webp`,
 });
 
+// The `v` query is the cut's date: a new cut gets a new address, so no cache (a browser's, or
+// Cloudflare's edge, which held the 404 the old site gave this path when the film first went
+// live, 2026-10-10) can serve an old answer for it.
 export const hero: Film = {
-  src: '/media/hero/rotli-hero.mp4',
-  poster: '/media/hero/rotli-hero-poster.webp',
+  src: "/media/hero/rotli-hero.mp4?v=2026-10-09",
+  poster: "/media/hero/rotli-hero-poster.webp?v=2026-10-09",
   silent: true,
   captioned: true,
   label:
-    'A screen recording of rotli, under a minute, without sound: a quick messy note with two tasks, a dropped picture of tiles, and a link to the Lisbon trip note; the Library, where the Librarian files notes into areas such as Travel; a search for "tile" that finds the note again; a chat asking what is still open for Lisbon, answered from those notes; and the same note as plain Markdown.',
+    "A screen recording of rotli, under a minute, without sound: a quick note about a call with Dana, written in Main; the Vault view showing the same file once, in the vault's inbox folder; on the Mac, the Librarian filing it into Clients while the words stay as typed; the note in its new place and still where it was in Main; and a chat asking what Dana wanted and what is left, answered from that note and the discount policy.",
 };
 
 /** The studio's 60-second story film, which the hero played until the product film. */
 export const story: Film = {
-  ...media('rotli-story'),
+  ...media("rotli-story"),
   label:
-    'The rotli story, a 60-second animated film: a quokka arrives on Rottnest Island, writes a trip plan, keeps it in one folder, lets the Librarian file it, keeps secure notes on the Mac, asks chat about it, and waves at sunset.',
+    "The rotli story, a 60-second animated film: a quokka arrives on Rottnest Island, writes a trip plan, keeps it in one folder, lets the Librarian file it, keeps secure notes on the Mac, asks chat about it, and waves at sunset.",
 };

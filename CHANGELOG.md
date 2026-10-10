@@ -353,6 +353,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **rotli.co's film plays everywhere, and screen readers describe the film
+  you see.** Its description still told of the earlier film; an error page
+  could also be kept by the site's cache for a day, which hid the new film
+  in some places. Errors are never cached now.
 - **Rotli Web's Vault view shows only folders that are on disk.** Choosing
   "Vault — folders as on disk" listed Inbox, Secure notes, Storage, and Board
   even where no such folder existed. They are gone; a real folder with one of

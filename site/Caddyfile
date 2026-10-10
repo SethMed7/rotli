@@ -183,6 +183,10 @@
 	# /about to /about/ on its own. Unknown paths fall through to the 404 page.
 	handle_errors {
 		import security
+		# An error is never cached: the route's own Cache-Control (a day for /media/*) would
+		# otherwise ride on the 404 page, and Cloudflare's edge kept one for a day when the hero
+		# film's path went live before the new site did (2026-10-10).
+		header Cache-Control "no-store"
 		# The sidecar is down (or still starting): the list and the roadmap's
 		# voting read as closed. The pages' probes see a non-200 (the footer's
 		# submit says the list isn't open yet, the roadmap says voting opens soon); a plain form post gets
