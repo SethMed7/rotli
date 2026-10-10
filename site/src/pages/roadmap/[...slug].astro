@@ -6,11 +6,14 @@
 // "Recently shipped", read from CHANGELOG.md's newest releases (src/releases.ts), and the
 // request form.
 //
-// The page, top to bottom: the head (components/roadmap/RoadmapHead.astro: words left, picture
-// right, as on a blog post), then two columns from 1100px: "On this page" pinned on the left
-// (RoadmapNav.astro), the groups on the right. In the work shows each item under its small
+// The page, top to bottom: the banner straight across the window (RoadmapScene.astro, as a blog
+// post's), the head under it on the reading column (components/roadmap/RoadmapHead.astro), then, from 901px, the long-form pages' tracks (`.longform`,
+// components/blog/article.css, the same as a post's): "On this page" pinned in the rail
+// (RoadmapNav.astro), the groups from the column's left edge, their notes at the reading measure
+// and the grids and lists running on to the page's right edge. In the work shows each item under its small
 // drawing (RoadmapMock.astro); Planned and Ideas are a calm list on hairlines. Every item says
-// its status and size and has a vote.
+// its status and size, and a vote while voting is open (src/roadmap.ts VOTING_OPEN; off for now,
+// the page says voting is in the works, and a notice says the roadmap is being reworked).
 //
 // People take part through the site's sidecar (site/server/roadmap.ts): a vote per item (one per
 // browser, remembered in localStorage) and a request. Until the sidecar's database is
@@ -18,17 +21,19 @@
 // requests open soon, with every control disabled. Live, a vote shows at once (optimistic) and is
 // taken back, with the reason beside the item, if the sidecar refuses it; Ideas can be ordered by
 // votes.
+import '../../components/blog/article.css';
 import Base from '../../layouts/Base.astro';
 import RecentlyShipped from '../../components/roadmap/RecentlyShipped.astro';
 import RequestForm from '../../components/roadmap/RequestForm.astro';
 import RoadmapHead from '../../components/roadmap/RoadmapHead.astro';
 import RoadmapMock from '../../components/roadmap/RoadmapMock.astro';
 import RoadmapNav from '../../components/roadmap/RoadmapNav.astro';
+import RoadmapScene from '../../components/roadmap/RoadmapScene.astro';
 import VoteButton from '../../components/roadmap/VoteButton.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import { recentReleases } from '../../releases';
-import { codeParts, publicRoadmap, SIZES } from '../../roadmap';
+import { codeParts, publicRoadmap, SIZES, VOTING_OPEN } from '../../roadmap';
 import { readChangelogFile, readRoadmapFile } from '../../roadmap-file';
 import { site } from '../../site';
 
@@ -41,7 +46,7 @@ const shipped = recentReleases(readChangelogFile());
 const ledes: Record<string, string> = {
   [work.slug]: 'Being built now, in development builds. Not released, so not done.',
   [planned.slug]: 'Decided, not started.',
-  [ideas.slug]: 'Not decided yet. Votes here help decide what comes next.',
+  [ideas.slug]: VOTING_OPEN ? 'Not decided yet. Votes here help decide what comes next.' : 'Not decided yet.',
 };
 /** What an item in each group is, said on the item itself. */
 const statusOf: Record<string, string> = { [work.slug]: 'In the work', [planned.slug]: 'Planned', [ideas.slug]: 'Idea' };
@@ -62,17 +67,23 @@ const links = [
 
 <Base
   title="Roadmap — rotli"
-  description="What is being built for rotli, what is planned, what is still an idea, and what shipped lately. Vote for what you want, or ask for something new."
+  description={`What is being built for rotli, what is planned, what is still an idea, and what shipped lately. ${VOTING_OPEN ? 'Vote for what you want, or ask for something new.' : 'Ask for something new.'}`}
   canonicalPath="/roadmap/"
   noindex={!site.indexable}
   markdownPath="/roadmap/index.md"
 >
   <SiteHeader current="roadmap" />
-  <main id="content" class="wrap roadmap-page" data-roadmap data-state="off">
+  <RoadmapScene banner />
+  <main id="content" class="wrap roadmap-page longform" data-roadmap data-state="off">
     <RoadmapHead
       heading="What’s next for rotli"
-      lede="What’s being built, what’s decided, and what’s still an idea, straight from the roadmap kept with rotli’s source. Vote for the things you’d use, or ask for something new. No account, and no email needed."
+      lede={`What’s being built, what’s decided, and what’s still an idea, straight from the roadmap kept with rotli’s source. ${VOTING_OPEN ? 'Vote for the things you’d use, or ask for something new.' : 'Ask for something new.'} No account, and no email needed.`}
       meta={['Direction, not a promise', 'No dates']}
+      notice={[
+        'Under construction.',
+        'This roadmap is being reworked and will be updated in the coming week to match where rotli is today.',
+      ]}
+      participation={VOTING_OPEN ? 'Voting and requests open soon.' : 'Voting is in the works, and requests open soon.'}
     />
 
     <div class="road-layout">
@@ -113,9 +124,9 @@ const links = [
                         </>
                       )}
                     </p>
-                    <VoteButton id={item.id} title={plain(item.title)} />
+                    {VOTING_OPEN && <VoteButton id={item.id} title={plain(item.title)} />}
                   </div>
-                  <p class="vote-error" data-vote-error={item.id} />
+                  {VOTING_OPEN && <p class="vote-error" data-vote-error={item.id} />}
                 </li>
               ))
             }
@@ -130,7 +141,7 @@ const links = [
                   <h2 id={`${section.slug}-title`}>{section.title}</h2>
                   <p class="section-note">{ledes[section.slug]}</p>
                 </div>
-                {section === ideas && (
+                {VOTING_OPEN && section === ideas && (
                   <div class="sort" role="group" aria-label="Order the ideas" data-sort hidden>
                     <span class="sort-label" aria-hidden="true">
                       Order
@@ -161,9 +172,9 @@ const links = [
                           </>
                         )}
                       </p>
-                      <p class="vote-error" data-vote-error={item.id} />
+                      {VOTING_OPEN && <p class="vote-error" data-vote-error={item.id} />}
                     </div>
-                    <VoteButton id={item.id} title={plain(item.title)} />
+                    {VOTING_OPEN && <VoteButton id={item.id} title={plain(item.title)} />}
                   </li>
                 ))}
               </ul>
@@ -260,7 +271,16 @@ const links = [
         paint(button);
       }
     }
-    if (note) note.textContent = live ? 'Voting is open: one vote per item, remembered by this browser.' : 'Voting and requests open soon.';
+    // With voting off (src/roadmap.ts VOTING_OPEN) there are no buttons, and the line says so.
+    const voting = buttons.length > 0;
+    if (note)
+      note.textContent = voting
+        ? live
+          ? 'Voting is open: one vote per item, remembered by this browser.'
+          : 'Voting and requests open soon.'
+        : live
+          ? 'Requests are open. Voting is in the works.'
+          : 'Voting is in the works, and requests open soon.';
     if (sort) sort.hidden = !live;
     document.dispatchEvent(new CustomEvent('roadmap:live', { detail: { live } }));
   }
@@ -336,10 +356,18 @@ const links = [
     gap: 2rem;
     margin-top: clamp(2rem, 4vw, 3rem);
   }
-  @media (min-width: 1100px) {
+  /* Beside the rail from 901px, on a post's tracks: the rail and its gap, then everything from
+     the column's left edge (the notes keep its measure; the grids and lists are wide). */
+  @media (min-width: 901px) {
     .road-layout {
-      grid-template-columns: 11.5rem minmax(0, 1fr);
-      column-gap: clamp(2.5rem, 4vw, 4rem);
+      grid-template-columns: var(--article-tracks);
+      column-gap: 0;
+    }
+    .road-layout > :global(.road-nav) {
+      grid-column: rail;
+    }
+    .road-body {
+      grid-column: main;
     }
   }
   .road-body {
@@ -375,7 +403,7 @@ const links = [
     letter-spacing: -0.02em;
   }
   .section-note {
-    max-width: 40rem;
+    max-width: var(--measure);
     margin: 0.35rem 0 1.5rem;
     color: var(--text-muted);
     line-height: 1.55;
@@ -482,7 +510,7 @@ const links = [
     min-width: 0;
   }
   .calm-text .summary {
-    max-width: 46rem;
+    max-width: var(--measure);
   }
 
   /* Ideas' order: two joined buttons, the current one filled. Shown only while votes are live. */

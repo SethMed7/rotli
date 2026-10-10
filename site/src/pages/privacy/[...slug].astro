@@ -6,15 +6,19 @@
 // When PRIVACY.md changes (a new data class, destination, retention behavior,
 // or control), update this page in the same change.
 // It reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
-// styles"): WritingPage's `article` layout, the title and the lede beside the night scene, the
-// left rail with the tree and the meter, and "More from rotli" at the end, with the posts about
-// privacy and the Download spot. Share is Copy link alone: a policy is pointed to, not posted.
+// styles", and 2026-10-09, beside "The AI you already pay for": "try to match it"):
+// WritingPage's `article` layout with a post's head, a byline, the updated date and the reading
+// time, topic chips, and a banner drawn like a post's (src/og.ts PAGE_ART: the quokka with its
+// padlock shield beside a locked note, the on-device chip up the beach), the left rail with the
+// tree and the meter, and "More from rotli" at the end, with the posts about privacy and the
+// Download spot. Share is a post's (the owner, 2026-10-09: "Full Share like posts"), Copy Markdown
+// included: the twin, /privacy/index.md, is made from this page after the build
+// (src/markdownTwin.ts).
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 import { MORE_POSTS } from '../../blog';
-import SecureScene from '../../components/SecureScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
-import { ogImage } from '../../og';
+import { ogImage, pageBanner } from '../../og';
 import { availablePromos, RAIL_PROMOS } from '../../promos';
 import { GITHUB_URL, site } from '../../site';
 import { morePostCard, publishedWriting } from '../../writing';
@@ -23,7 +27,10 @@ export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const UPDATED = 'October 6, 2026';
+const UPDATED = 'October 7, 2026';
+/** The reading time, as a post counts it (src/writing.ts readingMinutes: words / 230); the page is
+ * written here rather than in Markdown, so e2e/site/privacy.spec.ts recounts it from the page. */
+const READ_MINUTES = 10;
 
 // The end of the page: the posts about privacy, newest first, and the spots for the two things this
 // page describes, the Mac app and Rotli Web (each only in builds that offer it).
@@ -42,6 +49,7 @@ const toc = [
   { slug: 'ai', text: 'AI and your notes' },
   { slug: 'connect', text: 'How rotli connects to AI' },
   { slug: 'web', text: 'Rotli Web and Rotli Helper' },
+  { slug: 'keys', text: 'Keys and logins' },
   { slug: 'website', text: 'This website' },
   { slug: 'retention', text: 'Keeping and deleting' },
   { slug: 'changes', text: 'Changes to this page' },
@@ -96,25 +104,29 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
   section="privacy"
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
-  meta={[`Updated ${UPDATED}`]}
-  article={{ url: `${site.url}/privacy/`, share: 'link', noun: 'page', more: related, promos }}
+  meta={[`Updated ${UPDATED}`, `${READ_MINUTES} min read`]}
+  article={{
+    cover: pageBanner('privacy'),
+    author: 'Seth Medina',
+    tags: ['Privacy', 'AI', 'Security'],
+    url: `${site.url}/privacy/`,
+    markdown: '/privacy/index.md',
+    share: 'all',
+    shareTitle: 'rotli’s privacy promise: what it does with your notes, and why',
+    noun: 'page',
+    more: related,
+    promos,
+  }}
   toc={toc}
+  markdownPath="/privacy/index.md"
   progress
 >
-  <div slot="cover" class="night band-night">
-    <p class="night-caption">
-      <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
-      the clouds outside, never see them, and no model can edit a note you lock.
-    </p>
-    <div class="dome-frame"><SecureScene /></div>
-  </div>
-
   <h2 id="promise">Our privacy promise</h2>
   <p class="promise-lede">
     You choose which AI tools rotli uses, and, note by note, what each one may read and what it may change.
     rotli enforces your choice in the app, before anything reaches a model.
   </p>
-  <div class="promise-matrix">
+  <div class="promise-matrix wide">
     <table role="table">
       <caption>Who may read and change a note you wrote</caption>
       <thead role="rowgroup">
@@ -181,8 +193,8 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
     Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
     app's settings on your Mac, and it can rebuild them at any time. Main and named views are arrangements
-    of the same files, not copies. Passwords and keys you give rotli go into the macOS Keychain, never into
-    your notes or settings files.
+    of the same files, not copies. No key or login ever sits in these files: see <a href="#keys">Keys and
+    logins</a>.
   </p>
   <p>
     <strong>Why:</strong> a notes app should never be the only way to reach your notes. Because everything is
@@ -282,6 +294,52 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     other way around: the page is just the editor, and your folder stays on your computer.
   </p>
 
+  <h2 id="keys">Keys and logins</h2>
+  <p>
+    rotli has no account, so there's no rotli password to make, forget, or leak. It never asks for the login
+    to your AI tools either: Claude Code, Codex, and Cursor keep their own sign-in, in their own files, and
+    rotli never reads them.
+  </p>
+  <p>
+    A service rotli connects to may need a key of its own. The key is yours: you create it with that
+    service, paste it into Settings → Connections, and can remove it there at any time. Every key follows the
+    same rules:
+  </p>
+  <ul>
+    <li>
+      <strong>It lives in the macOS Keychain,</strong> never in a note, your vault, or a settings file, so it
+      never travels with your notes when you back them up, sync them, or share them.
+    </li>
+    <li><strong>It goes only to its own service,</strong> straight from your Mac.</li>
+    <li><strong>No AI model ever sees it,</strong> on your Mac or connected.</li>
+    <li>
+      <strong>Once saved, it isn't shown again,</strong> not even to you. Settings says the key is saved, and
+      you can replace it or remove it.
+    </li>
+  </ul>
+  <p>
+    Today that's one optional key. Web searches use DuckDuckGo, free and with no account, unless you
+    choose <strong>Brave Search</strong> and paste your own Brave key. Connections still in development, such as
+    remote agents and emailed briefs, keep their keys the same way, and this page will name each one before
+    it ships.
+  </p>
+  <p>
+    <strong>Rotli Helper</strong> has no password either. Its installer hands Rotli Web a pairing code in
+    the part of the address browsers never send to a server. The code stays on your computer, in the
+    Helper's own folder and in your browser, and the Helper answers only Rotli Web's own address.
+  </p>
+  <p>
+    <strong>Secrets in your notes.</strong> A note is a plain file, so a password manager is the better home
+    for passwords. If a note holds something shaped like a key (an API key, a private key, a card or Social
+    Security number), rotli marks it secure on its own, so remote models never see it. An ordinary password
+    looks like any other word, so rotli can't spot it: mark that note secure yourself.
+  </p>
+  <p>
+    <strong>Why:</strong> a key opens an account that can charge you or hold your data. Keeping every key in
+    the Keychain protects it the way your Mac protects your other passwords, and keeps it out of the files
+    you copy, sync, and hand to AI.
+  </p>
+
   <h2 id="website">This website</h2>
   <p>
     rotli.co sets no cookies and runs no analytics, ads, or third-party scripts. Fonts, images, and the film
@@ -295,10 +353,13 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
   <p>
     <strong>The email list.</strong> The footer's “Hear when it’s ready” list is optional. Only when you
     submit it, the address you type is sent to Resend, our email provider, and kept there as a contact on
-    rotli's list, so we can email you when there's news about rotli. Every email has an unsubscribe link,
-    handled by Resend; one click takes you off. When you join, the person building rotli also gets an email
-    with your address, sent the same way, so they know someone signed up. Your address isn't used for
-    anything else, and nothing else is collected or shared. Until the list opens, the form says so and the address is not kept or passed on.
+    rotli's list, so we can email you when there's news about rotli. When you join, the person building rotli
+    also gets one email with your address, sent the same way, so they know someone signed up. Every email
+    has an unsubscribe link, and your mail app's own Unsubscribe button works too: one click takes you off
+    the list, and within a day your address is erased from Resend as well. The one email sent when you
+    joined stays in that inbox; to have it deleted too, <a href="/roadmap/#request">send a request</a> that
+    gives the address and asks us to. Your address isn't used for anything else, and nothing else is collected
+    or shared. Until the list opens, the form says so and the address is not kept or passed on.
   </p>
   <p>
     <strong>Roadmap votes.</strong> A vote on the <a href="/roadmap/">roadmap</a> adds one to that item's
@@ -321,9 +382,14 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
 
   <h2 id="retention">Keeping and deleting</h2>
   <p>
-    There is no rotli server holding your notes, so there is nothing for us to keep or delete. You decide how
-    long your files exist and where they are backed up. Services you deliberately send something to, like
-    an AI provider or a website you search, keep it under their own policies.
+    There is no rotli server holding your notes, so there is nothing of them for us to keep or delete. You
+    decide how long your files exist and where they are backed up. Services you deliberately send something
+    to, like an AI provider or a website you search, keep it under their own policies.
+  </p>
+  <p>
+    This website keeps a little, only what you choose to send it: an address you add to the email list, a
+    request you send, and the count of votes on the roadmap. <a href="#website">This website</a> says what
+    each one keeps and how to have it deleted.
   </p>
 
   <h2 id="changes">Changes to this page</h2>
@@ -351,8 +417,9 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     font-size: var(--step-lede);
     line-height: 1.5;
   }
-  /* The matrix: its own full-width block below any floated companion, a strong rule over the
-     header and hairlines between rows. A refusal reads in weight and in words; the accent ink on
+  /* The matrix: a wide block (`.wide`, blog/article.css: from the words' edge to the page's right
+     edge where there is room), below any floated companion, a strong rule over the header and
+     hairlines between rows. A refusal reads in weight and in words; the accent ink on
      it measures 5.7:1 on the page ground. */
   .promise-matrix {
     clear: both;
@@ -456,66 +523,13 @@ const matrix: { kind: string; how: string; cells: [Cell, Cell, Cell] }[] = [
     font-size: 0.95rem;
   }
 
-  /* The story film's night, as the head's picture (WritingPage `article`, the `cover` slot): a
-     rounded frame like a post's picture, the caption in the open sky at the top and the dome of
-     "on this Mac" standing on the frame's floor below it. The frame clips (ArticleCover's
-     overflow), so the remote-AI clouds that drift in never leave it, and the caption keeps its own
-     ground, so the stars never sit under the words. The night and its caption are there at once,
-     still like a post's picture; only the scene inside plays, once (SecureScene's own reveal). The sky and its Ocean stars come from
-     .band-night (Base.astro), like the landing's PrivacyBrief; only the colour is set here.
-     Measured: the caption's --deep-muted on the night --deep is 8.6:1, its inked phrase
-     --deep-text 15.7:1. */
-  .night {
-    box-sizing: border-box;
-    display: grid;
-    gap: 0.5rem;
-    height: 100%;
-    padding: clamp(1.25rem, 2.5vw, 1.75rem) clamp(1.25rem, 2.5vw, 1.75rem) 0;
-    background-color: var(--deep);
-    color: var(--deep-text);
-  }
-  .night-caption {
-    justify-self: start;
-    max-width: 32rem;
-    margin: 0;
-    background-color: var(--deep);
-    box-shadow: 0 0 0 0.4rem var(--deep);
-    color: var(--deep-muted);
-    font-size: 1rem;
-    line-height: 1.5;
-    text-wrap: pretty;
-  }
-  .night-caption .inked {
-    color: var(--deep-text);
-    font-weight: 600;
-  }
-  /* The dome on the frame's floor, centred, never taller than about half the first window, so the
-     frame stays a picture beside the words and not a wall. */
-  .dome-frame {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    min-height: 0;
-  }
-  .dome-frame :global(.scene) {
-    width: 100%;
-    max-width: min(100%, calc(min(20rem, 42svh) * 720 / 560));
-  }
-  /* The promise's matrix breaks out of the words like a post's table (blog/article.css), only
-     where the middle has room for it; on a narrow middle it keeps the measure. */
-  @container article-prose (min-width: 48.5rem) {
-    :global(.writing.is-article .prose) > .promise-matrix {
-      max-width: min(100%, var(--measure) + 10rem);
-    }
-  }
-  /* The companion beside a section, the way the app shows it. */
-  /* The column's right edge, not the middle track's: every block of the article is centred at the
-     measure (blog/article.css), and a float's auto margins are zero, so it is placed by hand. */
+  /* The companion beside a section, the way the app shows it, on the column's right edge rather
+     than the main track's (the room past the words is for wide blocks), so it is placed by hand. */
   :global(.writing.is-article .prose) > .spot {
     float: right;
     width: 132px;
     height: 132px;
-    margin: 0 max(0px, (100% - var(--measure)) / 2) 1rem 1.5rem;
+    margin: 0 max(0px, 100% - var(--measure)) 1rem 1.5rem;
     shape-outside: circle(48%);
   }
   @media (max-width: 560px) {

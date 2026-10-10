@@ -351,29 +351,70 @@ test("the landing says rotli is more than notes and asks no extra AI fee", async
   await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
 });
 
-test("the page, its header, and its buttons cross into the night on one clock", async ({ page }) => {
+// Scroll to `offset` px past the point where the band's top reaches the header (or, when it is
+// taller than the window, where its end reaches the window's end).
+const scrollPastBand = (page: Page, offset: number) =>
+  page.evaluate((o) => {
+    const band = document.getElementById("privacy")!;
+    const next = document.getElementById("faq")!;
+    const header = document.querySelector<HTMLElement>(".site-header-bar")!.offsetHeight;
+    const top = next.getBoundingClientRect().top + window.scrollY - band.offsetHeight;
+    const lock = Math.max(-header, band.offsetHeight - window.innerHeight);
+    window.scrollTo({ top: top + lock + o, behavior: "instant" });
+  }, offset);
+
+test("only the header crosses into the night; the band paints its own and nothing else changes", async ({
+  page,
+}) => {
   await page.goto("/");
-  await scrollToPrivacy(page, 0.1);
+  await scrollPastBand(page, 40);
   await expect.poll(() => passage(page)).toBe("ocean-dark");
-  // Freeze the crossfade a third of the way in: the header is the page's own ground, and the
-  // night band's feathered edge is there to meet it.
-  const colours = await page.evaluate(() => {
-    const root = document.documentElement;
-    for (const animation of document.getAnimations()) {
-      if (animation.effect instanceof KeyframeEffect && animation.effect.target === root) {
-        animation.pause();
-        animation.currentTime = 300;
-      }
-    }
-    const header = getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor;
-    const body = getComputedStyle(document.body).backgroundColor;
-    const feather = getComputedStyle(document.getElementById("privacy")!, "::before").backgroundImage;
-    return { header, body, feather };
-  });
-  expect(colours.header).toBe(colours.body);
-  expect(colours.header).not.toBe("rgb(248, 242, 233)");
-  expect(colours.header).not.toBe("rgb(14, 23, 29)");
-  expect(colours.feather).toContain("linear-gradient");
+  const colour = (selector: string) =>
+    page.locator(selector).evaluate((el) => getComputedStyle(el).backgroundColor);
+  await expect.poll(() => colour(".site-header-bar")).toBe("rgb(14, 23, 29)");
+  // The header's words follow its ground, not the page's.
+  await expect(page.locator(".site-header-bar")).toHaveCSS("color", "rgb(231, 240, 244)");
+  expect(await colour("#privacy")).toBe("rgb(14, 23, 29)");
+  // The page and the questions keep the day: no crossfade of the whole page.
+  expect(await colour("body")).toBe("rgb(248, 242, 233)");
+  await expect(page.locator("#faq h2")).toHaveCSS("color", "rgb(58, 48, 40)");
+});
+
+test("the night grows out of the page: a card coming up, full width under the header, a card again leaving", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const band = page.locator("#privacy");
+  const grow = () => band.evaluate((el) => Number(el.style.getPropertyValue("--grow")));
+  const clip = () => band.evaluate((el) => getComputedStyle(el).clipPath);
+  // Put the band's top (or its end) at `share` of the window's height from the window's top.
+  const place = (edge: "top" | "end", share: number) =>
+    band.evaluate(
+      (el, [e, k]) => {
+        const top = el.getBoundingClientRect().top + window.scrollY;
+        const at = e === "top" ? top : top + (el as HTMLElement).offsetHeight;
+        window.scrollTo({ top: at - innerHeight * (k as number), behavior: "instant" });
+      },
+      [edge, share] as const,
+    );
+  // Coming up the window: a rounded card set inside the page, the header still day.
+  await place("top", 0.8);
+  await expect.poll(grow).toBeLessThan(0.5);
+  expect(await clip()).toMatch(/inset\(.*round/);
+  expect(await passage(page)).toBe("");
+  // Under the header: full width, square corners, the header in its night.
+  await place("top", 0.05);
+  await expect.poll(grow).toBe(1);
+  await expect.poll(() => passage(page)).toBe("ocean-dark");
+  // Leaving: it narrows back into a card, and the header is day again.
+  await place("end", 0.15);
+  await expect.poll(grow).toBeLessThan(0.5);
+  await expect.poll(() => passage(page)).toBe("");
+  // The questions after it never change colour.
+  expect(
+    await page.locator("#faq").evaluate((el) => getComputedStyle(el.closest("body")!).backgroundColor),
+  ).toBe("rgb(248, 242, 233)");
 });
 
 test("under reduced motion the page switches to the night at once", async ({ browser }) => {
@@ -391,6 +432,8 @@ test("under reduced motion the page switches to the night at once", async ({ bro
     header: getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor,
   }));
   expect(state).toEqual({ running: 0, header: "rgb(14, 23, 29)" });
+  // The band's words are there at once too, with no wait for the ink switch.
+  expect(await page.locator("#privacy > .wrap").evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   await context.close();
 });
 

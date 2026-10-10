@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 
-// /roadmap/: the head (words beside the picture, the source link), ROADMAP.md's three public
+// /roadmap/: the banner straight across the top and the head under it on the reading column (the
+// owner, 2026-10-09: "one thing straight across top like an image/banner then the rest under", as
+// a post's), the head's words and the source link, ROADMAP.md's three public
 // sections item for item with each item's status and size, "Recently shipped" read from
 // CHANGELOG.md's newest releases, votes (off while the sidecar is: astro preview has none;
 // live with the API stubbed: optimistic, kept once per browser, taken back on a refusal,
@@ -28,6 +30,8 @@ function sectionsInFile(): Record<string, string[]> {
   return sections;
 }
 const idsInFile = () => Object.values(sectionsInFile()).flat();
+/** Whether the site offers votes (site/src/roadmap.ts VOTING_OPEN; off since 2026-10-09). */
+const votingOpen = /export const VOTING_OPEN = true;/.test(read("site/src/roadmap.ts"));
 
 /** The newest four dated releases in CHANGELOG.md and their first three bold leads (Added, Changed, Fixed). */
 function releasesInFile() {
@@ -78,7 +82,9 @@ test.describe("the page", () => {
     }
   });
 
-  test("each item says its status and size beside its title, summary, and vote", async ({ page }) => {
+  test("each item says its status and size beside its title, summary, and (while voting is open) vote", async ({
+    page,
+  }) => {
     await page.goto("/roadmap/");
     const status = { "In the work": "In the work", Planned: "Planned", Ideas: "Idea" } as const;
     for (const [section, ids] of Object.entries(sectionsInFile())) {
@@ -87,7 +93,7 @@ test.describe("the page", () => {
         await expect(item.locator("h3")).not.toBeEmpty();
         await expect(item.locator(".summary")).not.toBeEmpty();
         await expect(item.locator(".item-meta")).toContainText(status[section as keyof typeof status]);
-        await expect(item.locator(`button[data-vote="${id}"]`)).toHaveCount(1);
+        await expect(item.locator(`button[data-vote="${id}"]`)).toHaveCount(votingOpen ? 1 : 0);
       }
     }
     // Sizes come from the file, e.g. Sheets (Beta) is L.
@@ -104,33 +110,60 @@ test.describe("the head", () => {
     const head = page.locator("[data-roadmap-head]");
     await expect(head.getByRole("heading", { level: 1 })).toHaveText("What’s next for rotli");
     await expect(head.locator(".lede")).toContainText(
-      "Vote for the things you’d use, or ask for something new",
+      votingOpen ? "Vote for the things you’d use, or ask for something new" : "Ask for something new.",
     );
     await expect(head.getByRole("link", { name: "Ask for something" })).toHaveAttribute("href", "#request");
     await expect(head.getByRole("link", { name: "Roadmap source" })).toHaveAttribute(
       "href",
       "https://github.com/SethMed7/rotli/blob/main/ROADMAP.md",
     );
-    await expect(head.locator("[data-roadmap-art]")).toBeVisible();
-    await expect(head.locator("[data-roadmap-art]")).toHaveAttribute("aria-hidden", "true");
+    // The picture is the page's banner, above the head, decorative.
+    const art = page.locator("[data-roadmap-art]");
+    await expect(art).toBeVisible();
+    await expect(art).toHaveAttribute("aria-hidden", "true");
+    await expect(head.locator("[data-roadmap-art]")).toHaveCount(0);
   });
 
-  test("puts the words left and the picture right on a wide screen, and the words first on a phone", async ({
+  test("puts the banner straight across the top at every width, and the words under it on the reading column", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/roadmap/");
     const title = page.locator("[data-roadmap-head] h1");
+    const copy = page.locator("[data-roadmap-head] .head-copy");
     const art = page.locator("[data-roadmap-art]");
-    let [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
-    expect(a.x).toBeGreaterThan(t.x + t.width - 1);
-    expect(a.y).toBeLessThan(t.y + t.height);
-    expect(a.y + a.height).toBeLessThanOrEqual(900);
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    [t, a] = [(await title.boundingBox())!, (await art.boundingBox())!];
-    expect(a.y).toBeGreaterThan(t.y + t.height);
-    expect(t.y + t.height).toBeLessThan(844);
+    await expect(page.locator("main [data-roadmap-art]")).toHaveCount(0);
+    expect(await art.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe("0px");
+    // Like a post's (2026-10-09): the banner from the window's left edge to its right, directly
+    // under the header, in a band that follows the window's width (clamp(13rem, 36vw, 34rem)), the
+    // drawing's own shape on a phone; the words under it, starting where the groups' words start,
+    // the title still in the first window.
+    for (const [width, height] of [
+      [1440, 900],
+      [960, 900],
+      [768, 1024],
+      [390, 844],
+    ] as const) {
+      await page.setViewportSize({ width, height });
+      const [t, a, c] = [
+        (await title.boundingBox())!,
+        (await art.boundingBox())!,
+        (await copy.boundingBox())!,
+      ];
+      const bar = (await page.locator(".site-header-bar").boundingBox())!;
+      const column = (await page.locator(".road-body .section-note").first().boundingBox())!;
+      const windowWidth = await page.evaluate(() => document.documentElement.clientWidth);
+      expect(Math.abs(a.x), `banner from the left edge at ${width}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(a.width - windowWidth), `banner across the window at ${width}`).toBeLessThanOrEqual(1);
+      expect(Math.abs(a.y - (bar.y + bar.height)), `banner under the header at ${width}`).toBeLessThanOrEqual(
+        1,
+      );
+      const band =
+        width > 700 ? Math.min(Math.max(13 * 16, 0.36 * windowWidth), 34 * 16) : (windowWidth * 900) / 1300;
+      expect(Math.abs(a.height - band), `banner's height at ${width}`).toBeLessThanOrEqual(1.5);
+      expect(c.y, `words under the banner at ${width}`).toBeGreaterThanOrEqual(a.y + a.height);
+      expect(Math.abs(c.x - column.x), `words on the reading column at ${width}`).toBeLessThan(1.5);
+      expect(t.y + t.height, `title in the first window at ${width}`).toBeLessThan(height);
+    }
   });
 });
 
@@ -166,135 +199,167 @@ test.describe("Recently shipped", () => {
   });
 });
 
-test.describe("votes", () => {
-  test("without the sidecar, voting and requests say they open soon and nothing is clickable", async ({
-    page,
-  }) => {
-    await page.goto("/roadmap/");
-    await expect(page.locator("[data-roadmap]")).toHaveAttribute("data-state", "off");
-    await expect(
-      page.getByRole("status").filter({ hasText: "Voting and requests open soon." }),
-    ).toBeVisible();
-    const votes = page.locator("button[data-vote]");
-    expect(await votes.count()).toBe(idsInFile().length);
-    for (const button of await votes.all()) await expect(button).toBeDisabled();
-    await expect(page.locator("[data-sort]")).toBeHidden();
-    await expect(page.getByLabel("What should rotli do?")).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Send request" })).toBeDisabled();
-    await expect(page.locator("[data-request-status]")).toHaveText("Requests open soon.");
-  });
-
-  test("a 503 from the sidecar reads the same as no sidecar", async ({ page }) => {
-    await page.route(VOTES, (route) => route.fulfill({ status: 503, body: "This is not open right now." }));
-    await page.goto("/roadmap/");
-    await expect(page.locator("[data-roadmap]")).toHaveAttribute("data-state", "off");
-    await expect(page.locator("button[data-vote]").first()).toBeDisabled();
-  });
-
-  test("a vote shows at once, takes the sidecar's count, and is remembered by this browser", async ({
-    page,
-  }) => {
-    const [first] = idsInFile();
-    const posted: unknown[] = [];
-    let release!: () => void;
-    const answered = new Promise<void>((resolve) => (release = resolve));
-    await page.route("**/api/roadmap/vote", async (route: Route) => {
-      posted.push(route.request().postDataJSON());
-      await answered;
-      await route.fulfill({ json: { ok: true, counted: true, count: 9 } });
+// Only the state the site is in is tested: voting off (VOTING_OPEN false) or the votes below.
+if (!votingOpen)
+  test.describe("while voting is off", () => {
+    test("no item has a vote, the page says voting is in the works, and the rework notice shows", async ({
+      page,
+    }) => {
+      await page.goto("/roadmap/");
+      await expect(page.locator("button[data-vote]")).toHaveCount(0);
+      await expect(page.locator("[data-sort]")).toHaveCount(0);
+      await expect(
+        page.getByRole("status").filter({ hasText: "Voting is in the works, and requests open soon." }),
+      ).toBeVisible();
+      await expect(page.locator("[data-roadmap-notice]")).toHaveText(
+        "Under construction. This roadmap is being reworked and will be updated in the coming week to match where rotli is today.",
+      );
+      // Nothing the page says for itself still invites a vote (items may mention voting).
+      for (const part of await page.locator("[data-roadmap-head] .lede, .section-note").all())
+        await expect(part).not.toContainText(/\bvote/i);
+      // Requests keep their own state.
+      await expect(page.locator("[data-request-status]")).toHaveText("Requests open soon.");
     });
-    await openLive(page, { [first!]: 7 });
-    await expect(page.locator("[data-roadmap-note]")).toHaveText(
-      "Voting is open: one vote per item, remembered by this browser.",
-    );
 
-    const button = page.locator(`button[data-vote="${first}"]`);
-    await expect(button).toBeEnabled();
-    await expect(button).toHaveAttribute("aria-pressed", "false");
-    await expect(button.locator("[data-vote-count]")).toHaveText("7");
-
-    await button.click();
-    // Before the sidecar answers: already pressed, counted, and saying so.
-    await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(button.locator("[data-vote-count]")).toHaveText("8");
-    await expect(button).toContainText("Voted");
-    await expect(button).toHaveAttribute("aria-busy", "true");
-    release();
-    await expect(button).not.toHaveAttribute("aria-busy", "true");
-    await expect(button.locator("[data-vote-count]")).toHaveText("9");
-    expect(posted).toEqual([{ id: first }]);
-
-    // A second click does nothing: one vote per item per browser.
-    await button.click();
-    expect(posted).toHaveLength(1);
-    expect(await page.evaluate(() => window.localStorage.getItem("rotli.roadmap.voted"))).toBe(
-      JSON.stringify([first]),
-    );
-
-    // Back on the page later, the vote is still marked as this browser's.
-    await page.reload();
-    await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(button).toHaveAccessibleName(/^You voted for .*, 7 votes$/);
+    test("with requests open, the line says so and voting is still in the works", async ({ page }) => {
+      await page.route(VOTES, (route) => route.fulfill({ json: { live: true, votes: {} } }));
+      await page.goto("/roadmap/");
+      await expect(
+        page.getByRole("status").filter({ hasText: "Requests are open. Voting is in the works." }),
+      ).toBeVisible();
+    });
   });
 
-  test("a refused vote is taken back, and the reason shows beside the item", async ({ page }) => {
-    const [first] = idsInFile();
-    await page.route("**/api/roadmap/vote", (route) =>
-      route.fulfill({
-        status: 429,
-        json: { ok: false, error: "Too many votes in a row. Give it a few minutes." },
-      }),
-    );
-    await openLive(page, { [first!]: 3 });
-    const button = page.locator(`button[data-vote="${first}"]`);
-    await button.click();
-    await expect(page.locator(`[data-vote-error="${first}"]`)).toHaveText(
-      "Too many votes in a row. Give it a few minutes.",
-    );
-    await expect(button).toHaveAttribute("aria-pressed", "false");
-    await expect(button.locator("[data-vote-count]")).toHaveText("3");
-    expect(await page.evaluate(() => window.localStorage.getItem("rotli.roadmap.voted"))).toBeNull();
-  });
+if (votingOpen)
+  test.describe("votes", () => {
+    test("without the sidecar, voting and requests say they open soon and nothing is clickable", async ({
+      page,
+    }) => {
+      await page.goto("/roadmap/");
+      await expect(page.locator("[data-roadmap]")).toHaveAttribute("data-state", "off");
+      await expect(
+        page.getByRole("status").filter({ hasText: "Voting and requests open soon." }),
+      ).toBeVisible();
+      const votes = page.locator("button[data-vote]");
+      expect(await votes.count()).toBe(idsInFile().length);
+      for (const button of await votes.all()) await expect(button).toBeDisabled();
+      await expect(page.locator("[data-sort]")).toBeHidden();
+      await expect(page.getByLabel("What should rotli do?")).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Send request" })).toBeDisabled();
+      await expect(page.locator("[data-request-status]")).toHaveText("Requests open soon.");
+    });
 
-  test("works from the keyboard", async ({ page }) => {
-    const ids = sectionsInFile().Planned!;
-    await page.route("**/api/roadmap/vote", (route) =>
-      route.fulfill({ json: { ok: true, counted: true, count: 1 } }),
-    );
-    await openLive(page);
-    const button = page.locator(`button[data-vote="${ids[0]}"]`);
-    await button.focus();
-    await expect(button).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(button).toHaveAttribute("aria-pressed", "true");
-    const next = page.locator(`button[data-vote="${ids[1]}"]`);
-    await next.focus();
-    await page.keyboard.press("Space");
-    await expect(next).toHaveAttribute("aria-pressed", "true");
-  });
+    test("a 503 from the sidecar reads the same as no sidecar", async ({ page }) => {
+      await page.route(VOTES, (route) => route.fulfill({ status: 503, body: "This is not open right now." }));
+      await page.goto("/roadmap/");
+      await expect(page.locator("[data-roadmap]")).toHaveAttribute("data-state", "off");
+      await expect(page.locator("button[data-vote]").first()).toBeDisabled();
+    });
 
-  test("Ideas can be ordered by votes while votes are live, and back to the roadmap's order", async ({
-    page,
-  }) => {
-    const ideas = sectionsInFile().Ideas!;
-    const votes = { [ideas[5]!]: 12, [ideas[2]!]: 30, [ideas[9]!]: 12 };
-    await openLive(page, votes);
-    const order = () =>
-      page
-        .locator('[data-list="ideas"] > li')
-        .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-roadmap-item")));
-    expect(await order()).toEqual(ideas);
-    const most = page.getByRole("button", { name: "Most votes" });
-    await most.click();
-    await expect(most).toHaveAttribute("aria-pressed", "true");
-    const sorted = await order();
-    // Most votes first; a tie keeps the file's order; the rest follow in it.
-    expect(sorted.slice(0, 3)).toEqual([ideas[2], ideas[5], ideas[9]]);
-    expect(sorted.slice(3)).toEqual(ideas.filter((id) => !(id in votes)));
-    await page.getByRole("button", { name: "Roadmap order" }).click();
-    expect(await order()).toEqual(ideas);
+    test("a vote shows at once, takes the sidecar's count, and is remembered by this browser", async ({
+      page,
+    }) => {
+      const [first] = idsInFile();
+      const posted: unknown[] = [];
+      let release!: () => void;
+      const answered = new Promise<void>((resolve) => (release = resolve));
+      await page.route("**/api/roadmap/vote", async (route: Route) => {
+        posted.push(route.request().postDataJSON());
+        await answered;
+        await route.fulfill({ json: { ok: true, counted: true, count: 9 } });
+      });
+      await openLive(page, { [first!]: 7 });
+      await expect(page.locator("[data-roadmap-note]")).toHaveText(
+        "Voting is open: one vote per item, remembered by this browser.",
+      );
+
+      const button = page.locator(`button[data-vote="${first}"]`);
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveAttribute("aria-pressed", "false");
+      await expect(button.locator("[data-vote-count]")).toHaveText("7");
+
+      await button.click();
+      // Before the sidecar answers: already pressed, counted, and saying so.
+      await expect(button).toHaveAttribute("aria-pressed", "true");
+      await expect(button.locator("[data-vote-count]")).toHaveText("8");
+      await expect(button).toContainText("Voted");
+      await expect(button).toHaveAttribute("aria-busy", "true");
+      release();
+      await expect(button).not.toHaveAttribute("aria-busy", "true");
+      await expect(button.locator("[data-vote-count]")).toHaveText("9");
+      expect(posted).toEqual([{ id: first }]);
+
+      // A second click does nothing: one vote per item per browser.
+      await button.click();
+      expect(posted).toHaveLength(1);
+      expect(await page.evaluate(() => window.localStorage.getItem("rotli.roadmap.voted"))).toBe(
+        JSON.stringify([first]),
+      );
+
+      // Back on the page later, the vote is still marked as this browser's.
+      await page.reload();
+      await expect(button).toHaveAttribute("aria-pressed", "true");
+      await expect(button).toHaveAccessibleName(/^You voted for .*, 7 votes$/);
+    });
+
+    test("a refused vote is taken back, and the reason shows beside the item", async ({ page }) => {
+      const [first] = idsInFile();
+      await page.route("**/api/roadmap/vote", (route) =>
+        route.fulfill({
+          status: 429,
+          json: { ok: false, error: "Too many votes in a row. Give it a few minutes." },
+        }),
+      );
+      await openLive(page, { [first!]: 3 });
+      const button = page.locator(`button[data-vote="${first}"]`);
+      await button.click();
+      await expect(page.locator(`[data-vote-error="${first}"]`)).toHaveText(
+        "Too many votes in a row. Give it a few minutes.",
+      );
+      await expect(button).toHaveAttribute("aria-pressed", "false");
+      await expect(button.locator("[data-vote-count]")).toHaveText("3");
+      expect(await page.evaluate(() => window.localStorage.getItem("rotli.roadmap.voted"))).toBeNull();
+    });
+
+    test("works from the keyboard", async ({ page }) => {
+      const ids = sectionsInFile().Planned!;
+      await page.route("**/api/roadmap/vote", (route) =>
+        route.fulfill({ json: { ok: true, counted: true, count: 1 } }),
+      );
+      await openLive(page);
+      const button = page.locator(`button[data-vote="${ids[0]}"]`);
+      await button.focus();
+      await expect(button).toBeFocused();
+      await page.keyboard.press("Enter");
+      await expect(button).toHaveAttribute("aria-pressed", "true");
+      const next = page.locator(`button[data-vote="${ids[1]}"]`);
+      await next.focus();
+      await page.keyboard.press("Space");
+      await expect(next).toHaveAttribute("aria-pressed", "true");
+    });
+
+    test("Ideas can be ordered by votes while votes are live, and back to the roadmap's order", async ({
+      page,
+    }) => {
+      const ideas = sectionsInFile().Ideas!;
+      const votes = { [ideas[5]!]: 12, [ideas[2]!]: 30, [ideas[9]!]: 12 };
+      await openLive(page, votes);
+      const order = () =>
+        page
+          .locator('[data-list="ideas"] > li')
+          .evaluateAll((rows) => rows.map((row) => row.getAttribute("data-roadmap-item")));
+      expect(await order()).toEqual(ideas);
+      const most = page.getByRole("button", { name: "Most votes" });
+      await most.click();
+      await expect(most).toHaveAttribute("aria-pressed", "true");
+      const sorted = await order();
+      // Most votes first; a tie keeps the file's order; the rest follow in it.
+      expect(sorted.slice(0, 3)).toEqual([ideas[2], ideas[5], ideas[9]]);
+      expect(sorted.slice(3)).toEqual(ideas.filter((id) => !(id in votes)));
+      await page.getByRole("button", { name: "Roadmap order" }).click();
+      expect(await order()).toEqual(ideas);
+    });
   });
-});
 
 test.describe("the request form", () => {
   test("checks each field before sending, then sends once and says thanks", async ({ page }) => {

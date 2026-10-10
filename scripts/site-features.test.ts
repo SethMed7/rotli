@@ -123,8 +123,11 @@ describe("the feature catalog", () => {
 
   test("only the next release's items are Coming soon", () => {
     const soon = features.ALL_FEATURES.filter((f) => f.status === "Coming soon").flatMap(features.roadmapIds);
+    // "canvas" is Graph and Canvas: its graph is built for the next release (CHANGELOG.md
+    // Unreleased), its canvas still in development builds, one roadmap item for both.
     expect([...soon].sort((a: string, b: string) => a.localeCompare(b))).toEqual([
       "ai-inline",
+      "canvas",
       "charts",
       "chat-attachments",
     ]);

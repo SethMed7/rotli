@@ -52,11 +52,14 @@ test("each step of the story puts its words above its picture on a tablet and a 
   for (const width of [390, 768]) {
     await page.setViewportSize({ width, height: 1024 });
     await page.goto("/");
-    for (const step of await page.locator("#features .steps > li").all()) {
-      const words = (await step.locator(".step-copy").boundingBox())!;
-      const picture = (await step.locator("> figure").boundingBox())!;
+    // Stacked, not pinned: no list of steps, every picture open.
+    await expect(page.locator(".story-tabs")).toBeHidden();
+    for (const slide of await page.locator("#features .story-slide").all()) {
+      const words = (await slide.locator(".slide-head").boundingBox())!;
+      const picture = (await slide.locator("> figure").boundingBox())!;
       expect(picture.y).toBeGreaterThanOrEqual(words.y + words.height);
       expect(picture.x + picture.width).toBeLessThanOrEqual(width);
+      await expect(slide).toHaveJSProperty("inert", false);
     }
   }
 });

@@ -56,3 +56,61 @@ test("a plain folder vault is rooted at itself", () => {
     { note: "b" },
   ]);
 });
+
+test("the reserved destination rows a folder list carries are not folders on disk, so they stay out", () => {
+  // Rotli Web's folder list leads with the destinations (Inbox, Secure notes, Storage, Board): ids
+  // that are names, not paths. A real folder of the same name is a path and still shows.
+  const tree = vaultTree(
+    [note("n1", "call w/ dana", "wiki/_inbox")],
+    [
+      { id: "Inbox", name: "Inbox", parentId: null },
+      { id: "Secure notes", name: "Secure notes", parentId: null },
+      { id: "Storage", name: "Storage", parentId: null },
+      { id: "Board", name: "Board", parentId: null },
+      { id: "wiki", name: "wiki", parentId: null },
+      { id: "wiki/_inbox", name: "_inbox", parentId: "wiki" },
+      { id: "wiki/Inbox", name: "Inbox", parentId: "wiki" },
+    ],
+  );
+  expect(tree).toEqual([
+    { folder: "_inbox", children: [{ note: "n1" }] },
+    { folder: "Inbox", children: [] },
+  ]);
+});
+
+test("a plain folder vault's real top-level Inbox, Storage, or Board folder shows, empty or not", () => {
+  // the Mac app lists a plain vault's folders by their bare names
+  expect(
+    vaultTree(
+      [],
+      [
+        { id: "Inbox", name: "Inbox", parentId: null },
+        { id: "Work", name: "Work", parentId: null },
+      ],
+    ),
+  ).toEqual([
+    { folder: "Inbox", children: [] },
+    { folder: "Work", children: [] },
+  ]);
+  // Rotli Web leads with its six destination rows, then the real folders
+  const web = ["Inbox", "Secure notes", "Storage", "Board", "Archive", "Trash"].map((id) => ({
+    id,
+    name: id,
+    parentId: null,
+  }));
+  expect(vaultTree([], [...web, { id: "Board", name: "Board", parentId: null }])).toEqual([
+    { folder: "Board", children: [] },
+  ]);
+});
+
+test("in a memex, a shelf the Mac app lists as a bare Inbox is not a folder on disk", () => {
+  expect(
+    vaultTree(
+      [note("n1", "call w/ dana", "wiki/_inbox", "Inbox")],
+      [
+        { id: "wiki", name: "wiki", parentId: null },
+        { id: "Inbox", name: "Inbox", parentId: null },
+      ],
+    ),
+  ).toEqual([{ folder: "_inbox", children: [{ note: "n1" }] }]);
+});

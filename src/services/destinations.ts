@@ -48,6 +48,12 @@ export const DEST = {
   trash: "Trash",
 } as const;
 
+/** The destination rows Rotli Web's folder list leads with, in this order
+ * (folderNotes.ts listFolders): projections, not folders on disk. id === name,
+ * no parent — the same grammar the in-memory service seeds, so
+ * `DEST.inbox === folder.id` holds in every mode. */
+export const RESERVED_FOLDERS = [DEST.inbox, DEST.secure, DEST.storage, DEST.board, DEST.archive, DEST.trash];
+
 export type Destination = (typeof DEST)[keyof typeof DEST];
 
 /** The never-delete SINKS — Archive and Trash. Moving a note INTO one stamps the

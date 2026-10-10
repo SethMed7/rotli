@@ -198,14 +198,16 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         color-scheme: light;
       }
-      /* The privacy passage (src/passage.ts): while the landing's privacy band is the focal
-         passage, the whole page, header, menus, and buttons included, steps into the app's
-         Ocean Dark environment (src/styles/themes.css; border-strong and selection derived the
-         way base.css derives them) and steps back out when the visitor leaves it either way.
-         Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the ground
-         8.60:1). The --deep-* night of .band-night already matches, so the band and the page
-         become one sky. */
-      :root[data-passage='ocean-dark'] {
+      /* The privacy passage (src/passage.ts): the landing's privacy band paints its own night
+         and grows out of the page as it arrives (the owner,
+         2026-10-08: "more of like a lock transition not a cross fade", then the grow below).
+         While the band is under the header, the header (with its menus) steps into the app's Ocean Dark environment
+         (src/styles/themes.css; border-strong and selection derived the way base.css derives
+         them) and steps back out as daylight reaches it. Nothing else on the page changes
+         colour. Lowest pair at rest: muted text on the night --surface-2 at 6.75:1 (on the
+         ground 8.60:1). The --deep-* night of .band-night matches, so header and band are one
+         sky. */
+      :root[data-passage='ocean-dark'] .site-header-bar {
         color-scheme: dark;
         --ground: #0e171d;
         --surface: #152229;
@@ -224,7 +226,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       /* The crossfade runs on the tokens themselves, registered so they can be animated on the
          root: every surface that reads them (the ground, the header, menus, buttons, borders)
-         changes in the same frame, on one clock. The grounds ease over 900 ms; the inks switch
+         changes in the same frame, on one clock. The grounds ease over 240 ms; the inks switch
          whole just past halfway, when the ground is mid-tone and both inks read alike (text
          fading through a ground fading the other way vanishes in the middle); muted and accent
          text lean onto --text around the switch. src/passage.ts holds the same numbers and
@@ -251,11 +253,19 @@ const socialImageUrl = new URL(image, siteUrl).href;
         /* Also a plain value, so muted and accent text keep their colours in a browser
            without @property (the lean animation then simply never runs). */
         --passage-lean: 0;
-        --passage-ms: 900ms;
+        --passage-ms: 240ms;
         --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
-        --passage-ink-at: 459ms;
+        --passage-ink-at: 122ms;
       }
-      :root.passage-fading {
+      /* The header reads its own muted, accent, and star colours, so they follow its tokens
+         (registered colours resolve where they are declared). */
+      .site-header-bar {
+        color: var(--text);
+        --text-muted: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--muted-ink));
+        --accent-text: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--accent-ink));
+        --github-star: color-mix(in srgb, var(--text) calc(var(--passage-lean) * 100%), var(--github-star-ink));
+      }
+      :root.passage-fading .site-header-bar {
         transition-property:
           --ground, --surface, --surface-2, --tint, --border, --border-strong, --selection,
           --text, --muted-ink, --accent, --accent-ink, --on-accent, --on-text, --github-star-ink;
@@ -276,24 +286,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       /* While the tokens move, nothing else chases them on its own clock (a button's 140 ms
          hover fade would smear its switch); reveals keep moving. */
-      :root.passage-fading :where(body *) {
+      :root.passage-fading :where(.site-header-bar *) {
         transition-property: opacity, transform, background-size !important;
-      }
-      /* The night sky spreads past the band: the band's own stars, over the whole page while
-         the passage lasts, faded in and out on the same clock (bands with their own ground
-         cover it). */
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        z-index: -1;
-        background: url('/night-stars-ocean.svg') 0 0 / 480px 480px;
-        opacity: 0;
-        transition: opacity var(--passage-ms) var(--passage-ease);
-        pointer-events: none;
-      }
-      :root[data-passage='ocean-dark'] body::before {
-        opacity: 1;
       }
       /* The band's edges are feathered into the page's padding above and below it, so a day
          page meets its night as dusk, not a cut. In the night the feather is the ground's own
@@ -317,6 +311,27 @@ const socialImageUrl = new URL(image, siteUrl).href;
       [data-passage]::after {
         top: 100%;
         background: linear-gradient(to top, transparent, var(--deep));
+      }
+      /* The night grows out of the page (with script; the owner, 2026-10-08, picking it from the
+         patterns premium product pages use): the band comes up the window as a rounded card set
+         inside the day page, widens to the full width with square corners as it arrives, and
+         narrows back into a card as it leaves. src/passage.ts sets --grow (0 to 1) from where
+         the band is; only its clip changes, so nothing reflows. Nothing else on the page changes
+         colour. Under reduced motion, or without script, it is simply full width (feathered,
+         without script). */
+      :root.js [data-passage] {
+        --grow: 1;
+        --grow-inset: clamp(12px, 4vw, 64px);
+        clip-path: inset(0 calc((1 - var(--grow)) * var(--grow-inset)) round calc((1 - var(--grow)) * 32px));
+      }
+      :root.js [data-passage]::before,
+      :root.js [data-passage]::after {
+        content: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :root.js [data-passage] {
+          clip-path: none;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         :root.passage-fading {
@@ -551,6 +566,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .brand-mark {
         width: 28px;
         line-height: 0;
+      }
+      .brand-mark svg,
+      .footer-brand span svg {
+        width: 100%;
+        height: auto;
       }
       .wordmark,
       .footer-brand b {
@@ -1007,20 +1027,33 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .footer-lead .subscribe-note {
         margin: 0.2rem 0 0.75rem;
       }
+      /* One field with the arrow inside it, the way the app's chat composer sends. */
       .subscribe-row {
         display: flex;
-        flex-wrap: wrap;
+        align-items: center;
         gap: 0.5rem;
+        min-height: 52px;
+        padding: 0.25rem 0.25rem 0.25rem 0.95rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.9rem;
+        background: var(--surface);
+      }
+      .subscribe-row:has(input:focus-visible) {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 1px;
+      }
+      .subscribe-row:has(input[aria-invalid='true']) {
+        border-color: var(--accent-text);
       }
       .subscribe input[type='email'] {
-        flex: 1 1 12rem;
+        flex: 1 1 auto;
         min-width: 0;
-        min-height: 44px;
-        padding: 0.55rem 0.8rem;
-        border: 1px solid var(--border-strong);
-        border-radius: 0.6rem;
-        background: var(--surface);
+        min-height: 42px;
+        padding: 0;
+        border: 0;
+        background: transparent;
         color: var(--text);
+        font: inherit;
         font-size: 1rem;
       }
       .subscribe input[type='email']::placeholder {
@@ -1028,22 +1061,41 @@ const socialImageUrl = new URL(image, siteUrl).href;
         opacity: 1;
       }
       .subscribe input[type='email']:focus-visible {
-        outline: 2px solid var(--accent-text);
-        outline-offset: 1px;
+        outline: none;
       }
-      .subscribe input[aria-invalid='true'] {
-        border-color: var(--accent-text);
-      }
-      .subscribe .button {
+      .subscribe-send {
         flex: none;
-        min-height: 44px;
-        padding: 0.45rem 1rem;
-        border-radius: 0.6rem;
-        font-size: 0.92rem;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 0.7rem;
+        background: var(--text);
+        color: var(--on-text);
+        cursor: pointer;
+        transition: background-color 140ms ease;
       }
-      .subscribe .button:disabled {
+      .subscribe-send:hover {
+        background: var(--accent-text);
+        color: var(--on-accent);
+      }
+      .subscribe-send:focus-visible {
+        outline: 2px solid var(--accent-text);
+        outline-offset: 2px;
+      }
+      .subscribe-send svg {
+        width: 18px;
+        height: 18px;
+        transition: transform 140ms ease;
+      }
+      .subscribe-send:hover svg {
+        transform: translateX(2px);
+      }
+      .subscribe-send:disabled {
         cursor: progress;
-        opacity: 0.82;
+        opacity: 0.6;
       }
       .footer-lead .subscribe-status {
         margin: 0.5rem 0 0;

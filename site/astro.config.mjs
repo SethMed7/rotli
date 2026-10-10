@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +7,7 @@ import { defineConfig } from "astro/config";
 
 import { movedFeatures } from "./src/features";
 import { figurePlugin } from "./src/figures";
+import { pageMarkdown } from "./src/markdownTwin";
 import { votableIds } from "./src/roadmap";
 import { readRoadmapFile } from "./src/roadmap-file";
 import { site } from "./src/site";
@@ -78,6 +79,29 @@ function figures() {
         if (processor?.name !== "satteri" || !Array.isArray(processor.options?.mdastPlugins))
           throw new Error(`rotli-figures expects Astro's Sätteri Markdown processor, found ${processor?.name}`);
         processor.options.mdastPlugins.push(figurePlugin);
+      },
+    },
+  };
+}
+
+/**
+ * Pages written in Astro rather than Markdown that still offer Copy Markdown and answer
+ * `Accept: text/markdown` like a post (/privacy/): their twin is made from the built page's
+ * article (src/markdownTwin.ts) and written beside it as index.md. A page that lost its
+ * article fails the build instead of shipping an empty twin.
+ */
+const MARKDOWN_TWIN_PAGES = ["/privacy/"];
+function markdownTwins() {
+  return {
+    name: "rotli-markdown-twins",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        const root = fileURLToPath(dir);
+        for (const path of MARKDOWN_TWIN_PAGES) {
+          const html = join(root, path, "index.html");
+          if (!existsSync(html)) continue; // a coming-soon build has no such page
+          writeFileSync(join(root, path, "index.md"), pageMarkdown(readFileSync(html, "utf8"), `${site.url}${path}`));
+        }
       },
     },
   };
@@ -228,6 +252,7 @@ export default defineConfig({
   integrations: [
     figures(),
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),
+    markdownTwins(),
     cspInlineStyleGuard(),
     agentFilesGuard(),
     roadmapGuard(),

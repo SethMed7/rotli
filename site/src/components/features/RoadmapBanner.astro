@@ -8,6 +8,7 @@
 // carry the meaning; the art is hidden from assistive technology. On narrow screens the art
 // steps below the words instead of beside them.
 import searching from '../../../../src/assets/characters/filled/cocoa/searching.webp';
+import { VOTING_OPEN } from '../../roadmap';
 ---
 
 <section class="roadmap-banner" aria-labelledby="roadmap-banner-title">
@@ -15,9 +16,15 @@ import searching from '../../../../src/assets/characters/filled/cocoa/searching.
     <div class="copy">
       <h2 id="roadmap-banner-title">
         <span class="strong">Wondering what comes next?</span>
-        <span class="soft">Vote for it on the roadmap.</span>
+        <span class="soft">{VOTING_OPEN ? 'Vote for it on the roadmap.' : 'See it on the roadmap.'}</span>
       </h2>
-      <p class="line">See what is being built and what is planned, vote for what you want, or ask for something new.</p>
+      <p class="line">
+        {
+          VOTING_OPEN
+            ? 'See what is being built and what is planned, vote for what you want, or ask for something new.'
+            : 'See what is being built and what is planned, or ask for something new.'
+        }
+      </p>
       <a class="button primary" href="/roadmap/">See the roadmap</a>
     </div>
     <div class="art" aria-hidden="true">

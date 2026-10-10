@@ -86,7 +86,7 @@ export type OgCardName = keyof typeof OG_CARDS;
  */
 export interface PostArt {
   pose: Pose;
-  scene: 'bench' | 'helper' | 'memory' | 'two-notes' | 'making' | 'beach';
+  scene: 'bench' | 'helper' | 'memory' | 'two-notes' | 'making' | 'beach' | 'privacy';
   /** What is drawn around the quokka, for the alt text. */
   around: string;
 }
@@ -234,6 +234,40 @@ export function postBanner(slug: string): Banner | undefined {
     mobile: bannerPath(slug, 'mobile'),
     ...BANNER,
     alt: thumbnailAlt(slug),
+  };
+}
+
+/** Pages outside the blog that read like a post and carry a banner of their own (/privacy/,
+ * the owner, 2026-10-09: "compare to this blog … and then try to match it"). */
+export const PAGE_ART = {
+  privacy: {
+    pose: 'stays_local',
+    scene: 'privacy',
+    around: 'beside a note with a padlock on it, the friendly on-device chip up the beach',
+  },
+} as const satisfies Record<string, PostArt>;
+export type PageArtName = keyof typeof PAGE_ART;
+
+export function pageBannerPath(name: PageArtName, variant: 'wide' | 'half' | 'mobile' = 'wide'): string {
+  const suffix = { wide: '', half: '-1200', mobile: '-mobile' }[variant];
+  return `/banners/${name}${suffix}.webp`;
+}
+
+export function pageBannerAlt(name: PageArtName): string {
+  const art = PAGE_ART[name];
+  return `The rotli quokka ${POSES[art.pose]}, ${art.around}`;
+}
+
+/** A page's banner, or undefined until `bun run build:brand-images` has rendered it. */
+export function pageBanner(name: PageArtName): Banner | undefined {
+  const src = pageBannerPath(name);
+  if (![src, pageBannerPath(name, 'half'), pageBannerPath(name, 'mobile')].every(hasPublicFile)) return undefined;
+  return {
+    src,
+    srcset: `${pageBannerPath(name, 'half')} 1200w, ${src} 2400w`,
+    mobile: pageBannerPath(name, 'mobile'),
+    ...BANNER,
+    alt: pageBannerAlt(name),
   };
 }
 

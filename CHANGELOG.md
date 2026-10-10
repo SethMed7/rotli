@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
   being built, what's planned, and what's still an idea, straight from the
   roadmap kept with rotli's source, each with its status and how big it is.
-  It opens like a blog post, the title beside a drawing of the quokka with a
+  It opens like a blog post, under a drawing of the quokka with a
   map and a signpost, and ends with Recently shipped: the newest releases,
   their dates, and a few headlines from each, read from this changelog and
   linked to their notes. Vote for what you want (once per item; your browser
@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beside the item, if it doesn't go through, and Ideas can be ordered by
   votes. Or ask for something new with a short form that needs no account
   and no email; it says what's kept, and requests are read, never published.
-  Until voting opens on the live site, the page says so. "On this page"
+  Voting is switched off for now while the roadmap is reworked: the page
+  says voting is in the works, and a notice says the roadmap will be updated
+  in the coming week to match where rotli is today. "On this page"
   stays beside the list on a wide screen, the page reads well on a phone,
   and "Roadmap source" links the full roadmap on GitHub. It's in the
   Resources menu and the footer, and the privacy page says what votes and
@@ -39,12 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **rotli.co's blog posts are calmer to read.** A post lines up with the
-  header: the title, summary, author, and topics sit beside the post's
-  picture, shown whole, with "Blog" above the title, and the title is in
-  view without scrolling. Below that are two columns: the contents,
-  progress, sources, and Share on the left, and the text in the room to its
-  right, at a comfortable line of about 66 characters on every screen. The
+- **rotli.co's blog posts are calmer to read.** A post opens on its
+  picture straight across the top of the window, and under it the title,
+  summary, author, and topics start where the text does, with "Blog" above
+  the title, all in view without scrolling. Below that are two columns: the contents,
+  progress, sources, and Share on the left, and the text just beside it, at
+  a comfortable line of about 66 characters on every screen. Headings,
+  paragraphs, lists, tables, and charts all start on one edge, with no wide
+  empty gap beside the contents; tables and charts run on to the page's
+  right edge where there's room. The privacy page and the roadmap are laid
+  out the same way, so all three read as one family; the privacy page now
+  opens like a post too, with a byline, its reading time, topics, a drawn
+  picture of the quokka guarding a locked note, and the same Share options,
+  Copy Markdown included. The
   sources show four at a time with "Show all", every one whole, and the
   left column stays with you as you read without ever cutting anything off.
   The suggestions that sat on the right now close the post as "More from
@@ -80,11 +89,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page opens on a picture of the quokka at its desk among a note, a chat, and
   a board. The areas are now tabs on one bar beside a smaller search box, each
   showing how many entries it holds (and how many match what you typed), and
-  the page closes on a banner to the roadmap instead of a line of text.
+  the page closes on a banner to the roadmap instead of a line of text. Graph
+  and Canvas joins Organizing as one entry, next to views: the graph of your
+  notes is coming soon, and the canvas is in development. On the roadmap
+  they are one item too, with its own drawing.
 - **rotli.co's home page opens on the app itself.** The film under the
-  headline is now a real recording of rotli: a quick note, the Library,
-  search, chat, and the same note as plain Markdown. It has no sound, so the
-  player offers Watch again instead of Click for sound.
+  headline is a real recording of rotli telling the page's own story: a note
+  written in Main, its one file in the vault, the Librarian filing it on the
+  Mac with your words untouched and your view as you left it, then a chat
+  that reads only the notes it needs. It has no sound, so the player offers
+  Watch again instead of Click for sound.
 - **rotli.co says what rotli is for.** The landing page now opens on "Write
   like a person. Let AI do the filing.", explains with a side-by-side note why
   AI reads notes differently from people (and what the Librarian adds around
@@ -117,10 +131,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file sits in two open columns, as you write it and after the Librarian: the
   lines it adds are marked, and your words are marked unchanged. Its example
   files the note in a real area.
-- **Scrolling into "Some notes never leave this Mac" takes the whole of
-  rotli.co into the night.** The page, its header, menus, and buttons step
-  into Ocean Dark while the privacy section is in view, and step back out
-  when you scroll on or back. With reduced motion the change is immediate.
+- **"Some notes never leave this Mac" on rotli.co grows out of the page.**
+  The night arrives as a rounded card inside the page, widens to the full
+  screen as you scroll in, and narrows back into a card as you leave. While
+  it fills the screen, the header turns to Ocean Dark too. Nothing else on the
+  page changes colour. With reduced motion it is simply full width.
 - **The quokkas at the bottom of rotli.co each have something to do.** One
   sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
   waves when you arrive and frowns if you reach for the leaves), two play
@@ -192,7 +207,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boards build on, and says there is no extra AI plan to buy: rotli uses the
   one you already have, or a model on your Mac. Two new questions, "Do I
   have to pay for AI?" and "Is rotli just a notes app?", answer both. The
-  privacy page's opening on AI is plainer.
+  privacy page's opening on AI is plainer, and a new "Keys and logins"
+  section says what rotli never asks for (a rotli password, your AI tools'
+  logins), the one optional key it may keep (Brave Search, in the macOS
+  Keychain) and the rules every key follows, how Rotli Helper pairs, and
+  which secrets in a note rotli can spot on its own. "Keeping and deleting"
+  now points to what the website keeps.
+- **Unsubscribing from rotli's email list erases your address.** The
+  unsubscribe link in every email, or your mail app's Unsubscribe button,
+  takes you off the list, and within a day your address is deleted from the
+  list's provider too, not just marked unsubscribed. Signing up again later
+  puts you back on the list. The privacy page says so, and how to have the
+  one signup notice deleted as well.
 - **The privacy page and blog posts show how far through you are,** with the
   same "N% through" bar as the guides, so every article reads the same way.
 - **rotli.co's blog shows a picture for every post.** Each post has its own
@@ -262,7 +288,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole vault. A small picture joins the note in your view to its file in the
   vault with a dotted line. The before-and-after that had its own section
   ("You write for yourself. AI reads differently.") is now the second step's
-  picture and plays the same way. A short "What is an LLM wiki?" links to
+  picture and plays the same way. The steps show one at a time and follow
+  your scroll: the section holds still while you scroll through Write, File,
+  and Ask, each picture sliding through one framed stage, the open step
+  joined to it, and a step's name takes you to it. On a
+  phone they stack. "What is an LLM wiki?" under the heading links to
   Andrej Karpathy's note that named the idea. The three pictures now share
   one open style with no cards and one width, each heading starts level with
   its picture, and the steps drop their numbers. The third picture shows the
@@ -323,6 +353,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web's Vault view shows only folders that are on disk.** Choosing
+  "Vault — folders as on disk" listed Inbox, Secure notes, Storage, and Board
+  even where no such folder existed. They are gone; a real folder with one of
+  those names still shows.
+- **The Vault view remembers which folders you opened.** Every folder you
+  opened in "Vault — folders as on disk" was closed again the next time Rotli
+  started. Now they stay as you left them.
 - **The theme studio's previous and next buttons on rotli.co sit on one row
   on phones** again, beside the theme's name.
 - **"On this page" on rotli.co's articles is no longer cut off.** The reading

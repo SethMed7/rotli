@@ -8,7 +8,7 @@ import { GUIDE } from "./blog";
 import { questions } from "./faq";
 import { figuresToMarkdown } from "./figures";
 import { alsoCovers, availabilityOf, catalog, featurePath } from "./features";
-import type { RoadmapSection } from "./roadmap";
+import { type RoadmapSection, VOTING_OPEN } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
 
@@ -115,7 +115,9 @@ export function llmsText(writing: { posts: Writing[] }): string {
       link(
         "Roadmap",
         "/roadmap/index.md",
-        "what is being built, what is planned, and what is still an idea; people vote on items and send requests on the page",
+        VOTING_OPEN
+          ? "what is being built, what is planned, and what is still an idea; people vote on items and send requests on the page"
+          : "what is being built, what is planned, and what is still an idea; people send requests on the page",
       ),
       link("About", "/about/", "why it is being built, where the name comes from, and who makes it"),
     );
@@ -173,7 +175,9 @@ export function roadmapMarkdown(sections: RoadmapSection[]): string {
     "",
     "---",
     "",
-    `Vote for an item, or ask for something new, at ${site.url}/roadmap/`,
+    VOTING_OPEN
+      ? `Vote for an item, or ask for something new, at ${site.url}/roadmap/`
+      : `Ask for something new at ${site.url}/roadmap/`,
     "",
   );
   return lines.join("\n");

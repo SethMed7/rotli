@@ -5,12 +5,15 @@
 // heading and sentence say what the item is, so the whole drawing is aria-hidden.
 // Keyed by the item's ROADMAP.md id; an id without a drawing gets a plain note.
 // No inline styles: production serves the page under `style-src 'self'`.
+import GraphCanvasArt from '../GraphCanvasArt.astro';
+
 interface Props {
   id: string;
 }
 
 const { id } = Astro.props;
 const known = [
+  'canvas',
   'sheets-beta',
   'docs-beta',
   'charts',
@@ -237,6 +240,17 @@ Thu  4
     )
   }
   {
+    kind === 'canvas' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Graph</span>
+          <span class="gc-label">Canvas</span>
+        </div>
+        <GraphCanvasArt />
+      </div>
+    )
+  }
+  {
     kind === 'note' && (
       <div class="win">
         <div class="win-bar">
@@ -253,6 +267,9 @@ Thu  4
 </div>
 
 <style>
+  .gc-label {
+    color: var(--text-muted);
+  }
   /* The stage: the item's one frame, a quiet rounded ground the window sits on. The item's
      words sit below it on the page, never in a second box around both. */
   .stage {

@@ -22,6 +22,8 @@
     "mktemp",
     "gitleaks",
     "ffmpeg",
+    "ffprobe",
+    "osascript",
     "cwebp"
   ],
   "ignoreExportsUsedInFile": true

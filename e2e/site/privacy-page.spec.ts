@@ -1,13 +1,16 @@
 // /privacy/ reads like a blog post (the owner, 2026-10-06: "Privacy page design should match blog
-// styles"): WritingPage's `article` layout on the header's edges. The head is the title, the lede,
-// and "Updated …" beside the night scene from 1000px (stacked, the scene first, below it), the
-// scene rounded and contained, its caption on its own night ground above the dome, the clouds kept
-// inside the frame. The body is the left rail (the short title, the tree, the meter as a percent,
-// and Share as Copy link alone, no Sources) beside the reading column, and "More from rotli" after
-// it with the posts about privacy. On a phone the tree is the disclosure, the meter a slim bar, and
-// Copy link follows the article. The full-width pinned banner is gone. `#promise` (the hero's and
-// the landing band's link) lands just under the header at every width, and nothing scrolls
-// sideways from 320 to 2560. The matrix itself: privacy-promise.spec.ts.
+// styles", and 2026-10-09: match "The AI you already pay for"): WritingPage's `article` layout on
+// the header's edges. It opens as a post does since 2026-10-09 ("one thing straight across top like
+// an image/banner then the rest under"): its picture a banner straight across the window under the
+// header, edge to edge and square cornered, scrolling away with the page (the old pinned banner is
+// gone), and under it, on the reading column, the title, the lede, the byline (the author,
+// "Updated …", the reading time), and the topic chips. The body is the left rail (the short title,
+// the tree, the meter as a percent, and Share as a post's, Copy Markdown from the page's twin
+// included, no Sources) beside the reading column, and "More from rotli" after it with the posts
+// about privacy. On a phone the tree is the disclosure, the meter a slim bar, and Copy link
+// follows the article. `#promise` (the hero's and the landing band's link) lands just under the
+// header at every width, and nothing scrolls sideways from 320 to 2560. The matrix itself:
+// privacy-promise.spec.ts.
 import { expect, test, type Page } from "@playwright/test";
 
 const SECTIONS = [
@@ -17,12 +20,13 @@ const SECTIONS = [
   "AI and your notes",
   "How rotli connects to AI",
   "Rotli Web and Rotli Helper",
+  "Keys and logins",
   "This website",
   "Keeping and deleting",
   "Changes to this page",
 ];
-/** Where the words and the scene go side by side (blog/ArticleCover.astro). */
-const SIDE_BY_SIDE = 1000;
+/** Where the banner shows the phone crop (blog/ArticleBanner.astro). */
+const PHONE = 700;
 
 /** WCAG contrast of two computed colours (rgb()/rgba() or color(srgb …)); throws on transparency. */
 function contrastOf(fg: string, bg: string): number {
@@ -82,22 +86,23 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 320, height: 640 },
 ]) {
-  test(`/privacy/ opens on its title beside the night scene, or under it when narrow (${viewport.width}px)`, async ({
+  test(`/privacy/ opens like a post: its banner straight across the top, its title under it (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto("/privacy/");
-    // The post's head, not the old full-width pinned banner.
+    // Not the old pinned banner: a post's, which scrolls away with the page (article-banner.spec.ts).
     await expect(page.locator("[data-article-banner]")).toHaveCount(0);
     const head = page.locator("[data-article-cover] .head-copy");
     await expect(head.getByRole("heading", { level: 1 })).toHaveText("Privacy");
     await expect(head.locator(".lede")).toHaveText(
       "rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way.",
     );
-    // The meta line is the date alone: no author's mark or name, and no topics.
-    await expect(head.locator(".byline")).toHaveText(/^Updated \w+ \d{1,2}, \d{4}$/);
-    await expect(head.locator(".author, .avatar")).toHaveCount(0);
-    await expect(head.locator(".tags")).toHaveCount(0);
+    // A post's byline and topics: the author, the date it was updated, the reading time.
+    await expect(head.locator(".byline")).toContainText("Seth Medina");
+    await expect(head.locator(".byline")).toContainText(/Updated \w+ \d{1,2}, \d{4}/);
+    await expect(head.locator(".byline")).toContainText(/\d+ min read/);
+    await expect(head.locator(".tags li")).toHaveText(["Privacy", "AI", "Security"]);
     const [title, lede, byline] = await Promise.all(
       ["h1", ".lede", ".byline"].map((part) => box(page, `[data-article-cover] .head-copy ${part}`)),
     );
@@ -105,57 +110,51 @@ for (const viewport of [
     expect(byline!.y).toBeGreaterThanOrEqual(lede!.y + lede!.height - 1);
     expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
-    // The scene: contained in the page's width, rounded, under the header, clipping its drifting
-    // clouds, with the caption above the dome and never over it.
-    const scene = page.locator("[data-article-scene]");
-    await expect(scene.locator(".night-caption")).toContainText("Secure notes stay home.");
-    const art = await box(page, "[data-article-scene]");
-    const wrap = await box(page, "main.writing");
-    expect(art.x).toBeGreaterThanOrEqual(wrap.x - 1);
-    expect(art.x + art.width).toBeLessThanOrEqual(wrap.x + wrap.width + 1);
-    expect(art.width).toBeLessThan(viewport.width);
-    expect(art.y).toBeGreaterThan(await headerBottom(page));
-    const frame = await scene.evaluate((el) => {
-      const style = getComputedStyle(el);
-      return { radius: style.borderTopLeftRadius, overflow: style.overflow };
-    });
-    expect(frame.radius).not.toBe("0px");
-    expect(frame.overflow).toBe("hidden");
-    const caption = await box(page, "[data-article-scene] .night-caption");
-    const dome = await box(page, "[data-article-scene] .dome-frame");
-    expect(caption.y + caption.height).toBeLessThanOrEqual(dome.y + 1);
-    for (const part of [caption, dome]) {
-      expect(part.x).toBeGreaterThanOrEqual(art.x - 1);
-      expect(part.x + part.width).toBeLessThanOrEqual(art.x + art.width + 1);
-      expect(part.y + part.height).toBeLessThanOrEqual(art.y + art.height + 1);
-    }
-    // The caption reads on its own opaque night, and its inked phrase too.
-    for (const text of [".night-caption", ".night-caption .inked"]) {
-      const { fg, bg } = await colours(
-        page,
-        `[data-article-scene] ${text}`,
-        "[data-article-scene] .night-caption",
-      );
-      expect(contrastOf(fg, bg), text).toBeGreaterThanOrEqual(4.5);
+    // The banner: a post's, straight across the window under the header, outside the page's
+    // wrapper, square cornered, described for assistive tech.
+    await expect(page.locator("main [data-article-art]")).toHaveCount(0);
+    const picture = page.locator("[data-article-art] img");
+    await expect(picture).toHaveAttribute("alt", /padlock/);
+    await expect
+      .poll(() => picture.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+    const art = await box(page, "[data-article-art]");
+    const windowWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(Math.abs(art.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.width - windowWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(art.y - (await headerBottom(page)))).toBeLessThanOrEqual(1);
+    expect(
+      await page.locator("[data-article-art]").evaluate((el) => getComputedStyle(el).borderTopLeftRadius),
+    ).toBe("0px");
+    // The wide scene, cropped only off the top and bottom; on a phone the quokka crop, whole.
+    const shape = await picture.evaluate((el: HTMLImageElement) => ({
+      src: el.currentSrc,
+      width: el.getBoundingClientRect().width,
+      height: el.getBoundingClientRect().height,
+      natural: el.naturalWidth / el.naturalHeight,
+    }));
+    expect(shape.height).toBeLessThanOrEqual(shape.width / shape.natural + 1);
+    if (viewport.width > PHONE) {
+      expect(shape.src).toMatch(/\.webp$/);
+      expect(shape.src).not.toMatch(/-mobile\.webp$/);
+    } else {
+      expect(shape.src).toMatch(/-mobile\.webp$/);
+      expect(Math.abs(shape.width / shape.height - shape.natural)).toBeLessThan(0.02);
     }
 
+    // The words under the banner, on the reading column: they start where the page's words do,
+    // past the rail (on the header's left edge) from 901px, on the page's left edge below that.
     const copy = await box(page, "[data-article-cover] .head-copy");
-    if (viewport.width >= SIDE_BY_SIDE) {
-      // The words on the left, the scene on the right, overlapping in height, neither over the other.
-      expect(copy.x + copy.width).toBeLessThan(art.x);
-      expect(copy.y).toBeLessThan(art.y + art.height);
-      expect(art.y).toBeLessThan(copy.y + copy.height);
-    } else {
-      expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
-    }
+    expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+    const column = await box(page, "[data-prose] > p");
+    expect(Math.abs(copy.x - column.x)).toBeLessThan(1.5);
+    const header = await box(page, ".site-header");
     if (viewport.width > 900) {
-      // On the header's edges, like a post: the words and the rail on the left one, the scene
-      // ending on the right one.
-      const header = await box(page, ".site-header");
       const rail = await box(page, "[data-article-rail]");
-      expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
       expect(Math.abs(rail.x - header.x)).toBeLessThan(1.5);
-      expect(Math.abs(art.x + art.width - (header.x + header.width))).toBeLessThan(1.5);
+      expect(copy.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+    } else {
+      expect(Math.abs(copy.x - header.x)).toBeLessThan(1.5);
     }
     for (const text of ["h1", ".lede", ".byline"]) {
       const { fg, bg } = await colours(page, `[data-article-cover] .head-copy ${text}`, "body");
@@ -170,7 +169,7 @@ for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1024, height: 768 },
 ]) {
-  test(`/privacy/'s rail: its title, the tree, the meter, and Copy link alone (${viewport.width}px)`, async ({
+  test(`/privacy/'s rail: its title, the tree, the meter, and a post's Share (${viewport.width}px)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -181,12 +180,17 @@ for (const viewport of [
     const tree = rail.getByRole("navigation", { name: "On this page" });
     await expect(tree.getByRole("link")).toHaveText(SECTIONS);
     await expect(tree.getByRole("link").first()).toHaveAttribute("href", "#promise");
-    // No Sources on a policy; Share is Copy link alone (no X, LinkedIn, email, or Markdown).
+    // No Sources on a policy; Share is a post's: X, LinkedIn, Email, Copy link, Copy Markdown.
     await expect(rail.locator("[data-rail-sources]")).toHaveCount(0);
     const share = rail.locator("[data-share]");
     await expect(share).toBeVisible();
-    await expect(share.locator("a")).toHaveCount(0);
-    await expect(share.getByRole("button")).toHaveText(["Copy link"]);
+    await expect(share.locator("a")).toHaveText(["X", "LinkedIn", "Email"]);
+    await expect(share.locator("a").first()).toHaveAttribute("href", /privacy%20promise/);
+    await expect(share.getByRole("button")).toHaveText(["Copy link", "Copy Markdown"]);
+    await expect(share.getByRole("button", { name: "Copy Markdown" })).toHaveAttribute(
+      "data-copy-src",
+      "/privacy/index.md",
+    );
     await expect(share.getByRole("button", { name: "Copy link" })).toHaveAttribute(
       "data-copy-value",
       /\/privacy\/$/,
@@ -244,9 +248,9 @@ test("/privacy/ on a phone: the tree's disclosure, the slim bar, and Copy link a
   expect(target.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
   expect(target.y).toBeLessThan(400);
   expect(Math.abs(barBox.y - (await headerBottom(page)))).toBeLessThan(2);
-  // Copy link follows the article and comes before "More from rotli".
+  // Share follows the article and comes before "More from rotli".
   const share = page.locator("[data-share]");
-  await expect(share.getByRole("button")).toHaveText(["Copy link"]);
+  await expect(share.getByRole("button")).toHaveText(["Copy link", "Copy Markdown"]);
   const prose = await box(page, "[data-prose]");
   const shareBox = (await share.boundingBox())!;
   const more = await box(page, "[data-article-more]");
@@ -309,3 +313,81 @@ for (const width of [320, 360, 390, 414, 600, 660, 768, 900, 901, 999, 1000, 102
     expect(widest).toBeLessThanOrEqual(width + 0.5);
   });
 }
+
+// Keys and logins (the owner, 2026-10-07: "passwords and keys ... work different", so they get a
+// section of their own): no rotli password, AI tools keep their own logins, the one optional key
+// and its rules, the Helper's pairing code, and what rotli can and can't spot in a note.
+test("keys and logins have their own section, linked from where the files are described", async ({
+  page,
+}) => {
+  await page.goto("/privacy/");
+  const link = page.locator("#your-notes ~ p a[href='#keys']").first();
+  await expect(link).toHaveText("Keys and logins");
+  await link.click();
+  await expect(page).toHaveURL(/#keys$/);
+  const section = page.locator("#keys ~ *:not(h2#website ~ *)");
+  await expect(section.filter({ hasText: "no rotli password" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "never reads them" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "lives in the macOS Keychain" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "No AI model ever sees it" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "Brave Search" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "pairing code" })).toHaveCount(1);
+  await expect(section.filter({ hasText: "mark that note secure yourself" })).toHaveCount(1);
+});
+
+// What the website keeps (the owner, 2026-10-07): unsubscribing, by the link or the mail app's
+// button, erases the address within a day (site/server/unsubscribed.ts), the signup alert keeps
+// one copy, and a request deletes that too;
+// "Keeping and deleting" points to all of it, since its notes line alone read as "nothing kept".
+test("the email list says how to erase an address, and Keeping and deleting points to the website", async ({
+  page,
+}) => {
+  await page.goto("/privacy/");
+  const list = page.locator("#website ~ p", { hasText: "The email list." });
+  await expect(list).toContainText("Unsubscribe button works too");
+  await expect(list).toContainText("within a day your address is erased from Resend");
+  await expect(list.locator("a[href='/roadmap/#request']")).toHaveText("send a request");
+  const retention = page.locator("#retention ~ p", { hasText: "This website keeps a little" });
+  await expect(retention.locator("a[href='#website']")).toHaveText("This website");
+  await expect(page.locator(".meta, [data-article-cover]").first()).toContainText("Updated October 7, 2026");
+});
+
+test("/privacy/'s reading time is counted the way a post's is", async ({ page }) => {
+  await page.goto("/privacy/");
+  // src/writing.ts readingMinutes: words / 230, at least 1. The page is written in Astro, not
+  // Markdown, so its constant is checked against the words on the page.
+  const words = await page
+    .locator(".prose")
+    .evaluate((el) => (el as HTMLElement).innerText.split(/\s+/).filter(Boolean).length);
+  const shown = Number(
+    (await page.locator("[data-article-cover] .byline").innerText()).match(/(\d+) min read/)![1],
+  );
+  expect(Math.abs(shown - Math.max(1, Math.round(words / 230)))).toBeLessThanOrEqual(1);
+});
+
+test("/privacy/ has a Markdown twin made from the page, for Copy Markdown and for agents", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/privacy/");
+  await expect(page.locator('link[rel="alternate"][type="text/markdown"]')).toHaveAttribute(
+    "href",
+    "/privacy/index.md",
+  );
+  const twin = await request.get("/privacy/index.md");
+  expect(twin.ok()).toBe(true);
+  const text = await twin.text();
+  expect(text.startsWith("# Privacy\n\n> rotli is built so there is nothing about you to collect.")).toBe(
+    true,
+  );
+  // Every section of the page, in order, as a heading.
+  const headings = [...text.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  expect(headings).toHaveLength(SECTIONS.length);
+  // The promise's table, as a table, its rows the page's.
+  expect(text).toContain("| Note | On-device model (runs on your Mac) |");
+  expect(text).toContain("| **Secure note** (Right-click → Mark secure) |");
+  // Links are whole addresses; nothing decorative slips in.
+  expect(text).not.toMatch(/\]\((?!https?:)/);
+  expect(text).not.toMatch(/<[a-z]/i);
+  expect(text.trimEnd().endsWith("Source: https://rotli.co/privacy/")).toBe(true);
+});

@@ -13,12 +13,13 @@
 // record: nothing is kept. An `article` carries the same measure in its rail and, narrow, as a
 // slim bar.
 // Blog posts and /privacy/ pass `article` (opt-in), on the site's one 76rem page, so the head has
-// the header's edges: the head (blog/ArticleCover.astro: the words beside the picture on a wide
-// screen; /privacy/ draws its night scene through the `cover` slot), then two columns on named
-// tracks (--article-tracks: the left rail, then the middle with the reading column of about 66
-// characters centred in it, blog/article.css). The rail has the short title, the tree, the meter
-// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro;
-// /privacy/ shares by Copy link alone). After the article, "More from rotli": more posts and
+// the header's edges: the banner straight across the window above the page (blog/ArticleBanner.astro,
+// or a drawing through the `cover` slot), the head under it on the reading column
+// (blog/ArticleCover.astro), then two columns on named
+// tracks (--article-tracks, `.longform` in blog/article.css: the left rail, its gap, then the
+// reading column of about 66 characters on one left edge, wide blocks running on to the page's
+// right edge). The rail has the short title, the tree, the meter
+// as a percent, Sources, and Share, pinned only when it fits the window (blog/ArticleRail.astro). After the article, "More from rotli": more posts and
 // rotli's own spots (blog/ArticleAside.astro), which take the place of the article's own Sources
 // list where the rail shows the sources. Under 901px the tree is the disclosure, the meter a slim
 // bar under the header, the article keeps its Sources list, and Share follows the article, all on
@@ -33,6 +34,7 @@ import type { Promo } from '../promos';
 import type { Source } from '../sources';
 import { site } from '../site';
 import ArticleAside, { type MorePost } from './blog/ArticleAside.astro';
+import ArticleBanner from './blog/ArticleBanner.astro';
 import ArticleCover from './blog/ArticleCover.astro';
 import ArticleRail from './blog/ArticleRail.astro';
 import SiteFooter from './SiteFooter.astro';
@@ -73,7 +75,9 @@ interface Props {
     markdown?: string;
     /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
     sources?: Source[];
-    /** Every way to share (a post), or Copy link alone (/privacy/). */
+    /** What Share calls the page (X's text, Email's subject) when the heading alone is too short. */
+    shareTitle?: string;
+    /** Every way to share, or Copy link alone. */
     share?: 'all' | 'link';
     /** What the rail calls the page in its labels: "About this post", "Position in this page". */
     noun?: 'post' | 'page';
@@ -127,6 +131,13 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
+  {
+    article && (article.cover || drawnCover) && (
+      <ArticleBanner cover={article.cover} drawn={drawnCover}>
+        {drawnCover && <slot name="cover" />}
+      </ArticleBanner>
+    )
+  }
   <main
     id="content"
     class:list={[
@@ -134,7 +145,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
       {
         center,
         'has-progress': progress,
-        'is-article': article,
+        'is-article longform': article,
         // The rail lists the sources, so on a wide screen the article's own list gives way (article.css).
         'has-rail-sources': sources.length > 0,
       },
@@ -142,7 +153,6 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
   >
     {article ? (
       <ArticleCover
-        cover={article.cover}
         crumbs={crumbs}
         kicker={kicker}
         heading={heading}
@@ -150,10 +160,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
         author={article.author}
         meta={meta}
         tags={article.tags ?? []}
-        drawn={drawnCover}
-      >
-        {drawnCover && <Fragment slot="art"><slot name="cover" /></Fragment>}
-      </ArticleCover>
+      />
     ) : (
     <header class="writing-head">
       <div class="head-copy">
@@ -233,7 +240,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
             noun={article.noun}
             share={{
               url: article.url,
-              title: heading,
+              title: article.shareTitle ?? heading,
               text: description,
               markdown: article.markdown,
               mode: article.share,
@@ -464,7 +471,7 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
      bar under the header below 900px; the rail beside the reading column, Share after it on
      narrow screens. The column's type and the figures are blog/article.css. */
   .writing.is-article {
-    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+    padding-top: clamp(2rem, 4vw, 3.25rem);
   }
   .writing.is-article.has-progress {
     --meter-height: 0px;
@@ -472,38 +479,17 @@ const drawnCover = article !== undefined && Astro.slots.has('cover');
   .read-progress.slim {
     display: none;
   }
-  /* The article's grid (the owner, 2026-10-06: "remove the part on right and move blog content
-     more right"). The post is on the site's one 76rem page, the header's width, and the tracks are
-     named so the head (blog/ArticleCover.astro) and the body share them:
-       [rail] the left rail · a gap · [main] the middle, holding [text] the reading column centred
-       in it, so the column sits in the middle of the room right of the rail.
-     The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
-     characters. The rail and the gap are fluid in the page's own width (cqi: main is the
-     container): the rail 10rem at 901px to 16rem from about 1180px (where it stops), the gap 2rem
-     to 2.5rem. At the full 76rem page the middle is 57.5rem: the column and about 7rem a side,
-     room that figures, tables, and code may break out into. Below 901px it is one column (the
-     rail's Share and "More from rotli" follow the article, on the text's edges). */
-  .writing.is-article {
-    container-type: inline-size;
-    --prose-size: 1.125rem;
-    --measure: calc(var(--prose-size) * 38.5);
-    --col-left: clamp(10rem, 35.42cqi - 8.35rem, 16rem);
-    --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 2.5rem);
-    --article-tracks: [main-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr)
-      [main-end];
-  }
-  @media (min-width: 901px) {
-    .writing.is-article {
-      --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
-        [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
-    }
-  }
+  /* The article's grid: the long-form tracks (`.longform`, blog/article.css, shared with
+     /roadmap/): the rail, its gap, then the reading column starting on one left edge with the
+     wide room to its right. Below 901px it is one column (the rail's Share and "More from rotli"
+     follow the article, on the text's edges). */
   .writing-body.has-rail {
     grid-template-columns: var(--article-tracks);
     gap: 0;
   }
+  /* The "On this page" disclosure (below 901px) is a bar across the page, on the picture's edges. */
   .writing-body.has-rail > .toc-compact {
-    grid-column: text;
+    grid-column: main;
   }
   .writing-body.has-rail > .prose {
     grid-column: main;

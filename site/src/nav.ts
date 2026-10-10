@@ -8,6 +8,7 @@ import {
   WEB_APP_PATH,
   site,
 } from './site';
+import { VOTING_OPEN } from './roadmap';
 
 export type NavSection =
   | 'product'
@@ -93,7 +94,7 @@ export function resourceItems(options: { hasPosts: boolean }): NavItem[] {
       section: 'roadmap',
       href: '/roadmap/',
       label: 'Roadmap',
-      description: 'What’s next, and your vote on it',
+      description: VOTING_OPEN ? 'What’s next, and your vote on it' : 'What’s being built, and what’s next',
     },
     {
       section: 'studio',

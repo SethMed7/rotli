@@ -59,9 +59,9 @@ each step of the Overview puts its words above its picture on a tablet and a pho
 the landing's smallest controls (the footnote marks, the 404's other ways in)
 answer a 44px touch. Small controls grow their hit area under
 `(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
-holds the landing's order and grounds, the Overview's three steps (the view and
-vault picture's dotted line level with both marked rows from 320 to 1920, the
-LLM wiki source link, the closing "See every feature" link), the before and after's
+holds the landing's order and grounds, the Overview's three steps (pinned, one
+step per third of the scroll, stacked on short windows; the view and vault picture's dotted line level with both marked rows from 320 to 1920, the
+LLM wiki link under the lede), the before and after's
 play (once in view, held off screen, resting marked, Replay, one window at
 1440×900, no script, reduced motion), the FAQ's Rotli Web answer when it is
 there, and the closing panel, whose art never touches its words from 320 to
@@ -118,7 +118,8 @@ there, and the closing panel, whose art never touches its words from 320 to
   name; below 560px the star link ("Star rotli on GitHub" and the count) and
   "Download free" move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
-  ready." sign-up, always shown (see "The coming-soon list" below); its
+  ready." sign-up, always shown (see "The coming-soon list" below): one field
+  with an arrow inside it that sends, named "Keep me posted"; its
   closing row holds the maker line, with a drawn X mark (not the platform's
   artwork) linking to `https://x.com/iamsethmedina`, `rel="me"`, in a 44px
   target, and the Launch Llama badge; the quokka scenery runs along its bottom
@@ -162,10 +163,31 @@ there, and the closing panel, whose art never touches its words from 320 to
      as one story in three steps (the owner, 2026-10-06: "clarify view vs
      where it actually lives"). It absorbed the former TwoKinds section ("You
      write for yourself. AI reads differently.") the same day, because the
-     two said the same thing. Each step is a number, a heading, and one or two
-     sentences beside one picture drawn in HTML on the site's tokens (words
-     above the picture below 1080px), with the app's quokka standing on it and
-     no outer card (the owner, 2026-10-05: no card in a card):
+     two said the same thing. One step shows at a time, following the scroll
+     (the owner, 2026-10-08: the three in one scroll felt "dead and
+     overwhelming"; then "make the switches of what I am looking at happen
+     with scroll not manually"). On a window at least 1081 wide and 800 tall
+     the story pins in the middle of the window under the header while the
+     page scrolls a runway below it (half a window per step after the
+     first, `src/storyScroll.ts`); each third of the runway is one step. The
+     steps are listed on the left, each a heading, the open one with its one
+     sentence on a highlight in the frame's colour that glides between them
+     and joins the frame with two concave corners; the pictures slide through
+     one framed stage on the right (a warm bezel round a lighter panel, after
+     a reference the owner shared, 2026-10-08), each centred in it, the stage
+     keeping the tallest one's height. Along the stage's floor runs a slim,
+     faint stretch of the island's shore (`StageScenery.astro`: the sea's
+     line, a sail, dunes and grass, no clouds behind the words), wider than
+     the stage, panning a little as the pictures slide so the steps read as a
+     walk along the shore; the pictures keep `--shore` of room above it.
+     Stacked, each picture sits in its own matching frame, without the shore. A step switches whole (nothing is scrubbed
+     with the scroll), and a step's name scrolls the page to it. Only the open
+     picture is focusable (the others are `inert`). Narrow or short windows,
+     and no script, stack the three, each heading and sentence over its
+     picture. Reduced motion: the steps switch without the slide. Each picture
+     is drawn in HTML on the site's tokens, with the app's quokka standing on
+     it (it hops as its picture opens) and no outer card (the owner,
+     2026-10-05: no card in a card):
      1. Write in your view (`ViewAndVault.astro`): the note in Main under a
         folder, and its one file in the vault at `wiki/_inbox/dana-call.md`,
         the two marked rows joined by a dotted "same file" line. Both panels
@@ -192,14 +214,11 @@ there, and the closing panel, whose art never touches its words from 320 to
         The app has no "sources" control, so none is drawn.
      Every claim is a contract's; `docs/design/landing-layout-2026-10-05.md`
      ("Revised 2026-10-06 (evening)") lists the source of each. Under the
-     steps, "What is an LLM wiki?" is a short aside under one hairline: two
-     sentences, Andrej Karpathy's "LLM Wiki" gist (2026-04-04) as the term's
-     source, and Getting started as rotli's own page. It is an aside, not an
-     FAQ entry, because FAQ answers are plain strings (they are also the
-     FAQPage JSON-LD) and this one needs its source linked inside the
-     sentence. The section ends on the landing's one link to `/features/`,
-     "See every feature" (a secondary button; it closed the tour until that
-     was removed, 2026-10-06). The
+     lede, "What is an LLM wiki? ↗" is one link to Andrej Karpathy's "LLM
+     Wiki" gist (2026-04-04), the term's source; it replaced a two-sentence
+     aside under the steps (the owner, 2026-10-08). The story is the
+     section's last word: no "See every feature" (Features is in the
+     header). The
      "more than notes" message the old lede carried stays in the hero lede
      and the FAQ.
   4. The dev-only Experiments (plain; between the plain Overview and the
@@ -312,16 +331,18 @@ there, and the closing panel, whose art never touches its words from 320 to
   It reads like a blog post (the owner, 2026-10-06: "Privacy page design
   should match blog styles"): `WritingPage`'s `article` layout, so the head,
   the rail, the reading column, and the end are a post's (see "The blog
-  post" below). The head is "Privacy", the lede, and "Updated …" (no author,
-  no topics) beside the film's night (`SecureScene.astro` through the
-  `cover` slot, see "The privacy head" below). The rail has the tree from its
-  `##` headings, the meter as a percent, no Sources, and Share as **Copy
-  link** alone (a policy is pointed to, not posted, and it has no Markdown
-  twin; the whole Share block waits for script and a clipboard, so it is
-  never an empty label). The promise's matrix breaks out of the words like a
-  post's table where the middle has room (the same `article-prose`
-  container query, 48.5rem), and the section companions float on the
-  column's right edge, not the middle track's. "More from rotli" closes it:
+  post" below). The head is a post's: "Privacy", the lede, the byline with
+  "Updated …" and the reading time, and topics, beside a drawn banner (see
+  "The privacy head" below). The rail has the tree from its
+  `##` headings, the meter as a percent, no Sources, and a post's Share (the
+  owner, 2026-10-09: "Full Share like posts"): X, LinkedIn, and Email, with
+  `shareTitle` ("rotli's privacy promise: …") as their text since "Privacy"
+  alone is thin, then Copy link and Copy Markdown from the page's twin,
+  `/privacy/index.md` (see "Markdown twins"). The promise's matrix is a wide block (`.wide`): it
+  starts on the words' edge and runs on to the page's right edge like a
+  post's table where there is room (the same `article-prose` container
+  query, 48.5rem), and the section companions float on the column's right
+  edge, not the main track's. "More from rotli" closes it:
   the published posts tagged **Privacy** (`morePostCard` in `src/writing.ts`,
   shared with the blog) and the Download and Rotli Web spots, each only in
   builds that offer it. `e2e/site/privacy-page.spec.ts` holds the head from
@@ -419,48 +440,64 @@ there, and the closing panel, whose art never touches its words from 320 to
     head has the header's edges (the logo's left, Download's right) at every
     width; there is no wider post page any more. The grid is named tracks,
     `--article-tracks`, shared by the head and the body: `rail`, a gap, and
-    `main` (the middle) holding `text` centred in it. There is no right rail.
+    `main` (the room right of the gap), which starts with `text`, the reading
+    column; the rest of `main` is room for wide blocks. There is no right
+    rail. The tracks and tokens are `.longform` in `blog/article.css`, the
+    one definition the posts, `/privacy/`, and `/roadmap/` share (the owner,
+    2026-10-07; the measured evaluation and the options are
+    `docs/design/article-pages-width-2026-10-07.md`).
     The reading column is a measure, `--measure`: 18px type × 38.5, about 66
     characters, at every width. The rail and the gap are fluid in the
     article's own width (`cqi`; the article is the container). By window
     width:
 
-    | Window     | Page             | Left rail              | Gap        | Middle (column centred) | Line        |
-    | ---------- | ---------------- | ---------------------- | ---------- | ----------------------- | ----------- |
-    | to 900     | window − gutters | (disclosure)           | none       | the column              | to 66 chars |
-    | 901 – 1179 | window − gutters | 10rem → 16rem by ~1180 | 2 → 2.5rem | the rest                | 61 – 66     |
-    | 1180 – 1295 | window − gutters | 16rem                 | 2.5rem     | the rest                | 66          |
-    | 1296 and up | 76rem            | 16rem                 | 2.5rem     | 57.5rem: the column and about 7rem a side | 66 |
+    | Window      | Page             | Left rail              | Gap        | Main (column, then wide room)          | Line        |
+    | ----------- | ---------------- | ---------------------- | ---------- | -------------------------------------- | ----------- |
+    | to 900      | window − gutters | (disclosure)           | none       | the page; the column on its left edge  | to 66 chars |
+    | 901 – 1179  | window − gutters | 10rem → 16rem by ~1180 | 2 → 2.5rem | the rest                               | 61 – 66     |
+    | 1180 – 1295 | window − gutters | 16rem                  | 2.5rem     | the rest                               | 66          |
+    | 1296 and up | 76rem            | 16rem                  | 2.5rem     | 57.5rem: the column, then 14.2rem      | 66          |
 
-    The column sits in the middle of the room right of the rail, so on a wide
-    screen it is further right than the page's centre (the owner: "move blog
-    content more right"). Below 901px the rail folds (its tree the
-    disclosure, its meter the slim bar, its Share after the article).
-    `/privacy/` uses the same layout (see "The privacy head" below).
-  - **What breaks out.** Every block of the post keeps the measure, centred
-    in the middle; figures, tables, and code blocks may break out, but only
-    when the middle is at least 48.5rem (a container query on the prose), so
-    a figure is never a sliver wider than the text, and never by more than
-    5rem a side (`min(100%, --measure + 10rem)`), so nothing is over-wide.
-    Beside the full-width rail (from about 1180px) they spread; on a narrow
-    middle they keep the measure. Nothing reaches into the rail.
-  - **The head** (`blog/ArticleCover.astro`) spans the page, the header's
-    edges. From 1000px it is two columns, centred on each other so neither
-    leaves an empty band: on the left "Blog /" small and quiet, the title
-    (wrapping at about 22em), the summary, one meta line (the face mark as
-    avatar, the author, date, reading time), and the `tags` as light outlined
-    labels; on the right the post's picture, whole, rounded, in a hairline
-    frame. The picture beside the title is the banner's quokka crop
-    (`postBanner(slug).mobile`, 1300 × 900) at its own shape (`object-fit:
-    contain`), so no ears or feet are ever cut; the words get a little more
-    room (`1.08fr` to `1fr`). Below 1000px it stacks, as on a phone: the
-    wide scene across the page (`clamp(12rem, min(30cqi, 44svh), 27rem)`
-    tall, `object-position: 100% 70%`), then the words (on the page's left
-    edge from 901px, on the reading column's below); under 700px the picture
-    is the quokka crop again. A hairline closes the head. Nothing overlaps
-    the picture, nothing is pinned, and the title is in the first window at
-    1280 × 800 and 1440 × 900. A post without art gets the same head without
-    the picture.
+    Every block starts on the column's left edge, one rail gap past the rail;
+    nothing is centred in the room, so the gap is the gap and no more (the
+    owner, 2026-10-07, after the centred column of "move blog content more
+    right" left 153px between the rail and the words at 1440). Below 901px
+    the rail folds (its tree the disclosure, a bar across the page on the
+    picture's edges; its meter the slim bar; its Share after the article)
+    and the column starts on the page's left edge. `/privacy/` uses the
+    same layout (see "The privacy head" below), and `/roadmap/` the same
+    tracks.
+  - **What breaks out.** Every block of the post keeps the measure; figures,
+    tables, code blocks, and anything marked `.wide` start on the words'
+    edge and run on to the page's right edge (the header's, and the head
+    picture's), but only when `main` is at least 48.5rem (a container query
+    on the prose), so a wide block is never a sliver wider than the text.
+    On a narrower `main` (about 901 to 1150px) they keep the measure.
+    Nothing reaches into the rail.
+  - **Lists.** A top-level list respects the column's one left line (the
+    owner, 2026-10-07): its bullet or number is drawn (`::before`, not
+    `::marker`, whose place the browser decides) exactly on the edge the
+    words and tables start on, and its words start one step in (1.25rem for
+    bullets, 1.75rem for numbers), at every width. Nothing hangs into the
+    rail's gap. Nested lists indent from their item; the Sources list and
+    footnotes draw their numbers on the same line.
+  - **The head** opens on a banner straight across the window (the owner,
+    2026-10-09, pointing at deno.com/blog: "one thing straight across top like
+    an image/banner then the rest under instead of text left illustration
+    right"; from 2026-10-06 the title had sat beside the picture from 1000px).
+    `blog/ArticleBanner.astro`, which `WritingPage` renders before the page's
+    centred wrapper so it is the window's width with no negative margin: the
+    wide scene (2400 × 1000) edge to edge under the header, square-cornered
+    with a hairline under it, `clamp(13rem, 36vw, 34rem)` tall (about 86% of
+    the scene's height, so the crop comes off the sky and the quokka keeps its
+    ears and feet, `object-position: 72% 92%`); at 700px and under, the phone
+    crop at its own shape, capped at 55svh. Under it, on the reading column
+    (`blog/ArticleCover.astro`, the `text` track, so the title starts where the
+    post's words start): "Blog /" small and quiet, the title (wrapping at about
+    22em), the summary, one meta line (the face mark as avatar, the author,
+    date, reading time), the `tags` as light outlined labels, and a hairline.
+    Nothing is pinned or overlaps the picture. A post without art gets the same
+    head without the banner. `/privacy/` and `/roadmap/` open the same way.
   - **The left rail** (`blog/ArticleRail.astro`) reads, top to bottom: the
     short title (`railTitle`: a title's first sentence), "On this page" as a
     tree (`###` under `##`, `tocTree`), the reading meter as a bar and a
@@ -528,9 +565,8 @@ there, and the closing panel, whose art never touches its words from 320 to
     list), footnotes, and the figures' styles; long words and bare addresses
     break instead of widening a phone's page.
   - Specs: `e2e/site/article-banner.spec.ts` (the head at 2560 to 390: the
-    words beside the picture from 1000px and centred on it, the picture whole
-    at its own shape, stacked below; its order, alignment to the header,
-    first-window title, and measured contrast), `article-rail.spec.ts` (the
+    banner edge to edge under the header, the words under it on the reading
+    column; their order, alignment, first-window title, and measured contrast), `article-rail.spec.ts` (the
     rail's order, nothing in it clipping, four sources then "Show all"
     opening all nine whole in the window at 1440 × 900, 1440 × 700, 1280 ×
     800, and 1024 × 640, the button from the keyboard, all sources without
@@ -546,28 +582,26 @@ there, and the closing panel, whose art never touches its words from 320 to
     sideways scroll, the rail and figures never over the text, 60 to 80
     characters a line from 768px and 62 to 70 from 1180px, 18px type, the
     head and picture on the header's edges ±1.5px from 1024 to 2560, the
-    column centred in the middle, figures breaking out and never by more
-    than 5rem a side; the rail 16rem from 1440, a post's page and the index's
+    column one rail gap past the rail with a list's words on its edge,
+    figures on the words' edge ending on the page's right edge when they
+    break out, and posts, `/privacy/`, and `/roadmap/` sharing the rail and
+    the edge from 901px; the rail 16rem from 1440, a post's page and the index's
     both 76rem, a live resize matching a fresh load); `scripts/site-writing.test.ts`
     holds `sourcesOf` against the published post, `railTitle`, `morePosts`,
     and the promos' data and rotation.
-- **The privacy head** (`blog/ArticleCover.astro` with `drawn`, through
-  `WritingPage`'s `cover` slot; the owner, 2026-10-06). `/privacy/` once opened
-  on a full-width banner pinned under the header with the head as a panel
-  rising over it; that banner (`WritingPage`'s `banner` prop and slot) is gone,
-  and the page opens like a post: the words on the header's left edge and the
-  night in the post picture's place and frame (rounded, a hairline,
-  `overflow: hidden`), side by side from 1000px and stacked below it, the
-  night first. The night is `.band-night` (Ocean Dark tokens and stars): the
-  caption ("Secure notes stay home. …") on its own `--deep` ground at the
-  top, so the stars never sit under it (8.6:1, the inked phrase 15.7:1), and
-  the dome standing on the frame's floor below it, at most
-  `min(20rem, 42svh)` tall; the remote-AI clouds drift into the sky between
-  them and the frame clips them. The night and the caption are still, like a
-  post's picture; only the scene plays, once (its own `[data-reveal]`).
-  ArticleCover's other options for it: no `author` (the meta line stands
-  alone, no mark), no `tags`; ArticleRail's `noun: 'page'` ("About this
-  page", "Position in this page") and `share.mode: 'link'`.
+- **The privacy head** (`blog/ArticleCover.astro`; the owner, 2026-10-06, and
+  2026-10-09: "compare to this blog [The AI you already pay for] … and then
+  try to match it"). `/privacy/` opens exactly like a post: the title, the
+  lede, a byline (the author's mark and name, "Updated …", and the reading
+  time, `READ_MINUTES`, counted the way a post's is and rechecked against the
+  page's words by `privacy-page.spec.ts`), the topic chips (Privacy, AI,
+  Security), and a banner drawn like a post's: `PAGE_ART.privacy` in
+  `src/og.ts`, rendered by `bun run build:brand-images` into
+  `public/banners/privacy*.webp` (the island by day, the quokka with its
+  padlock shield, a locked note in front, the friendly on-device chip up the
+  beach). It replaced the Ocean Dark night with its caption that stood in the
+  picture's place (2026-10-06 to 2026-10-09); the night stays on the landing's
+  privacy band. Share is a post's, Copy Markdown included (2026-10-09).
 - **Writing.** Blog posts, the guides among them (tagged Guide), are Markdown
   in one content collection, `src/content/writing/posts/` (schema:
   `src/content.config.ts`; posts may add `tags`, up to four short topics shown
@@ -856,33 +890,24 @@ there, and the closing panel, whose art never touches its words from 320 to
   its lines in either environment.
 - **The privacy passage** (the owner's call, 2026-10-05; `src/passage.ts`).
   A section marked `data-passage="ocean-dark"` (the landing's privacy band)
-  takes the whole page into the app's Ocean Dark while it is the focal
-  passage: the ground, text, accents, bands, buttons, and the sticky header
-  with its navigation, dropdown, and Menu all switch to Ocean Dark tokens
-  (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
-  the night's stars spread over the plain grounds, `color-scheme` and the
-  `theme-color` meta follow, and it all fades back out on leaving the band in
-  either direction. It turns on once the band fills 40% of the window (or of
-  itself, if shorter) and off once it fills under 25%, so a page resting near
-  a boundary never flickers; a reload mid-band lands in the night at once.
-  It reads as one dusk (the owner's "more smooth and better polished",
-  2026-10-05). The cut the owner saw came from the band always painting its
-  own night while the page followed only once the middle of the window was
-  well inside it, with the header, buttons, stars, and ground each fading on
-  its own clock. Now the band's top and bottom edges are feathered into the
-  neighbours' empty section padding (`[data-passage]::before/::after`, the
-  band's own night to transparent; in the night they vanish into the ground),
-  and the crossfade runs on the tokens themselves, registered with
-  `@property` and transitioned on the root, so everything that reads them
-  changes in the same frame. Grounds ease over 900 ms
-  (`cubic-bezier(0.65, 0, 0.35, 1)`); text never fades through the ground
-  (where both cross, it would vanish), so the inks switch whole at 459 ms,
-  when the ground is mid-tone, while muted and accent text lean onto `--text`
-  around the switch and a primary button's label (`--on-text`) switches with
-  its button. `scripts/site-interactions.test.ts` measures every frame: never
-  under 3:1, and under 4.5:1 for under 80 ms. It is a time-based eased
-  crossfade at a threshold, not a scroll scrub (the owner rejected scrubbing
-  for the story). Reduced motion switches at once. It is a passage, not a preference: nothing is stored. Lowest night pair:
+  paints the app's Ocean Dark itself, with its stars, and grows out of the
+  page (the owner's pick, 2026-10-08, from the patterns premium product pages
+  use): with script it comes up the window as a rounded card set inside the
+  day page, widens to the full width with square corners over 0.7 of a window
+  as it arrives, and narrows back into a card as it leaves. `passageGrow`
+  sets `--grow` (0 to 1, eased in and out) and only the band's `clip-path`
+  changes, so nothing reflows. While the band is full width under the header,
+  the header with its navigation, dropdown, and Menu takes the Ocean Dark
+  tokens (`:root[data-passage='ocean-dark'] .site-header-bar`, values from
+  `src/styles/themes.css`), as do `color-scheme` there and the `theme-color`
+  meta, in a 240 ms flip on its own registered tokens (the inks switch whole
+  at 122 ms; `scripts/site-interactions.test.ts` measures every frame).
+  Nothing else on the page changes colour. How it got here: from 2026-10-05
+  the whole page crossfaded into the night, and each version left something
+  wrong at the switch (a neighbour recoloured, or hidden and blank); a curtain
+  lock followed, then this. Reduced motion, and no script, keep the band full
+  width (feathered, without script). It is a passage, not a preference:
+  nothing is stored. Lowest night pair:
   muted text on `--surface-2`, 6.75:1. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
   orb swatches (the owner's call, 2026-09-23):
@@ -1028,14 +1053,13 @@ there, and the closing panel, whose art never touches its words from 320 to
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
   stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
-  through `.band-night` (the landing privacy band and the night beside the
-  title on `/privacy/`); `IslandScene.astro` is the island by
+  through `.band-night` (the landing privacy band); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
   the `/about/` story, captioned with where the name comes from); the FAQ has the searching
   quokka among question cards; the closing panel has the writing quokka.
   The footer's quokka beach, right below that panel, is the page's one
-  closing scene. `/privacy/` places its night through `WritingPage`'s
-  `cover` slot (see "The privacy head"); `/about/` places its scene through
+  closing scene. `/privacy/` opens on a drawn banner like a post's (see "The
+  privacy head"); `/about/` places its scene through
   the `scene` slot and uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/#promise`: the
   promise and three facts on the left, the night scene on the right.
@@ -1151,6 +1175,13 @@ agents; every sentence in it restates a claim the pages already make.
   Cloudflare ignores `Vary` for everything but images; negotiation is safe only
   because it caches no HTML, `.md`, or `.txt` by default. A "Cache Everything"
   rule would hand cached Markdown to browsers: exclude the negotiated paths first.
+  A page written in Astro rather than Markdown gets its twin from the built page
+  (`/privacy/`, listed in `MARKDOWN_TWIN_PAGES` in `astro.config.mjs`):
+  `src/markdownTwin.ts` reads the article (`data-prose`) back into Markdown after
+  the build (headings, paragraphs, lists, emphasis, code, whole links, and tables,
+  a header's small print in parentheses; decoration left out) and writes
+  `index.md` beside the page. No dependency; `scripts/site-markdown-twin.test.ts`
+  holds the rules and `privacy-page.spec.ts` the built twin.
 - **JSON-LD.** The landing page carries `WebSite`, `SoftwareApplication`, and
   `FAQPage` (the FAQ's own list, `src/faq.ts`); `/download/` carries
   `SoftwareApplication`; writing pages carry `Article` or `BlogPosting` with a
@@ -1256,15 +1287,28 @@ voting opens soon, and every page keeps serving.
   `POST https://api.resend.com/contacts` with
   `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
   per address in Resend, so when the contact already exists it calls
-  `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
-  answered exactly like a new one, and an earlier unsubscribe is never
-  overridden. Addresses are never logged (only Resend's status and error name).
+  `POST /contacts/{email}/segments/{segment_id}` and then
+  `PATCH /contacts/{email}` with `{ unsubscribed: false }` instead: a repeat
+  signup is answered exactly like a new one, and someone who left and signs up
+  again is subscribed again (otherwise the unsubscribed sweep below would erase
+  the address a day after the signup said yes). Addresses are never logged
+  (only Resend's status and error name).
   This is Resend's current Contacts API: Audiences are now Segments, and
   Broadcasts take a `segment_id` (checked against resend.com/docs, 2026-10-05).
 - Consent: one sign-up (single opt-in) with the footer's line ("Unsubscribe
   anytime") and `/privacy/#website`, which says what is kept and how to leave.
-  Unsubscribing is Resend's own Broadcast link. Double opt-in is not built: it
-  needs a verified sending domain and a confirmation email (an owner decision).
+  Unsubscribing is Resend's own Broadcast link, or the one-click Unsubscribe
+  button mail apps draw from the List-Unsubscribe headers Resend adds to every
+  Broadcast. Double opt-in is not built: it needs a verified sending domain
+  and a confirmation email (an owner decision).
+- Unsubscribing erases (the owner, 2026-10-07). Resend keeps an unsubscribed
+  contact, marked; the sidecar's sweep (`server/unsubscribed.ts`) deletes
+  every unsubscribed contact in the segment a minute after start and then
+  daily (`GET /contacts?segment_id=…`, then `DELETE /contacts/{id}`, spaced
+  to stay under Resend's rate limit; resend.com/docs, checked 2026-10-07).
+  It logs counts only, never an address. Contacts are global in Resend, so a
+  deleted address is gone from every segment, and a later signup starts
+  fresh. It runs whenever the list is on; there is no separate switch.
 - Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
 
 **Owner setup: the same Resend account as the portfolio.** The portfolio's
@@ -1329,25 +1373,49 @@ the file disagree. `/roadmap/index.md` is its Markdown twin, linked from
 The page (`src/pages/roadmap/[...slug].astro`, its parts in
 `src/components/roadmap/`), top to bottom:
 
-- **Head** (`RoadmapHead.astro`), laid out like a blog post's: from 1000px the
-  words on the left (Resources /, the title, a lede on what the roadmap is and
-  how to take part, "Direction, not a promise · No dates", the voting state,
-  See what's in the work and Ask for something, and "Roadmap source" to
-  ROADMAP.md on GitHub while the source is public) and the picture on the
-  right; narrower, the words first. The picture (`RoadmapScene.astro`) is
-  drawn in SVG at a cover's 1300 × 900 with the site's tokens and the quokka's
-  own art (`searching`): a map whose route runs through a done, a current, and
-  an open stop, and a signpost pointing three ways. Decorative, so
+- **Head** (`RoadmapHead.astro`), laid out like a blog post's (2026-10-09):
+  the picture is the page's banner, straight across the window above the page
+  (`RoadmapScene.astro` with `banner`, rendered before the wrapper, the same
+  band as a post's), and the words are under it on the reading column
+  (Resources /, the title, a lede on what the roadmap is and how to take part,
+  "Direction, not a promise · No dates", the rework notice, the participation
+  line, See what's in the work and Ask for something, and "Roadmap source" to
+  ROADMAP.md on GitHub while the source is public). The picture is drawn in
+  SVG at a cover's 1300 × 900 with the site's tokens and the quokka's own art
+  (`searching`): a map whose route runs through a done, a current, and an open
+  stop, and a signpost pointing three ways. In the wide band the drawing stays
+  whole in the middle on the band's floor, and its sky (a cloud each side),
+  sea, dunes, and sand are drawn on past its edges (`overflow: visible`, the
+  band clips); under 700px it is its own shape. Decorative, so
   `aria-hidden`; nothing is fetched.
 - **On this page** (`RoadmapNav.astro`): a link per group with its item count.
-  From 1100px a column pinned under the header beside the groups, marking the
-  group being read (`aria-current`, a bar and weight); narrower, a wrapping row
-  of chips in the flow.
+  From 901px a column in a post's rail (the `.longform` tracks,
+  `blog/article.css`), pinned under the header beside the groups, marking the
+  group being read (`aria-current`, a bar and weight); narrower, a wrapping
+  row of chips in the flow. The groups start on a post's column edge, one
+  rail gap past it: section notes and summaries keep the reading measure,
+  and the grids and lists run on to the page's right edge.
 - **In the work**: each item under its drawing (`RoadmapMock.astro`, the
-  item's one frame; the words sit on the page, never in a card around both).
+  item's one frame; the words sit on the page, never in a card around both;
+  an id with no drawing yet gets a plain note, so a new In the work item
+  should get one). Graph and Canvas (`canvas`) draws both halves: the graph,
+  its hovered note lit and a secure note a hollow ring, beside a canvas's
+  cards, lines, and group.
   **Planned** and **Ideas**: a calm list on hairlines. Every item shows its
-  title, summary, status (In the work, Planned, Idea), size, and vote
-  (`VoteButton.astro`).
+  title, summary, status (In the work, Planned, Idea), size, and, while
+  voting is open, its vote (`VoteButton.astro`).
+- **Voting is off for now** (`VOTING_OPEN` in `src/roadmap.ts`; the owner,
+  2026-10-09: "for now lets remove it and say it is in the works"): no vote
+  buttons and no "Most votes", the participation line says "Voting is in the
+  works" (with "and requests open soon" until the request sidecar answers), and
+  every invitation to vote elsewhere (the lede, the page description, the
+  Resources menu, the roadmap promo, the Features banner, `/llms.txt`, and the
+  roadmap's Markdown twin) says what is there instead. The sidecar's vote
+  endpoints and the privacy page's paragraph on votes stay for when it opens;
+  setting the flag brings the whole thing back, and `roadmap.spec.ts` registers
+  the vote tests only then (and the voting-off tests only while it is off). A notice under the head's meta line (`notice`: "Under
+  construction. This roadmap is being reworked and will be updated in the
+  coming week to match where rotli is today.") marks the rework.
 - **Recently shipped** (`RecentlyShipped.astro`): the newest four releases in
   CHANGELOG.md (`src/releases.ts`), each with its version, date, and the bold
   leads of its first three items (Added, then Changed, then Fixed) word for
@@ -1472,36 +1540,84 @@ docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  
 ## Films
 
 **The hero film** (`public/media/hero/rotli-hero.mp4` and
-`rotli-hero-poster.webp`, `hero` in `src/films.ts`) is the product itself: a
-real Rotli Web session, under a minute, made by `bun run capture:hero` from a
-local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
-tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
-finds the note with search, asks chat what is still open, and ends on the note
-as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
-in a 162 px band under the picture, never over the UI, in 80 px type so they
-still read (about 15 px) when a phone shows the film 350 px wide. Each caption
-is one line (the script refuses one over 1760 px), the last stays on the frame
-the player rests on, and the player keeps Watch again and pause above the band
-(`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
-`+faststart`, no audio, CRF 18 (about 1.75 MB); the poster is a frame of the
-written note. What is fixture, all synthetic:
+`rotli-hero-poster.webp`, `hero` in `src/films.ts`) tells the landing's own
+story (the owner, 2026-10-09: the earlier film "doesn't show the view and the
+image attached makes no sense"): write in your view, the file lives once in your
+vault, the Librarian files it, ask. It is made by `bun run capture:hero` from a
+local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`, around one clip from the
+Mac app:
 
-- **The Library's filed notes** (Travel, People, Home) are planted as files
-  carrying the Librarian's own fields (`area`, `summary`, `tags`, `links`,
-  `filed_by`). The Librarian runs only in the Mac app, so the film shows what
-  it filed, never a live run, and the note written on camera stays a capture.
+1. **Write in your view** (Rotli Web): New note in Main, "call w/ dana re
+   pricing / she's ok w/ annual. wants the deck fri?? / ask jo about the
+   discount thing", its row in Main.
+2. **The file lives once, in your vault** (Rotli Web): the view picker to
+   "Vault — folders as on disk", the file in `_inbox/`.
+3. **On the Mac, the Librarian files it** (the Mac app, the owner's call:
+   the Librarian runs only there, so its filing is recorded for real). The
+   script cuts here and splices in `HERO_LIBRARIAN_CLIP` (already cropped to
+   the film's picture shape by the take script): `_inbox/` empties and the
+   note lands in `Clients/`, and its location turns "★ Main · Clients".
+4. **Your words untouched. Your view as you left it.** (Rotli Web): the
+   Vault view with the file in `Clients/`, the location "★ Main · Clients",
+   the words as typed, then Main with the note where it was.
+5. **Ask, and the AI reads only what it needs** (Rotli Web): a chat asks
+   "What did Dana want, and what's left?" and answers from that note and the
+   Discount policy.
+
+Real controls are clicked with a drawn pointer; captions sit in a 162 px band
+under the picture, never over the UI, in 80 px type so they still read (about
+15 px) when a phone shows the film 350 px wide. Each caption is one line (the
+script refuses one over 1760 px), and the last stays on the frame the player
+rests on (`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18; the poster is a frame of the note in Main.
+Without `HERO_LIBRARIAN_CLIP` the script makes a draft in `_review/hero-video/`
+with a placeholder card at the cut and never replaces the site's film.
+
+**Shooting the Mac clip.** `bun scripts/hero-librarian-take.mjs` shoots it in a
+debug build that cannot reach your own Rotli (build it first with the command in
+the script's header): the build's own identifier (`com.rotli.dev`), a sandbox
+home in `/tmp/rotli-hero/home` for its settings, viewstate, and model list, and
+a fresh labeled demo vault from `scripts/hero-librarian-vault.mjs` (the same
+notes, and the note written on camera waiting in `wiki/_inbox/`, word for word,
+already in Main, with its own `.rotli/settings.json` letting the Librarian file
+it within about a minute: a 5-second quiet window, the on-device model at
+`localhost:11435`, a filing sentence for Clients, people groups off). It starts
+the binary itself, never `open`, the `rotli` CLI, or a `rotli://` link (they
+reach the installed app), checks the sandbox still points at the demo vault
+right before launch, and stat-compares your Rotli settings folder and
+`~/memex-vault/.rotli` before and after (2026-10-09: an edited `corpus.json`
+in the installed app reverted to the real vault between launches). It records
+the window alone with ScreenCaptureKit, hands focus back to the app that had it
+so the Librarian may run, waits for the note to land in `Clients/`, and cuts
+`_review/hero-video/librarian-clip.mp4`: 4 seconds of the note waiting, the
+move, 5 seconds after, with macOS's purple "being recorded" badge painted out.
+`--cut` re-cuts the last take. Then
+`HERO_LIBRARIAN_CLIP=_review/hero-video/librarian-clip.mp4 bun run capture:hero`.
+The clip leaves the file's raw fields hidden: an open note does not yet redraw
+them after the Librarian moves its file.
+
+What is fixture, all synthetic:
+
+- **The vault's other notes** (Clients, People, Projects, Research; shared
+  with the Mac vault through `scripts/hero-film-fixture.mjs`) are planted as
+  files carrying the Librarian's own fields: notes it filed earlier.
+- **After the cut**, the web vault is given the Librarian's real result from
+  the clip: its fields set in the note's own frontmatter and the file moved
+  to `wiki/Clients/`, the words untouched. The script checks that is what is
+  on disk at the end.
 - **Chat** runs through a fake Rotli Helper on loopback (the
   `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
   every prompt and runs the search and both note reads; only the model's text
   is scripted, and it answers from what those reads returned.
 - **The clock** starts at the real time (New York time zone) so the app's
-  clock and the vault's file times, which the browser stamps itself, agree:
-  the note written on camera reads "just now" and the dates are the day it
-  was shot.
+  clock and the vault's file times, which the browser stamps itself, agree.
+- **The window** is tidied through Settings before the camera rolls (no
+  ambient player; Home without the activity card, All notes, or Tasks), the
+  Welcome lessons folded and their tab closed.
 
-The script fails if the note written on camera is not Markdown in the vault
-or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the
-poster before committing a new take.
+The script fails if the note is not filed in `wiki/Clients/` with its words
+untouched at the end, or the film is over 6 MB. Look at
+`_review/hero-video/frame-*.png` and the poster before committing a new take.
 
 `FilmPlayer.astro` plays it muted, once, as soon as it is on screen, then it
 rests on its last frame; it never loops. A silent film (`silent` in

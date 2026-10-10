@@ -28,9 +28,9 @@ interface PassagePair {
   main?: readonly [string, string];
 }
 let passage: {
-  passageActive(section: { top: number; bottom: number }, viewport: number, active: boolean): boolean;
-  ENTER_SHARE: number;
-  LEAVE_SHARE: number;
+  passageActive(section: { top: number; bottom: number }, nextTop: number | null, line: number): boolean;
+  GROW_SPAN: number;
+  passageGrow(section: { top: number; bottom: number }, viewportHeight: number): number;
   PASSAGE_MS: number;
   GROUND_EASE: readonly [number, number, number, number];
   INK_AT: number;
@@ -77,6 +77,12 @@ interface Cycle {
   pinned: number;
   nextAt: number;
 }
+let story: {
+  STEP_RUNWAY: number;
+  runwayProgress(pinTop: number, stickAt: number, runway: number): number;
+  stepAt(progress: number, steps: number): number;
+  progressFor(step: number, steps: number): number;
+};
 let cycle: {
   CYCLE_MS: number;
   RESUME_MS: number;
@@ -125,45 +131,50 @@ beforeAll(async () => {
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
   cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
+  story = (await import(site("storyScroll.ts"))) as typeof story;
   human = (await import(site("quokka", "human.ts"))) as typeof human;
 });
 
 describe("the privacy passage", () => {
-  const viewport = 800;
-  // A band taller than the window, its top edge at `top`.
-  const band = (top: number, height = 1200) => ({ top, bottom: top + height });
+  const line = 68; // the header's bottom edge
+  const band = (top: number, height = 900) => ({ top, bottom: top + height });
 
-  test("turns on once the band fills a good share of the window, not only its middle", () => {
-    expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
-    const enter = viewport * (1 - passage.ENTER_SHARE);
-    expect(passage.passageActive(band(enter + 1), viewport, false)).toBe(false);
-    expect(passage.passageActive(band(enter - 1), viewport, false)).toBe(true);
-    // Earlier than the old focal line (the middle of the window, plus a margin).
-    expect(enter).toBeGreaterThan(viewport * 0.5);
+  test("is on exactly while the header sits over the band", () => {
+    expect(passage.passageActive(band(400), 1300, line)).toBe(false); // still coming up
+    expect(passage.passageActive(band(line + 2), 970, line)).toBe(false);
+    expect(passage.passageActive(band(line), 968, line)).toBe(true); // locked under the header
+    // The next section slides up over the locked band; daylight reaches the header and it ends.
+    expect(passage.passageActive(band(line), line + 2, line)).toBe(true);
+    expect(passage.passageActive(band(line), line, line)).toBe(false);
   });
 
-  test("holds near a boundary instead of flickering, then lets go in either direction", () => {
-    const enter = viewport * (1 - passage.ENTER_SHARE);
-    const leave = viewport * (1 - passage.LEAVE_SHARE);
-    // Scrolling back up a little past the switch point keeps it on.
-    expect(passage.passageActive(band(enter + 20), viewport, true)).toBe(true);
-    // Leaving upward (the band falls back down the window) turns it off.
-    expect(passage.passageActive(band(leave + 1), viewport, true)).toBe(false);
-    // Leaving downward (the band's end rises up the window) turns it off too.
-    const end = (bottom: number) => ({ top: bottom - 1200, bottom });
-    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE + 1), viewport, true)).toBe(true);
-    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE - 1), viewport, true)).toBe(false);
-    expect(passage.LEAVE_SHARE).toBeLessThan(passage.ENTER_SHARE);
-  });
-
-  test("a band shorter than the window counts its own height", () => {
-    // A 300px band wholly in an 800px window fills all of itself.
-    expect(passage.passageActive({ top: 200, bottom: 500 }, viewport, false)).toBe(true);
+  test("with nothing after it, the band's own end decides", () => {
+    expect(passage.passageActive(band(-800), null, line)).toBe(true);
+    expect(passage.passageActive(band(-900), null, line)).toBe(false);
   });
 
   test("a hidden or empty section never turns it on", () => {
-    expect(passage.passageActive({ top: 0, bottom: 0 }, viewport, false)).toBe(false);
-    expect(passage.passageActive({ top: 0, bottom: 800 }, 0, true)).toBe(false);
+    expect(passage.passageActive({ top: 0, bottom: 0 }, null, line)).toBe(false);
+  });
+
+  test("grows from a card to the full width as it arrives, and narrows as it leaves", () => {
+    const vh = 1000;
+    const tall = (top: number) => ({ top, bottom: top + 1100 });
+    expect(passage.passageGrow(tall(vh), vh)).toBe(0); // just under the window: a card
+    expect(passage.passageGrow(tall(vh - 100), vh)).toBeLessThan(0.1); // holds its shape at first
+    expect(passage.passageGrow(tall(vh * (1 - passage.GROW_SPAN)), vh)).toBe(1); // arrived: full width
+    expect(passage.passageGrow(tall(-100), vh)).toBe(1); // in the middle of it
+    // Leaving, it narrows as its end nears the window's top.
+    expect(passage.passageGrow({ top: -1000, bottom: 300 }, vh)).toBeGreaterThan(0);
+    expect(passage.passageGrow({ top: -1000, bottom: 300 }, vh)).toBeLessThan(0.5);
+    expect(passage.passageGrow({ top: -1300, bottom: 0 }, vh)).toBe(0);
+    // It only ever gets wider as it comes in.
+    let last = -1;
+    for (let top = vh; top >= 0; top -= 25) {
+      const g = passage.passageGrow(tall(top), vh);
+      expect(g).toBeGreaterThanOrEqual(last);
+      last = g;
+    }
   });
 });
 
@@ -310,6 +321,29 @@ describe("the theme studio's autoplay", () => {
     const c = cycle.resume(cycle.createCycle(14, 0, true), 50_000);
     expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS - 1).shown).toBe(0);
     expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS).shown).toBe(1);
+  });
+});
+
+describe("the landing's three steps follow the scroll", () => {
+  test("the runway's share picks the step, a third each, held at both ends", () => {
+    const runway = 1000;
+    expect(story.runwayProgress(300, 100, runway)).toBe(0); // not stuck yet
+    expect(story.runwayProgress(-400, 100, runway)).toBe(0.5);
+    expect(story.runwayProgress(-5000, 100, runway)).toBe(1); // past it
+    expect([0, 0.32, 0.34, 0.66, 0.67, 1].map((p) => story.stepAt(p, 3))).toEqual([0, 0, 1, 1, 2, 2]);
+  });
+
+  test("a tab lands its step in the middle of its share", () => {
+    for (const step of [0, 1, 2]) expect(story.stepAt(story.progressFor(step, 3), 3)).toBe(step);
+  });
+
+  test("each step gets a good part of a window's scroll, so none is skipped in a flick", () => {
+    expect(story.STEP_RUNWAY).toBeGreaterThanOrEqual(0.5);
+  });
+
+  test("no runway or no steps never throws off the page", () => {
+    expect(story.runwayProgress(0, 100, 0)).toBe(0);
+    expect(story.stepAt(0.5, 0)).toBe(0);
   });
 });
 

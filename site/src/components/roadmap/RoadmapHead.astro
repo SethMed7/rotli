@@ -1,20 +1,24 @@
 ---
-// The top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro): from 1000px
-// the words on the left and the picture on the right (RoadmapScene.astro, the cover's 1300 × 900
-// shape), centred on each other, on the header's edges; narrower, the words first and the
-// picture under them, so the title is always the first thing read. The words: where the page
-// sits ("Resources /"), the title, what the roadmap is and how to take part, a meta line, the
-// voting state (the page's script keeps it current), and the two ways in.
+// The words at the top of /roadmap/, laid out like a blog post's head (blog/ArticleCover.astro):
+// under the page's banner (RoadmapScene.astro straight across the window, rendered by the page
+// above its wrapper; the owner, 2026-10-09: "one thing straight across top like an image/banner
+// then the rest under"), on the reading column of the long-form tracks, so the title starts where
+// the groups' words start. The words: where the page sits ("Resources /"), the title, what the
+// roadmap is and how to take part, a meta line, a notice while the roadmap is being reworked, the
+// participation state (the page's script keeps it current), and the two ways in.
 import { ROADMAP_URL, site } from '../../site';
-import RoadmapScene from './RoadmapScene.astro';
 
 interface Props {
   heading: string;
   lede: string;
   meta: string[];
+  /** A short notice under the meta line, its first sentence in bold (the roadmap under rework). */
+  notice?: [string, string];
+  /** The participation line before the page's script has asked the sidecar. */
+  participation: string;
 }
 
-const { heading, lede, meta } = Astro.props;
+const { heading, lede, meta, notice, participation } = Astro.props;
 ---
 
 <header class="road-head" data-roadmap-head>
@@ -35,8 +39,15 @@ const { heading, lede, meta } = Astro.props;
         ))
       }
     </p>
+    {
+      notice && (
+        <p class="notice" data-roadmap-notice>
+          <b>{notice[0]}</b> {notice[1]}
+        </p>
+      )
+    }
     <p class="participation" id="participation-note" role="status" data-roadmap-note>
-      Voting and requests open soon.
+      {participation}
     </p>
     <div class="head-actions">
       <a class="button primary" href="#in-the-work">See what’s in the work</a>
@@ -53,18 +64,18 @@ const { heading, lede, meta } = Astro.props;
       )
     }
   </div>
-  <RoadmapScene />
 </header>
 
 <style>
   .road-head {
     display: grid;
-    gap: clamp(1.75rem, 4vw, 2.5rem);
-    padding-bottom: clamp(2rem, 4vw, 3rem);
-    border-bottom: 1px solid var(--border-strong);
+    grid-template-columns: var(--article-tracks);
   }
   .head-copy {
+    grid-column: text;
     min-width: 0;
+    padding-bottom: clamp(2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--border-strong);
   }
   .crumbs {
     display: flex;
@@ -107,6 +118,20 @@ const { heading, lede, meta } = Astro.props;
     color: var(--text-muted);
     font-size: 0.9rem;
   }
+  /* The rework notice: a quiet line on an accent rule, so it reads as news, not as an error. */
+  .notice {
+    max-width: 36rem;
+    margin: 1rem 0 0;
+    padding: 0.15rem 0 0.15rem 0.85rem;
+    border-left: 3px solid var(--accent);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .notice b {
+    color: var(--text);
+    font-weight: 600;
+  }
   .participation {
     margin: 0.4rem 0 0;
     color: var(--text);
@@ -140,21 +165,9 @@ const { heading, lede, meta } = Astro.props;
       margin: -0.7rem 0;
     }
   }
-  @media (max-width: 999px) {
-    .road-head :global([data-roadmap-art]) {
-      max-width: 36rem;
-    }
-  }
   @media (max-width: 480px) {
     .head-actions .button {
       flex: 1 1 100%;
-    }
-  }
-  @media (min-width: 1000px) {
-    .road-head {
-      grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
-      align-items: center;
-      column-gap: clamp(2rem, 4.5vw, 4rem);
     }
   }
 </style>

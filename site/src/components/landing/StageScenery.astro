@@ -1,0 +1,102 @@
+---
+// The story stage's scenery (Overview.astro; the owner, 2026-10-08: "maybe even scenery", then
+// "Add scenery to the stage"): a quiet stretch of the quokka's island shore behind the pictures,
+// in the film's palette (Base.astro): a slim band along the stage's floor, the sea's line, a
+// sail, and low dunes with grass (no clouds: nothing sits behind the pictures' words). It is
+// wider than the stage and pans a little as the pictures slide (by --story-at, the open step),
+// less than they do, so moving between the steps reads as travelling along the shore. Faint, so the pictures and their words stay on top;
+// shown only on the pinned stage. Decoration only.
+---
+
+<div class="stage-scenery" aria-hidden="true">
+  <svg viewBox="0 0 2400 160" preserveAspectRatio="xMinYMax meet" role="presentation">
+    <rect class="sea" x="0" y="44" width="2400" height="116" />
+    <path class="sea-line" d="M0 44H2400" />
+    <path class="swell" d="M180 66q40-6 80 0M760 74q50-7 100 0M1400 62q40-6 80 0M2020 72q46-7 92 0" />
+    <g class="sail">
+      <path class="hull" d="M1312 42h56l-8 8h-40z" />
+      <path class="canvas" d="M1338 40V2l22 38z" />
+    </g>
+    <path
+      class="dune far"
+      d="M0 104C220 82 420 86 640 100S1060 122 1280 102 1700 76 1920 94 2260 118 2400 106V160H0z"
+    />
+    <path
+      class="dune near"
+      d="M0 132C260 118 520 122 760 132S1200 146 1460 130 1900 114 2140 126 2340 138 2400 134V160H0z"
+    />
+    <path
+      class="grass"
+      d="M120 124l-6-16M128 124l2-18M136 124l8-14M900 130l-5-14M908 130l3-16M916 130l7-12M1640 120l-6-15M1648 120l2-17M1656 120l8-13M2200 126l-5-14M2208 126l3-16"
+    />
+  </svg>
+</div>
+
+<style>
+  /* The band's height is the stage's --shore (Overview.astro), the room kept under the
+     pictures for it. */
+  .stage-scenery {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--shore, 72px);
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .stage-scenery svg {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 125%;
+    max-width: none;
+    height: auto;
+    aspect-ratio: 2400 / 160;
+    opacity: 0.55;
+    transform: translateX(calc(var(--story-at, 0) * -8%));
+    transition: transform 900ms cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .sea {
+    fill: var(--sea);
+    opacity: 0.35;
+  }
+  .sea-line {
+    fill: none;
+    stroke: var(--sea-deep);
+    stroke-width: 1.5;
+    opacity: 0.35;
+  }
+  .swell {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .hull {
+    fill: var(--wood);
+  }
+  .canvas {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    opacity: 0.8;
+  }
+  .dune.far {
+    fill: var(--limestone);
+  }
+  .dune.near {
+    fill: var(--sand);
+  }
+  .grass {
+    fill: none;
+    stroke: var(--olive);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stage-scenery svg {
+      transition: none;
+    }
+  }
+</style>

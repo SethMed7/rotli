@@ -2,8 +2,8 @@
 // a matrix of who may read and change a note you wrote (on-device model, connected AI, the
 // Librarian) for an everyday, a secure, and a locked note, then five plain points. It is the
 // page's first section and its one access table. On a phone each row is a block whose cells
-// name their reader, and nothing runs off the side at any width. Where the reading column's middle
-// has room, the matrix breaks out of the words like a post's table, never into the rail.
+// name their reader, and nothing runs off the side at any width. It starts on the words' edge and,
+// where there is room, runs on to the page's right edge like a post's table, never into the rail.
 import { expect, test } from "@playwright/test";
 
 const READERS = ["On-device model", "Connected AI", "The Librarian"];
@@ -70,6 +70,19 @@ for (const width of [320, 390, 660, 768, 1024, 1440, 1920, 2560]) {
       expect(box.x).toBeGreaterThanOrEqual(rail.x + rail.width);
       const lede = (await page.locator(".promise-lede").boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(lede.width - 1);
+      // On the words' left edge (one edge for the column), and, where it breaks out, on the
+      // header's right edge.
+      expect(Math.abs(box.x - lede.x)).toBeLessThan(1.5);
+      // The five points' bullets are on that line too (the owner, 2026-10-07: one left line).
+      const bullet = await page
+        .locator(".promise-points > li")
+        .first()
+        .evaluate((li) => li.getBoundingClientRect().x + parseFloat(getComputedStyle(li, "::before").left));
+      expect(Math.abs(bullet - lede.x)).toBeLessThan(1);
+      if (width >= 1440) {
+        const header = (await page.locator(".site-header").boundingBox())!;
+        expect(Math.abs(box.x + box.width - (header.x + header.width))).toBeLessThan(1.5);
+      }
     }
 
     const cells = page.locator(".promise-matrix tbody td");
