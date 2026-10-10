@@ -1616,7 +1616,9 @@ What is fixture, all synthetic:
   Welcome lessons folded and their tab closed.
 
 The script fails if the note is not filed in `wiki/Clients/` with its words
-untouched at the end, or the film is over 6 MB. Look at
+untouched at the end, or the film is over 6 MB. A new cut also bumps the `v`
+date on `hero.src` and `hero.poster` in `src/films.ts`, so no browser or
+Cloudflare edge serves the old file (or an old 404) for the new one. Look at
 `_review/hero-video/frame-*.png` and the poster before committing a new take.
 
 `FilmPlayer.astro` plays it muted, once, as soon as it is on screen, then it

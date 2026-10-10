@@ -19,12 +19,12 @@ const media = (slug: string) => ({
   poster: `/media/story/${slug}-poster.webp`,
 });
 
-// The `v` query is the cut's date: a new cut gets a new address, so no cache (a browser's, or
-// Cloudflare's edge, which held the 404 the old site gave this path when the film first went
-// live, 2026-10-10) can serve an old answer for it.
+// The `v` query is the cut's date; bump it with every new cut (site/README.md "Films"). A new
+// address means no cache (a browser's, or Cloudflare's edge, which held the 404 the old site gave
+// this path when the film first went live, 2026-10-10) can serve an old answer for it.
 export const hero: Film = {
-  src: "/media/hero/rotli-hero.mp4?v=2026-10-09",
-  poster: "/media/hero/rotli-hero-poster.webp?v=2026-10-09",
+  src: '/media/hero/rotli-hero.mp4?v=2026-10-09',
+  poster: '/media/hero/rotli-hero-poster.webp?v=2026-10-09',
   silent: true,
   captioned: true,
   label:
@@ -33,7 +33,7 @@ export const hero: Film = {
 
 /** The studio's 60-second story film, which the hero played until the product film. */
 export const story: Film = {
-  ...media("rotli-story"),
+  ...media('rotli-story'),
   label:
-    "The rotli story, a 60-second animated film: a quokka arrives on Rottnest Island, writes a trip plan, keeps it in one folder, lets the Librarian file it, keeps secure notes on the Mac, asks chat about it, and waves at sunset.",
+    'The rotli story, a 60-second animated film: a quokka arrives on Rottnest Island, writes a trip plan, keeps it in one folder, lets the Librarian file it, keeps secure notes on the Mac, asks chat about it, and waves at sunset.',
 };
