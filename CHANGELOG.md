@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co's film is a one-minute tour of the Mac app.** The landing hero
+  now plays a real recording of the Mac app on synthetic notes: writing a
+  note, the Librarian filing it on your Mac, tasks, search, docs, sheets and
+  boards, asking Claude about the notes, and the seven themes. Nothing in it
+  is mocked; the edit only trims and removes waiting. The film has a new
+  address, so no browser or edge cache serves the old one.
 - **Update checks go through rotli.co.** The Mac app asks rotli.co first,
   with its version in the address, and rotli.co passes it to the signed feed
   on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's

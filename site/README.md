@@ -1540,12 +1540,31 @@ docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  
 ## Films
 
 **The hero film** (`public/media/hero/rotli-hero.mp4` and
-`rotli-hero-poster.webp`, `hero` in `src/films.ts`) tells the landing's own
-story (the owner, 2026-10-09: the earlier film "doesn't show the view and the
-image attached makes no sense"): write in your view, the file lives once in your
-vault, the Librarian files it, ask. It is made by `bun run capture:hero` from a
-local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`, around one clip from the
-Mac app:
+`rotli-hero-poster.webp`, `hero` in `src/films.ts`) is a one-minute tour of the
+Mac app (the owner, 2026-10-10: show only what really works in the app, nothing
+made up). Every shot is the native app on the synthetic Northwind Studio demo
+vault, driven with computer use and recorded window-only with ScreenCaptureKit:
+a title card; "Write like a person." (a note typed live: heading, bold, a slash
+checklist, a `[[Jo Park]]` link); "Let AI do the filing, on your Mac." (the
+Librarian, on the on-device model, files it into Clients and sets its summary,
+tags, and links; its pass was started with Run now, since it skips a note open
+in a tab); "Every task, from every note, in one list."; "Find anything with
+⌘K."; "Boards, docs, and sheets (beta) too." (a sheet recalculating after an
+edit); "Ask Claude. It reads your notes." (Claude Sonnet 5.5 through the Claude
+Code lane, answering from that day's edits); "Seven themes, light and dark.";
+an end card. The edit only cuts, trims, removes waits (Claude's reply took
+about ten seconds), runs the typing at 1.1×, and holds one real frame of each
+theme for about half a second. Same frame as before: 1920 × 1080, 30 fps,
+captions in the 162 px band, no audio, CRF 18, `+faststart`; the poster is the
+finished note. The takes and the cut script stay on the maintainer's Mac
+(`_review/promo-v6/`, outside the repository). A new cut bumps the `v` date in
+`src/films.ts`.
+
+**The earlier web film** (2026-10-09) told the landing's own story: write in
+your view, the file lives once in your vault, the Librarian files it, ask. It
+is made by `bun run capture:hero` from a local
+`ROTLI_BUILD_CHANNEL=stable bun run dev:web`, around one clip from the Mac app,
+and writes the hero's file and poster, so running it now replaces the tour:
 
 1. **Write in your view** (Rotli Web): New note in Main, "call w/ dana re
    pricing / she's ok w/ annual. wants the deck fri?? / ask jo about the
