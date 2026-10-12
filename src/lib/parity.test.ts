@@ -24,7 +24,7 @@ import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
-import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
+import { SECURE_NOTES_FOLDER, inSecureHome } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
@@ -107,6 +107,10 @@ describe("parity.json ↔ TS constants", () => {
   test("secureNotesFolder", () => {
     expect<string>(SECURE_NOTES_FOLDER).toBe(entries.secureNotesFolder.value);
     expect<string>(DEST.secure).toBe(entries.secureNotesFolder.value);
+  });
+
+  test("secureHomeCases", () => {
+    for (const c of entries.secureHomeCases.value) expect(inSecureHome(c.path)).toBe(c.secure);
   });
 
   test("stripMarkers", () => {

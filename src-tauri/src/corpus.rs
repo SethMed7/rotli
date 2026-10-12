@@ -3873,8 +3873,8 @@ impl CorpusStore {
     ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
     ///   The per-note bit wins over the vault default in BOTH directions.
     ///
-    /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
-    /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
+    /// Location in either secure home is checked even without frontmatter.
+    /// The secret DETECTOR also runs on the body (#21, audit 2026-07) — the auto-flag only fires when
     /// the metadata panel is opened, so a never-inspected note with detectable
     /// secrets must not slip through on the flag alone.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
@@ -3890,7 +3890,8 @@ impl CorpusStore {
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+        let secure = self.file_is_protected(rel)
+            || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
             || fm
                 .foreign
                 .iter()
@@ -3917,6 +3918,46 @@ impl CorpusStore {
             crate::secret::remember_secure_text(body);
         }
         Ok(text)
+    }
+
+    /// AI-purpose access to a frontmatter-free file. The editor's file reads
+    /// remain separate; this check runs before any AI decoder sees bytes.
+    pub(crate) fn file_for_ai(&self, rel: &str, model_is_local: bool) -> Result<PathBuf, String> {
+        validate_rel(rel)?;
+        if surfaced(self.layout, rel) == Surface::Hidden {
+            return Err("not available to AI".into());
+        }
+        let secure = self.file_is_protected(rel);
+        if secure && !model_is_local {
+            return Err("blocked: a secure file cannot be sent to a remote model".into());
+        }
+        if secure && !self.secure_local_ai() {
+            return Err("blocked: local AI access to secure files is off for this vault".into());
+        }
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err("not a file".into());
+        }
+        Ok(abs)
+    }
+
+    pub(crate) fn read_file_bytes_for_ai(
+        &self,
+        rel: &str,
+        model_is_local: bool,
+    ) -> Result<Vec<u8>, String> {
+        let abs = self.file_for_ai(rel, model_is_local)?;
+        let data = fs::read(abs).map_err(|e| e.to_string())?;
+        if model_is_local && self.file_is_protected(rel) {
+            let ext = Path::new(rel).extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase();
+            let text = match ext.as_str() {
+                "docx" | "docm" | "dotx" | "dotm" => crate::ai_files::docx_text(&data)?,
+                "xlsx" => crate::ai_files::xlsx_text(&data)?,
+                _ => String::from_utf8_lossy(&data).into_owned(),
+            };
+            crate::secret::remember_secure_text(&text);
+        }
+        Ok(data)
     }
 
     /// May an ON-DEVICE model read this secure note? Default yes (2026-08-01);
@@ -7321,27 +7362,30 @@ fn prefix_write_result(root_id: &str, mut result: CorpusWriteResult) -> CorpusWr
 /// under the corpus mutex. Connected vaults are registered switch targets, not
 /// simultaneous data sources. The walk stays off Tauri's main thread.
 #[tauri::command]
-pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
+pub async fn corpus_list(app: tauri::AppHandle, fresh: Option<bool>) -> Result<CorpusList, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        corpus_list_inner(&state)
+        corpus_list_inner(&state, fresh.unwrap_or(false))
     })
     .await
     .map_err(|e| format!("corpus list worker failed ({e})"))?
 }
 
 /// The active-vault half of `corpus_list`, shared with `corpus_notes_ai`.
-fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
+fn corpus_list_inner(state: &CorpusState, fresh: bool) -> Result<CorpusList, String> {
     let mut reg = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?;
     let default_id = reg.default_id.clone();
-    reg.stores
+    let store = reg.stores
         .get_mut(&default_id)
-        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?
-        .list()
+        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?;
+    if fresh {
+        store.suppress.bump();
+    }
+    store.list()
 }
 
 /// The Tasks projection over the DEFAULT corpus (decision 2026-07-25): every
@@ -7483,7 +7527,7 @@ pub async fn corpus_notes_ai(
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let listed = corpus_list_inner(&state)?;
+        let listed = corpus_list_inner(&state, false)?;
         let reference = corpus_reference_notes_inner(&state)?;
         let mut permitted = Vec::new();
         for meta in listed.notes.into_iter().chain(reference) {
@@ -7583,6 +7627,43 @@ pub fn corpus_file_bytes(
     let data = fs::read(&abs).map_err(|e| e.to_string())?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
+}
+
+/// AI file reads use their own Rust policy before opening the file. The model
+/// identity is checked here, not accepted as a caller-supplied boolean.
+#[tauri::command]
+pub fn corpus_file_text_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
+    let cap = max_bytes.unwrap_or(200_000);
+    let text = String::from_utf8_lossy(&data[..data.len().min(cap)]).into_owned();
+    if !local && crate::secret::blocked_for_remote(&text) {
+        return Err("blocked: this file contains secret-shaped content".into());
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+pub fn corpus_file_bytes_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    use base64::Engine;
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
+    let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data[..data.len().min(cap)]))
 }
 
 /// Import a dropped external file into the corpus's binary area (the memex
@@ -8221,14 +8302,21 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        let body = s.read_for_ai(&rel, model_is_local)?;
-        Ok(CorpusAiRead {
-            revision: crate::fsutil::revision(body.as_bytes()),
-            editor: with_editor
-                .unwrap_or(false)
-                .then(|| ai_journal::editor_text(&body).to_string()),
-            body,
-        })
+        read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
+    })
+}
+
+fn read_ai_versioned(
+    store: &mut CorpusStore,
+    rel: &str,
+    model_is_local: bool,
+    with_editor: bool,
+) -> Result<CorpusAiRead, String> {
+    let body = store.read_for_ai(rel, model_is_local)?;
+    Ok(CorpusAiRead {
+        revision: crate::fsutil::revision(body.as_bytes()),
+        editor: with_editor.then(|| ai_journal::editor_text(&body).to_string()),
+        body,
     })
 }
 
@@ -8773,6 +8861,10 @@ mod injection_evals;
 #[cfg(test)]
 #[path = "corpus_ai_write_tests.rs"]
 mod ai_write_tests;
+
+#[cfg(test)]
+#[path = "corpus_ai_file_tests.rs"]
+mod ai_file_tests;
 
 #[cfg(test)]
 mod tests {
@@ -13404,6 +13496,20 @@ mod tests {
     }
 
     // ─── the walk cache (perf audit 2026-07-30, #1/#5) ───────────────────────
+
+    #[test]
+    fn fresh_corpus_list_invalidates_the_cached_walk_once() {
+        let (_dir, store) = bare();
+        let root = store.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+        let before = corpus_list_inner(&state, false).unwrap().notes.len();
+        fs::write(root.join("new.md"), "# New\n").unwrap();
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before);
+        assert_eq!(corpus_list_inner(&state, true).unwrap().notes.len(), before + 1);
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before + 1);
+    }
 
     #[test]
     fn walk_cache_holds_until_the_generation_moves() {

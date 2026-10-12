@@ -16,6 +16,7 @@ import { extOf, fileNameStem } from "../lib/fileKind";
 import { editableDocumentForAi } from "./artifacts";
 import { editDocumentAsAi } from "./documentEdits";
 import { looksSecret } from "./guard";
+import { aiFileAccessById } from "./hostFiles";
 
 const fail = (error: string): AgentAnswer => ({ ok: false, error });
 
@@ -32,8 +33,10 @@ function documentAnswer(
 }
 
 async function readDocument(file: string): Promise<AgentAnswer> {
-  const { editManagedDocument } = await import("../documents/composition");
-  const editable = await editManagedDocument(file);
+  const refusal = await aiFileAccessById(file, false);
+  if (refusal) return fail(refusal);
+  const { readAiManagedDocument } = await import("../documents/composition");
+  const editable = await readAiManagedDocument(file, { id: "agent", endpoint: "" });
   if (editable.kind !== "ready") return fail("this document is too large for an agent.");
   return documentAnswer(file, editableDocumentForAi(editable.document), editable.revision, editable.warnings);
 }
@@ -58,10 +61,17 @@ export async function answerAgentRequest(request: AgentRequest): Promise<AgentAn
   if (!DOCX_EDITABLE.has(extOf(file))) return fail("Rotli's agents read and edit Word documents (.docx).");
   if (tool === "read_document") return readDocument(file);
   if (tool === "apply_document") {
+    const refusal = await aiFileAccessById(file, false);
+    if (refusal) return fail(refusal);
     const expected = args.expectedRevision;
     if (typeof expected !== "string" || !expected) return fail("pass expectedRevision from the read.");
     const actions = Array.isArray(args.actions) ? args.actions : [];
-    const edit = await editDocumentAsAi({ id: file, title: fileNameStem(file) }, actions, expected);
+    const edit = await editDocumentAsAi(
+      { id: file, title: fileNameStem(file) },
+      actions,
+      { id: "agent", endpoint: "" },
+      expected,
+    );
     if (edit.kind === "refused") return fail(edit.reason);
     return documentAnswer(file, editableDocumentForAi(edit.document), edit.revision);
   }

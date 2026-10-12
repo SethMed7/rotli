@@ -518,7 +518,7 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let fm = fm.unwrap_or_default();
     let mut fields = BTreeMap::new();
     let mut locked = false;
-    let mut secure = false;
+    let mut secure = corpus::rules_store::in_secure_home_path(rel);
     for line in &fm.foreign {
         if corpus::locked_field(line) == Some(true) {
             locked = true;
@@ -3010,6 +3010,18 @@ mod tests {
             sweep(&root, &state),
             vec!["wiki/Projects/gap.md".to_string()]
         );
+    }
+
+    #[test]
+    fn secure_home_plain_text_is_never_an_organizer_candidate() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
+            fs::create_dir_all(root.join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(root.join(rel), "task,status\nDraft,ready").unwrap();
+            assert!(snapshot_note(root, rel).unwrap().secure, "{rel}");
+        }
     }
 
     #[test]

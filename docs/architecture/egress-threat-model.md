@@ -191,13 +191,13 @@ way a compromised loop would.
 
 | # | Path | Verdict | Enforced by |
 |---|---|---|---|
-| 10 | `corpus_read_ai` (read by id) | SAFE | `read_for_ai` — locality re-derived in Rust; refusals quote nothing |
+| 10 | `corpus_read_ai` (read by id) | SAFE | `read_for_ai` — locality re-derived in Rust; frontmatter, detector, name, and secure-home location all classify a read, including plain CSV/text reached through the note path; refusals quote nothing |
 | 11 | `corpus_readable_ids` (batch probe) | SAFE | the exact same `read_for_ai` per id; bodies never returned |
 | 12 | `corpus_search` + TS filter | **GAP → FIXED** | Rust supplied the verdict, **TypeScript applied it**. A loop that skipped the probe got the titles and snippets of every matching secure note. New `corpus_search_ai` applies `read_for_ai` per hit **in Rust**, before anything crosses the boundary — one round trip instead of two, so it is also faster |
 | 13 | `corpus_list` / `corpus_reference_notes` → knowledge map | **GAP → FIXED** | same shape: secure TITLES reached the map through a TS-side filter. New `corpus_notes_ai` filters in Rust |
 | 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED, NOT CLOSED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body. The ledger is warm before commands run and blocks verbatim overlap at Rust egress seams, but a hostile webview that obtained the plaintext can transform it before invoking those seams. This is the unresolved trust-boundary contradiction described above |
 | 15 | Workspace `notes list` / `search` / `query` / `read` | SAFE | `read_for_ai(id, false)` per item, filter-before-truncate |
-| 16 | Workspace `list` — files and folders | **GAP → FIXED** | `NoteKind::File` metas and the whole folder tree bypassed every filter (`_ => true`), shipping the reserved `Secure notes/` folder name to a remote agent. Both now pass `agent_listable` |
+| 16 | Workspace `list` — files and folders | **GAP → FIXED** | Folder metas pass `agent_listable`; file metas also pass `file_is_protected`, so secure-home and keyword-protected titles and paths never appear in remote listings |
 | 16a | Remote relay connector | SAFE | every response is produced by the same workspace dispatcher and `read_for_ai`/write gates; the outbound transport adds no alternate corpus reads, starts only by explicit user action, serializes disconnect/vault switch against in-flight dispatch and delivery, binds separate client/device credentials to their minted relay base, bounds the complete response envelope, and logs no frames |
 
 ### Writes — persistence and laundering
@@ -336,8 +336,16 @@ cold because search now uses an index.
 - **The ledger stops only bulk verbatim copying.** ≤4-word chunking, paraphrase,
   translation, reordering, and any encoding defeat it — by design; it is a layer
   over `read_for_ai`, not a covert-channel defense. Stated in full above.
-- **Storage FILES carry no `secure:` flag**, so `read_file` has only the
-  heuristic. Files are not notes and the matrix does not cover them.
+- **Storage FILES carry no `secure:` flag.** Chat file tools resolve an exact
+  id and check the secure home and secure keyword before extraction in
+  TypeScript; an exact-id miss invalidates the Rust corpus walk once before
+  failing closed. Dedicated Rust AI file reads repeat the location check. The
+  note read gate also checks location, since plain text files can enter through
+  `read_note`. Allowed local secure file reads feed the Rust prose-overlap
+  ledger with decoded DOCX and XLSX text, rather than ZIP bytes. If an office
+  package cannot be decoded for the ledger, its secure local read refuses.
+  The secret-pattern detector still checks extracted text. Files
+  outside those locations have no per-file secure flag.
 - **DNS exfil**: `vetted_resolve` emits the lookup before vetting the address,
   so an encoded subdomain leaves over DNS even when the connection is then
   refused. Closing it needs a resolver that vets the NAME first — a real change

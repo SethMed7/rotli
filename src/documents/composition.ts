@@ -7,8 +7,10 @@ import {
   corpusConvertDocument,
   corpusCreateManagedFile,
   corpusFileBytes,
+  corpusFileBytesAi,
   corpusFileStat,
   corpusWriteFileBytes,
+  type ChatModelInfo,
 } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
@@ -30,6 +32,11 @@ const reader: DocumentFileReader = {
   stat: corpusFileStat,
   readBase64: corpusFileBytes,
 };
+
+const aiReader = (model: Pick<ChatModelInfo, "id" | "endpoint">): DocumentFileReader => ({
+  stat: corpusFileStat,
+  readBase64: (id, maxBytes) => corpusFileBytesAi(id, model, maxBytes),
+});
 
 const writer: DocumentFileWriter = {
   writeBase64: corpusWriteFileBytes,
@@ -93,13 +100,22 @@ export async function createAiDocumentFromMarkdown(
 }
 
 /** The AI's edit session: the same codec, saving through the AI's write lane. */
-export async function editAiDocument(fileId: string) {
+export async function editAiDocument(fileId: string, model: Pick<ChatModelInfo, "id" | "endpoint">) {
   const { docxEditorCodec } = await import("./codec/docx");
   const aiWriter: DocumentFileWriter = {
     writeBase64: (id, base64, _backup, revision) => corpusWriteFileAi(id, base64, revision),
   };
   return editDocument(
-    { reader, writer: aiWriter, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
+    { reader: aiReader(model), writer: aiWriter, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
+    fileId,
+  );
+}
+
+/** Chat's Word read uses the AI byte gate; the user's editor keeps `reader`. */
+export async function readAiManagedDocument(fileId: string, model: Pick<ChatModelInfo, "id" | "endpoint">) {
+  const { docxEditorCodec } = await import("./codec/docx");
+  return editDocument(
+    { reader: aiReader(model), writer, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
     fileId,
   );
 }

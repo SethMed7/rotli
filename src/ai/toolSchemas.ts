@@ -129,6 +129,11 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
   },
 };
 
+/** Registry inventory for the file-access regression guard. */
+export function registeredToolSpecs(): NativeToolSpec[] {
+  return Object.entries(SPECS).map(([name, spec]) => ({ name, ...spec }));
+}
+
 /** Native definitions for exactly the tools this turn allows, in a stable order. */
 export function toolSpecsFor(allowed: ReadonlySet<ToolName>): NativeToolSpec[] {
   return [...allowed].flatMap((name) => {
