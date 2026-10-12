@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { agentLinkTargets } from "./src/agentLinks";
 import { movedFeatures } from "./src/features";
 import { figurePlugin } from "./src/figures";
 import { pageMarkdown } from "./src/markdownTwin";
@@ -109,7 +110,7 @@ function markdownTwins() {
 
 /**
  * The agent-facing files (src/agents.ts) are only useful if they are true to
- * the build: every link in /llms.txt must land on a page this build emitted
+ * the build: every rotli.co address in /llms.txt and /llms-full.txt must land on a page this build emitted
  * (agents follow them literally), and every JSON-LD block must parse. A page
  * renamed without updating the summary fails here, not on rotli.co.
  */
@@ -120,18 +121,15 @@ function agentFilesGuard() {
       "astro:build:done": ({ dir }) => {
         const root = fileURLToPath(dir);
         const problems = [];
-        const llms = join(root, "llms.txt");
-        if (!existsSync(llms)) problems.push("llms.txt was not emitted");
-        else {
-          for (const [, href] of readFileSync(llms, "utf8").matchAll(/\]\((https?:[^)\s]+)\)/g)) {
-            const url = new URL(href);
-            if (url.origin !== site.url) continue;
-            const file = join(
-              root,
-              decodeURIComponent(url.pathname),
-              url.pathname.endsWith("/") ? "index.html" : "",
-            );
-            if (!existsSync(file)) problems.push(`llms.txt links ${href}, which this build did not emit`);
+        if (!existsSync(join(root, "llms.txt"))) problems.push("llms.txt was not emitted");
+        // llms-full.txt is the full site's alone (src/pages/[file].ts); CI's coming-soon build holds that
+        if (existsSync(join(root, "llms-full.txt")) !== site.showsFullSite)
+          problems.push(`llms-full.txt is ${site.showsFullSite ? "missing from" : "in"} a ${site.mode} build`);
+        for (const name of ["llms.txt", "llms-full.txt"]) {
+          const text = join(root, name);
+          if (!existsSync(text)) continue;
+          for (const { href, file } of agentLinkTargets(readFileSync(text, "utf8"), site.url)) {
+            if (!existsSync(join(root, file))) problems.push(`${name} links ${href}, which this build did not emit`);
           }
         }
         const walk = (folder) => {

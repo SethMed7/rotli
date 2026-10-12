@@ -155,7 +155,8 @@
 		# as it arrived, so the Markdown type is set here on the same matcher the
 		# rewrite uses. Vary keeps a cache from handing one to the other. Types are
 		# explicit because caddy:alpine has no /etc/mime.types (Go would sniff .md
-		# as text/plain). llms.txt stays text/plain so a browser shows it inline.
+		# as text/plain). llms.txt and llms-full.txt stay text/plain so a browser
+		# shows them inline.
 		@markdown {
 			header Accept *text/markdown*
 			file {path}index.md
@@ -164,7 +165,7 @@
 		rewrite @markdown {file_match.relative}
 		@markdownFile path *.md
 		header @markdownFile Content-Type "text/markdown; charset=utf-8"
-		@llms path /llms.txt
+		@llms path /llms.txt /llms-full.txt
 		header @llms Content-Type "text/plain; charset=utf-8"
 		header Vary Accept
 		# Crawlers ask for /sitemap.xml by habit; @astrojs/sitemap writes an index.
