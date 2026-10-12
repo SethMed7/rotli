@@ -298,8 +298,8 @@ export class HelperVaultDir implements VaultDir {
     return this.write(normalize(path), { text }, text, expectedContent);
   }
 
-  writeBytes(path: string, bytes: Uint8Array): Promise<void> {
-    return this.write(normalize(path), { base64: toBase64(bytes) });
+  writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
+    return this.write(normalize(path), { base64: toBase64(bytes) }, undefined, expectedContent);
   }
 
   /** Every write is revision-gated: the helper refuses it when the file on

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { MemoryVaultDir, type VaultDir } from "../services/vaultDir";
+import { MemoryVaultDir, bytesRevision, type VaultDir } from "../services/vaultDir";
 import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 
 /** Rotli Helper's vault verbs, served from a MemoryVaultDir: the wire the
@@ -49,7 +49,7 @@ function fakeHelper(disk = new MemoryVaultDir()) {
       case "vault_stat":
         return disk.stat(path);
       case "vault_write": {
-        const onDisk = (await disk.exists(path)) ? contentRevision(await disk.readText(path)) : "0";
+        const onDisk = (await disk.exists(path)) ? bytesRevision(await disk.readBytes(path)) : "0";
         const stale =
           typeof args.expectedContent === "string"
             ? args.expectedContent !== onDisk
@@ -155,6 +155,19 @@ for (const [name, make] of contract) {
       await dir.remove("wiki/Welcome");
       await dir.remove("wiki/Welcome");
       expect(await dir.exists("wiki/Welcome")).toBe(false);
+    });
+
+    test("binary writes compare the exact bytes in the adapter write turn", async () => {
+      const dir = make();
+      const first = new Uint8Array([0, 1, 255]);
+      await dir.writeBytes("storage/p.png", first);
+      await expect(
+        dir.writeBytes("storage/p.png", new Uint8Array([2]), bytesRevision(first)),
+      ).resolves.toBeUndefined();
+      await expect(
+        dir.writeBytes("storage/p.png", new Uint8Array([3]), bytesRevision(first)),
+      ).rejects.toThrow(/revision conflict/);
+      expect([...(await dir.readBytes("storage/p.png"))]).toEqual([2]);
     });
   });
 }

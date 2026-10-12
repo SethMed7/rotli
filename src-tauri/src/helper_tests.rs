@@ -359,6 +359,20 @@ fn completion_refresh_preserves_malformed_secure_and_chat_taint_policy() {
 }
 
 #[test]
+fn completion_refuses_early_secure_prose_after_ledger_capacity() {
+    let (folder, _config, helper) = completion_helper();
+    let quoted = "Synthetic indigo balloon delays fictional meadow survey until midsummer.";
+    // Each distinct word creates another five-word phrase. The quoted start
+    // of this secure body ages out of the bounded ledger during this scan.
+    let filler = (0..50_010).map(|i| format!("fillerword{i}")).collect::<Vec<_>>().join(" ");
+    std::fs::write(folder.path().join("first.md"), format!("---\nsecure: true\n---\n{quoted} {filler}")).unwrap();
+    for i in 0..32 {
+        std::fs::write(folder.path().join(format!("other-{i}.md")), format!("---\nsecure: true\n---\nSynthetic harbor ledger note number {i} stays private.")).unwrap();
+    }
+    assert_eq!(completion_refusal(&helper, quoted).1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
 fn completion_refuses_an_oversized_note_or_unreadable_config() {
     let (folder, config, helper) = completion_helper();
     let file = std::fs::File::create(folder.path().join("large.md")).unwrap();

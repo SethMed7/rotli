@@ -61,7 +61,7 @@ export async function hydrateWebNotes(link: HelperLink | null): Promise<boolean>
   }
   configureBrowserVault(new FolderVaultStore(dir));
   folderService = new FolderNotesService(dir);
-  configureWebVaultIo(dir, folderService);
+  configureWebVaultIo(dir, () => folderService);
   folderName = name;
   setWebVaultName(name);
   folderDir = dir;

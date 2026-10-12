@@ -11,7 +11,13 @@
 // folder — chats, notes, `.rotli/` — shares this one adapter, so the lock
 // lives here, per path, and never serializes unrelated files.
 
-import { contentRevision, type VaultDir, type VaultDirEntry, type VaultStat } from "../services/vaultDir";
+import {
+  bytesRevision,
+  contentRevision,
+  type VaultDir,
+  type VaultDirEntry,
+  type VaultStat,
+} from "../services/vaultDir";
 
 function segments(path: string): string[] {
   return path.split("/").filter((part) => part.length > 0 && part !== ".");
@@ -122,8 +128,17 @@ export class FsaVaultDir implements VaultDir {
     });
   }
 
-  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
-    await this.inTurn(path, () => this.writeFileUnlocked(path, bytes.slice().buffer as ArrayBuffer));
+  async writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
+    await this.inTurn(path, async () => {
+      if (expectedContent !== undefined) {
+        const handle = await this.file(path);
+        const current = handle
+          ? bytesRevision(new Uint8Array(await (await handle.getFile()).arrayBuffer()))
+          : "0";
+        if (current !== expectedContent) throw new Error(`revision conflict on ${path}`);
+      }
+      await this.writeFileUnlocked(path, bytes.slice().buffer as ArrayBuffer);
+    });
   }
 
   private async writeFileUnlocked(path: string, contents: string | ArrayBuffer): Promise<void> {

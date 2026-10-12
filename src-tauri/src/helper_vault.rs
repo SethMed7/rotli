@@ -121,10 +121,10 @@ impl ServedVault {
     pub(crate) fn guard_completion(&self, prompt: &str) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
         let config = read_config(&self.config_path).ok_or_else(unavailable)?;
-        read_verbs::refresh_secure_ledger(&config.root).map_err(|_| unavailable())?;
+        let quoted = read_verbs::refresh_secure_ledger(&config.root, Some(prompt)).map_err(|_| unavailable())?;
         let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
         *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config));
-        if crate::secret::blocked_for_remote(prompt) {
+        if quoted || crate::secret::blocked_for_remote(prompt) {
             return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
         }
         Ok(())
@@ -242,7 +242,7 @@ fn contains_helper_dir(root: &Path, config_path: &Path) -> bool {
 
 /// Read-only startup warm-up; completions repeat it and refuse on failure.
 fn warm_ledger(root: &Path) {
-    let warmed = read_verbs::refresh_secure_ledger(root);
+    let warmed = read_verbs::refresh_secure_ledger(root, None);
     if let Err((_, error)) = warmed {
         eprintln!("rotli-helper: couldn't read the vault's secure notes: {error}");
     }

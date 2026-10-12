@@ -17,11 +17,14 @@ import type { FolderNotesService } from "./folderNotes";
 import type { VaultDir } from "./vaultDir";
 
 let connectedDir: VaultDir | null = null;
-let connectedNotes: FolderNotesService | null = null;
+let connectedNotes: (() => FolderNotesService | null) | null = null;
 
-export function configureWebVaultIo(dir: VaultDir | null, notes: FolderNotesService | null): void {
+export function configureWebVaultIo(
+  dir: VaultDir | null,
+  notes: FolderNotesService | (() => FolderNotesService | null) | null,
+): void {
   connectedDir = dir;
-  connectedNotes = notes;
+  connectedNotes = typeof notes === "function" ? notes : () => notes;
   registerWebVaultIo(dir && notes ? webVaultIo : null);
 }
 
@@ -32,8 +35,9 @@ const directory = () => {
 };
 const notePath = async (id: string) => {
   const notes = connectedNotes;
-  if (!notes) throw new Error("Connect a vault first");
-  return notes.filePathOf(id);
+  const active = notes?.();
+  if (!active) throw new Error("Connect a vault first");
+  return active.filePathOf(id);
 };
 
 export const webVaultIo = {
@@ -42,8 +46,9 @@ export const webVaultIo = {
     key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",
     value: boolean,
   ): Promise<void> {
-    if (!connectedNotes) throw new Error("Connect a vault first");
-    await setFolderProtection(directory(), connectedNotes, id, key, value);
+    const notes = connectedNotes?.();
+    if (!notes) throw new Error("Connect a vault first");
+    await setFolderProtection(directory(), notes, id, key, value);
   },
   assetUrl: (id: string, temporary: boolean) => folderAssetUrl(directory(), id, temporary),
   text: (id: string, max?: number) => folderFileText(directory(), id, max),

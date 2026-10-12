@@ -66,7 +66,7 @@ export async function updateGitExclusions(
   dir: VaultDir,
   add: string[],
   remove: string[] = [],
-): Promise<void> {
+): Promise<{ before: string; after: string }> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const exists = await dir.exists(".gitignore");
     const text = exists ? await dir.readText(".gitignore") : "";
@@ -79,12 +79,13 @@ export async function updateGitExclusions(
     for (const line of add)
       if (!next.split("\n").some((have) => have.trim() === line))
         next += `${next && !next.endsWith("\n") ? "\n" : ""}${line}\n`;
-    if (next === text) return;
+    if (next === text) return { before: text, after: text };
     try {
       await dir.writeText(".gitignore", next, exists ? contentRevision(text) : "0");
-      return;
+      return { before: text, after: next };
     } catch (error) {
       if (!(error instanceof Error && /revision conflict/i.test(error.message) && attempt < 2)) throw error;
     }
   }
+  throw new Error("revision conflict: git exclusions changed during write");
 }

@@ -124,11 +124,11 @@ pub(super) fn read(root: &Path, rel: &[String], encoding: Option<&str>) -> Resul
 /// Unlike a display walk, a security refresh never skips unreadable entries.
 /// Use the existing corpus field parsers and secret policy, without building
 /// an index or silently dropping unreadable/non-UTF-8 notes.
-pub(super) fn refresh_secure_ledger(root: &Path) -> Result<(), Refusal> {
-    refresh_into(root, &[], &mut 0)
+pub(super) fn refresh_secure_ledger(root: &Path, prompt: Option<&str>) -> Result<bool, Refusal> {
+    refresh_into(root, &[], &mut 0, prompt)
 }
 
-fn refresh_into(root: &Path, rel: &[String], seen: &mut usize) -> Result<(), Refusal> {
+fn refresh_into(root: &Path, rel: &[String], seen: &mut usize, prompt: Option<&str>) -> Result<bool, Refusal> {
     let dir = resolve(root, rel)?;
     let entries = fs::read_dir(dir).map_err(|e| (500, e.to_string()))?;
     for entry in entries {
@@ -145,7 +145,7 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize) -> Result<(), Ref
         let mut path = rel.to_vec();
         path.push(name.clone());
         if metadata.is_dir() && !skipped_dir(&name) {
-            refresh_into(root, &path, seen)?;
+            if refresh_into(root, &path, seen, prompt)? { return Ok(true); }
         } else if metadata.is_file() && Path::new(&name).extension().is_some_and(|ext| {
             ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
         }) {
@@ -157,11 +157,15 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize) -> Result<(), Ref
             // the desktop walk's own rule, so the two ledgers can't drift
             let protected = crate::corpus::walked_secure(&frontmatter.unwrap_or_default(), body);
             if protected {
+                // Check this body before later notes can evict its hashes.
+                // Both direct and ledger checks use secret.rs's same phrases.
+                let quoted = prompt.is_some_and(|prompt| crate::secret::quotes_secure_text(prompt, body));
                 crate::secret::remember_secure_text(body);
+                if quoted { return Ok(true); }
             }
         }
     }
-    Ok(())
+    Ok(false)
 }
 
 /// Many texts in one answer, up to a budget; `more` lists what didn't fit.

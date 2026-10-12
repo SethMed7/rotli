@@ -25,7 +25,10 @@ Decided by the owner on 2026-09-22; the history is in
    failed scan (an unreadable or oversized Markdown file) refuses the
    completion before a provider process starts; a note that isn't UTF-8 is
    read lossily, so its markers still count. The refresh is a full,
-   read-only scan; it does not rely on cached timestamps.
+   read-only scan; it does not rely on cached timestamps. During the scan the
+   Helper also compares the prompt directly with each secure body using the
+   ledger's phrase rule, so an early note remains protected even when a large
+   vault exceeds the ledger's 50,000-phrase capacity.
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own
@@ -141,7 +144,8 @@ as Rust's raw lane does; relocation belongs to the explicit protection command.
 
 Named-view writes validate names and singular membership, ensure Main references,
 and synchronize each changed Markdown `view_tag`. Boards and binaries never
-receive frontmatter. Failed writes roll back only bytes this transaction wrote;
+receive frontmatter. Failed writes roll back only bytes this transaction wrote,
+including `.gitignore` exclusion edits;
 a newer external edit wins. Main may retain safe additional references after
 failure, as on desktop. Durable aliases resolve alongside current filename and
 title selectors; renaming a stable-id note preserves earlier selectors on disk.
@@ -156,7 +160,9 @@ out of the note index. File summaries never read binary contents or join the
 note text index; filename search uses their names. Local file text, bytes, and
 stat come from the connected vault. Media panes own temporary blob URLs and
 revoke them on unmount; cached thumbnail consumers use data URLs. HTML keeps
-its sandbox and no-egress policy. CSV saves are revision-gated and preserve a
+its sandbox and no-egress policy. CSV and other editable text-file saves pass
+the observed content revision into the adapter's write turn. Binary saves pass
+the revision of their observed bytes through the same gate. CSV saves preserve a
 first-save backup. DOCX and binary workbooks list as files but open to an honest
 unsupported state on the web. Finder, default-app, and macOS conversion actions
 are hidden there.
@@ -190,6 +196,7 @@ document creation; web seeding writes those variants as ordinary Markdown.
 Empty Trash in the web vault removes files permanently, so both confirmations
 say so. Finder-only row actions are absent. On focus or return to a visible tab,
 the File System Access road rebuilds its note listing and refetches notes;
+metadata and protection commands resolve paths through that refreshed listing;
 the editor's clean-buffer gate preserves unsaved typing.
 
 ## Rotli Helper's vault lane
@@ -214,7 +221,7 @@ the editor's clean-buffer gate preserves unsaved typing.
 - **Atomic, locked, revision-gated, no-clobber.** Writes use
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
-  content revision (`fnv1a64`, `expectedContent`) when the page knows the text
+  content revision (`fnv1a64`, `expectedContent`) when the page knows the bytes
   it edited, else by `${mtimeMs}:${size}`; a stale write is 409, and a write
   or delete of an EXISTING file with no gate at all is refused (only creating
   a file needs none), so no token holder can clobber without saying what it
@@ -235,8 +242,8 @@ the editor's clean-buffer gate preserves unsaved typing.
   is a 409 conflict, and an absent destination uses the ordinary no-replace move.
 - **Residual, documented:** in Chromium's folder mode the browser offers no
   no-replace write, so another writer creating a move's target in the same
-  instant as the check wins. A write whose text the page never read (a binary,
-  or a `.rotli/` file written after a stat) is gated by `${mtimeMs}:${size}`
+  instant as the check wins. A write whose content the page never read (for
+  example, a `.rotli/` file written after a stat) is gated by `${mtimeMs}:${size}`
   only; an external edit of the same size in the same millisecond would pass
   it (still under the lock). Checks resolve a path and the operation then
   reopens it. Another process running as the same user that swaps a folder

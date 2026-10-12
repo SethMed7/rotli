@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browser and sidebar commands; Welcome uses clickable web instructions, and
   menus omit Finder-only actions. Empty Trash says when deletion is permanent.
 - **Web folder changes appear when the tab regains focus.** A connected folder
-  refreshes its note listing while unsaved editor text stays in its buffer.
+  refreshes its note listing and metadata paths while unsaved editor text stays
+  in its buffer.
 - **Narrow web windows keep labels readable.** Note header metadata wraps at
   word boundaries and the palette footer keeps its key actions on one line.
 
@@ -58,11 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and refuse stale revisions or reserved-field changes. Secure notes move to
   their protected home with matching git exclusions.
 - **Web views and note names stay portable.** Named views synchronize Markdown
-  `view_tag` metadata, and title renames preserve earlier names as durable aliases.
+  `view_tag` metadata, failed view writes restore their own git exclusions, and
+  title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
-  search. Local media and HTML open from the vault; CSV edits save with revision
-  checks. Office files explain their web limitation, and native-only file actions
+  search. Local media and HTML open from the vault; CSV edits save with an
+  adapter-checked content revision. Office files explain their web limitation, and native-only file actions
   stay hidden.
+- **Rotli Helper refuses secure prose from large vaults.** Prompt checks include
+  every secure note even when the process ledger reaches its phrase limit.
 
 ### Changed
 

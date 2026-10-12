@@ -205,3 +205,13 @@ test("web file bytes/text/stat are real and CSV saves refuse stale revisions", a
     corpusWriteFileBytes("storage/data.csv", btoa("clobber"), false, stat.revision),
   ).rejects.toThrow(/revision conflict/);
 });
+
+test("metadata and protection follow the refreshed note service after an external move", async () => {
+  let active = notes;
+  configureWebVaultIo(dir, () => active);
+  await dir.move("wiki/first-title.md", "wiki/moved.md");
+  active = new FolderNotesService(dir);
+  expect((await corpusRawFrontmatter("durable")).contents).toContain("custom: keep me");
+  await corpusSetLocked("durable", true);
+  expect(await dir.readText("wiki/moved.md")).toContain("locked: true");
+});

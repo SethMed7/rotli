@@ -88,6 +88,7 @@ export async function writeFolderViews(
   const notes = new FolderNotesService(dir);
   const written: { path: string; before: string; applied: string }[] = [];
   let manifestWritten = false;
+  let ignoreRollback: { before: string | null; applied: string; safe: boolean } | null = null;
   try {
     for (const id of new Set([...before.keys(), ...next.keys()])) {
       if (before.get(id) === next.get(id)) continue;
@@ -113,22 +114,40 @@ export async function writeFolderViews(
         ignored &&
         ignored.contents.split("\n").some((line) => [".rotli", ".rotli/"].includes(line.trim()))
       ) {
-        await writeVersionedFile(
-          dir,
-          ".gitignore",
-          ignored.contents
-            .split("\n")
-            .map((line) => ([".rotli", ".rotli/"].includes(line.trim()) ? ".rotli/*" : line))
-            .join("\n"),
-          ignored.revision,
-        );
+        const narrowed = ignored.contents
+          .split("\n")
+          .map((line) => ([".rotli", ".rotli/"].includes(line.trim()) ? ".rotli/*" : line))
+          .join("\n");
+        await writeVersionedFile(dir, ".gitignore", narrowed, ignored.revision);
+        ignoreRollback = { before: ignored.contents, applied: narrowed, safe: true };
       }
-      await updateGitExclusions(dir, [".rotli/*", `!${mainPath}`, `!${path}`]);
+      const updated = await updateGitExclusions(dir, [".rotli/*", `!${mainPath}`, `!${path}`]);
+      if (ignoreRollback) {
+        ignoreRollback.safe &&= updated.before === ignoreRollback.applied;
+        ignoreRollback.applied = updated.after;
+      } else if (updated.after !== updated.before) {
+        ignoreRollback = {
+          before: ignored || updated.before ? updated.before : null,
+          applied: updated.after,
+          safe: true,
+        };
+      }
     }
     await writeVersionedFile(dir, path, contents, expectedRevision);
     manifestWritten = true;
     return true;
   } catch (error) {
+    if (ignoreRollback?.safe) {
+      try {
+        const current = await readVersionedFile(dir, ".gitignore");
+        if (current.contents === ignoreRollback.applied) {
+          if (ignoreRollback.before === null) await dir.remove(".gitignore");
+          else await writeVersionedFile(dir, ".gitignore", ignoreRollback.before, current.revision);
+        }
+      } catch {
+        /* preserve a newer edit, or a path that became unwritable */
+      }
+    }
     for (const entry of written.reverse()) {
       try {
         const current = await readVersionedFile(dir, entry.path);

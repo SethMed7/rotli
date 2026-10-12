@@ -106,6 +106,53 @@ test("binary write gates protect read-only storage and create the first CSV back
   await expect(folderFileStat(dir, "storage/../outside.csv")).rejects.toThrow(/not a vault file/);
 });
 
+test("a file save refuses an external edit inside the adapter write turn", async () => {
+  for (const path of ["rows.csv", "picture.png"]) {
+    const dir = new MemoryVaultDir();
+    await dir.writeText(path, "before");
+    const opened = (await folderFileStat(dir, path))!;
+    const writeText = dir.writeText.bind(dir);
+    const writeBytes = dir.writeBytes.bind(dir);
+    dir.writeText = async (target, contents, expected) => {
+      if (target === path && contents !== "before") await writeText(path, "external");
+      await writeText(target, contents, expected);
+    };
+    dir.writeBytes = async (target, bytes, expected) => {
+      if (target === path) await writeText(path, "external");
+      await writeBytes(target, bytes, expected);
+    };
+    await expect(folderWriteFileBytes(dir, path, btoa("ours"), false, opened.revision)).rejects.toThrow(
+      /revision conflict/,
+    );
+    expect(await dir.readText(path)).toBe("external");
+  }
+});
+
+test("a failed view manifest restores its gitignore edit unless a newer edit won", async () => {
+  for (const external of [false, true]) {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki/keep.md", text);
+    const originalIgnore = ".rotli\nuser-rule\n";
+    await dir.writeText(".gitignore", originalIgnore);
+    const write = dir.writeText.bind(dir);
+    dir.writeText = async (path, contents, expected) => {
+      if (path === ".rotli/views.json") {
+        if (external) await write(".gitignore", `${await dir.readText(".gitignore")}external-rule\n`);
+        throw new Error("manifest denied");
+      }
+      await write(path, contents, expected);
+    };
+    await expect(
+      writeFolderViews(dir, '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"}]}]}', "0"),
+    ).rejects.toThrow("manifest denied");
+    expect(await dir.readText(".gitignore")).toBe(
+      external
+        ? ".rotli/*\nuser-rule\n!.rotli/main.json\n!.rotli/views.json\nexternal-rule\n"
+        : originalIgnore,
+    );
+  }
+});
+
 test("detected secrets refuse secure removal through the explicit and raw lanes", async () => {
   const dir = new MemoryVaultDir();
   // Public synthetic test-card fixture, never a real account.

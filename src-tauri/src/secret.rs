@@ -221,6 +221,14 @@ pub fn echoes_secure_text(text: &str) -> bool {
     hashes.iter().any(|hash| ledger.seen.contains(hash))
 }
 
+/// Compare an outbound prompt directly with one secure body. The Helper scans
+/// the full vault before completion, so a large vault must not rely on the
+/// bounded process ledger to retain an early note's phrase until scan end.
+pub fn quotes_secure_text(prompt: &str, body: &str) -> bool {
+    let prompt_hashes: HashSet<u64> = phrase_hashes(prompt).into_iter().collect();
+    !prompt_hashes.is_empty() && phrase_hashes(body).into_iter().any(|hash| prompt_hashes.contains(&hash))
+}
+
 /// THE egress predicate. Every seam that can put caller-supplied text on a
 /// network — the model transports (chat.rs, provider.rs) and the web lanes
 /// (web.rs) — asks exactly this question and refuses on true. Keeping it one

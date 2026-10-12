@@ -16,6 +16,7 @@ import type {
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
+import { PLATFORM } from "./featurePolicy";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
@@ -24,7 +25,12 @@ import {
   currentWebFileStore,
   currentWebMemexBridge,
   currentWebVaultIo,
+  hasWebVaultIo,
 } from "./webAiSeam";
+
+/** The desktop browser twin has no connected folder; focused unit tests may
+ * install the web adapter explicitly. The web build always requires it. */
+export const usesWebVaultIo = (): boolean => PLATFORM === "web" || hasWebVaultIo();
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -983,8 +989,9 @@ export function splitRootId(id: string): { rootId: string; rel: string } {
 /** Display URL for a surfaced file. Web callers requesting `temporary` own
  * its blob URL and must revoke it; cached thumbnails use durable data URLs. */
 export async function fileAssetUrl(id: string, temporary = false): Promise<string> {
-  if (!isTauri())
+  if (!isTauri() && usesWebVaultIo())
     return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().assetUrl(id, temporary);
+  if (!isTauri()) return "";
   const { rootId, rel } = splitRootId(id);
   const abs = await corpusAbs(rootId, rel);
   return abs ? convertFileSrc(abs) : "";
@@ -1000,13 +1007,19 @@ export async function corpusCreateCanvas(folderId: string, name: string): Promis
 
 /** Read a surfaced file through the native or connected-folder adapter. */
 export async function corpusFileText(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().text(id, maxBytes);
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().text(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_text", { id, maxBytes });
 }
 
 /** Read surfaced file bytes as base64, with the adapter's size gate. */
 export async function corpusFileBytes(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().bytes(id, maxBytes);
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().bytes(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_bytes", { id, maxBytes });
 }
 
@@ -1028,7 +1041,8 @@ export interface FileStat {
 
 /** Size, revision, and writability for a surfaced file. */
 export async function corpusFileStat(id: string): Promise<FileStat | null> {
-  if (!isTauri()) return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().stat(id);
+  if (!isTauri())
+    return usesWebVaultIo() ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().stat(id) : null;
   return invoke<FileStat>("corpus_file_stat", { id });
 }
 
@@ -1052,13 +1066,14 @@ export async function corpusWriteFileBytes(
   bak: boolean,
   expectedRevision: string,
 ): Promise<string> {
-  if (!isTauri())
+  if (!isTauri() && usesWebVaultIo())
     return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeBytes(
       id,
       base64,
       bak,
       expectedRevision,
     );
+  if (!isTauri()) return expectedRevision;
   return invoke<string>("corpus_write_file_bytes", {
     id,
     base64,
@@ -1166,7 +1181,10 @@ export async function corpusSetPinned(id: string, pinned: boolean): Promise<void
  * the "Show file metadata" view renders this above the body. "" when the note
  * has none. */
 export async function corpusRawFrontmatter(id: string): Promise<VersionedText> {
-  if (!isTauri()) return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().rawMetadata(id);
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().rawMetadata(id)
+      : { contents: "", revision: "browser" };
   return invoke<VersionedText>("corpus_raw_frontmatter", { id });
 }
 
@@ -1178,12 +1196,13 @@ export async function corpusWriteFrontmatterRaw(
   block: string,
   expectedRevision: string,
 ): Promise<string> {
-  if (!isTauri())
+  if (!isTauri() && usesWebVaultIo())
     return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeMetadata(
       id,
       block,
       expectedRevision,
     );
+  if (!isTauri()) return "browser";
   return invoke<string>("corpus_write_frontmatter_raw", {
     id,
     block,

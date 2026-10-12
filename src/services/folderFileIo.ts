@@ -1,7 +1,7 @@
 // Connected-folder file I/O. Native callers keep using the Rust corpus.
 import { extOf, imageMimeOf, VIDEO_EXTS } from "../lib/fileKind";
 import type { FileStat, VersionedText } from "../lib/tauri";
-import { type VaultDir, contentRevision, vaultIsMemex } from "./vaultDir";
+import { type VaultDir, bytesRevision, contentRevision, vaultIsMemex } from "./vaultDir";
 
 export const STORAGE_OFFICE_EXTS = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"] as const;
 
@@ -113,13 +113,19 @@ export async function folderWriteFileBytes(
   if (!revision || stat.revision !== revision)
     throw new Error("revision conflict: file changed after it was opened");
   const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
-  if (backup && !(await dir.exists(`${path}.bak`)))
-    await dir.writeBytes(`${path}.bak`, await dir.readBytes(path));
+  const textLike = ["csv", "tsv", "txt", "html", "htm"].includes(extOf(path));
+  const observedBytes = await dir.readBytes(path);
+  const observedText = textLike ? new TextDecoder().decode(observedBytes) : null;
+  if (backup && !(await dir.exists(`${path}.bak`))) await dir.writeBytes(`${path}.bak`, observedBytes);
   if ((await fileRevision(dir, path)) !== revision)
     throw new Error("revision conflict: file changed during save");
-  if (["csv", "tsv", "txt", "html", "htm"].includes(extOf(path)))
-    await dir.writeText(path, new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  else await dir.writeBytes(path, bytes);
+  if (textLike)
+    await dir.writeText(
+      path,
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      contentRevision(observedText!),
+    );
+  else await dir.writeBytes(path, bytes, bytesRevision(observedBytes));
   return fileRevision(dir, path);
 }
 

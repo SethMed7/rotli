@@ -84,6 +84,9 @@ let webVaultIo: WebVaultIoShape<unknown, unknown, unknown> | null = null;
 export function registerWebVaultIo(io: WebVaultIoShape<unknown, unknown, unknown> | null): void {
   webVaultIo = io;
 }
+export function hasWebVaultIo(): boolean {
+  return webVaultIo !== null;
+}
 export function currentWebVaultIo<F = unknown, S = unknown, V = unknown>(): WebVaultIoShape<F, S, V> {
   if (!webVaultIo) throw new Error("Connect a vault first");
   return webVaultIo as WebVaultIoShape<F, S, V>;
