@@ -5,8 +5,10 @@ import { PLATFORM } from "./featurePolicy";
 import { corpusSetLocked } from "./noteProtection";
 import {
   corpusFileBytes,
+  corpusFileBytesAi,
   corpusFileStat,
   corpusFileText,
+  corpusFileTextAi,
   corpusRawFrontmatter,
   corpusWriteFileBytes,
   fileAssetUrl,
@@ -20,6 +22,12 @@ test("the desktop twin keeps its browser demo file and protection fallbacks with
   expect(await fileAssetUrl("storage/example.png")).toBe("");
   expect(await corpusFileText("storage/example.txt")).toBe("");
   expect(await corpusFileBytes("storage/example.png")).toBe("");
+  await expect(
+    corpusFileTextAi("storage/example.txt", { id: "remote", endpoint: "https://example.com" }),
+  ).rejects.toThrow();
+  await expect(
+    corpusFileBytesAi("storage/example.png", { id: "remote", endpoint: "https://example.com" }),
+  ).rejects.toThrow();
   expect(await corpusFileStat("storage/example.txt")).toBeNull();
   expect(await corpusWriteFileBytes("storage/example.txt", btoa("new"), false, "demo-revision")).toBe(
     "demo-revision",

@@ -14,8 +14,12 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
-import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
+import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
+import type { FrontmatterView } from "./corpusFrontmatter";
+export type { FrontmatterView } from "./corpusFrontmatter";
+import { splitRootId } from "./corpusWireId";
+export { rootIdOf, splitRootId } from "./corpusWireId";
 import { PLATFORM } from "./featurePolicy";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
@@ -338,6 +342,11 @@ function corpusInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 
 export function corpusList(): Promise<CorpusListPayload> {
   return corpusInvoke("corpus_list");
+}
+
+/** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
+export function corpusListFresh(): Promise<CorpusListPayload> {
+  return corpusInvoke("corpus_list", { fresh: true });
 }
 
 /** FULL-TEXT note search (corpus_search): Rust walks + reads + matches every
@@ -968,24 +977,6 @@ export async function resolveImageSrc(src: string, rootId = "default"): Promise<
   return abs ? convertFileSrc(abs) : "";
 }
 
-/** The corpus root a wire id belongs to ("default" for bare ids) — for
- * callers that must resolve RELATIVE resources (images) against the same
- * corpus the note lives in, not blindly against the default root. */
-export function rootIdOf(id: string): string {
-  return splitRootId(id).rootId;
-}
-
-/** Split a corpus wire id into its root + relative path. The default LOCAL root
- * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
- * where rootid has no slash. Mirrors Rust `split_root_id`. */
-export function splitRootId(id: string): { rootId: string; rel: string } {
-  const i = id.indexOf(":");
-  if (i > 0 && !id.slice(0, i).includes("/")) {
-    return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
-  }
-  return { rootId: "default", rel: id };
-}
-
 /** Display URL for a surfaced file. Web callers requesting `temporary` own
  * its blob URL and must revoke it; cached thumbnails use durable data URLs. */
 export async function fileAssetUrl(id: string, temporary = false): Promise<string> {
@@ -1021,6 +1012,29 @@ export async function corpusFileBytes(id: string, maxBytes?: number): Promise<st
       ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().bytes(id, maxBytes)
       : "";
   return invoke<string>("corpus_file_bytes", { id, maxBytes });
+}
+
+export async function corpusFileTextAi(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+  maxBytes?: number,
+): Promise<string> {
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
+  return invoke<string>("corpus_file_text_ai", { id, modelId: model.id, endpoint: model.endpoint, maxBytes });
+}
+
+export async function corpusFileBytesAi(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+  maxBytes?: number,
+): Promise<string> {
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
+  return invoke<string>("corpus_file_bytes_ai", {
+    id,
+    modelId: model.id,
+    endpoint: model.endpoint,
+    maxBytes,
+  });
 }
 
 export interface FileStat {
@@ -1134,25 +1148,6 @@ export async function corpusOpenWithApps(): Promise<string[]> {
 export async function corpusOpenFileWith(id: string, app: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_open_file_with", { id, app });
-}
-
-export interface FrontmatterView {
-  id: string;
-  created: string;
-  updated: string;
-  locked: boolean;
-  /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
-  secure: boolean;
-  /** The EFFECTIVE verdict for loopback-local AI on a secure note (note override
-   * → vault `secureLocalAi` knob → the default, allow). Rust resolves the policy
-   * once; the UI only reflects it (2026-08-01). */
-  localAiAllowed: boolean;
-  /** Pinned to the top of every list (pinned → updated → id sort). */
-  pinned: boolean;
-  /** May an AI rewrite this note's text? Rust's ai_edit_policy verdict. */
-  aiBodyEdit: AiBodyEdit;
-  /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
-  fields: string[];
 }
 
 /** Read a note's frontmatter for the metadata panel (display + lock state). */

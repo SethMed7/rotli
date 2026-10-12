@@ -19,8 +19,10 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
+import { inSecureHome } from "../security/secureNotes";
 import type { SearchHit } from "../types";
 import type { WebSearchProvider } from "./searchProvider";
+import { registeredToolSpecs } from "./toolSchemas";
 import type { Host } from "./types";
 
 const LOCAL: ChatModelInfo = {
@@ -59,6 +61,7 @@ interface Row {
   locked?: boolean;
   reference?: boolean;
   aiBodyEdit?: AiBodyEdit;
+  kind?: "note" | "file";
 }
 
 let rows: Row[] = [];
@@ -83,12 +86,15 @@ const meta = (row: Row): CorpusNoteMeta => ({
   updatedAt: 0,
   pinned: false,
   origin: null,
-  kind: "note",
+  kind: row.kind ?? "note",
 });
 
-/** The ONE policy the fake Rust side enforces — the real `read_for_ai`: a
- * secure note is refused to a remote model, allowed to an on-device one. */
-const readable = (row: Row, model: ChatModelInfo) => !row.secure || model.provider === "mlx";
+/** Match Rust's secure-home location rule (parity.json secureHomeCases), as
+ * well as the explicit flag. Rust's real gate is proved by
+ * ai_note_read_gate_refuses_plain_text_in_secure_homes and
+ * ai_file_gate_refuses_secure_home_and_honors_local_knob in cargo tests. */
+const readable = (row: Row, model: ChatModelInfo) =>
+  !(row.secure || inSecureHome(row.id) || inSecureHome(row.folderId)) || model.provider === "mlx";
 
 void mock.module("../lib/tauri", () => ({
   ...realTauri,
@@ -96,6 +102,10 @@ void mock.module("../lib/tauri", () => ({
     folders: [],
     notes: rows.filter((r) => !r.reference).map(meta),
   }),
+  corpusNotePath: async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    return row ? (id.includes("/") ? id : `${row.folderId}/${id}.md`) : id;
+  },
   // The AI lanes are GATED IN RUST since 2026-08-01 (GAP 1): the command
   // itself applies `read_for_ai` per hit, so the fake enforces `readable`
   // here — a secure row never crosses the boundary for a frontier model, with
@@ -204,6 +214,17 @@ afterAll(() => {
 });
 
 const { makeTauriHost } = await import("./host");
+
+test("the fake Rust read gate classifies secure homes without a flag", () => {
+  const row: Row = {
+    id: "wiki/_secure/plain.txt",
+    title: "Plain",
+    body: "ordinary prose",
+    folderId: "wiki/_secure",
+  };
+  expect(readable(row, FRONTIER)).toBe(false);
+  expect(readable(row, LOCAL)).toBe(true);
+});
 
 /** `updateNote` is optional on the Host port; the Tauri host always wires it,
  * and a missing one is itself a failure worth naming. */
@@ -357,6 +378,112 @@ describe("the brain's memory lanes are retrievable by BOTH classes", () => {
   test("read_note opens a reference note by its path id", async () => {
     expect(await makeTauriHost(FRONTIER).readNote("identity/00-identity.md")).toContain("quokkanaut");
   });
+});
+
+test("read_note and read_memory refuse secret-free paths inside either secure home", async () => {
+  for (const id of ["wiki/_secure/plan.csv", "Secure notes/plan.txt"]) {
+    rows.push({
+      id,
+      title: "Plan",
+      body: "task,status\nDraft,ready",
+      folderId: id.split("/").slice(0, -1).join("/"),
+    });
+    expect(inSecureHome(id)).toBe(true);
+    await expect(makeTauriHost(FRONTIER).readNote(id)).rejects.toThrow(/secure|blocked/i);
+    const host = makeTauriHost(FRONTIER);
+    if (!host.readMemory) throw new Error("the host must register read_memory");
+    await expect(host.readMemory(id)).rejects.toThrow(/secure|blocked/i);
+  }
+});
+
+test("a local AI edit reading secure-home text taints its chat", async () => {
+  const id = "Secure notes/plan.txt";
+  rows.push({ id, title: "Plan", body: "task,status\nDraft,ready", folderId: "Secure notes" });
+  let tainted = false;
+  const host = makeTauriHost(LOCAL, {
+    onSecureNoteRead: () => {
+      tainted = true;
+    },
+  });
+  await updateVia(host, id, "updated plan");
+  expect(tainted).toBe(true);
+});
+
+test("every registered vault-content tool refuses secure-home content for a remote model", async () => {
+  const registered = registeredToolSpecs().map(({ name }) => name);
+  const nonContentTools = [
+    "create_note",
+    "open_note",
+    "web_search",
+    "web_fetch",
+    "generate_image",
+    "create_document",
+    "create_artifact",
+    "draw_board",
+  ];
+  const contentTools = registered.filter((name) => !nonContentTools.includes(name));
+  expect(contentTools).toEqual([
+    "search_memory",
+    "read_memory",
+    "search_notes",
+    "read_note",
+    "update_note",
+    "read_file",
+    "edit_document",
+  ]);
+  rows.push(
+    {
+      id: "wiki/_secure/plan.csv",
+      title: "Plan CSV",
+      body: "quokka project status",
+      folderId: "wiki/_secure",
+      kind: "file",
+    },
+    {
+      id: "Secure notes/plan.txt",
+      title: "Plan text",
+      body: "quokka project status",
+      folderId: "Secure notes",
+    },
+    {
+      id: "wiki/_secure/plan.docx",
+      title: "Plan Word",
+      body: "quokka project status",
+      folderId: "wiki/_secure",
+      kind: "file",
+    },
+  );
+  const host = makeTauriHost(FRONTIER);
+  if (!host.searchMemory || !host.readMemory) throw new Error("the host must register memory tools");
+  const checks: Record<(typeof contentTools)[number], () => Promise<void>> = {
+    search_memory: async () => {
+      expect(await host.searchMemory!("quokka", 20)).not.toContainEqual(
+        expect.objectContaining({ id: "Secure notes/plan.txt" }),
+      );
+    },
+    read_memory: async () => {
+      await expect(host.readMemory!("Secure notes/plan.txt")).rejects.toThrow(/secure|blocked/i);
+    },
+    search_notes: async () => {
+      expect(await host.searchNotes("quokka", 20)).not.toContainEqual(
+        expect.objectContaining({ id: "Secure notes/plan.txt" }),
+      );
+    },
+    read_note: async () => {
+      await expect(host.readNote("Secure notes/plan.txt")).rejects.toThrow(/secure|blocked/i);
+    },
+    update_note: async () => {
+      expect(await updateVia(host, "Secure notes/plan.txt", "changed")).toMatch(/^blocked:/);
+      expect(writes).toEqual([]);
+    },
+    read_file: async () => {
+      expect(await host.readFile("wiki/_secure/plan.csv")).toMatch(/^blocked:/);
+    },
+    edit_document: async () => {
+      expect(await host.editDocument?.("wiki/_secure/plan.docx", [])).toMatch(/^blocked:/);
+    },
+  };
+  for (const name of contentTools) await checks[name]!();
 });
 
 // 2026-09-29: a note a PERSON wrote is theirs — no class rewrites it without

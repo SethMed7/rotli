@@ -32,17 +32,23 @@ impl CorpusStore {
             )
     }
 
-    /// Does this path sit in a secure home — the memex's `wiki/_secure/` or
-    /// the legacy `Secure notes/` — in either layout? Notes there carry the
-    /// `secure:` flag `read_for_ai` checks; this covers a FILE beside them
-    /// (a PDF, an image), which carries no frontmatter to say so. Compared
-    /// without case: the Mac's file system doesn't distinguish it either.
+    /// Does this path sit in a secure home in either layout?
     pub(crate) fn in_secure_home(&self, rel: &str) -> bool {
-        let rel = rel.to_lowercase();
-        ["wiki/_secure", super::SECURE_NOTES_FOLDER].iter().any(|home| {
-            let home = home.to_lowercase();
-            rel == home || rel.starts_with(&format!("{home}/"))
-        })
+        in_secure_home_path(rel)
+    }
+
+    /// Frontmatter-free file visibility for AI in either vault layout.
+    pub(crate) fn file_is_protected(&self, rel: &str) -> bool {
+        let title = std::path::Path::new(rel)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        self.in_secure_home(rel)
+            || crate::librarian_rules::secure_by_name(
+                title,
+                rel,
+                &self.librarian_rules().secure_keywords,
+            )
     }
 
     /// Protect every Library note already named with a secure keyword (the
@@ -82,6 +88,16 @@ impl CorpusStore {
         }
         Ok(protected)
     }
+}
+
+/// Shared location rule for corpus AI reads and the independent organizer.
+/// Compare without case because the Mac's file system does not distinguish it.
+pub(crate) fn in_secure_home_path(rel: &str) -> bool {
+    let rel = rel.to_lowercase();
+    ["wiki/_secure", super::SECURE_NOTES_FOLDER].iter().any(|home| {
+        let home = home.to_lowercase();
+        rel == home || rel.starts_with(&format!("{home}/"))
+    })
 }
 
 /// Protect every note already named with a secure keyword (Settings →

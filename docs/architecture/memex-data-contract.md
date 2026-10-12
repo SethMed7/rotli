@@ -733,6 +733,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
   from normal organizer areas while the sidebar exposes it deliberately.
   Protection is also stored on each Markdown file as `secure: true`.
+  AI reads classify the physical secure home even when a plain text file there
+  has no frontmatter; the organizer independently skips the same location.
 - Marking an existing note secure records its prior physical folder, moves the
   stable note id into `wiki/_secure/`, and updates its gitignore protection
   before either path changes. Removing protection moves it back before dropping
@@ -797,6 +799,13 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `local_ai_allowed` line overrides the vault knob in either direction. No knob
   exists, or will exist, that opens a secure note to a remote model. A frontier
   provider behind a localhost proxy still fails this gate.
+- Frontmatter-free files under `wiki/_secure/` or `Secure notes/`, and files
+  named with a secure keyword, inherit the secure visibility rule. Chat resolves
+  the exact file id before extraction; an ambiguous filename or unknown path is
+  refused. A remote model never reads these files. An on-device model may read
+  them while the vault's `secureLocalAi` setting allows it, and that read taints
+  the chat against later remote sends. The note-level `local_ai_allowed` override
+  applies to Markdown notes only. User editor reads remain available.
 - **A person's note refuses AI body edits without their grant** (2026-09-29):
   the same seams as `locked` below, in both layers, with Rotli Web running the
   TypeScript twin itself. A chat attached to such a note keeps its

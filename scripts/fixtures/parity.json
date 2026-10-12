@@ -230,6 +230,17 @@
       "sourceOfTruth": "src/security/secureNotes.ts SECURE_NOTES_FOLDER + src/services/destinations.ts DEST.secure ↔ src-tauri/src/corpus.rs SECURE_NOTES_FOLDER",
       "value": "Secure notes"
     },
+    "secureHomeCases": {
+      "sourceOfTruth": "src/security/secureNotes.ts inSecureHome ↔ src-tauri/src/corpus_rules.rs in_secure_home",
+      "value": [
+        { "path": "wiki/_secure/plan.docx", "secure": true },
+        { "path": "WIKI/_SECURE/team/budget.xlsx", "secure": true },
+        { "path": "Secure notes/plan.csv", "secure": true },
+        { "path": "secure NOTES/team/plan.csv", "secure": true },
+        { "path": "wiki/_securely/plan.docx", "secure": false },
+        { "path": "storage/plan.csv", "secure": false }
+      ]
+    },
     "stripMarkers": {
       "sourceOfTruth": "src/services/derive.ts BLOCK_MARKERS ↔ src-tauri/src/corpus.rs STRIP_MARKERS",
       "value": [
