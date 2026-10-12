@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web fills missing note identity and dates on save or move.** Editing
+  a hand-written note with frontmatter no longer leaves blank `id`, `created`,
+  or `updated` fields, and moving it keeps its original edit date.
+- **New Web note titles name their files.** The first heading replaces the
+  temporary `untitled.md` name while keeping the note's stable identity.
+- **Rotli Web reopens the notes you had open.** A tab whose note lives in
+  Captures, Archive, or Trash — including every note you just created — now
+  comes back after a reload instead of closing, and the Mac app shares the
+  same check at relaunch; only notes that are actually gone from the vault
+  drop out.
 - **Rotli Web keeps Mermaid diagrams private.** Diagrams with images, links,
   or configuration that could load a URL are refused before rendering,
   with an explanation beside the source.

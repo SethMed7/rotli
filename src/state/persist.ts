@@ -64,6 +64,7 @@ import { archiveChat, listChats, loadConfig } from "../memex/service";
 import { type NewItemKind, newTabDefaultFrom } from "../newItems/model";
 import { mainFolderIds, mainNoteIds, removeFromMain } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
+import type { NotesService } from "../services/notesPort";
 import { isRetentionEligible, parseRetentionDays } from "../services/retentionPolicy";
 import { DEFAULT_TASK_ARCHIVE_AGE, TASK_ARCHIVE_AGES, type TaskArchiveAge } from "../services/tasksView";
 import type { PaneNode, Tab } from "../types";
@@ -996,6 +997,15 @@ function validPane(v: unknown, alive: Set<string>): PaneNode | null {
   return null;
 }
 
+/** Every item id that still exists in the vault — the WHOLE corpus, never the
+ * All Notes listing. That listing hides Captures, Archive, and Trash, and a
+ * new memex note is born a capture (wiki/_inbox, shelf Inbox), so gating
+ * restored tabs on it closed every just-written note at the next launch.
+ * Exported for tests. */
+export async function existingItemIds(service: Pick<NotesService, "listAll">): Promise<Set<string>> {
+  return new Set((await service.listAll()).map((item) => item.id));
+}
+
 async function hydrateViewstate(): Promise<void> {
   let data: Record<string, unknown>;
   try {
@@ -1004,8 +1014,7 @@ async function hydrateViewstate(): Promise<void> {
     return; // first run / corrupted file → the default pristine pane
   }
   // the disk truth gates everything id-shaped: tabs, MRU, the folder selection
-  const [notes, folders] = await Promise.all([notesService.listNotes(), notesService.listFolders()]);
-  const alive = new Set(notes.map((n) => n.id));
+  const [alive, folders] = await Promise.all([existingItemIds(notesService), notesService.listFolders()]);
 
   // the Aa map is keyed by note id — drop entries whose notes are gone, so
   // settings.json never accumulates orphans across deletes

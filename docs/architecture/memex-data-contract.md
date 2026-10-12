@@ -490,6 +490,13 @@ The Rust corpus boundary independently validates every write.
     UTC timestamp.
   So a note made on the Mac carries timestamps until its first edit there or
   on the web turns `updated` into a day; both shapes read the same age.
+- On a body save of an imported note that already has a frontmatter fence,
+  Rotli Web fills a missing `id` with a stable ULID and a missing or invalid
+  `created` from the file's modification time, then stamps `updated` with the
+  writer's calendar day. A lifecycle move of a fenced note fills missing or
+  invalid `created` and `updated` from the pre-move file time, but never bumps a
+  valid `updated`. An imported note without a fence stays fenceless on a body
+  save or move. Unknown frontmatter fields survive these writes.
 - A full timestamp is taken as written. A day is never read as an hour: Rotli
   shows a note's age from the file's own time when that time falls on the
   stamped day — the reader's local day, widened to the UTC day because Mac
