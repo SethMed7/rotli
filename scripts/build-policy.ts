@@ -21,8 +21,11 @@ type BuildOutput = Record<string, BuildChunk | { type: string }>;
 
 /** JSXGraph ships an optional compiler that contains eval. Rotli pins its
  * JessieCode interpreter to compile:false in check:structure, so the compiler
- * path is unreachable. Suppress only that exact vendor warning. */
+ * path is unreachable. Suppress only that exact vendor warning. Rolldown's
+ * PLUGIN_TIMINGS reports a slow build, not a change to the bundle: it fired
+ * on a loaded machine (2026-10-12) and failed an otherwise clean build. */
 export function shouldIgnoreBuildWarning(warning: BuildWarning): boolean {
+  if (warning.code === "PLUGIN_TIMINGS") return true;
   return (
     warning.code === "EVAL" && (warning.id?.replaceAll("\\", "/").endsWith(JSXGRAPH_EVAL_SOURCE) ?? false)
   );
