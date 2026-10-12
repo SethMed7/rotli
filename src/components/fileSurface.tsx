@@ -37,7 +37,7 @@ import {
   fileAssetUrl,
   isTauri,
 } from "../lib/tauri";
-import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheets/facts";
+import { deriveSheetFacts, describeShape, formatStamp, sizeLine, truncatedRowsNote } from "../sheets/facts";
 import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -681,9 +681,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
               </div>
             )}
             {sheet?.truncated && (
-              <div className="file-sheet-note">
-                showing the first {sheet.rows.length.toLocaleString()} rows — Open externally for the rest
-              </div>
+              <div className="file-sheet-note">{truncatedRowsNote(sheet.rows.length, DESKTOP)}</div>
             )}
             <div className="file-sheet-scroll">
               {sheet && sheet.rows.length > 0 ? (

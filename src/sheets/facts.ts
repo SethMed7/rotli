@@ -76,3 +76,9 @@ export function formatStamp(ms: number | null | undefined): string {
 export function sizeLine(stat: FileStat | null): string {
   return stat ? formatBytes(stat.len) : "—";
 }
+
+/** The note over a read-only table cut at the row cap. Only the Mac can hand
+ * the whole file to another app, so only the Mac says to. */
+export function truncatedRowsNote(rows: number, desktop: boolean): string {
+  return `showing the first ${rows.toLocaleString()} rows${desktop ? " — Open externally for the rest" : ""}`;
+}

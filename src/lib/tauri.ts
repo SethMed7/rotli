@@ -1111,9 +1111,10 @@ export async function corpusConvertDocument(id: string): Promise<string> {
   return invoke<string>("corpus_convert_document", { id });
 }
 
-/** False for genuinely read-only roots or unsupported vault contracts. */
+/** False for genuinely read-only roots or unsupported vault contracts. A
+ * connected web folder is writable: connecting asks for readwrite access. */
 export async function corpusManagedFileCreationAvailable(): Promise<boolean> {
-  if (!isTauri()) return false;
+  if (!isTauri()) return hasWebVaultIo();
   return invoke<boolean>("corpus_managed_file_creation_available");
 }
 

@@ -4,7 +4,7 @@ import { SHEET_BIN, SHEET_EDIT_MAX_BYTES, sheetFormatEditable, workbookWithheld 
 import type { SheetTable } from "../../sheets/view";
 
 export const OFFICE_READ_MAX_BYTES = 8_000_000;
-type Features = Pick<typeof LAUNCH_FEATURES, "documents" | "sheets">;
+type Features = { documents: boolean; sheets: boolean };
 type OfficeKind = "document" | "sheet";
 type OfficeStat = { len: number; writable: boolean };
 

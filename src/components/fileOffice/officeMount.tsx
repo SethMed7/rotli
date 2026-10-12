@@ -3,6 +3,11 @@ import { Suspense, lazy, type RefObject } from "react";
 import { DOCX_EDITABLE, DOCUMENT_CONVERTIBLE } from "../../documents/kinds";
 import { LAUNCH_FEATURES, PLATFORM } from "../../lib/featurePolicy";
 
+/** How to edit a PDF or legacy document on Rotli Web, where conversion (a
+ * Mac-only local converter) isn't offered: make the DOCX elsewhere. */
+export const WEB_DOCX_COPY_HINT =
+  "Rotli edits Word documents saved as .docx. Open this file in Word, Pages, or LibreOffice, save a .docx copy into this vault, then open the copy here.";
+
 // Keep the editor engines out of the initial file-surface bundle.
 const SheetEditor = lazy(() => import("../../sheets/sheetEditor"));
 const DocumentEditor = lazy(() => import("../documentEditor"));
@@ -82,8 +87,8 @@ export function OfficeMount({
   if (!LAUNCH_FEATURES.documents)
     return (
       <div className="file-document-fallback">
-        <h2>.{ext || "unknown"} is unsupported on the web</h2>
-        <p>Open this file in Rotli for Mac to edit or convert a local copy.</p>
+        <h2>.{ext || "unknown"} is unsupported in this build</h2>
+        <p>Documents aren’t available in this build yet.</p>
       </div>
     );
   if (DOCX_EDITABLE.has(ext))
@@ -95,7 +100,8 @@ export function OfficeMount({
   if (PLATFORM !== "desktop")
     return (
       <div className="file-document-fallback">
-        <h2>.{ext || "unknown"} is unsupported</h2>
+        <h2>.{ext || "unknown"} can’t be edited on the web</h2>
+        <p>{WEB_DOCX_COPY_HINT}</p>
       </div>
     );
   return (

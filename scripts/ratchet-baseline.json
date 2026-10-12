@@ -6,7 +6,7 @@
     "src/state/panes.ts": 1267,
     "src/components/systemSurface.tsx": 1189,
     "src/components/sidebar/sidebarHome.tsx": 1301,
-    "src/components/fileSurface.tsx": 726,
+    "src/components/fileSurface.tsx": 724,
     "src/components/chat/chatSurface.tsx": 2864,
     "src/components/breve/breveSurface.tsx": 2335,
     "src/components/settingsSurface.tsx": 3502,
@@ -15,7 +15,7 @@
     "src/ai/loop.test.ts": 1254,
     "src/lib/tauri.ts": 2391,
     "src/keys/actions.ts": 894,
-    "src/documents/codec/docx.ts": 741,
+    "src/documents/codec/docx.ts": 738,
     "src/documents/engine/univer.ts": 789,
     "src/editor/livePreview.ts": 1190,
     "src/editor/tableRender.ts": 797,
@@ -59,6 +59,6 @@
     "src/editor": 0.5
   },
   "dupClusters": 226,
-  "runtimeGates": 70,
+  "runtimeGates": 65,
   "disabledRuntimeOffers": 4
 }

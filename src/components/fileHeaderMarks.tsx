@@ -1,7 +1,9 @@
 import { DOCX_EDITABLE } from "../documents/kinds";
+import { PLATFORM } from "../lib/featurePolicy";
 import { isBetaFileExt } from "../newItems/model";
 import { sheetReadOnlyReason } from "../sheets/kinds";
 import { BetaBadge } from "./betaBadge";
+import { WEB_DOCX_COPY_HINT } from "./fileOffice/officeMount";
 
 /** The status marks beside an open file's name: Beta while a Univer editor is
  * mounted, otherwise the reason editing is off. Never both — a read-only view
@@ -24,6 +26,13 @@ export function FileHeaderMarks({
   documentEditable: boolean;
 }) {
   if ((sheetEditable || documentEditable) && isBetaFileExt(ext)) return <BetaBadge />;
+  // the Mac converts a PDF to an editable DOCX copy; the web says how to get one
+  if (kind === "pdf" && PLATFORM !== "desktop")
+    return (
+      <span className="file-readonly" title={WEB_DOCX_COPY_HINT}>
+        To edit, export a .docx copy in another app
+      </span>
+    );
   // EVERY read-only sheet says WHY editing is off, not just the read-only
   // root — .ods/.xls/oversize/failed-probe were silent (#53, audit 2026-07)
   if (kind === "sheet" && probed && !sheetEditable && !tooLarge) {

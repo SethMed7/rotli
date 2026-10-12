@@ -1,40 +1,28 @@
-// Activate with the web office flag flip. The editor must replay a draft made
-// inside the 800 ms autosave window before opening either conventional file.
+// Rotli Web office recovery: the editor must replay a draft made inside the
+// 800 ms autosave window before opening either conventional file.
 import { expect, test, type Page } from "@playwright/test";
 
 import { decodeDocx } from "../../src/documents/codec/docx";
 import { createDocxBase64 } from "../../src/documents/create";
-import { launchFeatures } from "../../src/lib/featurePolicy";
 import { fillFromCsvRows, loadXlsx, newWorkbook, saveXlsx } from "../../src/sheets/codec/xlsx";
-import { APP, plantOpfsFiles, readOpfsBase64, rememberOpfsVault, vaultGate } from "./support";
-
-const officeOnWeb = launchFeatures(false, "web").sheets && launchFeatures(false, "web").documents;
-test.beforeEach((_, info) => {
-  info.skip(!officeOnWeb, "Web office flags are intentionally off; remove this skip at the flag flip.");
-});
+import {
+  APP,
+  plantOpfsBinary,
+  plantOpfsFiles,
+  readOpfsBase64,
+  rememberOpfsVault,
+  vaultGate,
+} from "./support";
 
 async function startWithBinary(page: Page, path: string, base64: string): Promise<void> {
   await page.goto(APP);
   await expect(vaultGate(page)).toHaveText("Choose your vault");
   await plantOpfsFiles(page, { "wiki/anchor.md": "# Anchor\n" });
-  await page.evaluate(
-    async ({ path, base64 }) => {
-      const root = await navigator.storage.getDirectory();
-      const parts = path.split("/");
-      let folder = root;
-      for (const part of parts.slice(0, -1)) folder = await folder.getDirectoryHandle(part, { create: true });
-      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-      const writer = await (
-        await folder.getFileHandle(parts[parts.length - 1]!, { create: true })
-      ).createWritable();
-      await writer.write(bytes);
-      await writer.close();
-    },
-    { path, base64 },
-  );
+  await plantOpfsBinary(page, { [path]: base64 });
   await rememberOpfsVault(page);
   await page.reload();
-  await expect(page.locator(".tabstrip").getByRole("tab", { selected: true })).toBeVisible();
+  // boot opens the freshest note; a click made before that lands is replaced
+  await expect(page.locator(".tabstrip").getByRole("tab", { selected: true })).toContainText("Anchor");
   await page.locator(".sb-system .frow", { hasText: "Assets" }).click();
   await page.locator(`.system-browser [data-note-id="${path}"]`).first().dblclick();
 }

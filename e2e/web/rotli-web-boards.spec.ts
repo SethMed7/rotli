@@ -2,11 +2,11 @@
 // connected vault folder, exactly as on the Mac. Created from the ⌘N chooser
 // (reached through the palette — real controls, no chord), drawn on, saved
 // into the folder, and still listed and openable after a reload. Documents
-// (DOCX) stay a desktop capability: the chooser names them coming soon.
+// (DOCX) are offered here too, Beta and named first, as on the Mac.
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { readOpfsFile, startWithVault } from "./support";
+import { listOpfsFiles, readOpfsFile, startWithVault } from "./support";
 
 const EMPTY_SCENE =
   '{"type":"excalidraw","version":2,"source":"rotli","elements":[],"appState":{},"files":{}}';
@@ -155,19 +155,22 @@ test("a second board of the same name never replaces the first", async ({ page }
   expect(await readOpfsFile(page, "storage/excalidraw/Sketch-2.excalidraw")).toBe(EMPTY_SCENE);
 });
 
-test("the Document card is coming soon on the web and creates nothing", async ({ page }) => {
+test("the Document card is offered on the web as Beta and asks for its name first", async ({ page }) => {
   await startWithVault(page);
   await openChooser(page);
-  const card = page.locator(".ni-surface").getByRole("button", { name: /^New Document — Coming soon/ });
-  await expect(card).toHaveAttribute("aria-disabled", "true");
-  await expect(card).toContainText("Coming soon");
-  // its digit is dead too: pressing 4 on the chooser creates nothing
+  const card = page.locator(".ni-surface").getByRole("button", { name: /^New Document/ });
+  await expect(card).not.toHaveAttribute("aria-disabled", "true");
+  await expect(card).toContainText("Beta");
+  await expect(card).not.toContainText("Coming soon");
+  // its digit works: pressing 4 asks for the name before any file exists
   await page.locator(".ni-surface").press("4");
-  await expect(page.getByRole("dialog", { name: "Name document" })).toHaveCount(0);
-  await expect(page.locator(".ni-surface")).toBeVisible();
-  // the palette offers no document command either
-  await page.keyboard.press("Escape");
+  const dialog = page.getByRole("dialog", { name: "Name document" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await listOpfsFiles(page, "storage/rotli")).toEqual([]);
+  // the palette offers the document command too
   await page.getByRole("button", { name: /Search notes and actions/ }).click();
   await page.getByPlaceholder("Search notes, files, chats, actions…").fill("New document");
-  await expect(page.locator(".prow", { hasText: "New document" })).toHaveCount(0);
+  await expect(page.locator(".prow", { hasText: "New document" }).first()).toBeVisible();
 });

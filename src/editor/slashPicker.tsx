@@ -5,6 +5,7 @@ import { type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { PlusGlyph } from "../components/glyphs";
 import { glyphForNote } from "../components/noteGlyph";
 import { DOCX_EDITABLE } from "../documents/kinds";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { extOf, fileName } from "../lib/fileKind";
 import { subsequenceMatch } from "../lib/fuzzy";
 import { fitMenuToWindow, scrollRowIntoList, useTransientPopover } from "../lib/popover";
@@ -58,13 +59,7 @@ export function embedCreateName(mode: SlashPickerMode, query: string): string | 
 }
 
 async function createEmbeddedItem(mode: SlashPickerMode, name?: string): Promise<string | null> {
-  if (
-    !isTauri() ||
-    mode === "linkNote" ||
-    mode === "linkChat" ||
-    mode === "insertTemplate" ||
-    mode === "continueList"
-  )
+  if (mode === "linkNote" || mode === "linkChat" || mode === "insertTemplate" || mode === "continueList")
     return null;
   const kind = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   const item = await createManagedItem(kind, name ? { open: false, name } : { open: false });
@@ -89,11 +84,19 @@ export function pickerHint(note: NoteSummary): string {
   return note.id.includes("/") || note.id.includes(".") ? fileName(note.id) : "";
 }
 
-export function slashPickerCanCreate(mode: SlashPickerMode, tauri = isTauri(), writable = true): boolean {
-  // a template — or a note made from Link note — is an ordinary note: every
-  // vault can make one, web included
-  if (mode === "insertTemplate" || mode === "linkNote") return writable;
-  return tauri && writable && (mode === "embedBoard" || mode === "embedSheet" || mode === "embedDocument");
+/** The build decides which kinds the picker can make (Rotli Web included);
+ * `writable` is whether the connected vault can take a new file. */
+export function slashPickerCanCreate(
+  mode: SlashPickerMode,
+  features: { sheets: boolean; documents: boolean } = LAUNCH_FEATURES,
+  writable = true,
+): boolean {
+  if (!writable) return false;
+  // a template — or a note made from Link note — is an ordinary note
+  if (mode === "insertTemplate" || mode === "linkNote" || mode === "embedBoard") return true;
+  if (mode === "embedSheet") return features.sheets;
+  if (mode === "embedDocument") return features.documents;
+  return false;
 }
 
 export function SlashPicker({
@@ -146,7 +149,6 @@ export function SlashPicker({
   useEffect(() => {
     let cancelled = false;
     if (mode === "linkChat" || mode === "continueList") return;
-    if (!isTauri()) return;
     void corpusManagedFileCreationAvailable()
       .then((available) => {
         if (!cancelled) setCreationAvailable(available);
@@ -166,10 +168,16 @@ export function SlashPicker({
   const supportsCreate =
     mode === "insertTemplate" ||
     (mode === "linkNote" && !!newTitle && !titleTaken) ||
-    (isTauri() && (mode === "embedBoard" || mode === "embedSheet" || mode === "embedDocument"));
-  // Rotli Web writes to the folder the person connected — nothing to ask
+    mode === "embedBoard" ||
+    mode === "embedSheet" ||
+    mode === "embedDocument";
+  // a note is written by whichever notes service is mounted (the browser's
+  // always can); a file needs a vault that can take one — the adapter answers
+  const notesWritable = !isTauri() || creationAvailable === true;
+  const notesOnly = mode === "insertTemplate" || mode === "linkNote";
   const canCreate =
-    supportsCreate && slashPickerCanCreate(mode, isTauri(), !isTauri() || creationAvailable === true);
+    supportsCreate &&
+    slashPickerCanCreate(mode, LAUNCH_FEATURES, notesOnly ? notesWritable : creationAvailable === true);
   const rows = canCreate ? items.length + 1 : items.length;
   const createSelected = canCreate && selectedIndex === items.length;
   // arrowing past the fold scrolls the list with the highlight
