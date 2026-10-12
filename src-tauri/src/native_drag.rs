@@ -101,9 +101,9 @@ pub(crate) fn deliver(window: &Window, offered: usize, paths: &[PathBuf], positi
         // folders, vanished files, a poisoned grant lock: say so instead
         // of dropping the gesture on the floor
         eprintln!("rotli: native drop granted none of {offered} dropped item(s)");
-        let _ = window.emit(DROP_REFUSED_EVENT, RefusedNativeDrop { count: offered });
+        let _ = window.emit_to(window.label(), DROP_REFUSED_EVENT, RefusedNativeDrop { count: offered });
     } else {
-        let _ = window.emit(DROP_EVENT, AuthorizedNativeDrop { paths: granted, position });
+        let _ = window.emit_to(window.label(), DROP_EVENT, AuthorizedNativeDrop { paths: granted, position });
     }
 }
 
@@ -149,7 +149,7 @@ pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
     }
     match event {
         DragDropEvent::Enter { paths, position } => {
-            let _ = window.emit(
+            let _ = window.emit_to(window.label(), 
                 DRAG_EVENT,
                 NativeDrag {
                     phase: "over",
@@ -160,16 +160,16 @@ pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
             );
         }
         DragDropEvent::Over { position } => {
-            let _ = window.emit(
+            let _ = window.emit_to(window.label(), 
                 DRAG_EVENT,
                 NativeDrag { phase: "over", x: position.x, y: position.y, count: 1 },
             );
         }
         DragDropEvent::Leave => {
-            let _ = window.emit(DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
+            let _ = window.emit_to(window.label(), DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
         }
         DragDropEvent::Drop { paths, position } => {
-            let _ = window.emit(DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
+            let _ = window.emit_to(window.label(), DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
             let position = DropPosition { x: position.x, y: position.y };
             if debug_drops() {
                 debug_log(&format!("drop with {} file path(s)", paths.len()));

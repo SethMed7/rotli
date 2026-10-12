@@ -337,8 +337,17 @@ new IA — each piece owns one front or one zone.
 
 - **No virtualization.** Home renders the _curated_ Main tree, not every note,
   so its row count is unchanged by this work; Chat renders one row per chat.
-  Neither is a 900-row list today. If either becomes one, windowing that list is
-  the next step — measured first, not assumed.
+  A Main seeded from a huge folder _did_ become one (RAM review 2026-10-12:
+  145k rows, 1.48M DOM nodes, ~14 GB in WebKit). Two bounds now hold without
+  windowing: the tree is built from a per-parent index
+  (`indexMainProjection`), never a full scan per folder; and Main folders open
+  by default only while Main has at most `MAIN_DEFAULT_OPEN_LIMIT` (2,000)
+  items — past it they start folded, and a folder the user opens stays open.
+  The count is the manifest's folders plus note refs (`mainTreeSize`). One rule
+  (`isMainFolderOpen`) serves render, roving, toggle, and collapse; collapse-all
+  passes Main folder ids as default-open only while Main opens by default. A
+  flat Main with tens of thousands of root rows is still unbounded; windowing
+  is the next step if that shape appears.
 - **No new front.** Inbox (email) is still parked in `ROADMAP.md`. When it
   returns it is a third `SIDEBAR_FRONTS` entry, not a third accordion.
 - **No change to Breve.** Breve is still a sidebar _mode_ (a lens over the same

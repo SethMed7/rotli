@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
+import JSZip from "jszip";
 
-import { plantOpfsFiles, startWithVault } from "./support";
+import { createDocxBase64 } from "../../src/documents/create";
+import { fillFromCsvRows, newWorkbook, saveXlsx } from "../../src/sheets/codec/xlsx";
+import { listOpfsFiles, plantOpfsBinary, plantOpfsFiles, readOpfsBase64, startWithVault } from "./support";
 
 test("search never offers native window or vault-refresh actions", async ({ page }) => {
   await startWithVault(page);
@@ -87,11 +90,20 @@ test("Settings explains desktop runtime limits and keeps connected CLI configura
   await expect(page.getByRole("heading", { name: "Connected models" })).toBeVisible();
 });
 
-test("web hides document slash creation and explains existing document and sheet fences", async ({
+test("web mounts document, workbook, and CSV embeds and creates a document from the slash picker", async ({
   page,
 }) => {
   await startWithVault(page);
+  const docx = await createDocxBase64({
+    title: "Example",
+    blocks: [{ kind: "paragraph", text: "Embedded paragraph" }],
+  });
+  const xlsx = Buffer.from(
+    await saveXlsx(fillFromCsvRows(newWorkbook(), "Sheet1", [["Embedded cell"]])),
+  ).toString("base64");
+  await plantOpfsBinary(page, { "storage/example.docx": docx, "storage/example.xlsx": xlsx });
   await plantOpfsFiles(page, {
+    "storage/example.csv": "Name,Count\nSynthetic,7\n",
     "wiki/embed-limits.md":
       "# Embed limits\n\n```document\nstorage/example.docx\n```\n\n```sheet\nstorage/example.xlsx\n```\n\n```sheet\nstorage/example.csv\n```\n\nEnd.",
   });
@@ -103,13 +115,39 @@ test("web hides document slash creation and explains existing document and sheet
   await page.getByRole("combobox").fill("Embed limits");
   await expect(page.getByRole("option").first()).toContainText("Embed limits");
   await page.getByRole("option").first().click();
-  await expect(page.getByText("This document opens in Rotli for Mac.", { exact: true })).toBeVisible();
-  await expect(page.getByText("This spreadsheet opens in Rotli for Mac.", { exact: true })).toBeVisible();
-  await expect(page.getByText("This CSV embed opens in Rotli for Mac.", { exact: true })).toBeVisible();
+  // every embed mounts its editor; none is withheld as Mac-only
+  await expect(page.locator('.rotli-render-embed[data-lang="document"] canvas').first()).toBeVisible();
+  const sheets = page.locator('.rotli-render-embed[data-lang="sheet"]');
+  await expect(sheets).toHaveCount(2);
+  await expect(sheets.nth(0).locator("canvas").first()).toBeVisible();
+  await expect(sheets.nth(1).locator("canvas").first()).toBeVisible();
+  await expect(page.getByText(/opens in Rotli for Mac/)).toHaveCount(0);
+
+  // /document offers the picker and its Create row writes a real DOCX
   await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
   await page.locator(".pane.focused .cm-content").click();
   await page.keyboard.type("/document");
-  await expect(page.getByRole("menuitem", { name: /Document/ })).toHaveCount(0);
+  await page
+    .getByRole("menuitem", { name: /Document/ })
+    .first()
+    .click();
+  const create = page.getByRole("menuitem", { name: /Create new/ });
+  await expect(create).toBeEnabled();
+  await create.click();
+  // the fence lands in the note: its embed, or its source while the caret sits in it
+  await expect(
+    page
+      .locator(
+        '.pane.focused .rotli-render-embed[data-lang="document"], .pane.focused .cm-line:has-text("storage/rotli/untitled-")',
+      )
+      .first(),
+  ).toBeVisible();
+  await expect
+    .poll(() => listOpfsFiles(page, "storage/rotli"))
+    .toContainEqual(expect.stringMatching(/\.docx$/));
+  const [created] = (await listOpfsFiles(page, "storage/rotli")).filter((name) => name.endsWith(".docx"));
+  const zip = await JSZip.loadAsync(await readOpfsBase64(page, `storage/rotli/${created}`), { base64: true });
+  expect(zip.file("word/document.xml")).not.toBeNull();
 });
 
 test("a folder vault refreshes its listing when the page regains focus", async ({ page }) => {

@@ -55,6 +55,7 @@ const io: FileToolIo = {
       kind: "ready",
       warnings: [],
       revision: "r1",
+      sourceBase64: "",
       document: {
         id: "storage/rotli/brief.docx",
         title: "brief",

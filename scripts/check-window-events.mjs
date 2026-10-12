@@ -52,6 +52,63 @@ for (const [name, where] of byEvent) {
       `${name}: appears once (${[...where].join(", ")}) — an event needs a sender and a receiver, and the webview side lives in src/lib`,
     );
 }
+// Window targeting (review of PR 199): a bare `listen()` hears an event emitted
+// to ANY window, and Rust's `.emit()` sends to every window. So Rust must
+// address events per window (`emit_to`; only true broadcasts may `.emit`), and
+// every event Rust addresses must be heard with `listenHere` or a `target`.
+const BROADCASTS = new Set(["rotli:vault-changed"]);
+const constants = new Map();
+const addressed = new Set();
+for (const path of files.filter((p) => p.endsWith(".rs"))) {
+  const source = readFileSync(path, "utf8");
+  for (const m of source.matchAll(/const ([A-Z_]+): &str = "(rotli:[a-z0-9-]+)"/g)) constants.set(m[1], m[2]);
+}
+const eventOf = (token) => (token.startsWith('"') ? token.slice(1, -1) : constants.get(token));
+for (const path of files.filter((p) => p.endsWith(".rs"))) {
+  const source = readFileSync(path, "utf8");
+  const rel = relative(root, path);
+  for (const m of source.matchAll(/\.emit\(\s*("rotli:[a-z0-9-]+"|[A-Z_]+_EVENT)/g)) {
+    const name = eventOf(m[1]);
+    if (name && !BROADCASTS.has(name))
+      failures.push(
+        `${rel}: \`.emit(${m[1]})\` reaches every window — use emit_to(<label>, …) (or list a true broadcast)`,
+      );
+  }
+  for (const m of source.matchAll(/emit_to(?:_shells)?\([^;]*?("rotli:[a-z0-9-]+"|[A-Z_]+_EVENT)/gs)) {
+    const name = eventOf(m[1]);
+    if (name) addressed.add(name);
+  }
+}
+// listenHere is trusted by name below, so it must itself pass the target
+const adapterPath = join(root, "src/lib/tauri.ts");
+const adapter = files.includes(adapterPath) ? readFileSync(adapterPath, "utf8") : "";
+const listenHereBody = adapter.replace(/\r\n/g, "\n").match(/export function listenHere[\s\S]*?\n}\n/)?.[0];
+const callsListenHere = files.some(
+  (p) => /\.tsx?$/.test(p) && /\blistenHere(?:<[^>]*>)?\(\s*"/.test(readFileSync(p, "utf8")),
+);
+// a definition the pattern no longer finds must not quietly turn the check off
+if (callsListenHere && !listenHereBody?.includes("target:"))
+  failures.push(
+    "src/lib/tauri.ts: listenHere must be `export function listenHere` passing { target } — every per-window listener relies on it",
+  );
+for (const path of files.filter((p) => /\.tsx?$/.test(p))) {
+  const source = readFileSync(path, "utf8");
+  for (const m of source.matchAll(/\blisten(?:<[^>]*>)?\(\s*"(rotli:[a-z0-9-]+)"/g)) {
+    if (!addressed.has(m[1])) continue;
+    // the whole call, by balanced parentheses (handlers hold their own calls)
+    let depth = 0;
+    let end = source.indexOf("(", m.index);
+    for (; end < source.length; end++) {
+      if (source[end] === "(") depth++;
+      else if (source[end] === ")" && --depth === 0) break;
+    }
+    if (!source.slice(m.index, end).includes("target:"))
+      failures.push(
+        `${relative(root, path)}: ${m[1]} is addressed to one window by Rust — hear it with listenHere (or a target), not a bare listen`,
+      );
+  }
+}
+
 for (const name of documented) {
   if (!byEvent.has(name)) failures.push(`${name}: documented but no longer used in code — remove the row`);
 }
@@ -59,4 +116,6 @@ if (failures.length) {
   console.error(`check:window-events failed:\n${failures.map((f) => `  - ${f}`).join("\n")}`);
   process.exit(1);
 }
-console.log(`check:window-events ok — ${byEvent.size} events documented and wired on both sides`);
+console.log(
+  `check:window-events ok — ${byEvent.size} events documented and wired on both sides; ${addressed.size} window-addressed events heard per window`,
+);

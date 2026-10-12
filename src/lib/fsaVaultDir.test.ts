@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { testByteEditorRoad } from "../services/folderFileIo.test";
+import { FolderNotesService } from "../services/folderNotes";
 import { contentRevision } from "../services/vaultDir";
 import { FsaVaultDir } from "./fsaVaultDir";
 
@@ -53,6 +55,9 @@ class FakeFile {
 class FakeDir {
   readonly kind = "directory";
   readonly files = new Map<string, FakeFile>();
+  async *entries(): AsyncIterableIterator<[string, FakeFile]> {
+    for (const entry of this.files) yield entry;
+  }
   async removeEntry(name: string): Promise<void> {
     this.files.delete(name);
   }
@@ -71,6 +76,152 @@ class FakeDir {
 }
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
+
+async function withWebLocks(task: () => Promise<void>): Promise<void> {
+  const turns = new Map<string, Promise<void>>();
+  const locks = {
+    request: async <T>(
+      name: string,
+      optionsOrCallback: { signal?: AbortSignal } | (() => Promise<T>),
+      maybeCallback?: () => Promise<T>,
+    ): Promise<T> => {
+      const callback = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback!;
+      const before = turns.get(name) ?? Promise.resolve();
+      let release!: () => void;
+      const done = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const turn = before.then(() => done);
+      turns.set(name, turn);
+      await before;
+      try {
+        return await callback();
+      } finally {
+        release();
+        if (turns.get(name) === turn) turns.delete(name);
+      }
+    },
+  };
+  const browser = globalThis.navigator as Navigator;
+  const prior = Object.getOwnPropertyDescriptor(browser, "locks");
+  Object.defineProperty(browser, "locks", { configurable: true, value: locks });
+  try {
+    await task();
+  } finally {
+    if (prior) Object.defineProperty(browser, "locks", prior);
+    else Reflect.deleteProperty(browser, "locks");
+  }
+}
+
+for (const [label, initial] of [
+  ["save", "before"],
+  ["create", null],
+] as const) {
+  test(`two FSA adapters sharing a vault serialize a ${label} revision check with its write`, async () => {
+    await withWebLocks(async () => {
+      const root = new FakeDir();
+      if (initial) (await root.getFileHandle("shared.md", { create: true })).text = initial;
+      const originalGet = root.getFileHandle.bind(root);
+      let checked = 0;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      root.getFileHandle = async (name, options) => {
+        if (name === "shared.md" && !options?.create) {
+          checked += 1;
+          if (checked === 2) release();
+          await held;
+        }
+        return originalGet(name, options);
+      };
+      const first = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "shared-vault");
+      const second = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "shared-vault");
+      const expected = initial ? contentRevision(initial) : "0";
+      const pending = [
+        first.writeText("shared.md", "first", expected),
+        second.writeText("shared.md", "second", expected),
+      ];
+      setTimeout(release, 25); // lets a correctly locked first writer finish without waiting for the second
+      const results = await Promise.allSettled(pending);
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    });
+  });
+}
+
+test("a waiting FSA writer stays queued until the prior Web Lock releases", async () => {
+  await withWebLocks(async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (timeout === 30_000) throw new Error("unexpected 30-second lock deadline");
+      return originalSetTimeout(handler, timeout, ...args);
+    }) as typeof setTimeout;
+    try {
+      const root = new FakeDir();
+      const first = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "same-vault");
+      const second = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "same-vault");
+      const results = await Promise.allSettled([
+        first.writeText("shared.md", "first", "0"),
+        second.writeText("shared.md", "second", "0"),
+      ]);
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+      expect(await first.readText("shared.md")).toBe("first");
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+});
+
+test("an outside edit to a move source after destination publication survives", async () => {
+  const root = new FakeDir();
+  const dir = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle);
+  await dir.writeText("from.md", "original");
+  const get = root.getFileHandle.bind(root);
+  root.getFileHandle = async (name, options) => {
+    const handle = await get(name, options);
+    if (name === "to.md" && options?.create) {
+      const create = handle.createWritable.bind(handle);
+      handle.createWritable = async () => {
+        const stream = await create();
+        return {
+          write: (bytes) => stream.write(bytes),
+          close: async () => {
+            await stream.close();
+            root.files.get("from.md")!.text = "outside edit";
+          },
+        };
+      };
+    }
+    return handle;
+  };
+  await expect(dir.move("from.md", "to.md")).rejects.toThrow(/revision conflict/);
+  expect(root.files.get("from.md")?.text).toBe("outside edit");
+  expect(root.files.get("to.md")?.text).toBe("original");
+});
+
+test("FSA managed rename moves a backup through a case-only rename", async () => {
+  const dir = dirOf();
+  await dir.writeBytes("Draft.docx", new Uint8Array([1]));
+  await dir.writeBytes("Draft.docx.bak", new Uint8Array([2]));
+  const notes = new FolderNotesService(dir);
+  expect(await notes.renameFile("Draft.docx", "DRAFT")).toBe("DRAFT.docx");
+  expect(await dir.readBytes("DRAFT.docx.bak")).toEqual(new Uint8Array([2]));
+});
+
+testByteEditorRoad("FSA", () => {
+  const root = new FakeDir();
+  return {
+    dir: new FsaVaultDir(root as unknown as FileSystemDirectoryHandle),
+    externalBytes: async (path, bytes) => {
+      root.files.get(path)!.bytes = new Uint8Array(bytes);
+    },
+    externalText: async (path, text) => {
+      root.files.get(path)!.text = text;
+    },
+  };
+});
 
 test("writeText with stale expected content preserves the file bytes", async () => {
   const dir = dirOf();

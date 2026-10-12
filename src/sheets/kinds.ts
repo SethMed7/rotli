@@ -1,6 +1,6 @@
 // Spreadsheet file-kind constants — single source for FileSurface, chat host, etc.
 
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 
 /** Binary workbook formats the read path handles via base64 (exceljs).
  * `.xls`/`.ods` were dropped with SheetJS (2026-07): no editor, no preview —
@@ -35,7 +35,13 @@ export function sheetEditableFile(ext: string, stat: { writable: boolean; len: n
 }
 
 /** Why a sheet opened read-only — every cause says so (#53, audit 2026-07). */
-export function sheetReadOnlyReason(stat: { writable: boolean } | null, ext: string) {
+export function sheetReadOnlyReason(
+  stat: { writable: boolean } | null,
+  ext: string,
+  platform: "web" | "desktop" = PLATFORM,
+) {
+  const editElsewhere =
+    platform === "web" ? "open the original in another app to edit" : "use Open externally to edit";
   if (stat === null)
     return {
       label: "view only",
@@ -45,10 +51,10 @@ export function sheetReadOnlyReason(stat: { writable: boolean } | null, ext: str
   if (!SHEET_EDITABLE.has(ext))
     return {
       label: `view only · .${ext}`,
-      title: `Editing supports .xlsx and .csv — .${ext} opens as a view-only table (use Open externally to edit)`,
+      title: `Editing supports .xlsx and .csv — .${ext} opens as a view-only table (${editElsewhere})`,
     };
   return {
     label: "view only · too large",
-    title: "Too large to edit safely in rotli — use Open externally to edit",
+    title: `Too large to edit safely in rotli — ${editElsewhere}`,
   };
 }

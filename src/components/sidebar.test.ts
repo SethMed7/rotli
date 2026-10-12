@@ -64,7 +64,8 @@ test("file drops wait for Rust to issue native import grants", () => {
   expect(dropSource).toContain("onNativeDropAuthorized((event) =>");
   expect(dropSource).not.toContain("onDragDropEvent");
   expect(dropSource).not.toContain("getCurrentWebview");
-  expect(tauriSource).toContain('listen<AuthorizedNativeDrop>("rotli:native-drop-authorized"');
+  // only this window's drop: Rust addresses it with emit_to (audit 2026-10-12)
+  expect(tauriSource).toContain('listenHere<AuthorizedNativeDrop>("rotli:native-drop-authorized"');
 });
 
 // the chat/editor partition and the element-stack routing are behaviour-tested

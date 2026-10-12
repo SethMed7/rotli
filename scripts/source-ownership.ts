@@ -35,6 +35,7 @@ export const SOURCE_ROOT_FILE_OWNERS = {
 } as const;
 
 export const COMPONENT_DIRECTORY_OWNERS = {
+  fileOffice: "file surface Office probe, capability gate, and lazy editor mounts",
   pinnedSites: "pinned sites: the title bar buttons and the panel",
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
@@ -110,7 +111,6 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "helperVaultDir.ts": "Rotli Web helper mode: Rotli Helper's vault verbs behind the vault-dir port",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
   "paneDropDrag.ts": "sidebar note → pane drop workflow",
-  "nativeDrag.ts": "native Finder drag hover relay adapter",
   "popover.ts": "shared transient-popover hook backed by UI state",
   "chatWindowBridge.ts": "native Chat window adapter: show/hide and the two shell windows' messages",
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
@@ -130,7 +130,9 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
  * folder. Every production service declares the capability that owns it; when
  * one capability is physically clustered later, this registry moves with it. */
 export const SERVICE_FILE_OWNERS = {
+  "folderManagedFiles.ts": "vault files (managed Office creation and pristine discard)",
   "folderFileIo.ts": "vault files (guarded connected-folder bytes, text, URLs, and stat)",
+  "folderFileRename.ts": "vault files (managed rename and first-save backup carry)",
   "folderFileSummary.ts": "vault files (stat-only summaries)",
   "folderMetadata.ts": "notes (connected-folder protection and metadata writes)",
   "folderNoteAliases.ts": "notes (durable selectors and title rename preparation)",
@@ -213,6 +215,7 @@ export const SERVICE_FILE_OWNERS = {
   "vaultBinding.ts": "notes",
   "legacyBrowserNotes.ts": "notes",
   "webUnsavedJournal.ts": "notes",
+  "webOfficeRecovery.ts": "vault files (bounded browser drafts and revision-gated office replay)",
   "notesPort.ts": "notes application port",
   "query.ts": "notes retrieval",
   "retentionPolicy.ts": "vault lifecycle",

@@ -51,6 +51,9 @@ import {
   mainNoteIds,
   mainParentOfNote,
   mainRowSort,
+  indexMainProjection,
+  mainFoldersOpenByDefault,
+  mainTreeSize,
   liftToMainRoot,
   moveInTree,
   renameFolderInMain,
@@ -226,6 +229,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const noteIndex = useNoteIndex();
   const liveIds = useMainGcIds();
   const mainProjection = useMemo(() => buildMainTree(activeTree, noteIndex), [activeTree, noteIndex]);
+  // per-parent lookups, built once per projection — never a full scan per folder
+  const mainIndex = useMemo(() => indexMainProjection(mainProjection), [mainProjection]);
+  // ONE open rule for every Main folder site (render, roving, toggle, collapse):
+  // an explicit expand/collapse wins; otherwise open, unless this is the Vault
+  // view or Main is too large to paint whole
+  const mainOpenByDefault = !vaultOn && mainFoldersOpenByDefault(mainTreeSize(activeTree));
+  const isMainFolderOpen = (id: string): boolean => expandedDests[id] ?? mainOpenByDefault;
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
 
   // Captures count mirrors BoardSurface's curated-note rule: a staged note
@@ -528,10 +538,11 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     // rename inputs compensate for that slot so same-depth icons share one
     // visual column and nested children still advance by exactly 16px.
     const contentPad = rowPad + 18;
-    const childFolders = mainProjection.folders.filter((f) => f.parentId === parentId);
+    const childFolders = mainIndex.foldersIn(parentId);
     // the live filter narrows Main too; MUST mirror mainRovingRows below
-    const childNotes = mainProjection.notes
-      .filter((n) => n.folderId === parentId && matches(n))
+    const childNotes = mainIndex
+      .notesIn(parentId)
+      .filter(matches)
       // pinned float above hand-arranged order — the ONE comparator, shared
       // with mainRovingRows so j/k always mirrors the rendered order
       .sort(mainRowSort);
@@ -587,7 +598,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           // float first, then the hand-arranged order) — root only, so opening a
           // folder never renumbers them
           const slot = parentId === MAIN_ROOT && noteIndex < 9 ? noteIndex + 1 : undefined;
-          const parentFolderName = mainProjection.folders.find((folder) => folder.id === parentId)?.name;
+          const parentFolderName = mainIndex.folderName(parentId);
           const displayTitle = noteDisplayTitle(n.title, parentFolderName) || "Empty note";
           if (renamingNoteId === n.id) {
             return (
@@ -697,7 +708,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           );
         })}
         {childFolders.map((f) => {
-          const open = expandedDests[f.id] ?? !vaultOn;
+          const open = isMainFolderOpen(f.id);
           // Rename… swaps only the row for a field of the same size (the
           // owner, 2026-09-28): the folder's contents stay open below it.
           // Enter commits (sibling-uniquified), Esc/click-away cancels.
@@ -833,16 +844,15 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const mainRovingRows = (parentId: string): RovingRow[] => [
     // filtered by matches() exactly like renderMainTree — the roving cursor
     // must never point at a row the live filter hid
-    ...mainProjection.notes
-      .filter((n) => n.folderId === parentId && matches(n))
+    ...mainIndex
+      .notesIn(parentId)
+      .filter(matches)
       .sort(mainRowSort) // MUST mirror renderMainTree — pinned float included
       .map((n) => ({ id: `${MAIN_ROW_PREFIX}${n.id}`, kind: "note" as const })),
-    ...mainProjection.folders
-      .filter((f) => f.parentId === parentId)
-      .flatMap((f) => {
-        const row: RovingRow = { id: f.id, kind: "folder" };
-        return (expandedDests[f.id] ?? !vaultOn) ? [row, ...mainRovingRows(f.id)] : [row];
-      }),
+    ...mainIndex.foldersIn(parentId).flatMap((f) => {
+      const row: RovingRow = { id: f.id, kind: "folder" };
+      return isMainFolderOpen(f.id) ? [row, ...mainRovingRows(f.id)] : [row];
+    }),
   ];
 
   // the roving j/k cursor walks the Home front top to bottom: the smart rows,
@@ -886,11 +896,11 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         else openNote(row.id, { newTab });
         return;
       }
-      // a Main folder defaults OPEN (?? true) — toggle against that default,
-      // not toggleDestExpanded's closed default (first press must collapse)
+      // a Main folder has its own default (isMainFolderOpen) — toggle against
+      // it, not toggleDestExpanded's closed default (first press must collapse)
       if (row.id.startsWith(MAIN_ROOT)) {
         setSelectedFolderId(row.id);
-        setDestExpanded(row.id, !(expandedDests[row.id] ?? !vaultOn));
+        setDestExpanded(row.id, !isMainFolderOpen(row.id));
         return;
       }
       // the action row: it opens its surface, never becomes a selection
@@ -917,7 +927,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     onCollapseOrOut: (row) => {
       if (row.kind === "note") return false;
       const open = row.id.startsWith(MAIN_ROOT)
-        ? (expandedDests[row.id] ?? !vaultOn) // Main folders default open
+        ? isMainFolderOpen(row.id) // Main folders have their own default
         : expandedDests[row.id];
       if (open) {
         setDestExpanded(row.id, false);

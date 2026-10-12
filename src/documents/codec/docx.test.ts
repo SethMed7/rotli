@@ -582,3 +582,12 @@ describe("DOCX editor codec", () => {
     ]);
   });
 });
+
+test("a .docx that isn't a zip package says so in plain words, never the zip library's text", async () => {
+  const base64 = Buffer.from("synthetic package placeholder").toString("base64");
+  const failure = await decodeDocx(base64, "storage/letter.docx").catch((error: unknown) => error as Error);
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toBe(
+    "This file isn’t a readable Word document — it may be damaged, or another format saved with a .docx name.",
+  );
+});

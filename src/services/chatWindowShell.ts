@@ -4,14 +4,9 @@
 
 import { showChatWindow } from "../lib/chatWindowBridge";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import {
-  isTauri,
-  onCorpusChanged,
-  onNativeCloseTab,
-  onSummonChat,
-  startWindowDrag,
-  toggleMaximize,
-} from "../lib/tauri";
+import { onCorpusChanged, onNativeCloseTab } from "../lib/hostEvents";
+import { refreshWhenVisible } from "../lib/refreshWhenVisible";
+import { isTauri, onSummonChat, startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateChatFolders } from "./chatFolders";
 import { summonChat } from "./chatSummon";
@@ -37,17 +32,21 @@ export function zoomChatWindow(): void {
 /** Attach the chat shell's listeners; returns the teardown.
  *  - the vault changed on disk → re-read chats, chat folders, and notes. A
  *    shell that never hears this shows a stale chat, then fails its next save
- *    on the revision gate.
+ *    on the revision gate. While the window is hidden the re-read waits for
+ *    it to be shown (one refresh, however many changes landed).
  *  - File → Close Tab (Rust routes it to the focused shell window).
  *  - ⌥A while Chat lives in this window: the SAME summon policy as main —
  *    return to the chat already here, else the newest, else a fresh one. */
 export function attachChatShell(on: { closeTab: () => void }): () => void {
+  // hidden, a disk change is only remembered: one re-read when the window shows
+  const vaultRefresh = refreshWhenVisible(() => {
+    void invalidateMemex();
+    void invalidateChatFolders();
+    void invalidateNotes();
+  });
   const offs = [
-    onCorpusChanged(() => {
-      void invalidateMemex();
-      void invalidateChatFolders();
-      void invalidateNotes();
-    }),
+    onCorpusChanged(vaultRefresh.run),
+    vaultRefresh.stop,
     onNativeCloseTab(on.closeTab),
     onSummonChat(() => void summonChat({ here: true })),
   ];

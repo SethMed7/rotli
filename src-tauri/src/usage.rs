@@ -6,8 +6,7 @@
 //! never cross IPC.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -20,7 +19,6 @@ use time::OffsetDateTime;
 const HOUR_MS: u64 = 60 * 60 * 1_000;
 const DAY_MS: u64 = 24 * HOUR_MS;
 const MTIME_SLACK_MS: u64 = 36 * HOUR_MS;
-const MAX_JSONL_LINE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TRANSCRIPT_FILES: usize = 20_000;
 const MAX_WALK_DEPTH: usize = 12;
 const FORK_COPY_MAX_GAP_MS: u64 = 1_000;
@@ -139,14 +137,42 @@ pub struct ModelUsageSummary {
     pub sources: Vec<ModelUsageSource>,
 }
 
+/// One parsed usage line, kept per file for incremental rescans. Compact on
+/// purpose (RAM review 2026-10-12: 160k cached records held ~267 MB for a
+/// 10 GB transcript history): `model` and `session_id` repeat across a file's
+/// records and share one allocation (`intern_record`), and the Claude dedupe
+/// key is a 64-bit hash, not the two ids it came from.
 #[derive(Clone)]
 struct UsageRecord {
     provider: &'static str,
     timestamp_ms: u64,
-    model: String,
-    session_id: String,
+    model: Arc<str>,
+    session_id: Arc<str>,
     tokens: UsageTokens,
-    dedupe_key: Option<String>,
+    dedupe_key: Option<u64>,
+}
+
+/// Share repeated `model`/`session_id` strings across one file's records.
+fn intern_record(record: UsageRecord, seen: &mut HashSet<Arc<str>>) -> UsageRecord {
+    let mut share = |value: Arc<str>| match seen.get(&value) {
+        Some(existing) => Arc::clone(existing),
+        None => {
+            seen.insert(Arc::clone(&value));
+            value
+        }
+    };
+    UsageRecord {
+        model: share(record.model),
+        session_id: share(record.session_id),
+        ..record
+    }
+}
+
+fn dedupe_hash(message_id: &str, request_id: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (message_id, request_id).hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Default)]
@@ -248,7 +274,9 @@ pub(crate) fn model_usage_blocking(range: &str, refresh: bool) -> Result<ModelUs
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
         .ok_or_else(|| "the local account home could not be resolved".to_string())?;
-    let summary = scan_usage(&provider_roots(&home), cfg, now_ms())?;
+    let summary = scan_usage(&provider_roots(&home), cfg, now_ms());
+    crate::usage_lines::release_line_buffer();
+    let summary = summary?;
     CACHE
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -317,8 +345,8 @@ fn scan_usage(
                 if record.timestamp_ms < since_ms || record.timestamp_ms >= until_ms {
                     continue;
                 }
-                if let Some(key) = &record.dedupe_key {
-                    if !seen_claude.insert(key.clone()) {
+                if let Some(key) = record.dedupe_key {
+                    if !seen_claude.insert(key) {
                         continue;
                     }
                 }
@@ -327,22 +355,22 @@ fn scan_usage(
                 let key = (
                     bucket_start_ms,
                     record.provider.into(),
-                    record.model.clone(),
+                    record.model.to_string(),
                 );
                 let bucket = buckets.entry(key).or_default();
                 bucket.tokens.add(&record.tokens);
                 bucket.responses = bucket.responses.saturating_add(1);
                 if !record.session_id.is_empty() {
                     all_sessions.insert(format!("{}:{}", record.provider, record.session_id));
-                    bucket.sessions.insert(record.session_id.clone());
+                    bucket.sessions.insert(record.session_id.to_string());
                 }
                 let total = models
-                    .entry((record.provider.into(), record.model.clone()))
+                    .entry((record.provider.into(), record.model.to_string()))
                     .or_default();
                 total.tokens.add(&record.tokens);
                 total.responses = total.responses.saturating_add(1);
                 if !record.session_id.is_empty() {
-                    total.sessions.insert(record.session_id.clone());
+                    total.sessions.insert(record.session_id.to_string());
                 }
             }
         }
@@ -504,6 +532,10 @@ fn cached_file_records(
         })
         .unwrap_or_else(|| (0, Vec::new(), CodexState::default(), 0));
     let mut parsed = SourceCounters::default();
+    let mut shared: HashSet<Arc<str>> = records
+        .iter()
+        .flat_map(|record| [Arc::clone(&record.model), Arc::clone(&record.session_id)])
+        .collect();
     let ended_with_newline = scan_file_segment(
         &file.path,
         provider,
@@ -511,8 +543,9 @@ fn cached_file_records(
         file.len.saturating_sub(offset),
         &mut codex_state,
         &mut parsed,
-        |record| records.push(record),
+        |record| records.push(intern_record(record, &mut shared)),
     )?;
+    records.shrink_to_fit();
     let malformed_records = prior_malformed.saturating_add(parsed.malformed_records);
     counters.malformed_records = counters.malformed_records.saturating_add(malformed_records);
 
@@ -545,48 +578,16 @@ fn scan_file_segment(
     counters: &mut SourceCounters,
     mut accept: impl FnMut(UsageRecord),
 ) -> Result<bool, ()> {
-    let mut file = File::open(path).map_err(|_| ())?;
-    file.seek(SeekFrom::Start(offset)).map_err(|_| ())?;
-    let mut reader = BufReader::new(file.take(byte_count));
-    let mut line = Vec::with_capacity(8 * 1024);
-    let mut oversized = false;
-    let mut ended_with_newline = true;
-
-    loop {
-        let buffer = reader.fill_buf().map_err(|_| ())?;
-        if buffer.is_empty() {
-            if !line.is_empty() && !oversized {
-                parse_line(provider, &line, codex, counters, &mut accept);
-            }
-            return Ok(ended_with_newline);
-        }
-        let newline = buffer.iter().position(|byte| *byte == b'\n');
-        let take = newline.map_or(buffer.len(), |index| index + 1);
-        ended_with_newline = newline.is_some();
-        if !oversized {
-            if line.len().saturating_add(take) <= MAX_JSONL_LINE_BYTES {
-                line.extend_from_slice(&buffer[..take]);
-            } else {
-                oversized = true;
-                line.clear();
-                counters.malformed_records = counters.malformed_records.saturating_add(1);
-            }
-        }
-        reader.consume(take);
-        if newline.is_some() {
-            if !oversized {
-                while line
-                    .last()
-                    .is_some_and(|byte| *byte == b'\n' || *byte == b'\r')
-                {
-                    line.pop();
-                }
-                parse_line(provider, &line, codex, counters, &mut accept);
-            }
-            line.clear();
-            oversized = false;
-        }
-    }
+    let mut oversized = 0u64;
+    let ended_with_newline = crate::usage_lines::read_jsonl_segment(
+        path,
+        offset,
+        byte_count,
+        |line| parse_line(provider, line, codex, counters, &mut accept),
+        || oversized += 1,
+    )?;
+    counters.malformed_records = counters.malformed_records.saturating_add(oversized);
+    Ok(ended_with_newline)
 }
 
 fn parse_line(
@@ -677,12 +678,12 @@ fn parse_claude(value: &Value) -> Option<UsageRecord> {
     let message_id = bounded_string(message.get("id"), 256);
     let request_id = bounded_string(value.get("requestId"), 256);
     let dedupe_key = (!message_id.is_empty() || !request_id.is_empty())
-        .then(|| format!("{message_id}:{request_id}"));
+        .then(|| dedupe_hash(&message_id, &request_id));
     Some(UsageRecord {
         provider: "claude",
         timestamp_ms: parse_timestamp_ms(value.get("timestamp")?)?,
-        model,
-        session_id: bounded_string(value.get("sessionId"), 256),
+        model: model.into(),
+        session_id: bounded_string(value.get("sessionId"), 256).into(),
         tokens,
         dedupe_key,
     })
@@ -772,8 +773,8 @@ fn parse_codex(value: &Value, state: &mut CodexState) -> Option<UsageRecord> {
     Some(UsageRecord {
         provider: "codex",
         timestamp_ms,
-        model: state.model.clone(),
-        session_id: state.session_id.clone(),
+        model: state.model.as_str().into(),
+        session_id: state.session_id.as_str().into(),
         tokens,
         dedupe_key: None,
     })
@@ -782,7 +783,7 @@ fn parse_codex(value: &Value, state: &mut CodexState) -> Option<UsageRecord> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::OpenOptions;
+    use std::fs::{File, OpenOptions};
     use std::io::Write;
 
     fn write(path: &Path, lines: &[Value]) {

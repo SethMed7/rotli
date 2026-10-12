@@ -12,6 +12,10 @@ import {
 } from "../lib/noteProtection";
 import {
   corpusFileStat,
+  corpusCreateManagedFile,
+  corpusDiscardPristineManagedFile,
+  corpusMoveFileToSink,
+  corpusRestoreFile,
   corpusFrontmatter,
   corpusFileText,
   corpusRawFrontmatter,
@@ -20,6 +24,7 @@ import {
   fileAssetUrl,
 } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
+import { contentRevision } from "./vaultDir";
 import { MemoryVaultDir } from "./vaultDir";
 import { createWebAiCorpus } from "./webAiCorpus";
 import { configureWebVaultIo } from "./webVaultIo";
@@ -189,6 +194,7 @@ test("web file bytes/text/stat are real and CSV saves refuse stale revisions", a
   await dir.writeText("storage/data.csv", "name,value\none,1\n");
   const stat = (await corpusFileStat("storage/data.csv"))!;
   expect(stat?.writable).toBe(true);
+  expect(stat.revision).toBe(contentRevision("name,value\none,1\n"));
   expect(await corpusFileText("storage/data.csv")).toBe("name,value\none,1\n");
   const url = await fileAssetUrl("storage/data.csv", true);
   expect(url).toStartWith("blob:");
@@ -214,4 +220,26 @@ test("metadata and protection follow the refreshed note service after an externa
   expect((await corpusRawFrontmatter("durable")).contents).toContain("custom: keep me");
   await corpusSetLocked("durable", true);
   expect(await dir.readText("wiki/moved.md")).toContain("locked: true");
+});
+
+test("web corpus route creates managed bytes and refuses to discard changed bytes", async () => {
+  const id = await corpusCreateManagedFile("Draft.docx", btoa("original"));
+  expect(id).toBe("storage/rotli/Draft.docx");
+  expect(await dir.readText(id)).toBe("original");
+  await dir.writeText(id, "changed");
+  await expect(corpusDiscardPristineManagedFile(id)).rejects.toThrow(/revision conflict/);
+  expect(await dir.readText(id)).toBe("changed");
+  const next = await corpusCreateManagedFile("Draft.docx", btoa("other"));
+  expect(next).toBe("storage/rotli/Draft-2.docx");
+  await corpusDiscardPristineManagedFile(next);
+  expect(await dir.exists(next)).toBe(false);
+});
+
+test("ordinary web file lifecycle moves to Trash and restores its original path", async () => {
+  await dir.writeBytes("storage/manual.xlsx", new Uint8Array([7]));
+  const trashed = await corpusMoveFileToSink("storage/manual.xlsx", "Trash");
+  expect(trashed).toBe("trash/storage/manual.xlsx");
+  expect(await dir.exists(trashed)).toBe(true);
+  expect(await corpusRestoreFile(trashed)).toBe("storage/manual.xlsx");
+  expect(await dir.readBytes("storage/manual.xlsx")).toEqual(new Uint8Array([7]));
 });

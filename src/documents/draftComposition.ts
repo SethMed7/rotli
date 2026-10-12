@@ -4,7 +4,7 @@
  * to pane state, the managed-file lifecycle adapter, and Main's projection.
  */
 import { evictDocument } from "../editor/model";
-import { corpusDiscardBlank, corpusMoveFileToSink } from "../lib/tauri";
+import { corpusDiscardBlank, corpusDiscardPristineManagedFile } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateNotes } from "../services/hooks";
 import { removeFromMain } from "../services/mainTree";
@@ -78,7 +78,7 @@ async function discardDocument(fileId: string): Promise<void> {
   unregisterLiveDocument(fileId);
   deleteParkedDocument(fileId);
   try {
-    await corpusMoveFileToSink(fileId, "Trash");
+    await corpusDiscardPristineManagedFile(fileId);
     const { manifest, setTree } = useMainStore.getState();
     setTree(removeFromMain(manifest.tree, fileId));
     await Promise.all([invalidateNotes(), invalidateMemex()]);

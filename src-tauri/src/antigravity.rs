@@ -211,12 +211,13 @@ fn open_in_browser(url: &str) -> Result<(), String> {
         return Err("Antigravity returned an unexpected sign-in URL; refusing to open it".into());
     }
     #[cfg(target_os = "macos")]
-    Command::new("/usr/bin/open")
-        .arg(url)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("couldn't open the browser: {e}"))?;
+    crate::child_run::spawn_reaped(
+        Command::new("/usr/bin/open")
+            .arg(url)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null()),
+    )
+    .map_err(|e| format!("couldn't open the browser: {e}"))?;
     #[cfg(not(target_os = "macos"))]
     let _ = url;
     Ok(())

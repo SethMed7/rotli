@@ -27,7 +27,7 @@ import {
   useSwitchVault,
 } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
-import { mainFolderIds } from "../services/mainTree";
+import { mainFolderIds, mainFoldersOpenByDefault, mainTreeSize } from "../services/mainTree";
 import {
   connectPlan,
   vaultDisplayName,
@@ -396,8 +396,16 @@ export function Sidebar() {
              false — wiping the map alone re-EXPANDED them (#83, audit 2026-07;
              chat folders were missed until 2026-07-31). "Brain" is NOT passed:
              nothing renders it as default-open anymore, and treating it as
-             open made the first press a no-op on a fully-folded sidebar. */
-          onClick={() => collapseAllDests([...mainFolderIds(activeTree), ...chats.folderKeys])}
+             open made the first press a no-op on a fully-folded sidebar. A
+             Main too large to open by default is already folded unless a
+             folder was opened by hand, so it passes no ids (one per folder
+             would bloat the persisted map). */
+          onClick={() =>
+            collapseAllDests([
+              ...(mainFoldersOpenByDefault(mainTreeSize(activeTree)) ? mainFolderIds(activeTree) : []),
+              ...chats.folderKeys,
+            ])
+          }
         >
           <FoldGlyph size={16} />
           <span className="tip" aria-hidden="true">

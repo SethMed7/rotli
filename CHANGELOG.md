@@ -13,8 +13,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Secure Office comments and other package text now reach the local AI egress guard; uppercase secure Markdown stays out of agent results, and protected boards and files no longer add to agent counts.
+- **A big folder no longer takes gigabytes of memory.** Opening a folder
+  with tens of thousands of files as a vault, such as a code folder, could push
+  rotli past 10 GB and keep it busy at full CPU: the sidebar built every row
+  of Main at once and recomputed it on each change. Main's tree is now indexed
+  once per change, and when Main holds more than 2,000 items its folders start
+  folded (open one and it stays open). On a 133k-file test folder rotli went
+  from more than 17 GB and climbing to about 1.2 GB, settled.
+- **`node_modules` and `.git` folders stay out of your vault.** Rotli no
+  longer lists, watches, or counts the files inside them, at any depth, so a
+  package install in a code folder no longer reloads the whole vault. The
+  files themselves are untouched. The Rotli Web helper already worked this way.
+- **Quitting waits for every window to finish saving.** Each window heard
+  all four "save before quit" requests and answered four times, so a window
+  with nothing to save could let rotli quit while the main window was still
+  writing a large document or sheet. Each window now saves and answers once,
+  and rotli counts the answers per window.
+- **Model usage stats use far less memory.** Reading your Claude and Codex
+  terminal history for the usage stats left about 230 MB in rotli after a
+  90-day scan of a large (10 GB) history; it now leaves about 37 MB, with the
+  same numbers.
+- **Less work in the background.** The media player no longer checks for
+  sound every 1.5 seconds when there's nothing that could play, and a paused
+  browser tab no longer keeps it checking every 0.4 seconds. The sidebar
+  scenery is still again in the Iris and Blossom themes (its fireflies and
+  petals kept the sidebar redrawing). The Chat window, while hidden, waits
+  until it's shown to reload after your vault changes, instead of reloading
+  on every change. Opening a link, Show in Finder, Open with, and cancelling
+  a model download no longer leave finished helper processes behind.
+- **A big vault no longer holds the window back at launch.** rotli used to
+  read every note in every vault before showing its window; it now shows the
+  window right away and reads in the background. Until that read finishes,
+  nothing is sent to a cloud model (the secure-note check fails safe), and
+  reading the vault no longer locks every other request out while it runs.
+- **More of rotli rests when you aren't using it.** Each window now handles
+  only its own menu actions, drops, and reloads (Close Tab, Undo/Redo, file
+  drops, and ⌥A used to reach every window). The Librarian no longer starts
+  system tools every minute to check whether you are typing. Word documents
+  and sheets stop redrawing in background tabs. The Quick Note window loads
+  your note list only once you open it, and shows edits made in the main
+  window. A vault you switched away from stops being watched once it is
+  removed, and changes in a vault that isn't open no longer refresh the one
+  that is. Notes you've closed release their memory after half a minute
+  (unsaved changes always stay). Read-aloud closes its audio engine when it
+  finishes; searches are forgotten a minute after you close them; chat memory
+  keeps only the chats it reads; the clock that ages "2 min ago" labels stops
+  while rotli is hidden; and Rotli Web skips `node_modules` and `.git` at any
+  depth. The remote-agent connection waits longer between retries while the
+  relay is unreachable (up to a minute).
+- **Fewer note-list round trips.** Views that refresh together now share one
+  copy of the vault listing instead of each asking for their own.
 - **Secure spreadsheets saved by other apps stay private.** Prefixed and Strict workbook text now reaches the remote overlap guard; unreadable secure workbooks refuse local AI reads, and remote workspace references hide secure files and boards.
 - **Secure-home notes and files stay out of cloud and agent reads.** Chat note reads now check location even for plain CSV or text without secure frontmatter; remote listings omit protected file titles and paths. A newly created file can be found after a one-time list refresh. Local secure Word and spreadsheet reads feed their extracted text to the egress overlap guard. Refined Hand to AI accepts ordinary code samples with missing paths while refusing references to existing protected files.
+- **Rotli Web protects edits across browser tabs.** Saves and new files in a
+  connected folder now take turns across tabs, and a rename keeps an outside
+  edit to its source. Office drafts from separate tabs survive and recover as
+  separate copies when they conflict; opening a second tab leaves a live
+  editor's draft alone. A later oversized edit no longer makes an older,
+  already-saved draft reappear on reload. Concurrent first saves share the
+  one-time backup, and queued writes wait for their turn. File Archive and
+  Trash actions are enabled on web. A raced rename carries its backup beside
+  the actual new name, and read-only sheet help names an action available on web.
+- **Web chat only offers file tools it can use.** It no longer offers AI
+  `read_file` or document editing where the web vault cannot serve them.
+- **Web CSV edits survive a hard refresh during autosave.** A browser-local,
+  vault-bound draft replays against the file's original revision; a changed
+  file keeps both versions. The same recovery protects DOCX and XLSX edits.
+  Oversized drafts say when an edit is waiting on its normal save for
+  protection.
+- **Rotli Web protects file edits made elsewhere.** A CSV or other editable
+  file changed outside Rotli is never overwritten by a stale save, even when
+  its size and modified time stay the same. Oversized saves through Rotli
+  Helper now explain the file limit.
 - **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
   a save uses the saved version; a delete after an external removal is a no-op
   unless it carried a content gate. Binary saves also recover when the Helper
@@ -93,8 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
   search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8
-  source bytes and save with an adapter-checked content revision. Office files
-  explain their web limitation, and native-only file actions stay hidden.
+  source bytes and save with an adapter-checked content revision. Native-only
+  file actions stay hidden.
 
 ### Changed
 
@@ -122,6 +192,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rotli Web opens, edits, and creates Word documents and spreadsheets
+  (Beta).** In the folder you connected — directly or through Rotli Helper —
+  `.docx` and `.xlsx` files open in the same editors as the Mac app, and New
+  Document, New Sheet, `/document`, and `/sheet` make real files you can open
+  in Word or Excel. Formulas, number formats, extra sheets, headings, bold
+  text, and tables come through an edit unchanged; the first save keeps the
+  original beside it as a `.bak`, and a rename takes the `.bak` along. If
+  another app changes a file while it's open, Rotli says so and never saves
+  over it. Typing survives a refresh, up to about a megabyte of unsaved
+  changes per file; past that, Rotli says the change isn't protected until it
+  saves. Converting PDFs and older `.doc` files, PDF export, and opening
+  files in other apps stay on the Mac; on the web, a PDF or `.doc` tells you
+  to save a `.docx` copy in another app and open it here. Spreadsheet embeds
+  of `.csv` files now open on the web too. A `.docx` or `.xlsx` that isn't a
+  readable file says so plainly instead of showing a zip library error.
 - **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
   being built, what's planned, and what's still an idea, straight from the
   roadmap kept with rotli's source, each with its status and how big it is.

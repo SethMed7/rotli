@@ -3,7 +3,7 @@
  * `agents` covers the MCP server, the agent-integration commands, the remote
  * relay, and their Settings surface: out of production until refined. The
  * plain JSON CLI is not gated. `sheets` covers XLSX workbooks (CSV editing ships
- * everywhere the desktop does), `mermaidDiagrams` the Mermaid-diagram item kind
+ * everywhere), `mermaidDiagrams` the Mermaid-diagram item kind
  * (a ```mermaid fence in a note always renders), and `voice` read-aloud. */
 export type Platform = "desktop" | "web";
 
@@ -23,13 +23,13 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     breve: desktop && development,
     mermaidVisualEditing: development,
     agents: desktop && development,
-    // Sheets ship on the desktop as Beta (the owner, 2026-10-05); Rotli Web has
-    // no workbook lane. newItems/model.ts marks which kinds wear the Beta badge.
-    sheets: desktop,
-    // DOCX editing and creation need the desktop document lane (the managed
-    // storage writer and the Univer editor over corpus bytes); Rotli Web
-    // names Document as coming soon rather than offering a broken create.
-    documents: desktop,
+    // XLSX sheets and DOCX documents ship on both shells as Beta (desktop
+    // 2026-10-05; Rotli Web 2026-10-12, the owner): the connected folder's
+    // byte-revision saves and browser draft recovery carry them on the web.
+    // newItems/model.ts marks the Beta badge. PDF/legacy conversion, PDF
+    // export, Finder, and open-externally stay Mac-only, gated by PLATFORM.
+    sheets: true,
+    documents: true,
     // App-wide hotkeys — tabs, panes, views, history, the two-step leaders.
     // Rotli Web lives inside a browser whose own shortcuts own those keys
     // (⌃Tab, ⌘[, ⌘←, ⌘W…), so on the web only the editor's text formatting

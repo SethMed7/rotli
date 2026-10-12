@@ -75,9 +75,30 @@ against the in-memory reference and the helper adapter.
 Note and `.rotli/` manifest reads derive their revision from the exact text
 returned. Their writes present that content revision to the folder adapter,
 which checks it in the write turn; a concurrent edit is a conflict. A
-content-gated removal also compares exact bytes in its removal turn, so a
-rollback refuses a newer file it observes then. Chromium
-holds both source and destination turns for an entire move, through removal.
+file editor's revision is likewise FNV-1a 64 over the exact bytes it opened,
+including CSV text encoded as UTF-8. File stats use the same complete-byte
+revision for reload and parked-edit comparisons. A save passes that revision
+to `VaultDir.writeBytes`, which compares it inside its write turn, and returns
+the revision of the newly saved bytes; `"0"` permits creation only when the
+path is missing. The first user save keeps a one-time `.bak` of the prior bytes.
+Chromium's folder road holds a vault-and-path keyed Web Lock across each
+revision check and write, so tabs using this browser's vault identity take
+turns, including behind a long write rather than failing after a wait deadline.
+Moves acquire both path locks in sorted order through source removal.
+If Web Locks are unexpectedly unavailable, the adapter falls back to its
+per-instance turns; another tab can then race it.
+Rotli Helper reads up to 256 MiB per file, but its 24 MiB JSON request cap
+also counts base64 expansion on writes; an oversized save reports the Helper
+file limit to the page.
+A content-gated removal also compares exact bytes in its removal turn, so a
+rollback refuses a newer file it observes then. Chromium checks the source
+again after publishing a move destination; if it changed, both files remain
+and the move reports a conflict. An outside app can still write between a
+check and the filesystem operation: Web Locks cover Rotli tabs, not other
+processes, and the browser folder API has no atomic compare-and-swap.
+When an outside edit is detected, Rotli leaves both copies for the person to
+compare; a retry should reopen the current file first. An undetected write in
+that final gap remains a limitation of the browser folder road.
 An ungated removal of a missing path succeeds without changing anything;
 a content-gated removal of a missing or changed file is a revision conflict.
 The Helper adapter decides its removal gate after earlier queued writes and
@@ -122,13 +143,35 @@ revision-gated like notes (`${lastModified}:${size}`, then the helper's own
 gate). `FolderNotesService` lists boards by stat alone (they never join the
 note index as notes) and moves them through Archive/Trash like the Mac corpus.
 Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
-Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
-`launchFeatures(…, "web").documents` is false, so the chooser shows Document as
-coming soon and every create path refuses it. `/document` is hidden, and
-existing document and XLSX fences show an "opens in Rotli for Mac" message.
-CSV **embeds** remain withheld too: the sheet embed still uses the desktop
-stat/byte-save adapter, independently of CSV's standalone text surface. The
-fence source remains editable and unchanged.
+Not on the web: Reveal in Finder (hidden). The connected-folder managed-file
+adapter can create DOCX and XLSX bytes in `storage/rotli` for a memex vault or
+`Storage` for a plain vault. It accepts only those two extensions, collides as
+`stem-2.ext`, and uses the `"0"` content gate at every candidate, including
+after a racing create. Surfaced file Archive/Trash moves and restores use the
+folder notes lifecycle path; the file stat enables those menu actions. A new pristine document is hard-discarded on close only
+while its exact creation bytes remain; a changed or missing file is kept and
+the refusal is reported. Rename carries a first-save `.bak` beside the new
+name without replacing an existing backup. Both folder roads use the same
+rules. **Documents and sheets ship on the web (Beta, 2026-10-12).**
+`launchFeatures(…, "web")` turns `documents` and `sheets` on, so the chooser,
+the titlebar and sidebar New menus, the palette, `/document` and `/sheet` (with
+their Create rows, offered by build capability and a connected vault — never by
+runtime), and existing `document`/`sheet` fences mount the same editors and
+codecs as the Mac, with the same Beta badge. CSV embeds are never withheld:
+the sheet embed saves through the same byte-revision adapter on both shells.
+Every creation entry names a document before its file exists, so the pristine
+hard-discard lane above is reached by no current control on either shell; its
+proof is `folderManagedFiles.test.ts`. A Rotli Helper vault is not re-read on
+window focus (only the chosen-folder road is), so a file another app adds there
+appears after a reload. Proof: `e2e/web/rotli-web-office.spec.ts` runs create,
+type, save, reload, unzip, formula/format/second-sheet and heading/bold/table
+preservation, the same-size outside-change conflict, and rename-with-backup on
+the browser folder road and a binary-safe in-memory Helper fake. The fake
+enforces the Helper's 24 MiB JSON request cap. A Rust HTTP integration test in
+`src-tauri/src/helper_tests.rs` covers an office-sized binary round trip,
+content gates, and the real Helper's over-cap refusal; `helperClient.test.ts`
+covers the page's file-limit message. `rotli-web-privacy.spec.ts` proves
+editing both makes no off-origin request.
 
 Settings exposes `launchFeatures`' desktop-only `librarian` and `localModels`
 capabilities as one-line Mac availability states on web, without Run now,
@@ -186,12 +229,17 @@ its sandbox and no-egress policy. CSV and other editable text-file saves refuse
 source bytes that are not valid UTF-8 before writing a backup or saving, and
 pass the observed content revision into the adapter's write turn. Binary saves pass
 the revision of their observed bytes through the same gate. CSV saves preserve a
-first-save backup. DOCX and binary workbooks list as files but open to an honest
-unsupported state on the web. Finder, default-app, and macOS conversion actions
-are hidden there.
+first-save backup. If another tab creates that backup first, its exclusive
+create conflict is harmless and the save still reaches the main file's own
+revision gate. DOCX and XLSX open in their editors (Beta). A package that
+isn't a readable zip says so in plain words, never the zip library's message.
+Finder, default-app, PDF export, and macOS conversion actions are hidden there
+(gated by `PLATFORM`); a PDF or a legacy `.doc`/`.rtf`/`.odt` instead says to
+save a `.docx` copy in another app and open that copy here.
 
-The browser's read/check/write sequence is best effort, not a filesystem lock;
-the helper additionally enforces its server-side revision and lock. Multi-file
+The browser folder's Web Lock serializes Rotli tabs on the same origin; it
+cannot lock other apps writing the folder. The helper additionally enforces
+its server-side revision and lock. Multi-file
 view and protection operations cannot be made atomic by Chromium's folder API.
 
 ## Keys on the web
@@ -358,6 +406,40 @@ the editor's clean-buffer gate preserves unsaved typing.
   whenever that folder is chosen again, even after others — a small map of
   folder handles to ids), never by folder name; a draft that can be
   neither saved nor kept as a note waits under its own "kept" key.
+- **Office recovery.** CSV, XLSX, and DOCX edit in the web office editors. Each user
+  change in an office editor synchronously stores its engine-neutral snapshot
+  and the exact opened file bytes as base64 in a browser-local journal keyed by
+  the connected vault identity. This happens before the 800 ms autosave timer,
+  and `pagehide` takes one more synchronous snapshot of live dirty editors;
+  async hide/quit flushes remain best effort. The draft records the complete
+  byte revision of its base. Boot re-encodes the conventional file and writes
+  only through that revision gate; if the source changed, the draft becomes a
+  free `unsaved copy` sibling and the changed original stays untouched. A
+  failed replay moves to a separate kept record for that editing session,
+  retried on boot; only a confirmed save or confirmed conflict copy clears
+  that exact draft. Each tab's editing session has its own key and holds a
+  vault-and-session Web Lock for its lifetime. Boot skips another live tab's
+  draft without encoding, writing, or clearing it. A failed liveness check
+  also leaves the record untouched; without Web Locks, boot defers peer drafts
+  rather than guessing they are abandoned. A dead session replays in place
+  only when it is the file's sole draft and its base still matches. Competing
+  drafts become separate `unsaved copy` siblings. A draft added during
+  asynchronous replay remains queued. If a later edit exceeds the journal
+  limit, the last protected token is retained so a confirmed save clears the
+  older snapshot instead of recovering already-saved work. The
+  journal permits 1,000,000 ASCII characters per entry and 1,200,000 in total
+  for this vault. Even when each character counts as two UTF-16 bytes, that is
+  under 2.4 MiB of the usual approximately 5 MiB origin quota, leaving room
+  for note and pending-operation journals. A larger edit or blocked
+  storage displays “This change isn't protected until it saves” in the editor;
+  it is still offered to normal autosave. The web build does not prompt on tab
+  close, matching notes: a synchronous journal, rather than an unload-time
+  promise or prompt, guards dirty typing. `e2e/web/rotli-web-office-recovery.spec.ts`
+  types into each editor and hard-refreshes inside the autosave window; its
+  second-tab case checks that a live workbook draft remains untouched. A
+  document embed in a note is the same editor and is journaled; a **sheet
+  embed** is not (its live entry carries no source bytes), so its edits rely
+  on the 500 ms autosave and the `pagehide` flush.
 
 ## Migration
 

@@ -186,7 +186,18 @@ export function QuickNote() {
   // boards — this picker feeds the MARKDOWN editor, so a .excalidraw scene or
   // an image/pdf must never be pickable (corpus_read on one fails or renders
   // garbage). useNotes() alone missed staged notes (the search audit's P0).
-  const universe = useSearchableNotes();
+  // nothing vault-sized loads while the window has never been shown: the
+  // hidden Quick Note webview used to hold its own copy of the whole note list
+  // from launch (audit 2026-10-12)
+  const [shown, setShown] = useState(() => typeof document !== "undefined" && !document.hidden);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden) setShown(true);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+  const universe = useSearchableNotes({ enabled: shown });
   const notes = useMemo(() => universe.notes.filter((n) => n.kind !== "board"), [universe.notes]);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -349,6 +360,10 @@ export function QuickNote() {
   useEffect(
     () =>
       onQuickShow(() => {
+        setShown(true);
+        // edits made in the main window while this one was hidden: re-read the
+        // open note and the picker's list (nothing here goes stale on its own)
+        void invalidateNotes();
         setPickerOpen(false);
         setErr(null); // a fresh summon starts clean; a re-failure re-surfaces
         setShowNonce((n) => n + 1);
@@ -430,7 +445,14 @@ export function QuickNote() {
       {activeId ? (
         // key forces a clean remount per note AND per show (the nonce) — fresh
         // caret/scroll on switch, autoFocus re-lands the caret on every re-open
-        <EditorSurface key={`${activeId}:${showNonce}`} noteId={activeId} paneId={QUICK_PANE_ID} autoFocus />
+        shown ? (
+          <EditorSurface
+            key={`${activeId}:${showNonce}`}
+            noteId={activeId}
+            paneId={QUICK_PANE_ID}
+            autoFocus
+          />
+        ) : null
       ) : (
         <div className="list-empty">
           <p className="qe-title">No note open</p>

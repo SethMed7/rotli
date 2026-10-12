@@ -71,20 +71,29 @@ function flattenWire(messages: CompleteReq["messages"]): string {
   return `${labeled.join("\n\n")}\n\nAssistant:`;
 }
 
-const chatBodyCache = new Map<string, { modifiedMs: number; body: string }>();
+/** Memory search reads only this many newest chats, so the body cache holds no more. */
+export const CHAT_MEMORY_WINDOW = 100;
+type ChatBody = { modifiedMs: number; body: string };
+const CHAT_BOUNDS = { entries: CHAT_MEMORY_WINDOW, chars: 8_000_000 };
+const chatBodyCache = new Map<string, ChatBody>();
 
-async function cachedChatBody(
-  root: string,
-  slug: string,
-  modifiedMs: number,
-  read: () => Promise<string>,
-): Promise<string> {
+/** (Re)insert `key` as newest, then evict oldest-first until both bounds hold (Map order = recency). */
+export function touchBounded(map: Map<string, ChatBody>, key: string, value: ChatBody, max = CHAT_BOUNDS) {
+  map.delete(key);
+  map.set(key, value);
+  let chars = [...map.values()].reduce((sum, entry) => sum + entry.body.length, 0);
+  for (const [oldest, entry] of map) {
+    if (map.size <= max.entries && chars <= max.chars) return;
+    map.delete(oldest);
+    chars -= entry.body.length;
+  }
+}
+
+async function cachedChatBody(root: string, slug: string, modifiedMs: number, read: () => Promise<string>) {
   const key = `${root}\0${slug}`;
   const cached = chatBodyCache.get(key);
-  if (cached?.modifiedMs === modifiedMs) return cached.body;
-  const body = await read();
-  chatBodyCache.set(key, { modifiedMs, body });
-  if (chatBodyCache.size > 500) chatBodyCache.delete(chatBodyCache.keys().next().value ?? "");
+  const body = cached?.modifiedMs === modifiedMs ? cached.body : await read();
+  touchBounded(chatBodyCache, key, { modifiedMs, body });
   return body;
 }
 
@@ -398,7 +407,7 @@ export function makeTauriHost(
       }));
       const instance = activeInstance(await loadConfig());
       if (!instance) return noteHits.slice(0, limit);
-      const summaries = (await listChats(instance)).slice(0, 100);
+      const summaries = (await listChats(instance)).slice(0, CHAT_MEMORY_WINDOW);
       const documents = await Promise.all(
         summaries.map(async (summary) => ({
           slug: summary.slug,

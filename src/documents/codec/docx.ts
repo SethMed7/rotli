@@ -13,7 +13,7 @@ import type {
   DocumentTableCell,
   EditableDocument,
 } from "../model";
-import type { DocumentEditorCodec } from "../ports";
+import type { DecodedDocument, DocumentEditorCodec } from "../ports";
 import {
   HYPERLINK,
   HYPERLINK_RUN_STYLE,
@@ -562,15 +562,12 @@ function contentXml(
   return imageParagraphXml(content.image, binding.relationshipId, binding.numericId);
 }
 
-export async function decodeDocx(
-  base64: string,
-  fileId: string,
-): Promise<{
-  source: DocxSource;
-  document: EditableDocument;
-  warnings: string[];
-}> {
-  const zip = await JSZip.loadAsync(base64, { base64: true });
+export async function decodeDocx(base64: string, fileId: string): Promise<DecodedDocument<DocxSource>> {
+  const zip = await JSZip.loadAsync(base64, { base64: true }).catch(() => {
+    throw new Error(
+      "This file isn’t a readable Word document — it may be damaged, or another format saved with a .docx name.",
+    );
+  });
   const originalXml = await zip.file("word/document.xml")?.async("string");
   if (!originalXml) throw new Error("This DOCX has no editable Word document body");
   const documentXml = editorWordXml(originalXml);

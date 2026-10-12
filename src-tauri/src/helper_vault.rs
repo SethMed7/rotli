@@ -50,12 +50,9 @@ use crate::containment::resolve_beneath;
 
 pub(crate) const CONFIG_FILE: &str = "vault.json";
 const WRITE_PREFIX: &str = ".rotli-write-";
-/// Build output and history nobody edits from Rotli: never walked or listed
-/// (compared without letter case: `.GIT` on a case-insensitive disk is `.git`).
-const SKIPPED_DIRS: [&str; 2] = [".git", "node_modules"];
-
+/// Build output and history nobody edits from Rotli: the native corpus rule.
 fn skipped_dir(name: &str) -> bool {
-    SKIPPED_DIRS.iter().any(|skip| skip.eq_ignore_ascii_case(name))
+    crate::corpus::is_skipped_dir(name)
 }
 /// A walk that finds more than this is not a notes vault (a home folder, a
 /// drive root); it is refused rather than streamed.

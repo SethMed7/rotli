@@ -151,20 +151,40 @@ test("Assets lists mixed files, opens local image and CSV, and saves CSV across 
   await expect(page.locator(".tabstrip").getByRole("tab", { selected: true })).toContainText("values.csv");
 });
 
-test("web office files have honest unsupported states and HTML reads the actual file", async ({ page }) => {
+test("web office files say what is wrong, legacy formats say how to get a DOCX, and HTML reads the actual file", async ({
+  page,
+}) => {
   await startWithFolder(page, {
     "wiki/parity-note.md": NOTE,
     "storage/letter.docx": "synthetic package placeholder",
     "storage/budget.xlsx": "synthetic package placeholder",
+    "storage/memo.doc": "synthetic legacy placeholder",
+    "storage/reference.pdf": "%PDF-1.4 synthetic placeholder",
     "storage/page.html": "<!doctype html><h1>Local HTML content</h1>",
   });
   await booted(page);
-  for (const file of ["letter.docx", "budget.xlsx"]) {
+  // a damaged package is named in plain words — never the zip library's text
+  for (const [file, says] of [
+    ["letter.docx", "isn’t a readable Word document"],
+    ["budget.xlsx", "isn’t a readable Excel workbook"],
+  ] as const) {
     await assets(page);
     await page.locator(`.system-browser [data-note-id="storage/${file}"]`).first().dblclick();
-    await expect(page.locator(".file-document-fallback")).toContainText("unsupported");
-    await expect(page.getByRole("button", { name: /Open externally|Convert copy to DOCX/ })).toHaveCount(0);
+    await expect(page.getByRole("alert").first()).toContainText(says);
+    await expect(page.getByRole("alert").first()).not.toContainText("central directory");
   }
+  // conversion and the outside apps are Mac-only: the web says how to get a DOCX
+  await assets(page);
+  await page.locator('.system-browser [data-note-id="storage/memo.doc"]').first().dblclick();
+  await expect(page.locator(".file-document-fallback")).toContainText(".doc can’t be edited on the web");
+  await expect(page.locator(".file-document-fallback")).toContainText("save a .docx copy into this vault");
+  await expect(page.getByRole("button", { name: /Convert copy to DOCX|Open externally/ })).toHaveCount(0);
+  await assets(page);
+  await page.locator('.system-browser [data-note-id="storage/reference.pdf"]').first().dblclick();
+  await expect(page.locator(".file-head")).toContainText("To edit, export a .docx copy in another app");
+  await expect(
+    page.getByRole("button", { name: /Open externally|Convert to DOCX|Convert copy to DOCX/ }),
+  ).toHaveCount(0);
   await assets(page);
   await page.locator('.system-browser [data-note-id="storage/page.html"]').first().dblclick();
   await expect(page.frameLocator(".file-html").getByRole("heading")).toHaveText("Local HTML content");
