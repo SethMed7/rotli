@@ -276,3 +276,26 @@ describe("JSON-LD", () => {
     expect(list).not.toContain("Charts from your notes");
   });
 });
+
+// The build guard (astro.config.mjs, rotli-agent-files-guard) checks these files exist in dist.
+describe("the addresses the agent files send agents to", () => {
+  test("Markdown links and bare Page: lines, without trailing punctuation, as build files", async () => {
+    const { agentLinkTargets } = (await import(
+      join(import.meta.dir, "..", "site", "src", "agentLinks.ts")
+    )) as { agentLinkTargets: (text: string, origin: string) => { href: string; file: string }[] };
+    const text = [
+      "- [Features](https://rotli.co/features/): every feature",
+      "Page: https://rotli.co/features/markdown/.",
+      "Run https://rotli.co/helper/install.sh; then https://rotli.co/privacy/index.md, done.",
+      "Open https://rotli.co/app/ or https://github.com/SethMed7/rotli and http://rotli.co/x/",
+      "A space: https://rotli.co/blog/a%20b/",
+    ].join("\n");
+    expect(agentLinkTargets(text, "https://rotli.co").map(({ file }) => file)).toEqual([
+      "/features/index.html",
+      "/features/markdown/index.html",
+      "/helper/install.sh",
+      "/privacy/index.md",
+      "/blog/a b/index.html",
+    ]);
+  });
+});

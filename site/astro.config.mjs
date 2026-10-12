@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { agentLinkTargets } from "./src/agentLinks";
 import { movedFeatures } from "./src/features";
 import { figurePlugin } from "./src/figures";
 import { pageMarkdown } from "./src/markdownTwin";
@@ -121,20 +122,14 @@ function agentFilesGuard() {
         const root = fileURLToPath(dir);
         const problems = [];
         if (!existsSync(join(root, "llms.txt"))) problems.push("llms.txt was not emitted");
-        // llms-full.txt (full site only) carries its pages as bare `Page:`/`Source:` addresses
+        // llms-full.txt is the full site's alone (src/pages/[file].ts); CI's coming-soon build holds that
+        if (existsSync(join(root, "llms-full.txt")) !== site.showsFullSite)
+          problems.push(`llms-full.txt is ${site.showsFullSite ? "missing from" : "in"} a ${site.mode} build`);
         for (const name of ["llms.txt", "llms-full.txt"]) {
           const text = join(root, name);
           if (!existsSync(text)) continue;
-          for (const [href] of readFileSync(text, "utf8").matchAll(/https?:\/\/[^\s)<>\]"'`]+/g)) {
-            const url = new URL(href.replace(/[.,;:]+$/, ""));
-            // /app/ is Rotli Web, its own bundle served beside this build (site/Caddyfile)
-            if (url.origin !== site.url || url.pathname.startsWith("/app/")) continue;
-            const file = join(
-              root,
-              decodeURIComponent(url.pathname),
-              url.pathname.endsWith("/") ? "index.html" : "",
-            );
-            if (!existsSync(file)) problems.push(`${name} links ${href}, which this build did not emit`);
+          for (const { href, file } of agentLinkTargets(readFileSync(text, "utf8"), site.url)) {
+            if (!existsSync(join(root, file))) problems.push(`${name} links ${href}, which this build did not emit`);
           }
         }
         const walk = (folder) => {

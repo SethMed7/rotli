@@ -1205,12 +1205,18 @@ agents; every sentence in it restates a claim the pages already make.
   browser agent can fill in an address for the person it works for. There is
   no `toolautosubmit`: the browser stops at the arrow, and the person sends it.
   The spam-trap field is described as "Always leave this empty." because every
-  named control becomes a tool parameter. Browsers without WebMCP ignore the
+  named control becomes a tool parameter, and a form an agent filled in
+  (`:tool-form-active`, or a submit with `agentInvoked`) is sent without it, so
+  an agent that fills the trap anyway isn't silently dropped by the server. Browsers without WebMCP ignore the
   attributes; `src/env.d.ts` declares them for `astro check`, and
   `e2e/site/footer.spec.ts` holds them. Not to be confused with webmcp.dev, a
   third-party widget library the site does not use.
-- The build fails if an `llms.txt` link points at a page it did not emit, or if
-  a JSON-LD block does not parse (`astro.config.mjs`, `rotli-agent-files-guard`).
+- The build fails if a rotli.co address in `llms.txt` or `llms-full.txt` (a
+  Markdown link or a bare `Page:` line, trailing punctuation dropped) is not a
+  file it emitted, if `llms-full.txt` is in a coming-soon build or missing from
+  a full one, or if a JSON-LD block does not parse (`astro.config.mjs`,
+  `rotli-agent-files-guard`; addresses read by `src/agentLinks.ts`). Other
+  origins and `/app/` (Rotli Web, its own bundle) are not checked.
 - To check reachability as agents see it, scan with
   [agentcapable.dev](https://agentcapable.dev/methodology) or request a page
   with an agent's User-Agent (for example `curl -A 'GPTBot/1.1' https://rotli.co/`).

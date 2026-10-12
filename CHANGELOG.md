@@ -12,10 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **AI systems can read all of rotli.co in one file.** `/llms-full.txt` holds
-  every feature in full, the FAQ, the roadmap, and every post; `/llms.txt`
-  links it and the developers page. Each feature page now carries
-  structured data (schema.org), and the app's lists every shipped feature.
+- **AI systems can read rotli.co's features, answers, roadmap, and posts in
+  one file.** `/llms-full.txt` holds every feature in full, the FAQ, the
+  roadmap, and every post; `/llms.txt` links it and the developers page. Each
+  feature page now carries structured data (schema.org), and the app's entry
+  lists every shipped feature.
 - **The footer's sign-up works with browser agents (an experiment).** In
   browsers that support WebMCP (Chrome, with a trial or a flag), an AI agent
   can fill in your address for you; you still send it yourself.
