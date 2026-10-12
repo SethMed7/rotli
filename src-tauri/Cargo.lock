@@ -3465,6 +3465,7 @@ dependencies = [
  "objc2-web-kit",
  "pdf-extract",
  "percent-encoding",
+ "quick-xml",
  "regex",
  "security-framework",
  "serde",

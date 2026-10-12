@@ -4,8 +4,9 @@
 import { describe, expect, test } from "bun:test";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
-import { b64FromBytes, saveXlsx } from "./codec/xlsx";
+import { b64FromBytes, bytesFromB64, saveXlsx } from "./codec/xlsx";
 import { parseWorkbook, workbookForAi, workbookToCsv } from "./view";
 
 describe("parseWorkbook truncation flag", () => {
@@ -74,6 +75,25 @@ describe("xlsx bytes through the exceljs codec", () => {
 
   test("a workbook that isn't one is refused, never read as empty", async () => {
     expect(workbookForAi(b64FromBytes(new TextEncoder().encode("not a zip")), "x.xlsx")).rejects.toThrow();
+  });
+
+  test("chat reads prefixed Strict OOXML cell text", async () => {
+    const b64 = await xlsxB64((wb) => {
+      wb.addWorksheet("Plan").addRow(["The blue lantern stays lit through winter."]);
+    });
+    const zip = await JSZip.loadAsync(bytesFromB64(b64));
+    const strictNamespace = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+    for (const name of ["xl/sharedStrings.xml", "xl/worksheets/sheet1.xml"]) {
+      const entry = zip.file(name);
+      if (!entry) continue;
+      const xml = (await entry.async("string"))
+        .replace(/<(\/?)([A-Za-z][\w.-]*)(?=[\s/>])/g, "<$1x:$2")
+        .replace(/<x:(sst|worksheet)/, `<x:$1 xmlns:x="${strictNamespace}"`)
+        .replaceAll("http://schemas.openxmlformats.org/spreadsheetml/2006/main", strictNamespace);
+      zip.file(name, xml);
+    }
+    const strict = b64FromBytes(new Uint8Array(await zip.generateAsync({ type: "arraybuffer" })));
+    expect(await workbookForAi(strict, "plan.xltx")).toContain("The blue lantern stays lit through winter.");
   });
 
   test("cells come back as display strings, blank rows dropped", async () => {

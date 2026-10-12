@@ -197,7 +197,7 @@ way a compromised loop would.
 | 13 | `corpus_list` / `corpus_reference_notes` → knowledge map | **GAP → FIXED** | same shape: secure TITLES reached the map through a TS-side filter. New `corpus_notes_ai` filters in Rust |
 | 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED, NOT CLOSED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body. The ledger is warm before commands run and blocks verbatim overlap at Rust egress seams, but a hostile webview that obtained the plaintext can transform it before invoking those seams. This is the unresolved trust-boundary contradiction described above |
 | 15 | Workspace `notes list` / `search` / `query` / `read` | SAFE | `read_for_ai(id, false)` per item, filter-before-truncate |
-| 16 | Workspace `list` — files and folders | **GAP → FIXED** | Folder metas pass `agent_listable`; file metas also pass `file_is_protected`, so secure-home and keyword-protected titles and paths never appear in remote listings |
+| 16 | Workspace `list` and Main/view references — files and folders | **GAP → FIXED** | Folder metas pass `agent_listable`; file and board metas and references also pass `file_is_protected`, so secure-home and keyword-protected titles and paths never appear in remote listings or projections. Board reads and edits repeat the check |
 | 16a | Remote relay connector | SAFE | every response is produced by the same workspace dispatcher and `read_for_ai`/write gates; the outbound transport adds no alternate corpus reads, starts only by explicit user action, serializes disconnect/vault switch against in-flight dispatch and delivery, binds separate client/device credentials to their minted relay base, bounds the complete response envelope, and logs no frames |
 
 ### Writes — persistence and laundering
@@ -342,7 +342,11 @@ cold because search now uses an index.
   failing closed. Dedicated Rust AI file reads repeat the location check. The
   note read gate also checks location, since plain text files can enter through
   `read_note`. Allowed local secure file reads feed the Rust prose-overlap
-  ledger with decoded DOCX and XLSX text, rather than ZIP bytes. If an office
+  ledger with decoded DOCX-family and spreadsheet-package text, rather than ZIP
+  bytes. Spreadsheet XML is parsed by local element name, including prefixed
+  Strict OOXML; a package with worksheet/shared-string parts but no readable
+  text refuses its secure local read, as does malformed XML. The TS sheet codec
+  normalizes these namespaces before ExcelJS reads the workbook. If an office
   package cannot be decoded for the ledger, its secure local read refuses.
   The secret-pattern detector still checks extracted text. Files
   outside those locations have no per-file secure flag.

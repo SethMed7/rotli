@@ -8,6 +8,7 @@ import { extOf } from "../lib/fileKind";
 import { secureByName } from "../lib/librarianRules";
 import {
   type ChatModelInfo,
+  type CorpusNoteMeta,
   corpusFileBytesAi,
   corpusFileTextAi,
   corpusList,
@@ -24,9 +25,29 @@ import { editDocumentAsAi } from "./documentEdits";
 import { looksSecret, modelIsOnDevice } from "./guard";
 import type { Host } from "./types";
 
+/** Narrow file-read port keeps host tests independent of process-wide module mocks. */
+export interface FileToolIo {
+  corpusList: () => Promise<{ notes: Pick<CorpusNoteMeta, "id" | "title" | "kind">[] }>;
+  corpusListFresh: () => Promise<{ notes: Pick<CorpusNoteMeta, "id" | "title" | "kind">[] }>;
+  corpusFileBytesAi: typeof corpusFileBytesAi;
+  corpusFileTextAi: typeof corpusFileTextAi;
+  readAiManagedDocument: typeof import("../documents/composition").readAiManagedDocument;
+}
+
+const defaultFileToolIo: FileToolIo = {
+  corpusList: () => corpusList(),
+  corpusListFresh: () => corpusListFresh(),
+  corpusFileBytesAi: (...args) => corpusFileBytesAi(...args),
+  corpusFileTextAi: (...args) => corpusFileTextAi(...args),
+  readAiManagedDocument: async (...args) => {
+    const { readAiManagedDocument } = await import("../documents/composition");
+    return readAiManagedDocument(...args);
+  },
+};
+
 /** Resolve an exact id/path, or an unambiguous exact filename. */
-async function findVaultFile(query: string, fresh = false) {
-  const { notes } = await (fresh ? corpusListFresh() : corpusList());
+async function findVaultFile(query: string, fresh = false, io: FileToolIo = defaultFileToolIo) {
+  const { notes } = await (fresh ? io.corpusListFresh() : io.corpusList());
   const q = query.trim().replace(/^["']|["']$/g, "");
   const exact = q.startsWith("storage:") ? `storage/${q.slice("storage:".length)}` : q;
   const files = notes.filter((n) => n.kind === "file");
@@ -57,19 +78,24 @@ function fileAccess(file: Awaited<ReturnType<typeof findVaultFile>>, local: bool
 }
 
 /** Exact-id form for AI workflows that embed a previously generated file. */
-export async function aiFileAccessById(id: string, local: boolean): Promise<string | null> {
-  let file = await findVaultFile(id);
-  if (!file) file = await findVaultFile(id, true);
+export async function aiFileAccessById(
+  id: string,
+  local: boolean,
+  io: FileToolIo = defaultFileToolIo,
+): Promise<string | null> {
+  let file = await findVaultFile(id, false, io);
+  if (!file) file = await findVaultFile(id, true, io);
   return file?.id === id ? fileAccess(file, local) : "blocked: the exact file cannot be resolved safely.";
 }
 
 export function makeFileTools(
   model: ChatModelInfo,
   opts: { onSecureNoteRead?: () => void; isSecureContext?: () => boolean },
+  io: FileToolIo = defaultFileToolIo,
 ) {
   const tools: Pick<Host, "readFile"> & Required<Pick<Host, "editDocument">> = {
     async readFile(query: string): Promise<string> {
-      const file = await findVaultFile(query);
+      const file = await findVaultFile(query, false, io);
       if (!file) return "blocked: the exact file cannot be resolved safely.";
       const refusal = fileAccess(file, modelIsOnDevice(model));
       if (refusal) return refusal;
@@ -78,22 +104,21 @@ export function makeFileTools(
       let text: string;
       if (SHEET_BIN.has(ext)) {
         try {
-          text = await workbookForAi(await corpusFileBytesAi(file.id, model), file.title);
+          text = await workbookForAi(await io.corpusFileBytesAi(file.id, model), file.title);
         } catch {
           return `"${file.title}" isn't a workbook Rotli can read (damaged, or a format it doesn't open).`;
         }
       } else if (SHEET_TEXT.has(ext)) {
         text = await workbookToCsv({
-          csv: await corpusFileTextAi(file.id, model),
+          csv: await io.corpusFileTextAi(file.id, model),
           delimiter: ext === "tsv" ? "\t" : ",",
         });
       } else if (DOCX_EDITABLE.has(ext)) {
-        const { readAiManagedDocument } = await import("../documents/composition");
-        const editable = await readAiManagedDocument(file.id, model);
+        const editable = await io.readAiManagedDocument(file.id, model);
         text = editable.kind === "ready" ? editableDocumentForAi(editable.document) : "";
         if (!text) return "This document is too large or has no editable text Rotli can give the model.";
       } else {
-        text = await corpusFileTextAi(file.id, model);
+        text = await io.corpusFileTextAi(file.id, model);
       }
       // Storage files carry no frontmatter, so they skip corpus_read_ai's
       // secure gate — apply the same policy prior chats get (audit 2026-07):
@@ -109,7 +134,7 @@ export function makeFileTools(
       if (opts?.isSecureContext?.() === true) {
         return "blocked: this chat carries secure-note content, and Word documents are not protected note files.";
       }
-      const file = await findVaultFile(query);
+      const file = await findVaultFile(query, false, io);
       const refusal = fileAccess(file, modelIsOnDevice(model));
       if (refusal) return refusal;
       if (!file || !DOCX_EDITABLE.has(extOf(file.title))) return `no Word document matching "${query}".`;

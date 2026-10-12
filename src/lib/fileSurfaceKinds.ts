@@ -15,7 +15,7 @@ const HTML = new Set(["html", "htm", "xhtml"]);
 const TEXT = new Set(["txt", "text", "log", "json", "md", "markdown", "yaml", "yml", "xml", "vtt", "srt"]);
 
 // exceljs only round-trips real .xlsx; csv is the values-only text path. The
-// rest of the sheet family (xls/xlsm/ods/tsv) stays the read-only viewer.
+// rest of the sheet family (xlsm/xltx/xltm/tsv) stays the read-only viewer.
 
 // which installed "Open with …" apps make sense per kind (Rust reports what exists)
 export const OPEN_WITH_BY_KIND: Record<FileKind, string[]> = {

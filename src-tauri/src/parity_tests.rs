@@ -67,6 +67,22 @@ fn sheet_edit_max_bytes_matches_fixture() {
 }
 
 #[test]
+fn sheet_package_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("sheetPackageExts")),
+        crate::corpus::SHEET_PACKAGE_EXTS
+    );
+}
+
+#[test]
+fn docx_package_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("docxPackageExts")),
+        crate::corpus::DOCX_PACKAGE_EXTS
+    );
+}
+
+#[test]
 fn chat_image_asset_exts_match_fixture() {
     assert_eq!(
         string_list(&entry("chatImageAssetExts")),

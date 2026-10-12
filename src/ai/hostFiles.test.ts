@@ -3,19 +3,21 @@
 // numbered block, a damaged workbook says so, and a remote model never gets
 // secret-shaped contents.
 //
-// `mock.module` is process-wide and outlives this file, so each mock spreads
-// the real module and afterAll puts the real ones back.
+// The file-read port keeps these fakes inside this test file. No process-wide
+// module replacement can change the desktop twin's real Tauri fallbacks.
 
-import { afterAll, expect, mock, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import ExcelJS from "exceljs";
 
-import * as realDocuments from "../documents/composition";
-import * as realTauri from "../lib/tauri";
 import { b64FromBytes, saveXlsx } from "../sheets/codec/xlsx";
 import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
-import { aiFileAccessById, makeFileTools } from "./hostFiles";
+import {
+  aiFileAccessById as accessById,
+  type FileToolIo,
+  makeFileTools as createFileTools,
+} from "./hostFiles";
 import { registeredToolSpecs } from "./toolSchemas";
 
 const files: Record<string, string> = {};
@@ -26,16 +28,15 @@ let refreshes = 0;
 let cacheEnabled = false;
 const listed = (path: string) => ({
   id: path.includes("/") ? path : `storage/rotli/${path}`,
-  title: path.split("/").at(-1),
-  kind: "file",
+  title: path.split("/").at(-1) ?? "",
+  kind: "file" as const,
 });
 const mockAiRead = async (id: string) => {
   reads.push(id);
   return files[id.replace("storage/rotli/", "")] ?? "";
 };
 
-void mock.module("../lib/tauri", () => ({
-  ...realTauri,
+const io: FileToolIo = {
   corpusList: async () => {
     if (!cacheEnabled) return { folders: [], notes: Object.keys(files).map(listed) };
     cachedList ??= Object.keys(files).map(listed);
@@ -48,15 +49,13 @@ void mock.module("../lib/tauri", () => ({
   },
   corpusFileBytesAi: mockAiRead,
   corpusFileTextAi: mockAiRead,
-}));
-void mock.module("../documents/composition", () => ({
-  ...realDocuments,
-  readAiManagedDocument: async (id: string) => {
+  readAiManagedDocument: (async (id: string) => {
     documentReads.push(id);
     return {
       kind: "ready",
       warnings: [],
       revision: "r1",
+      sourceBase64: "",
       document: {
         id: "storage/rotli/brief.docx",
         title: "brief",
@@ -64,13 +63,14 @@ void mock.module("../documents/composition", () => ({
       },
       save: async () => "r2",
     };
-  },
-}));
+  }) as FileToolIo["readAiManagedDocument"],
+};
 
-afterAll(() => {
-  void mock.module("../lib/tauri", () => realTauri);
-  void mock.module("../documents/composition", () => realDocuments);
-});
+const makeFileTools = (
+  model: Parameters<typeof createFileTools>[0],
+  opts: Parameters<typeof createFileTools>[1],
+) => createFileTools(model, opts, io);
+const aiFileAccessById = (id: string, local: boolean) => accessById(id, local, io);
 
 const remote = {
   id: "m",

@@ -8,6 +8,8 @@ const dev = { sheets: true };
 test("stable withholds binary workbooks but keeps CSV editing", () => {
   expect(workbookWithheld("xlsx", stable)).toBe(true);
   expect(workbookWithheld("xlsm", stable)).toBe(true);
+  expect(workbookWithheld("xltx", stable)).toBe(true);
+  expect(workbookWithheld("xltm", stable)).toBe(true);
   expect(workbookWithheld("csv", stable)).toBe(false);
   expect(workbookWithheld("xlsx", dev)).toBe(false);
   expect(sheetFormatEditable("csv", stable)).toBe(true);

@@ -32,7 +32,7 @@ export interface SheetFacts {
 export function sheetFormatLabel(ext: string): string {
   if (ext === "csv") return "CSV";
   if (ext === "tsv") return "TSV";
-  if (ext === "xlsx" || ext === "xlsm") return "Excel workbook";
+  if (ext === "xlsx" || ext === "xlsm" || ext === "xltx" || ext === "xltm") return "Excel workbook";
   return "";
 }
 
