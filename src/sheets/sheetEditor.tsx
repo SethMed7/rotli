@@ -9,7 +9,11 @@ import { bytesRevision, contentRevision } from "../lib/contentRevision";
 import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { confirmWebOfficeSave, OFFICE_DRAFT_WARNING } from "../services/webOfficeRecovery";
+import {
+  confirmWebOfficeSave,
+  officeDraftTokenAfterProtect,
+  OFFICE_DRAFT_WARNING,
+} from "../services/webOfficeRecovery";
 import { usePanesStore } from "../state/panes";
 import { isDarkDataTheme, readDataTheme, useDataTheme } from "../state/theme";
 import {
@@ -228,7 +232,7 @@ export default function SheetEditor({
             sourceBase64Ref.current,
             idMapRef.current,
           );
-          draftTokenRef.current = token ?? "";
+          draftTokenRef.current = officeDraftTokenAfterProtect(draftTokenRef.current, token);
           setDraftWarning(token === null);
           setDirty(true);
           autosave.edited();

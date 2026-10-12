@@ -83,7 +83,8 @@ the revision of the newly saved bytes; `"0"` permits creation only when the
 path is missing. The first user save keeps a one-time `.bak` of the prior bytes.
 Chromium's folder road holds a vault-and-path keyed Web Lock across each
 revision check and write, so tabs using this browser's vault identity take
-turns. Moves acquire both path locks in sorted order through source removal.
+turns, including behind a long write rather than failing after a wait deadline.
+Moves acquire both path locks in sorted order through source removal.
 If Web Locks are unexpectedly unavailable, the adapter falls back to its
 per-instance turns; another tab can then race it.
 Rotli Helper reads up to 256 MiB per file, but its 24 MiB JSON request cap
@@ -146,8 +147,8 @@ Not on the web: Reveal in Finder (hidden). The connected-folder managed-file
 adapter can create DOCX and XLSX bytes in `storage/rotli` for a memex vault or
 `Storage` for a plain vault. It accepts only those two extensions, collides as
 `stem-2.ext`, and uses the `"0"` content gate at every candidate, including
-after a racing create. Ordinary file Archive/Trash moves and restores use the
-folder notes lifecycle path. A new pristine document is hard-discarded on close only
+after a racing create. Surfaced file Archive/Trash moves and restores use the
+folder notes lifecycle path; the file stat enables those menu actions. A new pristine document is hard-discarded on close only
 while its exact creation bytes remain; a changed or missing file is kept and
 the refusal is reported. Rename carries a first-save `.bak` beside the new
 name without replacing an existing backup. Both folder roads use the same
@@ -228,7 +229,9 @@ its sandbox and no-egress policy. CSV and other editable text-file saves refuse
 source bytes that are not valid UTF-8 before writing a backup or saving, and
 pass the observed content revision into the adapter's write turn. Binary saves pass
 the revision of their observed bytes through the same gate. CSV saves preserve a
-first-save backup. DOCX and XLSX open in their editors (Beta). A package that
+first-save backup. If another tab creates that backup first, its exclusive
+create conflict is harmless and the save still reaches the main file's own
+revision gate. DOCX and XLSX open in their editors (Beta). A package that
 isn't a readable zip says so in plain words, never the zip library's message.
 Finder, default-app, PDF export, and macOS conversion actions are hidden there
 (gated by `PLATFORM`); a PDF or a legacy `.doc`/`.rtf`/`.odt` instead says to
@@ -414,10 +417,16 @@ the editor's clean-buffer gate preserves unsaved typing.
   free `unsaved copy` sibling and the changed original stays untouched. A
   failed replay moves to a separate kept record for that editing session,
   retried on boot; only a confirmed save or confirmed conflict copy clears
-  that exact draft. Each tab's editing session has its own key, so a second
-  tab editing the same file retains its draft; competing edits replay as
-  separate `unsaved copy` siblings. A draft added during asynchronous replay
-  remains queued. The
+  that exact draft. Each tab's editing session has its own key and holds a
+  vault-and-session Web Lock for its lifetime. Boot skips another live tab's
+  draft without encoding, writing, or clearing it. A failed liveness check
+  also leaves the record untouched; without Web Locks, boot defers peer drafts
+  rather than guessing they are abandoned. A dead session replays in place
+  only when it is the file's sole draft and its base still matches. Competing
+  drafts become separate `unsaved copy` siblings. A draft added during
+  asynchronous replay remains queued. If a later edit exceeds the journal
+  limit, the last protected token is retained so a confirmed save clears the
+  older snapshot instead of recovering already-saved work. The
   journal permits 1,000,000 ASCII characters per entry and 1,200,000 in total
   for this vault. Even when each character counts as two UTF-16 bytes, that is
   under 2.4 MiB of the usual approximately 5 MiB origin quota, leaving room
@@ -426,7 +435,8 @@ the editor's clean-buffer gate preserves unsaved typing.
   it is still offered to normal autosave. The web build does not prompt on tab
   close, matching notes: a synchronous journal, rather than an unload-time
   promise or prompt, guards dirty typing. `e2e/web/rotli-web-office-recovery.spec.ts`
-  types into each editor and hard-refreshes inside the autosave window. A
+  types into each editor and hard-refreshes inside the autosave window; its
+  second-tab case checks that a live workbook draft remains untouched. A
   document embed in a note is the same editor and is journaled; a **sheet
   embed** is not (its live entry carries no source bytes), so its edits rely
   on the 500 ms autosave and the `pagehide` flush.

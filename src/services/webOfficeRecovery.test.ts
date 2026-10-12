@@ -11,11 +11,19 @@ import {
   type OfficeDraft,
   clearOfficeDraft,
   officeDraftKey,
+  officeDraftTokenAfterProtect,
   readOfficeDrafts,
   replayOfficeDrafts,
   snapshotBase64,
   writeOfficeDraft,
 } from "./webOfficeRecovery";
+
+const replayAbandoned = (
+  store: ReturnType<typeof storage>,
+  vault: string,
+  dir: MemoryVaultDir,
+  encoder?: (entry: OfficeDraft) => Promise<Uint8Array>,
+) => replayOfficeDrafts(store, vault, dir, encoder, async () => true);
 
 function storage() {
   const values = new Map<string, string>();
@@ -44,7 +52,7 @@ test("a draft added while replay is encoding remains journaled", async () => {
   const encoding = new Promise<void>((resolve) => {
     started = resolve;
   });
-  const replay = replayOfficeDrafts(store, "A", dir, async (entry) => {
+  const replay = replayAbandoned(store, "A", dir, async (entry) => {
     started();
     await paused;
     return encode(entry);
@@ -68,11 +76,85 @@ test("two editing sessions for one file replay both edits as separate copies", a
     snapshotBase64: b64(second),
   });
   expect(readOfficeDrafts(store, "A")).toHaveLength(2);
-  const result = await replayOfficeDrafts(store, "A", dir, encode);
-  expect(result.saved).toBe(1);
-  expect(result.keptAside).toHaveLength(1);
-  expect(await dir.readBytes("storage/plan.csv")).toEqual(edited);
-  expect(await dir.readBytes(result.keptAside[0]!)).toEqual(second);
+  const result = await replayAbandoned(store, "A", dir, encode);
+  expect(result.saved).toBe(0);
+  expect(result.keptAside).toHaveLength(2);
+  expect(await dir.readBytes("storage/plan.csv")).toEqual(original);
+  expect(await Promise.all(result.keptAside.map((path) => dir.readBytes(path)))).toEqual([edited, second]);
+});
+
+test("a live peer's draft is untouched by another tab's boot", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  const token = writeOfficeDraft(store, "A", { ...draft(), sessionId: "tab-a" }).token;
+  const prior = Object.getOwnPropertyDescriptor(navigator, "locks");
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request: async (
+        _name: string,
+        options: { ifAvailable?: boolean },
+        callback: (lock: object | null) => unknown,
+      ) => callback(options.ifAvailable ? null : {}),
+    },
+  });
+  try {
+    expect(await replayOfficeDrafts(store, "A", dir, encode)).toEqual({
+      saved: 0,
+      keptAside: [],
+      unresolved: 0,
+    });
+    expect(await dir.readBytes("storage/plan.csv")).toEqual(original);
+    expect(readOfficeDrafts(store, "A").map((entry) => entry.token)).toEqual([token]);
+  } finally {
+    if (prior) Object.defineProperty(navigator, "locks", prior);
+    else Reflect.deleteProperty(navigator, "locks");
+  }
+});
+
+test("a dead session's draft replays after its Web Lock is released", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  writeOfficeDraft(store, "A", { ...draft(), sessionId: "closed-tab" });
+  const prior = Object.getOwnPropertyDescriptor(navigator, "locks");
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request: async (
+        _name: string,
+        _options: { ifAvailable?: boolean },
+        callback: (lock: object | null) => unknown,
+      ) => callback({}),
+    },
+  });
+  try {
+    expect(await replayOfficeDrafts(store, "A", dir, encode)).toEqual({
+      saved: 1,
+      keptAside: [],
+      unresolved: 0,
+    });
+    expect(await dir.readBytes("storage/plan.csv")).toEqual(edited);
+    expect(readOfficeDrafts(store, "A")).toEqual([]);
+  } finally {
+    if (prior) Object.defineProperty(navigator, "locks", prior);
+    else Reflect.deleteProperty(navigator, "locks");
+  }
+});
+
+test("a failed peer liveness check leaves its journal record byte-for-byte intact", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  writeOfficeDraft(store, "A", { ...draft(), sessionId: "other-tab" });
+  const before = [...store.values];
+  const result = await replayOfficeDrafts(store, "A", dir, encode, async () => {
+    throw new Error("Web Locks unavailable");
+  });
+  expect(result).toEqual({ saved: 0, keptAside: [], unresolved: 0 });
+  expect([...store.values]).toEqual(before);
+  expect(await dir.readBytes("storage/plan.csv")).toEqual(original);
 });
 
 test("draft tokens include the editing session so a save cannot clear another tab", () => {
@@ -83,6 +165,19 @@ test("draft tokens include the editing session so a save cannot clear another ta
   expect(b.token).toStartWith("tab-b:");
   clearOfficeDraft(store, "A", draft().fileId, a.token);
   expect(readOfficeDrafts(store, "A").map((item) => item.token)).toEqual([b.token]);
+});
+
+test("a successful save clears the older protected draft after a later quota refusal", () => {
+  const store = storage();
+  const first = writeOfficeDraft(store, "A", draft());
+  const refused = writeOfficeDraft(store, "A", {
+    ...draft(),
+    snapshotBase64: "x".repeat(OFFICE_DRAFT_ENTRY_MAX_CHARS),
+  });
+  expect(refused.protected).toBe(false);
+  const token = officeDraftTokenAfterProtect(first.token, refused.protected ? refused.token : null);
+  clearOfficeDraft(store, "A", draft().fileId, token);
+  expect(readOfficeDrafts(store, "A")).toEqual([]);
 });
 
 test("blocked storage enumeration leaves boot with no readable drafts", () => {
@@ -123,7 +218,7 @@ test("a draft for vault A never replays into vault B", async () => {
   writeOfficeDraft(store, "A", draft());
   const dirB = new MemoryVaultDir();
   await dirB.writeBytes("storage/plan.csv", original);
-  expect(await replayOfficeDrafts(store, "B", dirB, encode)).toEqual({
+  expect(await replayAbandoned(store, "B", dirB, encode)).toEqual({
     saved: 0,
     keptAside: [],
     unresolved: 0,
@@ -137,7 +232,7 @@ test("replay saves against the opened byte revision and clears only after confir
   await dir.writeBytes("storage/plan.csv", original);
   const store = storage();
   writeOfficeDraft(store, "A", draft());
-  const result = await replayOfficeDrafts(store, "A", dir, encode);
+  const result = await replayAbandoned(store, "A", dir, encode);
   expect(result).toEqual({ saved: 1, keptAside: [], unresolved: 0 });
   expect(await dir.readBytes("storage/plan.csv")).toEqual(edited);
   expect(readOfficeDrafts(store, "A")).toHaveLength(0);
@@ -149,7 +244,7 @@ test("a changed file keeps both versions in a free sibling and never clobbers", 
   await dir.writeBytes("storage/plan.csv", other);
   const store = storage();
   writeOfficeDraft(store, "A", draft());
-  const result = await replayOfficeDrafts(store, "A", dir, encode);
+  const result = await replayAbandoned(store, "A", dir, encode);
   expect(result.keptAside).toEqual(["storage/plan (unsaved copy).csv"]);
   expect(await dir.readBytes("storage/plan.csv")).toEqual(other);
   expect(await dir.readBytes(result.keptAside[0]!)).toEqual(edited);
@@ -162,7 +257,7 @@ test("a refused save retains the draft; a newer draft survives an older save con
   const first = writeOfficeDraft(store, "A", draft());
   expect(
     (
-      await replayOfficeDrafts(store, "A", dir, async () => {
+      await replayAbandoned(store, "A", dir, async () => {
         throw new Error("offline");
       })
     ).unresolved,
@@ -223,7 +318,7 @@ test("a real DOCX model survives refresh and remains a valid Word package", asyn
     sourceBase64,
     snapshotBase64: snapshotBase64(model),
   });
-  expect((await replayOfficeDrafts(store, "A", dir)).saved).toBe(1);
+  expect((await replayAbandoned(store, "A", dir)).saved).toBe(1);
   const saved = b64(await dir.readBytes(fileId));
   expect((await decodeDocx(saved, fileId)).document.content).toContainEqual({
     kind: "paragraph",
@@ -248,7 +343,7 @@ test("a real XLSX cell survives refresh and remains a valid workbook", async () 
     sourceBase64,
     snapshotBase64: snapshotBase64(model),
   });
-  expect((await replayOfficeDrafts(store, "A", dir)).saved).toBe(1);
+  expect((await replayAbandoned(store, "A", dir)).saved).toBe(1);
   const saved = await dir.readBytes(fileId);
   const reopened = await loadXlsx(saved.buffer as ArrayBuffer);
   expect(reopened.worksheets[0]?.getCell(1, 1).value).toBe("recovered cell");
@@ -277,7 +372,7 @@ test("XLSX replay keeps sheet identity after a prior save removed a sheet", asyn
     snapshotBase64: snapshotBase64(model),
     sheetIdMap: [...idMap],
   });
-  expect((await replayOfficeDrafts(store, "A", dir)).saved).toBe(1);
+  expect((await replayAbandoned(store, "A", dir)).saved).toBe(1);
   const saved = await dir.readBytes(fileId);
   const reopened = await loadXlsx(saved.buffer as ArrayBuffer);
   expect(reopened.worksheets.map((sheet) => sheet.name)).toEqual(["Kept"]);

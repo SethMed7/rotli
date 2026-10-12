@@ -61,6 +61,49 @@ test("an XLSX cell typed immediately before hard refresh survives", async ({ pag
     .toContain("recovered cell");
 });
 
+test("opening a second tab leaves a live workbook draft and its source untouched", async ({
+  page,
+  context,
+}) => {
+  const path = "storage/peer-budget.xlsx";
+  const bytes = await saveXlsx(fillFromCsvRows(newWorkbook(), "Budget", [["before"]]));
+  const original = Buffer.from(bytes).toString("base64");
+  await startWithBinary(page, path, original);
+  await expect(page.locator(".sheet-editor canvas").first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest(".sheet-editor"))).toBe(true);
+  await page.clock.pauseAt(new Date()); // keep Tab A inside the autosave window while Tab B boots
+  await page.keyboard.type("peer edit");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const key = Object.keys(window.localStorage).find(
+          (candidate) => candidate.startsWith("rotli-office-unsaved:") && candidate.includes(":draft:"),
+        );
+        return key ? { key, value: window.localStorage.getItem(key) } : null;
+      }),
+    )
+    .not.toBeNull();
+  // Read the exact journal record after the poll; shared localStorage must
+  // still contain these bytes after the second tab completes boot.
+  const before = await page.evaluate(() => {
+    const key = Object.keys(window.localStorage).find(
+      (candidate) => candidate.startsWith("rotli-office-unsaved:") && candidate.includes(":draft:"),
+    );
+    return key ? { key, value: window.localStorage.getItem(key) } : null;
+  });
+  expect(before).not.toBeNull();
+  const peer = await context.newPage();
+  try {
+    await peer.goto(APP);
+    await expect(peer.locator(".tabstrip").getByRole("tab", { selected: true })).toContainText("Anchor");
+    expect(await peer.evaluate((key) => window.localStorage.getItem(key), before!.key)).toBe(before!.value);
+    expect(await readOpfsBase64(peer, path)).toBe(original);
+  } finally {
+    await peer.close();
+  }
+});
+
 test("a DOCX paragraph typed immediately before hard refresh survives", async ({ page }) => {
   const path = "storage/letter.docx";
   const original = await createDocxBase64({

@@ -33,16 +33,10 @@ export class FsaVaultDir implements VaultDir {
     const acquire = (index: number): Promise<T> => {
       const name = names[index];
       if (!name) return task();
-      // Abort only a stalled acquisition. Once acquired, the callback contains
-      // file API work only and the browser releases its lock on tab closure.
-      const waiting = new AbortController();
-      const timer = setTimeout(() => waiting.abort(), 30_000);
-      return locks
-        .request(name, { signal: waiting.signal }, async () => {
-          clearTimeout(timer);
-          return acquire(index + 1);
-        })
-        .finally(() => clearTimeout(timer));
+      // File writes are bounded, and the browser releases locks when a tab
+      // closes. A deadline would turn a long but valid queued write into an
+      // avoidable save failure, so wait for this path's turn.
+      return locks.request(name, () => acquire(index + 1));
     };
     return acquire(0);
   }

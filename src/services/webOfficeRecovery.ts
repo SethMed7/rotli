@@ -36,6 +36,41 @@ const PREFIX = "rotli-office-unsaved:";
 let serial = 0;
 /** One browser-tab editing session; a refreshed tab gets a new slot. */
 export const officeEditingSessionId = crypto.randomUUID();
+const heldSessions = new Map<string, Promise<void>>();
+const sessionLockName = (vault: string, sessionId: string) =>
+  `rotli-office-session:${encodeURIComponent(vault)}:${encodeURIComponent(sessionId)}`;
+
+/** A tab holds its session lock until the browser tears down the page. Boot
+ * awaits acquisition before editors can create drafts under this session. */
+export function holdOfficeEditingSession(vault: string): Promise<void> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  if (!locks) return Promise.resolve();
+  const name = sessionLockName(vault, officeEditingSessionId);
+  const existing = heldSessions.get(name);
+  if (existing) return existing;
+  let acquired!: () => void;
+  let failed!: (reason: unknown) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    acquired = resolve;
+    failed = reject;
+  });
+  heldSessions.set(name, ready);
+  void locks
+    .request(name, async () => {
+      acquired();
+      await new Promise<void>(() => {}); // page teardown releases the browser-owned lock
+    })
+    .catch(failed);
+  return ready;
+}
+
+async function abandonedOfficeSession(vault: string, sessionId: string): Promise<boolean> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  // A browser without Web Locks cannot prove a peer is gone; leave its draft
+  // intact. The supported folder/Helper browser roads both provide Web Locks.
+  if (!locks) return false;
+  return locks.request(sessionLockName(vault, sessionId), { ifAvailable: true }, (lock) => !!lock);
+}
 
 export const officeDraftKey = (vault: string): string => `${PREFIX}${vault}`;
 const draftKey = (vault: string, draft: Pick<OfficeDraft, "sessionId" | "fileId">, kept = false) =>
@@ -148,6 +183,12 @@ export function confirmWebOfficeSave(fileId: string, token: string): void {
   if (vault) clearOfficeDraft(window.localStorage, vault, fileId, token);
 }
 
+/** A failed protection attempt leaves the previous journal entry in storage.
+ * Keep its token so a later confirmed save can clear that stale entry. */
+export function officeDraftTokenAfterProtect(current: string, protectedToken: string | null): string {
+  return protectedToken ?? current;
+}
+
 /** Snapshot bytes are JSON for the engine-neutral model; source bytes are the
  * opened DOCX/XLSX/CSV file. Both are base64 so quota is predictable. */
 export function snapshotBase64(model: unknown): string {
@@ -165,23 +206,39 @@ export async function replayOfficeDrafts(
   vault: string,
   dir: VaultDir,
   encode: (draft: OfficeDraft) => Promise<Uint8Array> = encodeOfficeDraft,
+  sessionIsAbandoned: (vault: string, sessionId: string) => Promise<boolean> = abandonedOfficeSession,
 ): Promise<{ saved: number; keptAside: string[]; unresolved: number }> {
   const drafts = readOfficeDrafts(store, vault);
   let saved = 0;
   const keptAside: string[] = [];
   let unresolved = 0;
+  const draftsPerFile = new Map<string, number>();
+  for (const draft of drafts) draftsPerFile.set(draft.fileId, (draftsPerFile.get(draft.fileId) ?? 0) + 1);
   for (const draft of drafts) {
+    // A failed liveness probe gives no authority to move even the local
+    // journal key into kept storage. Leave the peer's record byte-for-byte.
+    let abandoned = false;
+    try {
+      abandoned = await sessionIsAbandoned(vault, draft.sessionId);
+    } catch {
+      continue;
+    }
+    if (!abandoned) continue;
     try {
       assertVaultFilePath(draft.fileId);
       if (bytesRevision(bytesFromBase64(draft.sourceBase64)) !== draft.baseRevision)
         throw new Error("draft source revision does not match its base");
       const next = await encode(draft);
       const current = await dir.readBytes(draft.fileId).catch(() => null);
-      if (current && bytesRevision(current) === bytesRevision(next)) {
+      if (
+        draftsPerFile.get(draft.fileId) === 1 &&
+        current &&
+        bytesRevision(current) === bytesRevision(next)
+      ) {
         clearOfficeDraft(store, vault, draft.fileId, draft.token);
         continue;
       }
-      if (current && bytesRevision(current) === draft.baseRevision) {
+      if (draftsPerFile.get(draft.fileId) === 1 && current && bytesRevision(current) === draft.baseRevision) {
         try {
           await folderWriteFileBytes(dir, draft.fileId, bytesToBase64(next), true, draft.baseRevision);
           saved += 1;

@@ -21,7 +21,11 @@ import {
 import { registerEditor, unregisterEditor } from "../editor/commands";
 import { corpusFileStat, openUrl } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { confirmWebOfficeSave, OFFICE_DRAFT_WARNING } from "../services/webOfficeRecovery";
+import {
+  confirmWebOfficeSave,
+  officeDraftTokenAfterProtect,
+  OFFICE_DRAFT_WARNING,
+} from "../services/webOfficeRecovery";
 import { usePanesStore } from "../state/panes";
 import { SaveStatus, useAutosave } from "./autosave";
 
@@ -154,7 +158,7 @@ export default function DocumentEditor({
           markDocumentDraftChanged(fileId);
           dirtyGenRef.current += 1;
           const token = protectDocumentDraft(fileId, session, handle.save(), diskRevisionRef.current);
-          draftTokenRef.current = token ?? "";
+          draftTokenRef.current = officeDraftTokenAfterProtect(draftTokenRef.current, token);
           setDraftWarning(token === null);
           setDirty(true);
           autosave.edited();

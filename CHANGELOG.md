@@ -16,8 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rotli Web protects edits across browser tabs.** Saves and new files in a
   connected folder now take turns across tabs, and a rename keeps an outside
   edit to its source. Office drafts from separate tabs survive and recover as
-  separate copies when they conflict. A raced rename carries its backup beside
+  separate copies when they conflict; opening a second tab leaves a live
+  editor's draft alone. A later oversized edit no longer makes an older,
+  already-saved draft reappear on reload. Concurrent first saves share the
+  one-time backup, and queued writes wait for their turn. File Archive and
+  Trash actions are enabled on web. A raced rename carries its backup beside
   the actual new name, and read-only sheet help names an action available on web.
+- **Web chat only offers file tools it can use.** It no longer offers AI
+  `read_file` or document editing where the web vault cannot serve them.
 - **Web CSV edits survive a hard refresh during autosave.** A browser-local,
   vault-bound draft replays against the file's original revision; a changed
   file keeps both versions. The same recovery protects DOCX and XLSX edits.

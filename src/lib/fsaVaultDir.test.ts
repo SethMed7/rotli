@@ -82,9 +82,10 @@ async function withWebLocks(task: () => Promise<void>): Promise<void> {
   const locks = {
     request: async <T>(
       name: string,
-      _options: { signal: AbortSignal },
-      callback: () => Promise<T>,
+      optionsOrCallback: { signal?: AbortSignal } | (() => Promise<T>),
+      maybeCallback?: () => Promise<T>,
     ): Promise<T> => {
+      const callback = typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback!;
       const before = turns.get(name) ?? Promise.resolve();
       let release!: () => void;
       const done = new Promise<void>((resolve) => {
@@ -148,6 +149,30 @@ for (const [label, initial] of [
     });
   });
 }
+
+test("a waiting FSA writer stays queued until the prior Web Lock releases", async () => {
+  await withWebLocks(async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (timeout === 30_000) throw new Error("unexpected 30-second lock deadline");
+      return originalSetTimeout(handler, timeout, ...args);
+    }) as typeof setTimeout;
+    try {
+      const root = new FakeDir();
+      const first = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "same-vault");
+      const second = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "same-vault");
+      const results = await Promise.allSettled([
+        first.writeText("shared.md", "first", "0"),
+        second.writeText("shared.md", "second", "0"),
+      ]);
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+      expect(await first.readText("shared.md")).toBe("first");
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
+  });
+});
 
 test("an outside edit to a move source after destination publication survives", async () => {
   const root = new FakeDir();

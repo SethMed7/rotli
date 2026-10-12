@@ -27,7 +27,7 @@ import {
   webVaultIsFreshFolder,
   webVaultKey,
 } from "./webNotes";
-import { replayOfficeDrafts } from "./webOfficeRecovery";
+import { holdOfficeEditingSession, replayOfficeDrafts } from "./webOfficeRecovery";
 import { journalKey, replayJournal } from "./webUnsavedJournal";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
@@ -101,6 +101,7 @@ export async function hydrateWebVault(): Promise<boolean> {
   notesService = activeWebNotesService(notesService);
   const vault = webVaultKey();
   if (connected && vault && typeof window !== "undefined") {
+    await holdOfficeEditingSession(vault);
     // typing the last page couldn't save before it unloaded
     try {
       const { keptAside } = await replayJournal(window.localStorage, journalKey(vault), notesService);

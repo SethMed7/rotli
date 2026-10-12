@@ -78,8 +78,8 @@ export async function folderFileStat(dir: VaultDir, path: string): Promise<FileS
     len: stat.size,
     revision: bytesRevision(await dir.readBytes(path)),
     writable: fileWritable(memex, path),
-    lifecycleMutable: false,
-    lifecycleReason: "File lifecycle actions are unavailable on the web",
+    lifecycleMutable: true,
+    lifecycleReason: null,
     createdMs: null,
     modifiedMs: stat.lastModified,
   };
@@ -133,8 +133,16 @@ export async function folderWriteFileBytes(
   }
   if (observedBytes && bytesRevision(observedBytes) !== revision)
     throw new Error("revision conflict: file changed during save");
-  if (backup && observedBytes && !(await dir.exists(`${path}.bak`)))
-    await dir.writeBytes(`${path}.bak`, observedBytes, "0");
+  if (backup && observedBytes && !(await dir.exists(`${path}.bak`))) {
+    try {
+      await dir.writeBytes(`${path}.bak`, observedBytes, "0");
+    } catch (error) {
+      // Another tab may have created the one-time backup after exists(). Its
+      // exclusive create gate protects that copy; the main file has its own
+      // revision gate below and must still get a chance to save.
+      if (!(error instanceof Error) || !/revision conflict/i.test(error.message)) throw error;
+    }
+  }
   try {
     await dir.writeBytes(path, bytes, revision);
   } catch (error) {

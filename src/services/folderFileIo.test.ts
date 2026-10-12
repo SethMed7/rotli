@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
 
 import { folderFileBytes, folderFileStat, folderFileText, folderWriteFileBytes } from "./folderFileIo";
+import { FolderNotesService } from "./folderNotes";
+import { fileLifecycleRows, readFileLifecycle } from "./itemLifecycle";
 import { MemoryVaultDir, bytesRevision, contentRevision, type VaultDir } from "./vaultDir";
 
 interface Road {
@@ -77,4 +79,61 @@ export function testByteEditorRoad(name: string, make: () => Road): void {
 testByteEditorRoad("Memory", () => {
   const dir = new MemoryVaultDir();
   return memoryBackedRoad(dir, dir);
+});
+
+test("two first saves race for one backup but both reach the main file revision gate", async () => {
+  const disk = new MemoryVaultDir();
+  const path = "rows.csv";
+  await disk.writeText(path, "before");
+  let arrived = 0;
+  let release!: () => void;
+  const bothChecked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let mainWrites = 0;
+  const dir = new Proxy(disk, {
+    get(target, key) {
+      if (key === "exists")
+        return async (candidate: string) => {
+          if (candidate === `${path}.bak`) {
+            arrived += 1;
+            if (arrived === 2) release();
+            await bothChecked;
+            return false;
+          }
+          return target.exists(candidate);
+        };
+      if (key === "writeBytes")
+        return async (candidate: string, bytes: Uint8Array, gate?: string) => {
+          if (candidate === path) mainWrites += 1;
+          return target.writeBytes(candidate, bytes, gate);
+        };
+      const value = Reflect.get(target, key) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as VaultDir;
+  const revision = contentRevision("before");
+  const results = await Promise.allSettled([
+    folderWriteFileBytes(dir, path, btoa("first"), true, revision),
+    folderWriteFileBytes(dir, path, btoa("other"), true, revision),
+  ]);
+  expect(mainWrites).toBe(2);
+  expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+  expect(await disk.readText(`${path}.bak`)).toBe("before");
+});
+
+test("a connected-folder file enables Archive and Trash in its menu", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.mkdir("wiki");
+  await dir.writeBytes("storage/rotli/Plan.docx", new Uint8Array([1]));
+  const stat = await folderFileStat(dir, "storage/rotli/Plan.docx");
+  expect(fileLifecycleRows(await readFileLifecycle(async () => stat)).movable).toBe(true);
+  const notes = new FolderNotesService(dir);
+  const archived = await notes.moveNote("storage/rotli/Plan.docx", "Archive");
+  expect(archived.id).toBe("archive/storage/rotli/Plan.docx");
+  expect(await dir.exists("storage/rotli/Plan.docx")).toBe(false);
+  const restored = await notes.restoreNote(archived.id);
+  expect(restored.id).toBe("storage/rotli/Plan.docx");
+  const trashed = await notes.moveNote(restored.id, "Trash");
+  expect(trashed.id).toBe("trash/storage/rotli/Plan.docx");
 });
