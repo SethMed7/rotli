@@ -12,7 +12,9 @@ test("an oversized Helper byte save explains the file limit", async () => {
         base64: "AA==",
         expectedContent: "0",
       }),
-    ).rejects.toThrow(/file too large for Rotli Helper/i);
+    ).rejects.toThrow(
+      "file too large for Rotli Helper (24 MiB request limit; encoded files need more space)",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

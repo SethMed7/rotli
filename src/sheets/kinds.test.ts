@@ -32,3 +32,11 @@ test("every read-only sheet names its reason", () => {
   expect(sheetReadOnlyReason({ writable: true }, "tsv").label).toBe("view only · .tsv");
   expect(sheetReadOnlyReason({ writable: true }, "csv").title.startsWith("Too large")).toBe(true);
 });
+
+test("web read-only sheet help names an available action for xlsm and oversized files", () => {
+  for (const ext of ["xlsm", "xlsx"]) {
+    const title = sheetReadOnlyReason({ writable: true }, ext, "web").title;
+    expect(title).toContain("open the original in another app");
+    expect(title).not.toContain("Open externally");
+  }
+});

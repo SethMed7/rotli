@@ -20,9 +20,10 @@ export interface OfficeDraft {
   snapshotBase64: string;
   sheetIdMap?: [string, number][];
   token: string;
+  sessionId: string;
 }
-export type OfficeDraftInput = Omit<OfficeDraft, "token">;
-type SyncStore = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+export type OfficeDraftInput = Omit<OfficeDraft, "token" | "sessionId"> & { sessionId?: string };
+type SyncStore = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
 
 // localStorage is commonly about 5 MiB for the whole origin. ASCII base64 may
 // count as two UTF-16 bytes per character; at most 2.4 MiB leaves over half
@@ -33,9 +34,12 @@ export const OFFICE_DRAFT_WARNING =
   "This change isn't protected until it saves. The browser's draft storage is full or this file is too large.";
 const PREFIX = "rotli-office-unsaved:";
 let serial = 0;
+/** One browser-tab editing session; a refreshed tab gets a new slot. */
+export const officeEditingSessionId = crypto.randomUUID();
 
 export const officeDraftKey = (vault: string): string => `${PREFIX}${vault}`;
-const keptKey = (vault: string): string => `${officeDraftKey(vault)}:kept`;
+const draftKey = (vault: string, draft: Pick<OfficeDraft, "sessionId" | "fileId">, kept = false) =>
+  `${officeDraftKey(vault)}:${kept ? "kept" : "draft"}:${encodeURIComponent(draft.sessionId)}:${encodeURIComponent(draft.fileId)}`;
 
 function valid(value: unknown): value is OfficeDraft {
   if (!value || typeof value !== "object") return false;
@@ -51,21 +55,45 @@ function valid(value: unknown): value is OfficeDraft {
         draft.sheetIdMap.every(
           (entry) => Array.isArray(entry) && typeof entry[0] === "string" && typeof entry[1] === "number",
         ))) &&
-    typeof draft.token === "string"
+    typeof draft.token === "string" &&
+    typeof draft.sessionId === "string"
   );
 }
 
-function read(store: SyncStore, key: string): OfficeDraft[] {
+function read(store: SyncStore, key: string): OfficeDraft | null {
   try {
-    const parsed: unknown = JSON.parse(store.getItem(key) ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter(valid) : [];
+    const parsed: unknown = JSON.parse(store.getItem(key) ?? "null");
+    return valid(parsed) ? parsed : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
+function draftKeys(store: SyncStore, vault: string): string[] {
+  const prefix = `${officeDraftKey(vault)}:`;
+  const keys: string[] = [];
+  try {
+    for (let index = 0; index < store.length; index += 1) {
+      const key = store.key(index);
+      if (key?.startsWith(`${prefix}draft:`) || key?.startsWith(`${prefix}kept:`)) keys.push(key);
+    }
+  } catch {
+    return []; // private-mode storage can refuse even enumeration
+  }
+  return keys;
+}
+
 export function readOfficeDrafts(store: SyncStore, vault: string): OfficeDraft[] {
-  return [...read(store, keptKey(vault)), ...read(store, officeDraftKey(vault))];
+  return draftKeys(store, vault)
+    .map((key) => read(store, key))
+    .filter((draft): draft is OfficeDraft => !!draft);
+}
+
+function totalDraftChars(store: SyncStore, vault: string): number {
+  return draftKeys(store, vault).reduce(
+    (total, key) => total + key.length + (store.getItem(key)?.length ?? 0),
+    0,
+  );
 }
 
 /** Returns false when storage is blocked or the latest edit exceeds the
@@ -75,18 +103,31 @@ export function writeOfficeDraft(
   vault: string,
   input: OfficeDraftInput,
 ): { protected: boolean; token: string } {
-  const token = `${Date.now()}:${++serial}`;
+  const sessionId = input.sessionId ?? officeEditingSessionId;
+  const token = `${sessionId}:${Date.now()}:${++serial}`;
   try {
     assertVaultFilePath(input.fileId);
-    const draft = { ...input, token };
+    const draft: OfficeDraft = { ...input, sessionId, token };
     const encoded = JSON.stringify(draft);
     if (encoded.length > OFFICE_DRAFT_ENTRY_MAX_CHARS) return { protected: false, token };
-    const key = officeDraftKey(vault);
-    const next = [...read(store, key).filter((item) => item.fileId !== input.fileId), draft];
-    const payload = JSON.stringify(next);
-    if (payload.length + (store.getItem(keptKey(vault))?.length ?? 0) > OFFICE_DRAFT_TOTAL_MAX_CHARS)
+    const key = draftKey(vault, draft);
+    const previous = store.getItem(key);
+    if (
+      totalDraftChars(store, vault) -
+        (previous ? key.length + previous.length : 0) +
+        key.length +
+        encoded.length >
+      OFFICE_DRAFT_TOTAL_MAX_CHARS
+    )
       return { protected: false, token };
-    store.setItem(key, payload);
+    store.setItem(key, encoded);
+    // Tabs may journal at once. The post-write check keeps the shared budget
+    // bounded when another session published between our read and write.
+    if (totalDraftChars(store, vault) > OFFICE_DRAFT_TOTAL_MAX_CHARS) {
+      if (previous === null) store.removeItem(key);
+      else store.setItem(key, previous);
+      return { protected: false, token };
+    }
     return { protected: true, token };
   } catch {
     return { protected: false, token };
@@ -95,12 +136,9 @@ export function writeOfficeDraft(
 
 /** A completed save may clear only the exact draft it started with. */
 export function clearOfficeDraft(store: SyncStore, vault: string, fileId: string, token: string): void {
-  for (const key of [officeDraftKey(vault), keptKey(vault)]) {
+  for (const key of draftKeys(store, vault)) {
     const current = read(store, key);
-    const next = current.filter((draft) => draft.fileId !== fileId || draft.token !== token);
-    if (next.length === current.length) continue;
-    if (next.length) store.setItem(key, JSON.stringify(next));
-    else store.removeItem(key);
+    if (current?.fileId === fileId && current.token === token) store.removeItem(key);
   }
 }
 
@@ -131,7 +169,7 @@ export async function replayOfficeDrafts(
   const drafts = readOfficeDrafts(store, vault);
   let saved = 0;
   const keptAside: string[] = [];
-  const unresolved: OfficeDraft[] = [];
+  let unresolved = 0;
   for (const draft of drafts) {
     try {
       assertVaultFilePath(draft.fileId);
@@ -139,11 +177,15 @@ export async function replayOfficeDrafts(
         throw new Error("draft source revision does not match its base");
       const next = await encode(draft);
       const current = await dir.readBytes(draft.fileId).catch(() => null);
-      if (current && bytesRevision(current) === bytesRevision(next)) continue;
+      if (current && bytesRevision(current) === bytesRevision(next)) {
+        clearOfficeDraft(store, vault, draft.fileId, draft.token);
+        continue;
+      }
       if (current && bytesRevision(current) === draft.baseRevision) {
         try {
           await folderWriteFileBytes(dir, draft.fileId, bytesToBase64(next), true, draft.baseRevision);
           saved += 1;
+          clearOfficeDraft(store, vault, draft.fileId, draft.token);
           continue;
         } catch (error) {
           if (!(error instanceof Error) || !/revision conflict/i.test(error.message)) throw error;
@@ -153,16 +195,21 @@ export async function replayOfficeDrafts(
       const copy = await freeSiblingPath(dir, draft.fileId, "unsaved copy");
       await dir.writeBytes(copy, next, "0");
       keptAside.push(copy);
+      clearOfficeDraft(store, vault, draft.fileId, draft.token);
     } catch {
-      unresolved.push(draft);
+      unresolved += 1;
+      const activeKey = draftKey(vault, draft);
+      if (read(store, activeKey)?.token === draft.token) {
+        try {
+          store.setItem(draftKey(vault, draft, true), JSON.stringify(draft));
+          if (read(store, activeKey)?.token === draft.token) store.removeItem(activeKey);
+        } catch {
+          // The active record still holds this draft if storage refuses.
+        }
+      }
     }
   }
-  // Kept first, then clear the unload record. A storage refusal retains the
-  // old record; replay may retry but never loses the unsaved payload.
-  if (unresolved.length) store.setItem(keptKey(vault), JSON.stringify(unresolved));
-  else store.removeItem(keptKey(vault));
-  store.removeItem(officeDraftKey(vault));
-  return { saved, keptAside, unresolved: unresolved.length };
+  return { saved, keptAside, unresolved };
 }
 
 async function encodeOfficeDraft(draft: OfficeDraft): Promise<Uint8Array> {

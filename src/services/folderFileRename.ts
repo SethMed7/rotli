@@ -16,7 +16,7 @@ export async function renameFolderFile(
     throw new Error(`a file named “${next}” already exists here`);
   const movedId = await move(path, newPath);
   const oldBackup = `${path}.bak`;
-  const newBackup = `${newPath}.bak`;
+  const newBackup = `${movedId}.bak`;
   if (await dir.exists(oldBackup)) {
     try {
       if (newBackup.toLowerCase() === oldBackup.toLowerCase() || !(await dir.exists(newBackup)))

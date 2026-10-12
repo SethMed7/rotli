@@ -77,6 +77,105 @@ class FakeDir {
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
 
+async function withWebLocks(task: () => Promise<void>): Promise<void> {
+  const turns = new Map<string, Promise<void>>();
+  const locks = {
+    request: async <T>(
+      name: string,
+      _options: { signal: AbortSignal },
+      callback: () => Promise<T>,
+    ): Promise<T> => {
+      const before = turns.get(name) ?? Promise.resolve();
+      let release!: () => void;
+      const done = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const turn = before.then(() => done);
+      turns.set(name, turn);
+      await before;
+      try {
+        return await callback();
+      } finally {
+        release();
+        if (turns.get(name) === turn) turns.delete(name);
+      }
+    },
+  };
+  const browser = globalThis.navigator as Navigator;
+  const prior = Object.getOwnPropertyDescriptor(browser, "locks");
+  Object.defineProperty(browser, "locks", { configurable: true, value: locks });
+  try {
+    await task();
+  } finally {
+    if (prior) Object.defineProperty(browser, "locks", prior);
+    else Reflect.deleteProperty(browser, "locks");
+  }
+}
+
+for (const [label, initial] of [
+  ["save", "before"],
+  ["create", null],
+] as const) {
+  test(`two FSA adapters sharing a vault serialize a ${label} revision check with its write`, async () => {
+    await withWebLocks(async () => {
+      const root = new FakeDir();
+      if (initial) (await root.getFileHandle("shared.md", { create: true })).text = initial;
+      const originalGet = root.getFileHandle.bind(root);
+      let checked = 0;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      root.getFileHandle = async (name, options) => {
+        if (name === "shared.md" && !options?.create) {
+          checked += 1;
+          if (checked === 2) release();
+          await held;
+        }
+        return originalGet(name, options);
+      };
+      const first = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "shared-vault");
+      const second = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle, "shared-vault");
+      const expected = initial ? contentRevision(initial) : "0";
+      const pending = [
+        first.writeText("shared.md", "first", expected),
+        second.writeText("shared.md", "second", expected),
+      ];
+      setTimeout(release, 25); // lets a correctly locked first writer finish without waiting for the second
+      const results = await Promise.allSettled(pending);
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    });
+  });
+}
+
+test("an outside edit to a move source after destination publication survives", async () => {
+  const root = new FakeDir();
+  const dir = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle);
+  await dir.writeText("from.md", "original");
+  const get = root.getFileHandle.bind(root);
+  root.getFileHandle = async (name, options) => {
+    const handle = await get(name, options);
+    if (name === "to.md" && options?.create) {
+      const create = handle.createWritable.bind(handle);
+      handle.createWritable = async () => {
+        const stream = await create();
+        return {
+          write: (bytes) => stream.write(bytes),
+          close: async () => {
+            await stream.close();
+            root.files.get("from.md")!.text = "outside edit";
+          },
+        };
+      };
+    }
+    return handle;
+  };
+  await expect(dir.move("from.md", "to.md")).rejects.toThrow(/revision conflict/);
+  expect(root.files.get("from.md")?.text).toBe("outside edit");
+  expect(root.files.get("to.md")?.text).toBe("original");
+});
+
 test("FSA managed rename moves a backup through a case-only rename", async () => {
   const dir = dirOf();
   await dir.writeBytes("Draft.docx", new Uint8Array([1]));

@@ -9,7 +9,8 @@
 // listing read a chat while the model backfill rewrote it, the whole notes
 // query rejected, and the window opened on "Untitled"). Every writer to the
 // folder — chats, notes, `.rotli/` — shares this one adapter, so the lock
-// lives here, per path, and never serializes unrelated files.
+// lives here, per path, and never serializes unrelated files. Web Locks extend
+// those turns across tabs for the same browser-bound vault identity.
 
 import { bytesRevision, type VaultDir, type VaultDirEntry, type VaultStat } from "../services/vaultDir";
 
@@ -20,7 +21,31 @@ function segments(path: string): string[] {
 export class FsaVaultDir implements VaultDir {
   private readonly turns = new Map<string, Promise<void>>();
 
-  constructor(readonly root: FileSystemDirectoryHandle) {}
+  constructor(
+    readonly root: FileSystemDirectoryHandle,
+    private readonly vaultId: string = crypto.randomUUID(),
+  ) {}
+
+  private async inWebLocks<T>(keys: string[], task: () => Promise<T>): Promise<T> {
+    const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+    if (!locks) return task(); // Chromium FSA normally has Web Locks; retain local turns if absent.
+    const names = keys.map((key) => `rotli-fsa:${this.vaultId}:${key}`).sort();
+    const acquire = (index: number): Promise<T> => {
+      const name = names[index];
+      if (!name) return task();
+      // Abort only a stalled acquisition. Once acquired, the callback contains
+      // file API work only and the browser releases its lock on tab closure.
+      const waiting = new AbortController();
+      const timer = setTimeout(() => waiting.abort(), 30_000);
+      return locks
+        .request(name, { signal: waiting.signal }, async () => {
+          clearTimeout(timer);
+          return acquire(index + 1);
+        })
+        .finally(() => clearTimeout(timer));
+    };
+    return acquire(0);
+  }
 
   /** Reserve every path before yielding; opposing moves cannot deadlock. */
   private async inTurns<T>(paths: string[], task: () => Promise<T>): Promise<T> {
@@ -34,7 +59,7 @@ export class FsaVaultDir implements VaultDir {
     for (const key of keys) this.turns.set(key, turn);
     await Promise.all(before);
     try {
-      return await task();
+      return await this.inWebLocks(keys, task);
     } finally {
       done();
       for (const key of keys) if (this.turns.get(key) === turn) this.turns.delete(key);
@@ -176,6 +201,8 @@ export class FsaVaultDir implements VaultDir {
     if (!handle) throw new Error(`not found: ${from}`);
     const bytes = await (await handle.getFile()).arrayBuffer();
     await this.writeFileUnlocked(to, bytes);
+    if ((await this.contentRevisionUnlocked(from)) !== bytesRevision(new Uint8Array(bytes)))
+      throw new Error(`revision conflict on ${from}: source changed during move; destination copy kept`);
     await this.removeUnlocked(from);
   }
 

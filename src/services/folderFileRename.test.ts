@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { renameFolderFile } from "./folderFileRename";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
 
@@ -34,4 +35,25 @@ test("a case-only rename carries its backup", async () => {
   const notes = new FolderNotesService(dir);
   expect(await notes.renameFile("Storage/Plan.docx", "PLAN")).toBe("Storage/PLAN.docx");
   expect(await dir.readBytes("Storage/PLAN.docx.bak")).toEqual(new Uint8Array([32]));
+});
+
+test("a racing destination takes the backup to the actual collided name", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("Storage/Old.docx", new Uint8Array([1]));
+  await dir.writeBytes("Storage/Old.docx.bak", new Uint8Array([2]));
+  const moved = await renameFolderFile(
+    dir,
+    "Storage/Old.docx",
+    "New",
+    "Storage/Old.docx",
+    async (from, to) => {
+      await dir.writeBytes(to, new Uint8Array([3]), "0");
+      const actual = "Storage/New (2).docx";
+      await dir.move(from, actual);
+      return actual;
+    },
+  );
+  expect(moved).toBe("Storage/New (2).docx");
+  expect(await dir.readBytes("Storage/New (2).docx.bak")).toEqual(new Uint8Array([2]));
+  expect(await dir.exists("Storage/New.docx.bak")).toBe(false);
 });

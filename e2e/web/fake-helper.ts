@@ -14,6 +14,7 @@ import { APP, vaultGate } from "./support";
 
 export const PORT = 43120;
 export const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
+const HELPER_MAX_REQUEST_BYTES = 24 * 1024 * 1024;
 
 interface Served {
   name: string;
@@ -171,6 +172,12 @@ export function fakeHelperVault() {
       if (state.refused || request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
         return route.fulfill({ status: 401, headers: cors, body: JSON.stringify({ error: "unauthorized" }) });
       }
+      if ((request.postDataBuffer()?.byteLength ?? 0) > HELPER_MAX_REQUEST_BYTES)
+        return route.fulfill({
+          status: 413,
+          headers: cors,
+          body: JSON.stringify({ error: "request too large" }),
+        });
       const { cmd, args } = request.postDataJSON() as { cmd: string; args: Record<string, unknown> };
       calls.push({ cmd, args: args ?? {} });
       if (cmd.startsWith("vault_") && cmd !== "vault_info" && cmd !== "vault_choose" && !state.served)

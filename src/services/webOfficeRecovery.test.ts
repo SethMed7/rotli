@@ -24,8 +24,79 @@ function storage() {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => void values.set(key, value),
     removeItem: (key: string) => void values.delete(key),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
   };
 }
+
+test("a draft added while replay is encoding remains journaled", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  writeOfficeDraft(store, "A", { ...draft(), sessionId: "tab-a" });
+  let resume!: () => void;
+  let started!: () => void;
+  const paused = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  const encoding = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const replay = replayOfficeDrafts(store, "A", dir, async (entry) => {
+    started();
+    await paused;
+    return encode(entry);
+  });
+  await encoding;
+  writeOfficeDraft(store, "A", { ...draft("storage/other.csv"), sessionId: "tab-b" });
+  resume();
+  await replay;
+  expect(readOfficeDrafts(store, "A").map((item) => item.fileId)).toEqual(["storage/other.csv"]);
+});
+
+test("two editing sessions for one file replay both edits as separate copies", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  writeOfficeDraft(store, "A", { ...draft(), sessionId: "tab-a" });
+  const second = new TextEncoder().encode("another edit");
+  writeOfficeDraft(store, "A", {
+    ...draft(),
+    sessionId: "tab-b",
+    snapshotBase64: b64(second),
+  });
+  expect(readOfficeDrafts(store, "A")).toHaveLength(2);
+  const result = await replayOfficeDrafts(store, "A", dir, encode);
+  expect(result.saved).toBe(1);
+  expect(result.keptAside).toHaveLength(1);
+  expect(await dir.readBytes("storage/plan.csv")).toEqual(edited);
+  expect(await dir.readBytes(result.keptAside[0]!)).toEqual(second);
+});
+
+test("draft tokens include the editing session so a save cannot clear another tab", () => {
+  const store = storage();
+  const a = writeOfficeDraft(store, "A", { ...draft(), sessionId: "tab-a" });
+  const b = writeOfficeDraft(store, "A", { ...draft(), sessionId: "tab-b" });
+  expect(a.token).toStartWith("tab-a:");
+  expect(b.token).toStartWith("tab-b:");
+  clearOfficeDraft(store, "A", draft().fileId, a.token);
+  expect(readOfficeDrafts(store, "A").map((item) => item.token)).toEqual([b.token]);
+});
+
+test("blocked storage enumeration leaves boot with no readable drafts", () => {
+  const blocked = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    key: () => null,
+    get length(): number {
+      throw new Error("storage blocked");
+    },
+  };
+  expect(readOfficeDrafts(blocked, "A")).toEqual([]);
+});
 
 const original = new TextEncoder().encode("before");
 const edited = new TextEncoder().encode("after");
@@ -110,7 +181,7 @@ test("an oversized snapshot is refused without dropping the last protected draft
       .protected,
   ).toBe(false);
   expect(readOfficeDrafts(store, "A")[0]?.snapshotBase64).toBe(draft().snapshotBase64);
-  expect(store.values.has(officeDraftKey("A"))).toBe(true);
+  expect([...store.values.keys()].some((key) => key.startsWith(`${officeDraftKey("A")}:draft:`))).toBe(true);
 });
 
 test("the combined vault budget refuses another entry and retains the first", () => {
@@ -121,6 +192,16 @@ test("the combined vault budget refuses another entry and retains the first", ()
   expect(writeOfficeDraft(store, "A", first).protected).toBe(true);
   expect(writeOfficeDraft(store, "A", second).protected).toBe(false);
   expect(readOfficeDrafts(store, "A").map((entry) => entry.fileId)).toEqual(["storage/one.csv"]);
+});
+
+test("competing drafts for the same file share the total vault budget", () => {
+  const store = storage();
+  const payload = "x".repeat(Math.floor(OFFICE_DRAFT_TOTAL_MAX_CHARS / 2));
+  const first = { ...draft(), sessionId: "tab-a", snapshotBase64: payload };
+  const second = { ...draft(), sessionId: "tab-b", snapshotBase64: payload };
+  expect(writeOfficeDraft(store, "A", first).protected).toBe(true);
+  expect(writeOfficeDraft(store, "A", second).protected).toBe(false);
+  expect(readOfficeDrafts(store, "A").map((item) => item.sessionId)).toEqual(["tab-a"]);
 });
 
 test("a real DOCX model survives refresh and remains a valid Word package", async () => {

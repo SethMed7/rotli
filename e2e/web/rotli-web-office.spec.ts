@@ -7,9 +7,9 @@
 
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import { connectThroughHelper, fakeHelperVault, withoutFolderApi } from "./fake-helper";
+import { connectThroughHelper, fakeHelperVault, PORT, TOKEN, withoutFolderApi } from "./fake-helper";
 import { budgetXlsx, letterDocx, packagePart, readXlsx } from "./office-fixtures";
-import { listOpfsFiles, plantOpfsBinary, readOpfsBase64, startWithVault } from "./support";
+import { APP, listOpfsFiles, plantOpfsBinary, readOpfsBase64, startWithVault } from "./support";
 
 interface Road {
   /** A seeded vault with `files` written behind the page, then refocused. */
@@ -71,6 +71,30 @@ const ROADS = [
   { name: "connected folder", make: (page: Page) => folderRoad(page) },
   { name: "Rotli Helper", make: (page: Page, context: BrowserContext) => helperRoad(page, context) },
 ] as const;
+
+test("the fake Helper refuses an office write above the real 24 MiB HTTP request cap", async ({
+  page,
+  context,
+}) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await page.goto(APP);
+  const result = await page.evaluate(
+    async ({ port, token }) => {
+      const response = await fetch(`http://127.0.0.1:${port}/rpc`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          cmd: "vault_write",
+          args: { path: "storage/too-large.xlsx", base64: "A".repeat(24 * 1024 * 1024) },
+        }),
+      });
+      return { status: response.status, body: await response.json() };
+    },
+    { port: PORT, token: TOKEN },
+  );
+  expect(result).toEqual({ status: 413, body: { error: "request too large" } });
+});
 
 async function openFromAssets(page: Page, path: string): Promise<void> {
   await page.locator(".sb-system .frow", { hasText: "Assets" }).click();

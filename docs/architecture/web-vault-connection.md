@@ -81,12 +81,23 @@ revision for reload and parked-edit comparisons. A save passes that revision
 to `VaultDir.writeBytes`, which compares it inside its write turn, and returns
 the revision of the newly saved bytes; `"0"` permits creation only when the
 path is missing. The first user save keeps a one-time `.bak` of the prior bytes.
+Chromium's folder road holds a vault-and-path keyed Web Lock across each
+revision check and write, so tabs using this browser's vault identity take
+turns. Moves acquire both path locks in sorted order through source removal.
+If Web Locks are unexpectedly unavailable, the adapter falls back to its
+per-instance turns; another tab can then race it.
 Rotli Helper reads up to 256 MiB per file, but its 24 MiB JSON request cap
 also counts base64 expansion on writes; an oversized save reports the Helper
 file limit to the page.
 A content-gated removal also compares exact bytes in its removal turn, so a
-rollback refuses a newer file it observes then. Chromium
-holds both source and destination turns for an entire move, through removal.
+rollback refuses a newer file it observes then. Chromium checks the source
+again after publishing a move destination; if it changed, both files remain
+and the move reports a conflict. An outside app can still write between a
+check and the filesystem operation: Web Locks cover Rotli tabs, not other
+processes, and the browser folder API has no atomic compare-and-swap.
+When an outside edit is detected, Rotli leaves both copies for the person to
+compare; a retry should reopen the current file first. An undetected write in
+that final gap remains a limitation of the browser folder road.
 An ungated removal of a missing path succeeds without changing anything;
 a content-gated removal of a missing or changed file is a revision conflict.
 The Helper adapter decides its removal gate after earlier queued writes and
@@ -154,8 +165,12 @@ window focus (only the chosen-folder road is), so a file another app adds there
 appears after a reload. Proof: `e2e/web/rotli-web-office.spec.ts` runs create,
 type, save, reload, unzip, formula/format/second-sheet and heading/bold/table
 preservation, the same-size outside-change conflict, and rename-with-backup on
-both roads; `rotli-web-privacy.spec.ts` proves editing both makes no
-off-origin request.
+the browser folder road and a binary-safe in-memory Helper fake. The fake
+enforces the Helper's 24 MiB JSON request cap. A Rust HTTP integration test in
+`src-tauri/src/helper_tests.rs` covers an office-sized binary round trip,
+content gates, and the real Helper's over-cap refusal; `helperClient.test.ts`
+covers the page's file-limit message. `rotli-web-privacy.spec.ts` proves
+editing both makes no off-origin request.
 
 Settings exposes `launchFeatures`' desktop-only `librarian` and `localModels`
 capabilities as one-line Mac availability states on web, without Run now,
@@ -219,8 +234,9 @@ Finder, default-app, PDF export, and macOS conversion actions are hidden there
 (gated by `PLATFORM`); a PDF or a legacy `.doc`/`.rtf`/`.odt` instead says to
 save a `.docx` copy in another app and open that copy here.
 
-The browser's read/check/write sequence is best effort, not a filesystem lock;
-the helper additionally enforces its server-side revision and lock. Multi-file
+The browser folder's Web Lock serializes Rotli tabs on the same origin; it
+cannot lock other apps writing the folder. The helper additionally enforces
+its server-side revision and lock. Multi-file
 view and protection operations cannot be made atomic by Chromium's folder API.
 
 ## Keys on the web
@@ -396,8 +412,12 @@ the editor's clean-buffer gate preserves unsaved typing.
   byte revision of its base. Boot re-encodes the conventional file and writes
   only through that revision gate; if the source changed, the draft becomes a
   free `unsaved copy` sibling and the changed original stays untouched. A
-  failed replay moves to a separate per-vault kept record, retried on boot;
-  only a confirmed save or confirmed conflict copy clears the draft. The
+  failed replay moves to a separate kept record for that editing session,
+  retried on boot; only a confirmed save or confirmed conflict copy clears
+  that exact draft. Each tab's editing session has its own key, so a second
+  tab editing the same file retains its draft; competing edits replay as
+  separate `unsaved copy` siblings. A draft added during asynchronous replay
+  remains queued. The
   journal permits 1,000,000 ASCII characters per entry and 1,200,000 in total
   for this vault. Even when each character counts as two UTF-16 bytes, that is
   under 2.4 MiB of the usual approximately 5 MiB origin quota, leaving room

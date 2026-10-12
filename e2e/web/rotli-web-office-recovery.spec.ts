@@ -30,7 +30,7 @@ async function startWithBinary(page: Page, path: string, base64: string): Promis
 async function hasOfficeJournal(page: Page): Promise<boolean> {
   return page.evaluate(() =>
     Object.keys(window.localStorage).some(
-      (key) => key.startsWith("rotli-office-unsaved:") && !key.endsWith(":kept"),
+      (key) => key.startsWith("rotli-office-unsaved:") && key.includes(":draft:"),
     ),
   );
 }

@@ -1,4 +1,5 @@
 use std::io::{Read as _, Write as _};
+use base64::Engine as _;
 
 use super::*;
 use crate::helper_args::DEFAULT_ORIGINS;
@@ -255,6 +256,49 @@ fn a_paired_page_writes_a_real_file_in_the_chosen_vault_and_nothing_without_the_
         &format!("{{\"cmd\":\"vault_read\",\"args\":{{\"path\":\"../../etc/passwd\",\"vaultId\":\"{id}\"}}}}"),
     );
     assert!(escape.starts_with("HTTP/1.1 400"), "{escape}");
+}
+
+/// Office packages travel as base64 through the same HTTP listener as the
+/// page, including its body limit and the served vault's content gate.
+#[test]
+fn an_office_sized_binary_round_trips_through_the_real_helper_http_path() {
+    let (port, token, service) = helper();
+    let folder = tempfile::TempDir::new().unwrap();
+    let id = service.vault.choose(folder.path()).unwrap().id;
+    let auth = format!("Authorization: Bearer {token}\r\n");
+    let bytes: Vec<u8> = (0..2 * 1024 * 1024).map(|index| (index % 251) as u8).collect();
+    let base64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let write = json!({"cmd":"vault_write","args":{
+        "path":"storage/budget.xlsx", "base64":base64, "expectedContent":"0", "vaultId":id
+    }}).to_string();
+    let written = rpc(port, &auth, &write);
+    assert!(written.starts_with("HTTP/1.1 200"), "{}", &written[..written.len().min(300)]);
+    assert_eq!(std::fs::read(folder.path().join("storage/budget.xlsx")).unwrap(), bytes);
+
+    let read = json!({"cmd":"vault_read","args":{
+        "path":"storage/budget.xlsx", "encoding":"base64", "vaultId":id
+    }}).to_string();
+    let answer = rpc(port, &auth, &read);
+    assert!(answer.starts_with("HTTP/1.1 200"), "{}", &answer[..answer.len().min(300)]);
+    let body = answer.split_once("\r\n\r\n").unwrap().1;
+    let value: Value = serde_json::from_str(body).unwrap();
+    assert_eq!(base64::engine::general_purpose::STANDARD.decode(value["result"].as_str().unwrap()).unwrap(), bytes);
+
+    let stale = rpc(port, &auth, &write);
+    assert!(stale.starts_with("HTTP/1.1 409"), "{}", &stale[..stale.len().min(300)]);
+    assert!(stale.contains("revision conflict"));
+    let current = crate::fsutil::revision(&bytes);
+    let replacement = json!({"cmd":"vault_write","args":{
+        "path":"storage/budget.xlsx", "base64":base64, "expectedContent":current, "vaultId":id
+    }}).to_string();
+    assert!(rpc(port, &auth, &replacement).starts_with("HTTP/1.1 200"));
+
+    let over_cap = raw_request(port, &format!(
+        "POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+        HELPER_MAX_REQUEST_BYTES + 1
+    ));
+    assert!(over_cap.starts_with("HTTP/1.1 413"), "{over_cap}");
+    assert!(over_cap.contains("request too large"), "{over_cap}");
 }
 
 /// Completion regressions call the dispatcher directly: no listener or CLI.
