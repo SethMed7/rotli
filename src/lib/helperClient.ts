@@ -82,7 +82,7 @@ export function helperUnreachable(error: unknown): boolean {
 }
 
 /** Terminal connection failures are distinct from ordinary file conflicts.
- * Only vault verbs can change the vault gate; a CLI tool's 404 is a tool error. */
+ * Vault verbs can change the vault gate; a CLI tool's 404 is a tool error. */
 export function helperConnectionError(error: unknown, cmd: string): boolean {
   if (!HELPER_VAULT_COMMANDS.has(cmd) || !(error instanceof HelperHttpError)) return false;
   return (

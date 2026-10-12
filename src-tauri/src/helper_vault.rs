@@ -118,9 +118,12 @@ impl ServedVault {
 
     /// Fresh disk truth before every remote completion, including external
     /// edits and config changes whose timestamps happen to be unchanged.
-    pub(crate) fn guard_completion(&self, prompt: &str) -> Result<(), Refusal> {
+    pub(crate) fn guard_completion(&self, prompt: &str, vault_id: Option<&str>) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
         let config = read_config(&self.config_path).ok_or_else(unavailable)?;
+        if vault_id.is_some_and(|bound| bound != config.id) {
+            return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+        }
         let quoted = read_verbs::refresh_secure_ledger(&config.root, Some(prompt)).map_err(|_| unavailable())?;
         let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
         *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config));

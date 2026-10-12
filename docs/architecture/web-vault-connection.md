@@ -19,8 +19,10 @@ Decided by the owner on 2026-09-22; the history is in
    names another host, and `e2e/web/rotli-web-privacy.spec.ts` proves the app
    never asks. The one outbound path is a chat the user starts, which runs the
    user's own AI CLI through the helper; secure notes are refused before it
-   runs (`blocked_for_remote`). Before every completion the helper re-reads
-   its vault config and refreshes the served vault's secure-prose ledger,
+   runs (`blocked_for_remote`). Before every completion on the Helper vault
+   road, the page sends its bound vault id. The Helper checks that id before
+   starting a provider, then re-reads its vault config and refreshes the
+   served vault's secure-prose ledger,
    including helper writes and external edits. An unavailable vault or a
    failed scan (an unreadable or oversized Markdown file) refuses the
    completion before a provider process starts; a note that isn't UTF-8 is
@@ -61,7 +63,9 @@ identical above it. `lib/helperVaultDir.test.ts` runs the port's contract
 against the in-memory reference and the helper adapter.
 Note and `.rotli/` manifest reads derive their revision from the exact text
 returned. Their writes present that content revision to the folder adapter,
-which checks it in the write turn; a concurrent edit is a conflict. Chromium
+which checks it in the write turn; a concurrent edit is a conflict. A
+content-gated removal also compares exact bytes in its removal turn, so a
+rollback refuses a newer file it observes then. Chromium
 holds both source and destination turns for an entire move, through removal.
 Secure note relocation adds the destination to `.gitignore` before moving and
 removes the source exclusion after the move succeeds.
@@ -160,8 +164,9 @@ out of the note index. File summaries never read binary contents or join the
 note text index; filename search uses their names. Local file text, bytes, and
 stat come from the connected vault. Media panes own temporary blob URLs and
 revoke them on unmount; cached thumbnail consumers use data URLs. HTML keeps
-its sandbox and no-egress policy. CSV and other editable text-file saves pass
-the observed content revision into the adapter's write turn. Binary saves pass
+its sandbox and no-egress policy. CSV and other editable text-file saves refuse
+source bytes that are not valid UTF-8 before writing a backup or saving, and
+pass the observed content revision into the adapter's write turn. Binary saves pass
 the revision of their observed bytes through the same gate. CSV saves preserve a
 first-save backup. DOCX and binary workbooks list as files but open to an honest
 unsupported state on the web. Finder, default-app, and macOS conversion actions
@@ -215,9 +220,11 @@ the editor's clean-buffer gate preserves unsaved typing.
   contains the helper's own directory (`~/.rotli-helper`, e.g. the home
   folder) is refused, so the page can never rewrite the config that names the
   root or read the pairing token.
-- **Bound to one vault per page.** Every verb carries the `vaultId` the page
-  bound to; a helper since pointed at another folder answers 409 "vault
+- **Bound to one vault per page.** Every vault verb and every completion from a
+  page on the Helper vault road carries the `vaultId` the page bound to; a helper
+  since pointed at another folder answers 409 "vault
   changed" before touching disk, and the page re-probes into setup.
+  A page on the browser folder road sends no completion `vaultId`.
 - **Atomic, locked, revision-gated, no-clobber.** Writes use
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's

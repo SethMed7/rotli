@@ -5,7 +5,7 @@ import { readVersionedFile, textRevision, writeVersionedFile } from "./folderFil
 import { updateGitExclusions } from "./folderMemexNotes";
 import { FolderNotesService } from "./folderNotes";
 import type { MainNode } from "./mainTree";
-import type { VaultDir } from "./vaultDir";
+import { contentRevision, type VaultDir } from "./vaultDir";
 import { VIEW_FOLDER_FORBIDDEN_CHARS, viewNameError, type ViewsManifest } from "./viewTree";
 
 function membership(raw: string): Map<string, string> {
@@ -141,7 +141,7 @@ export async function writeFolderViews(
       try {
         const current = await readVersionedFile(dir, ".gitignore");
         if (current.contents === ignoreRollback.applied) {
-          if (ignoreRollback.before === null) await dir.remove(".gitignore");
+          if (ignoreRollback.before === null) await dir.remove(".gitignore", current.revision);
           else await writeVersionedFile(dir, ".gitignore", ignoreRollback.before, current.revision);
         }
       } catch {
@@ -161,7 +161,7 @@ export async function writeFolderViews(
       const current = await readVersionedFile(dir, path);
       if (current.contents === contents) {
         if (previous) await writeVersionedFile(dir, path, previous, current.revision);
-        else await dir.remove(path);
+        else await dir.remove(path, contentRevision(contents));
       }
     }
     throw error;

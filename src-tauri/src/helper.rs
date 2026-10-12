@@ -378,7 +378,7 @@ impl Helper {
         let Some(_held) = reserve(&self.in_flight, &request_id) else {
             return Err((409, format!("a run is already in flight for \"{request_id}\"")));
         };
-        self.vault.guard_completion(&prompt)?;
+        self.vault.guard_completion(&prompt, arguments.get("vaultId").and_then(Value::as_str))?;
         let effort = arguments.get("reasoningEffort").and_then(Value::as_str);
         let tier = arguments.get("serviceTier").and_then(Value::as_str);
         let timeout = arguments.get("timeoutMs").and_then(Value::as_u64);

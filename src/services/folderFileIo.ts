@@ -115,7 +115,14 @@ export async function folderWriteFileBytes(
   const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
   const textLike = ["csv", "tsv", "txt", "html", "htm"].includes(extOf(path));
   const observedBytes = await dir.readBytes(path);
-  const observedText = textLike ? new TextDecoder().decode(observedBytes) : null;
+  let observedText: string | null = null;
+  if (textLike) {
+    try {
+      observedText = new TextDecoder("utf-8", { fatal: true }).decode(observedBytes);
+    } catch {
+      throw new Error("This text file is not valid UTF-8; Rotli cannot save it without changing its bytes.");
+    }
+  }
   if (backup && !(await dir.exists(`${path}.bak`))) await dir.writeBytes(`${path}.bak`, observedBytes);
   if ((await fileRevision(dir, path)) !== revision)
     throw new Error("revision conflict: file changed during save");

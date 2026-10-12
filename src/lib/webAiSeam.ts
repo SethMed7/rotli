@@ -15,6 +15,16 @@ export function currentWebAiBridge(): WebAiBridge | null {
   return webAiBridge;
 }
 
+/** The Helper vault this page opened. Another tab changing the device binding
+ * cannot retarget a completion from an already open chat. */
+let webHelperVaultId: string | null = null;
+export function registerWebHelperVaultId(vaultId: string | null): void {
+  webHelperVaultId = vaultId;
+}
+export function currentWebHelperVaultId(): string | null {
+  return webHelperVaultId;
+}
+
 /** The model-facing view of the browser-side vault, with the secure-note law
  * applied by services/webAiCorpus (Rust's job in the app). The wire shapes
  * are lib/tauri's; this seam stays shape-agnostic so it never imports it. */

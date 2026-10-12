@@ -21,6 +21,7 @@ import {
 } from "../lib/helperClient";
 import type { HelperLink } from "../lib/helperPairing";
 import { HelperVaultDir, type PendingOp } from "../lib/helperVaultDir";
+import { registerWebHelperVaultId } from "../lib/webAiSeam";
 import { type VaultConnection, useVaultConnection } from "../state/vaultConnection";
 import { type VaultDir, freeSiblingPath } from "./vaultDir";
 import {
@@ -87,6 +88,7 @@ export async function clearHelperBinding(): Promise<void> {
  * untouched; the browser forgets which folder it opens (and reloads). */
 export async function leaveVault(): Promise<void> {
   await clearHelperBinding();
+  registerWebHelperVaultId(null);
   await disconnectFolderVault();
 }
 
@@ -162,6 +164,7 @@ export interface ResolvedVault {
 export async function resolveVault(link: HelperLink | null): Promise<ResolvedVault> {
   const support = browserFolderSupportSync();
   const binding = await loadHelperBinding();
+  registerWebHelperVaultId(binding?.vaultId ?? null);
   if (binding || support.kind !== "live") {
     const unsupported = binding ? null : unsupportedBrowser(support, navigator.userAgent);
     if (unsupported) return { connection: { status: "unsupported", browser: unsupported }, dir: null };

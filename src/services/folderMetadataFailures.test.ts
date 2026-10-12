@@ -128,6 +128,18 @@ test("a file save refuses an external edit inside the adapter write turn", async
   }
 });
 
+test("a CSV save refuses invalid UTF-8 without changing its original bytes", async () => {
+  const dir = new MemoryVaultDir();
+  const original = new Uint8Array([0x4e, 0x61, 0x6d, 0x65, 0x0a, 0x63, 0x61, 0x66, 0xe9, 0x0a]);
+  await dir.writeBytes("rows.csv", original);
+  const opened = (await folderFileStat(dir, "rows.csv"))!;
+  await expect(
+    folderWriteFileBytes(dir, "rows.csv", btoa("Name\nupdated\n"), true, opened.revision),
+  ).rejects.toThrow(/UTF-8/);
+  expect(await dir.readBytes("rows.csv")).toEqual(original);
+  expect(await dir.exists("rows.csv.bak")).toBe(false);
+});
+
 test("a failed view manifest restores its gitignore edit unless a newer edit won", async () => {
   for (const external of [false, true]) {
     const dir = new MemoryVaultDir();
@@ -151,6 +163,26 @@ test("a failed view manifest restores its gitignore edit unless a newer edit won
         : originalIgnore,
     );
   }
+});
+
+test("a created gitignore survives an external edit between rollback read and remove", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  await dir.mkdir(".git");
+  const write = dir.writeText.bind(dir);
+  dir.writeText = async (path, contents, expected) => {
+    if (path === ".rotli/views.json") throw new Error("manifest denied");
+    await write(path, contents, expected);
+  };
+  const remove = dir.remove.bind(dir);
+  dir.remove = async (path, expected) => {
+    if (path === ".gitignore") await write(path, `${await dir.readText(path)}external-rule\n`);
+    await remove(path, expected);
+  };
+  await expect(
+    writeFolderViews(dir, '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"}]}]}', "0"),
+  ).rejects.toThrow("manifest denied");
+  expect(await dir.readText(".gitignore")).toContain("external-rule\n");
 });
 
 test("detected secrets refuse secure removal through the explicit and raw lanes", async () => {

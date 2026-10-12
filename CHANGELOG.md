@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rotli Web keeps Mermaid diagrams private.** Diagrams with images, links,
   or configuration that could load a URL are refused before rendering,
   with an explanation beside the source.
-- **A Helper token reset or disconnected vault returns to setup.** Unsaved
+- **A Helper token reset, changed vault, or disconnected vault returns to setup.**
+  Chat requests from a Helper vault carry its identity before a provider starts. Unsaved
   typing and pending writes stay on this computer for reconnection; ordinary
   file revision conflicts still report a file error.
 - **Web controls describe what can actually run.** Search omits native window
@@ -59,10 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and refuse stale revisions or reserved-field changes. Secure notes move to
   their protected home with matching git exclusions.
 - **Web views and note names stay portable.** Named views synchronize Markdown
-  `view_tag` metadata, failed view writes restore their own git exclusions, and
+  `view_tag` metadata, failed view writes restore their own git exclusions without
+  deleting a newer external edit, and
   title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
-  search. Local media and HTML open from the vault; CSV edits save with an
+  search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8
+  source bytes and save with an
   adapter-checked content revision. Office files explain their web limitation, and native-only file actions
   stay hidden.
 - **Rotli Helper refuses secure prose from large vaults.** Prompt checks include

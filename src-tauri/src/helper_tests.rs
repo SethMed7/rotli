@@ -277,6 +277,33 @@ fn completion_refusal(helper: &Helper, prompt: &str) -> (u16, String) {
 }
 
 #[test]
+fn helper_completion_checks_the_page_vault_before_starting_a_provider() {
+    let (_folder, config, helper) = completion_helper();
+    let original_id = helper.vault.current().unwrap().id;
+    let other = tempfile::TempDir::new().unwrap();
+    crate::helper_vault::choose_config(&config.path().join(CONFIG_FILE), other.path()).unwrap();
+    let args = |vault_id: Option<&str>| {
+        let mut args = json!({
+            "requestId": "bound-vault-test", "provider": "definitely-not-a-cli",
+            "model": "synthetic", "prompt": "ordinary synthetic prompt",
+        });
+        if let Some(id) = vault_id { args["vaultId"] = json!(id); }
+        args
+    };
+    let mismatched = helper.dispatch("cli_complete", &args(Some(&original_id))).unwrap_err();
+    assert_eq!(mismatched.0, 409);
+    assert!(mismatched.1.starts_with("vault changed"));
+    assert!(helper.children.lock().unwrap().is_empty());
+    assert!(helper.in_flight.lock().unwrap().is_empty());
+
+    let served_id = helper.vault.current().unwrap().id;
+    for supplied in [Some(served_id.as_str()), None] {
+        let result = helper.dispatch("cli_complete", &args(supplied)).unwrap_err();
+        assert_ne!(result.0, 409, "a matched or absent vault id reaches provider validation");
+    }
+}
+
+#[test]
 fn helper_regression_completion_refreshes_notes_written_through_the_vault() {
     let (_folder, _config, helper) = completion_helper();
     let body = "Synthetic amber observatory postpones imaginary telescope delivery until winter.";

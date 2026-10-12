@@ -5,9 +5,11 @@
 import { deviceVaultStore } from "../lib/browserVault";
 import { HelperHttpError, helperHealth, helperRpc } from "../lib/helperClient";
 import { HELPER_COMMANDS, type HelperLink, pairingFromHash, parsePairingCode } from "../lib/helperPairing";
-import { registerWebAiBridge } from "../lib/webAiSeam";
+import { currentWebHelperVaultId, registerWebAiBridge } from "../lib/webAiSeam";
 import { showFileNotice } from "../state/fileNotice";
 import { type HelperProblem, useHelperLink } from "../state/helperLink";
+import { useVaultConnection } from "../state/vaultConnection";
+import { helperConnection, loadHelperBinding, probeHelper } from "./vaultBinding";
 
 const LINK_KEY = "helper-link";
 
@@ -16,8 +18,8 @@ const LINK_KEY = "helper-link";
 // link lives in this browser's own database whatever the vault mode.
 const device = deviceVaultStore;
 
-function bridgeFor(link: HelperLink) {
-  return (cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> => {
+export function bridgeFor(link: HelperLink) {
+  return async (cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> => {
     if (!HELPER_COMMANDS.has(cmd)) {
       return Promise.reject(new Error(`${cmd}: not available through Rotli Helper`));
     }
@@ -27,7 +29,12 @@ function bridgeFor(link: HelperLink) {
     if (cmd === "cli_complete" && Array.isArray(images) && images.length > 0) {
       return Promise.reject(new Error("Images are not sent through Rotli Helper in this release."));
     }
-    return helperRpc(link, cmd, args ?? {}).then(
+    let requestArgs = args ?? {};
+    if (cmd === "cli_complete") {
+      const vaultId = currentWebHelperVaultId();
+      if (vaultId) requestArgs = { ...requestArgs, vaultId };
+    }
+    return helperRpc(link, cmd, requestArgs).then(
       (result) => {
         // a call that lands clears whatever was wrong
         const state = useHelperLink.getState();
@@ -35,8 +42,8 @@ function bridgeFor(link: HelperLink) {
         if (state.reachable !== true) state.setReachable(true);
         return result;
       },
-      (error: unknown) => {
-        noteFailure(error);
+      async (error: unknown) => {
+        await noteFailure(error, link, cmd);
         throw error;
       },
     );
@@ -46,10 +53,22 @@ function bridgeFor(link: HelperLink) {
 /** Record what a failed call says about the pairing: a 401 is a refused
  * token, a network failure is an unreachable helper; a tool's own error is
  * neither and leaves the pairing alone. */
-function noteFailure(error: unknown): void {
+async function noteFailure(error: unknown, link: HelperLink, cmd: string): Promise<void> {
   const state = useHelperLink.getState();
   if (error instanceof HelperHttpError) {
     if (error.status === 401) state.setProblem("refused");
+    if (cmd === "cli_complete" && error.status === 409 && /^vault changed\b/i.test(error.message)) {
+      const boundId = currentWebHelperVaultId();
+      const connection = useVaultConnection.getState().connection;
+      const binding = boundId
+        ? {
+            kind: "helper" as const,
+            vaultId: boundId,
+            vaultName: connection.status === "connected" ? connection.name : boundId,
+          }
+        : await loadHelperBinding();
+      useVaultConnection.getState().setConnection(helperConnection(binding, await probeHelper(link)));
+    }
     return;
   }
   if (error instanceof TypeError) {

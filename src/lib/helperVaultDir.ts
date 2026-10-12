@@ -375,20 +375,28 @@ export class HelperVaultDir implements VaultDir {
 
   /** A file is removed only if it is still the version this tab saw — a note
    * the desktop app changed meanwhile is kept (409). Folders aren't gated. */
-  async remove(path: string): Promise<void> {
+  async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalize(path);
     // decide against what is really there, never against an empty cache
     if (!this.entries.has(key)) await this.fresh();
     const entry = this.entries.get(key);
-    if (!entry) return; // nothing there: the port's "missing is a no-op"
+    if (!entry) {
+      if (expectedContent !== undefined && expectedContent !== "0")
+        throw new Error(`revision conflict on ${key}`);
+      return; // nothing there: the port's "missing is a no-op"
+    }
+    if (entry.kind !== "file" && expectedContent !== undefined && expectedContent !== "0")
+      throw new Error(`revision conflict on ${key}`);
     const base = entry.kind === "file" ? revisionOf(entry) : "";
     const seen = this.texts.get(key);
     const gate =
       entry.kind !== "file"
         ? { directory: true } // a folder removal never deletes a file that took its name
-        : seen && seen.revision === base
-          ? { expectedContent: contentRevision(seen.text) }
-          : { expectedRevision: base };
+        : expectedContent !== undefined
+          ? { expectedContent }
+          : seen && seen.revision === base
+            ? { expectedContent: contentRevision(seen.text) }
+            : { expectedRevision: base };
     await this.mutate({ kind: "remove", path: key, base }, () =>
       this.call("vault_remove", { path: key, ...gate }).catch((error: unknown) => {
         if (isConflict(error)) this.invalidate();

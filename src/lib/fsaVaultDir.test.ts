@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { contentRevision } from "../services/vaultDir";
 import { FsaVaultDir } from "./fsaVaultDir";
 
 // A fake of the one Chromium behaviour that matters: while a writable stream
@@ -64,6 +65,22 @@ class FakeDir {
 }
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
+
+test("remove checks expected content after an external edit in its removal turn", async () => {
+  const root = new FakeDir();
+  const dir = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle);
+  await dir.writeText(".gitignore", "created by Rotli\n");
+  const get = root.getFileHandle.bind(root);
+  root.getFileHandle = async (name, options) => {
+    const handle = await get(name, options);
+    if (name === ".gitignore") handle.text = "edited outside Rotli\n";
+    return handle;
+  };
+  await expect(dir.remove(".gitignore", contentRevision("created by Rotli\n"))).rejects.toThrow(
+    /revision conflict/,
+  );
+  expect(root.files.get(".gitignore")?.text).toBe("edited outside Rotli\n");
+});
 
 describe("FsaVaultDir takes turns per path", () => {
   test("a read that starts mid-write waits for the swap and sees the new text", async () => {

@@ -80,7 +80,7 @@ function fakeHelper(disk = new MemoryVaultDir()) {
             throw Object.assign(new Error("revision conflict: the file changed on disk"), { status: 409 });
           }
         }
-        return disk.remove(path);
+        return disk.remove(path, typeof args.expectedContent === "string" ? args.expectedContent : undefined);
       }
       default:
         throw new Error(`unknown ${cmd}`);
@@ -214,6 +214,14 @@ describe("never overwriting another writer", () => {
     await fake.disk.writeText("wiki/a.md", "edited in the Mac app");
     await expect(fake.dir.remove("wiki/a.md")).rejects.toThrow(/revision conflict/);
     expect(await fake.disk.readText("wiki/a.md")).toBe("edited in the Mac app");
+  });
+
+  test("an explicit content gate protects rollback removes", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText(".gitignore", "ours");
+    await fake.disk.writeText(".gitignore", "external");
+    await expect(fake.dir.remove(".gitignore", contentRevision("ours"))).rejects.toThrow(/revision conflict/);
+    expect(await fake.disk.readText(".gitignore")).toBe("external");
   });
 
   test("rapid saves of one note each land: every write is gated on the one before it", async () => {
