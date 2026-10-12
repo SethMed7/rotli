@@ -1,3 +1,4 @@
+import { bytesRevision } from "../lib/contentRevision";
 import { userFileName } from "../lib/fileKind";
 import { blankDocumentDraft, type DocumentDraft, type EditableDocument } from "./model";
 import type {
@@ -97,8 +98,12 @@ export async function editDocument<Source>(
   if (stat && stat.len > dependencies.maxBytes) return { kind: "too-large" };
   if (!stat) throw new Error("The document is unavailable.");
   const base64 = await dependencies.reader.readBase64(fileId, dependencies.maxBytes + 1);
+  const openedBytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  if (openedBytes.length > dependencies.maxBytes) return { kind: "too-large" };
   const decoded = await dependencies.codec.decode(base64, fileId);
-  let revision = stat.revision;
+  // The stat is for the size gate; the editing token belongs to the exact
+  // package read below, even if another writer changed it after the stat.
+  let revision = bytesRevision(openedBytes);
   return {
     kind: "ready",
     document: decoded.document,

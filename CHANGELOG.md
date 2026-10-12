@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web protects file edits made elsewhere.** A CSV or other editable
+  file changed outside Rotli is never overwritten by a stale save, even when
+  its size and modified time stay the same. Oversized saves through Rotli
+  Helper now explain the file limit.
 - **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
   a save uses the saved version; a delete after an external removal is a no-op
   unless it carried a content gate. Binary saves also recover when the Helper

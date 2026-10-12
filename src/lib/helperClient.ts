@@ -62,11 +62,13 @@ export async function helperRpc<T>(
   }
   if (!response.ok) {
     const message =
-      body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
-        ? (body as { error: string }).error
-        : response.status === 401
-          ? "Rotli Helper refused the pairing token — pair again."
-          : `Rotli Helper answered ${response.status}`;
+      response.status === 413 && cmd === "vault_write"
+        ? "file too large for Rotli Helper (24 MiB request limit; encoded files need more space)"
+        : body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
+          ? (body as { error: string }).error
+          : response.status === 401
+            ? "Rotli Helper refused the pairing token — pair again."
+            : `Rotli Helper answered ${response.status}`;
     throw new HelperHttpError(message, response.status);
   }
   if (body && typeof body === "object" && "result" in body) return (body as { result: T }).result;

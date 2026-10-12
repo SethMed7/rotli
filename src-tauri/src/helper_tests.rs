@@ -170,12 +170,17 @@ fn a_completion_with_images_is_refused_before_anything_is_staged() {
 #[test]
 fn an_oversized_body_is_refused_on_the_header() {
     let (port, token, _) = helper();
-    // 26 MB > the 24 MiB cap, and no body follows: the length alone ends it
+    // A 20 MiB workbook becomes 27,962,028 base64 bytes before JSON overhead,
+    // exceeding the 24 MiB request cap. The header alone must refuse it.
+    let workbook_bytes: usize = 20 * 1024 * 1024;
+    let encoded_bytes = workbook_bytes.div_ceil(3) * 4;
+    assert!(encoded_bytes > HELPER_MAX_REQUEST_BYTES);
     let answer = raw_request(
         port,
-        &format!("POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: 26000000\r\n\r\n"),
+        &format!("POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: {encoded_bytes}\r\n\r\n"),
     );
     assert!(answer.starts_with("HTTP/1.1 413"), "{answer}");
+    assert!(answer.contains("request too large"), "{answer}");
 }
 
 #[test]

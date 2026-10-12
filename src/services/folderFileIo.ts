@@ -17,10 +17,24 @@ export function assertVaultFilePath(path: string): void {
     throw new Error(`not a vault file: ${path}`);
 }
 
-export async function fileRevision(dir: VaultDir, path: string): Promise<string> {
-  const stat = await dir.stat(path);
-  if (!stat) throw new Error(`no such file: ${path}`);
-  return `${stat.lastModified}:${stat.size}`;
+async function assertSurfacedPath(dir: VaultDir, path: string): Promise<boolean> {
+  assertVaultFilePath(path);
+  const memex = await vaultIsMemex(dir);
+  if (
+    memex &&
+    !["wiki", "chats", "archive", "trash", "Archive", "Trash", "storage"].some((root) => under(path, root))
+  )
+    throw new Error("file is outside the surfaced vault lanes");
+  return memex;
+}
+
+function fileWritable(memex: boolean, path: string): boolean {
+  return (
+    !memex ||
+    !under(path, "storage") ||
+    under(path, "storage/excalidraw") ||
+    STORAGE_OFFICE_EXTS.some((ext) => ext === extOf(path))
+  );
 }
 
 /** A text file and the revision of exactly the bytes read — never a stat
@@ -57,25 +71,13 @@ export async function writeVersionedFile(
 
 /** Rust's surfaced + storage_office_editable gates. Binaries never become notes. */
 export async function folderFileStat(dir: VaultDir, path: string): Promise<FileStat | null> {
-  assertVaultFilePath(path);
-  const memex = await vaultIsMemex(dir);
-  if (
-    memex &&
-    !["wiki", "chats", "archive", "trash", "Archive", "Trash", "storage"].some((root) => under(path, root))
-  )
-    throw new Error("file is outside the surfaced vault lanes");
+  const memex = await assertSurfacedPath(dir, path);
   const stat = await dir.stat(path);
   if (!stat) return null;
-  const storage = under(path, "storage");
-  const writable =
-    !memex ||
-    !storage ||
-    under(path, "storage/excalidraw") ||
-    STORAGE_OFFICE_EXTS.some((ext) => ext === extOf(path));
   return {
     len: stat.size,
-    revision: `${stat.lastModified}:${stat.size}`,
-    writable,
+    revision: bytesRevision(await dir.readBytes(path)),
+    writable: fileWritable(memex, path),
     lifecycleMutable: false,
     lifecycleReason: "File lifecycle actions are unavailable on the web",
     createdMs: null,
@@ -84,17 +86,22 @@ export async function folderFileStat(dir: VaultDir, path: string): Promise<FileS
 }
 
 export async function folderFileText(dir: VaultDir, path: string, maxBytes = 2_000_000): Promise<string> {
-  const stat = await folderFileStat(dir, path);
+  await assertSurfacedPath(dir, path);
+  const stat = await dir.stat(path);
   if (!stat) throw new Error(`no such file: ${path}`);
-  if (stat.len > maxBytes) throw new Error("file is too large to read safely");
-  return dir.readText(path);
+  if (stat.size > maxBytes) throw new Error("file is too large to read safely");
+  const bytes = await dir.readBytes(path);
+  if (bytes.length > maxBytes) throw new Error("file is too large to read safely");
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 export async function folderFileBytes(dir: VaultDir, path: string, maxBytes = 8_000_000): Promise<string> {
-  const stat = await folderFileStat(dir, path);
+  await assertSurfacedPath(dir, path);
+  const stat = await dir.stat(path);
   if (!stat) throw new Error(`no such file: ${path}`);
-  if (stat.len > maxBytes) throw new Error("file is too large to read safely");
+  if (stat.size > maxBytes) throw new Error("file is too large to read safely");
   const bytes = await dir.readBytes(path);
+  if (bytes.length > maxBytes) throw new Error("file is too large to read safely");
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000)
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -108,32 +115,34 @@ export async function folderWriteFileBytes(
   backup: boolean,
   revision: string,
 ): Promise<string> {
+  const memex = await assertSurfacedPath(dir, path);
   const stat = await folderFileStat(dir, path);
-  if (!stat?.writable) throw new Error("file is not writable");
-  if (!revision || stat.revision !== revision)
+  if (!fileWritable(memex, path)) throw new Error("file is not writable");
+  if (!revision || (stat ? stat.revision !== revision : revision !== "0"))
     throw new Error("revision conflict: file changed after it was opened");
   const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
   const textLike = ["csv", "tsv", "txt", "html", "htm"].includes(extOf(path));
-  const observedBytes = await dir.readBytes(path);
-  let observedText: string | null = null;
+  const observedBytes = stat ? await dir.readBytes(path) : null;
   if (textLike) {
     try {
-      observedText = new TextDecoder("utf-8", { fatal: true }).decode(observedBytes);
+      if (observedBytes) new TextDecoder("utf-8", { fatal: true }).decode(observedBytes);
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     } catch {
       throw new Error("This text file is not valid UTF-8; Rotli cannot save it without changing its bytes.");
     }
   }
-  if (backup && !(await dir.exists(`${path}.bak`))) await dir.writeBytes(`${path}.bak`, observedBytes);
-  if ((await fileRevision(dir, path)) !== revision)
+  if (observedBytes && bytesRevision(observedBytes) !== revision)
     throw new Error("revision conflict: file changed during save");
-  if (textLike)
-    await dir.writeText(
-      path,
-      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-      contentRevision(observedText!),
-    );
-  else await dir.writeBytes(path, bytes, bytesRevision(observedBytes));
-  return fileRevision(dir, path);
+  if (backup && observedBytes && !(await dir.exists(`${path}.bak`)))
+    await dir.writeBytes(`${path}.bak`, observedBytes, "0");
+  try {
+    await dir.writeBytes(path, bytes, revision);
+  } catch (error) {
+    if (error instanceof Error && /revision conflict/i.test(error.message))
+      throw new Error("revision conflict: file changed after it was opened");
+    throw error;
+  }
+  return bytesRevision(bytes);
 }
 
 export async function folderAssetUrl(dir: VaultDir, path: string, temporary: boolean): Promise<string> {

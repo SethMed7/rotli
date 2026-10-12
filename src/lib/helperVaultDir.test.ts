@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { memoryBackedRoad, testByteEditorRoad } from "../services/folderFileIo.test";
 import { MemoryVaultDir, bytesRevision, type VaultDir } from "../services/vaultDir";
 import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 
@@ -121,6 +122,11 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     },
   };
 }
+
+testByteEditorRoad("Helper", () => {
+  const { dir, disk } = fakeHelper();
+  return memoryBackedRoad(dir, disk);
+});
 
 // The same cases the port promises, run against the reference and the adapter.
 const contract: Array<[string, () => VaultDir]> = [

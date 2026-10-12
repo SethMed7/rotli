@@ -35,6 +35,7 @@ import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
+import { bytesRevision } from "./contentRevision";
 import { VIDEO_EXTS } from "./fileKind";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
@@ -44,6 +45,10 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("byteRevisionVector", () => {
+    const { bytes, revision } = entries.byteRevisionVector.value;
+    expect(bytesRevision(new Uint8Array(bytes))).toBe(revision);
+  });
   test("rawImmutableKeys", () => {
     expect<string[]>([...RAW_IMMUTABLE_KEYS]).toEqual(entries.rawImmutableKeys.value);
   });

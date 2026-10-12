@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { testByteEditorRoad } from "../services/folderFileIo.test";
 import { contentRevision } from "../services/vaultDir";
 import { FsaVaultDir } from "./fsaVaultDir";
 
@@ -71,6 +72,19 @@ class FakeDir {
 }
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
+
+testByteEditorRoad("FSA", () => {
+  const root = new FakeDir();
+  return {
+    dir: new FsaVaultDir(root as unknown as FileSystemDirectoryHandle),
+    externalBytes: async (path, bytes) => {
+      root.files.get(path)!.bytes = new Uint8Array(bytes);
+    },
+    externalText: async (path, text) => {
+      root.files.get(path)!.text = text;
+    },
+  };
+});
 
 test("writeText with stale expected content preserves the file bytes", async () => {
   const dir = dirOf();

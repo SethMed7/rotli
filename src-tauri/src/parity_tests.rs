@@ -24,6 +24,21 @@ fn string_list(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn byte_revision_vector_matches_fixture() {
+    let vector = entry("byteRevisionVector");
+    let bytes: Vec<u8> = vector["bytes"]
+        .as_array()
+        .expect("byte revision vector has bytes")
+        .iter()
+        .map(|byte| byte.as_u64().expect("byte is unsigned") as u8)
+        .collect();
+    assert_eq!(
+        crate::fsutil::revision(&bytes),
+        vector["revision"].as_str().expect("vector has revision")
+    );
+}
+
+#[test]
 fn document_edit_limits_match_fixture() {
     assert_eq!(
         entry("documentEditMaxActions").as_u64(),

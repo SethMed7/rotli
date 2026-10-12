@@ -5,6 +5,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { SaveStatus, useAutosave } from "../components/autosave";
+import { bytesRevision, contentRevision } from "../lib/contentRevision";
 import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
@@ -165,8 +166,8 @@ export default function SheetEditor({
           setDirty(true);
           autosave.edited();
         } else if (mode === "csv") {
-          revisionRef.current = stat.revision;
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
+          revisionRef.current = contentRevision(csv);
           if (new TextEncoder().encode(csv).length > SHEET_EDIT_MAX_BYTES) {
             throw new Error("this file is too large to edit in rotli — opening read-only is fine");
           }
@@ -176,9 +177,9 @@ export default function SheetEditor({
           model = workbookToModel(wb, fileId);
           idMapRef.current = buildSheetIdMap(wb, model);
         } else {
-          revisionRef.current = stat.revision;
           const b64 = await corpusFileBytes(fileId, SHEET_EDIT_MAX_BYTES + 1);
           const bytes = bytesFromB64(b64);
+          revisionRef.current = bytesRevision(bytes);
           if (bytes.length > SHEET_EDIT_MAX_BYTES) {
             throw new Error("this file is too large to edit in rotli — opening read-only is fine");
           }

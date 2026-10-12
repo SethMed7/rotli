@@ -20,6 +20,7 @@ import {
   fileAssetUrl,
 } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
+import { contentRevision } from "./vaultDir";
 import { MemoryVaultDir } from "./vaultDir";
 import { createWebAiCorpus } from "./webAiCorpus";
 import { configureWebVaultIo } from "./webVaultIo";
@@ -189,6 +190,7 @@ test("web file bytes/text/stat are real and CSV saves refuse stale revisions", a
   await dir.writeText("storage/data.csv", "name,value\none,1\n");
   const stat = (await corpusFileStat("storage/data.csv"))!;
   expect(stat?.writable).toBe(true);
+  expect(stat.revision).toBe(contentRevision("name,value\none,1\n"));
   expect(await corpusFileText("storage/data.csv")).toBe("name,value\none,1\n");
   const url = await fileAssetUrl("storage/data.csv", true);
   expect(url).toStartWith("blob:");

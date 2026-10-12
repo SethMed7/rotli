@@ -75,7 +75,16 @@ against the in-memory reference and the helper adapter.
 Note and `.rotli/` manifest reads derive their revision from the exact text
 returned. Their writes present that content revision to the folder adapter,
 which checks it in the write turn; a concurrent edit is a conflict. A
-content-gated removal also compares exact bytes in its removal turn, so a
+file editor's revision is likewise FNV-1a 64 over the exact bytes it opened,
+including CSV text encoded as UTF-8. File stats use the same complete-byte
+revision for reload and parked-edit comparisons. A save passes that revision
+to `VaultDir.writeBytes`, which compares it inside its write turn, and returns
+the revision of the newly saved bytes; `"0"` permits creation only when the
+path is missing. The first user save keeps a one-time `.bak` of the prior bytes.
+Rotli Helper reads up to 256 MiB per file, but its 24 MiB JSON request cap
+also counts base64 expansion on writes; an oversized save reports the Helper
+file limit to the page.
+A content-gated removal also compares exact bytes in its removal turn, so a
 rollback refuses a newer file it observes then. Chromium
 holds both source and destination turns for an entire move, through removal.
 An ungated removal of a missing path succeeds without changing anything;

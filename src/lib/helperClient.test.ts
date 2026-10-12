@@ -1,6 +1,22 @@
 import { expect, test } from "bun:test";
 
-import { HelperHttpError, helperConnectionError, helperUnreachable } from "./helperClient";
+import { HelperHttpError, helperConnectionError, helperRpc, helperUnreachable } from "./helperClient";
+
+test("an oversized Helper byte save explains the file limit", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('{"error":"request too large"}', { status: 413 });
+  try {
+    await expect(
+      helperRpc({ port: 1234, token: "synthetic-token" }, "vault_write", {
+        path: "book.xlsx",
+        base64: "AA==",
+        expectedContent: "0",
+      }),
+    ).rejects.toThrow(/file too large for Rotli Helper/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 test("terminal vault errors do not become network outages or CLI tool errors", () => {
   for (const [status, message] of [
     [401, "refused"],
