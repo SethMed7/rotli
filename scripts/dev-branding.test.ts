@@ -63,7 +63,9 @@ test("the development icon uses Rotli's blue identity", async () => {
 });
 
 test("Command-R refreshes the current vault without reloading the webview", () => {
-  const actionsSource = readFileSync(join(root, "src/keys/actions.ts"), "utf8");
+  // the vault actions live beside actions.ts, which registers them
+  const actionsSource = readFileSync(join(root, "src/keys/vaultActions.ts"), "utf8");
+  expect(readFileSync(join(root, "src/keys/actions.ts"), "utf8")).toContain("registerVaultActions()");
   expect(actionsSource).toContain('id: "vault.refresh"');
   expect(actionsSource).toContain('defaultChord: "Meta+R"');
   expect(actionsSource).toContain("reconnectActiveVault()");
