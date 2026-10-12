@@ -6,8 +6,9 @@
 //   ROTLI_BUILD_CHANNEL=stable bun run dev:web     # serves localhost:1437/app/
 //   HERO_LIBRARIAN_CLIP=/path/to/clip.mov bun run capture:hero [http://localhost:1437/app/]
 //
-// Without HERO_LIBRARIAN_CLIP it makes a draft in _review/hero-video/ (a placeholder card at the
-// cut) and leaves the site's film alone. site/README.md ("The hero film") has the storyboard, how
+// It writes only under _review/hero-video/: the hero now plays the native Mac tour, and this web
+// cut must never land in site/public/media/hero/ under the tour's cache key (src/films.ts `v`).
+// Without HERO_LIBRARIAN_CLIP the cut is a draft (a placeholder card at the cut). site/README.md ("The hero film") has the storyboard, how
 // to shoot the Mac clip (scripts/hero-librarian-vault.mjs), and what is fixture and why.
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -30,10 +31,8 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(app.hostname) || app.username 
 const root = join(import.meta.dir, "..");
 const review = join(root, "_review/hero-video");
 const frameDir = join(review, "frames");
-const siteOut = join(root, "site/public/media/hero");
 await rm(frameDir, { recursive: true, force: true });
 await mkdir(frameDir, { recursive: true });
-await mkdir(siteOut, { recursive: true });
 
 const HELPER_PORT = 43111;
 const HELPER_TOKEN = "fixture-token-with-at-least-twenty-four-chars";
@@ -527,8 +526,8 @@ for (const [i, c] of CAPTIONS.entries()) {
 // JPEG frames are full range; browsers expect broadcast range
 chain.push(`${last}scale=out_range=tv,format=yuv420p[out]`);
 last = "[out]";
-// A draft (no Mac clip yet) never replaces the site's film.
-const film = draft ? join(review, "rotli-hero-draft.mp4") : join(siteOut, "rotli-hero.mp4");
+// Never the site's film: replacing the tour is a deliberate copy plus a `v` bump in src/films.ts.
+const film = join(review, draft ? "rotli-hero-draft.mp4" : "rotli-hero-web.mp4");
 ffmpeg([
   ...inputs,
   "-filter_complex",
@@ -561,7 +560,7 @@ ffmpeg([
 // the poster: the note written in Main, before the vault
 const posterPng = join(review, "poster.png");
 ffmpeg(["-ss", (at("vault") - 0.6).toFixed(3), "-i", film, "-frames:v", "1", posterPng]);
-const poster = draft ? join(review, "rotli-hero-poster-draft.webp") : join(siteOut, "rotli-hero-poster.webp");
+const poster = join(review, draft ? "rotli-hero-poster-draft.webp" : "rotli-hero-poster-web.webp");
 const webp = spawnSync("cwebp", ["-quiet", "-q", "82", posterPng, "-o", poster], { stdio: "inherit" });
 if (webp.status !== 0) throw new Error("cwebp failed");
 // six evenly spaced frames for review
@@ -592,6 +591,6 @@ await writeFile(
   ) + "\n",
 );
 console.log(
-  `Hero film${draft ? " (draft, no Mac clip)" : ""}: ${duration.toFixed(1)} s, ${(size / 1e6).toFixed(2)} MB → ${draft ? "_review/hero-video/" : "site/public/media/hero/"}`,
+  `Hero film${draft ? " (draft, no Mac clip)" : ""}: ${duration.toFixed(1)} s, ${(size / 1e6).toFixed(2)} MB → _review/hero-video/`,
 );
 if (size > 6e6) throw new Error("The hero film is over the 6 MB budget; raise HERO_CRF");

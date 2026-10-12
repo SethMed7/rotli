@@ -1593,7 +1593,7 @@ finished note. The takes and the cut script stay on the maintainer's Mac
 your view, the file lives once in your vault, the Librarian files it, ask. It
 is made by `bun run capture:hero` from a local
 `ROTLI_BUILD_CHANNEL=stable bun run dev:web`, around one clip from the Mac app,
-and writes the hero's file and poster, so running it now replaces the tour:
+and writes only under `_review/hero-video/`, never over the tour:
 
 1. **Write in your view** (Rotli Web): New note in Main, "call w/ dana re
    pricing / she's ok w/ annual. wants the deck fri?? / ask jo about the

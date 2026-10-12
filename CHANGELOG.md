@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now plays a real recording of the Mac app on synthetic notes: writing a
   note, the Librarian filing it on your Mac, tasks, search, docs, sheets and
   boards, asking Claude about the notes, and the seven themes. Nothing in it
-  is mocked; the edit only trims and removes waiting. The film has a new
+  is mocked; the edit only trims, removes waiting, speeds the typing
+  slightly, and holds each theme briefly. The film has a new
   address, so no browser or edge cache serves the old one.
 - **AI systems can read rotli.co's features, answers, roadmap, and posts in
   one file.** `/llms-full.txt` holds every feature in full, the FAQ, the
