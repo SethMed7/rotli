@@ -12,7 +12,7 @@
 import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { extOf, fileName, userFileName } from "../lib/fileKind";
+import { extOf, fileName, isSkippedDir, userFileName } from "../lib/fileKind";
 import {
   type NoteFrontmatter,
   composeNoteDocument,
@@ -83,8 +83,6 @@ const MEMEX_NOTE_ROOTS = ["wiki", "chats", "archive", "trash"] as const;
 /** Roots a PLAIN folder never walks, so a vault holding a memex spine without a `wiki/` keeps
  * those files out of the note list (chats/ is indexed; All notes hides it via isChats). */
 const SKIPPED_ROOTS = new Set(["identity", "personality", "history"]);
-/** Never walked at any depth, in any case: the native walker's `SKIPPED_DIRS` (corpus.rs). */
-const SKIPPED_ANYWHERE = /^(node_modules|\.git)$/i;
 
 /** Cached bytes for one file, keyed by the revision they were read at. */
 interface CachedFile {
@@ -171,7 +169,7 @@ export class FolderNotesService implements NotesService {
       if (entry.name.startsWith(".")) continue;
       const child = joinVaultPath(path, entry.name);
       if (entry.kind === "directory") {
-        if (SKIPPED_ANYWHERE.test(entry.name) || (isRoot && SKIPPED_ROOTS.has(entry.name))) continue;
+        if (isSkippedDir(entry.name) || (isRoot && SKIPPED_ROOTS.has(entry.name))) continue;
         await this.collect(child, out);
       } else if (!isCanvasFile(child) || LAUNCH_FEATURES.jsonCanvas) out.push(child);
     }
@@ -278,7 +276,7 @@ export class FolderNotesService implements NotesService {
   private async collectDirs(path: string, out: string[], isRoot = false): Promise<void> {
     for (const entry of await this.dir.list(path)) {
       if (entry.kind !== "directory" || entry.name.startsWith(".")) continue;
-      if (SKIPPED_ANYWHERE.test(entry.name) || (isRoot && SKIPPED_ROOTS.has(entry.name))) continue;
+      if (isSkippedDir(entry.name) || (isRoot && SKIPPED_ROOTS.has(entry.name))) continue;
       const child = joinVaultPath(path, entry.name);
       out.push(child);
       await this.collectDirs(child, out);

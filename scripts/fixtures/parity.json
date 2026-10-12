@@ -527,12 +527,30 @@
     "noteFilenameSlugs": {
       "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (note filenames) — src/memex/contract.ts noteSlugify + noteStem ↔ src-tauri/src/corpus.rs slugify + filename_for",
       "value": [
-        { "title": "Untitled", "slug": "untitled" },
-        { "title": "Chooser thing", "slug": "chooser-thing" },
-        { "title": "Hello, World!", "slug": "hello-world" },
-        { "title": "  ⌥Space — the way in  ", "slug": "space-the-way-in" },
-        { "title": "Café résumé", "slug": "café-résumé" },
-        { "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+        {
+          "title": "Untitled",
+          "slug": "untitled"
+        },
+        {
+          "title": "Chooser thing",
+          "slug": "chooser-thing"
+        },
+        {
+          "title": "Hello, World!",
+          "slug": "hello-world"
+        },
+        {
+          "title": "  ⌥Space — the way in  ",
+          "slug": "space-the-way-in"
+        },
+        {
+          "title": "Café résumé",
+          "slug": "café-résumé"
+        },
+        {
+          "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
       ]
     },
     "noteDateStamps": {
@@ -731,15 +749,51 @@
     "canvasHome": {
       "sourceOfTruth": "src-tauri/src/corpus_files.rs canvas_home ↔ src/services/folderCanvases.ts canvasHome (where a new canvas is written; a plain vault's reserved lanes are each side's own note rule and stay out)",
       "value": [
-        { "folder": "wiki", "memex": true, "home": "wiki" },
-        { "folder": "wiki/projects", "memex": true, "home": "wiki/projects" },
-        { "folder": "", "memex": true, "home": "wiki/_inbox" },
-        { "folder": "chats", "memex": true, "home": "wiki/_inbox" },
-        { "folder": "storage", "memex": true, "home": "wiki/_inbox" },
-        { "folder": "wikis", "memex": true, "home": "wiki/_inbox" },
-        { "folder": "", "memex": false, "home": "" },
-        { "folder": "Plans", "memex": false, "home": "Plans" },
-        { "folder": "Plans/Q3", "memex": false, "home": "Plans/Q3" }
+        {
+          "folder": "wiki",
+          "memex": true,
+          "home": "wiki"
+        },
+        {
+          "folder": "wiki/projects",
+          "memex": true,
+          "home": "wiki/projects"
+        },
+        {
+          "folder": "",
+          "memex": true,
+          "home": "wiki/_inbox"
+        },
+        {
+          "folder": "chats",
+          "memex": true,
+          "home": "wiki/_inbox"
+        },
+        {
+          "folder": "storage",
+          "memex": true,
+          "home": "wiki/_inbox"
+        },
+        {
+          "folder": "wikis",
+          "memex": true,
+          "home": "wiki/_inbox"
+        },
+        {
+          "folder": "",
+          "memex": false,
+          "home": ""
+        },
+        {
+          "folder": "Plans",
+          "memex": false,
+          "home": "Plans"
+        },
+        {
+          "folder": "Plans/Q3",
+          "memex": false,
+          "home": "Plans/Q3"
+        }
       ]
     },
     "emptyCanvasFile": {
@@ -767,6 +821,13 @@
         "docm",
         "dotx",
         "dotm"
+      ]
+    },
+    "skippedDirs": {
+      "sourceOfTruth": "src/lib/fileKind.ts SKIPPED_DIRS ↔ src-tauri/src/corpus.rs SKIPPED_DIRS",
+      "value": [
+        ".git",
+        "node_modules"
       ]
     }
   }

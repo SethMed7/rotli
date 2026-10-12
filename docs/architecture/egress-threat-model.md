@@ -321,9 +321,11 @@ This is stated plainly rather than glossed. Three things bound it:
 
 **Launch warm-up (2026-10-12).** App setup walks every registered root on a
 background thread so a huge vault no longer holds the window back. Until that
-walk finishes (`secret::finish_ledger_warmup`), `blocked_for_remote` answers
-true for ANY text: no remote send, no AI write of unprotected text, no history
-diff, for the first moments after launch. Walks themselves now read the disk
+walk has fed the ledger from EVERY registered root (`secret::warm_until_done`:
+a root whose walk fails is retried every 30 s and keeps the gate shut; a root
+removed from the registry stops holding it), `blocked_for_remote` answers true
+for ANY text: no remote send, no AI write of unprotected text (refused with a
+"still reading this vault" message), no history diff. Walks themselves now read the disk
 with the corpus lock released (`CorpusState::walk_unlocked`); a walk the vault
 changed under is discarded, and every walk feeds the ledger, discarded or not.
 

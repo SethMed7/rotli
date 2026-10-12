@@ -484,6 +484,21 @@ describe("releasing closed buffers", () => {
     expect(getDocumentText("release-dirty")).toBe("# release-dirty\nbody\ntyped");
   });
 
+  test("a buffer closed while saving is released once the save lands", async () => {
+    setReleaseDelayForTests(10);
+    let land: () => void = () => {};
+    setWriteNoteBodyForTests(() => new Promise<void>((resolve) => (land = resolve)));
+    const close = view("release-after-save");
+    editDocument("release-after-save", (lines) => [...lines, "typed"]);
+    close();
+    void flushNote("release-after-save");
+    await settle(30);
+    expect(getDocumentText("release-after-save")).toBeDefined(); // still saving
+    land();
+    await settle(40);
+    expect(getDocumentText("release-after-save")).toBeUndefined();
+  });
+
   test("reopening before the grace period ends keeps the live buffer", async () => {
     setReleaseDelayForTests(20);
     view("release-reopen")();

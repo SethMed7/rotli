@@ -259,6 +259,52 @@ fn blocked_given(warm: bool, text: &str) -> bool {
     !warm || protected_for_remote(text) || echoes_secure_text(text)
 }
 
+/// One root's warm-up attempt.
+pub enum Warm {
+    Done,
+    Failed,
+    /// The root left the registry; it no longer holds the gate.
+    Gone,
+}
+
+/// Warm root by root and open egress only when EVERY root still registered
+/// has warmed: a failed walk is retried after `wait()` and keeps egress shut
+/// meanwhile (review of PR 199 — finishing regardless left a failed vault's
+/// secure prose unguarded once the gate opened).
+pub fn warm_until_done<T>(
+    mut pending: Vec<T>,
+    mut try_warm: impl FnMut(&T) -> Warm,
+    mut wait: impl FnMut(),
+    on_done: impl FnOnce(),
+) {
+    loop {
+        pending.retain(|root| matches!(try_warm(root), Warm::Failed));
+        if pending.is_empty() {
+            return on_done();
+        }
+        wait();
+    }
+}
+
+/// Why an AI write of `body` into a note must be refused (the laundering rule:
+/// protected prose only lands in a protected note), or None. While the ledger
+/// is still warming every body counts as blocked, so the refusal says so
+/// instead of blaming a secure note.
+pub fn secure_write_refusal(target_secure: bool, body: &str) -> Option<&'static str> {
+    secure_write_refusal_given(LEDGER_WARM.load(Ordering::Acquire), target_secure, body)
+}
+
+fn secure_write_refusal_given(warm: bool, target_secure: bool, body: &str) -> Option<&'static str> {
+    if target_secure || !blocked_given(warm, body) {
+        return None;
+    }
+    Some(if warm {
+        "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
+    } else {
+        "Rotli is still reading this vault after launch, so AI edits wait a moment. Try again shortly."
+    })
+}
+
 /// The Luhn checksum over an all-digit candidate — true when it checks out
 /// (i.e. the run is shaped like a real card number).
 fn luhn_ok(digits: &str) -> bool {
@@ -283,6 +329,41 @@ fn luhn_ok(digits: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn egress_opens_only_after_every_registered_root_warmed() {
+        let mut attempts = std::collections::HashMap::<&str, u32>::new();
+        let mut waits = 0;
+        let done = std::cell::Cell::new(false);
+        warm_until_done(
+            vec!["ok", "flaky", "gone"],
+            |root| {
+                let n = attempts.entry(*root).or_default();
+                *n += 1;
+                match (*root, *n) {
+                    ("gone", _) => Warm::Gone,
+                    ("flaky", 1 | 2) => Warm::Failed,
+                    _ => Warm::Done,
+                }
+            },
+            || {
+                assert!(!done.get(), "egress opened while a root was still cold");
+                waits += 1;
+            },
+            || done.set(true),
+        );
+        assert!(done.get());
+        assert_eq!(waits, 2, "the failed root is retried, not skipped");
+        assert_eq!((attempts["ok"], attempts["flaky"], attempts["gone"]), (1, 3, 1));
+    }
+
+    #[test]
+    fn a_cold_ledger_says_so_instead_of_blaming_a_secure_note() {
+        let plain = "an ordinary sentence about the weather this week";
+        assert!(secure_write_refusal_given(false, false, plain).unwrap().contains("still reading"));
+        assert_eq!(secure_write_refusal_given(true, false, plain), None);
+        assert_eq!(secure_write_refusal_given(false, true, plain), None, "a secure target always accepts");
+    }
 
     #[test]
     fn nothing_leaves_while_the_ledger_is_still_warming() {

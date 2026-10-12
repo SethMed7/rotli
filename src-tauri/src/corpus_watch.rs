@@ -3,12 +3,33 @@
 //! dependency folders never do.
 
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::RecvTimeoutError;
+use std::sync::mpsc::{RecvTimeoutError, Sender};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use super::{is_skipped_dir, normalized_watch_path, SuppressSet};
 
 const DEBOUNCE: Duration = Duration::from_millis(300);
+
+/// A watcher's mailbox: an fs event, or `None` = stop now.
+type WatchMsg = Option<notify::Result<notify::Event>>;
+
+/// Every running watcher's root and mailbox, so removing a vault stops its
+/// watcher at once instead of on its next fs event (review of PR 199).
+static WATCHERS: Mutex<Vec<(PathBuf, Sender<WatchMsg>)>> = Mutex::new(Vec::new());
+
+/// Stop every watcher on `root` (the vault left the registry).
+pub(crate) fn stop_watching(root: &Path) {
+    let root = normalized_watch_path(root);
+    let mut watchers = WATCHERS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    watchers.retain(|(watched, mailbox)| {
+        if *watched != root {
+            return true;
+        }
+        let _ = mailbox.send(None);
+        false
+    });
+}
 
 /// Watch the corpus for EXTERNAL changes (a folder dropped in, a note edited
 /// in another app) and fire `on_change` once per quiet burst, carrying the
@@ -24,9 +45,13 @@ pub fn spawn_watcher(
     on_change: impl Fn(&[PathBuf]) -> bool + Send + 'static,
 ) -> notify::Result<()> {
     use notify::{RecursiveMode, Watcher};
-    let (tx, rx) = std::sync::mpsc::channel();
+    let (tx, rx) = std::sync::mpsc::channel::<WatchMsg>();
+    WATCHERS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((normalized_watch_path(&root), tx.clone()));
     let handler = move |res: notify::Result<notify::Event>| {
-        let _ = tx.send(res);
+        let _ = tx.send(Some(res));
     };
     // Sandboxed macOS test processes do not receive FSEvents reliably. The
     // polling backend exercises the same filter/debounce/suppression pipeline;
@@ -41,7 +66,7 @@ pub fn spawn_watcher(
     watcher.watch(&root, RecursiveMode::Recursive)?;
     std::thread::spawn(move || {
         let _keep_alive = watcher;
-        while let Ok(res) = rx.recv() {
+        while let Ok(Some(res)) = rx.recv() {
             let mut paths = relevant_paths(&root, &suppress, &res);
             if paths.is_empty() {
                 continue;
@@ -49,10 +74,11 @@ pub fn spawn_watcher(
             // trailing debounce: absorb the burst, fire once when it goes quiet
             loop {
                 match rx.recv_timeout(DEBOUNCE) {
-                    Ok(res) => {
+                    Ok(Some(res)) => {
                         paths.extend(relevant_paths(&root, &suppress, &res));
                         continue;
                     }
+                    Ok(None) => return,
                     Err(RecvTimeoutError::Timeout) => {
                         paths.sort();
                         paths.dedup();
@@ -260,6 +286,24 @@ mod tests {
         fs::write(root.join("second.md"), "# second\n").unwrap();
         std::thread::sleep(Duration::from_millis(1200));
         assert_eq!(fired.load(Ordering::SeqCst), 1, "a stopped watcher fired again");
+    }
+
+    #[test]
+    fn removing_a_vault_stops_its_watcher_without_waiting_for_an_event() {
+        let (_dir, store) = bare();
+        let root = store.root().to_path_buf();
+        let fired = Arc::new(AtomicUsize::new(0));
+        let counter = fired.clone();
+        spawn_watcher(root.clone(), store.suppress_set(), move |_paths: &[PathBuf]| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            true
+        })
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
+        super::stop_watching(&root);
+        fs::write(root.join("after-removal.md"), "# late\n").unwrap();
+        std::thread::sleep(Duration::from_millis(1200));
+        assert_eq!(fired.load(Ordering::SeqCst), 0, "a stopped watcher fired");
     }
 
     #[test]

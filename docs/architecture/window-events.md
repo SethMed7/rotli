@@ -19,7 +19,9 @@ does (Rust's menu Close Tab / Undo / Redo and native drag-and-drop now
 `emit_to` the window they belong to, not `emit` to all);
 before that, each window flushed and acked four times per quit (an idle
 panel's acks could release quit while main was still saving) and each shell
-refreshed twice per vault change. Rust also counts quit acks per window label
+refreshed twice per vault change. `check:window-events` enforces both halves:
+Rust may `.emit` only a true broadcast (`rotli:vault-changed`), and every event
+Rust addresses must be heard with `listenHere` or a `target`. Rust also counts quit acks per window label
 (`src-tauri/src/quit_flush.rs`), so a repeat ack never stands in for another
 window's.
 

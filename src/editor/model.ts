@@ -502,7 +502,10 @@ function scheduleRelease(noteId: string): void {
     noteId,
     setTimeout(() => {
       releaseTimers.delete(noteId);
-      if (!docs.has(noteId) || !releasable(noteId)) return;
+      if (!docs.has(noteId) || subs.get(noteId)?.size) return;
+      // still unsaved, saving, or failed: look again later rather than keep
+      // the buffer for the life of the window once it settles (review of PR 199)
+      if (!releasable(noteId)) return scheduleRelease(noteId);
       docs.delete(noteId);
       revisions.delete(noteId);
       persistedBodies.delete(noteId);

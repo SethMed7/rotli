@@ -1322,7 +1322,7 @@ fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> R
                 continue;
             }
             let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() {
+            if kind.is_symlink() || (kind.is_dir() && corpus::is_skipped_dir(&name.to_string_lossy())) {
                 continue;
             }
             let target = to.join(&name);
@@ -1372,6 +1372,7 @@ mod vault_activation_tests {
             "# Plan\n"
         );
         assert!(destination.join(".obsidian/app.json").is_file());
+        assert!(!destination.join("Projects/node_modules").exists(), "dependency folders never copy");
         assert!(
             !destination.join(".rotli").exists(),
             "source-specific Rotli state must not copy"
@@ -2631,20 +2632,26 @@ pub fn run() {
             let warm_app = app.handle().clone();
             std::thread::spawn(move || {
                 let state = warm_app.state::<corpus::CorpusState>();
-                for (id, adopted) in warm_roots {
-                    // walk with the corpus lock released, then the locked
-                    // warm is a cache hit (or re-walks a vault changed meanwhile)
-                    let _ = state.walk_unlocked(&id);
-                    if let Err(e) = state.route(&id, |store| store.warm_secure_ledger()) {
-                        eprintln!("rotli: could not warm the secure-note ledger for root {id} ({e})");
+                let try_warm = |(id, adopted): &(String, bool)| {
+                    if !state.contains_root(id).unwrap_or(true) {
+                        return secret::Warm::Gone;
                     }
-                    if adopted {
-                        if let Err(e) = state.route(&id, |store| store.seed_main_from_disk_if_missing()) {
+                    // walk with the corpus lock released; the locked warm is
+                    // then a cache hit (or re-walks a vault changed meanwhile)
+                    let _ = state.walk_unlocked(id);
+                    if let Err(e) = state.route(id, |store| store.warm_secure_ledger()) {
+                        eprintln!("rotli: secure-note ledger not warm for root {id} ({e}); egress stays closed, retrying");
+                        return secret::Warm::Failed;
+                    }
+                    if *adopted {
+                        if let Err(e) = state.route(id, |store| store.seed_main_from_disk_if_missing()) {
                             eprintln!("rotli: could not mirror adopted vault {id} into Main ({e})");
                         }
                     }
-                }
-                secret::finish_ledger_warmup();
+                    secret::Warm::Done
+                };
+                let wait = || std::thread::sleep(std::time::Duration::from_secs(30));
+                secret::warm_until_done(warm_roots, try_warm, wait, secret::finish_ledger_warmup);
             });
             // agents reach Word documents through this app (agent_bridge.rs)
             agent_bridge::start(app.handle());

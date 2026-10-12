@@ -4039,11 +4039,8 @@ impl CorpusStore {
         // let protected prose land anywhere it would stop being protected.
         let target_secure =
             fm.foreign.iter().any(|l| secure_field(l) == Some(true)) || looks_secure(target_body);
-        if !target_secure && crate::secret::blocked_for_remote(body) {
-            return Err(
-                "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
-                    .into(),
-            );
+        if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
+            return Err(refusal.into());
         }
         self.writable(&rel)?;
         self.write_resolved(id_or_rel, body, rel)
@@ -4104,11 +4101,8 @@ impl CorpusStore {
             }
             let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
                 || looks_secure(target_body);
-            if !target_secure && crate::secret::blocked_for_remote(body) {
-                return Err(
-                    "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
-                        .into(),
-                );
+            if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
+                return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
@@ -7092,6 +7086,7 @@ impl CorpusState {
             .ok_or_else(|| "no such connected vault".to_string())?;
         persist()?;
         reg.stores.remove(root_id);
+        watch::stop_watching(&root);
         Ok(root)
     }
 
@@ -7192,9 +7187,13 @@ impl CorpusState {
         }) {
             return Err("the outgoing vault could not be assigned a safe route".into());
         }
-        let outgoing = reg.stores.remove(DEFAULT_ROOT_ID);
-        if let (Some(outgoing_id), Some(outgoing)) = (outgoing_id, outgoing) {
-            reg.stores.insert(outgoing_id, outgoing);
+        match (outgoing_id, reg.stores.remove(DEFAULT_ROOT_ID)) {
+            (Some(outgoing_id), Some(outgoing)) => {
+                reg.stores.insert(outgoing_id, outgoing);
+            }
+            // the outgoing vault leaves the registry: stop watching it now
+            (None, Some(outgoing)) => watch::stop_watching(outgoing.root()),
+            _ => {}
         }
         incoming.set_perms_read_only(false);
         reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
@@ -7294,7 +7293,15 @@ impl CorpusState {
     pub(crate) fn walk_unlocked(&self, root_id: &str) -> Result<(), String> {
         static UNLOCKED_WALK: Mutex<()> = Mutex::new(());
         let _one_walker = UNLOCKED_WALK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let plan = self.route(root_id, |store| Ok(store.walk_plan()))?;
+        let plan = self.route(root_id, |store| {
+            let plan = store.walk_plan();
+            // a stale cache is never served (every reader re-walks on a moved
+            // generation), so drop it now: never two copies of every body
+            if plan.is_some() {
+                store.list_cache = None;
+            }
+            Ok(plan)
+        })?;
         let Some(plan) = plan else {
             return Ok(());
         };

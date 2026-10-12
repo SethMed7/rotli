@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { pauseWhileHidden } from "./pauseWhileHidden";
+import { pauseRenderWhileHidden, pauseWhileHidden } from "./pauseWhileHidden";
 
 function unit(active = true) {
   return {
@@ -54,9 +54,40 @@ test("a unit Univer left inactive is never woken by the pause", () => {
 test("release stops watching and resumes anything still paused", () => {
   const units = [unit()];
   const watch = fakeObserver();
-  const release = pauseWhileHidden({} as Element, () => units, watch.observe);
+  const { release } = pauseWhileHidden({} as Element, () => units, watch.observe);
   watch.report(false);
   release();
   expect(watch.stopped()).toBe(true);
   expect(units[0]?.active).toBe(true);
+});
+
+test("a render unit created while hidden is paused at once, and only once", () => {
+  const watch = fakeObserver();
+  let onCreated: () => void = () => {};
+  const made: { active: boolean; deactivations: number }[] = [];
+  const all = new Map<string, unknown>();
+  const renderUnit = () => {
+    const state = { active: true, deactivations: 0 };
+    made.push(state);
+    return {
+      activated$: { subscribe: (next: (v: boolean) => void) => (next(state.active), { unsubscribe() {} }) },
+      activate: () => void (state.active = true),
+      deactivate: () => void ((state.active = false), state.deactivations++),
+    };
+  };
+  all.set("doc", renderUnit());
+  const manager = {
+    getRenderAll: () => all as Map<string, ReturnType<typeof renderUnit>>,
+    created$: { subscribe: (next: () => void) => ((onCreated = next), { unsubscribe() {} }) },
+  };
+  const release = pauseRenderWhileHidden({} as Element, manager, watch.observe);
+  watch.report(false);
+  all.set("late", renderUnit());
+  onCreated();
+  onCreated();
+  expect(made.map((m) => m.active)).toEqual([false, false]);
+  expect(made.map((m) => m.deactivations)).toEqual([1, 1]);
+  watch.report(true);
+  expect(made.map((m) => m.active)).toEqual([true, true]);
+  release();
 });
