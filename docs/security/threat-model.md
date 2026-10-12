@@ -17,8 +17,9 @@ or a compromised dependency behaves adversarially:
 
 1. User files remain readable without Rotli and are never replaced by an
    application database.
-2. Secure or secret-shaped Markdown never reaches a remote model, web tool, or
-   external workspace agent through a Rotli-controlled send path.
+2. Secure or secret-shaped Markdown and files in the secure home never reach a
+   remote model, web tool, or external workspace agent through a Rotli-controlled
+   send path.
 3. On-device model access to a secure note is permitted by default and can be
    withdrawn per note or per vault; it is the LOCAL tier that is allowed, never
    a remote one. The organizer never receives that permission.
@@ -125,6 +126,7 @@ transport, credential, or filesystem authority directly.
 | Prompt injection asks a model to reveal notes or run code | Structured untrusted model map, fenced/defused tool results, tool allowlists, explicit network capabilities, secret + private-prose overlap egress checks, bounded loops, secure-note exclusion, sandboxed CLI argv | Paraphrased semantic leakage through permitted web arguments; security review |
 | Secret-shaped text reaches a remote destination | Independent TypeScript/Rust detection, final-prompt scan, endpoint locality gate | Images are consented attachments and not OCR-scanned; documented accepted gap |
 | Secure content appears in search, metrics, or an agent response | Filter before mapping/search/read; fail-closed metadata parsing; remote policy for every agent | Board scenes have no secure classification; users must not store secrets in agent-managed boards |
+| A document, sheet, or CSV in a secure home reaches a remote chat or agent | Exact file-id resolution and secure-home/keyword checks before decoding in the TS chat host and Rust AI file commands; agent bridge checks location before reading; local reads honor the vault knob and taint the chat | User editor reads remain available; a compromised webview is covered by the separate webview residual risk |
 | An AI edits a note the user locked | Locked refusal at every AI write path on both layers (`corpus_write_ai`, the host's `update_note`, chat-memory sync, workspace agents, the organizer) | A locked note is still readable by every model; locking is not confidentiality |
 | A local chat launders secure prose into a note a remote chat later reads | One-way `secureContext` chat taint; tainted `create_note` is stamped secure; tainted `update_note` may edit only secure notes; a tainted loose chat writes no memory note; remote egress refuses tainted transcripts | A user who manually copies secure text into an open note is out of scope |
 | A crafted path or writable-lane symlink escapes the corpus | Per-component no-follow metadata, canonical registered-root containment, path/extension checks, declared Rust write lanes, contained atomic-temp parents | Same-user replacement races and a fully compromised Rust host are out of scope |

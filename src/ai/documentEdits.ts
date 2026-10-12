@@ -7,6 +7,7 @@
 import { applyDocumentEdits, type DocumentEditAction, parseEditAction } from "../documents/aiEdit";
 import type { EditableDocument } from "../documents/model";
 import { documentIsOpen } from "../documents/session";
+import type { ChatModelInfo } from "../lib/tauri";
 
 export type AiDocumentEdit =
   | { kind: "saved"; document: EditableDocument; revision: string; count: number }
@@ -17,6 +18,7 @@ export async function editDocumentAsAi(
   rawActions: unknown[],
   /** An outside agent's revision from its read: a newer file is refused. */
   expectedRevision?: string,
+  model?: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<AiDocumentEdit> {
   const refused = (reason: string): AiDocumentEdit => ({ kind: "refused", reason });
   const actions: DocumentEditAction[] = [];
@@ -29,7 +31,7 @@ export async function editDocumentAsAi(
     return refused(`blocked: "${file.title}" is open in a pane. Ask the user to close it, then try again.`);
   }
   const { editAiDocument } = await import("../documents/composition");
-  const editable = await editAiDocument(file.id);
+  const editable = await editAiDocument(file.id, model);
   if (editable.kind !== "ready") return refused("error: this document is too large for Rotli to edit.");
   if (expectedRevision !== undefined && editable.revision !== expectedRevision) {
     return refused("error: the document changed since it was read. Read it again, then edit.");

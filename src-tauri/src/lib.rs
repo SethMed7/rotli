@@ -2328,6 +2328,8 @@ pub fn run() {
             corpus::corpus_open_file,
             corpus::corpus_file_text,
             corpus::corpus_file_bytes,
+            corpus::corpus_file_text_ai,
+            corpus::corpus_file_bytes_ai,
             corpus::corpus_file_stat,
             corpus::corpus_move_file_to_sink,
             corpus::corpus_restore_file,

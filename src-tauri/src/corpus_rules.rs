@@ -45,6 +45,20 @@ impl CorpusStore {
         })
     }
 
+    /// Frontmatter-free file visibility for AI in either vault layout.
+    pub(crate) fn file_is_protected(&self, rel: &str) -> bool {
+        let title = std::path::Path::new(rel)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        self.in_secure_home(rel)
+            || crate::librarian_rules::secure_by_name(
+                title,
+                rel,
+                &self.librarian_rules().secure_keywords,
+            )
+    }
+
     /// Protect every Library note already named with a secure keyword (the
     /// Librarian rules): a title/file-name scan, no model, each note moved
     /// through the same ignore-before-move flow as the note menu's Secure.

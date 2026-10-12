@@ -196,6 +196,19 @@ describe("Hand to AI, Refined — what reaches the model", () => {
     expect(model.sent).toHaveLength(0);
   });
 
+  test("rotli file links and fenced file references refuse Refined before the model", async () => {
+    for (const reference of [
+      "[plan](rotli://open?kind=file&id=wiki%2F_secure%2Fplan.docx)",
+      "```text\nwiki/_secure/plan.docx\n```",
+      '```sh\ncat "Secure notes/plan.docx"\n```',
+    ]) {
+      const note = await notesService.createNote(DEST.inbox, `# Work\n\nPlease review.\n\n${reference}`);
+      const model = stubModel(faithful);
+      expect((await refineHandToAiFor(note.id, model.host, locate)).kind).toBe("secureAttachment");
+      expect(model.sent).toHaveLength(0);
+    }
+  });
+
   test("an answer that drops a path falls back to Basic, with the reason", async () => {
     const note = await notesService.createNote(DEST.inbox, "# Login\n\nFix it.\n\n![](storage:shot.png)");
     const model = stubModel(() => "## Task\nFix the login page, see the screenshot attached.\n");

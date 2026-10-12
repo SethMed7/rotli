@@ -25,14 +25,10 @@ import {
   corpusNotePath,
   isTauri,
   rootIdOf,
+  splitRootId,
 } from "../lib/tauri";
 import { currentWebFileStore } from "../lib/webAiSeam";
-import {
-  isSecureBrainFolder,
-  isSecureNotesFolder,
-  SECURE_BRAIN_FOLDER,
-  SECURE_NOTES_FOLDER,
-} from "../security/secureNotes";
+import { isSecureBrainFolder, isSecureNotesFolder, inSecureHome } from "../security/secureNotes";
 import { useLibrarianRules } from "../state/librarianRules";
 import type { Note } from "../types";
 import { imageSrcToRel } from "./imageRepair";
@@ -99,8 +95,6 @@ export const locateAttachment: LocateAttachment = async (rootId, rel) => {
   return path ? { status: "found", rel, path } : { status: "missing", rel };
 };
 
-const fold = (text: string) => text.toLowerCase();
-const SECURE_FOLDERS = [SECURE_NOTES_FOLDER, SECURE_BRAIN_FOLDER].map(fold);
 /** More rounds of percent-escapes than this is an attempt to hide a path. */
 const DECODE_ROUNDS = 4;
 // control characters are never part of a vault file name
@@ -146,10 +140,39 @@ export function attachmentIsSecure(src: string, keywords: readonly string[]): bo
   const rel = attachmentRel(src);
   if (rel === null) return true;
   const cut = rel.lastIndexOf("/");
-  const folder = fold(cut < 0 ? "" : rel.slice(0, cut));
-  if (SECURE_FOLDERS.some((secure) => folder === secure || folder.startsWith(`${secure}/`))) return true;
+  if (inSecureHome(rel)) return true;
   const name = rel.slice(cut + 1).replace(/\.[^.]*$/, "");
   return keywords.length > 0 && secureByName(name, rel, keywords);
+}
+
+/** File references retained verbatim in Context still reach Refined's model. */
+function embeddedFileReferences(body: string): { source: string; rootId?: string }[] {
+  const refs: { source: string; rootId?: string }[] = [];
+  for (const match of body.matchAll(/rotli:\/\/open\?[^\s<>)"']*/gi)) {
+    try {
+      const url = new URL(match[0]);
+      if (url.searchParams.get("kind") === "file") {
+        const { rel, rootId } = splitRootId(url.searchParams.get("id") ?? "");
+        refs.push({ source: rel, rootId });
+      }
+    } catch {
+      refs.push({ source: "" });
+    }
+  }
+  let fenced = false;
+  for (const line of body.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (!fenced) continue;
+    for (const match of line.matchAll(
+      /(?:^|[\s"'`(<])((?:[\w .-]+\/)+[\w .-]+\.[a-z0-9]{1,12})(?=$|[\s"'`)>;,])/gi,
+    )) {
+      refs.push({ source: match[1] ?? "" });
+    }
+  }
+  return refs;
 }
 
 async function placesOf(
@@ -183,6 +206,15 @@ export async function handToAiFor(
   if (!note.body.trim()) return { kind: "empty", title };
   const links = attachmentLinks(note.body);
   const { secureKeywords } = useLibrarianRules.getState().rules;
+  const embedded = embeddedFileReferences(note.body);
+  for (const { source, rootId } of embedded) {
+    if (rootId && rootId !== rootIdOf(note.id)) return { kind: "secureAttachment", title };
+    if (attachmentIsSecure(source, secureKeywords)) return { kind: "secureAttachment", title };
+    const rel = attachmentRel(source);
+    if (!rel || (await locate(rootIdOf(note.id), rel)).status !== "found") {
+      return { kind: "secureAttachment", title };
+    }
+  }
   if (links.some((link) => attachmentIsSecure(link.src, secureKeywords))) {
     return { kind: "secureAttachment", title };
   }

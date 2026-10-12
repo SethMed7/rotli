@@ -10,6 +10,7 @@ import { afterAll, beforeEach, expect, mock, test } from "bun:test";
 import * as realDocuments from "../documents/composition";
 import type { EditableDocument } from "../documents/model";
 import { registerLiveDocument, unregisterLiveDocument } from "../documents/session";
+import * as realTauri from "../lib/tauri";
 import * as realNewItems from "../newItems/composition";
 import { answerAgentRequest } from "./agentRequests";
 
@@ -38,8 +39,18 @@ const session = async () => ({
 
 void mock.module("../documents/composition", () => ({
   ...realDocuments,
-  editManagedDocument: session,
+  readAiManagedDocument: session,
   editAiDocument: session,
+}));
+void mock.module("../lib/tauri", () => ({
+  ...realTauri,
+  corpusList: async () => ({
+    folders: [],
+    notes: [
+      { id: FILE, title: "launch.docx", kind: "file" },
+      { id: "wiki/_secure/launch.docx", title: "launch.docx", kind: "file" },
+    ],
+  }),
 }));
 void mock.module("../newItems/composition", () => ({
   ...realNewItems,
@@ -52,6 +63,7 @@ void mock.module("../newItems/composition", () => ({
 
 afterAll(() => {
   void mock.module("../documents/composition", () => realDocuments);
+  void mock.module("../lib/tauri", () => realTauri);
   void mock.module("../newItems/composition", () => realNewItems);
 });
 
@@ -68,6 +80,13 @@ test("an agent reads numbered blocks and the revision its edit must name", async
   expect(await ask("read_document", { file: FILE })).toEqual({
     ok: true,
     result: { file: FILE, title: "launch", revision: "r1", blocks: "[1] paragraph: Ship it", warnings: [] },
+  });
+});
+
+test("the webview refuses an agent's secure-home document before decoding", async () => {
+  expect(await ask("read_document", { file: "wiki/_secure/launch.docx" })).toMatchObject({
+    ok: false,
+    error: expect.stringContaining("blocked:"),
   });
 });
 

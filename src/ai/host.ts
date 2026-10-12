@@ -13,7 +13,7 @@ import {
   chatMessages,
   chatMessagesStream,
   cliComplete,
-  corpusFileBytes,
+  corpusFileBytesAi,
   corpusFrontmatter,
   corpusCreateManagedFile,
   corpusExportNotePdf,
@@ -43,7 +43,7 @@ import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
-import { makeFileTools } from "./hostFiles";
+import { aiFileAccessById, makeFileTools } from "./hostFiles";
 import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
@@ -310,6 +310,8 @@ export function makeTauriHost(
       try {
         images = await Promise.all(
           generatedImagePaths.map(async (path, index) => {
+            const refusal = await aiFileAccessById(path, modelIsOnDevice(model));
+            if (refusal) throw new Error(refusal);
             const extension = extOf(path);
             const mimeType: DocumentImage["mimeType"] | null =
               extension === "png"
@@ -322,7 +324,7 @@ export function makeTauriHost(
                       ? "image/bmp"
                       : null;
             if (!mimeType) throw new Error(`unsupported generated image format: .${extension || "unknown"}`);
-            const base64 = await corpusFileBytes(path, 24 * 1024 * 1024);
+            const base64 = await corpusFileBytesAi(path, model, 24 * 1024 * 1024);
             if (!base64) throw new Error(`generated image is unavailable: ${path}`);
             return documentImageFromBase64(`generated-image-${index + 1}`, fileName(path), mimeType, base64);
           }),

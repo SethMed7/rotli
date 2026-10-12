@@ -3919,6 +3919,27 @@ impl CorpusStore {
         Ok(text)
     }
 
+    /// AI-purpose access to a frontmatter-free file. The editor's file reads
+    /// remain separate; this check runs before any AI decoder sees bytes.
+    pub(crate) fn file_for_ai(&self, rel: &str, model_is_local: bool) -> Result<PathBuf, String> {
+        validate_rel(rel)?;
+        if surfaced(self.layout, rel) == Surface::Hidden {
+            return Err("not available to AI".into());
+        }
+        let secure = self.file_is_protected(rel);
+        if secure && !model_is_local {
+            return Err("blocked: a secure file cannot be sent to a remote model".into());
+        }
+        if secure && !self.secure_local_ai() {
+            return Err("blocked: local AI access to secure files is off for this vault".into());
+        }
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err("not a file".into());
+        }
+        Ok(abs)
+    }
+
     /// May an ON-DEVICE model read this secure note? Default yes (2026-08-01);
     /// the note's explicit `local_ai_allowed` bit wins, else the vault knob.
     /// Never consulted for a remote model — remote is refused unconditionally.
@@ -7583,6 +7604,45 @@ pub fn corpus_file_bytes(
     let data = fs::read(&abs).map_err(|e| e.to_string())?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
+}
+
+/// AI file reads use their own Rust policy before opening the file. The model
+/// identity is checked here, not accepted as a caller-supplied boolean.
+#[tauri::command]
+pub fn corpus_file_text_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let abs = state.route(&root, |store| store.file_for_ai(&rel, local))?;
+    let data = fs::read(abs).map_err(|e| e.to_string())?;
+    let cap = max_bytes.unwrap_or(200_000);
+    let text = String::from_utf8_lossy(&data[..data.len().min(cap)]).into_owned();
+    if !local && crate::secret::blocked_for_remote(&text) {
+        return Err("blocked: this file contains secret-shaped content".into());
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+pub fn corpus_file_bytes_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    use base64::Engine;
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let abs = state.route(&root, |store| store.file_for_ai(&rel, local))?;
+    let data = fs::read(abs).map_err(|e| e.to_string())?;
+    let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data[..data.len().min(cap)]))
 }
 
 /// Import a dropped external file into the corpus's binary area (the memex
@@ -11976,6 +12036,33 @@ mod tests {
         assert!(store.read_frontmatter(&open.id).unwrap().local_ai_allowed);
         assert!(store.read_for_ai(&open.id, true).is_ok());
         assert!(store.read_for_ai(&open.id, false).is_ok());
+    }
+
+    #[test]
+    fn ai_file_gate_refuses_secure_home_and_honors_local_knob() {
+        let tmp = TempDir::new().unwrap();
+        let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        let rel = "Secure notes/plan.csv";
+        fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+        fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
+        assert!(store.file_for_ai(rel, false).is_err());
+        assert!(store.file_for_ai(rel, true).is_ok());
+        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        assert!(store.file_for_ai(rel, true).is_err());
+        let ordinary = "Storage/summary.csv";
+        fs::create_dir_all(store.root().join("Storage")).unwrap();
+        fs::write(store.root().join(ordinary), "task,status\nDraft,ready").unwrap();
+        assert!(store.file_for_ai(ordinary, false).is_ok());
+        let named = "Storage/bank-plan.csv";
+        fs::write(store.root().join(named), "task,status\nDraft,ready").unwrap();
+        store
+            .dot_write(
+                "settings",
+                "{\"secureLocalAi\":false,\"librarianRules\":{\"secureKeywords\":[\"bank\"]}}",
+            )
+            .unwrap();
+        assert!(store.file_for_ai(named, false).is_err());
+        assert!(store.file_for_ai(named, true).is_err());
     }
 
     /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can

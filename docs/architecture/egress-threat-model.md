@@ -336,8 +336,11 @@ cold because search now uses an index.
 - **The ledger stops only bulk verbatim copying.** ≤4-word chunking, paraphrase,
   translation, reordering, and any encoding defeat it — by design; it is a layer
   over `read_for_ai`, not a covert-channel defense. Stated in full above.
-- **Storage FILES carry no `secure:` flag**, so `read_file` has only the
-  heuristic. Files are not notes and the matrix does not cover them.
+- **Storage FILES carry no `secure:` flag.** Chat file tools now resolve an
+  exact id and check the secure home and secure keyword before extraction in
+  TypeScript; dedicated Rust AI file reads repeat that location check. The
+  secret-pattern detector still checks extracted text. Files outside those
+  locations have no per-file secure flag.
 - **DNS exfil**: `vetted_resolve` emits the lookup before vetting the address,
   so an encoded subdomain leaves over DNS even when the connection is then
   refused. Closing it needs a resolver that vets the NAME first — a real change

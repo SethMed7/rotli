@@ -782,6 +782,13 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `local_ai_allowed` line overrides the vault knob in either direction. No knob
   exists, or will exist, that opens a secure note to a remote model. A frontier
   provider behind a localhost proxy still fails this gate.
+- Frontmatter-free files under `wiki/_secure/` or `Secure notes/`, and files
+  named with a secure keyword, inherit the secure visibility rule. Chat resolves
+  the exact file id before extraction; an ambiguous filename or unknown path is
+  refused. A remote model never reads these files. An on-device model may read
+  them while the vault's `secureLocalAi` setting allows it, and that read taints
+  the chat against later remote sends. The note-level `local_ai_allowed` override
+  applies to Markdown notes only. User editor reads remain available.
 - **A person's note refuses AI body edits without their grant** (2026-09-29):
   the same seams as `locked` below, in both layers, with Rotli Web running the
   TypeScript twin itself. A chat attached to such a note keeps its

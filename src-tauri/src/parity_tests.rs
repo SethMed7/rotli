@@ -68,6 +68,16 @@ fn secure_notes_folder_matches_fixture() {
 }
 
 #[test]
+fn secure_home_cases_match_fixture() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let store = crate::corpus::CorpusStore::open(temp.path().join("corpus")).unwrap();
+    for case in entry("secureHomeCases").as_array().expect("cases") {
+        let path = case["path"].as_str().unwrap();
+        assert_eq!(store.in_secure_home(path), case["secure"].as_bool().unwrap(), "{path}");
+    }
+}
+
+#[test]
 fn strip_markers_match_fixture() {
     assert_eq!(
         string_list(&entry("stripMarkers")),
