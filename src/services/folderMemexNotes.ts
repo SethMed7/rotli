@@ -52,27 +52,34 @@ async function librarianEnabled(dir: VaultDir): Promise<boolean> {
 
 /** List a secure note's path in the vault's `.gitignore`, once. */
 export async function ignoreInGit(dir: VaultDir, path: string): Promise<void> {
-  await updateGitExclusion(dir, path, true);
+  await updateGitExclusions(dir, [path]);
 }
 
 /** A completed relocation no longer needs the old exact-path exclusion. */
 export async function removeGitExclusion(dir: VaultDir, path: string): Promise<void> {
-  await updateGitExclusion(dir, path, false);
+  await updateGitExclusions(dir, [], [path]);
 }
 
-async function updateGitExclusion(dir: VaultDir, path: string, add: boolean): Promise<void> {
+/** The one `.gitignore` writer: add and drop exact lines, revision-gated, and
+ * retried when another writer edited the file in between (their lines stay). */
+export async function updateGitExclusions(
+  dir: VaultDir,
+  add: string[],
+  remove: string[] = [],
+): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const exists = await dir.exists(".gitignore");
-    if (!exists && !add) return;
     const text = exists ? await dir.readText(".gitignore") : "";
-    const present = text.split("\n").some((line) => line.trim() === path);
-    if (present === add) return;
-    const next = add
-      ? `${text}${text && !text.endsWith("\n") ? "\n" : ""}${path}\n`
-      : text
+    let next = remove.length
+      ? text
           .split("\n")
-          .filter((line) => line.trim() !== path)
-          .join("\n");
+          .filter((line) => !remove.includes(line.trim()))
+          .join("\n")
+      : text;
+    for (const line of add)
+      if (!next.split("\n").some((have) => have.trim() === line))
+        next += `${next && !next.endsWith("\n") ? "\n" : ""}${line}\n`;
+    if (next === text) return;
     try {
       await dir.writeText(".gitignore", next, exists ? contentRevision(text) : "0");
       return;

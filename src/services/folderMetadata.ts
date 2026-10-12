@@ -10,6 +10,7 @@ import {
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
+import { updateGitExclusions } from "./folderMemexNotes";
 import { type VaultDir, baseName, freeVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
 
 const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
@@ -23,23 +24,6 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
     ...(value === null ? [] : [`${key}: ${value}`]),
   ],
 });
-
-/** Git exclusion changes are revision-gated too; unreadable files abort. */
-export async function syncSecureIgnore(dir: VaultDir, add: string[], remove: string[] = []): Promise<void> {
-  const opened = (await dir.exists(".gitignore")) ? await readVersionedFile(dir, ".gitignore") : null;
-  const before = opened?.contents ?? "";
-  let next = remove.length
-    ? before
-        .split("\n")
-        .filter((line) => !remove.includes(line.trim()))
-        .join("\n")
-    : before;
-  for (const path of add)
-    if (!next.split("\n").some((line) => line.trim() === path))
-      next += `${next && !next.endsWith("\n") ? "\n" : ""}${path}\n`;
-  if (next === before) return;
-  await writeVersionedFile(dir, ".gitignore", next, opened?.revision ?? "0");
-}
 
 function assertSecureRemoval(body: string): void {
   if (looksSecret(body))
@@ -60,7 +44,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
     fm = withField(fm, "secure", "true");
-    await syncSecureIgnore(dir, [path]);
+    await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
   }
   const origin = valueOf(fm, "secure_origin");
@@ -75,14 +59,14 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (secure ? !inHome : inHome) {
     target = await freeVaultPath(dir, targetHome, baseName(path), (stem, ext, n) => `${stem} (${n})${ext}`);
     assertVaultFilePath(target);
-    await syncSecureIgnore(dir, [target]);
+    await updateGitExclusions(dir, [target]);
     // Both writes used the opening revision; re-read before relocation.
     const currentFile = await readVersionedFile(dir, path);
     const expected = secure ? composeNoteDocument(fm, body) : opened.contents;
     if (currentFile.contents !== expected)
       throw new Error("revision conflict: secure note changed before move");
     await dir.move(path, target);
-    await syncSecureIgnore(dir, [], [path]);
+    await updateGitExclusions(dir, [], [path]);
   }
   if (!secure) {
     const final = await readVersionedFile(dir, target);
@@ -91,7 +75,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     for (const key of ["secure", "local_ai_allowed", "secure_origin"])
       cleared = withField(cleared, key, null);
     await writeVersionedFile(dir, target, composeNoteDocument(cleared, parsed.body), final.revision);
-    await syncSecureIgnore(dir, [], [target]);
+    await updateGitExclusions(dir, [], [target]);
   }
   return target;
 }
@@ -118,7 +102,7 @@ export async function setFolderProtection(
       throw new Error("Local AI access is only meaningful for a secure note");
     if (!isSecureFrontmatter(fm)) {
       fm = withField(fm, "secure", "true");
-      await syncSecureIgnore(dir, [path]);
+      await updateGitExclusions(dir, [path]);
     }
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
@@ -147,8 +131,8 @@ export async function writeFolderRawMetadata(
   const beforeSecure = !!was && isSecureFrontmatter(was);
   const afterSecure = !!after && isSecureFrontmatter(after);
   if (beforeSecure && !afterSecure) assertSecureRemoval(parseNoteDocument(next).body);
-  if (afterSecure && !beforeSecure) await syncSecureIgnore(dir, [path]);
+  if (afterSecure && !beforeSecure) await updateGitExclusions(dir, [path]);
   const landed = await writeVersionedFile(dir, path, next, revision);
-  if (beforeSecure && !afterSecure) await syncSecureIgnore(dir, [], [path]);
+  if (beforeSecure && !afterSecure) await updateGitExclusions(dir, [], [path]);
   return landed;
 }

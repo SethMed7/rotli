@@ -4,7 +4,7 @@ import { type NoteFrontmatter, composeNoteDocument, parseNoteDocument } from "..
 import { isPlaceholderAlias, isTitleTypingTrail } from "../memex/aliases";
 import { noteSlugify } from "../memex/contract";
 import { isSecureNote } from "./folderMemexNotes";
-import { syncSecureIgnore } from "./folderMetadata";
+import { updateGitExclusions } from "./folderMemexNotes";
 import { type VaultDir, baseName, freeVaultPath, parentPath } from "./vaultDir";
 
 function aliasValues(fm: NoteFrontmatter | null): string[] {
@@ -86,6 +86,6 @@ export async function prepareFolderTitleRename(
       ? path
       : await freeVaultPath(dir, parentPath(path), desired, (stem, ext, n) => `${stem} (${n})${ext}`);
   const fm = withRenameAliases(parsed.frontmatter, path, oldTitle, newTitle);
-  if (target !== path && isSecureNote(text)) await syncSecureIgnore(dir, [target]);
+  if (target !== path && isSecureNote(text)) await updateGitExclusions(dir, [target]);
   return { path: target, text: composeNoteDocument(fm, parsed.body) };
 }

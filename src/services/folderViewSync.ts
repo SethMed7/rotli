@@ -2,7 +2,7 @@
 // restores only our own bytes; a newer external edit always wins.
 import { composeNoteDocument, emptyFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import { readVersionedFile, textRevision, writeVersionedFile } from "./folderFileIo";
-import { syncSecureIgnore } from "./folderMetadata";
+import { updateGitExclusions } from "./folderMemexNotes";
 import { FolderNotesService } from "./folderNotes";
 import type { MainNode } from "./mainTree";
 import type { VaultDir } from "./vaultDir";
@@ -123,7 +123,7 @@ export async function writeFolderViews(
           ignored.revision,
         );
       }
-      await syncSecureIgnore(dir, [".rotli/*", `!${mainPath}`, `!${path}`]);
+      await updateGitExclusions(dir, [".rotli/*", `!${mainPath}`, `!${path}`]);
     }
     await writeVersionedFile(dir, path, contents, expectedRevision);
     manifestWritten = true;
