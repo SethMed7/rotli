@@ -17,6 +17,14 @@
       "sourceOfTruth": "src/sheets/kinds.ts SHEET_EDIT_MAX_BYTES ↔ src-tauri/src/corpus.rs SHEET_EDIT_MAX_BYTES",
       "value": 8000000
     },
+    "sheetPackageExts": {
+      "sourceOfTruth": "src/sheets/kinds.ts SHEET_BIN ↔ src-tauri/src/corpus.rs SHEET_PACKAGE_EXTS (secure AI byte reads)",
+      "value": ["xlsx", "xlsm", "xltx", "xltm"]
+    },
+    "docxPackageExts": {
+      "sourceOfTruth": "src/documents/kinds.ts DOCX_EDITABLE_EXTS ↔ src-tauri/src/corpus.rs DOCX_PACKAGE_EXTS (secure AI byte reads)",
+      "value": ["docx", "docm", "dotx", "dotm"]
+    },
     "chatImageAssetExts": {
       "sourceOfTruth": "src/lib/chatWork.ts CHAT_IMAGE_ASSET_EXTS ↔ src-tauri/src/corpus.rs CHAT_IMAGE_ASSET_EXTS",
       "value": [

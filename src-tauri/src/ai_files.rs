@@ -12,6 +12,9 @@ use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use quick_xml::escape::unescape;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::{compose_root_id, split_root_id, CorpusState};
@@ -182,62 +185,86 @@ fn zip_xml_names(bytes: &[u8]) -> Result<Vec<String>, String> {
 pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
     let mut text = String::new();
     for name in zip_xml_names(bytes)? {
-        let xml = String::from_utf8(
-            zip_entry(bytes, &name).map_err(|_| "not a readable spreadsheet".to_string())?,
-        )
-            .map_err(|_| "not a readable spreadsheet".to_string())?;
-        if name == "xl/sharedStrings.xml" {
-            for item in xml_elements(&xml, "si") {
-                for run in xml_elements(item, "t") {
-                    text.push_str(run);
-                }
-                text.push(' ');
-            }
-        } else {
-            for item in xml_elements(&xml, "is") {
-                for run in xml_elements(item, "t") {
-                    text.push_str(run);
-                }
-                text.push(' ');
-            }
-            for value in xml_elements(&xml, "v") {
-                text.push_str(value);
-                text.push(' ');
-            }
+        let xml = zip_entry(bytes, &name).map_err(|_| "not a readable spreadsheet".to_string())?;
+        if xml.len() > MAX_XML_BYTES as usize {
+            return Err("the spreadsheet's text is too large to check".into());
         }
-        if text.len() > MAX_XML_BYTES as usize {
+        spreadsheet_part_text(&xml, name == "xl/sharedStrings.xml", &mut text)?;
+    }
+    if text.trim().is_empty() {
+        return Err("not a readable spreadsheet".into());
+    }
+    Ok(text)
+}
+
+/// OOXML permits arbitrary namespace prefixes; Strict OOXML also uses a
+/// different namespace URI. Only the local element name carries this text
+/// policy. Parse XML rather than matching literal `<t>` or `<x:t>` strings.
+fn spreadsheet_part_text(xml: &[u8], shared: bool, text: &mut String) -> Result<(), String> {
+    let bad = || "not a readable spreadsheet".to_string();
+    let mut reader = Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut seen_root = false;
+    let mut in_item = false;
+    let mut item_text = String::new();
+    let root = if shared {
+        b"sst".as_slice()
+    } else {
+        b"worksheet".as_slice()
+    };
+    loop {
+        match reader.read_event().map_err(|_| bad())? {
+            Event::Start(start) => {
+                let local = start.local_name();
+                let local = local.as_ref();
+                if depth == 0 {
+                    if seen_root || local != root {
+                        return Err(bad());
+                    }
+                    seen_root = true;
+                }
+                if (shared && local == b"si") || (!shared && local == b"is") {
+                    in_item = true;
+                    item_text.clear();
+                }
+                if (in_item && local == b"t") || (!shared && local == b"v") {
+                    let raw = reader.read_text(start.name()).map_err(|_| bad())?;
+                    let decoded = raw.decode().map_err(|_| bad())?;
+                    let value = unescape(&decoded).map_err(|_| bad())?;
+                    if local == b"t" {
+                        item_text.push_str(&value);
+                    } else {
+                        text.push_str(&value);
+                        text.push(' ');
+                    }
+                } else {
+                    depth += 1;
+                }
+            }
+            Event::End(end) => {
+                let local = end.local_name();
+                if in_item
+                    && ((shared && local.as_ref() == b"si")
+                        || (!shared && local.as_ref() == b"is"))
+                {
+                    text.push_str(&item_text);
+                    text.push(' ');
+                    in_item = false;
+                    item_text.clear();
+                }
+                depth = depth.checked_sub(1).ok_or_else(bad)?;
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        if text.len() + item_text.len() > MAX_XML_BYTES as usize {
             return Err("the spreadsheet's text is too large to check".into());
         }
     }
-    Ok(text
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&"))
-}
-
-fn xml_elements<'a>(xml: &'a str, name: &str) -> Vec<&'a str> {
-    let opening = format!("<{name}");
-    let closing = format!("</{name}>");
-    let mut out = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find(&opening) {
-        rest = &rest[start + opening.len()..];
-        if !rest.starts_with('>') && !rest.starts_with(char::is_whitespace) {
-            continue;
-        }
-        let Some(open_end) = rest.find('>') else {
-            break;
-        };
-        rest = &rest[open_end + 1..];
-        let Some(close) = rest.find(&closing) else {
-            break;
-        };
-        out.push(&rest[..close]);
-        rest = &rest[close + closing.len()..];
+    if !seen_root || depth != 0 || in_item {
+        return Err(bad());
     }
-    out
+    Ok(())
 }
 
 /// The visible text of a .docx, paragraph by paragraph: what the secret

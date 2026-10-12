@@ -113,11 +113,78 @@ fn allowed_local_secure_xlsx_text_enters_remote_overlap_ledger() {
 }
 
 #[test]
+fn prefixed_strict_workbook_text_enters_remote_overlap_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    let rel = "Secure notes/strict.xlsx";
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let prose = "The copper lighthouse meeting begins after the first snowfall.";
+    let shared = format!(
+        "<x:sst xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"><x:si><x:t>{prose}</x:t></x:si></x:sst>"
+    );
+    let sheet = "<x:worksheet xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"><x:sheetData><x:row><x:c t=\"s\"><x:v>0</x:v></x:c></x:row></x:sheetData></x:worksheet>";
+    let bytes = crate::ai_files::tests::zip_with(
+        &[
+            ("xl/sharedStrings.xml", shared.as_bytes()),
+            ("xl/worksheets/sheet1.xml", sheet.as_bytes()),
+        ],
+        true,
+    );
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(prose));
+}
+
+#[test]
+fn a_workbook_with_undecodable_sheet_text_refuses_a_secure_local_read() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    let rel = "Secure notes/undecodable.xlsx";
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let sheet = b"<x:worksheet xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"><x:sheetData><x:row><x:c><x:unreadable>private prose</x:unreadable></x:c></x:row></x:sheetData></x:worksheet>";
+    let bytes = crate::ai_files::tests::zip_with(&[("xl/worksheets/sheet1.xml", sheet)], true);
+    fs::write(store.root().join(rel), bytes).unwrap();
+    assert!(store.read_file_bytes_for_ai(rel, true).is_err());
+}
+
+#[test]
+fn every_office_package_extension_uses_extracted_text_for_secure_reads() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    for ext in ["xlsx", "xlsm", "xltx", "xltm"] {
+        let rel = format!("Secure notes/workbook.{ext}");
+        let prose = format!("Amber {ext} travels past velvet {ext} toward indigo {ext} skies.");
+        let sheet = format!(
+            "<worksheet><sheetData><row><c t=\"inlineStr\"><is><t>{prose}</t></is></c></row></sheetData></worksheet>"
+        );
+        let bytes = crate::ai_files::tests::zip_with(
+            &[("xl/worksheets/sheet1.xml", sheet.as_bytes())],
+            true,
+        );
+        fs::write(store.root().join(&rel), bytes).unwrap();
+        store.read_file_bytes_for_ai(&rel, true).unwrap();
+        assert!(crate::secret::blocked_for_remote(&prose), "{rel}");
+    }
+    for ext in ["docx", "docm", "dotx", "dotm"] {
+        let rel = format!("Secure notes/document.{ext}");
+        let prose = format!("Crimson {ext} waits beside cobalt {ext} beneath silver {ext} clouds.");
+        let xml = format!(
+            "<w:document><w:body><w:p><w:t>{prose}</w:t></w:p></w:body></w:document>"
+        );
+        let bytes = crate::ai_files::tests::zip_with(&[("word/document.xml", xml.as_bytes())], true);
+        fs::write(store.root().join(&rel), bytes).unwrap();
+        store.read_file_bytes_for_ai(&rel, true).unwrap();
+        assert!(crate::secret::blocked_for_remote(&prose), "{rel}");
+    }
+}
+
+#[test]
 fn unreadable_secure_office_packages_refuse_local_ai_reads() {
     let tmp = TempDir::new().unwrap();
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
     fs::create_dir_all(store.root().join("Secure notes")).unwrap();
-    for ext in ["docx", "xlsx"] {
+    for ext in ["docx", "docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm"] {
         let rel = format!("Secure notes/damaged.{ext}");
         fs::write(store.root().join(&rel), b"not an office package").unwrap();
         assert!(store.read_file_bytes_for_ai(&rel, true).is_err(), "{rel}");

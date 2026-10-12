@@ -1529,6 +1529,10 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
 }
 
 pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
+/// AI byte reads extract these package families before remembering secure prose.
+/// Byte-identical to SHEET_BIN and DOCX_EDITABLE_EXTS (parity.json).
+pub(crate) const SHEET_PACKAGE_EXTS: &[&str] = &["xlsx", "xlsm", "xltx", "xltm"];
+pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
 
 /// The reserved PROVENANCE keys the raw-metadata editor must never change —
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
@@ -3949,11 +3953,17 @@ impl CorpusStore {
         let abs = self.file_for_ai(rel, model_is_local)?;
         let data = fs::read(abs).map_err(|e| e.to_string())?;
         if model_is_local && self.file_is_protected(rel) {
-            let ext = Path::new(rel).extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase();
-            let text = match ext.as_str() {
-                "docx" | "docm" | "dotx" | "dotm" => crate::ai_files::docx_text(&data)?,
-                "xlsx" => crate::ai_files::xlsx_text(&data)?,
-                _ => String::from_utf8_lossy(&data).into_owned(),
+            let ext = Path::new(rel)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let text = if DOCX_PACKAGE_EXTS.contains(&ext.as_str()) {
+                crate::ai_files::docx_text(&data)?
+            } else if SHEET_PACKAGE_EXTS.contains(&ext.as_str()) {
+                crate::ai_files::xlsx_text(&data)?
+            } else {
+                String::from_utf8_lossy(&data).into_owned()
             };
             crate::secret::remember_secure_text(&text);
         }

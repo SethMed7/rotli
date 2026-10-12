@@ -5,7 +5,7 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 /** Binary workbook formats the read path handles via base64 (exceljs).
  * `.xls`/`.ods` were dropped with SheetJS (2026-07): no editor, no preview —
  * the workspace-not-preview-catalog rule. */
-export const SHEET_BIN = new Set(["xlsx", "xlsm"]);
+export const SHEET_BIN = new Set(["xlsx", "xlsm", "xltx", "xltm"]);
 
 /** Text tabular formats the read path handles as UTF-8. */
 export const SHEET_TEXT = new Set(["csv", "tsv"]);

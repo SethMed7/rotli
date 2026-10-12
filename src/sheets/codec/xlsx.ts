@@ -4,6 +4,36 @@ import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 import JSZip from "jszip";
 
+const SPREADSHEET_NAMESPACE = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_SPREADSHEET_NAMESPACE = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+
+/** ExcelJS matches literal element names. Normalize only SpreadsheetML tags
+ * before its parser sees packages produced with a prefix or Strict namespace. */
+async function excelJsCompatibleBytes(zip: JSZip, original: ArrayBuffer): Promise<ArrayBuffer> {
+  let changed = false;
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (!name.startsWith("xl/") || !name.endsWith(".xml") || entry.dir) continue;
+    const xml = await entry.async("string");
+    const prefixes = Array.from(
+      xml.matchAll(
+        /xmlns:([A-Za-z_][\w.-]*)=["'](?:http:\/\/schemas\.openxmlformats\.org\/spreadsheetml\/2006\/main|http:\/\/purl\.oclc\.org\/ooxml\/spreadsheetml\/main)["']/g,
+      ),
+      (match) => match[1],
+    );
+    let normalized = xml.replaceAll(STRICT_SPREADSHEET_NAMESPACE, SPREADSHEET_NAMESPACE);
+    for (const prefix of prefixes) {
+      normalized = normalized.replaceAll(`<${prefix}:`, "<").replaceAll(`</${prefix}:`, "</");
+    }
+    if (normalized !== xml) {
+      zip.file(name, normalized);
+      changed = true;
+    }
+  }
+  if (!changed) return original;
+  const bytes = await zip.generateAsync({ type: "uint8array" });
+  return bytes.buffer as ArrayBuffer;
+}
+
 // Surfaces never touch the vendor — the codec is the ONE exceljs seam.
 export type { Workbook } from "exceljs";
 
@@ -43,7 +73,7 @@ export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
     );
   }
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(bytes);
+  await wb.xlsx.load(await excelJsCompatibleBytes(zip, bytes));
   return wb;
 }
 

@@ -18,7 +18,7 @@ import fixture from "../../scripts/fixtures/parity.json";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
-import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
+import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
@@ -32,7 +32,7 @@ import { canvasHome } from "../services/folderCanvases";
 import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
-import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
+import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
@@ -64,6 +64,14 @@ describe("parity.json ↔ TS constants", () => {
 
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
+  });
+
+  test("sheetPackageExts", () => {
+    expect([...SHEET_BIN]).toEqual(entries.sheetPackageExts.value);
+  });
+
+  test("docxPackageExts", () => {
+    expect<string[]>([...DOCX_EDITABLE_EXTS]).toEqual(entries.docxPackageExts.value);
   });
 
   test("chatImageAssetExts", () => {
