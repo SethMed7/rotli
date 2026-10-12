@@ -16,6 +16,7 @@ import {
   corpusMoveFileToSink,
   corpusRevealFile,
   corpusSetPinned,
+  isTauri,
 } from "../lib/tauri";
 import { openChatForNote } from "../noteChat/composition";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
@@ -168,11 +169,13 @@ export function useNoteMenu() {
                     {
                       kind: "action" as const,
                       label: "Show in Finder",
+                      disabled: !isTauri(),
                       onClick: () => void corpusRevealFile(note.id),
                     },
                     {
                       kind: "action" as const,
                       label: "Copy File Path",
+                      disabled: !isTauri(),
                       onClick: () => {
                         useUiStore.getState().setRowActionError(null);
                         void copyFilePath(note.id);
@@ -320,6 +323,7 @@ export function useNoteMenu() {
           items.push({
             kind: "action" as const,
             label: "Show in Finder",
+            disabled: !isTauri(),
             onClick: () => {
               // failures surfaced in the sidebar's inline error note — this
               // silently no-op'd for months while the Rust side threw (the maintainer #63)
@@ -337,6 +341,7 @@ export function useNoteMenu() {
           items.push({
             kind: "action" as const,
             label: "Copy File Path",
+            disabled: !isTauri(),
             onClick: () => {
               useUiStore.getState().setRowActionError(null);
               void copyFilePath(note.id);

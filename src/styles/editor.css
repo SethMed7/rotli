@@ -135,7 +135,9 @@
   font-weight: 600;
 }
 
-@media (max-width: 760px) {
+/* a phone-narrow window: the header wraps at word boundaries instead of
+   clipping mid-word; above this it stays one line so the note keeps its height */
+@media (max-width: 680px) {
   .ed-head {
     white-space: normal;
     align-items: flex-start;
