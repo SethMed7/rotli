@@ -58,5 +58,6 @@
     "src/services": 0.65,
     "src/editor": 0.5
   },
-  "dupClusters": 226
+  "dupClusters": 226,
+  "runtimeGates": 70
 }

@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Helper protects files and secure notes throughout a session.** A
+  case-only move refuses a different file already holding the destination;
+  chat checks every secure note in the current vault before every turn, however
+  large the vault, and refuses if they cannot be checked. Oversized reads are
+  refused, batches stay within their budget, and no folder can take a writer's
+  `.lock` name.
+- **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
+  vault metadata writes now refuse stale content; moving a file waits for
+  in-flight saves. Secure notes keep their Git exclusion when moved, and
+  recovered edits keep their secure and locked flags. Words typed into a new
+  note before its file appears survive a hard refresh.
 - **Rotli Web pastes images into notes.** Pasted image bytes now land in the
   connected vault, with a portable Markdown link at the caret.
 - **Note chat entry points use the web setup path.** Row menus and search open
@@ -25,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in its buffer.
 - **Narrow web windows keep labels readable.** Note header metadata wraps at
   word boundaries and the palette footer keeps its key actions on one line.
-
 - **Rotli Web fills missing note identity and dates on save or move.** Editing
   a hand-written note with frontmatter no longer leaves blank `id`, `created`,
   or `updated` fields, and moving it keeps its original edit date.
@@ -67,11 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
   search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8
-  source bytes and save with an
-  adapter-checked content revision. Office files explain their web limitation, and native-only file actions
-  stay hidden.
-- **Rotli Helper refuses secure prose from large vaults.** Prompt checks include
-  every secure note even when the process ledger reaches its phrase limit.
+  source bytes and save with an adapter-checked content revision. Office files
+  explain their web limitation, and native-only file actions stay hidden.
 
 ### Changed
 
@@ -416,16 +423,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Rotli Helper protects files and secure notes throughout a session.** A
-  case-only move refuses a different file already holding the destination;
-  chat checks the current vault's secure notes again before every turn and
-  refuses if they cannot be checked. Oversized reads are refused, batches
-  stay within their budget, and no folder can take a writer's `.lock` name.
-- **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
-  vault metadata writes now refuse stale content; moving a file waits for
-  in-flight saves. Secure notes keep their Git exclusion when moved, and
-  recovered edits keep their secure and locked flags. Words typed into a new
-  note before its file appears survive a hard refresh.
 - **rotli.co's film plays everywhere, and screen readers describe the film
   you see.** Its description still told of the earlier film; an error page
   could also be kept by the site's cache for a day, which hid the new film

@@ -74,7 +74,16 @@ for (const entry of readdirSync(join(root, "src"), { withFileTypes: true })) {
   if (modules >= COVERAGE_MIN_MODULES) coverage[`src/${entry.name}`] = Number((tests / modules).toFixed(2));
 }
 
-const current = { fileLines, sourceShapeAssertions, provenanceComments, coverage };
+// 5. Runtime capability gates in presentation: the BUILD decides what a
+// surface offers (PLATFORM / LAUNCH_FEATURES); isTauri() only picks an
+// adapter. Gating on the runtime hid desktop actions in the desktop twin lane
+// and leaked them on the web (review of the web parity batch, three lanes).
+const presentationRoots = ["src/components", "src/editor", "src/keys"];
+const runtimeGates = presentationRoots
+  .flatMap((dir) => walk(join(root, dir), (p) => /\.tsx?$/.test(p) && !/\.test\.tsx?$/.test(p)))
+  .reduce((n, p) => n + (readFileSync(p, "utf8").match(/\bisTauri\(\)/g) ?? []).length, 0);
+
+const current = { fileLines, sourceShapeAssertions, provenanceComments, coverage, runtimeGates };
 
 if (update || !existsSync(baselinePath)) {
   // dupClusters is owned by check:dup --gate; carry it across an update
@@ -114,6 +123,10 @@ for (const [k, v] of Object.entries(provenanceComments)) {
       `${k} comments rose to ${v} (ceiling ${baseline.provenanceComments[k]}) — keep the rationale, drop the attribution/phase name (git blame + CHANGELOG own provenance)`,
     );
 }
+if (runtimeGates > (baseline.runtimeGates ?? runtimeGates))
+  failures.push(
+    `isTauri() calls in presentation rose to ${runtimeGates} (ceiling ${baseline.runtimeGates}) — gate what a surface offers on PLATFORM / LAUNCH_FEATURES; isTauri() only chooses an adapter`,
+  );
 for (const [dir, ratio] of Object.entries(coverage)) {
   // a ratchet: the recorded ratio is the floor once it is above the constant —
   // Math.min let a directory stay wherever it had sunk to (audit 2026-09-03)
