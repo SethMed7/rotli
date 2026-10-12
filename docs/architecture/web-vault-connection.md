@@ -31,6 +31,12 @@ Decided by the owner on 2026-09-22; the history is in
    Helper also compares the prompt directly with each secure body using the
    ledger's phrase rule, so an early note remains protected even when a large
    vault exceeds the ledger's 50,000-phrase capacity.
+   On the browser folder road (`vaultRoad: "folder"`) the Helper cannot see
+   the page's folder, so that refresh covers only a vault the Helper itself
+   serves, if any. There the page is the enforcer: a chat that has read a
+   secure note is refused for a remote model (`ai/host.ts`), and the Helper
+   adds only `blocked_for_remote` (secure markers and secret shapes), not a
+   body comparison against the page's vault.
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own

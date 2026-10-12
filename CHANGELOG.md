@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Rotli Helper protects files and secure notes throughout a session.** A
   case-only move refuses a different file already holding the destination;
-  chat checks every secure note in the current vault before every turn, however
-  large the vault, and refuses if they cannot be checked. Oversized reads are
+  chat from a Helper-served vault checks every secure note in that vault
+  before every turn, however large the vault, and refuses if they cannot be
+  checked. With a browser folder, the page keeps secure notes out of chat. Oversized reads are
   refused, batches stay within their budget, and no folder can take a writer's
   `.lock` name.
 - **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
