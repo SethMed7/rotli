@@ -25,8 +25,9 @@ export interface VaultDir {
   stat(path: string): Promise<VaultStat | null>;
   /** Throws when the file is missing — a caller that may miss checks first. */
   readText(path: string): Promise<string>;
-  /** Creates parent directories as needed. */
-  writeText(path: string, text: string): Promise<void>;
+  /** Creates parents as needed. An expectedContent gate is checked in the same
+   * turn as the write; "0" requires a missing file, otherwise FNV-1a 64. */
+  writeText(path: string, text: string, expectedContent?: string): Promise<void>;
   /** Binary files (images): the same paths, raw bytes. Throws when missing. */
   readBytes(path: string): Promise<Uint8Array>;
   writeBytes(path: string, bytes: Uint8Array): Promise<void>;
@@ -39,6 +40,33 @@ export interface VaultDir {
   move(from: string, to: string): Promise<void>;
   /** A file or an EMPTY directory; a missing path is a no-op. */
   remove(path: string): Promise<void>;
+}
+
+/** Desktop-compatible FNV-1a 64 revision of the exact UTF-8 text observed. */
+export function contentRevision(text: string): string {
+  // the 64-bit hash as four 16-bit words, in plain integer arithmetic:
+  // listing a vault hashes every note, and BigInt per byte is slow in V8.
+  // The FNV prime is 2^40 + 0x1b3: each word times 0x1b3, plus the low two
+  // words shifted 8 bits into the high two (the 2^40 term), then carry.
+  let v0 = 0x2325;
+  let v1 = 0x8422;
+  let v2 = 0x9ce4;
+  let v3 = 0xcbf2;
+  for (const byte of new TextEncoder().encode(text)) {
+    v0 ^= byte;
+    const t0 = v0 * 0x1b3;
+    let t1 = v1 * 0x1b3;
+    let t2 = v2 * 0x1b3 + (v0 << 8);
+    const t3 = v3 * 0x1b3 + (v1 << 8);
+    t1 += t0 >>> 16;
+    v0 = t0 & 0xffff;
+    t2 += t1 >>> 16;
+    v1 = t1 & 0xffff;
+    v3 = (t3 + (t2 >>> 16)) & 0xffff;
+    v2 = t2 & 0xffff;
+  }
+  const word = (v: number) => v.toString(16).padStart(4, "0");
+  return `fnv1a64:${word(v3)}${word(v2)}${word(v1)}${word(v0)}`;
 }
 
 /** Trim the separators a caller may pass ("/wiki/", "wiki//a.md") down to the
@@ -181,11 +209,18 @@ export class MemoryVaultDir implements VaultDir {
     return file.text;
   }
 
-  async writeText(path: string, text: string): Promise<void> {
+  async writeText(path: string, text: string, expectedContent?: string): Promise<void> {
     const key = normalizeVaultPath(path);
     if (!key) throw new Error("a file needs a name");
     if (this.dirs.has(key)) throw new Error(`a directory already holds ${key}`);
     await this.mkdir(parentPath(key));
+    const current = this.files.get(key);
+    if (
+      expectedContent !== undefined &&
+      expectedContent !== (current ? contentRevision(current.text) : "0")
+    ) {
+      throw new Error(`revision conflict on ${key}`);
+    }
     this.files.set(key, { text, lastModified: this.tick(), size: byteLength(text) });
   }
 

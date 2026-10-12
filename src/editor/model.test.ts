@@ -13,6 +13,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { notesService } from "../services/notes";
 import {
+  unsavedDrafts,
   adoptPendingDocument,
   documentSaveError,
   editDocument,
@@ -409,4 +410,34 @@ describe("conflicts resolve themselves (2026-09-03)", () => {
     expect(read(seeded.id)).toEqual(["# Plan", "", "Notes, theirs."]);
     expect(documentSaveError(seeded.id)).toBeNull();
   });
+});
+
+test("non-empty pending typing is included in the synchronous unload journal", () => {
+  touched.add("pending:journal");
+  ensurePendingDocument("pending:journal");
+  editDocument("pending:journal", () => ["typed while creation was pending"]);
+  expect(unsavedDrafts().find((draft) => draft.noteId === "pending:journal")?.body).toBe(
+    "typed while creation was pending",
+  );
+  expect(unsavedDrafts().find((draft) => draft.noteId === "pending:journal")?.protection).toEqual({
+    secure: false,
+    locked: false,
+  });
+});
+
+test("a quit conflict copy keeps a secure locked note protected", async () => {
+  const folder = await notesService.createFolder("Protected conflicts");
+  const note = await notesService.createNote(folder.id, "# Private\n\nbefore", {
+    secure: true,
+    locked: true,
+  });
+  touched.add(note.id);
+  setWriteNoteBodyForTests(() => Promise.reject(new Error("revision conflict: changed")));
+  setReadNoteForTests(() => notesService.getNote(note.id));
+  ensureDocument(note.id, note.body, note.revision, note);
+  editDocument(note.id, () => ["# Private", "", "mine"]);
+  await flushNote(note.id);
+  await flushSyncs();
+  const copy = (await notesService.listNotes(folder.id)).find((item) => item.id !== note.id);
+  expect(copy).toMatchObject({ secure: true, locked: true });
 });

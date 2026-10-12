@@ -177,8 +177,9 @@ describe("creating notes", () => {
     const dir = await memexVault();
     const notes = new FolderNotesService(dir);
     await notes.createNote(DEST.inbox, "# Keys\n", { secure: true });
-    const fm = parseNoteDocument(await dir.readText("wiki/_inbox/keys.md")).frontmatter;
+    const fm = parseNoteDocument(await dir.readText("wiki/_secure/keys.md")).frontmatter;
     expect(fm?.foreign).toContain("secure: true");
+    expect((await dir.readText(".gitignore")).split("\n")).toContain("wiki/_secure/keys.md");
   });
 });
 

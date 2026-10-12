@@ -37,3 +37,55 @@ describe("folder-backed vault store", () => {
     expect(await vault.read("settings:settings")).toBe('{"theme":"dark"}');
   });
 });
+
+test("manifest bytes and their revision stay paired across an external save", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText(".rotli/main.json", "before");
+  const read = dir.readText.bind(dir);
+  let changed = false;
+  dir.readText = async (path) => {
+    const text = await read(path);
+    if (!changed) {
+      changed = true;
+      await dir.writeText(path, "external");
+    }
+    return text;
+  };
+  const vault = new BrowserVault(new FolderVaultStore(dir));
+  const opened = await vault.readVersioned("main");
+  if (opened.contents === "before") {
+    await expect(vault.writeVersioned("main", "mine", opened.revision)).rejects.toThrow("revision conflict");
+  } else expect(opened.contents).toBe("external");
+  expect(await read(".rotli/main.json")).toBe("external");
+});
+
+test("a manifest write carries its check into the adapter", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText(".rotli/main.json", "before");
+  const vault = new BrowserVault(new FolderVaultStore(dir));
+  const opened = await vault.readVersioned("main");
+  const write = dir.writeText.bind(dir);
+  dir.writeText = async (path, text, ...gate) => {
+    if (text === "mine") await write(path, "external");
+    return write(path, text, ...gate);
+  };
+  await expect(vault.writeVersioned("main", "mine", opened.revision)).rejects.toThrow("revision conflict");
+  expect(await dir.readText(".rotli/main.json")).toBe("external");
+});
+
+test("a manifest write returns the revision of its own bytes after a later save", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText(".rotli/main.json", "before");
+  const store = new FolderVaultStore(dir);
+  const vault = new BrowserVault(store);
+  const opened = await vault.readVersioned("main");
+  const swap = store.compareAndSwap.bind(store);
+  store.compareAndSwap = async (...args) => {
+    const swapped = await swap(...args);
+    if (swapped) await dir.writeText(".rotli/main.json", "external");
+    return swapped;
+  };
+  const mineRevision = await vault.writeVersioned("main", "mine", opened.revision);
+  await expect(vault.writeVersioned("main", "next", mineRevision)).rejects.toThrow("revision conflict");
+  expect(await dir.readText(".rotli/main.json")).toBe("external");
+});

@@ -12,6 +12,8 @@ export const SECURE_BRAIN_FOLDER = "wiki/_secure";
 export interface NoteCreationPolicy {
   /** Secure notes are gitignored and categorically unavailable to remote AI. */
   secure?: boolean;
+  /** Preserve a locked note when recovering an unsaved browser draft. */
+  locked?: boolean;
   /** Which AI made the note (`created_by`); absent for a person, whose notes
    * no AI may rewrite without a grant (src/lib/aiEditPolicy.ts). */
   createdBy?: NoteCreator;

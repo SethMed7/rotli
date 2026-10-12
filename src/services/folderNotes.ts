@@ -45,10 +45,29 @@ import {
   isSecureNote,
   memexNoteFolder,
   readMemexContract,
+  removeGitExclusion,
 } from "./folderMemexNotes";
+import {
+  SINK_DIRS,
+  WIKI,
+  WIKI_INBOX,
+  WIKI_SECURE,
+  diskDirFor,
+  relocationTarget,
+  under,
+  withoutSinkPrefix,
+} from "./folderNoteRelocation";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
-import { type VaultDir, baseName, freeVaultPath, joinVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
+import {
+  type VaultDir,
+  contentRevision,
+  baseName,
+  freeVaultPath,
+  joinVaultPath,
+  parentPath,
+  vaultIsMemex,
+} from "./vaultDir";
 
 /** A board, or a canvas where this build opens canvases: a raw file named by
  * its path, never frontmatter. */
@@ -63,15 +82,6 @@ const MEMEX_NOTE_ROOTS = ["wiki", "chats", "archive", "trash"] as const;
 // chats/ is indexed (the Library shows it; All notes still hides it through
 // isChats); the memory lanes stay out of the note universe
 const SKIPPED_ROOTS = new Set(["identity", "personality", "history", "node_modules"]);
-const WIKI = "wiki";
-const WIKI_INBOX = "wiki/_inbox";
-const WIKI_SECURE = "wiki/_secure";
-/** The disk name of each never-delete sink, in projection order. */
-const SINK_DIRS: { dir: string; dest: string }[] = [
-  { dir: "archive", dest: DEST.archive },
-  { dir: "trash", dest: DEST.trash },
-];
-const under = (path: string, root: string): boolean => path === root || path.startsWith(`${root}/`);
 
 /** Cached bytes for one file, keyed by the revision they were read at. */
 interface CachedFile {
@@ -106,24 +116,6 @@ export function projectVaultFolder(
     return fm && shelfOf(fm).includes(DEST.inbox) ? DEST.board : WIKI_SECURE;
   }
   return diskFolderId;
-}
-
-/** The physical directory a move target names, or null when the target is a
- * projection with no disk home (a shelf name) and only the shelf line moves. */
-function diskDirFor(folderId: string, isMemex: boolean): string | null {
-  if (!isMemex) return folderId === DEST.inbox ? "" : folderId;
-  if (folderId === DEST.board) return WIKI_INBOX;
-  if (under(folderId, WIKI)) return folderId;
-  return null;
-}
-
-/** A sink-relative path with its `archive/`/`trash/` prefix removed, so a note
- * moved between sinks never nests one inside the other. */
-function withoutSinkPrefix(path: string): string {
-  for (const sink of SINK_DIRS) {
-    if (path.startsWith(`${sink.dir}/`)) return path.slice(sink.dir.length + 1);
-  }
-  return path;
 }
 
 export class FolderNotesService implements NotesService {
@@ -194,8 +186,8 @@ export class FolderNotesService implements NotesService {
     return text;
   }
 
-  private async writeFile(path: string, text: string): Promise<void> {
-    await this.dir.writeText(path, text);
+  private async writeFile(path: string, text: string, expectedContent?: string): Promise<void> {
+    await this.dir.writeText(path, text, expectedContent);
     this.cache.delete(path);
   }
 
@@ -221,12 +213,14 @@ export class FolderNotesService implements NotesService {
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
-      secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
+      secure:
+        under(withoutSinkPrefix(path), WIKI_SECURE) ||
+        (frontmatter ? isSecureFrontmatter(frontmatter) : false),
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
       suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),
       body,
-      revision: `${stat.lastModified}:${stat.size}`,
+      revision: contentRevision(text),
     };
   }
 
@@ -418,7 +412,7 @@ export class FolderNotesService implements NotesService {
     await this.ensureIndex();
     const title = titleOf(body);
     const id = ulid();
-    const dir = this.isMemex ? WIKI_INBOX : "";
+    const dir = policy?.secure && this.isMemex ? WIKI_SECURE : this.isMemex ? WIKI_INBOX : "";
     const path = await this.freePath(dir, `${noteStem(title, id)}.md`);
     const text = composeNote(
       {
@@ -432,7 +426,10 @@ export class FolderNotesService implements NotesService {
       body,
       today(),
     );
-    await this.writeFile(path, text);
+    const protectedText = policy?.locked ? text.replace("\n---\n", "\nlocked: true\n---\n") : text;
+    const exactBodyText = body && !body.endsWith("\n") ? protectedText.slice(0, -1) : protectedText;
+    if (policy?.secure) await ignoreInGit(this.dir, path);
+    await this.writeFile(path, exactBodyText);
     this.reindex(id, id, path);
     return this.noteAt(path);
   }
@@ -467,18 +464,21 @@ export class FolderNotesService implements NotesService {
   async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
     const path = await this.pathOf(id);
     if (isPathItem(path)) throw new Error(`not a note: ${id}`);
-    const current = await this.noteAt(path);
-    if (!expectedRevision || (expectedRevision !== current.revision && expectedBody !== current.body)) {
+    const original = await this.readFile(path);
+    const revision = contentRevision(original);
+    const { frontmatter, body: currentBody } = parseNoteDocument(original);
+    if (!expectedRevision || (expectedRevision !== revision && expectedBody !== currentBody)) {
       throw new Error(
-        `revision conflict: expected ${expectedRevision || "(missing)"}, found ${current.revision}; the note changed after it was opened`,
+        `revision conflict: expected ${expectedRevision || "(missing)"}, found ${revision}; the note changed after it was opened`,
       );
     }
-    const { frontmatter } = parseNoteDocument(await this.readFile(path));
     // A file with no fence stays fenceless: a plain Markdown vault must not
     // sprout frontmatter the moment Rotli saves it.
     const text = frontmatter ? composeNoteDocument({ ...frontmatter, updated: today() }, body) : body;
-    await this.writeFile(path, text);
-    return this.noteAt(path);
+    await this.writeFile(path, text, revision);
+    const saved = await this.noteAt(path);
+    if (saved.revision !== contentRevision(text)) throw new Error(`revision conflict on ${path}`);
+    return saved;
   }
 
   async deleteNote(id: string): Promise<void> {
@@ -500,31 +500,23 @@ export class FolderNotesService implements NotesService {
    * is. Only `updateNote` stamps `updated` — a move never does. */
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const path = await this.pathOf(id);
-    if (isPathItem(path)) return this.moveFile(id, path, this.targetPath(path, targetFolder));
-    const current = await this.noteAt(path);
-    const { frontmatter, body } = parseNoteDocument(await this.readFile(path));
-    if (!frontmatter) return this.moveFile(id, path, this.targetPath(path, targetFolder));
+    if (isPathItem(path)) return this.moveFile(id, path, relocationTarget(path, targetFolder, this.isMemex));
+    const original = await this.readFile(path);
+    const { frontmatter, body } = parseNoteDocument(original);
+    if (!frontmatter) return this.moveFile(id, path, relocationTarget(path, targetFolder, this.isMemex));
     let next = frontmatter;
-    if (isSink(targetFolder) && !isSink(current.folderId)) next = { ...next, origin: current.folderId };
+    const folderId = projectVaultFolder(parentPath(path), frontmatter, this.isMemex);
+    if (isSink(targetFolder) && !isSink(folderId)) next = { ...next, origin: folderId };
     else if (!isSink(targetFolder) && next.origin !== null) next = { ...next, origin: null };
-    const toDisk = this.targetPath(path, targetFolder);
+    const toDisk = relocationTarget(path, targetFolder, this.isMemex);
     if (toDisk === path && !isSink(targetFolder) && diskDirFor(targetFolder, this.isMemex) === null) {
       next = withShelf(next, [targetFolder]);
     }
     // an untouched frontmatter is never rewritten: a plain wiki -> wiki move
     // must not normalize a hand-authored file for no reason
-    if (next !== frontmatter) await this.writeFile(path, composeNoteDocument(next, body));
+    if (next !== frontmatter)
+      await this.writeFile(path, composeNoteDocument(next, body), contentRevision(original));
     return this.moveFile(id, path, toDisk);
-  }
-
-  /** Where `targetFolder` puts the file: beneath a sink with the original path
-   * preserved, inside the named `wiki/**` directory, or nowhere at all. */
-  private targetPath(path: string, targetFolder: string): string {
-    for (const sink of SINK_DIRS) {
-      if (under(targetFolder, sink.dest)) return joinVaultPath(sink.dir, withoutSinkPrefix(path));
-    }
-    const dir = diskDirFor(targetFolder, this.isMemex);
-    return dir === null ? path : joinVaultPath(dir, baseName(path));
   }
 
   /** The one file relocation. A target a sibling already holds gets the next
@@ -537,7 +529,10 @@ export class FolderNotesService implements NotesService {
       if (to.toLowerCase() !== from.toLowerCase() && (await this.dir.exists(to))) {
         to = await this.freePath(parentPath(to), baseName(to));
       }
+      const secure = !isPathItem(from) && ((await this.noteAt(from)).secure || under(from, WIKI_SECURE));
+      if (secure) await ignoreInGit(this.dir, to);
       await this.dir.move(from, to);
+      if (secure) await removeGitExclusion(this.dir, from).catch(() => undefined);
       this.cache.delete(from);
       this.cache.delete(to);
     }
@@ -570,11 +565,15 @@ export class FolderNotesService implements NotesService {
   }
 
   private async clearOrigin(id: string, path: string): Promise<Note> {
-    const { frontmatter, body } = isPathItem(path)
-      ? { frontmatter: null, body: "" }
-      : parseNoteDocument(await this.readFile(path));
-    if (frontmatter && frontmatter.origin !== null) {
-      await this.writeFile(path, composeNoteDocument({ ...frontmatter, origin: null }, body));
+    const original = isPathItem(path) ? null : await this.readFile(path);
+    const { frontmatter, body } =
+      original === null ? { frontmatter: null, body: "" } : parseNoteDocument(original);
+    if (original !== null && frontmatter && frontmatter.origin !== null) {
+      await this.writeFile(
+        path,
+        composeNoteDocument({ ...frontmatter, origin: null }, body),
+        contentRevision(original),
+      );
     }
     const note = await this.noteAt(path);
     this.reindex(id, note.id, path);

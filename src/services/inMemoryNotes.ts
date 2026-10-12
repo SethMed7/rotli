@@ -189,6 +189,7 @@ export class InMemoryNotesService implements NotesService {
       updatedAt: now,
       pinned: false,
       ...(policy?.secure ? { secure: true } : {}),
+      ...(policy?.locked ? { locked: true } : {}),
       aiBodyEdit: policy?.createdBy ? "allowed" : "person-written",
       body,
       revision: this.nextRevision(),

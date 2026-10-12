@@ -50,6 +50,12 @@ Both roads implement the same `VaultDir` port (`services/vaultDir.ts`), so the
 notes service (`FolderNotesService`), the `.rotli/` store, chats, and files are
 identical above it. `lib/helperVaultDir.test.ts` runs the port's contract
 against the in-memory reference and the helper adapter.
+Note and `.rotli/` manifest reads derive their revision from the exact text
+returned. Their writes present that content revision to the folder adapter,
+which checks it in the write turn; a concurrent edit is a conflict. Chromium
+holds both source and destination turns for an entire move, through removal.
+Secure note relocation adds the destination to `.gitignore` before moving and
+removes the source exclusion after the move succeeds.
 
 ## The binding and the boot
 
@@ -210,6 +216,10 @@ reached from the search field — and Settings has no Keybindings pane.
   `pagehide` the editor's unsaved text is journaled synchronously to
   localStorage and written into the vault on the next boot, before the editor
   opens (`services/webUnsavedJournal.ts`), under the same never-overwrite rule.
+  The journal includes secure and locked policy; a conflict copy keeps both,
+  and an unknown policy leaves the draft queued. Nonempty typing in a new
+  tab is journaled even while file creation is pending and becomes a note on
+  the next boot if creation did not finish.
   The journal is keyed by the vault's identity on this browser (the helper's
   vault id, or an id this browser mints for a chosen folder and finds again
   whenever that folder is chosen again, even after others — a small map of
