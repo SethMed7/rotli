@@ -14,6 +14,7 @@ import SiteHeader from '../../components/SiteHeader.astro';
 import Catalog from '../../components/features/Catalog.astro';
 import FeatureDetail from '../../components/features/FeatureDetail.astro';
 import FeaturesScene from '../../components/features/FeaturesScene.astro';
+import { application, featureGraph } from '../../agents';
 import { areaOf, visibleFeatures, type Feature } from '../../features';
 import { ogImage } from '../../og';
 import { DOCS_AND_SHEETS, site } from '../../site';
@@ -36,6 +37,7 @@ const { feature } = Astro.props as { feature: Feature | undefined };
       description={feature.line}
       canonicalPath={`/features/${feature.id}/`}
       noindex={!site.indexable}
+      structuredData={featureGraph(feature)}
       {...ogImage('features')}
     >
       <SiteHeader current="features" />
@@ -50,6 +52,7 @@ const { feature } = Astro.props as { feature: Feature | undefined };
       description={`Everything rotli does, in one catalog: the Markdown editor, tasks and links, chat with your notes, the Librarian, Docs and Sheets (${DOCS_AND_SHEETS.inline}), boards, and the privacy rules around them.`}
       canonicalPath="/features/"
       noindex={!site.indexable}
+      structuredData={[application()]}
       markdownPath="/features/index.md"
       {...ogImage('features')}
     >
