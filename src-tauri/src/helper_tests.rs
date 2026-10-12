@@ -251,3 +251,120 @@ fn a_paired_page_writes_a_real_file_in_the_chosen_vault_and_nothing_without_the_
     );
     assert!(escape.starts_with("HTTP/1.1 400"), "{escape}");
 }
+
+/// Completion regressions call the dispatcher directly: no listener or CLI.
+fn completion_helper() -> (tempfile::TempDir, tempfile::TempDir, Helper) {
+    let folder = tempfile::TempDir::new().unwrap();
+    let config = tempfile::TempDir::new().unwrap();
+    let vault = ServedVault::new(config.path(), Box::new(|| Ok(None)));
+    vault.choose(folder.path()).unwrap();
+    let helper = Helper {
+        port: 0, origins: vec![], token: "synthetic".into(),
+        children: Arc::new(Mutex::new(HashMap::new())),
+        in_flight: Mutex::new(HashSet::new()), vault,
+    };
+    (folder, config, helper)
+}
+
+fn completion_refusal(helper: &Helper, prompt: &str) -> (u16, String) {
+    let error = helper.dispatch("cli_complete", &json!({
+        "requestId": "offline-regression", "provider": "definitely-not-a-cli",
+        "model": "synthetic", "prompt": prompt,
+    })).unwrap_err();
+    assert!(helper.children.lock().unwrap().is_empty());
+    assert!(helper.in_flight.lock().unwrap().is_empty());
+    error
+}
+
+#[test]
+fn helper_regression_completion_refreshes_notes_written_through_the_vault() {
+    let (_folder, _config, helper) = completion_helper();
+    let body = "Synthetic amber observatory postpones imaginary telescope delivery until winter.";
+    helper.dispatch("vault_write", &json!({
+        "vaultId": helper.vault.current().unwrap().id, "path": "wiki/secure.md",
+        "text": format!("---\nsecure: true\n---\n{body}"),
+    })).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.0, 400);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_refreshes_external_edits() {
+    let (folder, _config, helper) = completion_helper();
+    let path = folder.path().join("external.md");
+    std::fs::write(&path, "ordinary original note").unwrap();
+    let body = "Synthetic violet submarine reschedules imaginary harbor inspection until autumn.";
+    std::fs::write(&path, format!("---\nsecure: true\n---\n{body}")).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_rereads_config_even_with_unchanged_mtime() {
+    let (_folder, config, helper) = completion_helper();
+    let other = tempfile::TempDir::new().unwrap();
+    let body = "Synthetic copper airship schedules imaginary glacier expedition after springtime.";
+    std::fs::write(other.path().join("secure.md"), format!("---\nsecure: true\n---\n{body}")).unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
+    crate::helper_vault::choose_config(&path, other.path()).unwrap();
+    std::fs::File::open(&path).unwrap().set_times(std::fs::FileTimes::new().set_modified(stamp)).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_fails_closed_when_refresh_cannot_read_the_vault() {
+    let (folder, _config, helper) = completion_helper();
+    drop(folder);
+    let refused = completion_refusal(&helper, "ordinary synthetic prompt");
+    assert_eq!(refused.0, 503);
+    assert!(refused.1.contains("secure notes"), "{}", refused.1);
+}
+
+#[test]
+fn helper_regression_completion_reads_an_oddly_encoded_note_lossily() {
+    let (folder, _config, helper) = completion_helper();
+    // an ordinary note that isn't UTF-8 doesn't switch chat off…
+    std::fs::write(folder.path().join("latin1.md"), [b'c', b'a', b'f', 0xe9]).unwrap();
+    assert!(completion_refusal(&helper, "another ordinary synthetic prompt").1.contains("unknown provider"));
+    // …and a secure one still reads as secure
+    let body = "Synthetic amber lantern guides fictional harbour pilots past the breakwater.";
+    let mut bytes = format!("---\nsecure: true\n---\n{body}\n").into_bytes();
+    bytes.push(0xff);
+    std::fs::write(folder.path().join("odd-secure.md"), bytes).unwrap();
+    assert_eq!(completion_refusal(&helper, body).1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn completion_accepts_ordinary_prompts_and_does_not_write_a_vault_index() {
+    let (folder, _config, helper) = completion_helper();
+    std::fs::write(folder.path().join("ordinary.md"), "A public synthetic note.").unwrap();
+    let refused = completion_refusal(&helper, "A public synthetic question.");
+    assert!(refused.1.contains("unknown provider"));
+    assert!(!folder.path().join(".rotli").exists());
+}
+
+#[test]
+fn completion_refresh_preserves_malformed_secure_and_chat_taint_policy() {
+    let (folder, _config, helper) = completion_helper();
+    for (index, field, body) in [
+        (0, "secure: maybe", "Synthetic indigo balloon delays fictional meadow survey until midsummer."),
+        (1, "secureContext: true", "Synthetic silver caravan postpones fictional desert crossing until midwinter."),
+    ] {
+        std::fs::write(folder.path().join(format!("secure-{index}.MARKDOWN")), format!("---\n{field}\n---\n{body}")).unwrap();
+        assert_eq!(completion_refusal(&helper, body).1, crate::provider_lane::SECRET_MESSAGE);
+    }
+}
+
+#[test]
+fn completion_refuses_an_oversized_note_or_unreadable_config() {
+    let (folder, config, helper) = completion_helper();
+    let file = std::fs::File::create(folder.path().join("large.md")).unwrap();
+    file.set_len(256 * 1024 * 1024 + 1).unwrap();
+    assert_eq!(completion_refusal(&helper, "A synthetic oversized note check.").0, 503);
+    std::fs::remove_file(folder.path().join("large.md")).unwrap();
+    std::fs::write(config.path().join(CONFIG_FILE), "invalid synthetic config").unwrap();
+    assert_eq!(completion_refusal(&helper, "A synthetic invalid config check.").0, 503);
+}

@@ -19,7 +19,13 @@ Decided by the owner on 2026-09-22; the history is in
    names another host, and `e2e/web/rotli-web-privacy.spec.ts` proves the app
    never asks. The one outbound path is a chat the user starts, which runs the
    user's own AI CLI through the helper; secure notes are refused before it
-   runs (`blocked_for_remote`, with the ledger warmed from the served vault).
+   runs (`blocked_for_remote`). Before every completion the helper re-reads
+   its vault config and refreshes the served vault's secure-prose ledger,
+   including helper writes and external edits. An unavailable vault or a
+   failed scan (an unreadable or oversized Markdown file) refuses the
+   completion before a provider process starts; a note that isn't UTF-8 is
+   read lossily, so its markers still count. The refresh is a full,
+   read-only scan; it does not rely on cached timestamps.
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own
@@ -123,7 +129,8 @@ reached from the search field — and Settings has no Keybindings pane.
   or delete of an EXISTING file with no gate at all is refused (only creating
   a file needs none), so no token holder can clobber without saying what it
   saw. A page can never create a `<file>.lock` sidecar (the desktop writers'
-  lock), and Windows junctions are skipped in listings like symlinks. Deletes of a
+  lock), including a directory or ancestor component ending in `.lock`
+  (in any letter case), and Windows junctions are skipped in listings like symlinks. Deletes of a
   file take the same lock and gate, so a delete decided against an older
   version never removes a newer one, and a folder removal never deletes a file
   that has taken the folder's name. A move never replaces an existing file —
@@ -132,7 +139,10 @@ reached from the search field — and Settings has no Keybindings pane.
   by refusal in every `VaultDir` (the port's contract). A case-only rename
   (`a.md` → `A.md`) renames the file itself (helper) or goes through a unique
   temporary name (browser folder), never copy-then-delete, which on a
-  case-insensitive disk deletes the only copy.
+  case-insensitive disk deletes the only copy. The helper uses that rename
+  branch only when the destination identifies the source file (device/inode
+  on Unix, volume/file index on Windows); a distinct differently-cased sibling
+  is a 409 conflict, and an absent destination uses the ordinary no-replace move.
 - **Residual, documented:** in Chromium's folder mode the browser offers no
   no-replace write, so another writer creating a move's target in the same
   instant as the check wins. A write whose text the page never read (a binary,
@@ -144,7 +154,13 @@ reached from the search field — and Settings has no Keybindings pane.
   operation; such a process can already read and write everything the user
   can, and the page has no way to create a link.
 - **Few round trips.** `vault_walk` answers every list/stat in one call and
-  `vault_read_many` batches reads (12 MB per answer). Measured 2026-09-22 on
+  `vault_read_many` batches reads (12 MiB of text per answer). Reads require
+  regular files, check their size before allocating, and read at most the
+  allowed bytes plus one to catch growth after stat. An individual read (an
+  image, a video) has a 256 MiB cap and refuses larger files with 413; a batch also
+  checks its remaining budget and lists oversized or deferred files in its
+  existing `more` array. The client can then read on demand and receive the
+  individual refusal. Measured 2026-09-22 on
   a 900-note, 14 MB vault in Firefox: about 1.3 s per full reload, 11–12
   helper calls.
 - **Behind the same defences as chat**: loopback bind, origin allowlist,

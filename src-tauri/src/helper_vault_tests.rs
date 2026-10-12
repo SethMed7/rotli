@@ -353,3 +353,115 @@ fn a_page_can_never_create_a_writers_lock_sidecar() {
     }
     assert!(!vault.path().join("wiki/a.md.lock").exists());
 }
+
+#[test]
+fn helper_regression_case_only_move_never_replaces_a_distinct_sibling() {
+    let (vault, _config, served) = serving();
+    for ext in ["md", "excalidraw"] {
+        let from = format!("plan.{ext}");
+        let to = format!("Plan.{ext}");
+        fs::write(vault.path().join(&from), "source").unwrap();
+        let created = fs::OpenOptions::new().write(true).create_new(true).open(vault.path().join(&to));
+        let mut target = match created {
+            Ok(target) => target,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                eprintln!("case-sensitive sibling test skipped: this volume folds case");
+                return;
+            }
+            Err(error) => panic!("couldn't create a distinct sibling: {error}"),
+        };
+        use std::io::Write as _;
+        target.write_all(b"destination").unwrap();
+        let refused = call(&served, "vault_move", json!({ "from": from, "to": to })).unwrap_err();
+        assert_eq!(refused.0, 409);
+        assert_eq!(fs::read_to_string(vault.path().join(&from)).unwrap(), "source");
+        assert_eq!(fs::read_to_string(vault.path().join(&to)).unwrap(), "destination");
+    }
+}
+
+#[test]
+fn helper_regression_reads_refuse_oversized_files_then_read_normal_files() {
+    let (vault, _config, served) = serving();
+    let large = fs::File::create(vault.path().join("large.md")).unwrap();
+    large.set_len((READ_ONE_LIMIT + 1) as u64).unwrap();
+    fs::write(vault.path().join("small.md"), "small").unwrap();
+    for encoding in ["text", "base64"] {
+        let result = call(&served, "vault_read", json!({ "path": "large.md", "encoding": encoding }));
+        assert!(result.is_err(), "oversized read must be refused");
+        let refused = result.unwrap_err();
+        assert_eq!(refused.0, 413);
+        assert!(refused.1.contains("too large"));
+    }
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["large.md", "small.md"] })).unwrap();
+    assert!(answer["files"].get("large.md").is_none());
+    assert_eq!(answer["more"], json!(["large.md"]));
+    assert_eq!(answer["files"]["small.md"], "small");
+    assert_eq!(call(&served, "vault_read", json!({ "path": "small.md" })).unwrap(), "small");
+}
+
+#[test]
+fn helper_regression_read_many_checks_remaining_budget_before_reading() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("first.md"), vec![b'a'; READ_MANY_BUDGET - 2]).unwrap();
+    fs::write(vault.path().join("next.md"), "next").unwrap();
+    fs::write(vault.path().join("last.md"), "ok").unwrap();
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["first.md", "next.md", "last.md"] })).unwrap();
+    assert_eq!(answer["more"], json!(["next.md"]));
+    assert!(answer["files"].get("next.md").is_none());
+    assert_eq!(answer["files"]["last.md"], "ok");
+}
+
+#[test]
+fn helper_regression_read_requires_a_regular_file() {
+    let (vault, _config, served) = serving();
+    fs::create_dir(vault.path().join("folder")).unwrap();
+    assert_eq!(call(&served, "vault_read", json!({ "path": "folder" })).unwrap_err().0, 400);
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt as _;
+        let path = std::ffi::CString::new(vault.path().join("pipe").as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+        assert_eq!(call(&served, "vault_read", json!({ "path": "pipe" })).unwrap_err().0, 400);
+    }
+}
+
+#[test]
+fn helper_regression_mutations_refuse_every_lock_path_component() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("source.md"), "source").unwrap();
+    for (command, args) in [
+        ("vault_write", json!({ "path": "wiki/a.md.lock/child.txt", "text": "x" })),
+        ("vault_mkdir", json!({ "path": "wiki/a.md.lock" })),
+        ("vault_mkdir", json!({ "path": "wiki/a.md.LOCK/child" })),
+        ("vault_move", json!({ "from": "source.md", "to": "wiki/a.md.lock/child.txt" })),
+    ] {
+        assert_eq!(call(&served, command, args).unwrap_err().0, 403, "{command}");
+        assert!(!vault.path().join("wiki").exists());
+        assert_eq!(fs::read_to_string(vault.path().join("source.md")).unwrap(), "source");
+    }
+}
+
+#[test]
+fn file_identity_requires_an_existing_matching_file() {
+    let dir = TempDir::new().unwrap();
+    let first = dir.path().join("first.md");
+    let other = dir.path().join("other.md");
+    let alias = dir.path().join("alias.md");
+    fs::write(&first, "same contents").unwrap();
+    fs::write(&other, "same contents").unwrap();
+    fs::hard_link(&first, &alias).unwrap();
+    assert!(same_file(&first, &alias));
+    assert!(!same_file(&first, &other), "equal contents are not file identity");
+    assert!(!same_file(&first, &dir.path().join("absent.md")));
+}
+
+#[test]
+fn read_many_defers_lossy_text_that_would_exceed_the_budget() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("lossy.md"), vec![0xff; READ_MANY_BUDGET / 3 + 1]).unwrap();
+    fs::write(vault.path().join("normal.md"), "normal").unwrap();
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["lossy.md", "normal.md"] })).unwrap();
+    assert_eq!(answer["more"], json!(["lossy.md"]));
+    assert_eq!(answer["files"]["normal.md"], "normal");
+    assert!(answer["files"].get("lossy.md").is_none());
+}

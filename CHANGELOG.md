@@ -353,6 +353,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Helper protects files and secure notes throughout a session.** A
+  case-only move refuses a different file already holding the destination;
+  chat checks the current vault's secure notes again before every turn and
+  refuses if they cannot be checked. Oversized reads are refused, batches
+  stay within their budget, and no folder can take a writer's `.lock` name.
 - **rotli.co's film plays everywhere, and screen readers describe the film
   you see.** Its description still told of the earlier film; an error page
   could also be kept by the site's cache for a day, which hid the new film

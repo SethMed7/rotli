@@ -33,8 +33,8 @@
 //! user can; the page itself has no way to create a link.
 //!
 //! Nothing here touches the network. The secure-prose ledger is warmed from
-//! the served vault so `cli_complete`'s `blocked_for_remote` gate guards the
-//! notes this vault actually holds.
+//! the served vault and refreshed before every completion, so the
+//! `blocked_for_remote` gate guards the notes this vault actually holds.
 
 use std::fs;
 use std::io::ErrorKind;
@@ -59,8 +59,11 @@ fn skipped_dir(name: &str) -> bool {
 /// A walk that finds more than this is not a notes vault (a home folder, a
 /// drive root); it is refused rather than streamed.
 const MAX_WALK_ENTRIES: usize = 200_000;
-/// One `vault_read_many` answer's text budget; the page asks again for the rest.
+/// Per-file byte cap and one `vault_read_many` answer's text budget.
 const READ_MANY_BUDGET: usize = 12 * 1024 * 1024;
+/// One file read on its own (an image, a video the page shows): bounded so a
+/// huge file can't exhaust the helper, yet roomy enough for vault media.
+const READ_ONE_LIMIT: usize = 256 * 1024 * 1024;
 
 pub(crate) type Refusal = (u16, String);
 pub(crate) type Picker = Box<dyn Fn() -> Result<Option<PathBuf>, String> + Send + Sync>;
@@ -111,6 +114,20 @@ impl ServedVault {
             *cached = (stamp, config);
         }
         cached.1.clone()
+    }
+
+    /// Fresh disk truth before every remote completion, including external
+    /// edits and config changes whose timestamps happen to be unchanged.
+    pub(crate) fn guard_completion(&self, prompt: &str) -> Result<(), Refusal> {
+        let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
+        let config = read_config(&self.config_path).ok_or_else(unavailable)?;
+        read_verbs::refresh_secure_ledger(&config.root).map_err(|_| unavailable())?;
+        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
+        *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config));
+        if crate::secret::blocked_for_remote(prompt) {
+            return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
+        }
+        Ok(())
     }
 
     /// Serve `folder` from now on. The same root keeps its id; a new one
@@ -223,12 +240,10 @@ fn contains_helper_dir(root: &Path, config_path: &Path) -> bool {
     dir.starts_with(root)
 }
 
-/// The Mac app's own warm-up, read-only: the ledger then holds this vault's
-/// secure prose, so a chat turn that echoes it is refused before any CLI runs.
+/// Read-only startup warm-up; completions repeat it and refuse on failure.
 fn warm_ledger(root: &Path) {
-    let warmed = crate::corpus::CorpusStore::open_read_only(root.to_path_buf())
-        .and_then(|mut store| store.warm_secure_ledger());
-    if let Err(error) = warmed {
+    let warmed = read_verbs::refresh_secure_ledger(root);
+    if let Err((_, error)) = warmed {
         eprintln!("rotli-helper: couldn't read the vault's secure notes: {error}");
     }
 }
@@ -293,7 +308,7 @@ fn refuse_git(rel: &[String]) -> Result<(), Refusal> {
     }
     // `<file>.lock` is the desktop writers' lock sidecar: a page that could
     // create one could stall every desktop save of that file
-    if rel.last().is_some_and(|name| name.to_ascii_lowercase().ends_with(".lock")) {
+    if rel.iter().any(|name| name.to_ascii_lowercase().ends_with(".lock")) {
         return Err((403, "lock files belong to Rotli's writers".into()));
     }
     Ok(())
@@ -416,7 +431,7 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
     let target = resolve(root, to)?;
     // "a.md" → "A.md" on a case-insensitive disk names the SAME file: a
     // plain rename changes its spelling; a copy-then-delete would lose it
-    let case_only = joined(from).eq_ignore_ascii_case(&joined(to));
+    let case_only = joined(from).eq_ignore_ascii_case(&joined(to)) && same_file(&source, &target);
     if !case_only && fs::symlink_metadata(&target).is_ok() {
         // never replace: a stale listing must not destroy the note already there
         return Err((409, format!("{} already exists", joined(to))));
@@ -433,6 +448,47 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
     })
     .map(|()| Value::Null)
     .map_err(|e| (if e.starts_with("already exists") { 409 } else { 500 }, e))
+}
+
+/// Case-folded names alone do not establish identity on a case-sensitive disk.
+fn same_file(source: &Path, target: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        match (fs::symlink_metadata(source), fs::symlink_metadata(target)) {
+            (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle as _;
+        #[repr(C)]
+        struct FileInfo {
+            _attributes: u32, _times: [u32; 6], volume: u32,
+            _size: [u32; 2], _links: u32, index: [u32; 2],
+        }
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetFileInformationByHandle(handle: *mut std::ffi::c_void, info: *mut FileInfo) -> i32;
+        }
+        let identity = |path: &Path| {
+            let file = fs::File::open(path).ok()?;
+            let mut info = std::mem::MaybeUninit::<FileInfo>::uninit();
+            // The OS initializes BY_HANDLE_FILE_INFORMATION only on success.
+            if unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) } == 0 {
+                return None;
+            }
+            let info = unsafe { info.assume_init() };
+            Some((info.volume, info.index))
+        };
+        matches!((identity(source), identity(target)), (Some(a), Some(b)) if a == b)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (source, target);
+        false
+    }
 }
 
 /// Make `target` the source's content without ever replacing a file already
