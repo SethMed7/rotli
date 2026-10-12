@@ -18,8 +18,9 @@
 //! - A root that CONTAINS the helper's own directory (`~/.rotli-helper`, e.g.
 //!   the home folder) is refused, so the page can never rewrite the config
 //!   that names the root, or read the pairing token.
-//! - Every verb names the vault id the page bound to; a helper since pointed
-//!   at another folder refuses before touching disk (409 "vault changed").
+//! - Every vault verb and Helper-road completion names the vault id the page
+//!   bound to; a helper since pointed at another folder refuses before disk
+//!   or a provider (409 "vault changed"). Folder-road completions say so.
 //! - Writes are atomic (temp file + rename), taken under the SAME `.lock`
 //!   sidecar the desktop app's writes hold (`fsutil::with_file_lock`), and
 //!   revision-gated: by content (`fnv1a64`, the desktop's own revision) when
@@ -118,11 +119,24 @@ impl ServedVault {
 
     /// Fresh disk truth before every remote completion, including external
     /// edits and config changes whose timestamps happen to be unchanged.
-    pub(crate) fn guard_completion(&self, prompt: &str, vault_id: Option<&str>) -> Result<(), Refusal> {
+    pub(crate) fn guard_completion(&self, prompt: &str, vault_id: Option<&str>, vault_road: Option<&str>) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
-        let config = read_config(&self.config_path).ok_or_else(unavailable)?;
+        let Some(config) = read_config(&self.config_path) else {
+            // FSA pages can use a helper with no served vault. A missing config
+            // has no vault to confuse; a broken one may hide secure notes.
+            if self.config_path.exists() || vault_id.is_some() || vault_road.is_some_and(|road| road != "folder") {
+                return Err(unavailable());
+            }
+            if crate::secret::blocked_for_remote(prompt) {
+                return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
+            }
+            return Ok(());
+        };
         if vault_id.is_some_and(|bound| bound != config.id) {
             return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+        }
+        if (vault_id.is_none() && vault_road != Some("folder")) || (vault_id.is_some() && vault_road.is_some()) {
+            return Err((409, "completion vault road is unclear — reload Rotli Web before chatting".into()));
         }
         let quoted = read_verbs::refresh_secure_ledger(&config.root, Some(prompt)).map_err(|_| unavailable())?;
         let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
@@ -253,7 +267,7 @@ fn warm_ledger(root: &Path) {
 
 fn info(config: &VaultConfig) -> Value {
     let name = config.root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    json!({ "name": name, "id": config.id, "empty": folder_is_empty(&config.root) })
+    json!({ "name": name, "id": config.id, "empty": folder_is_empty(&config.root), "completionVaultBinding": true })
 }
 
 /// The page's `folderIsEmpty` rule: Finder droppings and `.rotli/` don't count.
@@ -524,6 +538,9 @@ fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
         return Err((400, "the vault itself can't be removed".into()));
     }
     let path = resolve(root, rel)?;
+    if args.get("expectedContent").is_some() && !path.is_file() {
+        return Err((409, format!("revision conflict on {}: expected a file", joined(rel))));
+    }
     // a folder removal never deletes a file that has since taken its name
     if path.is_file() && args.get("directory").and_then(Value::as_bool) == Some(true) {
         return Err((409, format!("{} is a file now, not a folder", joined(rel))));

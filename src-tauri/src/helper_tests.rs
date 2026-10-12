@@ -269,7 +269,7 @@ fn completion_helper() -> (tempfile::TempDir, tempfile::TempDir, Helper) {
 fn completion_refusal(helper: &Helper, prompt: &str) -> (u16, String) {
     let error = helper.dispatch("cli_complete", &json!({
         "requestId": "offline-regression", "provider": "definitely-not-a-cli",
-        "model": "synthetic", "prompt": prompt,
+        "model": "synthetic", "prompt": prompt, "vaultRoad": "folder",
     })).unwrap_err();
     assert!(helper.children.lock().unwrap().is_empty());
     assert!(helper.in_flight.lock().unwrap().is_empty());
@@ -297,10 +297,28 @@ fn helper_completion_checks_the_page_vault_before_starting_a_provider() {
     assert!(helper.in_flight.lock().unwrap().is_empty());
 
     let served_id = helper.vault.current().unwrap().id;
-    for supplied in [Some(served_id.as_str()), None] {
-        let result = helper.dispatch("cli_complete", &args(supplied)).unwrap_err();
-        assert_ne!(result.0, 409, "a matched or absent vault id reaches provider validation");
-    }
+    let matched = helper.dispatch("cli_complete", &args(Some(&served_id))).unwrap_err();
+    assert_ne!(matched.0, 409);
+    let legacy = helper.dispatch("cli_complete", &args(None)).unwrap_err();
+    assert_eq!(legacy.0, 409);
+    assert!(legacy.1.contains("reload Rotli Web"));
+    let mut folder = args(None);
+    folder["vaultRoad"] = json!("folder");
+    assert_ne!(helper.dispatch("cli_complete", &folder).unwrap_err().0, 409);
+    let mut ambiguous = args(Some(&served_id));
+    ambiguous["vaultRoad"] = json!("folder");
+    assert_eq!(helper.dispatch("cli_complete", &ambiguous).unwrap_err().0, 409);
+}
+
+#[test]
+fn legacy_completion_without_a_served_vault_reaches_provider_validation() {
+    let (_folder, config, helper) = completion_helper();
+    std::fs::remove_file(config.path().join(CONFIG_FILE)).unwrap();
+    let refused = helper.dispatch("cli_complete", &json!({
+        "requestId": "legacy-no-vault", "provider": "definitely-not-a-cli",
+        "model": "synthetic", "prompt": "ordinary synthetic prompt",
+    })).unwrap_err();
+    assert!(refused.1.contains("unknown provider"), "{refused:?}");
 }
 
 #[test]

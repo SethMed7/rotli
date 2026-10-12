@@ -48,6 +48,7 @@ fn the_picker_chooses_the_root_and_a_closed_picker_changes_nothing() {
     let (_unused, config, served) = served(Some(folder.path().to_path_buf()));
     let info = call(&served, "vault_choose", json!({})).unwrap();
     assert_eq!(info["empty"], true);
+    assert_eq!(info["completionVaultBinding"], true);
     let id = info["id"].as_str().unwrap().to_string();
     assert!(id.starts_with("hv_"));
     // the choice is persisted owner-only and survives a restart
@@ -148,6 +149,16 @@ fn move_mkdir_and_remove_follow_the_page_port() {
     call(&served, "vault_remove", json!({ "path": "wiki/Welcome" })).unwrap();
     assert_eq!(call(&served, "vault_remove", json!({ "path": "" })).unwrap_err().0, 400);
     assert_eq!(call(&served, "vault_move", json!({ "from": "nope.md", "to": "b.md" })).unwrap_err().0, 404);
+}
+
+#[test]
+fn content_gated_remove_refuses_a_directory_or_missing_path() {
+    let (vault, _config, served) = serving();
+    fs::create_dir(vault.path().join(".gitignore")).unwrap();
+    let gated = json!({ "path": ".gitignore", "expectedContent": "0" });
+    assert_eq!(call(&served, "vault_remove", gated).unwrap_err().0, 409);
+    assert!(vault.path().join(".gitignore").is_dir());
+    assert_eq!(call(&served, "vault_remove", json!({ "path": "missing", "expectedContent": "0" })).unwrap_err().0, 409);
 }
 
 #[test]

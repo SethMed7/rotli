@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import { deviceVaultStore } from "../lib/browserVault";
 import { registerWebHelperVaultId } from "../lib/webAiSeam";
+import { useHelperLink } from "../state/helperLink";
 import { useVaultConnection } from "../state/vaultConnection";
 import { bridgeFor } from "./helperLink";
 
@@ -22,6 +23,7 @@ test("a Helper-road chat completion carries the page's bound vault id", async ()
       }),
     );
     registerWebHelperVaultId("vault-a");
+    useHelperLink.getState().setCompletionVaultBinding(true);
     useVaultConnection.getState().setConnection({ status: "connected", via: "helper", name: "A" });
     await bridgeFor({ port: 43111, token: "synthetic-token" })("cli_complete", {
       requestId: "chat-1",
@@ -53,11 +55,25 @@ test("a Helper-road chat completion carries the page's bound vault id", async ()
       prompt: "hello",
     });
     expect(requests[2]?.args.vaultId).toBeUndefined();
+    expect(requests[2]?.args.vaultRoad).toBe("folder");
   } finally {
     registerWebHelperVaultId(null);
+    useHelperLink.getState().setCompletionVaultBinding(false);
     await deviceVaultStore().delete("vault-binding");
     useVaultConnection.getState().setConnection({ status: "unbound" });
     globalThis.fetch = previousFetch;
+  }
+});
+
+test("an older Helper cannot receive a Helper-road completion", async () => {
+  registerWebHelperVaultId("vault-a");
+  useHelperLink.getState().setCompletionVaultBinding(false);
+  try {
+    await expect(
+      bridgeFor({ port: 43111, token: "synthetic-token" })("cli_complete", { prompt: "private" }),
+    ).rejects.toThrow(/Update Rotli Helper/);
+  } finally {
+    registerWebHelperVaultId(null);
   }
 });
 
@@ -88,6 +104,7 @@ test("a completion vault mismatch returns the page to setup", async () => {
       "vault-binding",
       JSON.stringify({ kind: "helper", vaultId: "vault-b", vaultName: "B" }),
     );
+    useHelperLink.getState().setCompletionVaultBinding(true);
     await expect(
       bridgeFor({ port: 43111, token: "synthetic-token" })("cli_complete", {
         requestId: "chat-3",
@@ -103,6 +120,7 @@ test("a completion vault mismatch returns the page to setup", async () => {
     });
   } finally {
     registerWebHelperVaultId(null);
+    useHelperLink.getState().setCompletionVaultBinding(false);
     await deviceVaultStore().delete("vault-binding");
     useVaultConnection.getState().setConnection({ status: "unbound" });
     globalThis.fetch = previousFetch;

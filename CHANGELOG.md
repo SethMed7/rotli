@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or configuration that could load a URL are refused before rendering,
   with an explanation beside the source.
 - **A Helper token reset, changed vault, or disconnected vault returns to setup.**
-  Chat requests from a Helper vault carry its identity before a provider starts. Unsaved
+  Chat requests identify either the bound Helper vault or the browser folder road; an
+  older page must reload before chatting with a Helper that serves a vault. An older
+  Helper can still open vault files but asks for an update before Helper-vault chat. Unsaved
   typing and pending writes stay on this computer for reconnection; ordinary
   file revision conflicts still report a file error.
 - **Web controls describe what can actually run.** Search omits native window
@@ -61,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their protected home with matching git exclusions.
 - **Web views and note names stay portable.** Named views synchronize Markdown
   `view_tag` metadata, failed view writes restore their own git exclusions without
-  deleting a newer external edit, and
+  deleting a newer external edit or a directory that replaced `.gitignore`, and
   title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
   search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8

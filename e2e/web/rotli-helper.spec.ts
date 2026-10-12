@@ -71,6 +71,12 @@ function fakeHelper(
       case "cli_detect":
         return reply({ installed: true, version: "2.1.0 (Claude Code)", authenticated: true });
       case "cli_complete":
+        if ((body.args as { vaultRoad?: string }).vaultRoad !== "folder")
+          return route.fulfill({
+            status: 409,
+            headers: CORS,
+            body: JSON.stringify({ error: "reload Rotli Web" }),
+          });
         await replyGate;
         return reply("Hello from the fake helper.");
       case "cli_cancel":
@@ -127,6 +133,7 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
   const complete = calls.find((c) => c.cmd === "cli_complete");
   expect(complete).toBeDefined();
   expect((complete!.args as { provider: string }).provider).toBe("claude");
+  expect((complete!.args as { vaultRoad?: string }).vaultRoad).toBe("folder");
   // the token never travels anywhere but the helper, and no image rides along
   expect((complete!.args as { images?: unknown }).images).toBeUndefined();
   // the chat's companion note is created through the browser vault, not a

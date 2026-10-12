@@ -50,7 +50,7 @@ class FakeDir {
   async removeEntry(name: string): Promise<void> {
     this.files.delete(name);
   }
-  async getDirectoryHandle(): Promise<never> {
+  async getDirectoryHandle(_name?: string): Promise<FileSystemDirectoryHandle> {
     throw new DOMException("flat fake", "NotFoundError");
   }
   async getFileHandle(name: string, opts?: { create?: boolean }): Promise<FakeFile> {
@@ -80,6 +80,25 @@ test("remove checks expected content after an external edit in its removal turn"
     /revision conflict/,
   );
   expect(root.files.get(".gitignore")?.text).toBe("edited outside Rotli\n");
+});
+
+test("a content-gated remove cannot delete an empty directory", async () => {
+  const root = new FakeDir();
+  let removed = false;
+  root.getDirectoryHandle = async (name?: string) => {
+    if (name !== ".gitignore") throw new DOMException("not found", "NotFoundError");
+    return { kind: "directory" } as FileSystemDirectoryHandle;
+  };
+  root.removeEntry = async () => {
+    removed = true;
+  };
+  const dir = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle);
+  await expect(dir.remove(".gitignore", "0")).rejects.toThrow(/revision conflict/);
+  expect(removed).toBe(false);
+});
+
+test("a content-gated remove refuses a missing file", async () => {
+  await expect(dirOf().remove("missing.md", "0")).rejects.toThrow(/revision conflict/);
 });
 
 describe("FsaVaultDir takes turns per path", () => {

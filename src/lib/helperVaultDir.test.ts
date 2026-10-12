@@ -157,6 +157,17 @@ for (const [name, make] of contract) {
       expect(await dir.exists("wiki/Welcome")).toBe(false);
     });
 
+    test("a content-gated remove refuses an empty directory", async () => {
+      const dir = make();
+      await dir.mkdir(".gitignore");
+      await expect(dir.remove(".gitignore", "0")).rejects.toThrow(/revision conflict/);
+      expect(await dir.exists(".gitignore")).toBe(true);
+    });
+
+    test("a content-gated remove refuses a missing file", async () => {
+      await expect(make().remove("absent-note.md", "0")).rejects.toThrow(/revision conflict/);
+    });
+
     test("binary writes compare the exact bytes in the adapter write turn", async () => {
       const dir = make();
       const first = new Uint8Array([0, 1, 255]);

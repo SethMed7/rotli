@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
+import { registerWebHelperVaultId } from "../lib/webAiSeam";
+import { helperReadyFrom, useHelperLink } from "../state/helperLink";
 import {
   helperConnection,
+  probeHelper,
   persistPendingOnUnload,
   replayPendingOps,
   unsupportedBrowser,
@@ -11,6 +14,31 @@ import { MemoryVaultDir } from "./vaultDir";
 
 const binding = { kind: "helper", vaultId: "hv_1", vaultName: "memex" } as const;
 const info = { name: "memex", id: "hv_1", empty: false };
+
+test("vault_info capability gates Helper chat while old Helper file access stays connected", async () => {
+  const originalFetch = globalThis.fetch;
+  let capable = false;
+  globalThis.fetch = async (_input, init) =>
+    init?.method === "POST"
+      ? Response.json({ result: { ...info, ...(capable ? { completionVaultBinding: true } : {}) } })
+      : Response.json({ ok: true });
+  registerWebHelperVaultId("hv_1");
+  try {
+    const link = { port: 43111, token: "synthetic-token" };
+    const ready = { link, reachable: true, problem: null, verifying: false };
+    const old = await probeHelper(link);
+    expect(helperConnection(binding, old).status).toBe("connected");
+    expect(helperReadyFrom({ ...useHelperLink.getState(), ...ready })).toBe(false);
+    capable = true;
+    const modern = await probeHelper(link);
+    expect(helperConnection(binding, modern).status).toBe("connected");
+    expect(helperReadyFrom({ ...useHelperLink.getState(), ...ready })).toBe(true);
+  } finally {
+    registerWebHelperVaultId(null);
+    useHelperLink.getState().setCompletionVaultBinding(false);
+    globalThis.fetch = originalFetch;
+  }
+});
 
 describe("a helper binding's connection", () => {
   test("connected only when the helper serves the vault this browser opened", () => {

@@ -40,7 +40,8 @@ export interface VaultDir {
    * a free name first (`freeSiblingPath`). */
   move(from: string, to: string): Promise<void>;
   /** A file or an EMPTY directory; a missing path is a no-op without a gate.
-   * When supplied, expectedContent is checked during removal ("0" = missing). */
+   * A content gate applies only to an existing file; a directory or missing
+   * path conflicts, including when the supplied revision is "0". */
   remove(path: string, expectedContent?: string): Promise<void>;
 }
 
@@ -282,6 +283,8 @@ export class MemoryVaultDir implements VaultDir {
   async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalizeVaultPath(path);
     const file = this.files.get(key);
+    if (expectedContent !== undefined && (this.dirs.has(key) || !file))
+      throw new Error(`revision conflict on ${key}`);
     if (
       expectedContent !== undefined &&
       expectedContent !== (file ? bytesRevision(file.bytes ?? new TextEncoder().encode(file.text)) : "0")

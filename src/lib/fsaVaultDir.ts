@@ -182,6 +182,9 @@ export class FsaVaultDir implements VaultDir {
   async remove(path: string, expectedContent?: string): Promise<void> {
     await this.inTurn(path, async () => {
       if (expectedContent !== undefined) {
+        // A directory and an absent file both fail the file-content gate,
+        // including the "0" revision used for a previously missing file.
+        if (!(await this.file(path))) throw new Error(`revision conflict on ${path}`);
         const current = await this.contentRevisionUnlocked(path);
         if (current !== expectedContent) throw new Error(`revision conflict on ${path}`);
       }

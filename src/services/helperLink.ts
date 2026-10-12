@@ -32,7 +32,11 @@ export function bridgeFor(link: HelperLink) {
     let requestArgs = args ?? {};
     if (cmd === "cli_complete") {
       const vaultId = currentWebHelperVaultId();
-      if (vaultId) requestArgs = { ...requestArgs, vaultId };
+      if (vaultId) {
+        if (!useHelperLink.getState().completionVaultBinding)
+          throw new Error("Update Rotli Helper to chat with this vault, then reload Rotli Web.");
+        requestArgs = { ...requestArgs, vaultId };
+      } else requestArgs = { ...requestArgs, vaultRoad: "folder" };
     }
     return helperRpc(link, cmd, requestArgs).then(
       (result) => {

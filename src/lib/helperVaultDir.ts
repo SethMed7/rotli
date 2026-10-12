@@ -374,18 +374,18 @@ export class HelperVaultDir implements VaultDir {
   }
 
   /** A file is removed only if it is still the version this tab saw — a note
-   * the desktop app changed meanwhile is kept (409). Folders aren't gated. */
+   * the desktop app changed meanwhile is kept (409). Directory removal has
+   * its own type gate and refuses a supplied file-content gate. */
   async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalize(path);
     // decide against what is really there, never against an empty cache
     if (!this.entries.has(key)) await this.fresh();
     const entry = this.entries.get(key);
     if (!entry) {
-      if (expectedContent !== undefined && expectedContent !== "0")
-        throw new Error(`revision conflict on ${key}`);
+      if (expectedContent !== undefined) throw new Error(`revision conflict on ${key}`);
       return; // nothing there: the port's "missing is a no-op"
     }
-    if (entry.kind !== "file" && expectedContent !== undefined && expectedContent !== "0")
+    if (entry.kind !== "file" && expectedContent !== undefined)
       throw new Error(`revision conflict on ${key}`);
     const base = entry.kind === "file" ? revisionOf(entry) : "";
     const seen = this.texts.get(key);

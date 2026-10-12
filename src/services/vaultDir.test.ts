@@ -45,6 +45,17 @@ describe("path helpers", () => {
 });
 
 describe("MemoryVaultDir", () => {
+  test("a content-gated remove cannot delete an empty directory", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.mkdir(".gitignore");
+    await expect(dir.remove(".gitignore", "0")).rejects.toThrow(/revision conflict/);
+    expect(await dir.exists(".gitignore")).toBe(true);
+  });
+
+  test("a content-gated remove refuses a missing file", async () => {
+    const dir = new MemoryVaultDir();
+    await expect(dir.remove("missing.md", "0")).rejects.toThrow(/revision conflict/);
+  });
   test("writeText creates parent directories and stat reports bytes", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki/_inbox/a.md", "hello—");

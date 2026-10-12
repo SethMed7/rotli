@@ -47,7 +47,11 @@ function fakeHelperVault() {
     chat_models: () => [],
     vault_info: () =>
       state.served
-        ? { ...state.served, empty: files.size === 0 && [...dirs].every((d) => d === ".rotli") }
+        ? {
+            ...state.served,
+            empty: files.size === 0 && [...dirs].every((d) => d === ".rotli"),
+            completionVaultBinding: true,
+          }
         : null,
     vault_choose: () => {
       state.served = state.chooses;

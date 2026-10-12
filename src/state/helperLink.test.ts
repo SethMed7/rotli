@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { registerWebHelperVaultId } from "../lib/webAiSeam";
 import { helperReadyFrom } from "./helperLink";
 
 const link = { port: 43111, token: "t".repeat(24) };
@@ -17,4 +18,15 @@ test("a pairing is a chat runtime only once proven and while nothing is known to
   expect(helperReadyFrom({ link, reachable: true, problem: "refused", ...settled })).toBe(false);
   expect(helperReadyFrom({ link, reachable: true, problem: "unreachable", ...settled })).toBe(false);
   expect(helperReadyFrom({ link: null, reachable: true, problem: null, ...settled })).toBe(false);
+});
+
+test("Helper-road chat waits for the completion binding capability", () => {
+  registerWebHelperVaultId("hv_1");
+  try {
+    const ready = { link, reachable: true, problem: null, verifying: false };
+    expect(helperReadyFrom({ ...ready, completionVaultBinding: false })).toBe(false);
+    expect(helperReadyFrom({ ...ready, completionVaultBinding: true })).toBe(true);
+  } finally {
+    registerWebHelperVaultId(null);
+  }
 });

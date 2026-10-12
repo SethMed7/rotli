@@ -22,6 +22,7 @@ import {
 import type { HelperLink } from "../lib/helperPairing";
 import { HelperVaultDir, type PendingOp } from "../lib/helperVaultDir";
 import { registerWebHelperVaultId } from "../lib/webAiSeam";
+import { useHelperLink } from "../state/helperLink";
 import { type VaultConnection, useVaultConnection } from "../state/vaultConnection";
 import { type VaultDir, freeSiblingPath } from "./vaultDir";
 import {
@@ -59,6 +60,7 @@ export interface HelperVaultInfo {
   name: string;
   id: string;
   empty: boolean;
+  completionVaultBinding?: boolean;
 }
 
 export async function loadHelperBinding(): Promise<HelperBinding | null> {
@@ -127,6 +129,7 @@ export function helperConnection(binding: HelperBinding | null, probe: HelperPro
 
 /** Ask the helper whether it's there, takes our token, and what it serves. */
 export async function probeHelper(link: HelperLink): Promise<HelperProbe> {
+  useHelperLink.getState().setCompletionVaultBinding(false);
   try {
     const health = await helperHealth(link.port);
     if (!health.ok) return { kind: "offline" };
@@ -135,6 +138,7 @@ export async function probeHelper(link: HelperLink): Promise<HelperProbe> {
   }
   try {
     const info = await helperRpc<HelperVaultInfo | null>(link, "vault_info", {}, { timeoutMs: 5_000 });
+    useHelperLink.getState().setCompletionVaultBinding(info?.completionVaultBinding === true);
     return { kind: "serving", info };
   } catch (error) {
     if (error instanceof HelperHttpError && error.status === 401) return { kind: "refused" };

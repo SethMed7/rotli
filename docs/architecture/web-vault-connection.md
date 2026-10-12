@@ -222,9 +222,15 @@ the editor's clean-buffer gate preserves unsaved typing.
   root or read the pairing token.
 - **Bound to one vault per page.** Every vault verb and every completion from a
   page on the Helper vault road carries the `vaultId` the page bound to; a helper
-  since pointed at another folder answers 409 "vault
-  changed" before touching disk, and the page re-probes into setup.
-  A page on the browser folder road sends no completion `vaultId`.
+  since pointed at another folder answers 409 "vault changed" before touching
+  disk, and the page re-probes into setup. A page on the browser folder road
+  sends `vaultRoad: "folder"` instead. If the helper serves a vault, it refuses
+  a completion with neither marker and tells an older page to reload. With no
+  served vault, legacy completions may run because there is no Helper vault to
+  mix up; an unreadable or invalid vault configuration still fails closed.
+  `vault_info` advertises `completionVaultBinding: true` only when the helper
+  enforces this rule. A page paired to an older helper can still use its vault
+  files, but keeps Helper-road chat unavailable and asks for a Helper update.
 - **Atomic, locked, revision-gated, no-clobber.** Writes use
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
@@ -235,7 +241,8 @@ the editor's clean-buffer gate preserves unsaved typing.
   saw. A page can never create a `<file>.lock` sidecar (the desktop writers'
   lock), including a directory or ancestor component ending in `.lock`
   (in any letter case), and Windows junctions are skipped in listings like symlinks. Deletes of a
-  file take the same lock and gate, so a delete decided against an older
+  file take the same lock and gate; a content-gated delete refuses a directory
+  or missing path even if the supplied revision is `"0"`, so a delete decided against an older
   version never removes a newer one, and a folder removal never deletes a file
   that has taken the folder's name. A move never replaces an existing file —
   atomically in the helper (hard link, then unlink, both under the source's
