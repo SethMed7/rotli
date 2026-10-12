@@ -136,6 +136,8 @@ for (const { name, make } of ROADS) {
       const blank = await road.read(path);
       await typeInSheet(page, "Typed on the web");
       const saved = await savedOver(road, path, blank);
+      // the first save keeps what was there, as the Mac corpus does for any file
+      expect((await road.read(`${path}.bak`))?.equals(blank!)).toBe(true);
       expect(await packagePart(saved, "xl/workbook.xml")).toContain("<sheet ");
       expect((await readXlsx(saved)).worksheets[0]!.getCell("A1").value).toBe("Typed on the web");
 
@@ -171,6 +173,7 @@ for (const { name, make } of ROADS) {
       await expect(page.locator(".file-head")).toContainText("Beta");
       await typeInDocument(page, "Typed on the web");
       const saved = await savedOver(road, path, blank);
+      expect((await road.read(`${path}.bak`))?.equals(blank!)).toBe(true);
       expect(await packagePart(saved, "word/document.xml")).toContain("Typed on the web");
 
       await page.reload();
