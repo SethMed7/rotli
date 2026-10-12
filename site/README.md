@@ -1162,7 +1162,10 @@ agents; every sentence in it restates a claim the pages already make.
   what the edge enforces: Cloudflare's AI-bot blocking is a zone setting outside
   this repository, and a robots.txt that welcomes an agent the edge then refuses
   reads as a broken promise. To block an agent, set `allow: false` *and* block
-  it at the edge. The dev site disallows everything.
+  it at the edge. Every listed agent is welcome, training crawlers included
+  (GPTBot, ClaudeBot, CCBot, Bytespider): the owner chose on 2026-10-12 to turn Cloudflare's AI-bot
+  blocking off, so that models learn what rotli is from rotli.co
+  itself. The dev site disallows everything.
 - **`/llms.txt`** ([llmstxt.org](https://llmstxt.org)): a title, a one-line
   summary, the key facts, and links to the pages and to each resource's
   Markdown twin, built from the published writing so a link cannot go stale.

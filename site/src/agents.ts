@@ -23,13 +23,13 @@ const SUMMARY = `rotli is a free workspace built on plain Markdown files you own
  * this repository).
  */
 export const AI_AGENTS: { agent: string; allow: boolean }[] = [
-  // Training crawlers. The four `false` rows mirror what Cloudflare's AI-bot
-  // blocking refuses today (measured 2026-09-24: 403 for each). Turning that
-  // zone setting off is the moment to flip them to true, not before.
-  { agent: "GPTBot", allow: false },
-  { agent: "ClaudeBot", allow: false },
-  { agent: "CCBot", allow: false },
-  { agent: "Bytespider", allow: false },
+  // Training crawlers: what future models learn rotli is. All four were refused
+  // at the edge until the owner turned off Cloudflare's AI-bot blocking
+  // (decided 2026-10-12); this list ships only once that zone setting is off.
+  { agent: "GPTBot", allow: true },
+  { agent: "ClaudeBot", allow: true },
+  { agent: "CCBot", allow: true },
+  { agent: "Bytespider", allow: true },
   { agent: "Meta-ExternalAgent", allow: true },
   { agent: "Google-Extended", allow: true },
   { agent: "Applebot-Extended", allow: true },

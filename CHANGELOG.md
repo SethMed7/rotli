@@ -127,6 +127,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is mocked; the edit only trims, removes waiting, speeds the typing
   slightly, and holds each theme briefly. The film has a new
   address, so no browser or edge cache serves the old one.
+- **rotli.co is open to the crawlers AI models learn from.** GPTBot,
+  ClaudeBot, Common Crawl, and Bytespider were turned away; now they are
+  welcome like AI search and assistants already were, so models can learn
+  what rotli is from rotli.co itself. `/robots.txt` says so for each one.
 - **AI systems can read rotli.co's features, answers, roadmap, and posts in
   one file.** `/llms-full.txt` holds every feature in full, the FAQ, the
   roadmap, and every post; `/llms.txt` links it and the developers page. Each

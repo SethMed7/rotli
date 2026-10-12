@@ -109,11 +109,13 @@ describe("the update check through rotli.co (2026-10-01)", () => {
 });
 
 describe("robots.txt", () => {
-  test("names each AI crawler; the ones the zone blocks stay disallowed", () => {
+  // The owner turned off Cloudflare's AI-bot blocking on 2026-10-12: training crawlers are welcome.
+  test("names each AI crawler and welcomes every one, training crawlers included", () => {
     const robots = agents.robotsText();
-    for (const agent of ["GPTBot", "ClaudeBot", "CCBot", "Bytespider"]) {
-      expect(robots).toContain(`User-agent: ${agent}\nDisallow: /`);
+    for (const agent of ["GPTBot", "ClaudeBot", "CCBot", "Bytespider", "OAI-SearchBot", "Claude-User"]) {
+      expect(robots).toContain(`User-agent: ${agent}\nAllow: /\nDisallow: /app/`);
     }
+    expect(robots).not.toMatch(/Disallow: \/\n/);
     expect(robots).toContain("User-agent: *\nAllow: /\nDisallow: /app/");
     expect(robots).toContain("https://rotli.co/llms.txt");
     expect(robots).toContain("Sitemap: https://rotli.co/sitemap-index.xml");
