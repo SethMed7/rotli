@@ -30,7 +30,10 @@ Decided by the owner on 2026-09-22; the history is in
    read-only scan; it does not rely on cached timestamps. During the scan the
    Helper also compares the prompt directly with each secure body using the
    ledger's phrase rule, so an early note remains protected even when a large
-   vault exceeds the ledger's 50,000-phrase capacity.
+   vault exceeds the ledger's 50,000-phrase capacity. If the served-vault
+   configuration changes during the scan, the Helper rechecks a bound vault
+   id before completing the request and refreshes its cached configuration on
+   the next request.
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own
@@ -67,6 +70,10 @@ which checks it in the write turn; a concurrent edit is a conflict. A
 content-gated removal also compares exact bytes in its removal turn, so a
 rollback refuses a newer file it observes then. Chromium
 holds both source and destination turns for an entire move, through removal.
+An ungated removal of a missing path succeeds without changing anything;
+a content-gated removal of a missing or changed file is a revision conflict.
+The Helper adapter decides its removal gate after earlier queued writes and
+refreshes an invalidated walk before deciding whether the path exists.
 Secure note relocation adds the destination to `.gitignore` before moving and
 removes the source exclusion after the move succeeds.
 
@@ -240,7 +247,8 @@ the editor's clean-buffer gate preserves unsaved typing.
   a file needs none), so no token holder can clobber without saying what it
   saw. A page can never create a `<file>.lock` sidecar (the desktop writers'
   lock), including a directory or ancestor component ending in `.lock`
-  (in any letter case), and Windows junctions are skipped in listings like symlinks. Deletes of a
+  (in any letter case); reads may still inspect these ordinary files, as on
+  desktop. Windows junctions are skipped in listings like symlinks. Deletes of a
   file take the same lock and gate; a content-gated delete refuses a directory
   or missing path even if the supplied revision is `"0"`, so a delete decided against an older
   version never removes a newer one, and a folder removal never deletes a file

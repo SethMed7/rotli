@@ -336,8 +336,10 @@ export class HelperVaultDir implements VaultDir {
         const landed =
           retry &&
           isConflict(error) &&
-          text !== undefined &&
-          (await this.request<string>("vault_read", { path: key })) === text;
+          (text !== undefined
+            ? (await this.request<string>("vault_read", { path: key })) === text
+            : body.base64 !== undefined &&
+              (await this.request<string>("vault_read", { path: key, encoding: "base64" })) === body.base64);
         if (!landed) {
           // the file changed on disk: the next list/stat must see it
           if (isConflict(error)) this.invalidate();
@@ -378,32 +380,37 @@ export class HelperVaultDir implements VaultDir {
    * its own type gate and refuses a supplied file-content gate. */
   async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalize(path);
-    // decide against what is really there, never against an empty cache
-    if (!this.entries.has(key)) await this.fresh();
-    const entry = this.entries.get(key);
-    if (!entry) {
-      if (expectedContent !== undefined) throw new Error(`revision conflict on ${key}`);
-      return; // nothing there: the port's "missing is a no-op"
-    }
-    if (entry.kind !== "file" && expectedContent !== undefined)
-      throw new Error(`revision conflict on ${key}`);
-    const base = entry.kind === "file" ? revisionOf(entry) : "";
-    const seen = this.texts.get(key);
-    const gate =
-      entry.kind !== "file"
-        ? { directory: true } // a folder removal never deletes a file that took its name
-        : expectedContent !== undefined
-          ? { expectedContent }
-          : seen && seen.revision === base
-            ? { expectedContent: contentRevision(seen.text) }
-            : { expectedRevision: base };
-    await this.mutate({ kind: "remove", path: key, base }, () =>
-      this.call("vault_remove", { path: key, ...gate }).catch((error: unknown) => {
+    const op: PendingOp = { kind: "remove", path: key, base: "" };
+    await this.mutate(op, async () => {
+      // This turn follows queued writes. An invalidated walk must be refreshed
+      // even when the old entry still appears in the cache.
+      if (this.walkedAt === 0 || !this.entries.has(key)) await this.fresh();
+      const entry = this.entries.get(key);
+      if (!entry) {
+        if (expectedContent !== undefined) throw new Error(`revision conflict on ${key}`);
+        return;
+      }
+      if (entry.kind !== "file" && expectedContent !== undefined)
+        throw new Error(`revision conflict on ${key}`);
+      const base = entry.kind === "file" ? revisionOf(entry) : "";
+      op.base = base;
+      const seen = this.texts.get(key);
+      const gate =
+        entry.kind !== "file"
+          ? { directory: true }
+          : expectedContent !== undefined
+            ? { expectedContent }
+            : seen && seen.revision === base
+              ? { expectedContent: contentRevision(seen.text) }
+              : { expectedRevision: base };
+      try {
+        await this.call("vault_remove", { path: key, ...gate });
+      } catch (error) {
         if (isConflict(error)) this.invalidate();
         throw error;
-      }),
-    );
-    this.entries.delete(key);
-    this.texts.delete(key);
+      }
+      this.entries.delete(key);
+      this.texts.delete(key);
+    });
   }
 }
