@@ -1289,7 +1289,7 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
-fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+pub(crate) fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
         || fm
             .foreign
