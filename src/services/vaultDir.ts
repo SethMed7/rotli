@@ -4,7 +4,7 @@
 // above this port knows which one it holds.
 //
 // Paths are relative POSIX strings: "" is the vault root, "wiki/_inbox/a.md" a
-// file inside it. Text files only — binaries never cross this seam.
+// file inside it. Text and binary files share the revision-gated write seam.
 
 export interface VaultDirEntry {
   name: string;
@@ -16,7 +16,7 @@ export interface VaultStat {
   size: number;
 }
 
-/** Relative POSIX paths ("" = root, "wiki/_inbox/a.md"). Text files only. */
+/** Relative POSIX paths ("" = root, "wiki/_inbox/a.md"). */
 export interface VaultDir {
   /** Direct children of a directory; `[]` for a missing one (never throws). */
   list(path: string): Promise<VaultDirEntry[]>;
@@ -25,11 +25,13 @@ export interface VaultDir {
   stat(path: string): Promise<VaultStat | null>;
   /** Throws when the file is missing — a caller that may miss checks first. */
   readText(path: string): Promise<string>;
-  /** Creates parent directories as needed. */
-  writeText(path: string, text: string): Promise<void>;
+  /** Creates parents as needed. An expectedContent gate is checked in the same
+   * turn as the write; "0" requires a missing file, otherwise FNV-1a 64. */
+  writeText(path: string, text: string, expectedContent?: string): Promise<void>;
   /** Binary files (images): the same paths, raw bytes. Throws when missing. */
   readBytes(path: string): Promise<Uint8Array>;
-  writeBytes(path: string, bytes: Uint8Array): Promise<void>;
+  /** Optional revision of the exact prior bytes, checked in the write turn. */
+  writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void>;
   /** Recursive and idempotent. */
   mkdir(path: string): Promise<void>;
   /** File move: read → write → remove, in that order, so a failed write leaves
@@ -37,8 +39,42 @@ export interface VaultDir {
    * replaces: a `to` that exists is refused ("already exists") — callers pick
    * a free name first (`freeSiblingPath`). */
   move(from: string, to: string): Promise<void>;
-  /** A file or an EMPTY directory; a missing path is a no-op. */
-  remove(path: string): Promise<void>;
+  /** A file or an EMPTY directory; a missing path is a no-op without a gate.
+   * A content gate applies only to an existing file; a directory or missing
+   * path conflicts, including when the supplied revision is "0". */
+  remove(path: string, expectedContent?: string): Promise<void>;
+}
+
+/** Desktop-compatible FNV-1a 64 revision of the exact UTF-8 text observed. */
+export function contentRevision(text: string): string {
+  return bytesRevision(new TextEncoder().encode(text));
+}
+
+/** The same desktop FNV-1a 64 revision over exact bytes, including binaries. */
+export function bytesRevision(bytes: Uint8Array): string {
+  // the 64-bit hash as four 16-bit words, in plain integer arithmetic:
+  // listing a vault hashes every note, and BigInt per byte is slow in V8.
+  // The FNV prime is 2^40 + 0x1b3: each word times 0x1b3, plus the low two
+  // words shifted 8 bits into the high two (the 2^40 term), then carry.
+  let v0 = 0x2325;
+  let v1 = 0x8422;
+  let v2 = 0x9ce4;
+  let v3 = 0xcbf2;
+  for (const byte of bytes) {
+    v0 ^= byte;
+    const t0 = v0 * 0x1b3;
+    let t1 = v1 * 0x1b3;
+    let t2 = v2 * 0x1b3 + (v0 << 8);
+    const t3 = v3 * 0x1b3 + (v1 << 8);
+    t1 += t0 >>> 16;
+    v0 = t0 & 0xffff;
+    t2 += t1 >>> 16;
+    v1 = t1 & 0xffff;
+    v3 = (t3 + (t2 >>> 16)) & 0xffff;
+    v2 = t2 & 0xffff;
+  }
+  const word = (v: number) => v.toString(16).padStart(4, "0");
+  return `fnv1a64:${word(v3)}${word(v2)}${word(v1)}${word(v0)}`;
 }
 
 /** Trim the separators a caller may pass ("/wiki/", "wiki//a.md") down to the
@@ -181,11 +217,19 @@ export class MemoryVaultDir implements VaultDir {
     return file.text;
   }
 
-  async writeText(path: string, text: string): Promise<void> {
+  async writeText(path: string, text: string, expectedContent?: string): Promise<void> {
     const key = normalizeVaultPath(path);
     if (!key) throw new Error("a file needs a name");
     if (this.dirs.has(key)) throw new Error(`a directory already holds ${key}`);
     await this.mkdir(parentPath(key));
+    const current = this.files.get(key);
+    if (
+      expectedContent !== undefined &&
+      expectedContent !==
+        (current ? bytesRevision(current.bytes ?? new TextEncoder().encode(current.text)) : "0")
+    ) {
+      throw new Error(`revision conflict on ${key}`);
+    }
     this.files.set(key, { text, lastModified: this.tick(), size: byteLength(text) });
   }
 
@@ -196,11 +240,18 @@ export class MemoryVaultDir implements VaultDir {
     return file.bytes ?? new TextEncoder().encode(file.text);
   }
 
-  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
+  async writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
     const key = normalizeVaultPath(path);
     if (!key) throw new Error("a file needs a name");
     if (this.dirs.has(key)) throw new Error(`a directory already holds ${key}`);
     await this.mkdir(parentPath(key));
+    const current = this.files.get(key);
+    if (
+      expectedContent !== undefined &&
+      expectedContent !==
+        (current ? bytesRevision(current.bytes ?? new TextEncoder().encode(current.text)) : "0")
+    )
+      throw new Error(`revision conflict on ${key}`);
     this.files.set(key, { text: "", bytes, lastModified: this.tick(), size: bytes.byteLength });
   }
 
@@ -229,8 +280,16 @@ export class MemoryVaultDir implements VaultDir {
     await this.remove(source);
   }
 
-  async remove(path: string): Promise<void> {
+  async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalizeVaultPath(path);
+    const file = this.files.get(key);
+    if (expectedContent !== undefined && (this.dirs.has(key) || !file))
+      throw new Error(`revision conflict on ${key}`);
+    if (
+      expectedContent !== undefined &&
+      expectedContent !== (file ? bytesRevision(file.bytes ?? new TextEncoder().encode(file.text)) : "0")
+    )
+      throw new Error(`revision conflict on ${key}`);
     if (this.files.delete(key)) return;
     if (!this.dirs.has(key) || !key) return;
     const children = await this.list(key);

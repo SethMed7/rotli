@@ -4,6 +4,7 @@
 // errors land in the sidebar's inline lane, partial progress stays honest.
 
 import { isWebVault } from "../lib/browserVault";
+import { PLATFORM, type Platform } from "../lib/featurePolicy";
 import { corpusFileStat, corpusMoveFileToSink, corpusPurge } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 import { DEST } from "./destinations";
@@ -11,6 +12,18 @@ import { trashVirtualFolderItems } from "./folderTrash";
 import { invalidateNotes } from "./hooks";
 import { trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
+
+export function emptyTrashConfirmation(
+  count: number,
+  placement: "header" | "menu",
+  platform: Platform = PLATFORM,
+): string {
+  const items = `${count} ${count === 1 ? "item" : "items"}`;
+  if (platform === "web") return `Delete ${items} permanently`;
+  return placement === "header"
+    ? `Delete ${items} (recoverable in the macOS Trash)`
+    : `Delete ${items} forever (they land in the macOS Trash)`;
+}
 
 export async function trashSystemSelection(): Promise<void> {
   const ui = useUiStore.getState();

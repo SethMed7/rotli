@@ -1289,7 +1289,7 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
-fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+pub(crate) fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
         || fm
             .foreign
@@ -1528,11 +1528,13 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
     &text[..text.len() - body.len()]
 }
 
+pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
+
 /// The reserved PROVENANCE keys the raw-metadata editor must never change —
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-const RAW_IMMUTABLE_KEYS: [&str; 7] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "id",
     "created",
     "owner",
@@ -4351,7 +4353,6 @@ impl CorpusStore {
         if self.layout != Layout::Memex || self.band_read_only || self.perms_read_only {
             return false;
         }
-        // excalidraw is already its own writable lane — this is for foreign sheets.
         if rel == "storage/excalidraw" || rel.starts_with("storage/excalidraw/") {
             return false;
         }
@@ -4362,10 +4363,9 @@ impl CorpusStore {
             .extension()
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase);
-        matches!(
-            ext.as_deref(),
-            Some("xlsx") | Some("csv") | Some("docx") | Some("docm") | Some("dotx") | Some("dotm")
-        ) && self.guard_rel(rel).is_ok_and(|path| path.is_file())
+        ext.as_deref()
+            .is_some_and(|ext| STORAGE_OFFICE_EXTS.contains(&ext))
+            && self.guard_rel(rel).is_ok_and(|path| path.is_file())
     }
 
     /// Scan the disk (the truth), reconciling the id↔path index as we go:

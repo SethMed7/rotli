@@ -12,9 +12,17 @@
 
 import { type VaultStore, deviceVaultStore } from "../lib/browserVault";
 import { FsaVaultDir } from "../lib/fsaVaultDir";
-import { HelperHttpError, helperHealth, helperRpc, helperUnreachable } from "../lib/helperClient";
+import {
+  HelperHttpError,
+  helperConnectionError,
+  helperHealth,
+  helperRpc,
+  helperUnreachable,
+} from "../lib/helperClient";
 import type { HelperLink } from "../lib/helperPairing";
 import { HelperVaultDir, type PendingOp } from "../lib/helperVaultDir";
+import { registerWebHelperVaultId } from "../lib/webAiSeam";
+import { useHelperLink } from "../state/helperLink";
 import { type VaultConnection, useVaultConnection } from "../state/vaultConnection";
 import { type VaultDir, freeSiblingPath } from "./vaultDir";
 import {
@@ -52,6 +60,7 @@ export interface HelperVaultInfo {
   name: string;
   id: string;
   empty: boolean;
+  completionVaultBinding?: boolean;
 }
 
 export async function loadHelperBinding(): Promise<HelperBinding | null> {
@@ -81,6 +90,7 @@ export async function clearHelperBinding(): Promise<void> {
  * untouched; the browser forgets which folder it opens (and reloads). */
 export async function leaveVault(): Promise<void> {
   await clearHelperBinding();
+  registerWebHelperVaultId(null);
   await disconnectFolderVault();
 }
 
@@ -119,6 +129,7 @@ export function helperConnection(binding: HelperBinding | null, probe: HelperPro
 
 /** Ask the helper whether it's there, takes our token, and what it serves. */
 export async function probeHelper(link: HelperLink): Promise<HelperProbe> {
+  useHelperLink.getState().setCompletionVaultBinding(false);
   try {
     const health = await helperHealth(link.port);
     if (!health.ok) return { kind: "offline" };
@@ -127,11 +138,18 @@ export async function probeHelper(link: HelperLink): Promise<HelperProbe> {
   }
   try {
     const info = await helperRpc<HelperVaultInfo | null>(link, "vault_info", {}, { timeoutMs: 5_000 });
+    useHelperLink.getState().setCompletionVaultBinding(info?.completionVaultBinding === true);
     return { kind: "serving", info };
   } catch (error) {
     if (error instanceof HelperHttpError && error.status === 401) return { kind: "refused" };
     // a helper from before the vault verbs answers "unknown command"
     if (error instanceof HelperHttpError && error.status === 404) return { kind: "outdated" };
+    if (
+      helperConnectionError(error, "vault_info") &&
+      error instanceof HelperHttpError &&
+      error.status === 409
+    )
+      return { kind: "serving", info: null };
     return { kind: "offline" };
   }
 }
@@ -150,6 +168,7 @@ export interface ResolvedVault {
 export async function resolveVault(link: HelperLink | null): Promise<ResolvedVault> {
   const support = browserFolderSupportSync();
   const binding = await loadHelperBinding();
+  registerWebHelperVaultId(binding?.vaultId ?? null);
   if (binding || support.kind !== "live") {
     const unsupported = binding ? null : unsupportedBrowser(support, navigator.userAgent);
     if (unsupported) return { connection: { status: "unsupported", browser: unsupported }, dir: null };
@@ -188,24 +207,39 @@ function deadlineFor(cmd: string): number | undefined {
   return cmd === "vault_walk" || cmd === "vault_read_many" ? 60_000 : 20_000;
 }
 
-/** "vault changed": the helper was pointed at another folder while this page
- * had one open. Nothing was touched; boot again, into setup. */
-function vaultChanged(error: unknown): boolean {
-  return (
-    error instanceof HelperHttpError && error.status === 409 && error.message.startsWith("vault changed")
-  );
-}
-
+/** A terminal answer re-probes the binding and shows setup in-session. Drafts
+ * stay in the editor model and pending mutations stay available for replay. */
 export function helperVaultDir(link: HelperLink, vaultId: string): HelperVaultDir {
-  // every verb names the vault this page bound to; the helper refuses a mismatch
-  const call = (cmd: string, args: Record<string, unknown>) =>
-    helperRpc(link, cmd, { ...args, vaultId }, { timeoutMs: deadlineFor(cmd) }).catch((error: unknown) => {
-      if (vaultChanged(error) && typeof window !== "undefined") window.location.reload();
-      throw error;
+  const connection = useVaultConnection.getState().connection;
+  const name = connection.status === "connected" ? connection.name : vaultId;
+  let rechecking: Promise<void> | null = null;
+  const recheck = () => {
+    rechecking ??= (async () => {
+      useVaultConnection.getState().setReconnecting(true);
+      const binding = (await loadHelperBinding()) ?? { kind: "helper", vaultId, vaultName: name };
+      const next = helperConnection(binding, await probeHelper(link));
+      // Before this rejects and removes its editor, keep every unacknowledged
+      // operation. The presentation also snapshots its unsaved note buffers.
+      if (typeof window !== "undefined")
+        persistPendingOnUnload(window.localStorage, vaultId, dir.pendingOps());
+      useVaultConnection.getState().setConnection(next);
+      useVaultConnection.getState().setReconnecting(false);
+    })().finally(() => {
+      rechecking = null;
     });
+    return rechecking;
+  };
+  const call = (cmd: string, args: Record<string, unknown>) =>
+    helperRpc(link, cmd, { ...args, vaultId }, { timeoutMs: deadlineFor(cmd) }).catch(
+      async (error: unknown) => {
+        if (helperConnectionError(error, cmd)) await recheck();
+        throw error;
+      },
+    );
   const dir = new HelperVaultDir(call, {
     ping: async () => (await helperHealth(link.port)).ok === true,
     unreachable: helperUnreachable,
+    terminal: (error) => helperConnectionError(error, "vault_write"),
     onReconnecting: (reconnecting) => useVaultConnection.getState().setReconnecting(reconnecting),
     // everything acknowledged (an outage recovered in-session): an unload
     // record written during the outage must not replay a landed edit

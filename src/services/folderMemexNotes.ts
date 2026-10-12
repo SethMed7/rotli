@@ -5,7 +5,7 @@
 
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
-import type { VaultDir } from "./vaultDir";
+import { contentRevision, type VaultDir } from "./vaultDir";
 
 /** The vault's settings file: its `brainEnabled` is the Librarian switch. */
 const SETTINGS_FILE = ".rotli/settings.json";
@@ -52,8 +52,40 @@ async function librarianEnabled(dir: VaultDir): Promise<boolean> {
 
 /** List a secure note's path in the vault's `.gitignore`, once. */
 export async function ignoreInGit(dir: VaultDir, path: string): Promise<void> {
-  const existing = (await dir.exists(".gitignore")) ? await dir.readText(".gitignore") : "";
-  if (existing.split("\n").some((line) => line.trim() === path)) return;
-  const lead = existing && !existing.endsWith("\n") ? "\n" : "";
-  await dir.writeText(".gitignore", `${existing}${lead}${path}\n`);
+  await updateGitExclusions(dir, [path]);
+}
+
+/** A completed relocation no longer needs the old exact-path exclusion. */
+export async function removeGitExclusion(dir: VaultDir, path: string): Promise<void> {
+  await updateGitExclusions(dir, [], [path]);
+}
+
+/** The one `.gitignore` writer: add and drop exact lines, revision-gated, and
+ * retried when another writer edited the file in between (their lines stay). */
+export async function updateGitExclusions(
+  dir: VaultDir,
+  add: string[],
+  remove: string[] = [],
+): Promise<{ before: string; after: string }> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const exists = await dir.exists(".gitignore");
+    const text = exists ? await dir.readText(".gitignore") : "";
+    let next = remove.length
+      ? text
+          .split("\n")
+          .filter((line) => !remove.includes(line.trim()))
+          .join("\n")
+      : text;
+    for (const line of add)
+      if (!next.split("\n").some((have) => have.trim() === line))
+        next += `${next && !next.endsWith("\n") ? "\n" : ""}${line}\n`;
+    if (next === text) return { before: text, after: text };
+    try {
+      await dir.writeText(".gitignore", next, exists ? contentRevision(text) : "0");
+      return { before: text, after: next };
+    } catch (error) {
+      if (!(error instanceof Error && /revision conflict/i.test(error.message) && attempt < 2)) throw error;
+    }
+  }
+  throw new Error("revision conflict: git exclusions changed during write");
 }

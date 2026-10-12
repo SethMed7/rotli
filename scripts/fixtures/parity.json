@@ -505,6 +505,17 @@
         }
       ]
     },
+    "noteFilenameSlugs": {
+      "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (note filenames) — src/memex/contract.ts noteSlugify + noteStem ↔ src-tauri/src/corpus.rs slugify + filename_for",
+      "value": [
+        { "title": "Untitled", "slug": "untitled" },
+        { "title": "Chooser thing", "slug": "chooser-thing" },
+        { "title": "Hello, World!", "slug": "hello-world" },
+        { "title": "  ⌥Space — the way in  ", "slug": "space-the-way-in" },
+        { "title": "Café résumé", "slug": "café-résumé" },
+        { "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+      ]
+    },
     "noteDateStamps": {
       "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (Metadata ownership) — src/memex/dates.ts stampToMs + today ↔ src-tauri/src/note_dates.rs stamp_to_ms + day_stamp (independent implementations, fixture-aligned answers; localMidnight is each side's own zone)",
       "value": {
@@ -715,6 +726,29 @@
     "emptyCanvasFile": {
       "sourceOfTruth": "src-tauri/src/corpus_files.rs EMPTY_CANVAS ↔ src/jsonCanvas/model.ts EMPTY_CANVAS_FILE (a new canvas, written the way Obsidian writes one)",
       "value": "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}"
+    },
+    "rawImmutableKeys": {
+      "sourceOfTruth": "src/lib/frontmatterRaw.ts RAW_IMMUTABLE_KEYS ↔ src-tauri/src/corpus.rs RAW_IMMUTABLE_KEYS",
+      "value": [
+        "id",
+        "created",
+        "owner",
+        "local_ai_allowed",
+        "view_tag",
+        "created_by",
+        "ai_edit"
+      ]
+    },
+    "storageOfficeExts": {
+      "sourceOfTruth": "src/services/folderFileIo.ts STORAGE_OFFICE_EXTS ↔ src-tauri/src/corpus.rs STORAGE_OFFICE_EXTS",
+      "value": [
+        "xlsx",
+        "csv",
+        "docx",
+        "docm",
+        "dotx",
+        "dotm"
+      ]
     }
   }
 }

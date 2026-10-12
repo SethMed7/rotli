@@ -20,9 +20,18 @@ export interface JournalDraft {
   body: string;
   expectedRevision: string;
   expectedBody: string;
+  protection?: { secure: boolean; locked: boolean };
 }
 
 type KeyValue = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+function knownProtection(value: unknown): JournalDraft["protection"] | null {
+  if (!value || typeof value !== "object") return null;
+  const policy = value as Record<string, unknown>;
+  return typeof policy.secure === "boolean" && typeof policy.locked === "boolean"
+    ? { secure: policy.secure, locked: policy.locked }
+    : null;
+}
 
 /** The journal's key for one vault. */
 export function journalKey(vault: string): string {
@@ -87,7 +96,19 @@ export async function replayJournal(
       await service.updateNote(draft.noteId, draft.body, draft.expectedRevision, draft.expectedBody);
       saved += 1;
     } catch {
-      const copy = await service.createNote(note?.folderId ?? "", draft.body).catch(() => null);
+      const snapshot = knownProtection(draft.protection);
+      const protection =
+        snapshot || note
+          ? {
+              secure: snapshot?.secure === true || note?.secure === true,
+              locked: snapshot?.locked === true || note?.locked === true,
+            }
+          : null;
+      if (!protection) {
+        unresolved.push(draft);
+        continue;
+      }
+      const copy = await service.createNote(note?.folderId ?? "", draft.body, protection).catch(() => null);
       if (copy) keptAside.push(copy.title);
       else unresolved.push(draft); // neither saved nor kept aside: keep it for the next boot
     }

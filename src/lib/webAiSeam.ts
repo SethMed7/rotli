@@ -15,6 +15,16 @@ export function currentWebAiBridge(): WebAiBridge | null {
   return webAiBridge;
 }
 
+/** The Helper vault this page opened. Another tab changing the device binding
+ * cannot retarget a completion from an already open chat. */
+let webHelperVaultId: string | null = null;
+export function registerWebHelperVaultId(vaultId: string | null): void {
+  webHelperVaultId = vaultId;
+}
+export function currentWebHelperVaultId(): string | null {
+  return webHelperVaultId;
+}
+
 /** The model-facing view of the browser-side vault, with the secure-note law
  * applied by services/webAiCorpus (Rust's job in the app). The wire shapes
  * are lib/tauri's; this seam stays shape-agnostic so it never imports it. */
@@ -61,4 +71,33 @@ export function registerWebFileStore(store: WebFileStoreShape | null): void {
 }
 export function currentWebFileStore(): WebFileStoreShape | null {
   return webFileStore;
+}
+
+/** Connected-folder user file/metadata commands. Boot registers the concrete
+ * adapter; the IPC seam does not import browser startup or its dependencies. */
+export interface WebVaultIoShape<Frontmatter, Stat, Versioned> {
+  assetUrl(id: string, temporary: boolean): Promise<string>;
+  text(id: string, max?: number): Promise<string>;
+  bytes(id: string, max?: number): Promise<string>;
+  stat(id: string): Promise<Stat | null>;
+  writeBytes(id: string, bytes: string, backup: boolean, revision: string): Promise<string>;
+  rawMetadata(id: string): Promise<Versioned>;
+  writeMetadata(id: string, block: string, revision: string): Promise<string>;
+  frontmatter(id: string): Promise<Frontmatter | null>;
+  protection(
+    id: string,
+    key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",
+    value: boolean,
+  ): Promise<void>;
+}
+let webVaultIo: WebVaultIoShape<unknown, unknown, unknown> | null = null;
+export function registerWebVaultIo(io: WebVaultIoShape<unknown, unknown, unknown> | null): void {
+  webVaultIo = io;
+}
+export function hasWebVaultIo(): boolean {
+  return webVaultIo !== null;
+}
+export function currentWebVaultIo<F = unknown, S = unknown, V = unknown>(): WebVaultIoShape<F, S, V> {
+  if (!webVaultIo) throw new Error("Connect a vault first");
+  return webVaultIo as WebVaultIoShape<F, S, V>;
 }

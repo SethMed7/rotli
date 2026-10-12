@@ -1,6 +1,5 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
-// Tauri seam — every Tauri API call in the frontend goes through here, guarded
-// by isTauri(), so the whole UI renders in a plain browser (vite dev, no shell).
+// Tauri seam: native IPC and connected-folder browser twins.
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -17,6 +16,7 @@ import type {
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
+import { PLATFORM } from "./featurePolicy";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
@@ -24,7 +24,13 @@ import {
   currentWebAiCorpus,
   currentWebFileStore,
   currentWebMemexBridge,
+  currentWebVaultIo,
+  hasWebVaultIo,
 } from "./webAiSeam";
+
+/** The desktop browser twin has no connected folder; focused unit tests may
+ * install the web adapter explicitly. The web build always requires it. */
+export const usesWebVaultIo = (): boolean => PLATFORM === "web" || hasWebVaultIo();
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -980,9 +986,11 @@ export function splitRootId(id: string): { rootId: string; rel: string } {
   return { rootId: "default", rel: id };
 }
 
-/** Asset-protocol URL for a surfaced file note (kind "file"), to feed an
- * <audio>/<img>/<video>/<iframe>. "" outside Tauri or when it can't resolve. */
-export async function fileAssetUrl(id: string): Promise<string> {
+/** Display URL for a surfaced file. Web callers requesting `temporary` own
+ * its blob URL and must revoke it; cached thumbnails use durable data URLs. */
+export async function fileAssetUrl(id: string, temporary = false): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().assetUrl(id, temporary);
   if (!isTauri()) return "";
   const { rootId, rel } = splitRootId(id);
   const abs = await corpusAbs(rootId, rel);
@@ -997,17 +1005,21 @@ export async function corpusCreateCanvas(folderId: string, name: string): Promis
   return invoke<string>("corpus_create_canvas", { folderId, name });
 }
 
-/** Read a surfaced FILE's text content (for the in-app text viewer). Capped on
- * the Rust side. "" outside Tauri. */
+/** Read a surfaced file through the native or connected-folder adapter. */
 export async function corpusFileText(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().text(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_text", { id, maxBytes });
 }
 
-/** Read a surfaced FILE as BASE64 (for a binary the viewer must parse, e.g. a
- * `.xlsx` spreadsheet). Capped on the Rust side. "" outside Tauri. */
+/** Read surfaced file bytes as base64, with the adapter's size gate. */
 export async function corpusFileBytes(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().bytes(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_bytes", { id, maxBytes });
 }
 
@@ -1027,10 +1039,10 @@ export interface FileStat {
   modifiedMs: number | null;
 }
 
-/** Size + writability probe for a surfaced file — the sheet editor decides
- * read-only vs editable up front. null outside Tauri (browser demo = read-only). */
+/** Size, revision, and writability for a surfaced file. */
 export async function corpusFileStat(id: string): Promise<FileStat | null> {
-  if (!isTauri()) return null;
+  if (!isTauri())
+    return usesWebVaultIo() ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().stat(id) : null;
   return invoke<FileStat>("corpus_file_stat", { id });
 }
 
@@ -1054,6 +1066,13 @@ export async function corpusWriteFileBytes(
   bak: boolean,
   expectedRevision: string,
 ): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeBytes(
+      id,
+      base64,
+      bak,
+      expectedRevision,
+    );
   if (!isTauri()) return expectedRevision;
   return invoke<string>("corpus_write_file_bytes", {
     id,
@@ -1139,7 +1158,15 @@ export type WebAiCorpus = WebAiCorpusShape<
 >;
 const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
-  if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
+  if (!isTauri()) {
+    let io;
+    try {
+      io = currentWebVaultIo<FrontmatterView, FileStat, VersionedText>();
+    } catch {
+      return webCorpus()?.frontmatter(id) ?? null;
+    }
+    return io.frontmatter(id);
+  }
   return invoke<FrontmatterView>("corpus_frontmatter", { id });
 }
 
@@ -1152,9 +1179,12 @@ export async function corpusSetPinned(id: string, pinned: boolean): Promise<void
 
 /** The note's frontmatter as RAW TEXT (fences included), byte-exact from disk —
  * the "Show file metadata" view renders this above the body. "" when the note
- * has none (or outside Tauri). */
+ * has none. */
 export async function corpusRawFrontmatter(id: string): Promise<VersionedText> {
-  if (!isTauri()) return { contents: "", revision: "browser" };
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().rawMetadata(id)
+      : { contents: "", revision: "browser" };
   return invoke<VersionedText>("corpus_raw_frontmatter", { id });
 }
 
@@ -1166,6 +1196,12 @@ export async function corpusWriteFrontmatterRaw(
   block: string,
   expectedRevision: string,
 ): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeMetadata(
+      id,
+      block,
+      expectedRevision,
+    );
   if (!isTauri()) return "browser";
   return invoke<string>("corpus_write_frontmatter_raw", {
     id,

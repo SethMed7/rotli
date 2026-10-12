@@ -4,6 +4,7 @@
 // and rebindable. The Home front answers the request, because it owns the view
 // menu and the rendered Main rows the numbers point at.
 
+import { hotkeyHint } from "../lib/hotkeyHint";
 import { useUiStore } from "../state/ui";
 import { registerAction } from "./registry";
 
@@ -22,13 +23,14 @@ function askHomeFront(id: "views" | "sidebar"): void {
 export function registerLeaderActions(): void {
   registerAction({
     id: "chrome.pickView",
-    title: "Switch view — then ⌘1–9 picks one",
+    title: `Switch view${hotkeyHint(" — then ⌘1–9 picks one")}`,
     defaultChord: "Meta+Shift+W",
     run: () => askHomeFront("views"),
   });
   registerAction({
     id: "chrome.pickNote",
-    title: "Jump into the sidebar — then ⌘1–9 opens a top note",
+    platforms: ["desktop"],
+    title: `Jump into the sidebar${hotkeyHint(" — then ⌘1–9 opens a top note")}`,
     defaultChord: "Meta+Shift+S",
     run: () => askHomeFront("sidebar"),
   });

@@ -1,8 +1,13 @@
+import { PLATFORM } from "../../lib/featurePolicy";
+import { mermaidRefusal } from "../../lib/mermaidPolicy";
+
 /** Vendor seam for turning Mermaid source into editable Excalidraw elements. */
 export async function convertMermaidToBoardScene(definition: string): Promise<{
   elements: readonly unknown[];
   files: Record<string, unknown>;
 }> {
+  const refusal = mermaidRefusal(definition, PLATFORM);
+  if (refusal) throw new Error(refusal);
   const [{ parseMermaidToExcalidraw }, { convertToExcalidrawElements }] = await Promise.all([
     import("@excalidraw/mermaid-to-excalidraw"),
     import("@excalidraw/excalidraw"),

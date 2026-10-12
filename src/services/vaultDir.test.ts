@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   MemoryVaultDir,
+  contentRevision,
   baseName,
   byteLength,
   joinVaultPath,
@@ -44,6 +45,17 @@ describe("path helpers", () => {
 });
 
 describe("MemoryVaultDir", () => {
+  test("a content-gated remove cannot delete an empty directory", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.mkdir(".gitignore");
+    await expect(dir.remove(".gitignore", "0")).rejects.toThrow(/revision conflict/);
+    expect(await dir.exists(".gitignore")).toBe(true);
+  });
+
+  test("a content-gated remove refuses a missing file", async () => {
+    const dir = new MemoryVaultDir();
+    await expect(dir.remove("missing.md", "0")).rejects.toThrow(/revision conflict/);
+  });
   test("writeText creates parent directories and stat reports bytes", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki/_inbox/a.md", "hello—");
@@ -153,4 +165,22 @@ describe("binary files", () => {
     expect(await dir.readBytes("archive/a.png")).toEqual(bytes);
     expect(await dir.exists("storage/images/a.png")).toBe(false);
   });
+});
+
+test("the fast content revision agrees with plain 64-bit FNV-1a on every byte pattern", () => {
+  const reference = (text: string) => {
+    let hash = 0xcbf29ce484222325n;
+    for (const byte of new TextEncoder().encode(text)) {
+      hash ^= BigInt(byte);
+      hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+    }
+    return `fnv1a64:${hash.toString(16).padStart(16, "0")}`;
+  };
+  const samples = ["", "a", "ÿ\u0000￿", "— “quoted” é 🦘\n", "x".repeat(5000)];
+  for (let n = 0; n < 300; n += 1) {
+    samples.push(
+      Array.from({ length: n }, (_, i) => String.fromCharCode((i * 7919 + n * 104729) % 0xd7ff)).join(""),
+    );
+  }
+  for (const text of samples) expect(contentRevision(text)).toBe(reference(text));
 });

@@ -10,6 +10,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
+  a save uses the saved version; a delete after an external removal is a no-op
+  unless it carried a content gate. Binary saves also recover when the Helper
+  writes the bytes but the acknowledgement is lost. Chat rechecks its bound
+  vault after the secure-note scan if the served folder changes during it.
+- **Rotli Web keeps diagrams and folders private without hiding ordinary text.**
+  Mermaid blocks encoded images and links, while labels such as `click` and
+  `C://Users` still render. Concurrent view and secure-note changes preserve
+  Git exclusions.
+- **Web menus and guidance match connected folders.** Chat rows omit Show in
+  Finder, Settings → Location describes the connected browser folder, and the
+  Welcome privacy lesson no longer asks web users to review a Librarian setting.
+- **Rotli Helper protects files and secure notes throughout a session.** A
+  case-only move refuses a different file already holding the destination;
+  chat from a Helper-served vault checks every secure note in that vault
+  before every turn, however large the vault, and refuses if they cannot be
+  checked. With a browser folder, the page keeps secure notes out of chat.
+  Oversized reads are refused, batches stay within their budget, and no
+  write, move, or delete can take a writer's `.lock` name.
+- **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
+  vault metadata writes now refuse stale content; moving a file waits for
+  in-flight saves. Secure notes keep their Git exclusion when moved, and
+  recovered edits keep their secure and locked flags. Words typed into a new
+  note before its file appears survive a hard refresh.
+- **Rotli Web pastes images into notes.** Pasted image bytes now land in the
+  connected vault, with a portable Markdown link at the caret.
+- **Note chat entry points use the web setup path.** Row menus and search open
+  the Chat on the web guide until Rotli Helper is ready, then resolve notes
+  through the connected vault.
+- **Web actions and lessons name usable controls.** Search hides desktop-only
+  browser and sidebar commands; Welcome uses clickable web instructions, and
+  menus omit Finder-only actions. Empty Trash says when deletion is permanent.
+- **Web folder changes appear when the tab regains focus.** A connected folder
+  refreshes its note listing and metadata paths while unsaved editor text stays
+  in its buffer.
+- **Narrow web windows keep labels readable.** Note header metadata wraps at
+  word boundaries and the palette footer keeps its key actions on one line.
+- **Rotli Web fills missing note identity and dates on save or move.** Editing
+  a hand-written note with frontmatter no longer leaves blank `id`, `created`,
+  or `updated` fields, and moving it keeps its original edit date.
+- **New Web note titles name their files.** The first heading replaces the
+  temporary `untitled.md` name while keeping the note's stable identity.
+- **Rotli Web reopens the notes you had open.** A tab whose note lives in
+  Captures, Archive, or Trash — including every note you just created — now
+  comes back after a reload instead of closing, and the Mac app shares the
+  same check at relaunch; only notes that are actually gone from the vault
+  drop out.
+- **Rotli Web keeps Mermaid diagrams private.** Diagrams with images, links,
+  or configuration that could load a URL are refused before rendering,
+  with an explanation beside the source.
+- **A Helper token reset, changed vault, or disconnected vault returns to setup.**
+  Chat requests identify either the bound Helper vault or the browser folder road; an
+  older page must reload before chatting with a Helper that serves a vault. An older
+  Helper can still open vault files but asks for an update before Helper-vault chat. Unsaved
+  typing and pending writes stay on this computer for reconnection; ordinary
+  file revision conflicts still report a file error.
+- **Web controls describe what can actually run.** Search omits native window
+  and vault-refresh commands. Settings explains that the Librarian and local
+  model installation are available in Rotli for Mac, while keeping connected
+  CLI configuration.
+- **Web embeds explain desktop limits.** The slash menu hides Document, and
+  existing document, workbook, and CSV spreadsheet embeds name Rotli for Mac
+  instead of mounting an editor that cannot save.
+- **Attach image works in the browser.** The slash command opens an image
+  picker and saves the chosen bytes and portable link through the same vault
+  import lane as paste and drop.
+- **Web search and the tour stop advertising unavailable shortcuts.** Recent
+  notes, open tabs, navigation and view commands use the build's key policy.
+- **Rotli Web keeps note protection and file metadata.** Secure, lock, AI-edit,
+  and local-AI controls write to the connected vault. Raw metadata edits persist
+  and refuse stale revisions or reserved-field changes. Secure notes move to
+  their protected home with matching git exclusions.
+- **Web views and note names stay portable.** Named views synchronize Markdown
+  `view_tag` metadata, failed view writes restore their own git exclusions without
+  deleting a newer external edit or a directory that replaced `.gitignore`, and
+  title renames preserve earlier names as durable aliases.
+- **Assets work on the web.** Vault files appear in Assets, Library, and filename
+  search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8
+  source bytes and save with an adapter-checked content revision. Office files
+  explain their web limitation, and native-only file actions stay hidden.
+
 ### Changed
 
 - **rotli.co's film is a one-minute tour of the Mac app.** The landing hero

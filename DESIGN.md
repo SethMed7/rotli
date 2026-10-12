@@ -117,7 +117,7 @@ exception.
   removing a projection from moving durable content to Trash; virtual folders
   require an explicit second-step confirmation before their contents move.
 - Native content rows expose Copy File Path beside Show in Finder. Browser-mode
-  twins disable both filesystem-only actions instead of pretending they ran.
+  menus omit both filesystem-only actions.
 - Note-to-note wikilinks open with an ordinary click; web links — markdown
   links and bare-URL autolinks alike — keep the deliberate ⌘-click gesture
   inside the editor. A web link that cannot open shows a small **Couldn't open

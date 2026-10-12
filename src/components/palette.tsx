@@ -7,10 +7,11 @@
 
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { useBindingsStore, resolveChord } from "../keys/bindings";
+import { useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
-import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
+import { type KeyAction, allActions, currentChordFromBindings, dispatch, getAction } from "../keys/registry";
 import { subsequenceMatch } from "../lib/fuzzy";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { useTransientPopover } from "../lib/popover";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
@@ -94,9 +95,9 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     const noteById = new Map(notes.map((n) => [n.id, n]));
     const q = query.trim();
 
-    const chordOf = (a: KeyAction) => resolveChord(overrides, a.id, a.defaultChord);
-    const kbdHint = (a: KeyAction): ReactNode => {
-      const chord = chordOf(a);
+    const chordOf = (a: KeyAction) => currentChordFromBindings(a.id, overrides);
+    const kbdHint = (a: KeyAction | undefined): ReactNode => {
+      const chord = a ? chordOf(a) : null;
       return chord ? <kbd>{formatChord(chord)}</kbd> : null;
     };
     const noteRow = (n: NoteSummary, body = ""): Row => ({
@@ -139,7 +140,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
         if (!tab) return noteRow(n);
         return {
           ...noteRow(n),
-          hint: <kbd>{formatChord(`Meta+${i + 1}`)}</kbd>,
+          hint: kbdHint(getAction(`tabs.jump${i + 1}`)),
           run: (newTab) => {
             useUiStore.getState().setSidebarMode("notes");
             // ⌘⏎ keeps the footer's promise even on a row that is already a tab
@@ -162,7 +163,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
         const action = getAction(id);
         if (action) suggested.push(actionRow(action, label));
       };
-      suggest("notes.new", `New note in “${newNoteIn}”`);
+      suggest("notes.new", newNoteIn ? `New note in “${newNoteIn}”` : "New note");
       suggest("panes.splitRight");
       suggest("view.focus");
       return [
@@ -186,8 +187,8 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           label: n.title,
           icon: glyphForNote(n, { size: 15 }),
           hint:
-            leaf.id === focusedPaneId && i < 8 ? (
-              <kbd>{formatChord(`Meta+${i + 1}`)}</kbd>
+            leaf.id === focusedPaneId && i < 8 && currentChordFromBindings(`tabs.jump${i + 1}`, overrides) ? (
+              <kbd>{formatChord(currentChordFromBindings(`tabs.jump${i + 1}`, overrides)!)}</kbd>
             ) : (
               <span className="muted">Open tab</span>
             ),
@@ -411,9 +412,11 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           <span>
             <kbd>⏎</kbd> open
           </span>
-          <span>
-            <kbd>⌘⏎</kbd> open in new tab
-          </span>
+          {SHOW_HOTKEYS && (
+            <span>
+              <kbd>⌘⏎</kbd> open in new tab
+            </span>
+          )}
           <span className="end">
             <kbd>Esc</kbd> close
           </span>

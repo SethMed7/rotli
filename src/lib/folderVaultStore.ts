@@ -1,11 +1,12 @@
 // The VaultStore port over a real folder: `.rotli/` files instead of
 // IndexedDB keys, so Main, views, settings, and viewstate land where the Mac
 // app keeps them and the same vault opens in both. The optimistic revision
-// is the file's modification time and size — a write that presents a stale
-// one is refused, never clobbers.
+// is a hash of the exact bytes read — a write that presents stale content is
+// refused by the folder adapter.
 
-import type { VaultDir } from "../services/vaultDir";
-import type { VaultStore } from "./browserVault";
+import { writeFolderViews } from "../services/folderViewSync";
+import { contentRevision, type VaultDir } from "../services/vaultDir";
+import type { VaultStore, VersionedValue } from "./browserVault";
 
 /** Which `.rotli/` file a vault key maps to. Unknown keys live in
  * `.rotli/web/<key>` so the browser build never invents top-level files. */
@@ -31,9 +32,19 @@ const REVISION_SUFFIX = "#rev";
 export class FolderVaultStore implements VaultStore {
   constructor(private readonly dir: VaultDir) {}
 
+  writtenRevision(value: string): string {
+    return contentRevision(value);
+  }
+
   private async revisionOf(path: string): Promise<string> {
-    const stat = await this.dir.stat(path);
-    return stat ? `${stat.lastModified}:${stat.size}` : "0";
+    return (await this.dir.exists(path)) ? contentRevision(await this.dir.readText(path)) : "0";
+  }
+
+  async readVersioned(key: string): Promise<VersionedValue> {
+    const path = vaultKeyPath(key);
+    if (!(await this.dir.exists(path))) return { contents: "", revision: "0" };
+    const contents = await this.dir.readText(path);
+    return { contents, revision: contentRevision(contents) };
   }
 
   async get(key: string): Promise<string | undefined> {
@@ -54,14 +65,7 @@ export class FolderVaultStore implements VaultStore {
     await this.dir.remove(vaultKeyPath(key));
   }
 
-  /** The file's current stamp must equal what the writer read; then write.
-   * `nextRevision` is ignored: the next stamp is whatever the file gets.
-   *
-   * Best effort, not a lock: the stamp read and the write are two steps, so
-   * two tabs writing the same file in the same instant can both pass and the
-   * last one wins. The Mac app holds a file lock in Rust for the same files;
-   * the browser has no equivalent, and the window is milliseconds on a file a
-   * person edits in one tab. The next writer's stale stamp is refused. */
+  /** Carry the observed content revision into the adapter's write turn. */
   async compareAndSwap(
     key: string,
     value: string,
@@ -69,9 +73,14 @@ export class FolderVaultStore implements VaultStore {
     expectedRevision: string,
   ): Promise<boolean> {
     const path = vaultKeyPath(key);
-    const current = await this.revisionOf(path);
-    if (current !== expectedRevision) return false;
-    await this.dir.writeText(path, value);
-    return true;
+    // views also carry each note's view_tag: their own transaction
+    if (key === "views") return writeFolderViews(this.dir, value, expectedRevision);
+    try {
+      await this.dir.writeText(path, value, expectedRevision);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && /revision conflict/i.test(error.message)) return false;
+      throw error;
+    }
   }
 }

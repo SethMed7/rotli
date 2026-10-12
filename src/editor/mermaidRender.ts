@@ -1,3 +1,6 @@
+import { PLATFORM, type Platform } from "../lib/featurePolicy";
+import { mermaidRefusal } from "../lib/mermaidPolicy";
+
 async function loadMermaid() {
   const { default: mermaid } = await import("mermaid");
   return mermaid;
@@ -20,8 +23,16 @@ function cleanupMermaidOrphans(id: string): void {
 
 export async function renderMermaidElement(
   code: string,
-  options: { dark: boolean; id: string },
+  options: { dark: boolean; id: string; platform?: Platform },
 ): Promise<HTMLElement> {
+  const element = document.createElement("div");
+  element.className = "rotli-render-mermaid";
+  const refusal = mermaidRefusal(code, options.platform ?? PLATFORM);
+  if (refusal) {
+    element.textContent = refusal;
+    return element;
+  }
+  if (!code.trim()) return element;
   const mermaid = await loadMermaid();
   const theme = options.dark ? "dark" : "default";
   // Mermaid configuration is process-global, and the board converter also
@@ -35,9 +46,6 @@ export async function renderMermaidElement(
     themeVariables: { background: "transparent", xyChart: { backgroundColor: "transparent" } },
   });
 
-  const element = document.createElement("div");
-  element.className = "rotli-render-mermaid";
-  if (!code.trim()) return element;
   try {
     const { svg } = await mermaid.render(options.id, code);
     element.innerHTML = svg;

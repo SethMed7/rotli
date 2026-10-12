@@ -50,19 +50,24 @@ export function slashPlacement(
  * from Rotli Web (the Librarian runs in the Mac app). */
 export function filterSlashItems(
   query: string,
-  features: { sheets: boolean; librarian?: boolean } = { ...LAUNCH_FEATURES, librarian: PLATFORM !== "web" },
+  features: { sheets: boolean; documents?: boolean; librarian?: boolean } = LAUNCH_FEATURES,
+  platform: "desktop" | "web" = PLATFORM,
 ): SlashItem[] {
   const q = query.trim().toLowerCase();
   const items = SLASH_ITEMS.filter(
     (it) =>
       (features.sheets || !(it.op.kind === "picker" && it.op.mode === "embedSheet")) &&
+      (features.documents !== false || !(it.op.kind === "picker" && it.op.mode === "embedDocument")) &&
       // the Librarian and Ask AI both need the Mac app's model lanes
       (features.librarian !== false || (it.op.kind !== "librarian" && it.op.kind !== "ai")),
   );
-  if (q === "") return items;
+  const offered = items.map((item) =>
+    item.op.kind === "attachImage" && platform === "web" ? { ...item, hint: "Choose an image" } : item,
+  );
+  if (q === "") return offered;
   // best match first, catalog order within a rank (2026-10-05: `/ai` used to
   // land on Mermaid and `/ask` on Checklist, whose keyword holds "tasks")
-  return items
+  return offered
     .map((it) => ({ it, rank: slashRank(it, q) }))
     .filter(({ rank }) => rank < SLASH_NO_MATCH)
     .sort((a, b) => a.rank - b.rank)

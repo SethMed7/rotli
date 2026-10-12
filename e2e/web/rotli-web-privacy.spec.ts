@@ -106,6 +106,11 @@ test("a note's images and HTML can't send its text anywhere, not even to this si
     "wiki/leak.md": [
       "# Leak attempt",
       "",
+      "```mermaid",
+      "flowchart LR",
+      'A@{ img: "/app/index.html?note=secret-mermaid-text", w: 40, h: 40 }',
+      "```",
+      "",
       `![x](${origin}/app/?note=secret-image-text)`,
       "",
       "```html",
@@ -126,7 +131,7 @@ test("a note's images and HTML can't send its text anywhere, not even to this si
   await expect(page.getByRole("option").first()).toContainText("Leak attempt", { timeout: 15_000 });
   await page.keyboard.press("Enter");
   await expect(page.getByRole("tab", { selected: true })).toContainText("Leak attempt");
-  await page.waitForTimeout(1_500);
+  await expect(page.locator(".rotli-render-mermaid")).toContainText("privacy");
   expect(urls.filter((url) => url.includes("secret"))).toEqual([]);
   expect(egress(urls, origin)).toEqual([]);
 });

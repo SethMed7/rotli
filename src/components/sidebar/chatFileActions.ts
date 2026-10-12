@@ -3,6 +3,7 @@
 // already sits further down the menu on the Mac. A seam beside the chat
 // sidebar so the menu there stays a list of intents.
 
+import type { Platform } from "../../lib/featurePolicy";
 import { chatPreviewItem } from "../../services/systemBrowser";
 import { useUiStore } from "../../state/ui";
 
@@ -17,4 +18,11 @@ export function chatFileMenuItems(c: ChatRow): { kind: "action"; label: string; 
       onClick: () => useUiStore.getState().setPreviewItem(chatPreviewItem(c)),
     },
   ];
+}
+
+/** The build decides whether Finder exists; adapter readiness only disables it. */
+export function chatFinderMenuItems(platform: Platform, adapterReady: boolean, onClick: () => void) {
+  return platform === "desktop"
+    ? [{ kind: "action" as const, label: "Show in Finder", disabled: !adapterReady, onClick }]
+    : [];
 }

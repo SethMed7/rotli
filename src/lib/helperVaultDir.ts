@@ -1,3 +1,6 @@
+import { contentRevision } from "../services/vaultDir";
+export { contentRevision } from "../services/vaultDir";
+
 // Rotli Helper behind the VaultDir port: the vault folder the user chose,
 // served by the helper on this computer over loopback, for browsers without
 // the File System Access API (Zen, Firefox, Brave with its flag off). Every
@@ -53,6 +56,8 @@ export interface HelperVaultDirOptions {
   ping: () => Promise<boolean>;
   /** True if `error` means "nothing answered" rather than a refusal. */
   unreachable: (error: unknown) => boolean;
+  /** A rejected connection leaves mutations pending for the next boot. */
+  terminal?: (error: unknown) => boolean;
   /** The overlay's switch: true while calls wait for the helper. */
   onReconnecting?: (reconnecting: boolean) => void;
   /** Every mutation acknowledged: nothing is pending any more. */
@@ -70,18 +75,6 @@ const PREFETCHED = /\.(md|markdown)$/i;
 
 function revisionOf(entry: Entry | undefined): string {
   return entry?.kind === "file" ? `${entry.lastModified}:${entry.size}` : "0";
-}
-
-/** The desktop app's content revision (`fsutil::revision`): FNV-1a 64 over the
- * UTF-8 bytes. Sent with a write whose text this tab knows, so the helper's
- * gate compares content, not a millisecond stamp two edits can share. */
-export function contentRevision(text: string): string {
-  let hash = 0xcbf29ce484222325n;
-  for (const byte of new TextEncoder().encode(text)) {
-    hash ^= BigInt(byte);
-    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
-  }
-  return `fnv1a64:${hash.toString(16).padStart(16, "0")}`;
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -188,7 +181,9 @@ export class HelperVaultDir implements VaultDir {
       if (at >= 0) this.pending.splice(at, 1);
       if (this.pending.length === 0) this.options.onDrained?.();
     };
-    run.then(settle, settle);
+    run.then(settle, (error: unknown) => {
+      if (!this.options.terminal?.(error)) settle();
+    });
     this.chain = run.catch(() => undefined);
     return run;
   }
@@ -299,19 +294,24 @@ export class HelperVaultDir implements VaultDir {
     );
   }
 
-  writeText(path: string, text: string): Promise<void> {
-    return this.write(normalize(path), { text }, text);
+  writeText(path: string, text: string, expectedContent?: string): Promise<void> {
+    return this.write(normalize(path), { text }, text, expectedContent);
   }
 
-  writeBytes(path: string, bytes: Uint8Array): Promise<void> {
-    return this.write(normalize(path), { base64: toBase64(bytes) });
+  writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
+    return this.write(normalize(path), { base64: toBase64(bytes) }, undefined, expectedContent);
   }
 
   /** Every write is revision-gated: the helper refuses it when the file on
    * disk isn't the one this tab last saw (Rotli for Mac, or another tab,
    * wrote it meanwhile), so nothing is overwritten silently. The revision is
    * read when the write is SENT, after earlier writes in the queue landed. */
-  private async write(key: string, body: { text?: string; base64?: string }, text?: string): Promise<void> {
+  private async write(
+    key: string,
+    body: { text?: string; base64?: string },
+    text?: string,
+    expectedContent?: string,
+  ): Promise<void> {
     if (!key) throw new Error("a file needs a name");
     const op: PendingOp = { kind: "write", path: key, base: revisionOf(this.entries.get(key)), ...body };
     let base: string | null = null;
@@ -322,9 +322,11 @@ export class HelperVaultDir implements VaultDir {
       // the text this tab last saw in the file, when it knows it
       const seen = this.texts.get(key);
       const gate =
-        seen && seen.revision === base
-          ? { expectedContent: contentRevision(seen.text) }
-          : { expectedRevision: base };
+        expectedContent !== undefined
+          ? { expectedContent }
+          : seen && seen.revision === base
+            ? { expectedContent: contentRevision(seen.text) }
+            : { expectedRevision: base };
       let stat: VaultStat;
       try {
         stat = (await this.call("vault_write", { path: key, ...body, ...gate })) as VaultStat;
@@ -334,8 +336,10 @@ export class HelperVaultDir implements VaultDir {
         const landed =
           retry &&
           isConflict(error) &&
-          text !== undefined &&
-          (await this.request<string>("vault_read", { path: key })) === text;
+          (text !== undefined
+            ? (await this.request<string>("vault_read", { path: key })) === text
+            : body.base64 !== undefined &&
+              (await this.request<string>("vault_read", { path: key, encoding: "base64" })) === body.base64);
         if (!landed) {
           // the file changed on disk: the next list/stat must see it
           if (isConflict(error)) this.invalidate();
@@ -372,28 +376,41 @@ export class HelperVaultDir implements VaultDir {
   }
 
   /** A file is removed only if it is still the version this tab saw — a note
-   * the desktop app changed meanwhile is kept (409). Folders aren't gated. */
-  async remove(path: string): Promise<void> {
+   * the desktop app changed meanwhile is kept (409). Directory removal has
+   * its own type gate and refuses a supplied file-content gate. */
+  async remove(path: string, expectedContent?: string): Promise<void> {
     const key = normalize(path);
-    // decide against what is really there, never against an empty cache
-    if (!this.entries.has(key)) await this.fresh();
-    const entry = this.entries.get(key);
-    if (!entry) return; // nothing there: the port's "missing is a no-op"
-    const base = entry.kind === "file" ? revisionOf(entry) : "";
-    const seen = this.texts.get(key);
-    const gate =
-      entry.kind !== "file"
-        ? { directory: true } // a folder removal never deletes a file that took its name
-        : seen && seen.revision === base
-          ? { expectedContent: contentRevision(seen.text) }
-          : { expectedRevision: base };
-    await this.mutate({ kind: "remove", path: key, base }, () =>
-      this.call("vault_remove", { path: key, ...gate }).catch((error: unknown) => {
+    const op: PendingOp = { kind: "remove", path: key, base: "" };
+    await this.mutate(op, async () => {
+      // This turn follows queued writes. An invalidated walk must be refreshed
+      // even when the old entry still appears in the cache.
+      if (this.walkedAt === 0 || !this.entries.has(key)) await this.fresh();
+      const entry = this.entries.get(key);
+      if (!entry) {
+        if (expectedContent !== undefined) throw new Error(`revision conflict on ${key}`);
+        return;
+      }
+      if (entry.kind !== "file" && expectedContent !== undefined)
+        throw new Error(`revision conflict on ${key}`);
+      const base = entry.kind === "file" ? revisionOf(entry) : "";
+      op.base = base;
+      const seen = this.texts.get(key);
+      const gate =
+        entry.kind !== "file"
+          ? { directory: true }
+          : expectedContent !== undefined
+            ? { expectedContent }
+            : seen && seen.revision === base
+              ? { expectedContent: contentRevision(seen.text) }
+              : { expectedRevision: base };
+      try {
+        await this.call("vault_remove", { path: key, ...gate });
+      } catch (error) {
         if (isConflict(error)) this.invalidate();
         throw error;
-      }),
-    );
-    this.entries.delete(key);
-    this.texts.delete(key);
+      }
+      this.entries.delete(key);
+      this.texts.delete(key);
+    });
   }
 }

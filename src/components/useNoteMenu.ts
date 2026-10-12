@@ -8,7 +8,7 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -164,21 +164,25 @@ export function useNoteMenu() {
                 label: "Open in new tab",
                 onClick: () => openSummary(note, { newTab: true }),
               },
-              {
-                kind: "action" as const,
-                label: "Show in Finder",
-                disabled: !isTauri(),
-                onClick: () => void corpusRevealFile(note.id),
-              },
-              {
-                kind: "action" as const,
-                label: "Copy File Path",
-                disabled: !isTauri(),
-                onClick: () => {
-                  useUiStore.getState().setRowActionError(null);
-                  void copyFilePath(note.id);
-                },
-              },
+              ...(PLATFORM === "desktop"
+                ? [
+                    {
+                      kind: "action" as const,
+                      label: "Show in Finder",
+                      disabled: !isTauri(),
+                      onClick: () => void corpusRevealFile(note.id),
+                    },
+                    {
+                      kind: "action" as const,
+                      label: "Copy File Path",
+                      disabled: !isTauri(),
+                      onClick: () => {
+                        useUiStore.getState().setRowActionError(null);
+                        void copyFilePath(note.id);
+                      },
+                    },
+                  ]
+                : []),
               { kind: "sep" as const },
               restoreItem,
             ],
@@ -315,32 +319,34 @@ export function useNoteMenu() {
             setTimeout(() => ui.revealFocusedNote("brain", note.id), 0);
           },
         });
-        items.push({
-          kind: "action" as const,
-          label: "Show in Finder",
-          disabled: !isTauri(),
-          onClick: () => {
-            // failures surfaced in the sidebar's inline error note — this
-            // silently no-op'd for months while the Rust side threw (the maintainer #63)
-            useUiStore.getState().setRowActionError(null);
-            void corpusRevealFile(note.id).catch((err) =>
-              useUiStore
-                .getState()
-                .setRowActionError(
-                  `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
-                ),
-            );
-          },
-        });
-        items.push({
-          kind: "action" as const,
-          label: "Copy File Path",
-          disabled: !isTauri(),
-          onClick: () => {
-            useUiStore.getState().setRowActionError(null);
-            void copyFilePath(note.id);
-          },
-        });
+        if (PLATFORM === "desktop")
+          items.push({
+            kind: "action" as const,
+            label: "Show in Finder",
+            disabled: !isTauri(),
+            onClick: () => {
+              // failures surfaced in the sidebar's inline error note — this
+              // silently no-op'd for months while the Rust side threw (the maintainer #63)
+              useUiStore.getState().setRowActionError(null);
+              void corpusRevealFile(note.id).catch((err) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
+                  ),
+              );
+            },
+          });
+        if (PLATFORM === "desktop")
+          items.push({
+            kind: "action" as const,
+            label: "Copy File Path",
+            disabled: !isTauri(),
+            onClick: () => {
+              useUiStore.getState().setRowActionError(null);
+              void copyFilePath(note.id);
+            },
+          });
         items.push({ kind: "sep" as const });
         // "Move to…" retired (the maintainer, 2026-07-28: it listed Library areas no
         // matter which view you were in — misleading; the System browser and

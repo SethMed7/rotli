@@ -27,12 +27,18 @@ function fakeHelperVault() {
   let clock = 1_700_000_000_000;
   const state = {
     down: false,
+    refused: false,
     /** How long /health is held, as a browser holds a request while it asks
      * whether the page may reach apps on this device (Firefox, Zen). */
     healthDelayMs: 0,
     served: null as Served | null,
     chooses: { name: "notes", id: "hv_notes" } as Served,
+    /** vault_info advertises that cli_complete runs in the served vault;
+     * false is a helper from before that (it serves files, can't chat them). */
+    binding: true,
   };
+  /** Every authenticated call, in order, for assertions on the wire. */
+  const calls: { cmd: string; args: Record<string, unknown> }[] = [];
   const parent = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
   const mkdirs = (path: string) => {
     for (let dir = path; dir; dir = parent(dir)) dirs.add(dir);
@@ -44,9 +50,16 @@ function fakeHelperVault() {
   };
   const verbs: Record<string, (args: Record<string, unknown>) => unknown> = {
     chat_models: () => [],
+    cli_detect: () => ({ installed: true, version: "2.1.0 (Claude Code)", authenticated: true }),
+    cli_complete: () => "Hello from the helper's vault.",
+    cli_cancel: () => null,
     vault_info: () =>
       state.served
-        ? { ...state.served, empty: files.size === 0 && [...dirs].every((d) => d === ".rotli") }
+        ? {
+            ...state.served,
+            empty: files.size === 0 && [...dirs].every((d) => d === ".rotli"),
+            ...(state.binding ? { completionVaultBinding: true } : {}),
+          }
         : null,
     vault_choose: () => {
       state.served = state.chooses;
@@ -109,10 +122,17 @@ function fakeHelperVault() {
         const health = { ok: true, name: "rotli-helper", version: "1.3.0" };
         return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(health) });
       }
-      if (request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
+      if (state.refused || request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
         return route.fulfill({ status: 401, headers: cors, body: JSON.stringify({ error: "unauthorized" }) });
       }
       const { cmd, args } = request.postDataJSON() as { cmd: string; args: Record<string, unknown> };
+      calls.push({ cmd, args: args ?? {} });
+      if (cmd.startsWith("vault_") && cmd !== "vault_info" && cmd !== "vault_choose" && !state.served)
+        return route.fulfill({
+          status: 409,
+          headers: cors,
+          body: JSON.stringify({ error: "Rotli Helper isn't serving a vault yet — choose one first." }),
+        });
       const verb = verbs[cmd];
       if (!verb)
         return route.fulfill({
@@ -135,7 +155,7 @@ function fakeHelperVault() {
         });
       }
     });
-  return { files, state, install };
+  return { files, state, calls, install };
 }
 
 /** A browser without the File System Access API, like Zen or Firefox. */
@@ -382,4 +402,99 @@ test("a helper now serving a different folder asks which vault, instead of writi
     page.getByText(/This browser opened “notes”, but Rotli Helper now serves a different folder/),
   ).toBeVisible();
   await expect(page.locator(".cm-content")).toHaveCount(0);
+});
+
+for (const failure of ["token-reset", "no-vault"] as const)
+  test(`${failure} mid-session opens setup and keeps unsaved typing locally`, async ({ context, page }) => {
+    const helper = fakeHelperVault();
+    await helper.install(context);
+    await withoutFolderApi(context);
+    await connectThroughHelper(page);
+    const editor = page.locator(".cm-content:visible").first();
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    if (failure === "token-reset") helper.state.refused = true;
+    else helper.state.served = null;
+    await page.keyboard.type("\nsynthetic-terminal-draft");
+    await expect(page.locator(".cm-content")).toHaveCount(0);
+    await expect(vaultGate(page)).toHaveText(
+      failure === "token-reset" ? "Set up Rotli Helper" : "Choose your vault",
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-unsaved:helper:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-vault-pending:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+  });
+
+// Chat on the Helper vault road: the turn runs in the folder the helper
+// serves, so the page names that vault on the wire — never the "folder"
+// road a browser-held vault takes (review of #196).
+test("a chat turn names the served vault to the helper, and the reply comes back", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+  // the helper already answers, so Chat is a real front: switch a lane on in Settings
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  const lane = page.getByRole("switch", { name: "Use Claude Code" });
+  await lane.click();
+  await expect(lane).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Back to notes" }).click();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("Say hello");
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the helper's vault.")).toBeVisible({ timeout: 15_000 });
+  const complete = helper.calls.find((c) => c.cmd === "cli_complete");
+  expect(complete?.args.vaultId).toBe("hv_notes");
+  expect(complete?.args).not.toHaveProperty("vaultRoad");
+});
+
+test("an older helper still opens the vault's files, but chat asks for a helper update and sends nothing", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  helper.state.binding = false; // vault_info from before completionVaultBinding
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+  // the files are there
+  await expect(page.locator(".cm-content").first()).toContainText("Welcome to Rotli");
+  // a lane switched on doesn't make this helper a chat runtime
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  await page.getByRole("switch", { name: "Use Claude Code" }).click();
+  await page.getByRole("button", { name: "Back to notes" }).click();
+  // Chat stays behind the walkthrough, which says what to do
+  const gate = page.locator(".sb-switch-seg.desktop-only");
+  await expect(gate).toBeVisible();
+  await gate.click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Update Rotli Helper to chat with this vault, then reload Rotli Web. Your vault files remain available.",
+  );
+  await dialog.getByRole("button", { name: "Done" }).click();
+  // the other way in, the new-tab chooser's Chat, gets no composer either
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Chat/ })
+    .click();
+  // a chat pane opens, but on the walkthrough's way in, with nothing to type into
+  const setup = page.getByRole("button", { name: "Set up chat on the web" });
+  await expect(setup).toBeVisible();
+  await expect(page.getByPlaceholder(/Message rotli/)).toHaveCount(0);
+  await setup.click();
+  await expect(dialog.getByRole("alert")).toContainText("Update Rotli Helper to chat with this vault");
+  expect(helper.calls.some((c) => c.cmd === "cli_complete")).toBe(false);
 });

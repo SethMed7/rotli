@@ -118,10 +118,21 @@ describe("scanFences", () => {
 });
 
 test("a sheet fence is withheld only where the build lacks sheets; other embeds never are", () => {
-  expect(withheldEmbedMessage("sheet", { sheets: false })).toBe(
-    "Spreadsheets aren’t available in this build yet.",
-  );
+  expect(withheldEmbedMessage("sheet", { sheets: false })).toBe("This spreadsheet opens in Rotli for Mac.");
   expect(withheldEmbedMessage("sheet", { sheets: true })).toBeNull();
   expect(withheldEmbedMessage("board", { sheets: false })).toBeNull();
   expect(withheldEmbedMessage("mermaid", { sheets: false })).toBeNull();
+});
+
+test("document and sheet format matrix refuses unsupported web embed I/O", () => {
+  for (const [lang, target] of [
+    ["document", "storage/test.docx"],
+    ["sheet", "storage/test.xlsx"],
+    ["sheet", "storage/test.csv"],
+  ]) {
+    expect(withheldEmbedMessage(lang!, { sheets: false, documents: false }, target)).toContain(
+      "Rotli for Mac",
+    );
+    expect(withheldEmbedMessage(lang!, { sheets: true, documents: true }, target)).toBeNull();
+  }
 });

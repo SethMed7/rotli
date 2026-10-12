@@ -596,7 +596,8 @@ function GeneralPane() {
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
-        Chat uses it to address you like a person. It lives in your settings file on this Mac — never sent
+        Chat uses it to address you like a person. It lives in{" "}
+        {PLATFORM === "web" ? "this browser’s settings" : "your settings file on this Mac"} — never sent
         anywhere on its own.
       </p>
       <label className="setselect-row">
@@ -1421,7 +1422,7 @@ function LocationPane() {
       <>
         <PaneHead title="Location" char="local" motif="location" />
         <p className="lead">
-          Your notes folder lives on disk — this connects in the app, not the browser preview.
+          Your notes stay in the folder you connected on this computer. Rotli Web reads and saves them there.
         </p>
       </>
     );
@@ -1625,6 +1626,17 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
 };
 
 function BrainPane() {
+  if (!LAUNCH_FEATURES.librarian)
+    return (
+      <>
+        <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
+        <p className="setnote">The Librarian is available in Rotli for Mac.</p>
+      </>
+    );
+  return <DesktopBrainPane />;
+}
+
+function DesktopBrainPane() {
   const brainOn = useUiStore((s) => s.brainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
@@ -2705,10 +2717,14 @@ function ModelsPane() {
         lanes using accounts signed in to their official local clients.
       </p>
 
-      <LocalModelsSection
-        installed={local.data ?? []}
-        onChanged={() => void queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
-      />
+      {LAUNCH_FEATURES.localModels ? (
+        <LocalModelsSection
+          installed={local.data ?? []}
+          onChanged={() => void queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
+        />
+      ) : (
+        <p className="setnote">Local models are available in Rotli for Mac.</p>
+      )}
 
       <section className="aisection">
         <h4 className="set-subhead">Connected models</h4>

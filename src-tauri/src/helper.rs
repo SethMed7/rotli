@@ -25,7 +25,7 @@
 //! only outbound traffic the helper can cause is a user-started chat turn,
 //! which runs the user's own AI CLI (that tool talks to its provider) — and
 //! `blocked_for_remote` refuses a prompt that carries the served vault's
-//! secure notes, the ledger warmed from that vault at start.
+//! secure notes, the ledger refreshed from the current vault before every turn.
 //!
 //! Defences, in the order a request meets them:
 //! - **Loopback only.** The listener refuses a non-loopback address, so nothing
@@ -378,6 +378,11 @@ impl Helper {
         let Some(_held) = reserve(&self.in_flight, &request_id) else {
             return Err((409, format!("a run is already in flight for \"{request_id}\"")));
         };
+        self.vault.guard_completion(
+            &prompt,
+            arguments.get("vaultId").and_then(Value::as_str),
+            arguments.get("vaultRoad").and_then(Value::as_str),
+        )?;
         let effort = arguments.get("reasoningEffort").and_then(Value::as_str);
         let tier = arguments.get("serviceTier").and_then(Value::as_str);
         let timeout = arguments.get("timeoutMs").and_then(Value::as_u64);
