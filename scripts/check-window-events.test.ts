@@ -106,7 +106,18 @@ describe("check:window-events", () => {
         'export function listenHere(event, handler) {\n  return listen(event, handler);\n}\nlistenHere("rotli:quick-show", () => cb());\n',
     });
     expect(r.code).toBe(1);
-    expect(r.stderr).toContain("listenHere must pass { target }");
+    expect(r.stderr).toContain("passing { target }");
+  });
+
+  test("listenHere calls with no recognizable definition fail", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:quick-show"]),
+      "src-tauri/src/lib.rs": 'app.emit_to(LABEL, "rotli:quick-show", ());\n',
+      "src/lib/tauri.ts": "export const listenHere = (event, handler) => listen(event, handler);\n",
+      "src/lib/quick.ts": 'listenHere("rotli:quick-show", () => cb());\n',
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("listenHere must be `export function listenHere`");
   });
 
   test("a documented event no longer in code fails", async () => {
