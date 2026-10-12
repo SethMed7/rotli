@@ -86,6 +86,48 @@ Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
 `launchFeatures(…, "web").documents` is false, so the chooser shows Document as
 coming soon and every create path refuses it.
 
+## Metadata, views, and assets
+
+Protection controls and the raw metadata banner write through the connected
+`VaultDir`, using complete-file revisions and the note-document codec. Unknown
+fields and note bodies survive. The raw editor refuses changes to the same
+reserved keys Rust protects (`id`, `created`, `owner`, `local_ai_allowed`,
+`view_tag`, `created_by`, `ai_edit`); the web shows the refusal instead of
+silently restoring those lines. Lock, AI-edit permission, and local-AI access
+use their explicit commands. Local-AI access remains portable metadata even
+though the web's AI corpus has no on-device exception.
+
+Marking secure requires a stable frontmatter id, records `secure_origin`,
+protects both paths in `.gitignore` before relocation, and moves the note into
+`wiki/_secure` (a plain vault uses `Secure notes`). Clearing protection restores
+the prior home before removing the flag and ignore entry; detected secrets
+refuse removal. `folderMetadata.setFolderSecure` returns the resulting path
+for relocation bookkeeping. Raw `secure` edits synchronize the git exclusion,
+as Rust's raw lane does; relocation belongs to the explicit protection command.
+
+Named-view writes validate names and singular membership, ensure Main references,
+and synchronize each changed Markdown `view_tag`. Boards and binaries never
+receive frontmatter. Failed writes roll back only bytes this transaction wrote;
+a newer external edit wins. Main may retain safe additional references after
+failure, as on desktop. Durable aliases resolve alongside current filename and
+title selectors; renaming a stable-id note preserves earlier selectors on disk.
+
+The folder walk lists ordinary files by stat alone. Memex files surface from
+`wiki`, `chats`, lifecycle sinks, and `storage`; plumbing, memory lanes, and
+dot entries stay hidden. Storage Markdown outside the Excalidraw lane stays
+out of the note index. File summaries never read binary contents or join the
+note text index; filename search uses their names. Local file text, bytes, and
+stat come from the connected vault. Media panes own temporary blob URLs and
+revoke them on unmount; cached thumbnail consumers use data URLs. HTML keeps
+its sandbox and no-egress policy. CSV saves are revision-gated and preserve a
+first-save backup. DOCX and binary workbooks list as files but open to an honest
+unsupported state on the web. Finder, default-app, and macOS conversion actions
+are hidden there.
+
+The browser's read/check/write sequence is best effort, not a filesystem lock;
+the helper additionally enforces its server-side revision and lock. Multi-file
+view and protection operations cannot be made atomic by Chromium's folder API.
+
 ## Keys on the web
 
 Rotli Web has no app hotkeys (`launchFeatures(…, "web").hotkeys` is false,

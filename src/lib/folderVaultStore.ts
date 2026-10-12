@@ -4,6 +4,7 @@
 // is the file's modification time and size — a write that presents a stale
 // one is refused, never clobbers.
 
+import { writeFolderViews } from "../services/folderViewSync";
 import type { VaultDir } from "../services/vaultDir";
 import type { VaultStore } from "./browserVault";
 
@@ -71,6 +72,7 @@ export class FolderVaultStore implements VaultStore {
     const path = vaultKeyPath(key);
     const current = await this.revisionOf(path);
     if (current !== expectedRevision) return false;
+    if (key === "views") return writeFolderViews(this.dir, value, expectedRevision);
     await this.dir.writeText(path, value);
     return true;
   }

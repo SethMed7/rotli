@@ -29,12 +29,14 @@ import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
+import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
+import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
@@ -42,6 +44,12 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("rawImmutableKeys", () => {
+    expect<string[]>([...RAW_IMMUTABLE_KEYS]).toEqual(entries.rawImmutableKeys.value);
+  });
+  test("storageOfficeExts", () => {
+    expect<string[]>([...STORAGE_OFFICE_EXTS]).toEqual(entries.storageOfficeExts.value);
+  });
   test("documentEditMaxActions", () => {
     expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);
   });

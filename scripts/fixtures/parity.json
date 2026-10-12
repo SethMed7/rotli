@@ -715,6 +715,29 @@
     "emptyCanvasFile": {
       "sourceOfTruth": "src-tauri/src/corpus_files.rs EMPTY_CANVAS ↔ src/jsonCanvas/model.ts EMPTY_CANVAS_FILE (a new canvas, written the way Obsidian writes one)",
       "value": "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}"
+    },
+    "rawImmutableKeys": {
+      "sourceOfTruth": "src/lib/frontmatterRaw.ts RAW_IMMUTABLE_KEYS ↔ src-tauri/src/corpus.rs RAW_IMMUTABLE_KEYS",
+      "value": [
+        "id",
+        "created",
+        "owner",
+        "local_ai_allowed",
+        "view_tag",
+        "created_by",
+        "ai_edit"
+      ]
+    },
+    "storageOfficeExts": {
+      "sourceOfTruth": "src/services/folderFileIo.ts STORAGE_OFFICE_EXTS ↔ src-tauri/src/corpus.rs STORAGE_OFFICE_EXTS",
+      "value": [
+        "xlsx",
+        "csv",
+        "docx",
+        "docm",
+        "dotx",
+        "dotm"
+      ]
     }
   }
 }

@@ -1,0 +1,91 @@
+// Composition for public corpus wrappers in the browser shell.
+import { looksSecret } from "../ai/guard";
+import { bodyEdit } from "../lib/aiEditPolicy";
+import { isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
+import type { FrontmatterView } from "../lib/tauri";
+import { registerWebVaultIo } from "../lib/webAiSeam";
+import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import {
+  folderAssetUrl,
+  folderFileBytes,
+  folderFileStat,
+  folderFileText,
+  folderWriteFileBytes,
+} from "./folderFileIo";
+import { readFolderRawMetadata, writeFolderRawMetadata, setFolderProtection } from "./folderMetadata";
+import type { FolderNotesService } from "./folderNotes";
+import type { VaultDir } from "./vaultDir";
+
+let connectedDir: VaultDir | null = null;
+let connectedNotes: FolderNotesService | null = null;
+
+export function configureWebVaultIo(dir: VaultDir | null, notes: FolderNotesService | null): void {
+  connectedDir = dir;
+  connectedNotes = notes;
+  registerWebVaultIo(dir && notes ? webVaultIo : null);
+}
+
+const directory = () => {
+  const dir = connectedDir;
+  if (!dir) throw new Error("Connect a vault first");
+  return dir;
+};
+const notePath = async (id: string) => {
+  const notes = connectedNotes;
+  if (!notes) throw new Error("Connect a vault first");
+  return notes.filePathOf(id);
+};
+
+export const webVaultIo = {
+  async protection(
+    id: string,
+    key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",
+    value: boolean,
+  ): Promise<void> {
+    if (!connectedNotes) throw new Error("Connect a vault first");
+    await setFolderProtection(directory(), connectedNotes, id, key, value);
+  },
+  assetUrl: (id: string, temporary: boolean) => folderAssetUrl(directory(), id, temporary),
+  text: (id: string, max?: number) => folderFileText(directory(), id, max),
+  bytes: (id: string, max?: number) => folderFileBytes(directory(), id, max),
+  stat: (id: string) => folderFileStat(directory(), id),
+  writeBytes: (id: string, bytes: string, backup: boolean, revision: string) =>
+    folderWriteFileBytes(directory(), id, bytes, backup, revision),
+  rawMetadata: async (id: string) => readFolderRawMetadata(directory(), await notePath(id)),
+  writeMetadata: async (id: string, block: string, revision: string) =>
+    writeFolderRawMetadata(directory(), await notePath(id), block, revision),
+  async frontmatter(id: string): Promise<FrontmatterView | null> {
+    const dir = directory();
+    const path = await notePath(id);
+    const { frontmatter: fm, body } = parseNoteDocument(await dir.readText(path));
+    const fields = fm?.foreign ?? [];
+    let localAiAllowed = true;
+    if (await dir.exists(".rotli/settings.json")) {
+      const settings = JSON.parse(await dir.readText(".rotli/settings.json")) as { secureLocalAi?: boolean };
+      localAiAllowed = settings.secureLocalAi !== false;
+    }
+    const override = fields
+      .find((line) => line.split(":", 1)[0]?.trim() === "local_ai_allowed")
+      ?.split(":")
+      .slice(1)
+      .join(":")
+      .trim();
+    if (override === "true" || override === "false") localAiAllowed = override === "true";
+    const locked = !!fm && isLockedFrontmatter(fm);
+    return {
+      id: fm?.id || id,
+      created: fm?.created ?? "",
+      updated: fm?.updated ?? "",
+      pinned: fm?.pinned ?? false,
+      locked,
+      secure:
+        (!!fm && isSecureFrontmatter(fm)) ||
+        looksSecret(body) ||
+        isSecureBrainFolder(path.slice(0, path.lastIndexOf("/"))) ||
+        isSecureNotesFolder(path.slice(0, path.lastIndexOf("/"))),
+      localAiAllowed,
+      aiBodyEdit: locked ? "locked" : bodyEdit(fields),
+      fields,
+    };
+  },
+};

@@ -130,6 +130,12 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
  * folder. Every production service declares the capability that owns it; when
  * one capability is physically clustered later, this registry moves with it. */
 export const SERVICE_FILE_OWNERS = {
+  "folderFileIo.ts": "vault files (guarded connected-folder bytes, text, URLs, and stat)",
+  "folderFileSummary.ts": "vault files (stat-only summaries)",
+  "folderMetadata.ts": "notes (connected-folder protection and metadata writes)",
+  "folderNoteAliases.ts": "notes (durable selectors and title rename preparation)",
+  "folderViewSync.ts": "views (connected-folder manifest and Markdown transaction)",
+  "webVaultIo.ts": "vault composition (registered web corpus file and metadata commands)",
   "webLinks.ts": "graph",
   "canvasFiles.ts": "jsonCanvas",
   "folderCanvases.ts": "jsonCanvas",

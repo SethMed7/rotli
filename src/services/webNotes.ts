@@ -20,6 +20,7 @@ import type { NotesService } from "./notesPort";
 import { resolveVault } from "./vaultBinding";
 import type { VaultDir } from "./vaultDir";
 import { scaffoldVault } from "./vaultScaffold";
+import { configureWebVaultIo } from "./webVaultIo";
 
 let folderService: FolderNotesService | null = null;
 let folderName: string | null = null;
@@ -60,6 +61,7 @@ export async function hydrateWebNotes(link: HelperLink | null): Promise<boolean>
   }
   configureBrowserVault(new FolderVaultStore(dir));
   folderService = new FolderNotesService(dir);
+  configureWebVaultIo(dir, folderService);
   folderName = name;
   setWebVaultName(name);
   folderDir = dir;

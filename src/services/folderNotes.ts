@@ -12,7 +12,7 @@
 import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { extOf, fileName, fileNameStem, userFileName } from "../lib/fileKind";
+import { extOf, fileName, userFileName } from "../lib/fileKind";
 import {
   type NoteFrontmatter,
   composeNoteDocument,
@@ -23,7 +23,7 @@ import {
   isSecureFrontmatter,
 } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
-import { composeNote, noteSlugify, noteStem, stampToMs, today, ulid } from "../memex/contract";
+import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
@@ -37,8 +37,9 @@ import {
   isTrash,
   isVault,
 } from "./destinations";
-import { BOARD_LANE, boardTitle, isBoardPath } from "./folderBoards";
-import { canvasTitle, isCanvasFile } from "./folderCanvases";
+import { BOARD_LANE } from "./folderBoards";
+import { isCanvasFile } from "./folderCanvases";
+import { folderFileSummary } from "./folderFileSummary";
 import {
   assertSafeStem,
   ignoreInGit,
@@ -46,16 +47,18 @@ import {
   memexNoteFolder,
   readMemexContract,
 } from "./folderMemexNotes";
+import { syncSecureIgnore } from "./folderMetadata";
+import { folderNoteAliases, prepareFolderTitleRename } from "./folderNoteAliases";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import { type VaultDir, baseName, freeVaultPath, joinVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
 
-/** A board, or a canvas where this build opens canvases: a raw file named by
- * its path, never frontmatter. */
-const isPathItem = (path: string) => isBoardPath(path) || (LAUNCH_FEATURES.jsonCanvas && isCanvasFile(path));
+/** Every non-Markdown surface is addressed by its file path, never note
+ * frontmatter or a text-index entry. */
+const isPathItem = (path: string) => !path.toLowerCase().endsWith(".md");
 
 /** Disk roots that hold notes in a memex vault. Everything else — `.rotli/`,
- * dotfiles, `chats/` transcripts, and the `identity/ personality/ history/`
+ * dotfiles and the `identity/ personality/ history/`
  * knowledge spine — is deliberately outside the note universe. */
 const MEMEX_NOTE_ROOTS = ["wiki", "chats", "archive", "trash"] as const;
 /** Roots a PLAIN folder never walks, so a vault that happens to hold a memex
@@ -151,10 +154,10 @@ export class FolderNotesService implements NotesService {
     const paths: string[] = [];
     if (this.isMemex) {
       for (const root of MEMEX_NOTE_ROOTS) await this.collect(root, paths);
-      // the board lane lists boards only; the rest of storage/ stays out
+      // Storage binaries are file rows; only the board lane admits Markdown.
       const lane: string[] = [];
-      await this.collect(BOARD_LANE, lane);
-      paths.push(...lane.filter(isBoardPath));
+      await this.collect("storage", lane);
+      paths.push(...lane.filter((path) => isPathItem(path) || path.startsWith(`${BOARD_LANE}/`)));
     } else {
       await this.collect("", paths, true);
     }
@@ -178,7 +181,7 @@ export class FolderNotesService implements NotesService {
       if (entry.kind === "directory") {
         if (isRoot && SKIPPED_ROOTS.has(entry.name)) continue;
         await this.collect(child, out);
-      } else if (entry.name.toLowerCase().endsWith(".md") || isPathItem(entry.name)) out.push(child);
+      } else if (!isCanvasFile(child) || LAUNCH_FEATURES.jsonCanvas) out.push(child);
     }
   }
 
@@ -208,7 +211,7 @@ export class FolderNotesService implements NotesService {
     const title = titleOf(body);
     const diskFolderId = parentPath(path);
     const updatedAt = stampToMs(frontmatter?.updated, stat.lastModified) ?? stat.lastModified;
-    const aliases = [...new Set([fileNameStem(path), noteSlugify(title)].filter(Boolean))];
+    const aliases = folderNoteAliases(path, title, frontmatter);
     return {
       id: frontmatter?.id || path,
       title,
@@ -230,29 +233,12 @@ export class FolderNotesService implements NotesService {
     };
   }
 
-  /** A board's or a canvas's row. Never read to list it (Rust lists both by
-   * stat alone), so `body` is empty — their content goes through
-   * folderBoards / folderCanvases. A canvas lists as a file, like the Mac. */
+  /** Files list by stat alone; content reads belong to their editing adapter.
+   * Boards retain their kind, and every other non-Markdown surface is a file. */
   private async boardAt(path: string): Promise<Note> {
-    const stat = await this.dir.stat(path);
-    if (!stat) throw new Error(`unknown board: ${path}`);
-    const diskFolderId = parentPath(path);
-    return {
-      id: path,
-      title: isCanvasFile(path) ? canvasTitle(path) : boardTitle(path),
-      snippet: "",
-      bodyEmpty: false,
-      aliases: [],
-      folderId: projectVaultFolder(diskFolderId, null, this.isMemex),
-      diskFolderId,
-      createdAt: stat.lastModified,
-      updatedAt: stat.lastModified,
-      pinned: false,
-      kind: isCanvasFile(path) ? "file" : "board",
-      secure: false,
-      body: "",
-      revision: `${stat.lastModified}:${stat.size}`,
-    };
+    return folderFileSummary(this.dir, path, this.isMemex, (folder) =>
+      projectVaultFolder(folder, null, this.isMemex),
+    );
   }
 
   /** The vault-relative file behind a note id — what a Finder reveal needs. */
@@ -477,7 +463,13 @@ export class FolderNotesService implements NotesService {
     // A file with no fence stays fenceless: a plain Markdown vault must not
     // sprout frontmatter the moment Rotli saves it.
     const text = frontmatter ? composeNoteDocument({ ...frontmatter, updated: today() }, body) : body;
-    await this.writeFile(path, text);
+    const rename = await prepareFolderTitleRename(this.dir, path, text, current.title, titleOf(body));
+    await this.writeFile(path, rename.text);
+    if (rename.path !== path) {
+      const moved = await this.moveFile(id, path, rename.path);
+      if (isSecureNote(rename.text)) await syncSecureIgnore(this.dir, [], [path]);
+      return moved;
+    }
     return this.noteAt(path);
   }
 
