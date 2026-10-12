@@ -78,6 +78,34 @@ fn the_same_root_keeps_its_id_and_a_new_root_gets_a_new_one() {
 }
 
 #[test]
+fn a_config_change_during_completion_scan_is_seen_by_current() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    served.guard_completion_with_scan("ordinary prompt", None, Some("folder"), |_, _| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        choose_config(&path, other.path()).unwrap();
+        Ok(false)
+    }).unwrap();
+    assert_ne!(served.current().unwrap().id, old.id);
+}
+
+#[test]
+fn a_bound_completion_rechecks_its_vault_after_scan() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let result = served.guard_completion_with_scan("ordinary prompt", Some(&old.id), None, |_, _| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        choose_config(&path, other.path()).unwrap();
+        Ok(false)
+    });
+    assert_eq!(result.unwrap_err().0, 409);
+}
+
+#[test]
 fn write_read_stat_list_and_walk_round_trip() {
     let (_vault, _config, served) = serving();
     let written = call(&served, "vault_write", json!({ "path": "wiki/ideas/a.md", "text": "# A — note\n" })).unwrap();

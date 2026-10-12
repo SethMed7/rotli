@@ -101,6 +101,14 @@ test("a content-gated remove refuses a missing file", async () => {
   await expect(dirOf().remove("missing.md", "0")).rejects.toThrow(/revision conflict/);
 });
 
+test("an ungated remove after an external delete is a no-op", async () => {
+  const root = new FakeDir();
+  const dir = new FsaVaultDir(root as unknown as FileSystemDirectoryHandle);
+  await dir.writeText("note.md", "text");
+  root.files.delete("note.md");
+  await expect(dir.remove("note.md")).resolves.toBeUndefined();
+});
+
 describe("FsaVaultDir takes turns per path", () => {
   test("a read that starts mid-write waits for the swap and sees the new text", async () => {
     const dir = dirOf();

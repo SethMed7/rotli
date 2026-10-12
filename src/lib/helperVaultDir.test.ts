@@ -8,6 +8,8 @@ import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 function fakeHelper(disk = new MemoryVaultDir()) {
   const calls: string[] = [];
   let down = false;
+  let loseWriteAck = false;
+  let replaceAfterLostAck: Uint8Array | null = null;
   const walk = async (path: string, out: object[]): Promise<void> => {
     for (const entry of await disk.list(path)) {
       const child = path ? `${path}/${entry.name}` : entry.name;
@@ -63,6 +65,14 @@ function fakeHelper(disk = new MemoryVaultDir()) {
             path,
             Uint8Array.from(atob(String(args.base64)), (c) => c.charCodeAt(0)),
           );
+        if (loseWriteAck) {
+          loseWriteAck = false;
+          if (replaceAfterLostAck) {
+            await disk.writeBytes(path, replaceAfterLostAck);
+            replaceAfterLostAck = null;
+          }
+          throw new TypeError("Failed to fetch");
+        }
         return disk.stat(path);
       }
       case "vault_mkdir":
@@ -104,6 +114,10 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     drained,
     setDown: (value: boolean) => {
       down = value;
+    },
+    loseNextWriteAck: (replaceWith?: Uint8Array) => {
+      loseWriteAck = true;
+      replaceAfterLostAck = replaceWith ?? null;
     },
   };
 }
@@ -166,6 +180,18 @@ for (const [name, make] of contract) {
 
     test("a content-gated remove refuses a missing file", async () => {
       await expect(make().remove("absent-note.md", "0")).rejects.toThrow(/revision conflict/);
+    });
+
+    test("an ungated remove of a missing file is a no-op", async () => {
+      await expect(make().remove("absent-note.md")).resolves.toBeUndefined();
+    });
+
+    test("a content-gated remove refuses a changed file", async () => {
+      const dir = make();
+      await dir.writeText("note.md", "old");
+      await dir.writeText("note.md", "new");
+      await expect(dir.remove("note.md", contentRevision("old"))).rejects.toThrow(/revision conflict/);
+      expect(await dir.readText("note.md")).toBe("new");
     });
 
     test("binary writes compare the exact bytes in the adapter write turn", async () => {
@@ -243,6 +269,38 @@ describe("never overwriting another writer", () => {
       fake.dir.writeText("wiki/a.md", "123"),
     ]);
     expect(await fake.disk.readText("wiki/a.md")).toBe("123");
+  });
+
+  test("a remove queued behind a write uses the landed version", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText("wiki/a.md", "old");
+    await Promise.all([fake.dir.writeText("wiki/a.md", "new"), fake.dir.remove("wiki/a.md")]);
+    expect(await fake.disk.exists("wiki/a.md")).toBe(false);
+  });
+
+  test("an invalidated cache does not turn an externally deleted file into a conflict", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText("wiki/a.md", "old");
+    await fake.disk.remove("wiki/a.md");
+    fake.dir.invalidate();
+    await expect(fake.dir.remove("wiki/a.md")).resolves.toBeUndefined();
+  });
+
+  test("a binary write recovers when its acknowledgement is lost", async () => {
+    const fake = fakeHelper();
+    const bytes = new Uint8Array([0, 255, 128]);
+    fake.loseNextWriteAck();
+    await expect(fake.dir.writeBytes("storage/p.bin", bytes)).resolves.toBeUndefined();
+    expect([...(await fake.disk.readBytes("storage/p.bin"))]).toEqual([...bytes]);
+  });
+
+  test("a lost binary acknowledgement still conflicts if another writer changed the bytes", async () => {
+    const fake = fakeHelper();
+    fake.loseNextWriteAck(new Uint8Array([4, 5, 6]));
+    await expect(fake.dir.writeBytes("storage/p.bin", new Uint8Array([0, 255, 128]))).rejects.toThrow(
+      /revision conflict/,
+    );
+    expect([...(await fake.disk.readBytes("storage/p.bin"))]).toEqual([4, 5, 6]);
   });
 });
 

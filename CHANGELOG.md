@@ -12,13 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
+  a save uses the saved version; a delete after an external removal is a no-op
+  unless it carried a content gate. Binary saves also recover when the Helper
+  writes the bytes but the acknowledgement is lost. Chat rechecks its bound
+  vault after the secure-note scan if the served folder changes during it.
 - **Rotli Helper protects files and secure notes throughout a session.** A
   case-only move refuses a different file already holding the destination;
   chat from a Helper-served vault checks every secure note in that vault
   before every turn, however large the vault, and refuses if they cannot be
-  checked. With a browser folder, the page keeps secure notes out of chat. Oversized reads are
-  refused, batches stay within their budget, and no folder can take a writer's
-  `.lock` name.
+  checked. With a browser folder, the page keeps secure notes out of chat.
+  Oversized reads are refused, batches stay within their budget, and no
+  write, move, or delete can take a writer's `.lock` name.
 - **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
   vault metadata writes now refuse stale content; moving a file waits for
   in-flight saves. Secure notes keep their Git exclusion when moved, and

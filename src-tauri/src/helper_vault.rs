@@ -120,7 +120,20 @@ impl ServedVault {
     /// Fresh disk truth before every remote completion, including external
     /// edits and config changes whose timestamps happen to be unchanged.
     pub(crate) fn guard_completion(&self, prompt: &str, vault_id: Option<&str>, vault_road: Option<&str>) -> Result<(), Refusal> {
+        self.guard_completion_with_scan(prompt, vault_id, vault_road, read_verbs::refresh_secure_ledger)
+    }
+
+    fn guard_completion_with_scan(
+        &self,
+        prompt: &str,
+        vault_id: Option<&str>,
+        vault_road: Option<&str>,
+        scan: impl FnOnce(&Path, Option<&str>) -> Result<bool, Refusal>,
+    ) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
+        // Cache the stamp associated with the read, never a stamp observed
+        // after the full scan: --vault may rewrite config while we scan.
+        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
         let Some(config) = read_config(&self.config_path) else {
             // FSA pages can use a helper with no served vault. A missing config
             // has no vault to confuse; a broken one may hide secure notes.
@@ -138,9 +151,14 @@ impl ServedVault {
         if (vault_id.is_none() && vault_road != Some("folder")) || (vault_id.is_some() && vault_road.is_some()) {
             return Err((409, "completion vault road is unclear — reload Rotli Web before chatting".into()));
         }
-        let quoted = read_verbs::refresh_secure_ledger(&config.root, Some(prompt)).map_err(|_| unavailable())?;
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
+        let quoted = scan(&config.root, Some(prompt)).map_err(|_| unavailable())?;
         *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config));
+        if let Some(bound) = vault_id {
+            let current = read_config(&self.config_path).ok_or_else(unavailable)?;
+            if current.id != bound {
+                return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+            }
+        }
         if quoted || crate::secret::blocked_for_remote(prompt) {
             return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
         }
