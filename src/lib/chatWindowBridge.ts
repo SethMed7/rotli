@@ -12,7 +12,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 
 import type { MainNode } from "../services/mainTree";
 import type { ChatTabRef } from "../state/chatWindowTabs";
-import { isTauri } from "./tauri";
+import { isTauri, listenHere } from "./tauri";
 
 export type ChatWindowMessage =
   /** main → chat: open these chats (pop-out, or a chat opened in main while
@@ -47,7 +47,7 @@ export function onChatWindow(cb: (message: ChatWindowMessage) => void): () => vo
 /** Rust → the chat webview: the window was just shown. */
 export function onChatWindowShown(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:chat-window-show", () => cb());
+  const unlisten = listenHere("rotli:chat-window-show", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -55,7 +55,7 @@ export function onChatWindowShown(cb: () => void): () => void {
  * chats back to main instead of stranding them in a hidden window. */
 export function onChatWindowCloseRequest(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:chat-window-regroup", () => cb());
+  const unlisten = listenHere("rotli:chat-window-regroup", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 

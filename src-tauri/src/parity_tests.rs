@@ -76,6 +76,11 @@ fn chat_image_asset_exts_match_fixture() {
 }
 
 #[test]
+fn skipped_dirs_match_fixture() {
+    assert_eq!(string_list(&entry("skippedDirs")), crate::corpus::SKIPPED_DIRS);
+}
+
+#[test]
 fn secure_notes_folder_matches_fixture() {
     assert_eq!(
         entry("secureNotesFolder").as_str(),

@@ -16,7 +16,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-import { isTauri } from "./tauri";
+import { currentWindowLabel, isTauri } from "./tauri";
 
 type Flusher = () => Promise<void> | void;
 const flushers = new Set<Flusher>();
@@ -58,21 +58,31 @@ export function onQuitFlushFailure(fn: (message: string) => void): () => void {
 // The listener exists only in the Tauri shell (bun tests / browser preview
 // have no IPC — and nothing to flush that survives them anyway).
 if (typeof window !== "undefined" && isTauri()) {
-  void listen<QuitFlushPayload>("rotli:flush-before-quit", (event) => {
-    void (async () => {
-      try {
-        await runQuitFlushers();
-        await invoke("quit_flush_done", { attemptId: event.payload.attemptId, ok: true }).catch(() => {});
-      } catch (error) {
-        await invoke("quit_flush_done", {
-          attemptId: event.payload.attemptId,
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        }).catch(() => {});
-      }
-    })();
-  });
-  void listen<string>("rotli:quit-flush-failed", (event) => {
-    for (const subscriber of failureSubscribers) subscriber(event.payload);
-  });
+  // own-window only: Rust asks each window once, and a bare listen() heard all
+  // four requests (four flushes, four acks per window — audit 2026-10-12)
+  void listen<QuitFlushPayload>(
+    "rotli:flush-before-quit",
+    (event) => {
+      void (async () => {
+        try {
+          await runQuitFlushers();
+          await invoke("quit_flush_done", { attemptId: event.payload.attemptId, ok: true }).catch(() => {});
+        } catch (error) {
+          await invoke("quit_flush_done", {
+            attemptId: event.payload.attemptId,
+            ok: false,
+            error: error instanceof Error ? error.message : String(error),
+          }).catch(() => {});
+        }
+      })();
+    },
+    { target: currentWindowLabel() },
+  );
+  void listen<string>(
+    "rotli:quit-flush-failed",
+    (event) => {
+      for (const subscriber of failureSubscribers) subscriber(event.payload);
+    },
+    { target: currentWindowLabel() },
+  );
 }

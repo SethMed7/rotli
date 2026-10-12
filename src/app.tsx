@@ -43,23 +43,25 @@ import {
   emitCaptureAck,
   hasDurableCorpus,
   isTauri,
-  onBrainJournal,
   onCaptureSave,
-  onCorpusChanged,
-  onNativeCloseTab,
-  onNativeEditHistory,
-  onOpenRequest,
   onOrganizerProgress,
   onQuickCreated,
   onQuickSet,
   onRebind,
   onSummonChat,
-  onSummonSearch,
-  onVaultChanged,
   setAppIcon,
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
+import {
+  onCorpusChanged,
+  onVaultChanged,
+  onOpenRequest,
+  onNativeCloseTab,
+  onNativeEditHistory,
+  onBrainJournal,
+  onSummonSearch,
+} from "./lib/hostEvents";
 import { attachAgentBridge } from "./ai/agentRequests";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";

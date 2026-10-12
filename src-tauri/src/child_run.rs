@@ -12,6 +12,19 @@ use std::time::Duration;
 
 use crate::provider::{Running, NEXT_TOKEN};
 
+/// Start a short-lived helper (`open` a link, reveal in Finder) without
+/// waiting on it, and reap it when it exits. A dropped `Child` is never
+/// waited for, so each one stayed a `<defunct>` zombie until Rotli quit
+/// (audit 2026-10-12: two in a live session after ordinary use).
+pub(crate) fn spawn_reaped(command: &mut std::process::Command) -> std::io::Result<u32> {
+    let mut child = command.spawn()?;
+    let pid = child.id();
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(pid)
+}
+
 /// Register `child` under `request_id` and arm a watchdog that kills it after
 /// `deadline` — only if THIS run is still the one registered (the token keeps a
 /// stale watchdog from shooting a newer child under a reused id).
@@ -58,4 +71,18 @@ pub(crate) fn collect_stderr(pipe: Option<ChildStderr>) -> JoinHandle<String> {
         }
         text
     })
+}
+
+#[cfg(test)]
+mod spawn_reaped_tests {
+    #[test]
+    fn a_finished_helper_leaves_no_zombie() {
+        let pid = super::spawn_reaped(&mut std::process::Command::new("/usr/bin/true")).unwrap();
+        let gone = (0..50).any(|_| {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            // a zombie still answers kill(pid, 0); a reaped pid does not
+            unsafe { libc::kill(pid as libc::pid_t, 0) != 0 }
+        });
+        assert!(gone, "pid {pid} was never reaped");
+    }
 }

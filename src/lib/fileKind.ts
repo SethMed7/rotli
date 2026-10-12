@@ -128,3 +128,13 @@ export function imageBytesMatchExtension(ext: string, bytes: Uint8Array): boolea
       return false;
   }
 }
+
+/** Dependency and history folders no vault walker enters, at any depth and in
+ * any letter case — the native walker's `SKIPPED_DIRS` (corpus.rs; parity.json
+ * `skippedDirs`). */
+export const SKIPPED_DIRS = [".git", "node_modules"] as const;
+
+export function isSkippedDir(name: string): boolean {
+  const lower = name.toLowerCase();
+  return SKIPPED_DIRS.some((skip) => skip === lower);
+}

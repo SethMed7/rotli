@@ -178,8 +178,10 @@ load-bearing for the boundary.
 - **Rebuild.** Deleting `.rotli/search/` is always safe. The next `open_or_create`
   recreates it empty and the next query rebuilds it from the walk cache. A schema
   bump is a rebuild, not a migration.
-- **Startup.** `lib.rs` opens each store and calls `warm_secure_ledger` (a walk)
-  but does **not** build the index — the index builds lazily on first search, off
+- **Startup.** `lib.rs` opens each store and, on a background thread after
+  setup, walks it (`walk_unlocked`, then `warm_secure_ledger`) — egress is
+  refused until that finishes (egress-threat-model.md) — but does **not** build
+  the index — the index builds lazily on first search, off
   the main thread already implied by `corpus_search_ai`'s `spawn_blocking`. A
   large vault costs seconds on first search, never at launch.
 

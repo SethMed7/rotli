@@ -4,6 +4,7 @@
 // used to: models already on this Mac, installing one, or connecting the
 // person's own Claude, ChatGPT, Cursor, or Gemini client.
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -53,6 +54,18 @@ function localSize(mb: number): string {
   return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
 
+/** The download's byte total, polled only while an install runs. Same key and
+ * options as Settings' installer, so the two surfaces share ONE walk of the
+ * model folder; React Query pauses the poll while the window is hidden. */
+export function localInstallProgressQuery(name: string | undefined) {
+  return {
+    queryKey: ["local-install", name],
+    queryFn: () => (name ? localModelInstallProgress(name) : Promise.resolve(null)),
+    enabled: !!name,
+    refetchInterval: 1000,
+  };
+}
+
 export function providerSetupStatus(detection: CliDetect | undefined): string {
   if (!detection) return "Checking…";
   if (!detection.installed) return "Not installed";
@@ -85,7 +98,6 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
     label: string;
     approxMb: number;
   } | null>(null);
-  const [installedBytes, setInstalledBytes] = useState(0);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [openSection, setOpenSection] = useState<ModelSection | null>("local");
@@ -95,15 +107,7 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
   // asks once per session, however many empty chats open
   useEffect(() => startSetupDetection(), []);
 
-  useEffect(() => {
-    if (!installing) return;
-    const poll = window.setInterval(() => {
-      void localModelInstallProgress(installing.name)
-        .then((progress) => setInstalledBytes(progress.bytes))
-        .catch(() => {});
-    }, 1000);
-    return () => window.clearInterval(poll);
-  }, [installing]);
+  const installedBytes = useQuery(localInstallProgressQuery(installing?.name)).data?.bytes ?? 0;
 
   const installedIds = useMemo(() => new Set(local.map((model) => model.id)), [local]);
   const installable = installableCatalog(installedIds);
@@ -117,7 +121,6 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
     if (installing) return;
     const requestId = crypto.randomUUID();
     setNote(null);
-    setInstalledBytes(0);
     setInstalling({ requestId, name: entry.name, label: entry.label, approxMb: entry.approxMb });
     void localModelInstall({
       requestId,

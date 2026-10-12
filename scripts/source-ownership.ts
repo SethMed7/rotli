@@ -110,7 +110,6 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "helperVaultDir.ts": "Rotli Web helper mode: Rotli Helper's vault verbs behind the vault-dir port",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
   "paneDropDrag.ts": "sidebar note → pane drop workflow",
-  "nativeDrag.ts": "native Finder drag hover relay adapter",
   "popover.ts": "shared transient-popover hook backed by UI state",
   "chatWindowBridge.ts": "native Chat window adapter: show/hide and the two shell windows' messages",
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
