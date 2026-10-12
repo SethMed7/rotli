@@ -163,7 +163,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
         const action = getAction(id);
         if (action) suggested.push(actionRow(action, label));
       };
-      suggest("notes.new", `New note in “${newNoteIn}”`);
+      suggest("notes.new", newNoteIn ? `New note in “${newNoteIn}”` : "New note");
       suggest("panes.splitRight");
       suggest("view.focus");
       return [

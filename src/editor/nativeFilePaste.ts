@@ -10,6 +10,7 @@ import { EditorView } from "@codemirror/view";
 import { useEffect } from "react";
 
 import { chatDropAt } from "../components/chat/chatDrop";
+import { PLATFORM } from "../lib/featurePolicy";
 import {
   clipboardFilePaths,
   clipboardHasFiles,
@@ -76,7 +77,7 @@ async function pasteFiles(route: PasteFiles, target: PasteTarget, pasted: Pasted
 
 export function useNativeFilePaste(): void {
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauri() && PLATFORM !== "web") return;
     let pasteboardHasFiles = false;
     const refresh = () => {
       void clipboardHasFiles()
@@ -103,7 +104,7 @@ export function useNativeFilePaste(): void {
         fileCount: data.files.length,
         uriList: data.getData("text/uri-list"),
       };
-      const route = classifyPaste(payload, target.kind, pasteboardHasFiles);
+      const route = classifyPaste(payload, target.kind, isTauri() && pasteboardHasFiles);
       if (!route) return;
       event.preventDefault();
       event.stopPropagation();
@@ -123,10 +124,10 @@ export function useNativeFilePaste(): void {
           );
         });
     };
-    refresh();
-    window.addEventListener("focus", refresh);
-    document.addEventListener("copy", forget, true);
-    document.addEventListener("cut", forget, true);
+    if (isTauri()) refresh();
+    if (isTauri()) window.addEventListener("focus", refresh);
+    if (isTauri()) document.addEventListener("copy", forget, true);
+    if (isTauri()) document.addEventListener("cut", forget, true);
     window.addEventListener("paste", onPaste, true);
     return () => {
       window.removeEventListener("focus", refresh);

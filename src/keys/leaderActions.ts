@@ -29,6 +29,7 @@ export function registerLeaderActions(): void {
   });
   registerAction({
     id: "chrome.pickNote",
+    platforms: ["desktop"],
     title: `Jump into the sidebar${hotkeyHint(" — then ⌘1–9 opens a top note")}`,
     defaultChord: "Meta+Shift+S",
     run: () => askHomeFront("sidebar"),

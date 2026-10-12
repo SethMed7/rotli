@@ -23,6 +23,7 @@ import {
   activeWebNotesService,
   activeWebVaultDir,
   hydrateWebNotes,
+  refreshWebFolderService,
   webVaultIsFreshFolder,
   webVaultKey,
 } from "./webNotes";
@@ -77,6 +78,14 @@ export const initialNoteId = firstNoteId;
 // still trusts a remembered folder (hydrateWebVault, before the first render).
 // Consumers read the live binding at call time, never a captured copy.
 export let notesService: NotesService = FS_MODE ? new FsNotesService() : svc;
+
+/** Rebind the FSA folder reader so external additions and moves enter its index. */
+export function refreshWebFolderNotes(): boolean {
+  const refreshed = refreshWebFolderService();
+  if (!refreshed) return false;
+  notesService = refreshed;
+  return true;
+}
 
 /** Rotli Web only: connect the bound vault before the first render (main.tsx
  * awaits it). The helper pairing comes first — a vault served by Rotli Helper

@@ -74,6 +74,14 @@ export function activeWebNotesService(fallback: NotesService): NotesService {
   return folderService ?? fallback;
 }
 
+/** A folder picked through FSA has no watcher. Rebuild its listing on focus;
+ * the query refresh decides which clean note buffers may reload. */
+export function refreshWebFolderService(): FolderNotesService | null {
+  if (mode !== "folder" || !folderDir || !folderService) return null;
+  folderService = new FolderNotesService(folderDir);
+  return folderService;
+}
+
 /** The connected vault's note writer (Rotli Web's memex note lane); null
  * before a vault is connected. */
 export function activeWebNoteWriter(): FolderNotesService | null {
