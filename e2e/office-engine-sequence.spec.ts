@@ -54,6 +54,9 @@ async function disposeSheet(page: import("@playwright/test").Page): Promise<void
 test("a document opened after a workbook edits and saves, and a later workbook still edits", async ({
   page,
 }) => {
+  // three Univer mounts from a cold dev server: CI's first engine import alone
+  // took 11.6 s (2026-10-12), past the default 30 s once all three ran
+  test.slow();
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   await gotoApp(page);
