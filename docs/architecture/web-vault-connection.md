@@ -33,7 +33,13 @@ Decided by the owner on 2026-09-22; the history is in
    every author token (only a plain `<!doctype html>` precedes it), so not even the
    site's own origin can receive note text in a request URL. The no-egress
    E2E counts only requests that left the page and allows same-origin ones
-   only for files the build ships.
+   only for files the build ships. Mermaid source is checked by the pure
+   `lib/mermaidPolicy.ts` rule **before** either vendor renderer/converter runs:
+   images/icons, links/clicks, HTML, URL-bearing tokens, escaped tokens, and
+   author configuration are refused inline. Sanitizing the finished SVG would
+   be too late: Mermaid's image loader can make a request during rendering.
+   Ordinary diagrams remain available; this conservative refusal can also
+   withhold harmless source containing those tokens.
 3. **A lost connection is a reconnect screen, never a stand-in vault.**
    Nothing is written anywhere but the bound vault.
 4. **Typing is never lost** to an outage, a closed tab, or a hard refresh.
@@ -96,7 +102,21 @@ note index as notes) and moves them through Archive/Trash like the Mac corpus.
 Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
 Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
 `launchFeatures(…, "web").documents` is false, so the chooser shows Document as
-coming soon and every create path refuses it.
+coming soon and every create path refuses it. `/document` is hidden, and
+existing document and XLSX fences show an "opens in Rotli for Mac" message.
+CSV **embeds** remain withheld too: the sheet embed still uses the desktop
+stat/byte-save adapter, independently of CSV's standalone text surface. The
+fence source remains editable and unchanged.
+
+Settings exposes `launchFeatures`' desktop-only `librarian` and `localModels`
+capabilities as one-line Mac availability states on web, without Run now,
+hardware scanning, or model install/default/uninstall controls. Helper-supported
+connected CLI configuration stays available.
+
+`/attach` uses a browser `image/*` file picker on web and the existing
+`importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
+land in the bound vault and Markdown receives only a portable `storage:` link;
+cancelling adds nothing. Desktop keeps its native image/video picker.
 
 ## Keys on the web
 
@@ -105,8 +125,12 @@ Rotli Web has no app hotkeys (`launchFeatures(…, "web").hotkeys` is false,
 rest. `keys/registry.ts` `currentChord` answers null for every modifier chord
 except the editor's text formatting (`EDITOR_ACTION` — ⌘B, ⌘I…), so nothing
 dispatches it and no hint names it (`lib/hotkeyHint.ts` for hard-coded hints);
-bare keys (Esc, Enter) still answer. Every action stays in the ⌘K palette —
-reached from the search field — and Settings has no Keybindings pane.
+bare keys (Esc, Enter) still answer. Platform availability is separate from
+transient action enablement: the registry excludes desktop-only actions from
+web registration, dispatch, and search. Available actions stay in the palette,
+reached from the search field; Settings has no Keybindings pane. Palette row
+hints use `currentChord`, and hard-coded footer, leader, navigation, and tour
+hints use the same build policy.
 
 ## Rotli Helper's vault lane
 
@@ -126,7 +150,7 @@ reached from the search field — and Settings has no Keybindings pane.
   root or read the pairing token.
 - **Bound to one vault per page.** Every verb carries the `vaultId` the page
   bound to; a helper since pointed at another folder answers 409 "vault
-  changed" before touching disk, and the page reloads into setup.
+  changed" before touching disk, and the page re-probes into setup.
 - **Atomic, locked, revision-gated, no-clobber.** Writes use
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
@@ -212,6 +236,13 @@ reached from the search field — and Settings has no Keybindings pane.
   replay couldn't finish moves to a per-vault "kept" record — written before
   the record it came from is cleared — that no unload overwrites, retried
   every boot.
+- **A terminal answer mid-session** (401/refused token, 404 on an unavailable vault verb (not a missing file),
+  no-vault 409, or "vault changed" 409) re-probes the bound Helper and switches
+  to its setup gate. Before the editor unmounts, unsaved note buffers are
+  journaled synchronously and unacknowledged mutations are retained per vault.
+  No reload is needed to expose the failure. Stale-revision 409s remain file
+  errors and never change the connection gate; transient network outages keep
+  the retry cover described above.
 - **A hard refresh or closed tab** can't finish an async file write, so on
   `pagehide` the editor's unsaved text is journaled synchronously to
   localStorage and written into the vault on the next boot, before the editor

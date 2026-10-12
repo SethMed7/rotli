@@ -56,6 +56,8 @@ export interface HelperVaultDirOptions {
   ping: () => Promise<boolean>;
   /** True if `error` means "nothing answered" rather than a refusal. */
   unreachable: (error: unknown) => boolean;
+  /** A rejected connection leaves mutations pending for the next boot. */
+  terminal?: (error: unknown) => boolean;
   /** The overlay's switch: true while calls wait for the helper. */
   onReconnecting?: (reconnecting: boolean) => void;
   /** Every mutation acknowledged: nothing is pending any more. */
@@ -179,7 +181,9 @@ export class HelperVaultDir implements VaultDir {
       if (at >= 0) this.pending.splice(at, 1);
       if (this.pending.length === 0) this.options.onDrained?.();
     };
-    run.then(settle, settle);
+    run.then(settle, (error: unknown) => {
+      if (!this.options.terminal?.(error)) settle();
+    });
     this.chain = run.catch(() => undefined);
     return run;
   }

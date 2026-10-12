@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Rotli Web keeps Mermaid diagrams private.** Diagrams with images, links,
+  or configuration that could load a URL are refused before rendering,
+  with an explanation beside the source.
+- **A Helper token reset or disconnected vault returns to setup.** Unsaved
+  typing and pending writes stay on this computer for reconnection; ordinary
+  file revision conflicts still report a file error.
+- **Web controls describe what can actually run.** Search omits native window
+  and vault-refresh commands. Settings explains that the Librarian and local
+  model installation are available in Rotli for Mac, while keeping connected
+  CLI configuration.
+- **Web embeds explain desktop limits.** The slash menu hides Document, and
+  existing document, workbook, and CSV spreadsheet embeds name Rotli for Mac
+  instead of mounting an editor that cannot save.
+- **Attach image works in the browser.** The slash command opens an image
+  picker and saves the chosen bytes and portable link through the same vault
+  import lane as paste and drop.
+- **Web search and the tour stop advertising unavailable shortcuts.** Recent
+  notes, open tabs, navigation and view commands use the build's key policy.
+
 ### Changed
 
 - **Update checks go through rotli.co.** The Mac app asks rotli.co first,

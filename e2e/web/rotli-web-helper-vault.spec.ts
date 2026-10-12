@@ -27,6 +27,7 @@ function fakeHelperVault() {
   let clock = 1_700_000_000_000;
   const state = {
     down: false,
+    refused: false,
     /** How long /health is held, as a browser holds a request while it asks
      * whether the page may reach apps on this device (Firefox, Zen). */
     healthDelayMs: 0,
@@ -109,10 +110,16 @@ function fakeHelperVault() {
         const health = { ok: true, name: "rotli-helper", version: "1.3.0" };
         return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(health) });
       }
-      if (request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
+      if (state.refused || request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
         return route.fulfill({ status: 401, headers: cors, body: JSON.stringify({ error: "unauthorized" }) });
       }
       const { cmd, args } = request.postDataJSON() as { cmd: string; args: Record<string, unknown> };
+      if (cmd.startsWith("vault_") && cmd !== "vault_info" && cmd !== "vault_choose" && !state.served)
+        return route.fulfill({
+          status: 409,
+          headers: cors,
+          body: JSON.stringify({ error: "Rotli Helper isn't serving a vault yet — choose one first." }),
+        });
       const verb = verbs[cmd];
       if (!verb)
         return route.fulfill({
@@ -383,3 +390,27 @@ test("a helper now serving a different folder asks which vault, instead of writi
   ).toBeVisible();
   await expect(page.locator(".cm-content")).toHaveCount(0);
 });
+
+for (const failure of ["token-reset", "no-vault"] as const)
+  test(`${failure} mid-session opens setup and keeps unsaved typing locally`, async ({ context, page }) => {
+    const helper = fakeHelperVault();
+    await helper.install(context);
+    await withoutFolderApi(context);
+    await connectThroughHelper(page);
+    const editor = page.locator(".cm-content:visible").first();
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    if (failure === "token-reset") helper.state.refused = true;
+    else helper.state.served = null;
+    await page.keyboard.type("\nsynthetic-terminal-draft");
+    await expect(page.locator(".cm-content")).toHaveCount(0);
+    await expect(vaultGate(page)).toHaveText(
+      failure === "token-reset" ? "Set up Rotli Helper" : "Choose your vault",
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-unsaved:helper:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-vault-pending:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+  });

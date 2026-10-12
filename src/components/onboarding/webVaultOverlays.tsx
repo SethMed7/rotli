@@ -46,9 +46,15 @@ function useUnsavedJournal(): void {
     const resume = (event: PageTransitionEvent) => {
       if (event.persisted) window.localStorage.removeItem(key);
     };
+    // The gate removes this overlay in-session too. Snapshot synchronously
+    // when the connection changes, before React can unmount an editor.
+    const unsubscribe = useVaultConnection.subscribe((state) => {
+      if (state.connection.status !== "connected") keep();
+    });
     window.addEventListener("pagehide", keep);
     window.addEventListener("pageshow", resume);
     return () => {
+      unsubscribe();
       window.removeEventListener("pagehide", keep);
       window.removeEventListener("pageshow", resume);
     };

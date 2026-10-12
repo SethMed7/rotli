@@ -10,6 +10,8 @@ test("visual diagram editing is unavailable in production and available for deve
 test("public builds keep notes, chat, Sheets (Beta) and the Chat window while every experimental capability stays in development", () => {
   expect(launchFeatures(false)).toEqual({
     notes: true,
+    librarian: true,
+    localModels: true,
     chat: true,
     breve: false,
     mermaidVisualEditing: false,
@@ -25,6 +27,8 @@ test("public builds keep notes, chat, Sheets (Beta) and the Chat window while ev
   });
   expect(launchFeatures(true)).toEqual({
     notes: true,
+    librarian: true,
+    localModels: true,
     chat: true,
     breve: true,
     mermaidVisualEditing: true,
@@ -67,4 +71,13 @@ test("the web platform withholds every capability that needs the desktop shell, 
 test("the desktop platform is the default and is unchanged by the platform axis", () => {
   expect(launchFeatures(true, "desktop")).toEqual(launchFeatures(true));
   expect(launchFeatures(false, "desktop")).toEqual(launchFeatures(false));
+});
+
+test("web Settings withholds the Librarian and local model runtime, desktop retains both", () => {
+  for (const development of [false, true]) {
+    expect(launchFeatures(development, "web").librarian).toBe(false);
+    expect(launchFeatures(development, "web").localModels).toBe(false);
+    expect(launchFeatures(development, "desktop").librarian).toBe(true);
+    expect(launchFeatures(development, "desktop").localModels).toBe(true);
+  }
 });
