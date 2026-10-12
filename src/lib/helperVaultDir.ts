@@ -29,6 +29,7 @@ import {
   normalizeVaultPath as normalize,
   parentPath as parentOf,
 } from "../services/vaultDir";
+import { bytesFromBase64, bytesToBase64 } from "./base64Bytes";
 
 export type HelperCall = (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
 
@@ -75,20 +76,6 @@ const PREFETCHED = /\.(md|markdown)$/i;
 
 function revisionOf(entry: Entry | undefined): string {
   return entry?.kind === "file" ? `${entry.lastModified}:${entry.size}` : "0";
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 0x8000)
-    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(binary);
-}
-
-function fromBase64(encoded: string): Uint8Array {
-  const binary = atob(encoded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 function isConflict(error: unknown): boolean {
@@ -289,7 +276,7 @@ export class HelperVaultDir implements VaultDir {
   }
 
   async readBytes(path: string): Promise<Uint8Array> {
-    return fromBase64(
+    return bytesFromBase64(
       await this.request<string>("vault_read", { path: normalize(path), encoding: "base64" }),
     );
   }
@@ -299,7 +286,7 @@ export class HelperVaultDir implements VaultDir {
   }
 
   writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
-    return this.write(normalize(path), { base64: toBase64(bytes) }, undefined, expectedContent);
+    return this.write(normalize(path), { base64: bytesToBase64(bytes) }, undefined, expectedContent);
   }
 
   /** Every write is revision-gated: the helper refuses it when the file on

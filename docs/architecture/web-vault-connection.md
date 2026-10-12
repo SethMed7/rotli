@@ -367,6 +367,27 @@ the editor's clean-buffer gate preserves unsaved typing.
   whenever that folder is chosen again, even after others — a small map of
   folder handles to ids), never by folder name; a draft that can be
   neither saved nor kept as a note waits under its own "kept" key.
+- **Office recovery, before web office launch.** CSV edits already use the web
+  sheet editor; DOCX and XLSX remain behind their web feature flags. Each user
+  change in an office editor synchronously stores its engine-neutral snapshot
+  and the exact opened file bytes as base64 in a browser-local journal keyed by
+  the connected vault identity. This happens before the 800 ms autosave timer,
+  and `pagehide` takes one more synchronous snapshot of live dirty editors;
+  async hide/quit flushes remain best effort. The draft records the complete
+  byte revision of its base. Boot re-encodes the conventional file and writes
+  only through that revision gate; if the source changed, the draft becomes a
+  free `unsaved copy` sibling and the changed original stays untouched. A
+  failed replay moves to a separate per-vault kept record, retried on boot;
+  only a confirmed save or confirmed conflict copy clears the draft. The
+  journal permits 1,000,000 ASCII characters per entry and 1,200,000 in total
+  for this vault. Even when each character counts as two UTF-16 bytes, that is
+  under 2.4 MiB of the usual approximately 5 MiB origin quota, leaving room
+  for note and pending-operation journals. A larger edit or blocked
+  storage displays “This change isn't protected until it saves” in the editor;
+  it is still offered to normal autosave. The web build does not prompt on tab
+  close, matching notes: a synchronous journal, rather than an unload-time
+  promise or prompt, guards dirty typing. At the later DOCX/XLSX flag flip,
+  run the skipped real-web hard-refresh spec and remove its skip.
 
 ## Migration
 

@@ -4,6 +4,8 @@ import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 import JSZip from "jszip";
 
+import { bytesFromBase64, bytesToBase64 } from "../../lib/base64Bytes";
+
 // Surfaces never touch the vendor — the codec is the ONE exceljs seam.
 export type { Workbook } from "exceljs";
 
@@ -92,19 +94,11 @@ export function fillFromCsvRows(wb: Workbook, sheetName: string, rows: string[][
 }
 
 export function b64FromBytes(bytes: Uint8Array): string {
-  let bin = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(bin);
+  return bytesToBase64(bytes);
 }
 
 export function bytesFromB64(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  return bytesFromBase64(b64);
 }
 
 export function b64FromText(text: string): string {

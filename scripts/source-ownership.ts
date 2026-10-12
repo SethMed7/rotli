@@ -213,6 +213,7 @@ export const SERVICE_FILE_OWNERS = {
   "vaultBinding.ts": "notes",
   "legacyBrowserNotes.ts": "notes",
   "webUnsavedJournal.ts": "notes",
+  "webOfficeRecovery.ts": "vault files (bounded browser drafts and revision-gated office replay)",
   "notesPort.ts": "notes application port",
   "query.ts": "notes retrieval",
   "retentionPolicy.ts": "vault lifecycle",

@@ -12,6 +12,7 @@ import type { EditableDocument } from "../documents/model";
 import {
   deleteParkedDocument,
   getParkedDocument,
+  protectDocumentDraft,
   registerLiveDocument,
   setParkedDocument,
   unregisterLiveDocument,
@@ -20,6 +21,7 @@ import {
 import { registerEditor, unregisterEditor } from "../editor/commands";
 import { corpusFileStat, openUrl } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
+import { confirmWebOfficeSave, OFFICE_DRAFT_WARNING } from "../services/webOfficeRecovery";
 import { usePanesStore } from "../state/panes";
 import { SaveStatus, useAutosave } from "./autosave";
 
@@ -40,6 +42,8 @@ export default function DocumentEditor({
   const diskLenRef = useRef(0);
   const diskRevisionRef = useRef("");
   const dirtyGenRef = useRef(0);
+  const draftTokenRef = useRef("");
+  const [draftWarning, setDraftWarning] = useState(false);
   const armedRef = useRef(false);
   const pendingEngineDisposeRef = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
@@ -62,10 +66,15 @@ export default function DocumentEditor({
     // never runs two saves at once)
     if (!session || !handle || dirtyGenRef.current === 0) return;
     const generation = dirtyGenRef.current;
+    const draftToken = draftTokenRef.current;
     setSaving(true);
     setErr(null);
     try {
       diskRevisionRef.current = await session.save(handle.save());
+      if (dirtyGenRef.current === generation) {
+        confirmWebOfficeSave(fileId, draftToken);
+        setDraftWarning(false);
+      }
       const stat = await corpusFileStat(fileId).catch(() => null);
       if (stat) diskLenRef.current = stat.len;
       if (dirtyGenRef.current === generation) {
@@ -144,6 +153,9 @@ export default function DocumentEditor({
           if (!armedRef.current) return;
           markDocumentDraftChanged(fileId);
           dirtyGenRef.current += 1;
+          const token = protectDocumentDraft(fileId, session, handle.save(), diskRevisionRef.current);
+          draftTokenRef.current = token ?? "";
+          setDraftWarning(token === null);
           setDirty(true);
           autosave.edited();
         });
@@ -228,6 +240,8 @@ export default function DocumentEditor({
       dirtyGen: () => dirtyGenRef.current,
       onFlushed: (generation) => {
         if (dirtyGenRef.current === generation) {
+          confirmWebOfficeSave(fileId, draftTokenRef.current);
+          setDraftWarning(false);
           diskRevisionRef.current = entry.diskRevision;
           dirtyGenRef.current = 0;
           setDirty(false);
@@ -265,6 +279,11 @@ export default function DocumentEditor({
       {err && (
         <span className="document-save-error" role="alert">
           {err}
+        </span>
+      )}
+      {draftWarning && (
+        <span className="document-save-error" role="alert">
+          {OFFICE_DRAFT_WARNING}
         </span>
       )}
       {ready && <SaveStatus dirty={dirty} saving={saving} failed={err !== null && dirty} />}

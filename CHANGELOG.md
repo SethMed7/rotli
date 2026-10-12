@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Web CSV edits survive a hard refresh during autosave.** A browser-local,
+  vault-bound draft replays against the file's original revision; a changed
+  file keeps both versions. The same recovery is ready for DOCX and XLSX when
+  those web editors are enabled. Oversized drafts say when an edit is waiting
+  on its normal save for protection.
 - **Rotli Web protects file edits made elsewhere.** A CSV or other editable
   file changed outside Rotli is never overwritten by a stale save, even when
   its size and modified time stay the same. Oversized saves through Rotli
