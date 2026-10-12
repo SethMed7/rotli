@@ -109,7 +109,7 @@ function markdownTwins() {
 
 /**
  * The agent-facing files (src/agents.ts) are only useful if they are true to
- * the build: every link in /llms.txt must land on a page this build emitted
+ * the build: every rotli.co address in /llms.txt and /llms-full.txt must land on a page this build emitted
  * (agents follow them literally), and every JSON-LD block must parse. A page
  * renamed without updating the summary fails here, not on rotli.co.
  */
@@ -120,18 +120,21 @@ function agentFilesGuard() {
       "astro:build:done": ({ dir }) => {
         const root = fileURLToPath(dir);
         const problems = [];
-        const llms = join(root, "llms.txt");
-        if (!existsSync(llms)) problems.push("llms.txt was not emitted");
-        else {
-          for (const [, href] of readFileSync(llms, "utf8").matchAll(/\]\((https?:[^)\s]+)\)/g)) {
-            const url = new URL(href);
-            if (url.origin !== site.url) continue;
+        if (!existsSync(join(root, "llms.txt"))) problems.push("llms.txt was not emitted");
+        // llms-full.txt (full site only) carries its pages as bare `Page:`/`Source:` addresses
+        for (const name of ["llms.txt", "llms-full.txt"]) {
+          const text = join(root, name);
+          if (!existsSync(text)) continue;
+          for (const [href] of readFileSync(text, "utf8").matchAll(/https?:\/\/[^\s)<>\]"'`]+/g)) {
+            const url = new URL(href.replace(/[.,;:]+$/, ""));
+            // /app/ is Rotli Web, its own bundle served beside this build (site/Caddyfile)
+            if (url.origin !== site.url || url.pathname.startsWith("/app/")) continue;
             const file = join(
               root,
               decodeURIComponent(url.pathname),
               url.pathname.endsWith("/") ? "index.html" : "",
             );
-            if (!existsSync(file)) problems.push(`llms.txt links ${href}, which this build did not emit`);
+            if (!existsSync(file)) problems.push(`${name} links ${href}, which this build did not emit`);
           }
         }
         const walk = (folder) => {
