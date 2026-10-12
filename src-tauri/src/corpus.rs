@@ -7148,8 +7148,12 @@ impl CorpusState {
             .remove(incoming_id)
             .ok_or_else(|| format!("corpus root unavailable: {incoming_id}"))?;
         incoming.set_perms_read_only(false);
-        if let Some(outgoing_id) = outgoing_id {
-            reg.stores.insert(outgoing_id, outgoing);
+        match outgoing_id {
+            Some(outgoing_id) => {
+                reg.stores.insert(outgoing_id, outgoing);
+            }
+            // a folder that isn't kept leaves the registry: stop watching it now
+            None => watch::stop_watching(outgoing.root()),
         }
         reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
         reg.default_id = DEFAULT_ROOT_ID.to_string();

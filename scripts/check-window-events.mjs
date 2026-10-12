@@ -79,6 +79,12 @@ for (const path of files.filter((p) => p.endsWith(".rs"))) {
     if (name) addressed.add(name);
   }
 }
+// listenHere is trusted by name below, so it must itself pass the target
+const adapterPath = join(root, "src/lib/tauri.ts");
+const adapter = files.includes(adapterPath) ? readFileSync(adapterPath, "utf8") : "";
+const listenHereBody = adapter.match(/export function listenHere[\s\S]*?\n}\n/)?.[0];
+if (listenHereBody !== undefined && !listenHereBody.includes("target:"))
+  failures.push("src/lib/tauri.ts: listenHere must pass { target } — every per-window listener relies on it");
 for (const path of files.filter((p) => /\.tsx?$/.test(p))) {
   const source = readFileSync(path, "utf8");
   for (const m of source.matchAll(/\blisten(?:<[^>]*>)?\(\s*"(rotli:[a-z0-9-]+)"/g)) {

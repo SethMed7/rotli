@@ -46,10 +46,7 @@ pub fn spawn_watcher(
 ) -> notify::Result<()> {
     use notify::{RecursiveMode, Watcher};
     let (tx, rx) = std::sync::mpsc::channel::<WatchMsg>();
-    WATCHERS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .push((normalized_watch_path(&root), tx.clone()));
+    let mailbox = tx.clone();
     let handler = move |res: notify::Result<notify::Event>| {
         let _ = tx.send(Some(res));
     };
@@ -64,6 +61,12 @@ pub fn spawn_watcher(
     #[cfg(not(test))]
     let mut watcher = notify::recommended_watcher(handler)?;
     watcher.watch(&root, RecursiveMode::Recursive)?;
+    // registered only once the watch is live: a failed create/watch leaves
+    // no orphan mailbox behind
+    WATCHERS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((normalized_watch_path(&root), mailbox));
     std::thread::spawn(move || {
         let _keep_alive = watcher;
         while let Ok(Some(res)) = rx.recv() {

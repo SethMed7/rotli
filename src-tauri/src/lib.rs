@@ -1355,6 +1355,8 @@ mod vault_activation_tests {
         std::fs::write(source.join(".rotli/main.json"), "old rotli state").unwrap();
 
         std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
+        std::fs::create_dir_all(source.join(".git/objects")).unwrap();
+        std::fs::write(source.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
         std::fs::write(source.join("Projects/node_modules/dep/README.md"), "# Dep\n").unwrap();
 
         let report = inspect_vault_path(&source).unwrap();
@@ -1373,6 +1375,7 @@ mod vault_activation_tests {
         );
         assert!(destination.join(".obsidian/app.json").is_file());
         assert!(!destination.join("Projects/node_modules").exists(), "dependency folders never copy");
+        assert!(!destination.join(".git").exists(), "history folders never copy");
         assert!(
             !destination.join(".rotli").exists(),
             "source-specific Rotli state must not copy"
