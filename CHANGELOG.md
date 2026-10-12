@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unless it carried a content gate. Binary saves also recover when the Helper
   writes the bytes but the acknowledgement is lost. Chat rechecks its bound
   vault after the secure-note scan if the served folder changes during it.
+- **Rotli Web keeps diagrams and folders private without hiding ordinary text.**
+  Mermaid blocks encoded images and links, while labels such as `click` and
+  `C://Users` still render. Concurrent view and secure-note changes preserve
+  Git exclusions.
+- **Web menus and guidance match connected folders.** Chat rows omit Show in
+  Finder, Settings → Location describes the connected browser folder, and the
+  Welcome privacy lesson no longer asks web users to review a Librarian setting.
 - **Rotli Helper protects files and secure notes throughout a session.** A
   case-only move refuses a different file already holding the destination;
   chat from a Helper-served vault checks every secure note in that vault

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const policy = { ...(await import("../lib/featurePolicy")) };
 const react = { ...(await import("react")) };
-let selectedPane: "brain" | "models" = "brain";
+let selectedPane: "brain" | "models" | "location" = "brain";
 await mock.module("../lib/featurePolicy", () => ({
   ...policy,
   PLATFORM: "web",
@@ -45,4 +45,11 @@ test("web model Settings keeps connected CLI configuration without local runtime
   expect(html).not.toContain("Scan my Mac");
   expect(html).not.toMatch(/>\s*(Install|Uninstall|Make default)\s*</);
   expect(html).toContain("Connected models");
+});
+
+test("web Location describes the connected browser folder", () => {
+  selectedPane = "location";
+  const html = render();
+  expect(html).toContain("folder you connected");
+  expect(html).not.toContain("browser preview");
 });

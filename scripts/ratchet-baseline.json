@@ -59,5 +59,6 @@
     "src/editor": 0.5
   },
   "dupClusters": 226,
-  "runtimeGates": 70
+  "runtimeGates": 70,
+  "disabledRuntimeOffers": 4
 }

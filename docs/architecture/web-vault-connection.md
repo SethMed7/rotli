@@ -49,8 +49,11 @@ Decided by the owner on 2026-09-22; the history is in
    E2E counts only requests that left the page and allows same-origin ones
    only for files the build ships. Mermaid source is checked by the pure
    `lib/mermaidPolicy.ts` rule **before** either vendor renderer/converter runs:
-   images/icons, links/clicks, HTML, URL-bearing tokens, escaped tokens, and
-   author configuration are refused inline. Sanitizing the finished SVG would
+   images/icons, Markdown images, links/clicks, HTML, URL-bearing tokens,
+   escaped tokens, and author configuration are refused inline. HTML and
+   Mermaid entities are decoded to a fixed point with a bounded fail-closed
+   limit before these checks. Ordinary labels such as `click`, `Link`, and
+   `C://Users` remain readable. Sanitizing the finished SVG would
    be too late: Mermaid's image loader can make a request during rendering.
    Ordinary diagrams remain available; this conservative refusal can also
    withhold harmless source containing those tokens.
@@ -158,11 +161,14 @@ the prior home before removing the flag and ignore entry; detected secrets
 refuse removal. `folderMetadata.setFolderSecure` returns the resulting path
 for relocation bookkeeping. Raw `secure` edits synchronize the git exclusion,
 as Rust's raw lane does; relocation belongs to the explicit protection command.
+After a successful move, failure to remove the obsolete exclusion leaves that
+safe extra line in place without reporting the move as failed.
 
 Named-view writes validate names and singular membership, ensure Main references,
 and synchronize each changed Markdown `view_tag`. Boards and binaries never
 receive frontmatter. Failed writes roll back only bytes this transaction wrote,
-including `.gitignore` exclusion edits;
+including `.gitignore` exclusion edits. The one revision-gated exclusion writer
+also narrows `.rotli/` to `.rotli/*` while preserving concurrent secure entries;
 a newer external edit wins. Main may retain safe additional references after
 failure, as on desktop. Durable aliases resolve alongside current filename and
 title selectors; renaming a stable-id note preserves earlier selectors on disk.
@@ -209,8 +215,9 @@ the chat chip's Helper setup route until the Helper is ready, then resolve the
 note's path through the connected web vault.
 
 The Welcome catalog in `src/assets/welcome.json` remains shared with Rust.
-Its web replacements change only the lessons that teach desktop chords or
-document creation; web seeding writes those variants as ordinary Markdown.
+Its web replacements change lessons that teach desktop chords, document
+creation, or the desktop-only Librarian; web seeding writes those variants as
+ordinary Markdown.
 Empty Trash in the web vault removes files permanently, so both confirmations
 say so. Finder-only row actions are absent. On focus or return to a visible tab,
 the File System Access road rebuilds its note listing and refetches notes;

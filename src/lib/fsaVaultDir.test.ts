@@ -7,7 +7,13 @@ import { FsaVaultDir } from "./fsaVaultDir";
 // is open on a file, `getFile()` throws (NotReadableError), and the new
 // contents only appear once `close()` has swapped them in.
 class FakeFile {
-  text = "";
+  bytes = new Uint8Array();
+  get text(): string {
+    return new TextDecoder().decode(this.bytes);
+  }
+  set text(value: string) {
+    this.bytes = new TextEncoder().encode(value);
+  }
   lastModified = 1;
   writing = false;
   readonly kind = "file";
@@ -19,24 +25,24 @@ class FakeFile {
     size: number;
   }> {
     if (this.writing) throw new DOMException("could not be read", "NotReadableError");
-    const text = this.text;
+    const bytes = this.bytes.slice();
     return {
-      text: async () => text,
-      arrayBuffer: async () => new TextEncoder().encode(text).buffer,
+      text: async () => new TextDecoder().decode(bytes),
+      arrayBuffer: async () => bytes.buffer,
       lastModified: this.lastModified,
-      size: text.length,
+      size: bytes.length,
     };
   }
   async createWritable(): Promise<{ write(t: string | ArrayBuffer): Promise<void>; close(): Promise<void> }> {
     this.writing = true;
-    let pending = "";
+    let pending = new Uint8Array();
     return {
       write: async (t: string | ArrayBuffer) => {
-        pending = typeof t === "string" ? t : new TextDecoder().decode(t);
+        pending = typeof t === "string" ? new TextEncoder().encode(t) : new Uint8Array(t).slice();
         await new Promise((r) => setTimeout(r, 5)); // the bytes take time
       },
       close: async () => {
-        this.text = pending;
+        this.bytes = pending;
         this.lastModified += 1;
         this.writing = false;
       },
@@ -65,6 +71,25 @@ class FakeDir {
 }
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
+
+test("writeText with stale expected content preserves the file bytes", async () => {
+  const dir = dirOf();
+  await dir.writeText("note.md", "latest note bytes");
+  await expect(
+    dir.writeText("note.md", "stale replacement", contentRevision("superseded note bytes")),
+  ).rejects.toThrow(/revision conflict/);
+  expect(await dir.readBytes("note.md")).toEqual(new TextEncoder().encode("latest note bytes"));
+});
+
+test("writeBytes with stale expected content preserves the file bytes", async () => {
+  const dir = dirOf();
+  const newer = new Uint8Array([0, 1, 255, 2]);
+  await dir.writeBytes("asset.bin", newer);
+  await expect(
+    dir.writeBytes("asset.bin", new Uint8Array([3, 4]), contentRevision("superseded asset bytes")),
+  ).rejects.toThrow(/revision conflict/);
+  expect(await dir.readBytes("asset.bin")).toEqual(newer);
+});
 
 test("remove checks expected content after an external edit in its removal turn", async () => {
   const root = new FakeDir();

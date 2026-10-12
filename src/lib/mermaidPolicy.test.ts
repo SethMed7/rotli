@@ -17,6 +17,7 @@ const refused = [
   'A["https://example.com"]',
   'A["http://example.com"]',
   'A["//example.com"]',
+  "A[//example.com]",
   "links: relative.html",
   '%%{init: {"themeCSS":"@import "relative.css""}}%%\nflowchart LR\nA-->B',
   "---\nconfig:\n  themeCSS: url(relative.png)\n---\nflowchart LR\nA-->B",
@@ -28,12 +29,27 @@ const refused = [
   'classDiagram\nclass A\nlink A "relative.html"',
   "flowchart LR\nA@{ shape: 'image' }",
   String.raw`A["\x2fapp/index.html"]`,
+  'flowchart LR\nA["&amp;lt;img src=relative.png&amp;gt;"]',
+  "A[&amp;lt;img>]",
+  'flowchart LR\nA["![](/app/index.html?note=synthetic-private)"]',
+  "![](/app/...?note=synthetic-private)",
+  'flowchart LR\nA["file://vault/private.md"]',
+  'flowchart LR\nA["data:image/png;base64,AA=="]',
+  'flowchart LR\nA["ws://example.com"]',
+  'flowchart LR\nA["ftp://example.com"]',
+  'flowchart LR\nA["wss://example.com"]',
+  'flowchart LR\nA["src=//example.com/private.png"]',
 ];
 test("the pure web preflight refuses the entire network-bearing source matrix", () => {
   for (const source of refused) {
     expect(mermaidRefusal(source, "web")).toContain("privacy");
     expect(mermaidRefusal(source, "desktop")).toBeNull();
   }
+});
+test("entity nesting past the decoder limit is refused", () => {
+  let source = "&lt;img src=relative.png&gt;";
+  for (let i = 0; i < 9; i += 1) source = source.replaceAll("&", "&amp;");
+  expect(mermaidRefusal(`flowchart LR\nA["${source}"]`, "web")).toContain("privacy");
 });
 test("ordinary diagrams, bidirectional edges and arithmetic labels remain available", () => {
   for (const source of [
@@ -48,6 +64,9 @@ test("ordinary diagrams, bidirectional edges and arithmetic labels remain availa
     "%%{init: {'theme':'dark'}}%%\nflowchart LR\nA-->B",
     "---\ntitle: Synthetic plan\n---\nflowchart LR\nA-->B",
     'flowchart LR\nA["/app/index.html as plain text"]',
+    "flowchart LR\nA[click] --> Link",
+    'flowchart LR\nA["C://Users as plain text"]',
+    "A[C://Users]",
 
     "",
   ])

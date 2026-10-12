@@ -58,6 +58,10 @@
       {
         "desktop": "Chat and the Librarian are optional capabilities.",
         "web": "Chat is optional; the Librarian is available in Rotli for Mac."
+      },
+      {
+        "desktop": "- [ ] Review the Librarian setting and its explanation",
+        "web": "- [ ] Review Chat’s privacy settings before connecting a provider"
       }
     ]
   }

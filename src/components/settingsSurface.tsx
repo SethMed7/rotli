@@ -1422,7 +1422,7 @@ function LocationPane() {
       <>
         <PaneHead title="Location" char="local" motif="location" />
         <p className="lead">
-          Your notes folder lives on disk — this connects in the app, not the browser preview.
+          Your notes stay in the folder you connected on this computer. Rotli Web reads and saves them there.
         </p>
       </>
     );
