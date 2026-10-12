@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web no longer creates a duplicate unsaved office copy when two tabs recover the same abandoned edit.**
 - **A big folder no longer takes gigabytes of memory.** Opening a folder
   with tens of thousands of files as a vault, such as a code folder, could push
   rotli past 10 GB and keep it busy at full CPU: the sidebar built every row

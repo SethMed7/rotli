@@ -42,6 +42,8 @@ Chat's `read_file` now reads what a model can point at, instead of flat text:
   `src/ai/artifacts.ts`).
 
 The secret gate is unchanged (a remote model never gets secret-shaped text).
+Rotli Web does not offer `read_file` or the document creation/edit tools to
+chat; its prompt names only tools in that turn's offered registry.
 
 ## Done (slice 3, 2026-10-01): chat edits Word documents it created
 

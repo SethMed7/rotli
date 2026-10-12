@@ -6,15 +6,16 @@
 import {
   defuse,
   FRONTIER_ANSWER_STYLE,
-  FRONTIER_NOTE_RULES,
+  frontierNoteRules,
   frontierRules,
   PROGRESS_LIST_RULE,
   renderConversation,
   renderKnowledgeMap,
 } from "./prompt";
-import type { ChatTurn } from "./types";
+import type { ChatTurn, ToolName } from "./types";
 
 export interface NativePromptCtx {
+  offeredTools?: ReadonlySet<ToolName>;
   web: boolean;
   documentTool?: boolean;
   userName?: string;
@@ -23,11 +24,14 @@ export interface NativePromptCtx {
 }
 
 export function renderNativeSystem(ctx: NativePromptCtx): string {
-  const rules = frontierRules(ctx);
+  const rules = frontierRules({
+    ...ctx,
+    documentTool: ctx.offeredTools?.has("create_document") ?? ctx.documentTool ?? false,
+  });
   return `You are the assistant inside Rotli, a local-first notes app.
 ${rules.scope}
 
-TOOLS: the rotli tools are the only tools you have — call them directly when they add facts. ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${FRONTIER_NOTE_RULES} You have ${ctx.maxSteps} tool calls for this turn.
+TOOLS: the rotli tools are the only tools you have — call them directly when they add facts. ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${frontierNoteRules(ctx.offeredTools?.has("read_file") ?? true)} You have ${ctx.maxSteps} tool calls for this turn.
 
 ANSWER: your reply ${FRONTIER_ANSWER_STYLE}. When one missing choice would materially change the result, ask one concise question with 2–3 short options instead of guessing.
 

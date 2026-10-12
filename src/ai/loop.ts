@@ -203,6 +203,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     yield { type: "status", text: step === 1 ? "thinking…" : `thinking… (step ${step})` };
 
     const prompt = adapter.renderPrompt({
+      offeredTools: allowed,
       web: input.web,
       knowledge,
       history,
