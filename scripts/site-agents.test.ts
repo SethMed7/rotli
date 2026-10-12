@@ -11,16 +11,19 @@ const collapse = (text: string) => text.replace(/\s+/g, " ");
 
 // the site's own types (astro:content) stay out of the root typecheck: a
 // computed path, and only the two functions under test
+type RoadmapSections = {
+  title: string;
+  slug: string;
+  items: { id: string; title: string; size: string | null; summary: string }[];
+}[];
+
 let agents: {
   robotsText(): string;
   llmsText(writing: { posts: never[] }): string;
-  roadmapMarkdown(
-    sections: {
-      title: string;
-      slug: string;
-      items: { id: string; title: string; size: string | null; summary: string }[];
-    }[],
-  ): string;
+  llmsFullText(content: { posts: never[]; roadmap: RoadmapSections }): string;
+  featureGraph(feature: { id: string; name: string; line: string }): Record<string, unknown>[];
+  application(): Record<string, unknown>;
+  roadmapMarkdown(sections: RoadmapSections): string;
 };
 
 beforeAll(async () => {
@@ -40,10 +43,12 @@ describe("Caddy serves the Markdown twins", () => {
     expect(flat).toContain("rewrite @markdown {file_match.relative}");
   });
 
-  test("a cache keeps HTML and Markdown apart, and llms.txt reads inline", () => {
+  test("a cache keeps HTML and Markdown apart, and both llms files read inline", () => {
     const flat = collapse(caddyfile);
     expect(flat).toContain("header Vary Accept");
-    expect(flat).toContain('@llms path /llms.txt header @llms Content-Type "text/plain; charset=utf-8"');
+    expect(flat).toContain(
+      '@llms path /llms.txt /llms-full.txt header @llms Content-Type "text/plain; charset=utf-8"',
+    );
     expect(flat).toContain(
       '@markdownFile path *.md header @markdownFile Content-Type "text/markdown; charset=utf-8"',
     );
@@ -143,6 +148,14 @@ describe("llms.txt", () => {
     expect(text).not.toContain("/resources/why-local/");
   });
 
+  test("points agents at the developers page and the one-file version", () => {
+    const text = agents.llmsText({ posts: [] });
+    expect(text).toContain("[Developers](https://rotli.co/resources/developers/)");
+    // the launch site: MCP is still a development-build feature (ROADMAP.md agents-mcp)
+    expect(text).toContain("MCP for agents like Claude Code and Codex is coming soon");
+    expect(text).toContain("[Everything in one file](https://rotli.co/llms-full.txt)");
+  });
+
   test("links the roadmap's Markdown twin, which lists each item with its size", () => {
     expect(agents.llmsText({ posts: [] })).toContain("[Roadmap](https://rotli.co/roadmap/index.md)");
     const twin = agents.roadmapMarkdown([
@@ -202,5 +215,87 @@ describe("the FAQ's Rotli Web answer", () => {
 
   test("with Rotli Web off, the question isn't asked", () => {
     expect(questionsWith(false).some((item) => item.q.includes("browser"))).toBe(false);
+  });
+});
+
+describe("llms-full.txt", () => {
+  const roadmap = [
+    {
+      title: "Planned",
+      slug: "planned",
+      items: [{ id: "x", title: "Charts", size: "L", summary: "Type `/chart`." }],
+    },
+  ];
+
+  test("opens like llms.txt, then every feature, answer, and roadmap item in full", () => {
+    const text = agents.llmsFullText({ posts: [], roadmap });
+    expect(text.startsWith("# rotli\n\n> ")).toBe(true);
+    expect(text).toContain("https://rotli.co/privacy/index.md");
+    expect(text).toContain("# Everything rotli does");
+    expect(text).toContain("### A command line for scripts\n\nAvailable on Mac.");
+    expect(text).toContain('- `rotli notes search "launch plan"`: Search the vault.');
+    expect(text).toContain("Page: https://rotli.co/features/command-line/");
+    expect(text).toContain("# Questions people ask");
+    expect(text).toContain("- **Charts** (L): Type `/chart`.");
+    // the launch site leaves development-only entries out, as its catalog does
+    expect(text).not.toContain("### MCP for AI agents");
+  });
+
+  test("each post follows in full, after a rule", () => {
+    const post = {
+      id: "posts/why-local",
+      body: "## Your files\n\nThey stay yours.",
+      data: { title: "Why local?", description: "Files first.", tags: ["Guide"], section: "post" },
+    } as never;
+    const text = agents.llmsFullText({ posts: [post], roadmap });
+    expect(text).toContain("---\n\n# Why local?\n\n> Files first.\n\n## Your files\n\nThey stay yours.");
+    expect(text).toContain("Source: https://rotli.co/blog/why-local/");
+  });
+});
+
+describe("JSON-LD", () => {
+  test("a feature page says what it is about and where it sits", () => {
+    const [page, crumbs] = agents.featureGraph({
+      id: "tasks",
+      name: "Tasks that stay text",
+      line: "Checkboxes.",
+    });
+    expect(page).toMatchObject({
+      "@type": "WebPage",
+      name: "Tasks that stay text",
+      url: "https://rotli.co/features/tasks/",
+      about: { "@type": "SoftwareApplication", name: "rotli" },
+    });
+    expect(JSON.stringify(crumbs)).toContain('"item":"https://rotli.co/features/"');
+  });
+
+  test("the application lists what has shipped, and nothing still in development", () => {
+    const list = agents.application().featureList as string[];
+    expect(list).toContain("A command line for scripts");
+    expect(list).not.toContain("MCP for AI agents");
+    expect(list).not.toContain("Charts from your notes");
+  });
+});
+
+// The build guard (astro.config.mjs, rotli-agent-files-guard) checks these files exist in dist.
+describe("the addresses the agent files send agents to", () => {
+  test("Markdown links and bare Page: lines, without trailing punctuation, as build files", async () => {
+    const { agentLinkTargets } = (await import(
+      join(import.meta.dir, "..", "site", "src", "agentLinks.ts")
+    )) as { agentLinkTargets: (text: string, origin: string) => { href: string; file: string }[] };
+    const text = [
+      "- [Features](https://rotli.co/features/): every feature",
+      "Page: https://rotli.co/features/markdown/.",
+      "Run https://rotli.co/helper/install.sh; then https://rotli.co/privacy/index.md, done.",
+      "Open https://rotli.co/app/ or https://github.com/SethMed7/rotli and http://rotli.co/x/",
+      "A space: https://rotli.co/blog/a%20b/",
+    ].join("\n");
+    expect(agentLinkTargets(text, "https://rotli.co").map(({ file }) => file)).toEqual([
+      "/features/index.html",
+      "/features/markdown/index.html",
+      "/helper/install.sh",
+      "/privacy/index.md",
+      "/blog/a b/index.html",
+    ]);
   });
 });

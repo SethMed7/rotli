@@ -7,7 +7,7 @@
 import { GUIDE } from "./blog";
 import { questions } from "./faq";
 import { figuresToMarkdown } from "./figures";
-import { alsoCovers, availabilityOf, catalog, featurePath } from "./features";
+import { alsoCovers, availabilityOf, catalog, type Feature, featurePath, isOut } from "./features";
 import { type RoadmapSection, VOTING_OPEN } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
@@ -77,8 +77,8 @@ export function writingPath(entry: Writing): string {
 /** A guide: the evergreen how-to posts, tagged GUIDE (src/blog.ts). */
 const isGuide = (entry: Writing) => entry.data.tags.includes(GUIDE);
 
-/** /llms.txt (llmstxt.org): a title, a one-paragraph summary, then links. */
-export function llmsText(writing: { posts: Writing[] }): string {
+/** The head both /llms.txt and /llms-full.txt open with: the title, the summary, the plain facts. */
+function summaryLines(): string[] {
   const facts = [
     site.sourcePublic
       ? "Free, with no account. The source is open under the MIT license."
@@ -92,7 +92,12 @@ export function llmsText(writing: { posts: Writing[] }): string {
       ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are coming soon; until then, Windows and Linux use Rotli Web."
       : "Platforms: the Mac app. Native Windows and Linux apps are coming soon.",
   ];
-  const lines = [`# ${NAME}`, "", `> ${SUMMARY}`, "", ...facts.map((fact) => `- ${fact}`)];
+  return [`# ${NAME}`, "", `> ${SUMMARY}`, "", ...facts.map((fact) => `- ${fact}`)];
+}
+
+/** /llms.txt (llmstxt.org): a title, a one-paragraph summary, then links. */
+export function llmsText(writing: { posts: Writing[] }): string {
+  const lines = summaryLines();
   if (site.showsFullSite) {
     lines.push(
       "",
@@ -120,6 +125,13 @@ export function llmsText(writing: { posts: Writing[] }): string {
           : "what is being built, what is planned, and what is still an idea; people send requests on the page",
       ),
       link("About", "/about/", "why it is being built, where the name comes from, and who makes it"),
+      link(
+        "Developers",
+        "/resources/developers/",
+        site.showsExperiments
+          ? "MCP and the JSON command line for agents like Claude Code, Codex, and Cursor, under the app's own rules"
+          : "the JSON command line for scripts, available now; MCP for agents like Claude Code and Codex is coming soon",
+      ),
     );
     const section = (title: string, entries: Writing[]) =>
       entries.length > 0
@@ -151,6 +163,9 @@ export function llmsText(writing: { posts: Writing[] }): string {
     );
   }
   const optional = [
+    ...(site.showsFullSite
+      ? [link("Everything in one file", "/llms-full.txt", "this summary with every feature, answer, roadmap item, and post in full")]
+      : []),
     ...(site.sourcePublic ? [`- [Source code](${GITHUB_URL}): the repository`] : []),
     ...(site.indexable ? [link("Sitemap", "/sitemap-index.xml", "every page on this site")] : []),
   ];
@@ -200,6 +215,52 @@ export function writingMarkdown(entry: Writing): string {
   ].join("\n");
 }
 
+/** One capability in full, as its page says it: what it does, how to use it, and where it stops. */
+function featureMarkdown(feature: Feature): string[] {
+  const steps = (use: { keys: string; text: string }[]) => use.map((step) => `- \`${step.keys}\`: ${step.text}`);
+  const lines = [`### ${feature.name}`, "", `${availabilityOf(feature)}. ${feature.line}`];
+  for (const paragraph of feature.body) lines.push("", paragraph);
+  if (feature.use.length > 0) lines.push("", "How to use it:", "", ...steps(feature.use));
+  for (const section of feature.sections ?? []) {
+    lines.push("", `#### ${section.title}`);
+    for (const paragraph of section.body) lines.push("", paragraph);
+    if (section.use?.length) lines.push("", ...steps(section.use));
+  }
+  if (feature.limits.length > 0)
+    lines.push("", isOut(feature) ? "Limits:" : "Where it stands:", "", ...feature.limits.map((limit) => `- ${limit}`));
+  lines.push("", `Page: ${site.url}${featurePath(feature)}`);
+  return lines;
+}
+
+/**
+ * /llms-full.txt (llmstxt.org): the whole site as one Markdown file, for an agent that
+ * would rather read once than follow links. The /llms.txt head, then every feature in
+ * full, the FAQ, the roadmap, and every post; each part restates a page, nothing more.
+ */
+export function llmsFullText(content: { posts: Writing[]; roadmap: RoadmapSection[] }): string {
+  const parts = [
+    [
+      ...summaryLines(),
+      "",
+      `This file is the whole site in one place; ${site.url}/llms.txt is the short version with links. The privacy page in full: ${site.url}/privacy/index.md`,
+    ].join("\n"),
+    [
+      "# Everything rotli does",
+      ...catalog().flatMap(({ area, features }) => [
+        "",
+        `## ${area.name}`,
+        "",
+        area.line,
+        ...features.flatMap((feature) => ["", ...featureMarkdown(feature)]),
+      ]),
+    ].join("\n"),
+    ["# Questions people ask", ...questions.flatMap(({ q, a }) => ["", `## ${q}`, "", a])].join("\n"),
+    roadmapMarkdown(content.roadmap).trimEnd(),
+    ...content.posts.map((entry) => writingMarkdown(entry).trimEnd()),
+  ];
+  return parts.join("\n\n---\n\n") + "\n";
+}
+
 // ─── JSON-LD (schema.org) ────────────────────────────────────────────────
 
 type Ld = Record<string, unknown>;
@@ -227,6 +288,7 @@ export function application(): Ld {
     applicationCategory: "ProductivityApplication",
     operatingSystem: site.webAppEnabled ? "macOS, Web browser" : "macOS",
     isAccessibleForFree: true,
+    featureList: catalog().flatMap(({ features }) => features.filter(isOut).map((feature) => feature.name)),
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     ...(site.downloadsEnabled ? { downloadUrl: DOWNLOAD_URL } : {}),
     ...(site.sourcePublic ? { license: LICENSE_URL } : {}),
@@ -245,6 +307,29 @@ export function landingGraph(): Ld[] {
         name: q,
         acceptedAnswer: { "@type": "Answer", text: a },
       })),
+    },
+  ];
+}
+
+/** A capability's page: what it is about (the app) and where it sits (rotli > Features > it). */
+export function featureGraph(feature: Feature): Ld[] {
+  const url = `${site.url}${featurePath(feature)}`;
+  return [
+    {
+      "@type": "WebPage",
+      name: feature.name,
+      description: feature.line,
+      url,
+      isPartOf: { "@type": "WebSite", name: NAME, url: site.url },
+      about: { "@type": "SoftwareApplication", name: NAME, url: site.url },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: NAME, item: `${site.url}/` },
+        { "@type": "ListItem", position: 2, name: "Features", item: `${site.url}/features/` },
+        { "@type": "ListItem", position: 3, name: feature.name, item: url },
+      ],
     },
   ];
 }
