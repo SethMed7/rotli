@@ -96,7 +96,13 @@ test("opening a second tab leaves a live workbook draft and its source untouched
   const peer = await context.newPage();
   try {
     await peer.goto(APP);
-    await expect(peer.locator(".tabstrip").getByRole("tab", { selected: true })).toContainText("Anchor");
+    // tab layout is shared, so the peer reopens the workbook tab. Office
+    // replay is awaited in vault connect, before the app renders, so a tab
+    // strip means replay already ran. (The context's paused clock also holds
+    // the peer's editor at "Loading…", which this test doesn't need.)
+    await expect(peer.locator(".tabstrip").getByRole("tab", { selected: true })).toContainText(
+      "peer-budget.xlsx",
+    );
     expect(await peer.evaluate((key) => window.localStorage.getItem(key), before!.key)).toBe(before!.value);
     expect(await readOpfsBase64(peer, path)).toBe(original);
   } finally {
