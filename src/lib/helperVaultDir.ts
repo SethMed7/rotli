@@ -1,3 +1,6 @@
+import { contentRevision } from "../services/vaultDir";
+export { contentRevision } from "../services/vaultDir";
+
 // Rotli Helper behind the VaultDir port: the vault folder the user chose,
 // served by the helper on this computer over loopback, for browsers without
 // the File System Access API (Zen, Firefox, Brave with its flag off). Every
@@ -70,18 +73,6 @@ const PREFETCHED = /\.(md|markdown)$/i;
 
 function revisionOf(entry: Entry | undefined): string {
   return entry?.kind === "file" ? `${entry.lastModified}:${entry.size}` : "0";
-}
-
-/** The desktop app's content revision (`fsutil::revision`): FNV-1a 64 over the
- * UTF-8 bytes. Sent with a write whose text this tab knows, so the helper's
- * gate compares content, not a millisecond stamp two edits can share. */
-export function contentRevision(text: string): string {
-  let hash = 0xcbf29ce484222325n;
-  for (const byte of new TextEncoder().encode(text)) {
-    hash ^= BigInt(byte);
-    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
-  }
-  return `fnv1a64:${hash.toString(16).padStart(16, "0")}`;
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -299,8 +290,8 @@ export class HelperVaultDir implements VaultDir {
     );
   }
 
-  writeText(path: string, text: string): Promise<void> {
-    return this.write(normalize(path), { text }, text);
+  writeText(path: string, text: string, expectedContent?: string): Promise<void> {
+    return this.write(normalize(path), { text }, text, expectedContent);
   }
 
   writeBytes(path: string, bytes: Uint8Array): Promise<void> {
@@ -311,7 +302,12 @@ export class HelperVaultDir implements VaultDir {
    * disk isn't the one this tab last saw (Rotli for Mac, or another tab,
    * wrote it meanwhile), so nothing is overwritten silently. The revision is
    * read when the write is SENT, after earlier writes in the queue landed. */
-  private async write(key: string, body: { text?: string; base64?: string }, text?: string): Promise<void> {
+  private async write(
+    key: string,
+    body: { text?: string; base64?: string },
+    text?: string,
+    expectedContent?: string,
+  ): Promise<void> {
     if (!key) throw new Error("a file needs a name");
     const op: PendingOp = { kind: "write", path: key, base: revisionOf(this.entries.get(key)), ...body };
     let base: string | null = null;
@@ -322,9 +318,11 @@ export class HelperVaultDir implements VaultDir {
       // the text this tab last saw in the file, when it knows it
       const seen = this.texts.get(key);
       const gate =
-        seen && seen.revision === base
-          ? { expectedContent: contentRevision(seen.text) }
-          : { expectedRevision: base };
+        expectedContent !== undefined
+          ? { expectedContent }
+          : seen && seen.revision === base
+            ? { expectedContent: contentRevision(seen.text) }
+            : { expectedRevision: base };
       let stat: VaultStat;
       try {
         stat = (await this.call("vault_write", { path: key, ...body, ...gate })) as VaultStat;

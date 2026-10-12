@@ -353,6 +353,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web keeps edits safe across concurrent saves and reloads.** Note and
+  vault metadata writes now refuse stale content; moving a file waits for
+  in-flight saves. Secure notes keep their Git exclusion when moved, and
+  recovered edits keep their secure and locked flags. Words typed into a new
+  note before its file appears survive a hard refresh.
 - **rotli.co's film plays everywhere, and screen readers describe the film
   you see.** Its description still told of the earlier film; an error page
   could also be kept by the site's cache for a day, which hid the new film

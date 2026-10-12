@@ -31,6 +31,7 @@ const persistedBodies = new Map<string, string>();
 // buffers are real shared editor documents, but they deliberately have no save
 // timer until creation hands them a stable note id + disk revision.
 const pendingDocuments = new Set<string>();
+const protections = new Map<string, { secure: boolean; locked: boolean }>();
 const subs = new Map<string, Set<() => void>>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -83,6 +84,11 @@ export interface UnsavedDraft {
   body: string;
   expectedRevision: string;
   expectedBody: string;
+  protection?: { secure: boolean; locked: boolean };
+}
+
+export function setDocumentProtection(noteId: string, note: Pick<Note, "secure" | "locked">): void {
+  protections.set(noteId, { secure: note.secure === true, locked: note.locked === true });
 }
 
 /** Every buffer the dimmed save dot is showing, read synchronously (an
@@ -90,12 +96,29 @@ export interface UnsavedDraft {
 export function unsavedDrafts(): UnsavedDraft[] {
   const out: UnsavedDraft[] = [];
   for (const noteId of dirtyIds) {
-    if (pendingDocuments.has(noteId)) continue;
     const lines = docs.get(noteId);
+    if (pendingDocuments.has(noteId)) {
+      const body = lines?.join("\n") ?? "";
+      if (body.trim())
+        out.push({
+          noteId,
+          body,
+          expectedRevision: "0",
+          expectedBody: "",
+          protection: { secure: false, locked: false },
+        });
+      continue;
+    }
     const expectedRevision = revisions.get(noteId);
     const expectedBody = persistedBodies.get(noteId);
     if (lines && expectedRevision && expectedBody !== undefined) {
-      out.push({ noteId, body: lines.join("\n"), expectedRevision, expectedBody });
+      out.push({
+        noteId,
+        body: lines.join("\n"),
+        expectedRevision,
+        expectedBody,
+        ...(protections.has(noteId) ? { protection: protections.get(noteId)! } : {}),
+      });
     }
   }
   return out;
@@ -154,7 +177,13 @@ export function useDocumentSaveError(noteId: string): string | null {
 
 /** Seed the buffer from the service body. No-op if the note is already open
  * somewhere — the live buffer is the truth, never the (possibly stale) query. */
-export function ensureDocument(noteId: string, body: string, revision: string): void {
+export function ensureDocument(
+  noteId: string,
+  body: string,
+  revision: string,
+  note?: Pick<Note, "secure" | "locked">,
+): void {
+  if (note) setDocumentProtection(noteId, note);
   if (docs.has(noteId)) return;
   const lines = body.split("\n");
   docs.set(noteId, lines);
@@ -195,11 +224,13 @@ export function adoptPendingDocument(pendingId: string, note: Note): boolean {
   revisions.delete(pendingId);
   persistedBodies.delete(pendingId);
   pendingDocuments.delete(pendingId);
+  protections.delete(pendingId);
   taskSigs.delete(pendingId);
   setDirty(pendingId, false);
   setSaveError(pendingId, null);
 
   docs.set(note.id, lines);
+  setDocumentProtection(note.id, note);
   revisions.set(note.id, note.revision);
   persistedBodies.set(note.id, note.body);
   taskSigs.set(note.id, taskSignature(note.body.split("\n")));
@@ -274,6 +305,7 @@ export function evictDocument(noteId: string): void {
   revisions.delete(noteId);
   persistedBodies.delete(noteId);
   pendingDocuments.delete(noteId);
+  protections.delete(noteId);
   taskSigs.delete(noteId);
   setDirty(noteId, false);
   setSaveError(noteId, null);
@@ -384,7 +416,10 @@ async function keepConflictCopies(): Promise<string[]> {
       ? mine.replace(/^# (.*)$/m, `# $1 (unsaved edits ${stamp})`)
       : `# Unsaved edits ${stamp}\n\n${mine}`;
     try {
-      await notesService.createNote(note.folderId, body);
+      await notesService.createNote(note.folderId, body, {
+        secure: note.secure === true,
+        locked: note.locked === true,
+      });
     } catch {
       continue; // still dirty: the flush reports it honestly below
     }

@@ -353,7 +353,7 @@ export function EditorSurface({
   // the same file (the maintainer, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
     if (!note || pending) return;
-    ensureDocument(note.id, note.body, note.revision);
+    ensureDocument(note.id, note.body, note.revision, note);
     reloadDocumentIfClean(note.id, note.body, note.revision);
   }, [note, pending]);
 

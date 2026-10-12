@@ -174,6 +174,7 @@ export const SERVICE_FILE_OWNERS = {
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
   "folderMemexNotes.ts": "notes",
+  "folderNoteRelocation.ts": "notes",
   "folderNotes.ts": "notes",
   "vaultDir.ts": "notes",
   "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",

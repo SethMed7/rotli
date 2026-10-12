@@ -5,7 +5,7 @@
 
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
-import type { VaultDir } from "./vaultDir";
+import { contentRevision, type VaultDir } from "./vaultDir";
 
 /** The vault's settings file: its `brainEnabled` is the Librarian switch. */
 const SETTINGS_FILE = ".rotli/settings.json";
@@ -52,8 +52,32 @@ async function librarianEnabled(dir: VaultDir): Promise<boolean> {
 
 /** List a secure note's path in the vault's `.gitignore`, once. */
 export async function ignoreInGit(dir: VaultDir, path: string): Promise<void> {
-  const existing = (await dir.exists(".gitignore")) ? await dir.readText(".gitignore") : "";
-  if (existing.split("\n").some((line) => line.trim() === path)) return;
-  const lead = existing && !existing.endsWith("\n") ? "\n" : "";
-  await dir.writeText(".gitignore", `${existing}${lead}${path}\n`);
+  await updateGitExclusion(dir, path, true);
+}
+
+/** A completed relocation no longer needs the old exact-path exclusion. */
+export async function removeGitExclusion(dir: VaultDir, path: string): Promise<void> {
+  await updateGitExclusion(dir, path, false);
+}
+
+async function updateGitExclusion(dir: VaultDir, path: string, add: boolean): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const exists = await dir.exists(".gitignore");
+    if (!exists && !add) return;
+    const text = exists ? await dir.readText(".gitignore") : "";
+    const present = text.split("\n").some((line) => line.trim() === path);
+    if (present === add) return;
+    const next = add
+      ? `${text}${text && !text.endsWith("\n") ? "\n" : ""}${path}\n`
+      : text
+          .split("\n")
+          .filter((line) => line.trim() !== path)
+          .join("\n");
+    try {
+      await dir.writeText(".gitignore", next, exists ? contentRevision(text) : "0");
+      return;
+    } catch (error) {
+      if (!(error instanceof Error && /revision conflict/i.test(error.message) && attempt < 2)) throw error;
+    }
+  }
 }
