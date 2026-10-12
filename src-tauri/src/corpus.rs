@@ -1529,6 +1529,13 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
 }
 
 pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
+pub(crate) const MANAGED_FILE_EXTS: [&str; 2] = ["xlsx", "docx"];
+pub(crate) const MANAGED_MEMEX_LANE: &str = "storage/rotli";
+pub(crate) const MANAGED_PLAIN_LANE: &str = "Storage";
+
+pub(crate) fn managed_collision_name(stem: &str, ext: &str, n: usize) -> String {
+    format!("{stem}-{n}{ext}")
+}
 
 /// The reserved PROVENANCE keys the raw-metadata editor must never change —
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
@@ -3170,7 +3177,6 @@ impl CorpusStore {
     /// live in a dedicated storage/rotli lane, keeping the foreign storage tree
     /// read-only while giving generated assets an explicit ownership boundary.
     pub fn create_managed_file(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
-        const GENERATED_FILE_EXTS: &[&str] = &["xlsx", "docx"];
         self.mutation_allowed()?;
         validate_component(name)?;
         let ext = Path::new(name)
@@ -3179,18 +3185,18 @@ impl CorpusStore {
             .map(str::to_ascii_lowercase);
         if !ext
             .as_deref()
-            .is_some_and(|value| GENERATED_FILE_EXTS.contains(&value))
+            .is_some_and(|value| MANAGED_FILE_EXTS.contains(&value))
         {
             return Err(format!(
                 "managed files must use one of: {}",
-                GENERATED_FILE_EXTS.join(", ")
+                MANAGED_FILE_EXTS.join(", ")
             ));
         }
         let folder = match self.layout {
-            Layout::Memex => "storage/rotli",
-            Layout::LegacyRotli => "Storage",
+            Layout::Memex => MANAGED_MEMEX_LANE,
+            Layout::LegacyRotli => MANAGED_PLAIN_LANE,
         };
-        let rel = self.free_name(folder, name, None);
+        let rel = self.free_name_with(folder, name, None, managed_collision_name);
         self.guard_rel(&rel)?;
         fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
         let abs = self.abs(&rel);

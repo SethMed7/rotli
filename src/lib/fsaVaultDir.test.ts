@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { testByteEditorRoad } from "../services/folderFileIo.test";
+import { FolderNotesService } from "../services/folderNotes";
 import { contentRevision } from "../services/vaultDir";
 import { FsaVaultDir } from "./fsaVaultDir";
 
@@ -54,6 +55,9 @@ class FakeFile {
 class FakeDir {
   readonly kind = "directory";
   readonly files = new Map<string, FakeFile>();
+  async *entries(): AsyncIterableIterator<[string, FakeFile]> {
+    for (const entry of this.files) yield entry;
+  }
   async removeEntry(name: string): Promise<void> {
     this.files.delete(name);
   }
@@ -72,6 +76,15 @@ class FakeDir {
 }
 
 const dirOf = () => new FsaVaultDir(new FakeDir() as unknown as FileSystemDirectoryHandle);
+
+test("FSA managed rename moves a backup through a case-only rename", async () => {
+  const dir = dirOf();
+  await dir.writeBytes("Draft.docx", new Uint8Array([1]));
+  await dir.writeBytes("Draft.docx.bak", new Uint8Array([2]));
+  const notes = new FolderNotesService(dir);
+  expect(await notes.renameFile("Draft.docx", "DRAFT")).toBe("DRAFT.docx");
+  expect(await dir.readBytes("DRAFT.docx.bak")).toEqual(new Uint8Array([2]));
+});
 
 testByteEditorRoad("FSA", () => {
   const root = new FakeDir();

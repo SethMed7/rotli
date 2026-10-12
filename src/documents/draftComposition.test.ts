@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { corpusCreateManagedFile } from "../lib/tauri";
+import { FolderNotesService } from "../services/folderNotes";
 import { mainHasNote } from "../services/mainTree";
+import { MemoryVaultDir } from "../services/vaultDir";
+import { configureWebVaultIo } from "../services/webVaultIo";
 import { useMainStore } from "../state/main";
 import { findLeaf, usePanesStore } from "../state/panes";
 import type { LeafNode, PaneNode } from "../types";
@@ -37,8 +41,13 @@ describe("document draft tab lifecycle", () => {
   let previousFocus: string;
   let previousManifest: ReturnType<typeof useMainStore.getState>["manifest"];
   let previousSetTree: ReturnType<typeof useMainStore.getState>["setTree"];
+  let dir: MemoryVaultDir;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    dir = new MemoryVaultDir();
+    await dir.mkdir("wiki");
+    configureWebVaultIo(dir, new FolderNotesService(dir));
+    expect(await corpusCreateManagedFile("untitled-regression.docx", btoa("blank"))).toBe(FILE_ID);
     const panes = usePanesStore.getState();
     previousRoot = panes.root;
     previousFocus = panes.focusedPaneId;
@@ -53,6 +62,7 @@ describe("document draft tab lifecycle", () => {
   });
 
   afterEach(() => {
+    configureWebVaultIo(null, null);
     usePanesStore.setState({ root: previousRoot, focusedPaneId: previousFocus });
     useMainStore.setState({ manifest: previousManifest, setTree: previousSetTree });
   });
@@ -64,6 +74,7 @@ describe("document draft tab lifecycle", () => {
     expect(findLeaf(usePanesStore.getState().root, "draft-pane")?.tabs).toHaveLength(1);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(mainHasNote(useMainStore.getState().manifest.tree, FILE_ID)).toBe(false);
+    expect(await dir.exists(FILE_ID)).toBe(false);
   });
 
   test("a document with a content mutation remains in Main when its tab closes", async () => {
@@ -73,5 +84,6 @@ describe("document draft tab lifecycle", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(mainHasNote(useMainStore.getState().manifest.tree, FILE_ID)).toBe(true);
+    expect(await dir.exists(FILE_ID)).toBe(true);
   });
 });

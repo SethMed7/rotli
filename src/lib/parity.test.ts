@@ -30,6 +30,12 @@ import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
 import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
+import {
+  MANAGED_FILE_EXTS,
+  MANAGED_MEMEX_LANE,
+  MANAGED_PLAIN_LANE,
+  managedCollisionName,
+} from "../services/folderManagedFiles";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
@@ -54,6 +60,14 @@ describe("parity.json ↔ TS constants", () => {
   });
   test("storageOfficeExts", () => {
     expect<string[]>([...STORAGE_OFFICE_EXTS]).toEqual(entries.storageOfficeExts.value);
+  });
+  test("managedFileRules", () => {
+    expect({
+      memexLane: MANAGED_MEMEX_LANE,
+      plainLane: MANAGED_PLAIN_LANE,
+      collisionSuffix: managedCollisionName("sample", ".docx", 2).slice("sample".length, -".docx".length),
+      extensions: [...MANAGED_FILE_EXTS] as string[],
+    }).toEqual(entries.managedFileRules.value);
   });
   test("documentEditMaxActions", () => {
     expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);

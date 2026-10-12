@@ -746,6 +746,15 @@
         "ai_edit"
       ]
     },
+    "managedFileRules": {
+      "sourceOfTruth": "src/services/folderManagedFiles.ts ↔ src-tauri/src/corpus.rs managed create: lane, collision, and extension rules",
+      "value": {
+        "memexLane": "storage/rotli",
+        "plainLane": "Storage",
+        "collisionSuffix": "-2",
+        "extensions": ["xlsx", "docx"]
+      }
+    },
     "storageOfficeExts": {
       "sourceOfTruth": "src/services/folderFileIo.ts STORAGE_OFFICE_EXTS ↔ src-tauri/src/corpus.rs STORAGE_OFFICE_EXTS",
       "value": [
