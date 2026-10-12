@@ -596,7 +596,8 @@ function GeneralPane() {
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
-        Chat uses it to address you like a person. It lives in your settings file on this Mac — never sent
+        Chat uses it to address you like a person. It lives in{" "}
+        {PLATFORM === "web" ? "this browser’s settings" : "your settings file on this Mac"} — never sent
         anywhere on its own.
       </p>
       <label className="setselect-row">

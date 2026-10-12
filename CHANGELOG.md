@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web pastes images into notes.** Pasted image bytes now land in the
+  connected vault, with a portable Markdown link at the caret.
+- **Note chat entry points use the web setup path.** Row menus and search open
+  the Chat on the web guide until Rotli Helper is ready, then resolve notes
+  through the connected vault.
+- **Web actions and lessons name usable controls.** Search hides desktop-only
+  browser and sidebar commands; Welcome uses clickable web instructions, and
+  menus omit Finder-only actions. Empty Trash says when deletion is permanent.
+- **Web folder changes appear when the tab regains focus.** A connected folder
+  refreshes its note listing while unsaved editor text stays in its buffer.
+- **Narrow web windows keep labels readable.** Note header metadata wraps at
+  word boundaries and the palette footer keeps its key actions on one line.
+
 - **Rotli Web keeps Mermaid diagrams private.** Diagrams with images, links,
   or configuration that could load a URL are refused before rendering,
   with an explanation beside the source.

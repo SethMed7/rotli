@@ -79,3 +79,23 @@ test("Attach image opens a browser picker and stores chosen bytes and a portable
     })
     .toContain("![](storage:images/attached.png)");
 });
+
+test("pasting image bytes into a note stores the image and inserts its portable link", async ({ page }) => {
+  await startWithVault(page);
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await editor.evaluate((host, base64) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const data = new DataTransfer();
+    data.items.add(new File([bytes], "pasted.png", { type: "image/png" }));
+    host.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+  }, PNG_BASE64);
+  await expect.poll(() => readOpfsBase64(page, "storage/images/pasted.png")).toBe(PNG_BASE64);
+  await expect
+    .poll(async () => {
+      const files = await listOpfsFiles(page, "wiki/_inbox");
+      return (await Promise.all(files.map((file) => readOpfsFile(page, `wiki/_inbox/${file}`)))).join("\n");
+    })
+    .toContain("![](storage:images/pasted.png)");
+});

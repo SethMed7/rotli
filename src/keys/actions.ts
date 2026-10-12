@@ -8,7 +8,7 @@ import {
 // only capabilities enabled in this build.
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
 import { sendChatWindow } from "../lib/chatWindowBridge";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import {
   corpusFrontmatter,
   corpusSetPinned,
@@ -150,7 +150,8 @@ export function registerDefaultActions(): void {
 
   registerAction({
     id: "app.hide",
-    title: "Hide Rotli",
+    title: PLATFORM === "web" ? "Close current view" : "Hide Rotli",
+    transient: PLATFORM === "web",
     defaultChord: "Esc",
     run: () => {
       // Esc unwinds one layer at a time (quokka rule): topmost transient
@@ -773,6 +774,7 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "browser.open",
+    platforms: ["desktop"],
     title: "Open web browser",
     defaultChord: "Alt+T",
     run: () => void openUrl("https://www.google.com/"),
@@ -793,7 +795,14 @@ export function registerDefaultActions(): void {
     ["view.allNotes", "All notes", () => openView("allNotes", ALL_NOTES)],
     ["browser.private", "Open a private browser", () => usePanesStore.getState().openBrowser()],
   ] as const;
-  for (const [id, title, run] of views) registerAction({ id, title, defaultChord: null, run });
+  for (const [id, title, run] of views)
+    registerAction({
+      id,
+      title,
+      ...(id === "browser.private" ? { platforms: ["desktop"] as const } : {}),
+      defaultChord: null,
+      run,
+    });
   // — note ↔ chat: a note owns MANY chats (the maintainer, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);
   //   the New variant always adds another. The editor's chat chip is the

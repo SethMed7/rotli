@@ -117,6 +117,8 @@ connected CLI configuration stays available.
 `importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
 land in the bound vault and Markdown receives only a portable `storage:` link;
 cancelling adds nothing. Desktop keeps its native image/video picker.
+An image pasted into a web note uses that same byte-backed lane at the caret.
+No file path or source image URL is stored in the Markdown link.
 
 ## Metadata, views, and assets
 
@@ -173,6 +175,19 @@ web registration, dispatch, and search. Available actions stay in the palette,
 reached from the search field; Settings has no Keybindings pane. Palette row
 hints use `currentChord`, and hard-coded footer, leader, navigation, and tour
 hints use the same build policy.
+
+The palette omits desktop browser, Finder, window, and numbered-sidebar actions;
+Escape still closes the current web view. Note chat commands and row menus use
+the chat chip's Helper setup route until the Helper is ready, then resolve the
+note's path through the connected web vault.
+
+The Welcome catalog in `src/assets/welcome.json` remains shared with Rust.
+Its web replacements change only the lessons that teach desktop chords or
+document creation; web seeding writes those variants as ordinary Markdown.
+Empty Trash in the web vault removes files permanently, so both confirmations
+say so. Finder-only row actions are absent. On focus or return to a visible tab,
+the File System Access road rebuilds its note listing and refetches notes;
+the editor's clean-buffer gate preserves unsaved typing.
 
 ## Rotli Helper's vault lane
 

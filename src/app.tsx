@@ -70,7 +70,7 @@ import { openNoteChatFromQuickNote, summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
-import { notesService } from "./services/notes";
+import { notesService, refreshWebFolderNotes } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
 import { useMainWindowWork } from "./services/mainWindowWork";
 import {
@@ -189,6 +189,22 @@ function MainShell() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [chatAutoArchiveDays, mainAutoRemoveDays]);
+
+  useEffect(() => {
+    if (!isWebVault()) return;
+    const refresh = () => {
+      if (refreshWebFolderNotes()) void Promise.all([invalidateNotes(), invalidateFolders()]);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   // the capture card lives in another webview; this window owns the corpus — it
   // drops the capture onto the BOARD as a card (a real .md in Board/, NOT a note

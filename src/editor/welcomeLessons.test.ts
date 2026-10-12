@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { WELCOME_CATALOG, WELCOME_LESSONS, WELCOME_NOTE } from "./welcomeLessons";
+import { WELCOME_CATALOG, WELCOME_LESSONS, WELCOME_NOTE, welcomeCatalogForPlatform } from "./welcomeLessons";
 
 test("the catalog is the root welcome note plus three uniquely titled lessons that read as plain notes", () => {
   expect(WELCOME_NOTE.filename).toBe("Welcome to Rotli.md");
@@ -18,6 +18,14 @@ test("the catalog is the root welcome note plus three uniquely titled lessons th
     // the old session tab and its Playground branding are gone
     expect(entry.body).not.toMatch(/Playground|Save lesson|Raw Markdown|app-owned/);
   }
+});
+
+test("web Welcome lessons describe clickable controls and supported creation", () => {
+  const web = welcomeCatalogForPlatform("web");
+  expect(web).toHaveLength(WELCOME_CATALOG.length);
+  expect(web[0]?.body).toContain("tab strip");
+  expect(web[2]?.body).not.toContain("Document");
+  for (const entry of web) expect(entry.body).not.toMatch(/[⌘⌥]/);
 });
 
 test("the welcome note teaches autosave and the real new-note chords", () => {

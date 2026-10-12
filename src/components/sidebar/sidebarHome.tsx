@@ -545,7 +545,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         ? "Unstar — remove from Quick access"
         : full
           ? `Quick access is full (${QUICK_MAX}) — unstar one first`
-          : "Star for Quick access (the ⌥ Quick window)";
+          : SHOW_HOTKEYS
+            ? "Star for Quick access (the ⌥ Quick window)"
+            : "Star for Quick access";
       return (
         <span
           role="button"
@@ -1080,7 +1082,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           />
 
           {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
-              put it in Quick access — the capped set the ⌥ Quick window cycles
+              put it in Quick access — a capped set of starred notes
               (the maintainer, 2026-07-01). Add with the row menu or drag from the Library.
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
@@ -1211,7 +1213,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                 <>
                   The notes you reach for, arranged your way. Right-click a note and choose <b>Add to Main</b>
                   {hasBrain ? ", or drag one here from the Library" : ""} — then <b>★</b> your top {QUICK_MAX}{" "}
-                  for Quick access (the ⌥ Quick window).
+                  for Quick access{SHOW_HOTKEYS ? " (the ⌥ Quick window)" : ""}.
                 </>
               )}
             </p>

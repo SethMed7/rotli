@@ -4,6 +4,7 @@
 // also carry `view_tag: <name>` (synchronized by Rust); boards and binary files
 // remain frontmatter-free and are represented only by these reference trees.
 
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import type { MenuSpec } from "../state/contextMenu";
 import {
   MAIN_ROOT,
@@ -196,7 +197,7 @@ export function viewPickerItems(
   /** The Vault view (services/vaultTree.ts): the vault's folders as on disk. */
   vault?: { on: boolean; show: () => void },
 ): MenuSpec[] {
-  const slot = (index: number) => (numbered && index < 9 ? { hint: `⌘${index + 1}` } : {});
+  const slot = (index: number) => (numbered && SHOW_HOTKEYS && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
