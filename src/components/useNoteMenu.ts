@@ -8,7 +8,7 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -16,7 +16,6 @@ import {
   corpusMoveFileToSink,
   corpusRevealFile,
   corpusSetPinned,
-  isTauri,
 } from "../lib/tauri";
 import { openChatForNote } from "../noteChat/composition";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
@@ -164,7 +163,7 @@ export function useNoteMenu() {
                 label: "Open in new tab",
                 onClick: () => openSummary(note, { newTab: true }),
               },
-              ...(isTauri()
+              ...(PLATFORM === "desktop"
                 ? [
                     {
                       kind: "action" as const,
@@ -317,7 +316,7 @@ export function useNoteMenu() {
             setTimeout(() => ui.revealFocusedNote("brain", note.id), 0);
           },
         });
-        if (isTauri())
+        if (PLATFORM === "desktop")
           items.push({
             kind: "action" as const,
             label: "Show in Finder",
@@ -334,7 +333,7 @@ export function useNoteMenu() {
               );
             },
           });
-        if (isTauri())
+        if (PLATFORM === "desktop")
           items.push({
             kind: "action" as const,
             label: "Copy File Path",

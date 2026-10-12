@@ -21,6 +21,7 @@ import {
 
 import { DOCX_EDITABLE, DOCUMENT_CONVERTIBLE, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
+import { PLATFORM } from "../lib/featurePolicy";
 import { extOf, fileName, managedFileNote } from "../lib/fileKind";
 import { kindOf, OPEN_WITH_BY_KIND } from "../lib/fileSurfaceKinds";
 import { hotkeyHint } from "../lib/hotkeyHint";
@@ -43,6 +44,10 @@ import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { FileHeaderMarks } from "./fileHeaderMarks";
+
+/** The build, not the runtime, decides which native file actions exist: the
+ * desktop twin lane runs this outside Tauri and must still see them. */
+const DESKTOP = PLATFORM === "desktop";
 
 // Univer + exceljs are heavy — code-split like CanvasSurface, loaded only when an editor mounts.
 const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
@@ -154,7 +159,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const sheetEditable = kind === "sheet" && sheetKinds.sheetEditableFile(ext, stat);
   const withheld = kind === "sheet" && sheetKinds.workbookWithheld(ext);
   const documentEditable =
-    isTauri() &&
+    DESKTOP &&
     kind === "document" &&
     DOCX_EDITABLE.has(ext) &&
     !!stat?.writable &&
@@ -201,7 +206,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       .then((a) => !cancelled && setApps(a))
       .catch(() => {});
 
-    if (kind === "document" && !isTauri()) {
+    if (kind === "document" && !DESKTOP) {
       setProbed(true);
     } else if (kind === "text") {
       corpusFileText(fileId)
@@ -482,7 +487,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         {kind === "document" && documentEditable && (
           <div ref={documentChromeRef} className="file-document-chrome" />
         )}
-        {kind === "pdf" && isTauri() && (
+        {kind === "pdf" && DESKTOP && (
           <button
             type="button"
             className="file-open-ext file-convert-pdf"
@@ -554,7 +559,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             )}
           </div>
         )}
-        {isTauri() && (
+        {DESKTOP && (
           <button
             type="button"
             className="file-open-ext"
@@ -667,7 +672,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         {!err &&
           kind === "document" &&
           probed &&
-          isTauri() &&
+          DESKTOP &&
           DOCX_EDITABLE.has(ext) &&
           !documentEditable &&
           !tooLarge && (
@@ -675,13 +680,13 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
               <p>This document is in a protected location. Move it into Assets to edit it.</p>
             </div>
           )}
-        {!err && kind === "document" && probed && !isTauri() && (
+        {!err && kind === "document" && probed && !DESKTOP && (
           <div className="file-document-fallback">
             <h2>.{ext || "unknown"} is unsupported on the web</h2>
             <p>Open this file in Rotli for Mac to edit or convert a local copy.</p>
           </div>
         )}
-        {!err && kind === "document" && probed && isTauri() && !DOCX_EDITABLE.has(ext) && (
+        {!err && kind === "document" && probed && DESKTOP && !DOCX_EDITABLE.has(ext) && (
           <div className="file-document-fallback">
             {DOCUMENT_CONVERTIBLE.has(ext) ? (
               <>
