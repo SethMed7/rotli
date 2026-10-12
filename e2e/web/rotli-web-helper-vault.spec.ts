@@ -481,5 +481,20 @@ test("an older helper still opens the vault's files, but chat asks for a helper 
   await expect(dialog.getByRole("alert")).toHaveText(
     "Update Rotli Helper to chat with this vault, then reload Rotli Web. Your vault files remain available.",
   );
+  await dialog.getByRole("button", { name: "Done" }).click();
+  // the other way in, the new-tab chooser's Chat, gets no composer either
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Chat/ })
+    .click();
+  // a chat pane opens, but on the walkthrough's way in, with nothing to type into
+  const setup = page.getByRole("button", { name: "Set up chat on the web" });
+  await expect(setup).toBeVisible();
+  await expect(page.getByPlaceholder(/Message rotli/)).toHaveCount(0);
+  await setup.click();
+  await expect(dialog.getByRole("alert")).toContainText("Update Rotli Helper to chat with this vault");
   expect(helper.calls.some((c) => c.cmd === "cli_complete")).toBe(false);
 });
