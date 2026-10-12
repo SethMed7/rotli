@@ -145,6 +145,9 @@ receive frontmatter. Failed writes roll back only bytes this transaction wrote;
 a newer external edit wins. Main may retain safe additional references after
 failure, as on desktop. Durable aliases resolve alongside current filename and
 title selectors; renaming a stable-id note preserves earlier selectors on disk.
+The first H1 typed into a new blank note replaces its `untitled.md` staging
+filename with the title slug, retaining the same frontmatter id and Main/view
+references. A placeholder is not recorded as an alias.
 
 The folder walk lists ordinary files by stat alone. Memex files surface from
 `wiki`, `chats`, lifecycle sinks, and `storage`; plumbing, memory lanes, and

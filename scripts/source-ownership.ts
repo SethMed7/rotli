@@ -134,6 +134,7 @@ export const SERVICE_FILE_OWNERS = {
   "folderFileSummary.ts": "vault files (stat-only summaries)",
   "folderMetadata.ts": "notes (connected-folder protection and metadata writes)",
   "folderNoteAliases.ts": "notes (durable selectors and title rename preparation)",
+  "folderNoteStamps.ts": "notes (managed identity and date stamps for fenced imports)",
   "folderViewSync.ts": "views (connected-folder manifest and Markdown transaction)",
   "webVaultIo.ts": "vault composition (registered web corpus file and metadata commands)",
   "webLinks.ts": "graph",

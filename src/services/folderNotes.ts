@@ -59,6 +59,7 @@ import {
   under,
   withoutSinkPrefix,
 } from "./folderNoteRelocation";
+import { ownedNoteFacts } from "./folderNoteStamps";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import {
@@ -459,13 +460,16 @@ export class FolderNotesService implements NotesService {
     }
     // A file with no fence stays fenceless: a plain Markdown vault must not
     // sprout frontmatter the moment Rotli saves it.
-    const text = frontmatter ? composeNoteDocument({ ...frontmatter, updated: today() }, body) : body;
+    const modified = (await this.dir.stat(path))?.lastModified;
+    if (frontmatter && modified === undefined) throw new Error(`unknown note: ${path}`);
+    const text = frontmatter ? composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body) : body;
     const rename = await prepareFolderTitleRename(this.dir, path, text, titleOf(currentBody), titleOf(body));
     await this.writeFile(path, rename.text, revision);
     // moveFile carries a secure note's .gitignore line to the new name
     if (rename.path !== path) return this.moveFile(id, path, rename.path);
     const saved = await this.noteAt(path);
     if (saved.revision !== contentRevision(rename.text)) throw new Error(`revision conflict on ${path}`);
+    this.reindex(id, saved.id, path);
     return saved;
   }
 
@@ -485,14 +489,17 @@ export class FolderNotesService implements NotesService {
    * the `origin` breadcrumb with the row it came from. Leaving a sink clears
    * the breadcrumb. A move to a `wiki/**` folder is a physical move; a move to
    * any other projection rewrites the shelf line and leaves the file where it
-   * is. Only `updateNote` stamps `updated` — a move never does. */
+   * is. Only `updateNote` advances a valid `updated`; a move fills a missing
+   * stamp from the pre-move file time without changing an existing one. */
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const path = await this.pathOf(id);
     if (isPathItem(path)) return this.moveFile(id, path, relocationTarget(path, targetFolder, this.isMemex));
     const original = await this.readFile(path);
     const { frontmatter, body } = parseNoteDocument(original);
     if (!frontmatter) return this.moveFile(id, path, relocationTarget(path, targetFolder, this.isMemex));
-    let next = frontmatter;
+    const modified = (await this.dir.stat(path))?.lastModified;
+    if (modified === undefined) throw new Error(`unknown note: ${path}`);
+    let next = ownedNoteFacts(frontmatter, modified, false);
     const folderId = projectVaultFolder(parentPath(path), frontmatter, this.isMemex);
     if (isSink(targetFolder) && !isSink(folderId)) next = { ...next, origin: folderId };
     else if (!isSink(targetFolder) && next.origin !== null) next = { ...next, origin: null };
@@ -500,9 +507,15 @@ export class FolderNotesService implements NotesService {
     if (toDisk === path && !isSink(targetFolder) && diskDirFor(targetFolder, this.isMemex) === null) {
       next = withShelf(next, [targetFolder]);
     }
-    // an untouched frontmatter is never rewritten: a plain wiki -> wiki move
-    // must not normalize a hand-authored file for no reason
-    if (next !== frontmatter)
+    // A note with complete metadata keeps its hand-authored bytes on a plain
+    // wiki move; missing managed facts are stamped before the relocation.
+    if (
+      next.id !== frontmatter.id ||
+      next.created !== frontmatter.created ||
+      next.updated !== frontmatter.updated ||
+      next.origin !== frontmatter.origin ||
+      next.foreign !== frontmatter.foreign
+    )
       await this.writeFile(path, composeNoteDocument(next, body), contentRevision(original));
     return this.moveFile(id, path, toDisk);
   }

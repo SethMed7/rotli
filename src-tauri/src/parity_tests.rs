@@ -475,3 +475,15 @@ fn storage_office_exts_match_fixture() {
         string_list(&entry("storageOfficeExts"))
     );
 }
+
+#[test]
+fn note_filename_slugs_match_fixture() {
+    for case in entry("noteFilenameSlugs")
+        .as_array()
+        .expect("noteFilenameSlugs is an array")
+    {
+        let title = case["title"].as_str().expect("title is a string");
+        let slug = case["slug"].as_str().expect("slug is a string");
+        assert_eq!(crate::corpus::slugify(title), slug, "{title:?}");
+    }
+}

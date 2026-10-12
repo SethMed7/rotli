@@ -505,6 +505,17 @@
         }
       ]
     },
+    "noteFilenameSlugs": {
+      "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (note filenames) — src/memex/contract.ts noteSlugify + noteStem ↔ src-tauri/src/corpus.rs slugify + filename_for",
+      "value": [
+        { "title": "Untitled", "slug": "untitled" },
+        { "title": "Chooser thing", "slug": "chooser-thing" },
+        { "title": "Hello, World!", "slug": "hello-world" },
+        { "title": "  ⌥Space — the way in  ", "slug": "space-the-way-in" },
+        { "title": "Café résumé", "slug": "café-résumé" },
+        { "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+      ]
+    },
     "noteDateStamps": {
       "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (Metadata ownership) — src/memex/dates.ts stampToMs + today ↔ src-tauri/src/note_dates.rs stamp_to_ms + day_stamp (independent implementations, fixture-aligned answers; localMidnight is each side's own zone)",
       "value": {

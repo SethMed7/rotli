@@ -22,7 +22,7 @@ import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
-import { AI_KEYS } from "../memex/contract";
+import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
@@ -256,6 +256,13 @@ describe("parity.json ↔ TS constants", () => {
     }
     for (const { nowMs, timeZone, day } of days) {
       expect({ timeZone, day: today(new Date(nowMs), timeZone) }).toEqual({ timeZone, day });
+    }
+  });
+
+  test("noteFilenameSlugs", () => {
+    for (const { title, slug } of entries.noteFilenameSlugs.value) {
+      expect({ title, slug: noteSlugify(title) }).toEqual({ title, slug });
+      expect(noteStem(title, "ignored-id")).toBe(slug);
     }
   });
 });
