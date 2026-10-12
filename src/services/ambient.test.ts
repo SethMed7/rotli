@@ -8,6 +8,7 @@ import {
   applyAmbient,
   chooseAmbient,
   openMediaTab,
+  pollDelay,
   pollTabMedia,
   stepAmbient,
   stopAllSound,
@@ -149,5 +150,19 @@ describe("a pause or play from outside Rotli", () => {
     expect(element().paused).toBe(true);
     expect(useAmbient.getState().prefs.playing).toBe(true);
     setInAppMedia(false);
+  });
+});
+
+describe("pollDelay", () => {
+  // audit 2026-10-12: the media poll ran every 1.5 s for the whole session with
+  // nothing to ask, and at 0.4 s forever once any tab had paused media
+  test("nothing that can sound → no polling at all", () => {
+    expect(pollDelay({ fmOpen: false, tabs: 0, docked: false, playing: false })).toBeNull();
+  });
+  test("only something actually playing keeps the quick cadence", () => {
+    expect(pollDelay({ fmOpen: false, tabs: 2, docked: false, playing: true })).toBe(400);
+    expect(pollDelay({ fmOpen: false, tabs: 2, docked: false, playing: false })).toBe(1500);
+    expect(pollDelay({ fmOpen: true, tabs: 0, docked: false, playing: false })).toBe(400);
+    expect(pollDelay({ fmOpen: false, tabs: 0, docked: true, playing: false })).toBe(400);
   });
 });

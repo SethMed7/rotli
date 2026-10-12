@@ -4,9 +4,8 @@
 // window's answer goes back the same way. Off the Mac app there is no bridge.
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
-import { isTauri } from "./tauri";
+import { isTauri, listenHere } from "./tauri";
 
 export interface AgentRequest {
   requestId: number;
@@ -20,7 +19,7 @@ export type AgentAnswer = { ok: true; result: unknown } | { ok: false; error: st
 /** Listen for agent requests; `onListening` runs once the listener is live. */
 export function onAgentRequest(cb: (request: AgentRequest) => void, onListening?: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<AgentRequest>("rotli:agent-request", (event) => cb(event.payload));
+  const unlisten = listenHere<AgentRequest>("rotli:agent-request", (event) => cb(event.payload));
   void unlisten.then(() => onListening?.());
   return () => void unlisten.then((fn) => fn());
 }

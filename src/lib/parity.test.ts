@@ -42,7 +42,7 @@ import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
-import { VIDEO_EXTS } from "./fileKind";
+import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
@@ -91,6 +91,10 @@ describe("parity.json ↔ TS constants", () => {
 
   test("docxPackageExts", () => {
     expect<string[]>([...DOCX_EDITABLE_EXTS]).toEqual(entries.docxPackageExts.value);
+  });
+
+  test("skippedDirs", () => {
+    expect<string[]>([...SKIPPED_DIRS]).toEqual(entries.skippedDirs.value);
   });
 
   test("chatImageAssetExts", () => {

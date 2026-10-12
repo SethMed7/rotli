@@ -126,7 +126,7 @@ Everything in the tables below reduces to which question a seam asks.
 |---|---|---|
 | `secret::looks_secure` | credential SHAPES — API keys, PEM, JWT, SSN, Luhn-valid PANs | ordinary private prose |
 | `secret::protected_for_remote` | the above **+ markers**: `secure: true`, `local_ai_allowed:`, `secureContext: true` | prose whose markers were stripped |
-| `secret::blocked_for_remote` | the above **+ the secure-prose ledger** | prose that never entered the vault |
+| `secret::blocked_for_remote` | the above **+ the secure-prose ledger**; **everything** while the ledger is still warming at launch (fail closed) | prose that never entered the vault |
 
 **The ledger is the new thing, and it is what made most of the fixes possible.**
 Before it, Rust could only refuse text that ANNOUNCED itself. A secure note is
@@ -318,6 +318,16 @@ This is stated plainly rather than glossed. Three things bound it:
   `main.json` and `views.json`), so it is never committed, and it is not read by
   any support-bundle/diagnostics path — the same as the rest of `.rotli/` derived
   state (`index.json`, the journal, organizer state).
+
+**Launch warm-up (2026-10-12).** App setup walks every registered root on a
+background thread so a huge vault no longer holds the window back. Until that
+walk has fed the ledger from EVERY registered root (`secret::warm_until_done`:
+a root whose walk fails is retried every 30 s and keeps the gate shut; a root
+removed from the registry stops holding it), `blocked_for_remote` answers true
+for ANY text: no remote send, no AI write of unprotected text (refused with a
+"still reading this vault" message), no history diff. Walks themselves now read the disk
+with the corpus lock released (`CorpusState::walk_unlocked`); a walk the vault
+changed under is discarded, and every walk feeds the ledger, discarded or not.
 
 The **secure-prose ledger stays walk-fed and warm**: this change did not replace
 the walk with index-driven listing. `corpus_list`, `tasks`, and

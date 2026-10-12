@@ -911,6 +911,15 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
   same as picking a folder that already holds notes in setup. An open plain folder is still
   the switcher's current row and names its header.
+- **Dependency folders are never part of a vault** (2026-10-12). `.git` and
+  `node_modules` (any depth, any letter case) are skipped by the native corpus
+  walk, folder inspection, and the file watcher — one rule,
+  `corpus::SKIPPED_DIRS`, which the Rotli Web helper also uses (Rotli Web's own
+  folder reader skips the same two names at any depth). Their files
+  stay on disk untouched; they just never become rows, refs, or refreshes. A
+  code folder opened as a vault otherwise listed every package file (133k rows
+  and a 44 MB listing per refresh in the RAM review), and an install inside it
+  re-walked the whole vault.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —

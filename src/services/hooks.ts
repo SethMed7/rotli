@@ -118,7 +118,7 @@ function universeFolderIds(): (string | undefined)[] {
   ];
 }
 
-function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
+function useNoteUniverse(enabled = true): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
   // Whether the active root's chats/ means transcripts. Consulted only for the
   // All-Notes view's chats/ exclusion.
   const memexQ = useQuery({
@@ -133,6 +133,7 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
   const corpus = useQuery({
     queryKey: keys.notes(UNIVERSE_KEY),
     queryFn: () => notesService.listAll(),
+    enabled,
   });
   const memex = memexQ.data;
   const raw = corpus.data;
@@ -208,8 +209,13 @@ export function useMainGcIds(): Set<string> | undefined {
  * THIS — useNotes() alone is a VIEW that silently misses staged notes (the
  * 2026-07-01 search audit's P0: a staged Main note was unfindable everywhere).
  * `ready` = every listing has SUCCEEDED (the same completeness bar as the GC). */
-export function useSearchableNotes(): { notes: NoteSummary[]; ready: boolean } {
-  const { lists, complete } = useNoteUniverse();
+/** `enabled: false` holds the whole-vault fetch (the hidden Quick Note window
+ * waits for its first show — audit 2026-10-12). */
+export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {}): {
+  notes: NoteSummary[];
+  ready: boolean;
+} {
+  const { lists, complete } = useNoteUniverse(enabled);
   // which roots' chats/ means transcripts — session-static, like the roots list.
   // Browser twin: the one seeded memex is the Vault brain (mirrors notes.ts).
   const memexQ = useQuery({
@@ -258,13 +264,16 @@ export function useNoteSearch(query: string) {
   return useQuery(noteSearchOptions(useDebouncedValue(query.trim(), 180)));
 }
 
-function noteSearchOptions(q: string) {
+/** Every distinct query string is its own cache entry, so search opts out of
+ * the app-wide `gcTime: Infinity`: an unwatched result goes after a minute. */
+export function noteSearchOptions(q: string) {
   return {
     queryKey: ["search", q],
     queryFn: () => notesService.searchNotes(q, 50),
     enabled: q.length >= 2,
     placeholderData: keepPreviousData,
     staleTime: 5_000,
+    gcTime: 60_000,
   };
 }
 

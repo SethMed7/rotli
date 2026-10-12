@@ -6,10 +6,10 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { QueryObserver } from "@tanstack/react-query";
+import { QueryObserver, keepPreviousData } from "@tanstack/react-query";
 
 import type { Note, NoteSummary } from "../types";
-import { UNIVERSE_KEY, applyNoteWrite, invalidateNoteLists, keys } from "./hooks";
+import { UNIVERSE_KEY, applyNoteWrite, invalidateNoteLists, keys, noteSearchOptions } from "./hooks";
 import { queryClient } from "./query";
 
 const NOW = 1_800_000_000_000;
@@ -145,5 +145,15 @@ describe("invalidateNoteLists", () => {
     // blank note nobody had typed into (2026-09-01)
     expect(queryClient.getQueryState(keys.note("open-tab"))?.isInvalidated).toBe(false);
     expect(queryClient.getQueryState(keys.tasks)?.isInvalidated).toBe(false);
+  });
+});
+
+describe("noteSearchOptions", () => {
+  test("a search result is collected a minute after nothing watches it, unlike the app default", () => {
+    const options = noteSearchOptions("quarterly plan");
+    expect(options.queryKey).toEqual(["search", "quarterly plan"]);
+    expect(options.gcTime).toBe(60_000);
+    expect(queryClient.getDefaultOptions().queries?.gcTime).toBe(Number.POSITIVE_INFINITY);
+    expect(options.placeholderData).toBe(keepPreviousData);
   });
 });

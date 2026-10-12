@@ -63,6 +63,63 @@ describe("check:window-events", () => {
     expect(r.stderr).toContain("rotli:lonely: appears once");
   });
 
+  // window targeting (review of PR 199): Rust addresses per window, and the
+  // webview hears only its own copy
+  test("a Rust .emit of a per-window event fails; the broadcast is allowed", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:close-tab", "rotli:vault-changed"]),
+      "src-tauri/src/lib.rs": 'window.emit("rotli:close-tab", ()); app.emit("rotli:vault-changed", ());\n',
+      "src/lib/tauri.ts": 'listenHere("rotli:close-tab"); listen("rotli:vault-changed");\n',
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('`.emit("rotli:close-tab")` reaches every window');
+    expect(r.stderr).not.toContain('rotli:vault-changed")` reaches');
+  });
+
+  test("a bare listen of an event Rust addresses to one window fails", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:quick-show"]),
+      "src-tauri/src/quick_window.rs": 'app.emit_to(LABEL, "rotli:quick-show", ());\n',
+      "src/lib/tauri.ts": 'listen("rotli:quick-show", () => cb());\n',
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("rotli:quick-show is addressed to one window by Rust");
+  });
+
+  test("an addressed event heard with listenHere or a target passes", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:quick-show", "rotli:flush-before-quit"]),
+      "src-tauri/src/lib.rs":
+        'app.emit_to(LABEL, "rotli:quick-show", ()); app.emit_to(label, "rotli:flush-before-quit", ());\n',
+      "src/lib/tauri.ts":
+        'export function listenHere(event, handler) {\n  return listen(event, handler, { target: label() });\n}\nlistenHere("rotli:quick-show", () => cb());\nlisten("rotli:flush-before-quit", (e) => run(e), { target: label() });\n',
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("2 window-addressed events heard per window");
+  });
+
+  test("a listenHere that drops its target fails", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:quick-show"]),
+      "src-tauri/src/lib.rs": 'app.emit_to(LABEL, "rotli:quick-show", ());\n',
+      "src/lib/tauri.ts":
+        'export function listenHere(event, handler) {\n  return listen(event, handler);\n}\nlistenHere("rotli:quick-show", () => cb());\n',
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("passing { target }");
+  });
+
+  test("listenHere calls with no recognizable definition fail", async () => {
+    const r = await run({
+      "docs/architecture/window-events.md": doc(["rotli:quick-show"]),
+      "src-tauri/src/lib.rs": 'app.emit_to(LABEL, "rotli:quick-show", ());\n',
+      "src/lib/tauri.ts": "export const listenHere = (event, handler) => listen(event, handler);\n",
+      "src/lib/quick.ts": 'listenHere("rotli:quick-show", () => cb());\n',
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("listenHere must be `export function listenHere`");
+  });
+
   test("a documented event no longer in code fails", async () => {
     const r = await run({
       "docs/architecture/window-events.md": doc(["rotli:gone"]),
