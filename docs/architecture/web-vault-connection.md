@@ -140,14 +140,22 @@ folder notes lifecycle path. A new pristine document is hard-discarded on close 
 while its exact creation bytes remain; a changed or missing file is kept and
 the refusal is reported. Rename carries a first-save `.bak` beside the new
 name without replacing an existing backup. Both folder roads use the same
-rules. The DOCX/XLSX editor probe and lazy mount follow the build capabilities;
-`launchFeatures(…, "web")` still withholds documents and sheets in this slice,
-so the chooser shows Document as coming soon, `/document` is hidden, and
-existing document and XLSX fences show an "opens in Rotli for Mac" message.
-The later flag flip also needs browser draft recovery and an end-to-end pass.
-CSV **embeds** remain withheld too: the sheet embed still uses the desktop
-stat/byte-save adapter, independently of CSV's standalone text surface. The
-fence source remains editable and unchanged.
+rules. **Documents and sheets ship on the web (Beta, 2026-10-12).**
+`launchFeatures(…, "web")` turns `documents` and `sheets` on, so the chooser,
+the titlebar and sidebar New menus, the palette, `/document` and `/sheet` (with
+their Create rows, offered by build capability and a connected vault — never by
+runtime), and existing `document`/`sheet` fences mount the same editors and
+codecs as the Mac, with the same Beta badge. CSV embeds are never withheld:
+the sheet embed saves through the same byte-revision adapter on both shells.
+Every creation entry names a document before its file exists, so the pristine
+hard-discard lane above is reached by no current control on either shell; its
+proof is `folderManagedFiles.test.ts`. A Rotli Helper vault is not re-read on
+window focus (only the chosen-folder road is), so a file another app adds there
+appears after a reload. Proof: `e2e/web/rotli-web-office.spec.ts` runs create,
+type, save, reload, unzip, formula/format/second-sheet and heading/bold/table
+preservation, the same-size outside-change conflict, and rename-with-backup on
+both roads; `rotli-web-privacy.spec.ts` proves editing both makes no
+off-origin request.
 
 Settings exposes `launchFeatures`' desktop-only `librarian` and `localModels`
 capabilities as one-line Mac availability states on web, without Run now,
@@ -205,9 +213,11 @@ its sandbox and no-egress policy. CSV and other editable text-file saves refuse
 source bytes that are not valid UTF-8 before writing a backup or saving, and
 pass the observed content revision into the adapter's write turn. Binary saves pass
 the revision of their observed bytes through the same gate. CSV saves preserve a
-first-save backup. DOCX and binary workbooks list as files but open to an honest
-unsupported state on the web. Finder, default-app, and macOS conversion actions
-are hidden there.
+first-save backup. DOCX and XLSX open in their editors (Beta). A package that
+isn't a readable zip says so in plain words, never the zip library's message.
+Finder, default-app, PDF export, and macOS conversion actions are hidden there
+(gated by `PLATFORM`); a PDF or a legacy `.doc`/`.rtf`/`.odt` instead says to
+save a `.docx` copy in another app and open that copy here.
 
 The browser's read/check/write sequence is best effort, not a filesystem lock;
 the helper additionally enforces its server-side revision and lock. Multi-file
@@ -377,8 +387,7 @@ the editor's clean-buffer gate preserves unsaved typing.
   whenever that folder is chosen again, even after others — a small map of
   folder handles to ids), never by folder name; a draft that can be
   neither saved nor kept as a note waits under its own "kept" key.
-- **Office recovery, before web office launch.** CSV edits already use the web
-  sheet editor; DOCX and XLSX remain behind their web feature flags. Each user
+- **Office recovery.** CSV, XLSX, and DOCX edit in the web office editors. Each user
   change in an office editor synchronously stores its engine-neutral snapshot
   and the exact opened file bytes as base64 in a browser-local journal keyed by
   the connected vault identity. This happens before the 800 ms autosave timer,
@@ -396,8 +405,11 @@ the editor's clean-buffer gate preserves unsaved typing.
   storage displays “This change isn't protected until it saves” in the editor;
   it is still offered to normal autosave. The web build does not prompt on tab
   close, matching notes: a synchronous journal, rather than an unload-time
-  promise or prompt, guards dirty typing. At the later DOCX/XLSX flag flip,
-  run the skipped real-web hard-refresh spec and remove its skip.
+  promise or prompt, guards dirty typing. `e2e/web/rotli-web-office-recovery.spec.ts`
+  types into each editor and hard-refreshes inside the autosave window. A
+  document embed in a note is the same editor and is journaled; a **sheet
+  embed** is not (its live entry carries no source bytes), so its edits rely
+  on the 500 ms autosave and the `pagehide` flush.
 
 ## Migration
 

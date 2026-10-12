@@ -245,8 +245,8 @@ second user-visible product or storage location.
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
   round-trips supported OOXML while preserving unknown package parts and
-  unsupported Word objects; the Rust corpus boundary independently restricts
-  writes to the managed binary lane. The document editor always presents light
+  unsupported Word objects; the Rust corpus boundary (and on Rotli Web its TS
+  twin) independently restricts writes to the managed binary lane. The document editor always presents light
   Word-style chrome, literal white paper, and black Arial defaults when the file
   does not specify formatting. It settles at the document top with one complete
   page fitted to the pane and does not expose Markdown block handles or canvas
@@ -269,6 +269,21 @@ second user-visible product or storage location.
   exists as an editable DOCX. Formats without a faithful local route remain
   explicitly unsupported.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
+- **Rotli Web edits and creates documents and sheets (Beta, 2026-10-12).** In a
+  connected folder — the folder API or Rotli Helper — DOCX and XLSX open in the
+  same editors and codecs, wear the same Beta badge, and are created in the
+  same managed lane (`storage/rotli/` in a memex vault, `Storage/` otherwise)
+  with the same `stem-2` collisions and first-save `.bak`, which a rename
+  carries. The TS twin (`src/services/folderFileIo.ts`) applies the Rust
+  corpus's writable-lane rule. Every save is gated on the exact bytes Rotli
+  opened, so an outside change of the same size and stamp is refused and
+  shown, never overwritten; unsaved typing survives a refresh through a
+  bounded browser journal (`web-vault-connection.md`). Legacy and PDF
+  conversion, PDF export, Finder, and open-externally stay on the Mac, gated by
+  the build's platform; on the web a PDF or legacy document says to save a
+  `.docx` copy in another app and open it here. Chat's AI file tools stay
+  withheld on the web. Same files, same formats: the contract version does not
+  move.
 - The **Tasks** view is a per-call projection of open `- [ ]` checkboxes across
   ordinary Markdown notes (fenced code skipped; Trash/Archive/chats excluded;
   secure and locked notes included — it is the user's own local screen and is

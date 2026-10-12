@@ -107,10 +107,14 @@ vault's `.gitignore`) or `Storage/` in a plain vault. The connected-folder
 adapter creates only DOCX and XLSX with a create-only content gate and
 `stem-2.ext` collisions; a pristine new web document can be discarded only
 when its bytes still match the ones Rotli created. Its first-save `.bak`
-travels with rename unless the destination already has a backup. Browser
-editing remains behind the `documents` and `sheets` build capabilities until
-the later recovery and browser-proof slice enables them. Markdown-only features such as slash
-commands and embed fences are never mounted in documents.
+travels with rename unless the destination already has a backup. Rotli Web
+edits and creates documents (Beta) through the same model, codec, and Univer
+adapter, over either folder road; saves are gated on the exact opened bytes, and
+unsaved typing is journaled in the browser
+([web vault connection](../../docs/architecture/web-vault-connection.md)).
+Markdown-only features such as slash commands and embed fences are never
+mounted in documents. A `.docx` that is not a readable zip package fails with a
+plain-words message, never the zip library's text.
 
 The editor presents conventional document defaults independent of the app
 environment: white paper, black Arial text when the file does not specify a
@@ -140,6 +144,9 @@ encrypted PDFs fail explicitly instead of producing an empty document and must
 be OCRed or unlocked first. No account, network service, font download, or
 in-place conversion is involved. `.dot`, `.pages`, and other legacy formats
 remain unsupported when no faithful local conversion route is available.
+Conversion is Mac-only: Rotli Web offers no Convert action and instead tells
+the person to save a `.docx` copy in another app and open that copy here
+(`WEB_DOCX_COPY_HINT`, `components/fileOffice/officeMount.tsx`).
 
 Chat PDF generation is the reverse, copy-only lane: Rotli first creates a
 normal editable Markdown source, then the fixed macOS `/usr/sbin/cupsfilter`
