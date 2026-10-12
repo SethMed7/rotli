@@ -190,6 +190,7 @@ export function ensureDocument(
   revisions.set(noteId, revision);
   persistedBodies.set(noteId, body);
   taskSigs.set(noteId, taskSignature(lines));
+  if (!subs.get(noteId)?.size) scheduleRelease(noteId); // a seed nobody opened
 }
 
 /** Stable session id for the editable surface shown before Command-T's file
@@ -300,6 +301,8 @@ export function reloadDocumentIfClean(noteId: string, body: string, revision: st
 export function evictDocument(noteId: string): void {
   const pending = timers.get(noteId);
   if (pending !== undefined) clearTimeout(pending);
+  clearTimeout(releaseTimers.get(noteId));
+  releaseTimers.delete(noteId);
   timers.delete(noteId);
   docs.delete(noteId);
   revisions.delete(noteId);
@@ -533,6 +536,44 @@ document.addEventListener("visibilitychange", () => {
 });
 onQuitFlush(flushSyncs);
 
+// A note's buffer outlived its last editor for the life of the window — two
+// copies of every body ever opened (audit 2026-10-12). A CLEAN buffer nobody
+// views is dropped after a grace period; reopening reseeds it from the note
+// query. Unsaved, saving, failed, pending, or still-viewed buffers stay.
+let releaseDelayMs = 30_000;
+const releaseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function setReleaseDelayForTests(ms: number | null): void {
+  releaseDelayMs = ms ?? 30_000;
+}
+
+function releasable(noteId: string): boolean {
+  return (
+    !subs.get(noteId)?.size &&
+    !dirtyIds.has(noteId) &&
+    !timers.has(noteId) &&
+    !pendingDocuments.has(noteId) &&
+    !saveErrors.has(noteId)
+  );
+}
+
+function scheduleRelease(noteId: string): void {
+  clearTimeout(releaseTimers.get(noteId));
+  releaseTimers.set(
+    noteId,
+    setTimeout(() => {
+      releaseTimers.delete(noteId);
+      if (!docs.has(noteId) || !releasable(noteId)) return;
+      docs.delete(noteId);
+      revisions.delete(noteId);
+      persistedBodies.delete(noteId);
+      protections.delete(noteId);
+      taskSigs.delete(noteId);
+      subs.delete(noteId);
+    }, releaseDelayMs),
+  );
+}
+
 function subscribeDocument(noteId: string, fn: () => void): () => void {
   let set = subs.get(noteId);
   if (!set) {
@@ -540,8 +581,11 @@ function subscribeDocument(noteId: string, fn: () => void): () => void {
     subs.set(noteId, set);
   }
   set.add(fn);
+  clearTimeout(releaseTimers.get(noteId));
+  releaseTimers.delete(noteId);
   return () => {
     set.delete(fn);
+    if (set.size === 0) scheduleRelease(noteId);
   };
 }
 

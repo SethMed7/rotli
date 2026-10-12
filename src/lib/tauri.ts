@@ -1,6 +1,6 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 // Tauri seam: native IPC and connected-folder browser twins.
-import { emit, listen } from "@tauri-apps/api/event";
+import { type Event, type UnlistenFn, emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
@@ -21,6 +21,7 @@ export type { FrontmatterView } from "./corpusFrontmatter";
 import { splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
 import { PLATFORM } from "./featurePolicy";
+import { sameTaskRequest } from "./sameTaskRequest";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
@@ -35,6 +36,19 @@ import {
 /** The desktop browser twin has no connected folder; focused unit tests may
  * install the web adapter explicitly. The web build always requires it. */
 export const usesWebVaultIo = (): boolean => PLATFORM === "web" || hasWebVaultIo();
+
+/** This webview's label. A bare `listen()` hears an event emitted to ANY
+ * window (Tauri's default `Any` target); pass `{ target: currentWindowLabel() }`
+ * for events Rust addresses per window with `emit_to`. */
+export function currentWindowLabel(): string {
+  return getCurrentWindow().label;
+}
+
+/** `listen` for an event Rust addresses to one window (`emit_to`): only this
+ * window's copy, never another window's (audit 2026-10-12). */
+export function listenHere<T>(event: string, handler: (event: Event<T>) => void): Promise<UnlistenFn> {
+  return listen<T>(event, handler, { target: currentWindowLabel() });
+}
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -340,9 +354,12 @@ function corpusInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   });
 }
 
-export function corpusList(): Promise<CorpusListPayload> {
-  return corpusInvoke("corpus_list");
-}
+/** The whole-vault listing. Callers in one synchronous run (a refetch wave
+ * after one invalidation) share a single IPC answer instead of each parsing a
+ * full copy; treat the payload as read-only — it may be shared. */
+export const corpusList: () => Promise<CorpusListPayload> = sameTaskRequest(() =>
+  corpusInvoke<CorpusListPayload>("corpus_list"),
+);
 
 /** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
 export function corpusListFresh(): Promise<CorpusListPayload> {
@@ -601,7 +618,7 @@ export function localQueueCancel(requestId: string): Promise<void> {
  * never has to infer state. */
 export function onLocalQueue(cb: (q: LocalQueueSnapshot) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<LocalQueueSnapshot>("rotli:local-queue", (e) => cb(e.payload));
+  const unlisten = listenHere<LocalQueueSnapshot>("rotli:local-queue", (e) => cb(e.payload));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1768,7 +1785,9 @@ export function workspaceTakeOpenRequest(): Promise<WorkspaceOpenRequest | null>
  * invalidates and refetches — content appears when ready, no spinners. */
 export function onCorpusChanged(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:corpus-changed", () => cb());
+  // own-window only: Rust sends one copy to main and one to chat, and a bare
+  // listen() hears BOTH — every vault change refreshed each window twice
+  const unlisten = listenHere("rotli:corpus-changed", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1786,7 +1805,7 @@ export function onVaultChanged(cb: () => void): () => void {
  * 750ms workspaceTakeOpenRequest poll (perf audit 2026-07-30, #15). */
 export function onOpenRequest(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:open-request", () => cb());
+  const unlisten = listenHere("rotli:open-request", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1795,7 +1814,7 @@ export function onOpenRequest(cb: () => void): () => void {
  * round trip; pointer selection of the menu item still forwards here. */
 export function onNativeCloseTab(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:close-tab", () => cb());
+  const unlisten = listenHere("rotli:close-tab", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1803,7 +1822,7 @@ export function onNativeCloseTab(cb: () => void): () => void {
  * key presses instead; keys/editHistoryActions.ts). */
 export function onNativeEditHistory(cb: (redo: boolean) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<string>("rotli:edit-history", (event) => cb(event.payload === "redo"));
+  const unlisten = listenHere<string>("rotli:edit-history", (event) => cb(event.payload === "redo"));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1812,7 +1831,7 @@ export function onNativeEditHistory(cb: (redo: boolean) => void): () => void {
  * sidebar badge update within a beat, no polling. */
 export function onBrainJournal(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:brain-journal", () => cb());
+  const unlisten = listenHere("rotli:brain-journal", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1820,7 +1839,7 @@ export function onBrainJournal(cb: () => void): () => void {
  * ⌘K palette open ("find", the search twin of ⌥A's "ask"). */
 export function onSummonSearch(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:summon-search", () => cb());
+  const unlisten = listenHere("rotli:summon-search", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1842,7 +1861,7 @@ export interface OrganizerProgress {
 
 export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
+  const unlisten = listenHere<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1855,14 +1874,18 @@ export interface AuthorizedNativeDrop {
  * matching single-use import capabilities. */
 export function onNativeDropAuthorized(cb: (drop: AuthorizedNativeDrop) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) => cb(event.payload));
+  const unlisten = listenHere<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) =>
+    cb(event.payload),
+  );
   return () => void unlisten.then((fn) => fn());
 }
 
 /** A Finder drop none of whose items could be granted (folders, gone files). */
 export function onNativeDropRefused(cb: (count: number) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<{ count: number }>("rotli:native-drop-refused", (event) => cb(event.payload.count));
+  const unlisten = listenHere<{ count: number }>("rotli:native-drop-refused", (event) =>
+    cb(event.payload.count),
+  );
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -2057,14 +2080,14 @@ export function onCaptureAck(cb: (id: string) => void): () => void {
 /** Rust → capture webview: the card was just summoned (refocus the field). */
 export function onCaptureShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:capture-show", () => cb());
+  const unlisten = listenHere("rotli:capture-show", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
 /** Rust → quick webview: the card was just summoned (refocus the editor). */
 export function onQuickShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:quick-show", () => cb());
+  const unlisten = listenHere("rotli:quick-show", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -2072,7 +2095,7 @@ export function onQuickShow(cb: () => void): () => void {
  * is already shown Rust-side; the webview only picks/creates the chat tab. */
 export function onSummonChat(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:summon-chat", () => cb());
+  const unlisten = listenHere("rotli:summon-chat", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 

@@ -15,6 +15,7 @@
 //! Rust counterpart of `containsPrivateDataOverlap` — see its own section below.
 
 use std::collections::{HashSet, VecDeque};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
@@ -234,7 +235,28 @@ pub fn quotes_secure_text(prompt: &str, body: &str) -> bool {
 /// (web.rs) — asks exactly this question and refuses on true. Keeping it one
 /// function is what `check:security`'s gated-command guard can assert.
 pub fn blocked_for_remote(text: &str) -> bool {
-    protected_for_remote(text) || echoes_secure_text(text)
+    blocked_given(LEDGER_WARM.load(Ordering::Acquire), text)
+}
+
+/// The ledger is fed by a walk of every registered vault. App setup now runs
+/// that walk OFF the launch path (a huge folder held the window back for the
+/// whole walk — audit 2026-10-12), so until it finishes nothing may leave:
+/// every caller refuses while the ledger is cold (fail closed). Warm by
+/// default — the CLI, helper, and tests never start cold.
+static LEDGER_WARM: AtomicBool = AtomicBool::new(true);
+
+/// App setup, before the background walk starts.
+pub fn begin_ledger_warmup() {
+    LEDGER_WARM.store(false, Ordering::Release);
+}
+
+/// The background walk fed every registered vault.
+pub fn finish_ledger_warmup() {
+    LEDGER_WARM.store(true, Ordering::Release);
+}
+
+fn blocked_given(warm: bool, text: &str) -> bool {
+    !warm || protected_for_remote(text) || echoes_secure_text(text)
 }
 
 /// The Luhn checksum over an all-digit candidate — true when it checks out
@@ -261,6 +283,13 @@ fn luhn_ok(digits: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nothing_leaves_while_the_ledger_is_still_warming() {
+        let plain = "an ordinary sentence about the weather this week";
+        assert!(blocked_given(false, plain), "cold ledger must fail closed");
+        assert!(!blocked_given(true, plain));
+    }
 
     #[test]
     fn separated_pans_and_ssns_still_trip() {

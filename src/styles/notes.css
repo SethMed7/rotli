@@ -2898,6 +2898,12 @@
   fill: currentColor;
   stroke: none;
 }
+/* still art (sidebarScenery.tsx): the Iris fireflies and Blossom petals share
+   the Settings art's infinite animations, which kept the sidebar repainting
+   for as long as it was on screen (audit 2026-10-12) */
+svg.sb-scene * {
+  animation: none;
+}
 .sb-scene-top {
   top: 0;
   height: 56px;

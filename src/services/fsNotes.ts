@@ -70,7 +70,7 @@ export function memexRootMarkers(): Promise<ReadonlySet<string>> {
 export class FsNotesService implements NotesService {
   async listFolders(): Promise<Folder[]> {
     const { folders } = await corpusList();
-    return folders;
+    return [...folders]; // the payload may be shared with other callers
   }
 
   async createFolder(name: string, parentId: string | null = null): Promise<Folder> {
@@ -101,7 +101,7 @@ export class FsNotesService implements NotesService {
    * client-side, instead of walking corpus_list once per view. */
   async listAll(): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
-    return notes;
+    return [...notes]; // the payload may be shared with other callers
   }
 
   /** FULL-TEXT search — Rust walks + reads + matches (corpus_search), same

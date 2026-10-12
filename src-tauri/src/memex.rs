@@ -1090,10 +1090,7 @@ pub fn memex_reveal_chat(app: tauri::AppHandle, root: String, slug: String) -> R
     // spawn, don't wait — corpus_reveal_file's shape (a sync command blocks the
     // main thread for as long as it waits; adversarial review, PR #15)
     #[cfg(target_os = "macos")]
-    std::process::Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn()
+    crate::child_run::spawn_reaped(std::process::Command::new("open").arg("-R").arg(&path))
         .map_err(|e| format!("reveal: {e}"))?;
     #[cfg(not(target_os = "macos"))]
     let _ = path;
