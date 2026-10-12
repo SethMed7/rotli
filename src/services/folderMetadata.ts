@@ -1,0 +1,154 @@
+// The web twin of the corpus protection and raw-metadata commands.
+import { looksSecret } from "../ai/guard";
+import {
+  composeNoteDocument,
+  emptyFrontmatter,
+  isSecureFrontmatter,
+  parseNoteDocument,
+  type NoteFrontmatter,
+} from "../lib/frontmatter";
+import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
+import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
+import { type VaultDir, baseName, freeVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
+
+const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
+  const line = fm.foreign.find((line) => line.slice(0, line.indexOf(":")).trim() === key);
+  return line?.slice(line.indexOf(":") + 1).trim();
+};
+const withField = (fm: NoteFrontmatter, key: string, value: string | null): NoteFrontmatter => ({
+  ...fm,
+  foreign: [
+    ...fm.foreign.filter((line) => line.split(":", 1)[0]?.trim() !== key),
+    ...(value === null ? [] : [`${key}: ${value}`]),
+  ],
+});
+
+/** Git exclusion changes are revision-gated too; unreadable files abort. */
+export async function syncSecureIgnore(dir: VaultDir, add: string[], remove: string[] = []): Promise<void> {
+  const opened = (await dir.exists(".gitignore")) ? await readVersionedFile(dir, ".gitignore") : null;
+  const before = opened?.contents ?? "";
+  let next = remove.length
+    ? before
+        .split("\n")
+        .filter((line) => !remove.includes(line.trim()))
+        .join("\n")
+    : before;
+  for (const path of add)
+    if (!next.split("\n").some((line) => line.trim() === path))
+      next += `${next && !next.endsWith("\n") ? "\n" : ""}${path}\n`;
+  if (next === before) return;
+  await writeVersionedFile(dir, ".gitignore", next, opened?.revision ?? "0");
+}
+
+function assertSecureRemoval(body: string): void {
+  if (looksSecret(body))
+    throw new Error("Remove the detected secret from the note before removing secure protection");
+}
+
+/** Returns the resulting path for relocation bookkeeping. Identity is stable;
+ * protect the target BEFORE moving, and leave the old ignore on any failure. */
+export async function setFolderSecure(dir: VaultDir, path: string, secure: boolean): Promise<string> {
+  const opened = await readVersionedFile(dir, path);
+  const { frontmatter, body } = parseNoteDocument(opened.contents);
+  let fm = frontmatter ?? emptyFrontmatter();
+  if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
+  if (!secure) assertSecureRemoval(body);
+  const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
+  const current = parentPath(path);
+  const inHome = current === home || current.startsWith(`${home}/`);
+  if (secure) {
+    if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
+    fm = withField(fm, "secure", "true");
+    await syncSecureIgnore(dir, [path]);
+    await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
+  }
+  const origin = valueOf(fm, "secure_origin");
+  const targetHome = secure
+    ? home
+    : origin !== undefined && origin !== home && !origin.startsWith(`${home}/`)
+      ? origin
+      : (await vaultIsMemex(dir))
+        ? "wiki/_inbox"
+        : "Inbox";
+  let target = path;
+  if (secure ? !inHome : inHome) {
+    target = await freeVaultPath(dir, targetHome, baseName(path), (stem, ext, n) => `${stem} (${n})${ext}`);
+    assertVaultFilePath(target);
+    await syncSecureIgnore(dir, [target]);
+    // Both writes used the opening revision; re-read before relocation.
+    const currentFile = await readVersionedFile(dir, path);
+    const expected = secure ? composeNoteDocument(fm, body) : opened.contents;
+    if (currentFile.contents !== expected)
+      throw new Error("revision conflict: secure note changed before move");
+    await dir.move(path, target);
+    await syncSecureIgnore(dir, [], [path]);
+  }
+  if (!secure) {
+    const final = await readVersionedFile(dir, target);
+    const parsed = parseNoteDocument(final.contents);
+    let cleared = parsed.frontmatter ?? emptyFrontmatter();
+    for (const key of ["secure", "local_ai_allowed", "secure_origin"])
+      cleared = withField(cleared, key, null);
+    await writeVersionedFile(dir, target, composeNoteDocument(cleared, parsed.body), final.revision);
+    await syncSecureIgnore(dir, [], [target]);
+  }
+  return target;
+}
+
+export async function setFolderProtection(
+  dir: VaultDir,
+  notes: { filePathOf(id: string): Promise<string>; listAll(): Promise<unknown> },
+  id: string,
+  key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",
+  allowed: boolean,
+): Promise<void> {
+  const path = await notes.filePathOf(id);
+  if (!path.endsWith(".md")) throw new Error("not a Markdown note");
+  if (key === "secure") {
+    await setFolderSecure(dir, path, allowed);
+    await notes.listAll();
+    return;
+  }
+  const opened = await readVersionedFile(dir, path);
+  const { frontmatter, body } = parseNoteDocument(opened.contents);
+  let fm = frontmatter ?? emptyFrontmatter();
+  if (key === "local_ai_allowed") {
+    if (!isSecureFrontmatter(fm) && !looksSecret(body))
+      throw new Error("Local AI access is only meaningful for a secure note");
+    if (!isSecureFrontmatter(fm)) {
+      fm = withField(fm, "secure", "true");
+      await syncSecureIgnore(dir, [path]);
+    }
+  }
+  fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
+  await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
+}
+
+export async function readFolderRawMetadata(dir: VaultDir, path: string) {
+  const opened = await readVersionedFile(dir, path);
+  return { ...opened, contents: rawFrontmatterBlock(opened.contents) };
+}
+
+export async function writeFolderRawMetadata(
+  dir: VaultDir,
+  path: string,
+  block: string,
+  revision: string,
+): Promise<string> {
+  if (!path.endsWith(".md")) throw new Error("not a Markdown note");
+  const opened = await readVersionedFile(dir, path);
+  if (!revision || opened.revision !== revision)
+    throw new Error("revision conflict: note changed after metadata was opened");
+  const next = mergeRawFrontmatter(opened.contents, block);
+  if (next === opened.contents) return opened.revision;
+  const was = parseNoteDocument(opened.contents).frontmatter;
+  const after = parseNoteDocument(next).frontmatter;
+  const beforeSecure = !!was && isSecureFrontmatter(was);
+  const afterSecure = !!after && isSecureFrontmatter(after);
+  if (beforeSecure && !afterSecure) assertSecureRemoval(parseNoteDocument(next).body);
+  if (afterSecure && !beforeSecure) await syncSecureIgnore(dir, [path]);
+  const landed = await writeVersionedFile(dir, path, next, revision);
+  if (beforeSecure && !afterSecure) await syncSecureIgnore(dir, [], [path]);
+  return landed;
+}

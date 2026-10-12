@@ -4,6 +4,7 @@
 // is a hash of the exact bytes read — a write that presents stale content is
 // refused by the folder adapter.
 
+import { writeFolderViews } from "../services/folderViewSync";
 import { contentRevision, type VaultDir } from "../services/vaultDir";
 import type { VaultStore, VersionedValue } from "./browserVault";
 
@@ -72,6 +73,8 @@ export class FolderVaultStore implements VaultStore {
     expectedRevision: string,
   ): Promise<boolean> {
     const path = vaultKeyPath(key);
+    // views also carry each note's view_tag: their own transaction
+    if (key === "views") return writeFolderViews(this.dir, value, expectedRevision);
     try {
       await this.dir.writeText(path, value, expectedRevision);
       return true;

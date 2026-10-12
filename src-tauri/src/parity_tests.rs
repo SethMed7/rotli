@@ -459,3 +459,19 @@ fn metadata_link_targets_fixtures_agree() {
         );
     }
 }
+
+#[test]
+fn raw_immutable_keys_match_fixture() {
+    assert_eq!(
+        crate::corpus::RAW_IMMUTABLE_KEYS.to_vec(),
+        string_list(&entry("rawImmutableKeys"))
+    );
+}
+
+#[test]
+fn storage_office_exts_match_fixture() {
+    assert_eq!(
+        crate::corpus::STORAGE_OFFICE_EXTS.to_vec(),
+        string_list(&entry("storageOfficeExts"))
+    );
+}

@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import lane as paste and drop.
 - **Web search and the tour stop advertising unavailable shortcuts.** Recent
   notes, open tabs, navigation and view commands use the build's key policy.
+- **Rotli Web keeps note protection and file metadata.** Secure, lock, AI-edit,
+  and local-AI controls write to the connected vault. Raw metadata edits persist
+  and refuse stale revisions or reserved-field changes. Secure notes move to
+  their protected home with matching git exclusions.
+- **Web views and note names stay portable.** Named views synchronize Markdown
+  `view_tag` metadata, and title renames preserve earlier names as durable aliases.
+- **Assets work on the web.** Vault files appear in Assets, Library, and filename
+  search. Local media and HTML open from the vault; CSV edits save with revision
+  checks. Office files explain their web limitation, and native-only file actions
+  stay hidden.
 
 ### Changed
 

@@ -144,7 +144,7 @@ describe("boards in the folder notes listing", () => {
       ["storage/excalidraw/Roadmap.excalidraw", "Roadmap", "storage/excalidraw"],
       ["wiki/ideas/Flow.excalidraw", "Flow", "wiki/ideas"],
     ]);
-    expect(all.some((note) => note.id === "storage/photo.png")).toBe(false);
+    expect(all.find((note) => note.id === "storage/photo.png")?.kind).toBe("file");
     // a board is not a note: no body to read, no note save
     const notes = new FolderNotesService(dir);
     expect(await notes.getNote(id)).toBeNull();
