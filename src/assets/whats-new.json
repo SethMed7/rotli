@@ -1,4 +1,25 @@
 {
+  "1.8.1": [
+    {
+      "title": "Big folders stay light",
+      "body": "A vault holding a code folder or tens of thousands of files no longer pushes rotli to gigabytes of memory: node_modules and .git stay out, and large folder trees open folded.",
+      "platform": "mac"
+    },
+    {
+      "title": "Opens faster, rests when idle",
+      "body": "rotli shows its window right away and reads your vault in the background. Hidden documents and sheets stop redrawing, and background checks only run when they have something to do.",
+      "platform": "mac"
+    },
+    {
+      "title": "Quitting finishes saving first",
+      "body": "Every window now finishes saving before rotli quits, and secure documents, sheets, and CSV files never reach a cloud model."
+    },
+    {
+      "title": "Word and Excel files on the web (Beta)",
+      "body": "Rotli Web now opens, edits, and creates Word documents and spreadsheets in your connected folder, saving them back as ordinary .docx and .xlsx files.",
+      "platform": "web"
+    }
+  ],
   "1.8.0": [
     {
       "title": "Spreadsheets, in Beta",
