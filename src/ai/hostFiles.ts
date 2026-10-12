@@ -11,6 +11,7 @@ import {
   corpusFileBytesAi,
   corpusFileTextAi,
   corpusList,
+  corpusListFresh,
   splitRootId,
 } from "../lib/tauri";
 import { inSecureHome } from "../security/secureNotes";
@@ -24,8 +25,8 @@ import { looksSecret, modelIsOnDevice } from "./guard";
 import type { Host } from "./types";
 
 /** Resolve an exact id/path, or an unambiguous exact filename. */
-async function findVaultFile(query: string) {
-  const { notes } = await corpusList();
+async function findVaultFile(query: string, fresh = false) {
+  const { notes } = await (fresh ? corpusListFresh() : corpusList());
   const q = query.trim().replace(/^["']|["']$/g, "");
   const exact = q.startsWith("storage:") ? `storage/${q.slice("storage:".length)}` : q;
   const files = notes.filter((n) => n.kind === "file");
@@ -58,7 +59,7 @@ function fileAccess(file: Awaited<ReturnType<typeof findVaultFile>>, local: bool
 /** Exact-id form for AI workflows that embed a previously generated file. */
 export async function aiFileAccessById(id: string, local: boolean): Promise<string | null> {
   let file = await findVaultFile(id);
-  if (!file) file = await findVaultFile(id);
+  if (!file) file = await findVaultFile(id, true);
   return file?.id === id ? fileAccess(file, local) : "blocked: the exact file cannot be resolved safely.";
 }
 
@@ -115,7 +116,7 @@ export function makeFileTools(
       if (modelIsOnDevice(model) && fileIsProtected(file)) {
         opts?.onSecureNoteRead?.();
       }
-      const edit = await editDocumentAsAi(file, rawActions, undefined, model);
+      const edit = await editDocumentAsAi(file, rawActions, model);
       if (edit.kind === "refused") return edit.reason;
       const count = `${edit.count} change${edit.count === 1 ? "" : "s"}`;
       return `saved ${count} to "${file.title}" (a backup of the original was kept). It now reads:\n${editableDocumentForAi(edit.document)}`;

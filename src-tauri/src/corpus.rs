@@ -3949,7 +3949,13 @@ impl CorpusStore {
         let abs = self.file_for_ai(rel, model_is_local)?;
         let data = fs::read(abs).map_err(|e| e.to_string())?;
         if model_is_local && self.file_is_protected(rel) {
-            crate::secret::remember_secure_text(&String::from_utf8_lossy(&data));
+            let ext = Path::new(rel).extension().and_then(|ext| ext.to_str()).unwrap_or("").to_ascii_lowercase();
+            let text = match ext.as_str() {
+                "docx" | "docm" | "dotx" | "dotm" => crate::ai_files::docx_text(&data)?,
+                "xlsx" => crate::ai_files::xlsx_text(&data)?,
+                _ => String::from_utf8_lossy(&data).into_owned(),
+            };
+            crate::secret::remember_secure_text(&text);
         }
         Ok(data)
     }
@@ -7356,27 +7362,30 @@ fn prefix_write_result(root_id: &str, mut result: CorpusWriteResult) -> CorpusWr
 /// under the corpus mutex. Connected vaults are registered switch targets, not
 /// simultaneous data sources. The walk stays off Tauri's main thread.
 #[tauri::command]
-pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
+pub async fn corpus_list(app: tauri::AppHandle, fresh: Option<bool>) -> Result<CorpusList, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        corpus_list_inner(&state)
+        corpus_list_inner(&state, fresh.unwrap_or(false))
     })
     .await
     .map_err(|e| format!("corpus list worker failed ({e})"))?
 }
 
 /// The active-vault half of `corpus_list`, shared with `corpus_notes_ai`.
-fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
+fn corpus_list_inner(state: &CorpusState, fresh: bool) -> Result<CorpusList, String> {
     let mut reg = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?;
     let default_id = reg.default_id.clone();
-    reg.stores
+    let store = reg.stores
         .get_mut(&default_id)
-        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?
-        .list()
+        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?;
+    if fresh {
+        store.suppress.bump();
+    }
+    store.list()
 }
 
 /// The Tasks projection over the DEFAULT corpus (decision 2026-07-25): every
@@ -7518,7 +7527,7 @@ pub async fn corpus_notes_ai(
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let listed = corpus_list_inner(&state)?;
+        let listed = corpus_list_inner(&state, false)?;
         let reference = corpus_reference_notes_inner(&state)?;
         let mut permitted = Vec::new();
         for meta in listed.notes.into_iter().chain(reference) {
@@ -8852,6 +8861,10 @@ mod injection_evals;
 #[cfg(test)]
 #[path = "corpus_ai_write_tests.rs"]
 mod ai_write_tests;
+
+#[cfg(test)]
+#[path = "corpus_ai_file_tests.rs"]
+mod ai_file_tests;
 
 #[cfg(test)]
 mod tests {
@@ -12057,77 +12070,6 @@ mod tests {
         assert!(store.read_for_ai(&open.id, false).is_ok());
     }
 
-    #[test]
-    fn ai_file_gate_refuses_secure_home_and_honors_local_knob() {
-        let tmp = TempDir::new().unwrap();
-        let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        let rel = "Secure notes/plan.csv";
-        fs::create_dir_all(store.root().join("Secure notes")).unwrap();
-        fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
-        assert!(store.file_for_ai(rel, false).is_err());
-        assert!(store.file_for_ai(rel, true).is_ok());
-        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
-        assert!(store.file_for_ai(rel, true).is_err());
-        let ordinary = "Storage/summary.csv";
-        fs::create_dir_all(store.root().join("Storage")).unwrap();
-        fs::write(store.root().join(ordinary), "task,status\nDraft,ready").unwrap();
-        assert!(store.file_for_ai(ordinary, false).is_ok());
-        let named = "Storage/bank-plan.csv";
-        fs::write(store.root().join(named), "task,status\nDraft,ready").unwrap();
-        store
-            .dot_write(
-                "settings",
-                "{\"secureLocalAi\":false,\"librarianRules\":{\"secureKeywords\":[\"bank\"]}}",
-            )
-            .unwrap();
-        assert!(store.file_for_ai(named, false).is_err());
-        assert!(store.file_for_ai(named, true).is_err());
-    }
-
-    #[test]
-    fn ai_note_read_gate_refuses_plain_text_in_secure_homes() {
-        let tmp = TempDir::new().unwrap();
-        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
-            fs::create_dir_all(store.root().join(Path::new(rel).parent().unwrap()))
-                .unwrap();
-            fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
-            assert!(store.read_for_ai(rel, false).is_err(), "remote read: {rel}");
-            assert!(store.read_for_ai(rel, true).is_ok(), "local read: {rel}");
-        }
-        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
-        assert!(store.read_for_ai("Secure notes/plan.txt", true).is_err());
-    }
-
-    #[test]
-    fn corpus_read_ai_route_uses_the_shared_gate_for_plain_text_files() {
-        let tmp = TempDir::new().unwrap();
-        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
-            fs::create_dir_all(store.root().join(Path::new(rel).parent().unwrap()))
-                .unwrap();
-            fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
-            assert!(read_ai_versioned(&mut store, rel, false, false).is_err(), "{rel}");
-            assert_eq!(
-                read_ai_versioned(&mut store, rel, true, false).unwrap().body,
-                "task,status\nDraft,ready"
-            );
-        }
-    }
-
-    #[test]
-    fn allowed_local_secure_file_text_enters_remote_overlap_ledger() {
-        let tmp = TempDir::new().unwrap();
-        let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        let rel = "Secure notes/plan.txt";
-        fs::create_dir_all(store.root().join("Secure notes")).unwrap();
-        let prose = "The amber orchard schedule moves to the thirteenth of November.";
-        fs::write(store.root().join(rel), prose).unwrap();
-        let bytes = store.read_file_bytes_for_ai(rel, true).unwrap();
-        assert_eq!(bytes, prose.as_bytes());
-        assert!(crate::secret::blocked_for_remote(prose));
-    }
-
     /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can
     /// call ANY command: it does not have to use `corpus_read_ai`, whose result
     /// still carries the `secure: true` marker the egress detector looks for.
@@ -13554,6 +13496,20 @@ mod tests {
     }
 
     // ─── the walk cache (perf audit 2026-07-30, #1/#5) ───────────────────────
+
+    #[test]
+    fn fresh_corpus_list_invalidates_the_cached_walk_once() {
+        let (_dir, store) = bare();
+        let root = store.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+        let before = corpus_list_inner(&state, false).unwrap().notes.len();
+        fs::write(root.join("new.md"), "# New\n").unwrap();
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before);
+        assert_eq!(corpus_list_inner(&state, true).unwrap().notes.len(), before + 1);
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before + 1);
+    }
 
     #[test]
     fn walk_cache_holds_until_the_generation_moves() {

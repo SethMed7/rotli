@@ -66,10 +66,12 @@ export async function answerAgentRequest(request: AgentRequest): Promise<AgentAn
     const expected = args.expectedRevision;
     if (typeof expected !== "string" || !expected) return fail("pass expectedRevision from the read.");
     const actions = Array.isArray(args.actions) ? args.actions : [];
-    const edit = await editDocumentAsAi({ id: file, title: fileNameStem(file) }, actions, expected, {
-      id: "agent",
-      endpoint: "",
-    });
+    const edit = await editDocumentAsAi(
+      { id: file, title: fileNameStem(file) },
+      actions,
+      { id: "agent", endpoint: "" },
+      expected,
+    );
     if (edit.kind === "refused") return fail(edit.reason);
     return documentAnswer(file, editableDocumentForAi(edit.document), edit.revision);
   }

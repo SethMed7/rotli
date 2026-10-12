@@ -338,10 +338,13 @@ cold because search now uses an index.
   over `read_for_ai`, not a covert-channel defense. Stated in full above.
 - **Storage FILES carry no `secure:` flag.** Chat file tools resolve an exact
   id and check the secure home and secure keyword before extraction in
-  TypeScript; dedicated Rust AI file reads repeat that location check. The
+  TypeScript; an exact-id miss invalidates the Rust corpus walk once before
+  failing closed. Dedicated Rust AI file reads repeat the location check. The
   note read gate also checks location, since plain text files can enter through
   `read_note`. Allowed local secure file reads feed the Rust prose-overlap
-  ledger. The secret-pattern detector still checks extracted text. Files
+  ledger with decoded DOCX and XLSX text, rather than ZIP bytes. If an office
+  package cannot be decoded for the ledger, its secure local read refuses.
+  The secret-pattern detector still checks extracted text. Files
   outside those locations have no per-file secure flag.
 - **DNS exfil**: `vetted_resolve` emits the lookup before vetting the address,
   so an encoded subdomain leaves over DNS even when the connection is then

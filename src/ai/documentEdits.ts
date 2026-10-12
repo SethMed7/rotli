@@ -16,9 +16,9 @@ export type AiDocumentEdit =
 export async function editDocumentAsAi(
   file: { id: string; title: string },
   rawActions: unknown[],
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
   /** An outside agent's revision from its read: a newer file is refused. */
   expectedRevision?: string,
-  model?: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<AiDocumentEdit> {
   const refused = (reason: string): AiDocumentEdit => ({ kind: "refused", reason });
   const actions: DocumentEditAction[] = [];

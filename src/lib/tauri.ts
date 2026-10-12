@@ -344,6 +344,11 @@ export function corpusList(): Promise<CorpusListPayload> {
   return corpusInvoke("corpus_list");
 }
 
+/** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
+export function corpusListFresh(): Promise<CorpusListPayload> {
+  return corpusInvoke("corpus_list", { fresh: true });
+}
+
 /** FULL-TEXT note search (corpus_search): Rust walks + reads + matches every
  * root — title > body ranking with a highlighted-match snippet (char offsets;
  * see SearchHit in src/types.ts). A local user read: secure notes stay in,

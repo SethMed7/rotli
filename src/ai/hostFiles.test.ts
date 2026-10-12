@@ -21,7 +21,9 @@ import { registeredToolSpecs } from "./toolSchemas";
 const files: Record<string, string> = {};
 const reads: string[] = [];
 const documentReads: string[] = [];
-let omitNextList = false;
+let cachedList: ReturnType<typeof listed>[] | null = null;
+let refreshes = 0;
+let cacheEnabled = false;
 const listed = (path: string) => ({
   id: path.includes("/") ? path : `storage/rotli/${path}`,
   title: path.split("/").at(-1),
@@ -35,11 +37,14 @@ const mockAiRead = async (id: string) => {
 void mock.module("../lib/tauri", () => ({
   ...realTauri,
   corpusList: async () => {
-    if (omitNextList) {
-      omitNextList = false;
-      return { folders: [], notes: [] };
-    }
-    return { folders: [], notes: Object.keys(files).map(listed) };
+    if (!cacheEnabled) return { folders: [], notes: Object.keys(files).map(listed) };
+    cachedList ??= Object.keys(files).map(listed);
+    return { folders: [], notes: cachedList };
+  },
+  corpusListFresh: async () => {
+    refreshes++;
+    cachedList = Object.keys(files).map(listed);
+    return { folders: [], notes: cachedList };
   },
   corpusFileBytesAi: mockAiRead,
   corpusFileTextAi: mockAiRead,
@@ -174,13 +179,23 @@ test("every registered vault-content tool refuses a remote secure-home target", 
 });
 
 test("an exact just-written file refreshes a stale list once; an unknown id stays blocked", async () => {
-  files["storage/rotli/fresh.csv"] = "task,status\nDraft,ready";
-  omitNextList = true;
-  expect(await aiFileAccessById("storage/rotli/fresh.csv", false)).toBeNull();
-  files["wiki/_secure/fresh.csv"] = "task,status\nDraft,ready";
-  omitNextList = true;
-  expect(await aiFileAccessById("wiki/_secure/fresh.csv", false)).toMatch(/^blocked:/);
-  expect(await aiFileAccessById("storage/rotli/unknown.csv", false)).toMatch(/^blocked:/);
+  cacheEnabled = true;
+  cachedList = [];
+  refreshes = 0;
+  try {
+    files["storage/rotli/fresh.csv"] = "task,status\nDraft,ready";
+    expect(await aiFileAccessById("storage/rotli/fresh.csv", false)).toBeNull();
+    expect(refreshes).toBe(1);
+    cachedList = [];
+    files["wiki/_secure/fresh.csv"] = "task,status\nDraft,ready";
+    expect(await aiFileAccessById("wiki/_secure/fresh.csv", false)).toMatch(/^blocked:/);
+    expect(refreshes).toBe(2);
+    expect(await aiFileAccessById("storage/rotli/unknown.csv", false)).toMatch(/^blocked:/);
+    expect(refreshes).toBe(3);
+  } finally {
+    cacheEnabled = false;
+    cachedList = null;
+  }
 });
 
 test("a workbook arrives by cell address, its dates as dates", async () => {

@@ -100,10 +100,7 @@ export async function createAiDocumentFromMarkdown(
 }
 
 /** The AI's edit session: the same codec, saving through the AI's write lane. */
-export async function editAiDocument(
-  fileId: string,
-  model: Pick<ChatModelInfo, "id" | "endpoint"> = { id: "agent", endpoint: "" },
-) {
+export async function editAiDocument(fileId: string, model: Pick<ChatModelInfo, "id" | "endpoint">) {
   const { docxEditorCodec } = await import("./codec/docx");
   const aiWriter: DocumentFileWriter = {
     writeBase64: (id, base64, _backup, revision) => corpusWriteFileAi(id, base64, revision),
