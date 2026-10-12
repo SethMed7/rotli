@@ -1625,6 +1625,17 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
 };
 
 function BrainPane() {
+  if (!LAUNCH_FEATURES.librarian)
+    return (
+      <>
+        <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
+        <p className="setnote">The Librarian is available in Rotli for Mac.</p>
+      </>
+    );
+  return <DesktopBrainPane />;
+}
+
+function DesktopBrainPane() {
   const brainOn = useUiStore((s) => s.brainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
@@ -2705,10 +2716,14 @@ function ModelsPane() {
         lanes using accounts signed in to their official local clients.
       </p>
 
-      <LocalModelsSection
-        installed={local.data ?? []}
-        onChanged={() => void queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
-      />
+      {LAUNCH_FEATURES.localModels ? (
+        <LocalModelsSection
+          installed={local.data ?? []}
+          onChanged={() => void queryClient.invalidateQueries({ queryKey: ["chat", "models"] })}
+        />
+      ) : (
+        <p className="setnote">Local models are available in Rotli for Mac.</p>
+      )}
 
       <section className="aisection">
         <h4 className="set-subhead">Connected models</h4>

@@ -8,7 +8,7 @@ import { type MouseEvent, type ReactNode, useRef, useState } from "react";
 
 import { useBindingsStore } from "../keys/bindings";
 import { withChordHint } from "../keys/chords";
-import { EDITOR_ACTION } from "../keys/editorActionIds";
+import { EDITOR_ACTION, EDITOR_ACTION_LABEL as label } from "../keys/editorActionIds";
 import { currentChord, dispatch } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
 import {
@@ -118,23 +118,23 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
       <Fb label={hint("Code", EDITOR_ACTION.code)} on={markOn("code")} onClick={run(EDITOR_ACTION.code)}>
         {codeGlyph}
       </Fb>
-      <Fb label={hint("Link", EDITOR_ACTION.link)} on={markOn("link")} onClick={run(EDITOR_ACTION.link)}>
+      <Fb label={hint(label.link, EDITOR_ACTION.link)} on={markOn("link")} onClick={run(EDITOR_ACTION.link)}>
         {linkGlyph}
       </Fb>
-      <Fb label="Quote" on={blockOn("quote")} onClick={run(EDITOR_ACTION.quote)}>
+      <Fb label={label.quote} on={blockOn("quote")} onClick={run(EDITOR_ACTION.quote)}>
         {quoteGlyph}
       </Fb>
     </>
   );
   const listGroup = (
     <>
-      <Fb label="Bulleted list" on={blockOn("bullet")} onClick={run(EDITOR_ACTION.bulletList)}>
+      <Fb label={label.bulletList} on={blockOn("bullet")} onClick={run(EDITOR_ACTION.bulletList)}>
         {bulletGlyph}
       </Fb>
-      <Fb label="Numbered list" on={blockOn("numbered")} onClick={run(EDITOR_ACTION.numberedList)}>
+      <Fb label={label.numberedList} on={blockOn("numbered")} onClick={run(EDITOR_ACTION.numberedList)}>
         {numberedGlyph}
       </Fb>
-      <Fb label="Checklist" on={blockOn("checklist")} onClick={run(EDITOR_ACTION.checklist)}>
+      <Fb label={label.checklist} on={blockOn("checklist")} onClick={run(EDITOR_ACTION.checklist)}>
         {checklistGlyph}
       </Fb>
     </>
@@ -165,25 +165,25 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
         )}
       </div>
       <div className="fdiv" />
-      <Fb label={hint("Bold", EDITOR_ACTION.bold)} on={markOn("bold")} onClick={run(EDITOR_ACTION.bold)}>
+      <Fb label={hint(label.bold, EDITOR_ACTION.bold)} on={markOn("bold")} onClick={run(EDITOR_ACTION.bold)}>
         <strong>B</strong>
       </Fb>
       <Fb
-        label={hint("Italic", EDITOR_ACTION.italic)}
+        label={hint(label.italic, EDITOR_ACTION.italic)}
         on={markOn("italic")}
         onClick={run(EDITOR_ACTION.italic)}
       >
         <em>I</em>
       </Fb>
       <Fb
-        label={hint("Underline", EDITOR_ACTION.underline)}
+        label={hint(label.underline, EDITOR_ACTION.underline)}
         on={markOn("underline")}
         onClick={run(EDITOR_ACTION.underline)}
       >
         <u>U</u>
       </Fb>
       <Fb
-        label={hint("Strikethrough", EDITOR_ACTION.strike)}
+        label={hint(label.strike, EDITOR_ACTION.strike)}
         on={markOn("strike")}
         onClick={run(EDITOR_ACTION.strike)}
       >

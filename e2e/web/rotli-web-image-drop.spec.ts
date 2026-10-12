@@ -4,7 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { readOpfsBase64, readOpfsFile, startWithVault } from "./support";
+import { listOpfsFiles, readOpfsBase64, readOpfsFile, startWithVault } from "./support";
 
 // a 1×1 PNG
 const PNG_BASE64 =
@@ -54,4 +54,28 @@ test("an image dropped on a note is stored in the vault, linked with storage:, a
       .locator('img[src^="blob:"]')
       .first(),
   ).toBeVisible();
+});
+
+test("Attach image opens a browser picker and stores chosen bytes and a portable link", async ({ page }) => {
+  await startWithVault(page);
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await page.keyboard.type("# Attached picture\n\n/attach");
+  const attach = page.getByRole("menuitem", { name: /Attach image/ });
+  await expect(attach).toContainText("Choose an image");
+  await expect(attach).not.toContainText("Finder");
+  const chooser = page.waitForEvent("filechooser");
+  await attach.click();
+  await (
+    await chooser
+  ).setFiles({ name: "attached.png", mimeType: "image/png", buffer: Buffer.from(PNG_BASE64, "base64") });
+  await expect(editor.locator('img[src^="blob:"]')).toBeVisible();
+  await expect.poll(() => readOpfsBase64(page, "storage/images/attached.png")).toBe(PNG_BASE64);
+  await expect
+    .poll(async () => {
+      const files = await listOpfsFiles(page, "wiki/_inbox");
+      return (await Promise.all(files.map((file) => readOpfsFile(page, `wiki/_inbox/${file}`)))).join("\n");
+    })
+    .toContain("![](storage:images/attached.png)");
 });

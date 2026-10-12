@@ -17,11 +17,10 @@ import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useS
 
 import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
-import { corpusImportFile, corpusPickImages, rootIdOf } from "../lib/tauri";
-import { invalidateNotes } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { attachImagesAtPosition } from "./attachImage";
 import { autoPair } from "./autoPairInput";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
@@ -41,7 +40,6 @@ import {
 import { continueListFromPicker } from "./continueList";
 import { copyHandlers } from "./copyHandlers";
 import { emptyPlaceholder } from "./emptyPlaceholder";
-import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
 import { findHighlight, passageHighlight, setFindMarks, setPassageMark } from "./findHighlight";
 import { fmBlock } from "./fmBlock";
@@ -442,27 +440,14 @@ function CmEditorImpl({
           : (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
         if (item.op.kind === "attachImage") {
           setSlash((state) => ({ ...state, open: false }));
-          void corpusPickImages()
-            .then(async (picked) => {
-              const paths = picked.filter(isEmbeddablePath);
-              if (paths.length === 0) {
-                view.focus();
-                return;
-              }
-              const rootId = rootIdOf(noteId);
-              await importImagePathsAtPosition(view, paths, contentFrom, (path) =>
-                corpusImportFile(rootId, path),
+          void attachImagesAtPosition(view, noteId, contentFrom).catch((error: unknown) => {
+            useUiStore
+              .getState()
+              .setRowActionError(
+                `Couldn’t attach the image — ${error instanceof Error ? error.message : String(error)}`,
               );
-              await invalidateNotes();
-            })
-            .catch((error: unknown) => {
-              useUiStore
-                .getState()
-                .setRowActionError(
-                  `Couldn’t attach the image — ${error instanceof Error ? error.message : String(error)}`,
-                );
-              view.focus();
-            });
+            view.focus();
+          });
           return;
         }
         if (item.op.kind === "librarian" || item.op.kind === "handToAi") {

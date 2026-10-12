@@ -1,7 +1,7 @@
 import { IMAGE_EXTS, VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { parseBlock } from "./render";
 
-interface ImageDropEditor {
+export interface ImageDropEditor {
   dom?: { isConnected: boolean };
   posAtCoords(coords: { x: number; y: number }): number | null;
   state: {

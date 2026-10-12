@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { SLASH_FLIP_THRESHOLD, slashPlacement } from "./slashMenu";
+import { SLASH_FLIP_THRESHOLD, filterSlashItems, slashPlacement } from "./slashMenu";
 
 describe("slashPlacement", () => {
   test("plenty of room below → down", () => {
@@ -26,4 +26,12 @@ describe("slashPlacement", () => {
     expect(slashPlacement(400, 250, 200)).toBe("down");
     expect(slashPlacement(400, 150, 200)).toBe("up");
   });
+});
+
+test("web slash commands omit documents and keep image attachment with honest wording", () => {
+  const web = { sheets: false, documents: false, librarian: false };
+  expect(filterSlashItems("document", web)).toEqual([]);
+  expect(filterSlashItems("sheet", web)).toEqual([]);
+  expect(filterSlashItems("attach", web, "web")[0]?.hint).toBe("Choose an image");
+  expect(filterSlashItems("document", { sheets: true, documents: true }).length).toBeGreaterThan(0);
 });

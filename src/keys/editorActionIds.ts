@@ -18,3 +18,21 @@ export const EDITOR_ACTION = {
   alignCenter: "editor.alignCenter",
   alignRight: "editor.alignRight",
 } as const;
+
+/** Shared action names for search and formatting controls. */
+export const EDITOR_ACTION_LABEL = {
+  bold: "Bold",
+  italic: "Italic",
+  underline: "Underline",
+  strike: "Strikethrough",
+  code: "Inline code",
+  highlight: "Highlight",
+  link: "Link",
+  quote: "Quote",
+  bulletList: "Bulleted list",
+  numberedList: "Numbered list",
+  checklist: "Checklist",
+  alignLeft: "Align left",
+  alignCenter: "Align center",
+  alignRight: "Align right",
+} as const;

@@ -17,6 +17,8 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
   const desktop = platform === "desktop";
   return {
     notes: true,
+    librarian: desktop,
+    localModels: desktop,
     chat: desktop,
     breve: desktop && development,
     mermaidVisualEditing: development,
