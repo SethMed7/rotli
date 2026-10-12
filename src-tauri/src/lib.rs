@@ -49,6 +49,7 @@ mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
 mod ai_files;
+mod ai_office_text;
 mod pinned_site;
 mod private_browser;
 mod private_browser_media;

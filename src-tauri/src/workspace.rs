@@ -294,18 +294,7 @@ impl Workspace {
         let CorpusList { folders, notes } = self.store.list()?;
         let mut kept = Vec::with_capacity(notes.len());
         for meta in notes {
-            let visible = match meta.kind {
-                NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
-                // boards get the same secret gate the reads enforce — a
-                // scene the agent can't read shouldn't be offered to it
-                NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
-                // Files carry no frontmatter: omit both hidden and protected
-                // locations before a remote agent sees title or path.
-                _ => {
-                    self.store.agent_listable(&meta.id)
-                        && !self.store.file_is_protected(&meta.id)
-                }
-            };
+            let visible = self.remote_meta_visible(&meta);
             if visible {
                 kept.push(meta);
             }
@@ -330,6 +319,16 @@ impl Workspace {
             .map(|folder| self.prefix_folder(folder))
             .collect();
         Ok(list)
+    }
+
+    fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
+        match meta.kind {
+            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
+            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
+            NoteKind::File => {
+                self.store.agent_listable(&meta.id) && !self.store.file_is_protected(&meta.id)
+            }
+        }
     }
 
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
@@ -545,9 +544,8 @@ impl Workspace {
 
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
-        list.notes.retain(|meta| {
-            meta.kind != NoteKind::Note || self.store.read_for_ai(&meta.id, false).is_ok()
-        });
+        list.notes.retain(|meta| self.remote_meta_visible(meta));
+        list.folders.retain(|folder| self.store.agent_listable(&folder.id));
         let visible_notes = list
             .notes
             .iter()
@@ -633,10 +631,10 @@ impl Workspace {
             let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
                 return false;
             };
-            if rel.ends_with(".md") {
+            if rel.to_ascii_lowercase().ends_with(".md") {
                 return self.store.read_for_ai(wire_id, false).is_ok();
             }
-            if rel.ends_with(".excalidraw") {
+            if rel.to_ascii_lowercase().ends_with(".excalidraw") {
                 return self.read_board_for_remote(wire_id).is_ok();
             }
             return self.store.agent_listable(&rel) && !self.store.file_is_protected(&rel);
@@ -785,7 +783,7 @@ impl Workspace {
     fn view_writable(&mut self, item_id: &str) -> Result<(), String> {
         let text = self.store.read_for_ai(item_id, false)?;
         let rel = self.store.resolve_note_rel(item_id)?;
-        if !rel.ends_with(".md") {
+        if !rel.to_ascii_lowercase().ends_with(".md") {
             return Ok(()); // no frontmatter to write; the read gate is the whole gate
         }
         if crate::corpus::has_locked_frontmatter(&text) {

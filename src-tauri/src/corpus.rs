@@ -4948,7 +4948,7 @@ impl CorpusStore {
     /// Accepts either shape so "Open the note" can name any journal row.
     pub fn wire_id_of(&mut self, id_or_rel: &str) -> Result<String, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
-        if !rel.ends_with(".md") {
+        if !rel.to_ascii_lowercase().ends_with(".md") {
             return Ok(rel); // boards/files already travel as their rel
         }
         if let Some((id, _)) = self.index.iter().find(|(_, r)| **r == rel) {
@@ -5214,7 +5214,7 @@ impl CorpusStore {
         // memex). LegacyRotli waves both through.
         self.writable(&rel)?;
         self.writable(&target_folder)?;
-        if !rel.ends_with(".md") {
+        if !rel.to_ascii_lowercase().ends_with(".md") {
             // Into a SINK, an opaque item keeps its original path underneath it
             // (`trash/storage/excalidraw/x`) — that breadcrumb IS how
             // `restore_file` finds its way home, since a board carries no
@@ -5269,7 +5269,7 @@ impl CorpusStore {
             fs::rename(&abs, &target_abs).map_err(|e| format!("move {rel}: {e}"))?;
         }
         let (created_at, updated_at) = file_stamps(&target_abs);
-        let is_board = target_rel.ends_with(".excalidraw");
+        let is_board = target_rel.to_ascii_lowercase().ends_with(".excalidraw");
         let folder = folder_of(&target_rel);
         Ok(NoteMeta {
             id: target_rel.clone(),
@@ -6056,7 +6056,7 @@ impl CorpusStore {
     /// Read a board's raw Excalidraw scene JSON. `id` IS the relative path.
     pub fn read_board(&mut self, id: &str) -> Result<CorpusBoardDoc, String> {
         validate_rel(id)?;
-        if !id.ends_with(".excalidraw") {
+        if !id.to_ascii_lowercase().ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
         }
         // reads honor the same memex scope as writes: never return a board that
@@ -6085,7 +6085,7 @@ impl CorpusStore {
     /// Save a board's raw scene JSON verbatim (no frontmatter, no index touch).
     pub fn write_board(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         validate_rel(id)?;
-        if !id.ends_with(".excalidraw") {
+        if !id.to_ascii_lowercase().ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
         }
         self.writable(id)?;
@@ -6125,7 +6125,7 @@ impl CorpusStore {
         expected_revision: &str,
     ) -> Result<CorpusWriteResult, String> {
         validate_rel(id)?;
-        if !id.ends_with(".excalidraw") {
+        if !id.to_ascii_lowercase().ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
         }
         self.writable(id)?;
@@ -6202,7 +6202,7 @@ impl CorpusStore {
     /// (its id IS the new relpath). Boards carry no index, so this is a pure file
     /// move + a fresh meta — no id remap to chase elsewhere (the maintainer, 2026-06-26).
     pub fn rename_board(&mut self, id: &str, new_name: &str) -> Result<NoteMeta, String> {
-        if !id.ends_with(".excalidraw") {
+        if !id.to_ascii_lowercase().ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
         }
         self.writable(id)?;
@@ -6616,7 +6616,7 @@ fn walk(
                 walk(
                     layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
                 )?;
-            } else if kind.is_file() && name.ends_with(".md") {
+            } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
                 let abs = entry.path();
                 let Ok(text) = fs::read_to_string(&abs) else {
                     continue;
@@ -6693,7 +6693,7 @@ fn walk(
             walk(
                 layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
             )?;
-        } else if kind.is_file() && name.ends_with(".md") {
+        } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
             let abs = entry.path();
             let Ok(text) = fs::read_to_string(&abs) else {
                 continue;
@@ -6770,7 +6770,7 @@ fn walk(
                 origin,
                 kind: NoteKind::Note,
             });
-        } else if kind.is_file() && name.ends_with(".excalidraw") {
+        } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".excalidraw") {
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
             // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
             // title = the file stem. They live next to `.md` notes in the tree.

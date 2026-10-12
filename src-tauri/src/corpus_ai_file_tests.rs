@@ -113,6 +113,63 @@ fn allowed_local_secure_xlsx_text_enters_remote_overlap_ledger() {
 }
 
 #[test]
+fn numeric_only_secure_workbook_enters_remote_overlap_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    let rel = "Secure notes/numbers.xlsx";
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let sheet = b"<worksheet><sheetData><row><c><v>1234567</v></c><c><v>2345678</v></c><c><v>3456789</v></c><c><v>4567890</v></c><c><v>5678901</v></c></row></sheetData></worksheet>";
+    let bytes = crate::ai_files::tests::zip_with(&[("xl/worksheets/sheet1.xml", sheet)], true);
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(
+        "1234567 2345678 3456789 4567890 5678901"
+    ));
+}
+
+#[test]
+fn secure_office_comments_enter_remote_overlap_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let sheet = b"<worksheet><sheetData><row><c><v>1</v></c></row></sheetData></worksheet>";
+    let sheet_secret = "The bronze meadow comment settles after the midsummer lantern parade.";
+    let comments = format!(
+        "<comments><commentList><comment><text><t>{sheet_secret}</t></text></comment></commentList></comments>"
+    );
+    let workbook = crate::ai_files::tests::zip_with(
+        &[
+            ("xl/worksheets/sheet1.xml", sheet),
+            ("xl/comments/comment1.xml", comments.as_bytes()),
+        ],
+        true,
+    );
+    fs::write(store.root().join("Secure notes/comments.xlsx"), workbook).unwrap();
+    store
+        .read_file_bytes_for_ai("Secure notes/comments.xlsx", true)
+        .unwrap();
+    assert!(crate::secret::blocked_for_remote(sheet_secret));
+
+    let word_secret = "The indigo meadow comment settles after the winter lantern parade.";
+    let document = b"<w:document><w:body><w:p><w:t>Public plan</w:t></w:p></w:body></w:document>";
+    let word_comments = format!(
+        "<w:comments><w:comment><w:p><w:t>{word_secret}</w:t></w:p></w:comment></w:comments>"
+    );
+    let word = crate::ai_files::tests::zip_with(
+        &[
+            ("word/document.xml", document),
+            ("word/comments.xml", word_comments.as_bytes()),
+        ],
+        true,
+    );
+    fs::write(store.root().join("Secure notes/comments.docx"), word).unwrap();
+    store
+        .read_file_bytes_for_ai("Secure notes/comments.docx", true)
+        .unwrap();
+    assert!(crate::secret::blocked_for_remote(word_secret));
+}
+
+#[test]
 fn prefixed_strict_workbook_text_enters_remote_overlap_ledger() {
     let tmp = TempDir::new().unwrap();
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();

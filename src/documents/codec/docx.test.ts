@@ -15,6 +15,33 @@ describe("DOCX editor codec", () => {
   const RED_PIXEL_PNG =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nCEAAAAASUVORK5CYII=";
 
+  test("reads text from a prefixed Strict document for the AI edit view", async () => {
+    const base64 = await createDocxBase64({
+      title: "Private title",
+      blocks: [{ kind: "paragraph", text: "Readable body" }],
+    });
+    const zip = await JSZip.loadAsync(base64, { base64: true });
+    const xml = await zip.file("word/document.xml")?.async("string");
+    if (!xml) throw new Error("fixture has no document.xml");
+    zip.file(
+      "word/document.xml",
+      xml
+        .replaceAll(
+          "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+          "http://purl.oclc.org/ooxml/wordprocessingml/main",
+        )
+        .replace("xmlns:w=", "xmlns:x=")
+        .replaceAll("w:", "x:"),
+    );
+    const decoded = await decodeDocx(await zip.generateAsync({ type: "base64" }), "strict.docx");
+    expect(
+      decoded.document.content.some(
+        (block) =>
+          block.kind === "paragraph" && block.paragraph.runs.some((run) => run.text === "Readable body"),
+      ),
+    ).toBe(true);
+  });
+
   test("round-trips edited paragraphs without rewriting opaque package parts", async () => {
     const base64 = await createDocxBase64({
       title: "Original title",

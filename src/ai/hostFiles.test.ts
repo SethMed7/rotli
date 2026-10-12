@@ -89,7 +89,7 @@ const workbook = async (fill: (wb: ExcelJS.Workbook) => void) => {
 };
 
 test("remote file tools refuse secret-free secure-home files before extraction", async () => {
-  for (const ext of ["docx", "xlsx", "csv"]) {
+  for (const ext of ["docx", "xlsx", "xlsm", "xltx", "xltm", "csv"]) {
     const id = `wiki/_secure/plan.${ext}`;
     files[id] = "ordinary project data";
     reads.length = 0;

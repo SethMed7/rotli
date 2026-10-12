@@ -22,7 +22,10 @@ async function excelJsCompatibleBytes(zip: JSZip, original: ArrayBuffer): Promis
     );
     let normalized = xml.replaceAll(STRICT_SPREADSHEET_NAMESPACE, SPREADSHEET_NAMESPACE);
     for (const prefix of prefixes) {
+      if (!prefix) continue;
       normalized = normalized.replaceAll(`<${prefix}:`, "<").replaceAll(`</${prefix}:`, "</");
+      const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      normalized = normalized.replace(new RegExp(`(\\s)${escaped}:([\\w.-]+)=`, "g"), "$1$2=");
     }
     if (normalized !== xml) {
       zip.file(name, normalized);
