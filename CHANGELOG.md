@@ -383,8 +383,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Rotli Web opens, edits, and creates Word documents and spreadsheets
-  (Beta).** In the folder you connected — directly or through Rotli Helper —
+- **Rotli Web opens, edits, and creates Word documents and spreadsheets (Beta).**
+  In the folder you connected — directly or through Rotli Helper —
   `.docx` and `.xlsx` files open in the same editors as the Mac app, and New
   Document, New Sheet, `/document`, and `/sheet` make real files you can open
   in Word or Excel. Formulas, number formats, extra sheets, headings, bold
