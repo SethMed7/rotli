@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Secure spreadsheets saved by other apps stay private.** Prefixed and Strict workbook text now reaches the remote overlap guard; unreadable secure workbooks refuse local AI reads, and remote workspace references hide secure files and boards.
 - **Secure-home notes and files stay out of cloud and agent reads.** Chat note reads now check location even for plain CSV or text without secure frontmatter; remote listings omit protected file titles and paths. A newly created file can be found after a one-time list refresh. Local secure Word and spreadsheet reads feed their extracted text to the egress overlap guard. Refined Hand to AI accepts ordinary code samples with missing paths while refusing references to existing protected files.
 - **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
   a save uses the saved version; a delete after an external removal is a no-op
