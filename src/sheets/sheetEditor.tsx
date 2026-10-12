@@ -346,7 +346,11 @@ export default function SheetEditor({
           White
         </button>
       </div>
-      {err && <span className="sheet-save-err">⚠ {err}</span>}
+      {err && (
+        <span className="sheet-save-err" role="alert">
+          ⚠ {err}
+        </span>
+      )}
       {draftWarning && (
         <span className="sheet-save-err" role="alert">
           {OFFICE_DRAFT_WARNING}

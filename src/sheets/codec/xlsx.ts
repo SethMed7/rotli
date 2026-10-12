@@ -16,7 +16,11 @@ export function newWorkbook(): Workbook {
 
 /** Load an xlsx from raw bytes. */
 export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
-  const zip = await JSZip.loadAsync(bytes);
+  const zip = await JSZip.loadAsync(bytes).catch(() => {
+    throw new Error(
+      "This file isn’t a readable Excel workbook — it may be damaged, or another format saved with an .xlsx name.",
+    );
+  });
   const unsupported = Object.keys(zip.files).filter((name) => {
     const path = name.toLowerCase();
     return (

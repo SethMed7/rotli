@@ -57,3 +57,10 @@ describe("round-trip safety", () => {
     await expect(loadXlsx(bytes.buffer as ArrayBuffer)).rejects.toThrow("chart");
   });
 });
+
+test("an .xlsx that isn't a zip package says so in plain words, never the zip library's text", async () => {
+  const bytes = new TextEncoder().encode("synthetic package placeholder");
+  await expect(loadXlsx(bytes.buffer as ArrayBuffer)).rejects.toThrow(
+    "This file isn’t a readable Excel workbook — it may be damaged, or another format saved with an .xlsx name.",
+  );
+});
