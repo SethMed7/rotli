@@ -11,7 +11,8 @@ import { join, relative } from "node:path";
 
 import { type BrowserContext, expect, test } from "@playwright/test";
 
-import { APP, plantOpfsFiles, startWithVault } from "./support";
+import { budgetXlsx, letterDocx } from "./office-fixtures";
+import { APP, plantOpfsBinary, plantOpfsFiles, readOpfsBase64, startWithVault } from "./support";
 
 /** Every request that actually LEFT the page, as URLs. A request the
  * browser's content policy stopped before sending (Chromium reports it as
@@ -134,4 +135,50 @@ test("a note's images and HTML can't send its text anywhere, not even to this si
   await expect(page.locator(".rotli-render-mermaid")).toContainText("privacy");
   expect(urls.filter((url) => url.includes("secret"))).toEqual([]);
   expect(egress(urls, origin)).toEqual([]);
+});
+
+// The office editors (2026-10-12, Rotli Web Beta): opening, typing into, and
+// saving a Word document and an Excel workbook loads only the app's own
+// files — no font, worker, or converter is fetched from anywhere else.
+test("opening and editing a document and a workbook never leaves this computer", async ({
+  context,
+  page,
+  baseURL,
+}) => {
+  const urls = recordRequests(context);
+  const posts: string[] = [];
+  context.on("request", (request) => {
+    if (request.method() !== "GET" && !request.url().startsWith("http://127.0.0.1:"))
+      posts.push(request.url());
+  });
+  await startWithVault(page);
+  const xlsx = (await budgetXlsx()).toString("base64");
+  const docx = (await letterDocx()).toString("base64");
+  await plantOpfsBinary(page, { "storage/budget.xlsx": xlsx, "storage/letter.docx": docx });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const open = async (path: string) => {
+    await page.locator(".sb-system .frow", { hasText: "Assets" }).click();
+    await page.locator(`.system-browser [data-note-id="${path}"]`).first().dblclick();
+  };
+
+  await open("storage/budget.xlsx");
+  await expect(page.locator(".sheet-editor canvas").first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest(".sheet-editor"))).toBe(true);
+  await page.keyboard.type("private cell");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => readOpfsBase64(page, "storage/budget.xlsx")).not.toBe(xlsx);
+
+  await open("storage/letter.docx");
+  const canvas = page.locator(".document-editor-host.is-ready canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("the document canvas has no bounds");
+  await page.mouse.click(box.x + 100, box.y + 100);
+  await page.keyboard.press("End");
+  await page.keyboard.type(" private paragraph");
+  await expect.poll(() => readOpfsBase64(page, "storage/letter.docx")).not.toBe(docx);
+
+  expect(egress(urls, new URL(baseURL ?? APP).origin)).toEqual([]);
+  expect(posts).toEqual([]);
+  expect(urls.filter((url) => url.includes("private"))).toEqual([]);
 });
