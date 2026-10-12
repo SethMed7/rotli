@@ -142,6 +142,33 @@ fn board_lane_matches_fixture() {
 }
 
 #[test]
+fn managed_file_rules_match_fixture() {
+    let rules = entry("managedFileRules");
+    assert_eq!(
+        rules["memexLane"].as_str(),
+        Some(crate::corpus::MANAGED_MEMEX_LANE)
+    );
+    assert_eq!(
+        rules["plainLane"].as_str(),
+        Some(crate::corpus::MANAGED_PLAIN_LANE)
+    );
+    let collision = crate::corpus::managed_collision_name("stem", ".docx", 2);
+    assert_eq!(
+        rules["collisionSuffix"].as_str(),
+        collision
+            .strip_prefix("stem")
+            .and_then(|value| value.strip_suffix(".docx"))
+    );
+    let extensions: Vec<&str> = rules["extensions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap())
+        .collect();
+    assert_eq!(extensions, crate::corpus::MANAGED_FILE_EXTS);
+}
+
+#[test]
 fn board_limits_match_fixture() {
     let limits = entry("boardLimits");
     assert_eq!(

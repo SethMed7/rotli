@@ -131,10 +131,20 @@ revision-gated like notes (`${lastModified}:${size}`, then the helper's own
 gate). `FolderNotesService` lists boards by stat alone (they never join the
 note index as notes) and moves them through Archive/Trash like the Mac corpus.
 Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
-Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
-`launchFeatures(…, "web").documents` is false, so the chooser shows Document as
-coming soon and every create path refuses it. `/document` is hidden, and
+Not on the web: Reveal in Finder (hidden). The connected-folder managed-file
+adapter can create DOCX and XLSX bytes in `storage/rotli` for a memex vault or
+`Storage` for a plain vault. It accepts only those two extensions, collides as
+`stem-2.ext`, and uses the `"0"` content gate at every candidate, including
+after a racing create. Ordinary file Archive/Trash moves and restores use the
+folder notes lifecycle path. A new pristine document is hard-discarded on close only
+while its exact creation bytes remain; a changed or missing file is kept and
+the refusal is reported. Rename carries a first-save `.bak` beside the new
+name without replacing an existing backup. Both folder roads use the same
+rules. The DOCX/XLSX editor probe and lazy mount follow the build capabilities;
+`launchFeatures(…, "web")` still withholds documents and sheets in this slice,
+so the chooser shows Document as coming soon, `/document` is hidden, and
 existing document and XLSX fences show an "opens in Rotli for Mac" message.
+The later flag flip also needs browser draft recovery and an end-to-end pass.
 CSV **embeds** remain withheld too: the sheet embed still uses the desktop
 stat/byte-save adapter, independently of CSV's standalone text surface. The
 fence source remains editable and unchanged.

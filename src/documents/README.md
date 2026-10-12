@@ -102,8 +102,14 @@ A person names a document before it is created and can rename it from its
 row or tab menu; the naming rules live in the
 [memex data contract](../../docs/architecture/memex-data-contract.md).
 
-Managed documents live in `storage/` inside the vault, which the vault's
-`.gitignore` excludes, so they are never tracked by git even when notes are. Markdown-only features such as slash
+Managed documents live in `storage/rotli/` in a memex vault (excluded by the
+vault's `.gitignore`) or `Storage/` in a plain vault. The connected-folder
+adapter creates only DOCX and XLSX with a create-only content gate and
+`stem-2.ext` collisions; a pristine new web document can be discarded only
+when its bytes still match the ones Rotli created. Its first-save `.bak`
+travels with rename unless the destination already has a backup. Browser
+editing remains behind the `documents` and `sheets` build capabilities until
+the later recovery and browser-proof slice enables them. Markdown-only features such as slash
 commands and embed fences are never mounted in documents.
 
 The editor presents conventional document defaults independent of the app

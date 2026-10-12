@@ -6,7 +6,7 @@
     "src/state/panes.ts": 1267,
     "src/components/systemSurface.tsx": 1189,
     "src/components/sidebar/sidebarHome.tsx": 1301,
-    "src/components/fileSurface.tsx": 854,
+    "src/components/fileSurface.tsx": 726,
     "src/components/chat/chatSurface.tsx": 2864,
     "src/components/breve/breveSurface.tsx": 2335,
     "src/components/settingsSurface.tsx": 3502,

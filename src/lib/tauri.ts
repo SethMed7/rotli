@@ -1048,13 +1048,19 @@ export async function corpusFileStat(id: string): Promise<FileStat | null> {
 
 /** Move a surfaced storage asset into an in-memex lifecycle sink. */
 export async function corpusMoveFileToSink(id: string, sink: "Archive" | "Trash"): Promise<string> {
-  if (!isTauri()) return id;
+  if (!isTauri()) return currentWebVaultIo().moveFileToSink(id, sink);
   return invoke<string>("corpus_move_file_to_sink", { id, sink });
+}
+
+/** A newly created document can be discarded only while its exact bytes remain. */
+export async function corpusDiscardPristineManagedFile(id: string): Promise<void> {
+  if (!isTauri()) return currentWebVaultIo().discardPristineManagedFile(id);
+  await corpusMoveFileToSink(id, "Trash");
 }
 
 /** Restore a surfaced file from Archive/Trash to its original storage path. */
 export async function corpusRestoreFile(id: string): Promise<string> {
-  if (!isTauri()) return id;
+  if (!isTauri()) return currentWebVaultIo().restoreFile(id);
   return invoke<string>("corpus_restore_file", { id });
 }
 
@@ -1088,7 +1094,7 @@ export async function corpusCreateManagedFile(
   base64: string,
   rootId?: string,
 ): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri()) return currentWebVaultIo().createManagedFile(name, base64);
   return invoke<string>("corpus_create_managed_file", { name, base64, rootId });
 }
 

@@ -23,12 +23,11 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     breve: desktop && development,
     mermaidVisualEditing: development,
     agents: desktop && development,
-    // Sheets ship on the desktop as Beta (the owner, 2026-10-05); Rotli Web has
-    // no workbook lane. newItems/model.ts marks which kinds wear the Beta badge.
+    // Sheets ship on the desktop as Beta (the owner, 2026-10-05). The web
+    // managed-file lane exists, but browser draft recovery gates the flag flip.
     sheets: desktop,
-    // DOCX editing and creation need the desktop document lane (the managed
-    // storage writer and the Univer editor over corpus bytes); Rotli Web
-    // names Document as coming soon rather than offering a broken create.
+    // The browser document lane is wired but remains behind draft recovery
+    // and browser proof. Until then Web names Document as coming soon.
     documents: desktop,
     // App-wide hotkeys — tabs, panes, views, history, the two-step leaders.
     // Rotli Web lives inside a browser whose own shortcuts own those keys
