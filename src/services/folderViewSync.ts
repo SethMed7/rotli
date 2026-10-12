@@ -8,6 +8,8 @@ import type { MainNode } from "./mainTree";
 import { contentRevision, type VaultDir } from "./vaultDir";
 import { VIEW_FOLDER_FORBIDDEN_CHARS, viewNameError, type ViewsManifest } from "./viewTree";
 
+const broadRotliExclusions = [".rotli", ".rotli/"];
+
 function membership(raw: string): Map<string, string> {
   const manifest = JSON.parse(raw || '{"version":1,"views":[]}') as ViewsManifest;
   if (manifest.version !== 1 || !Array.isArray(manifest.views))
@@ -109,25 +111,15 @@ export async function writeFolderViews(
       throw new Error("revision conflict: views changed during write");
     if ((await dir.exists(".gitignore")) || (await dir.exists(".git"))) {
       // Narrow the directory exclusion so git can include the two projections.
-      const ignored = (await dir.exists(".gitignore")) ? await readVersionedFile(dir, ".gitignore") : null;
-      if (
-        ignored &&
-        ignored.contents.split("\n").some((line) => [".rotli", ".rotli/"].includes(line.trim()))
-      ) {
-        const narrowed = ignored.contents
-          .split("\n")
-          .map((line) => ([".rotli", ".rotli/"].includes(line.trim()) ? ".rotli/*" : line))
-          .join("\n");
-        await writeVersionedFile(dir, ".gitignore", narrowed, ignored.revision);
-        ignoreRollback = { before: ignored.contents, applied: narrowed, safe: true };
-      }
-      const updated = await updateGitExclusions(dir, [".rotli/*", `!${mainPath}`, `!${path}`]);
-      if (ignoreRollback) {
-        ignoreRollback.safe &&= updated.before === ignoreRollback.applied;
-        ignoreRollback.applied = updated.after;
-      } else if (updated.after !== updated.before) {
+      const hadIgnore = await dir.exists(".gitignore");
+      const updated = await updateGitExclusions(
+        dir,
+        [".rotli/*", `!${mainPath}`, `!${path}`],
+        broadRotliExclusions,
+      );
+      if (updated.after !== updated.before) {
         ignoreRollback = {
-          before: ignored || updated.before ? updated.before : null,
+          before: hadIgnore || updated.before ? updated.before : null,
           applied: updated.after,
           safe: true,
         };

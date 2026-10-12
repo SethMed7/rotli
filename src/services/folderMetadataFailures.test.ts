@@ -159,10 +159,47 @@ test("a failed view manifest restores its gitignore edit unless a newer edit won
     ).rejects.toThrow("manifest denied");
     expect(await dir.readText(".gitignore")).toBe(
       external
-        ? ".rotli/*\nuser-rule\n!.rotli/main.json\n!.rotli/views.json\nexternal-rule\n"
+        ? "user-rule\n.rotli/*\n!.rotli/main.json\n!.rotli/views.json\nexternal-rule\n"
         : originalIgnore,
     );
   }
+});
+
+test("view exclusion narrowing retries a concurrent secure exclusion edit", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText(".gitignore", ".rotli/\n");
+  const write = dir.writeText.bind(dir);
+  let injected = false;
+  dir.writeText = async (path, contents, expected) => {
+    if (path === ".gitignore" && !injected) {
+      injected = true;
+      await write(path, ".rotli/\nwiki/_secure/concurrent.md\n");
+    }
+    await write(path, contents, expected);
+  };
+  expect(await writeFolderViews(dir, '{"version":1,"views":[]}', "0")).toBe(true);
+  expect(await dir.readText(".gitignore")).toContain("wiki/_secure/concurrent.md\n");
+  expect(await dir.readText(".gitignore")).toContain(".rotli/*\n");
+});
+
+test("a secure move succeeds when removing its old git exclusion fails", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  const write = dir.writeText.bind(dir);
+  let moved = false;
+  const move = dir.move.bind(dir);
+  dir.move = async (from, to) => {
+    await move(from, to);
+    moved = true;
+  };
+  dir.writeText = async (path, contents, expected) => {
+    if (moved && path === ".gitignore") throw new Error("old exclusion unavailable");
+    await write(path, contents, expected);
+  };
+  expect(await setFolderSecure(dir, "wiki/keep.md", true)).toBe("wiki/_secure/keep.md");
+  expect(await dir.exists("wiki/keep.md")).toBe(false);
+  expect(await dir.exists("wiki/_secure/keep.md")).toBe(true);
+  expect(await dir.readText(".gitignore")).toContain("wiki/keep.md\n");
 });
 
 test("a created gitignore survives an external edit between rollback read and remove", async () => {

@@ -26,6 +26,10 @@ test("web Welcome lessons describe clickable controls and supported creation", (
   expect(web[0]?.body).toContain("tab strip");
   expect(web[2]?.body).not.toContain("Document");
   for (const entry of web) expect(entry.body).not.toMatch(/[⌘⌥]/);
+  expect(web.find((entry) => entry.id === "privacy")?.body).not.toContain("Review the Librarian setting");
+  expect(WELCOME_CATALOG.find((entry) => entry.id === "privacy")?.body).toContain(
+    "Review the Librarian setting",
+  );
 });
 
 test("the welcome note teaches autosave and the real new-note chords", () => {

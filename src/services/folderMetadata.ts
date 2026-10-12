@@ -66,7 +66,10 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     if (currentFile.contents !== expected)
       throw new Error("revision conflict: secure note changed before move");
     await dir.move(path, target);
-    await updateGitExclusions(dir, [], [path]);
+    await updateGitExclusions(dir, [], [path]).catch(() => {
+      // The move landed; retaining an obsolete exclusion is safer than
+      // reporting failure after the caller's path has already changed.
+    });
   }
   if (!secure) {
     const final = await readVersionedFile(dir, target);

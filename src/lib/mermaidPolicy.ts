@@ -20,11 +20,14 @@ const NETWORK_BEARING = [
   /image-set\s*\(/i,
   /@import\b/i,
   /\bthemeCSS\b/i,
-  /\b(?:https?|ftp|wss?):/i,
-  /\/\//,
+  /\b(?:https?|ftp|wss?|file):\/\//i,
+  /\bdata:/i,
+  /(?:^|[\s"'=[(])\/\/[a-z0-9.-]+/im,
+  /!\[/,
   new RegExp(`<\\s*\\/?\\s*(?!(?:${SAFE_TAGS})\\b)[a-z!?]`, "i"),
   /<[^>]*\bstyle\s*=/i,
-  /^\s*(?:click|links?|callback)\b/im,
+  /^\s*(?:click|links?|callback)\s+[a-z0-9_.:-]+(?:\s|$)/im,
+  /^\s*links?\s*:/im,
   /\\(?:x|u|[0-9a-fA-F])/,
 ];
 
@@ -56,7 +59,13 @@ function decodeEntities(code: string): string {
  * app's webview can't send note text to a site. */
 export function mermaidRefusal(code: string, platform: Platform): string | null {
   if (platform !== "web") return null;
-  const decoded = decodeEntities(code);
-  const bearing = NETWORK_BEARING.some((rule) => rule.test(code) || rule.test(decoded));
-  return bearing ? MERMAID_WEB_REFUSAL : null;
+  let decoded = code;
+  for (let i = 0; i < 8; i += 1) {
+    if (NETWORK_BEARING.some((rule) => rule.test(decoded))) return MERMAID_WEB_REFUSAL;
+    const next = decodeEntities(decoded);
+    if (next === decoded) return null;
+    decoded = next;
+  }
+  // Entity nesting beyond the bounded decoder is ambiguous to this preflight.
+  return MERMAID_WEB_REFUSAL;
 }

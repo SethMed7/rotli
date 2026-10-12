@@ -74,6 +74,16 @@ describe("check:ratchets", () => {
     expect(r.stderr).toContain("source-shape test assertions rose to 3 (ceiling 2)");
   });
 
+  test("a disabled runtime-only menu offer trips the component ceiling at baseline minus one", async () => {
+    const r = await run({
+      "scripts/ratchet-baseline.json": baseline({ disabledRuntimeOffers: 0 }),
+      "src/big.ts": big(600),
+      "src/components/menu.tsx": "export const menu = { disabled: !isTauri() };\n",
+    });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("disabled runtime-only offers rose to 1 (ceiling 0)");
+  });
+
   test("a directory sinking below its recorded coverage ratio fails", async () => {
     const files: Record<string, string> = {
       "scripts/ratchet-baseline.json": baseline({ coverage: { "src/thin": 0.5 } }),

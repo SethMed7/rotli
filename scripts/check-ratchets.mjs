@@ -82,8 +82,21 @@ const presentationRoots = ["src/components", "src/editor", "src/keys"];
 const runtimeGates = presentationRoots
   .flatMap((dir) => walk(join(root, dir), (p) => /\.tsx?$/.test(p) && !/\.test\.tsx?$/.test(p)))
   .reduce((n, p) => n + (readFileSync(p, "utf8").match(/\bisTauri\(\)/g) ?? []).length, 0);
+// Offers must be gated by PLATFORM; a disabled runtime adapter check may only
+// appear inside an existing desktop offer. Count all uses as a simple ceiling.
+const disabledRuntimeOffers = walk(
+  join(root, "src/components"),
+  (p) => /\.tsx?$/.test(p) && !/\.test\.tsx?$/.test(p),
+).reduce((n, p) => n + (readFileSync(p, "utf8").match(/disabled:\s*!isTauri\(\)/g) ?? []).length, 0);
 
-const current = { fileLines, sourceShapeAssertions, provenanceComments, coverage, runtimeGates };
+const current = {
+  fileLines,
+  sourceShapeAssertions,
+  provenanceComments,
+  coverage,
+  runtimeGates,
+  disabledRuntimeOffers,
+};
 
 if (update || !existsSync(baselinePath)) {
   // dupClusters is owned by check:dup --gate; carry it across an update
@@ -126,6 +139,10 @@ for (const [k, v] of Object.entries(provenanceComments)) {
 if (runtimeGates > (baseline.runtimeGates ?? runtimeGates))
   failures.push(
     `isTauri() calls in presentation rose to ${runtimeGates} (ceiling ${baseline.runtimeGates}) — gate what a surface offers on PLATFORM / LAUNCH_FEATURES; isTauri() only chooses an adapter`,
+  );
+if (disabledRuntimeOffers > (baseline.disabledRuntimeOffers ?? disabledRuntimeOffers))
+  failures.push(
+    `disabled runtime-only offers rose to ${disabledRuntimeOffers} (ceiling ${baseline.disabledRuntimeOffers}) — gate the offered item on PLATFORM before using isTauri() to disable its adapter`,
   );
 for (const [dir, ratio] of Object.entries(coverage)) {
   // a ratchet: the recorded ratio is the floor once it is above the constant —
