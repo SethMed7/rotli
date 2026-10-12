@@ -4,15 +4,9 @@
 
 import { showChatWindow } from "../lib/chatWindowBridge";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { onCorpusChanged, onNativeCloseTab } from "../lib/hostEvents";
 import { refreshWhenVisible } from "../lib/refreshWhenVisible";
-import {
-  isTauri,
-  onCorpusChanged,
-  onNativeCloseTab,
-  onSummonChat,
-  startWindowDrag,
-  toggleMaximize,
-} from "../lib/tauri";
+import { isTauri, onSummonChat, startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateChatFolders } from "./chatFolders";
 import { summonChat } from "./chatSummon";

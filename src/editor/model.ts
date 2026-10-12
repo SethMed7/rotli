@@ -13,7 +13,10 @@ import { notesService } from "../services/notes";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
 import { threeWayMerge } from "./merge";
+import { dirtyNoteIds, documentSaveError, isDirty, setDirty, setSaveError } from "./saveStatus";
 import { MARK } from "./taskState";
+
+export { documentSaveError, useDocumentDirty, useDocumentSaveError } from "./saveStatus";
 
 const SYNC_DEBOUNCE_MS = 400;
 // a failed write retries on its own — waiting for the next keystroke would
@@ -64,19 +67,6 @@ function taskSignature(lines: readonly string[]): string {
   return sig;
 }
 
-// ——— the olive-dot grammar: muted while a debounced sync is pending or in
-// flight, olive once the service confirmed the write. NO spinners, ever. ———
-
-const dirtyIds = new Set<string>();
-const dirtySubs = new Set<() => void>();
-
-function setDirty(noteId: string, value: boolean): void {
-  if (dirtyIds.has(noteId) === value) return;
-  if (value) dirtyIds.add(noteId);
-  else dirtyIds.delete(noteId);
-  for (const fn of dirtySubs) fn();
-}
-
 /** A buffer with edits not yet on disk: its text and the baseline it was
  * typed against, so a page that unloads mid-save can finish it next boot. */
 export interface UnsavedDraft {
@@ -95,7 +85,7 @@ export function setDocumentProtection(noteId: string, note: Pick<Note, "secure" 
  * unloading page can't await). Pending Command-T buffers have no file yet. */
 export function unsavedDrafts(): UnsavedDraft[] {
   const out: UnsavedDraft[] = [];
-  for (const noteId of dirtyIds) {
+  for (const noteId of dirtyNoteIds()) {
     const lines = docs.get(noteId);
     if (pendingDocuments.has(noteId)) {
       const body = lines?.join("\n") ?? "";
@@ -122,57 +112,6 @@ export function unsavedDrafts(): UnsavedDraft[] {
     }
   }
   return out;
-}
-
-/** True while the note has unsaved edits (pending debounce or sync in flight). */
-export function useDocumentDirty(noteId: string): boolean {
-  const subscribe = useCallback((fn: () => void) => {
-    dirtySubs.add(fn);
-    return () => {
-      dirtySubs.delete(fn);
-    };
-  }, []);
-  return useSyncExternalStore(subscribe, () => dirtyIds.has(noteId));
-}
-
-// ——— save failures SURFACE (perf audit 2026-07-30, correctness #1): a write
-// that fails for any reason keeps the buffer,
-// shows itself in the editor, and retries — silence here is data loss. ———
-
-const saveErrors = new Map<string, string>();
-// per-note subscriber partitions, same shape as `subs` — note A's failure must
-// not wake note B's editor (Greptile, PR #12)
-const errorSubs = new Map<string, Set<() => void>>();
-
-function setSaveError(noteId: string, message: string | null): void {
-  if ((saveErrors.get(noteId) ?? null) === message) return;
-  if (message === null) saveErrors.delete(noteId);
-  else saveErrors.set(noteId, message);
-  const set = errorSubs.get(noteId);
-  if (set) for (const fn of set) fn();
-}
-
-/** The note's last failed-write message, null when saves are healthy. */
-export function documentSaveError(noteId: string): string | null {
-  return saveErrors.get(noteId) ?? null;
-}
-
-export function useDocumentSaveError(noteId: string): string | null {
-  const subscribe = useCallback(
-    (fn: () => void) => {
-      let set = errorSubs.get(noteId);
-      if (!set) {
-        set = new Set();
-        errorSubs.set(noteId, set);
-      }
-      set.add(fn);
-      return () => {
-        set.delete(fn);
-      };
-    },
-    [noteId],
-  );
-  return useSyncExternalStore(subscribe, () => documentSaveError(noteId));
 }
 
 /** Seed the buffer from the service body. No-op if the note is already open
@@ -255,7 +194,7 @@ export function reloadDocumentIfClean(noteId: string, body: string, revision: st
     ensureDocument(noteId, body, revision);
     return;
   }
-  if (dirtyIds.has(noteId)) {
+  if (isDirty(noteId)) {
     // Disk changed under unsaved edits. Metadata-only writes (the Librarian)
     // keep the prose, so the new revision is simply a safe base. When the
     // PROSE changed too — a task ticked from the Tasks view, a chat edit,
@@ -400,7 +339,7 @@ export function setReadNoteForTests(fn: typeof readNote | null): void {
 
 async function reconcileFromDisk(noteId: string): Promise<void> {
   const note = await readNote(noteId).catch(() => null);
-  if (!note || !dirtyIds.has(noteId)) return;
+  if (!note || !isDirty(noteId)) return;
   reloadDocumentIfClean(noteId, note.body, note.revision);
 }
 
@@ -409,8 +348,8 @@ async function reconcileFromDisk(noteId: string): Promise<void> {
  * open note adopts the disk version. Returns the ids it copied. */
 async function keepConflictCopies(): Promise<string[]> {
   const kept: string[] = [];
-  for (const noteId of [...dirtyIds]) {
-    if (!saveErrors.get(noteId)?.startsWith("revision conflict")) continue;
+  for (const noteId of [...dirtyNoteIds()]) {
+    if (!documentSaveError(noteId)?.startsWith("revision conflict")) continue;
     const mine = docs.get(noteId)?.join("\n");
     const note = await readNote(noteId).catch(() => null);
     if (mine === undefined || !note) continue;
@@ -513,10 +452,10 @@ export async function flushSyncs(): Promise<void> {
   timers.clear();
   await Promise.allSettled(pending);
   await keepConflictCopies();
-  const unsaved = [...dirtyIds];
+  const unsaved = [...dirtyNoteIds()];
   if (unsaved.length > 0) {
     const detail = unsaved
-      .map((noteId) => saveErrors.get(noteId))
+      .map((noteId) => documentSaveError(noteId))
       .filter((message): message is string => Boolean(message))[0];
     throw new Error(
       `${unsaved.length} note${unsaved.length === 1 ? "" : "s"} still has unsaved edits${detail ? `: ${detail}` : ""}`,
@@ -550,10 +489,10 @@ export function setReleaseDelayForTests(ms: number | null): void {
 function releasable(noteId: string): boolean {
   return (
     !subs.get(noteId)?.size &&
-    !dirtyIds.has(noteId) &&
+    !isDirty(noteId) &&
     !timers.has(noteId) &&
     !pendingDocuments.has(noteId) &&
-    !saveErrors.has(noteId)
+    documentSaveError(noteId) === null
   );
 }
 

@@ -2,8 +2,9 @@
 
 The cross-window and Rust→webview event registry. Every event name below is a
 string literal in exactly two places by design: a sender and a receiver. The
-webview side always lives in `src/lib/tauri.ts` (or `src/lib/quitFlush.ts`
-for the quit lane, `src/lib/chatWindowBridge.ts` for the Chat window) as an
+webview side always lives in `src/lib/tauri.ts` (or `src/lib/hostEvents.ts`
+for the vault and native-menu events, `src/lib/quitFlush.ts` for the quit
+lane, `src/lib/chatWindowBridge.ts` for the Chat window) as an
 `emit*`/`on*` pair, so components never touch Tauri's
 event API directly. `check:window-events` proves every literal in `src/` and
 `src-tauri/src/` has a row here and that each row is still wired on both
