@@ -32,8 +32,7 @@ Decided by the owner on 2026-09-22; the history is in
    ledger's phrase rule, so an early note remains protected even when a large
    vault exceeds the ledger's 50,000-phrase capacity. If the served-vault
    configuration changes during the scan, the Helper rechecks a bound vault
-   id before completing the request and refreshes its cached configuration on
-   the next request.
+   id before completing the request.
    On the browser folder road (`vaultRoad: "folder"`) the Helper cannot see
    the page's folder, so that refresh covers only a vault the Helper itself
    serves, if any. There the page is the enforcer: a chat that has read a
@@ -230,7 +229,8 @@ the editor's clean-buffer gate preserves unsaved typing.
 
 - **Chosen by a person, never by the page.** `rotli-helper --vault <dir>`
   writes `~/.rotli-helper/vault.json` (0600) and exits; the running helper
-  follows the file. `vault_choose` opens the OS picker (`helper_picker.rs`).
+  re-reads that file on every request (never trusting its mtime alone), so it
+  follows the switch at once. `vault_choose` opens the OS picker (`helper_picker.rs`).
   The page learns only the folder's name and id.
 - **Confined.** Every path is relative and resolved by
   `containment::resolve_beneath`; `..`, absolute paths, drive prefixes,

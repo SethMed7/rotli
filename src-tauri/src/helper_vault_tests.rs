@@ -105,6 +105,37 @@ fn a_bound_completion_rechecks_its_vault_after_scan() {
     assert_eq!(result.unwrap_err().0, 409);
 }
 
+/// Rewrite the config to serve `root`, keeping the file's old mtime — two
+/// quick `--vault` writes can share one on a coarse-clock filesystem.
+fn switch_keeping_mtime(path: &std::path::Path, root: &std::path::Path) {
+    let stamp = fs::metadata(path).unwrap().modified().unwrap();
+    choose_config(path, root).unwrap();
+    fs::File::options().write(true).open(path).unwrap().set_times(fs::FileTimes::new().set_modified(stamp)).unwrap();
+}
+
+#[test]
+fn current_follows_a_vault_switch_that_kept_the_config_mtime() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    switch_keeping_mtime(&config.path().join(CONFIG_FILE), other.path());
+    assert_ne!(served.current().unwrap().id, old.id);
+}
+
+#[test]
+fn a_refused_completion_leaves_current_on_the_new_vault_even_with_the_old_mtime() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let result = served.guard_completion_with_scan("ordinary prompt", Some(&old.id), None, |_, _| {
+        switch_keeping_mtime(&path, other.path());
+        Ok(false)
+    });
+    assert_eq!(result.unwrap_err().0, 409);
+    assert_ne!(served.current().unwrap().id, old.id, "a 409 must not pin the old vault");
+}
+
 #[test]
 fn write_read_stat_list_and_walk_round_trip() {
     let (_vault, _config, served) = serving();

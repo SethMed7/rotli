@@ -80,9 +80,11 @@ pub(crate) struct VaultConfig {
 
 pub(crate) struct ServedVault {
     config_path: PathBuf,
-    /// The config as last read, keyed by the file's mtime: `rotli-helper
-    /// --vault` in a terminal rewrites the file and the running helper follows.
-    cached: Mutex<(Option<SystemTime>, Option<VaultConfig>)>,
+    /// The config as last read, only to warm the ledger once per new vault.
+    /// Every request re-reads the (tiny) file instead of trusting its mtime:
+    /// `rotli-helper --vault` in a terminal rewrites it, and two quick
+    /// rewrites can share an mtime.
+    cached: Mutex<Option<VaultConfig>>,
     picker: Picker,
     picking: Mutex<bool>,
 }
@@ -91,30 +93,30 @@ impl ServedVault {
     pub(crate) fn new(config_dir: &Path, picker: Picker) -> Self {
         let served = Self {
             config_path: config_dir.join(CONFIG_FILE),
-            cached: Mutex::new((None, None)),
+            cached: Mutex::new(None),
             picker,
             picking: Mutex::new(false),
         };
-        if let Some(config) = served.current() {
-            warm_ledger(&config.root);
-        }
+        served.current(); // warms the served vault's ledger
         served
     }
 
-    /// The vault being served now, re-read when the config file changed.
+    /// The vault being served now, read fresh from the config file.
     pub(crate) fn current(&self) -> Option<VaultConfig> {
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
+        let config = read_config(&self.config_path);
+        self.remember(config.as_ref());
+        config
+    }
+
+    /// Warm the ledger when the served vault is new to this process.
+    fn remember(&self, config: Option<&VaultConfig>) {
         let mut cached = self.cached.lock().unwrap_or_else(|p| p.into_inner());
-        if cached.0 != stamp || (stamp.is_some() && cached.1.is_none()) {
-            let config = stamp.and_then(|_| read_config(&self.config_path));
-            if config.is_some() && cached.1 != config {
-                if let Some(config) = &config {
-                    warm_ledger(&config.root);
-                }
+        if cached.as_ref() != config {
+            if let Some(config) = config {
+                warm_ledger(&config.root);
             }
-            *cached = (stamp, config);
+            *cached = config.cloned();
         }
-        cached.1.clone()
     }
 
     /// Fresh disk truth before every remote completion, including external
@@ -131,9 +133,6 @@ impl ServedVault {
         scan: impl FnOnce(&Path, Option<&str>) -> Result<bool, Refusal>,
     ) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
-        // Cache the stamp associated with the read, never a stamp observed
-        // after the full scan: --vault may rewrite config while we scan.
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
         let Some(config) = read_config(&self.config_path) else {
             // FSA pages can use a helper with no served vault. A missing config
             // has no vault to confuse; a broken one may hide secure notes.
@@ -152,9 +151,10 @@ impl ServedVault {
             return Err((409, "completion vault road is unclear — reload Rotli Web before chatting".into()));
         }
         let quoted = scan(&config.root, Some(prompt)).map_err(|_| unavailable())?;
-        *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config));
+        // --vault may rewrite the config while we scan: a bound page must
+        // still be on the vault it named once the scan is done.
         if let Some(bound) = vault_id {
-            let current = read_config(&self.config_path).ok_or_else(unavailable)?;
+            let current = self.current().ok_or_else(unavailable)?;
             if current.id != bound {
                 return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
             }
@@ -169,9 +169,7 @@ impl ServedVault {
     /// gets a new id, so a page bound to the old vault notices.
     pub(crate) fn choose(&self, folder: &Path) -> Result<VaultConfig, String> {
         let config = choose_config(&self.config_path, folder)?;
-        warm_ledger(&config.root);
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
-        *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config.clone()));
+        self.remember(Some(&config));
         Ok(config)
     }
 
