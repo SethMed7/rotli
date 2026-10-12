@@ -14,6 +14,12 @@
 // The sign-up is one field with an arrow inside it (the owner, 2026-10-08: "an arrow style submit
 // button and simpler text"); the arrow's name is "Keep me posted".
 //
+// The sign-up is also a WebMCP tool (an experiment, 2026-10-12): the declarative form attributes
+// (toolname, tooldescription, toolparamdescription; W3C Web Machine Learning group draft) let a
+// browser agent fill in the address for the person it works for. No `toolautosubmit`, so the
+// browser stops at the arrow and the person sends it themselves. Browsers without WebMCP
+// (everything but Chrome with the origin trial or flag) ignore the attributes.
+//
 // The maker line carries an X mark to the maker's profile (rel="me", like /about/): a plain
 // drawn X, not the platform's logo artwork.
 import { mark } from '../mark';
@@ -52,7 +58,16 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
       <div class="footer-lead">
         <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
         <p>{tagline}</p>
-        <form id="newsletter" class="subscribe" action="/api/subscribe" method="post" data-subscribe aria-labelledby="subscribe-title">
+        <form
+          id="newsletter"
+          class="subscribe"
+          action="/api/subscribe"
+          method="post"
+          data-subscribe
+          aria-labelledby="subscribe-title"
+          toolname="subscribe_to_rotli_updates"
+          tooldescription="Sign up for occasional email updates about rotli, a free workspace built on plain Markdown files. Fills in the address; the person sends it themselves. Unsubscribe anytime."
+        >
           <h2 id="subscribe-title">Hear when it’s ready.</h2>
           <p class="subscribe-note" id="subscribe-note">Occasional updates. Unsubscribe anytime.</p>
           <div class="subscribe-row">
@@ -67,13 +82,14 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
               spellcheck="false"
               placeholder="Your email"
               aria-describedby="subscribe-note subscribe-status"
+              toolparamdescription="The email address to send updates to."
             />
             <button class="subscribe-send" type="submit" aria-label="Keep me posted" title="Keep me posted">
               <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
             </button>
           </div>
           <div class="subscribe-trap" aria-hidden="true">
-            <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+            <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off" toolparamdescription="Always leave this empty." /></label>
           </div>
           <p class="subscribe-status" id="subscribe-status" role="status" data-subscribe-status></p>
         </form>
@@ -137,6 +153,14 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
   const status = form?.querySelector<HTMLElement>('[data-subscribe-status]');
   const input = form?.querySelector<HTMLInputElement>('input[name="email"]');
   const button = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+  // A browser without WebMCP doesn't know the pseudo-class and throws.
+  const toolFilled = (form: HTMLFormElement) => {
+    try {
+      return form.matches(':tool-form-active');
+    } catch {
+      return false;
+    }
+  };
 
   if (form && status && input && button) {
     const show = (state: 'idle' | 'sending' | 'done' | 'error' | 'closed', message = '') => {
@@ -181,6 +205,11 @@ const MAKER_X_URL = 'https://x.com/iamsethmedina';
       }
       show('sending');
       const fields = Object.fromEntries(new FormData(form));
+      // WebMCP makes every named control a tool parameter, the spam trap included. A form a
+      // browser agent filled in (`:tool-form-active` until it is sent) drops the trap, so an
+      // agent that fills it anyway doesn't get the address silently thrown away by the server.
+      if ((event as SubmitEvent & { agentInvoked?: boolean }).agentInvoked || toolFilled(form))
+        delete fields.website;
       try {
         const res = await fetch(form.action, {
           method: 'POST',
