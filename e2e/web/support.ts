@@ -109,9 +109,31 @@ export function readOpfsBase64(page: Page, path: string): Promise<string> {
       const bytes = new Uint8Array(
         await (await (await dir.getFileHandle(parts[parts.length - 1]!)).getFile()).arrayBuffer(),
       );
-      return btoa(String.fromCharCode(...bytes));
+      // chunked: one spread over a whole office package overflows the stack
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(binary);
     } catch {
       return "";
     }
   }, path);
+}
+
+/** Write binary files (base64 contents) into the origin-private folder,
+ * creating folders as needed — real .docx/.xlsx packages behind the page. */
+export async function plantOpfsBinary(page: Page, files: Record<string, string>): Promise<void> {
+  await page.evaluate(async (entries) => {
+    const root = await navigator.storage.getDirectory();
+    for (const [path, base64] of Object.entries(entries)) {
+      const parts = path.split("/");
+      let dir = root;
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+      const writable = await (
+        await dir.getFileHandle(parts[parts.length - 1]!, { create: true })
+      ).createWritable();
+      await writable.write(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0)));
+      await writable.close();
+    }
+  }, files);
 }

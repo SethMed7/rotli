@@ -130,21 +130,29 @@ describe("slash command catalog", () => {
     );
   });
 
-  test("native board, sheet, and document pickers offer creation when writable", () => {
-    expect(slashPickerCanCreate("embedBoard", true)).toBe(true);
-    expect(slashPickerCanCreate("embedSheet", true)).toBe(true);
-    expect(slashPickerCanCreate("embedDocument", true)).toBe(true);
-    expect(slashPickerCanCreate("embedSheet", false)).toBe(false);
-    expect(slashPickerCanCreate("embedDocument", true, false)).toBe(false);
+  test("board, sheet, and document pickers offer creation where the build has the kind and the vault is writable", () => {
+    const office = { sheets: true, documents: true };
+    // the build decides the offer, not the runtime: Rotli Web creates too
+    expect(slashPickerCanCreate("embedBoard", office)).toBe(true);
+    expect(slashPickerCanCreate("embedSheet", office)).toBe(true);
+    expect(slashPickerCanCreate("embedDocument", office)).toBe(true);
+    // a build without the kind offers no create row for it; boards always ship
+    const plain = { sheets: false, documents: false };
+    expect(slashPickerCanCreate("embedSheet", plain)).toBe(false);
+    expect(slashPickerCanCreate("embedDocument", plain)).toBe(false);
+    expect(slashPickerCanCreate("embedBoard", plain)).toBe(true);
+    // a vault that can't take a new file offers nothing
+    expect(slashPickerCanCreate("embedDocument", office, false)).toBe(false);
+    expect(slashPickerCanCreate("embedBoard", office, false)).toBe(false);
     // a template is an ordinary note: creatable in every build that can write
-    expect(slashPickerCanCreate("insertTemplate", false)).toBe(true);
-    expect(slashPickerCanCreate("insertTemplate", true, false)).toBe(false);
-    expect(slashPickerCanCreate("linkChat", true)).toBe(false);
+    expect(slashPickerCanCreate("insertTemplate", plain)).toBe(true);
+    expect(slashPickerCanCreate("insertTemplate", office, false)).toBe(false);
+    expect(slashPickerCanCreate("linkChat", office)).toBe(false);
     // Link note makes the note you typed — web and native alike, never read-only
-    expect(slashPickerCanCreate("linkNote", false)).toBe(true);
-    expect(slashPickerCanCreate("linkNote", true, false)).toBe(false);
+    expect(slashPickerCanCreate("linkNote", plain)).toBe(true);
+    expect(slashPickerCanCreate("linkNote", office, false)).toBe(false);
     // Continue a project list makes its next note itself, never from the picker
-    expect(slashPickerCanCreate("continueList", true)).toBe(false);
+    expect(slashPickerCanCreate("continueList", office)).toBe(false);
   });
 
   test("document discovery uses the editable DOCX vocabulary", () => {
@@ -369,7 +377,7 @@ describe("/template", () => {
   });
 
   test("it offers to create one — a note made like any other, then moved into its folder", () => {
-    expect(slashPickerCanCreate("insertTemplate", true, true)).toBe(true);
+    expect(slashPickerCanCreate("insertTemplate", { sheets: true, documents: true }, true)).toBe(true);
   });
 
   test("into an EMPTY note the template comes whole — its heading names the new note", () => {

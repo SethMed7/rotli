@@ -9,8 +9,8 @@ const { TOUR_STEPS } = await import("./guidedTourModel");
 afterAll(async () => {
   await mock.module("../../lib/featurePolicy", () => live);
 });
-test("the web tour names no withheld app shortcut or document creation", () => {
+test("the web tour names no withheld app shortcut and names document creation the web now offers", () => {
   expect(TOUR_STEPS.some((step) => /[⌘⌃]/.test(step.body))).toBe(false);
-  expect(TOUR_STEPS.find((step) => step.id === "new")?.body).not.toContain("documents");
+  expect(TOUR_STEPS.find((step) => step.id === "new")?.body).toContain("documents and boards");
   expect(TOUR_STEPS.find((step) => step.id === "search")?.body).toContain("from here");
 });

@@ -64,6 +64,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy of the vault listing instead of each asking for their own.
 - **Secure spreadsheets saved by other apps stay private.** Prefixed and Strict workbook text now reaches the remote overlap guard; unreadable secure workbooks refuse local AI reads, and remote workspace references hide secure files and boards.
 - **Secure-home notes and files stay out of cloud and agent reads.** Chat note reads now check location even for plain CSV or text without secure frontmatter; remote listings omit protected file titles and paths. A newly created file can be found after a one-time list refresh. Local secure Word and spreadsheet reads feed their extracted text to the egress overlap guard. Refined Hand to AI accepts ordinary code samples with missing paths while refusing references to existing protected files.
+- **Rotli Web protects edits across browser tabs.** Saves and new files in a
+  connected folder now take turns across tabs, and a rename keeps an outside
+  edit to its source. Office drafts from separate tabs survive and recover as
+  separate copies when they conflict; opening a second tab leaves a live
+  editor's draft alone. A later oversized edit no longer makes an older,
+  already-saved draft reappear on reload. Concurrent first saves share the
+  one-time backup, and queued writes wait for their turn. File Archive and
+  Trash actions are enabled on web. A raced rename carries its backup beside
+  the actual new name, and read-only sheet help names an action available on web.
+- **Web chat only offers file tools it can use.** It no longer offers AI
+  `read_file` or document editing where the web vault cannot serve them.
+- **Web CSV edits survive a hard refresh during autosave.** A browser-local,
+  vault-bound draft replays against the file's original revision; a changed
+  file keeps both versions. The same recovery protects DOCX and XLSX edits.
+  Oversized drafts say when an edit is waiting on its normal save for
+  protection.
+- **Rotli Web protects file edits made elsewhere.** A CSV or other editable
+  file changed outside Rotli is never overwritten by a stale save, even when
+  its size and modified time stay the same. Oversized saves through Rotli
+  Helper now explain the file limit.
 - **Rotli Web Helper saves and deletes stay ordered.** A delete queued behind
   a save uses the saved version; a delete after an external removal is a no-op
   unless it carried a content gate. Binary saves also recover when the Helper
@@ -142,8 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title renames preserve earlier names as durable aliases.
 - **Assets work on the web.** Vault files appear in Assets, Library, and filename
   search. Local media and HTML open from the vault; CSV edits refuse invalid UTF-8
-  source bytes and save with an adapter-checked content revision. Office files
-  explain their web limitation, and native-only file actions stay hidden.
+  source bytes and save with an adapter-checked content revision. Native-only
+  file actions stay hidden.
 
 ### Changed
 
@@ -171,6 +191,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rotli Web opens, edits, and creates Word documents and spreadsheets
+  (Beta).** In the folder you connected — directly or through Rotli Helper —
+  `.docx` and `.xlsx` files open in the same editors as the Mac app, and New
+  Document, New Sheet, `/document`, and `/sheet` make real files you can open
+  in Word or Excel. Formulas, number formats, extra sheets, headings, bold
+  text, and tables come through an edit unchanged; the first save keeps the
+  original beside it as a `.bak`, and a rename takes the `.bak` along. If
+  another app changes a file while it's open, Rotli says so and never saves
+  over it. Typing survives a refresh, up to about a megabyte of unsaved
+  changes per file; past that, Rotli says the change isn't protected until it
+  saves. Converting PDFs and older `.doc` files, PDF export, and opening
+  files in other apps stay on the Mac; on the web, a PDF or `.doc` tells you
+  to save a `.docx` copy in another app and open it here. Spreadsheet embeds
+  of `.csv` files now open on the web too. A `.docx` or `.xlsx` that isn't a
+  readable file says so plainly instead of showing a zip library error.
 - **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
   being built, what's planned, and what's still an idea, straight from the
   roadmap kept with rotli's source, each with its status and how big it is.

@@ -124,11 +124,17 @@ test("a sheet fence is withheld only where the build lacks sheets; other embeds 
   expect(withheldEmbedMessage("mermaid", { sheets: false })).toBeNull();
 });
 
-test("document and sheet format matrix refuses unsupported web embed I/O", () => {
+test("a CSV embed is never withheld: CSV editing ships in every build", () => {
+  for (const target of ["storage/test.csv", " storage/Upper.CSV "]) {
+    expect(withheldEmbedMessage("sheet", { sheets: false, documents: false }, target)).toBeNull();
+    expect(withheldEmbedMessage("sheet", { sheets: true, documents: true }, target)).toBeNull();
+  }
+});
+
+test("document and workbook embeds are withheld only where the build lacks them", () => {
   for (const [lang, target] of [
     ["document", "storage/test.docx"],
     ["sheet", "storage/test.xlsx"],
-    ["sheet", "storage/test.csv"],
   ]) {
     expect(withheldEmbedMessage(lang!, { sheets: false, documents: false }, target)).toContain(
       "Rotli for Mac",

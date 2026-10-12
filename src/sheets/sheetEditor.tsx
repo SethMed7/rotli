@@ -5,12 +5,25 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { SaveStatus, useAutosave } from "../components/autosave";
+import { bytesRevision, contentRevision } from "../lib/contentRevision";
 import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
+import {
+  confirmWebOfficeSave,
+  officeDraftTokenAfterProtect,
+  OFFICE_DRAFT_WARNING,
+} from "../services/webOfficeRecovery";
 import { usePanesStore } from "../state/panes";
 import { isDarkDataTheme, readDataTheme, useDataTheme } from "../state/theme";
-import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "./codec/xlsx";
+import {
+  type Workbook,
+  b64FromText,
+  bytesFromB64,
+  fillFromCsvRows,
+  loadXlsx,
+  newWorkbook,
+} from "./codec/xlsx";
 import { parseCsvExact } from "./csv";
 import {
   type SheetHandle,
@@ -27,6 +40,7 @@ import {
   getParked,
   getSetAside,
   parkedResume,
+  protectSheetDraft,
   registerLiveDirty,
   saveSetAsideAsCopy,
   setAsideParked,
@@ -66,6 +80,7 @@ export default function SheetEditor({
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draftWarning, setDraftWarning] = useState(false);
   const [themeMode, setThemeMode] = useState<SheetThemeMode>(() => themeModeMemo.get(fileId) ?? "themed");
   const appTheme = useDataTheme(); // live across all fourteen environments
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
@@ -77,6 +92,8 @@ export default function SheetEditor({
   modeRef.current = mode;
   const diskLenRef = useRef(0);
   const revisionRef = useRef("");
+  const sourceBase64Ref = useRef("");
+  const draftTokenRef = useRef("");
   const dirtyGen = useRef(0);
   const armedRef = useRef(false);
 
@@ -97,6 +114,7 @@ export default function SheetEditor({
     // edit is unwritten.
     if (!wb || !handle || dirtyGen.current === 0) return;
     const gen = dirtyGen.current;
+    const draftToken = draftTokenRef.current;
     setSaving(true);
     setErr(null);
     try {
@@ -111,7 +129,10 @@ export default function SheetEditor({
       );
       diskLenRef.current = saved.len;
       revisionRef.current = saved.revision;
+      sourceBase64Ref.current = saved.base64;
       if (dirtyGen.current === gen) {
+        confirmWebOfficeSave(fileId, draftToken);
+        setDraftWarning(false);
         dirtyGen.current = 0;
         setDirty(false);
         deleteParked(fileId);
@@ -161,12 +182,14 @@ export default function SheetEditor({
           idMapRef.current = park.idMap;
           diskLenRef.current = park.diskLen;
           revisionRef.current = park.revision;
+          sourceBase64Ref.current = park.sourceBase64 ?? "";
           dirtyGen.current = Math.max(1, dirtyGen.current);
           setDirty(true);
           autosave.edited();
         } else if (mode === "csv") {
-          revisionRef.current = stat.revision;
           const csv = await corpusFileText(fileId, SHEET_EDIT_MAX_BYTES + 1);
+          revisionRef.current = contentRevision(csv);
+          sourceBase64Ref.current = b64FromText(csv);
           if (new TextEncoder().encode(csv).length > SHEET_EDIT_MAX_BYTES) {
             throw new Error("this file is too large to edit in rotli — opening read-only is fine");
           }
@@ -176,9 +199,10 @@ export default function SheetEditor({
           model = workbookToModel(wb, fileId);
           idMapRef.current = buildSheetIdMap(wb, model);
         } else {
-          revisionRef.current = stat.revision;
           const b64 = await corpusFileBytes(fileId, SHEET_EDIT_MAX_BYTES + 1);
           const bytes = bytesFromB64(b64);
+          revisionRef.current = bytesRevision(bytes);
+          sourceBase64Ref.current = b64;
           if (bytes.length > SHEET_EDIT_MAX_BYTES) {
             throw new Error("this file is too large to edit in rotli — opening read-only is fine");
           }
@@ -200,6 +224,16 @@ export default function SheetEditor({
         const sub = handle.onDirty(() => {
           if (!armedRef.current) return;
           dirtyGen.current += 1;
+          const token = protectSheetDraft(
+            fileId,
+            modeRef.current,
+            handle.save(),
+            revisionRef.current,
+            sourceBase64Ref.current,
+            idMapRef.current,
+          );
+          draftTokenRef.current = officeDraftTokenAfterProtect(draftTokenRef.current, token);
+          setDraftWarning(token === null);
           setDirty(true);
           autosave.edited();
         });
@@ -229,6 +263,7 @@ export default function SheetEditor({
             diskLen: diskLenRef.current,
             revision: revisionRef.current,
             mode: modeRef.current,
+            sourceBase64: sourceBase64Ref.current,
           });
         }
       } catch {
@@ -255,11 +290,15 @@ export default function SheetEditor({
       idMap: idMapRef.current,
       diskLen: diskLenRef.current,
       revision: revisionRef.current,
+      sourceBase64: sourceBase64Ref.current,
       dirtyGen: () => dirtyGen.current,
       onFlushed: (gen) => {
         if (dirtyGen.current === gen) {
+          confirmWebOfficeSave(fileId, draftTokenRef.current);
+          setDraftWarning(false);
           diskLenRef.current = entry.diskLen;
           revisionRef.current = entry.revision;
+          sourceBase64Ref.current = entry.sourceBase64 ?? "";
           dirtyGen.current = 0;
           setDirty(false);
           deleteParked(fileId);
@@ -311,7 +350,16 @@ export default function SheetEditor({
           White
         </button>
       </div>
-      {err && <span className="sheet-save-err">⚠ {err}</span>}
+      {err && (
+        <span className="sheet-save-err" role="alert">
+          ⚠ {err}
+        </span>
+      )}
+      {draftWarning && (
+        <span className="sheet-save-err" role="alert">
+          {OFFICE_DRAFT_WARNING}
+        </span>
+      )}
       {ready && <SaveStatus dirty={dirty} saving={saving} failed={err !== null && dirty} />}
     </div>
   );

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { memoryBackedRoad, testByteEditorRoad } from "../services/folderFileIo.test";
+import { FolderNotesService } from "../services/folderNotes";
 import { MemoryVaultDir, bytesRevision, type VaultDir } from "../services/vaultDir";
 import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 
@@ -121,6 +123,21 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     },
   };
 }
+
+testByteEditorRoad("Helper", () => {
+  const { dir, disk } = fakeHelper();
+  return memoryBackedRoad(dir, disk);
+});
+
+test("Helper managed rename moves a backup through a case-only rename", async () => {
+  const { dir, disk } = fakeHelper();
+  await disk.writeBytes("Outline.docx", new Uint8Array([71]));
+  await disk.writeBytes("Outline.docx.bak", new Uint8Array([72]));
+  const notes = new FolderNotesService(dir);
+  const renamed = await notes.renameFile("Outline.docx", "OUTLINE");
+  expect(renamed).toBe("OUTLINE.docx");
+  expect(await disk.readBytes(`${renamed}.bak`)).toEqual(new Uint8Array([72]));
+});
 
 // The same cases the port promises, run against the reference and the adapter.
 const contract: Array<[string, () => VaultDir]> = [

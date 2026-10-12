@@ -30,12 +30,19 @@ import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
 import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
+import {
+  MANAGED_FILE_EXTS,
+  MANAGED_MEMEX_LANE,
+  MANAGED_PLAIN_LANE,
+  managedCollisionName,
+} from "../services/folderManagedFiles";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
-import { VIDEO_EXTS, SKIPPED_DIRS } from "./fileKind";
+import { bytesRevision } from "./contentRevision";
+import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
@@ -44,11 +51,23 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("byteRevisionVector", () => {
+    const { bytes, revision } = entries.byteRevisionVector.value;
+    expect(bytesRevision(new Uint8Array(bytes))).toBe(revision);
+  });
   test("rawImmutableKeys", () => {
     expect<string[]>([...RAW_IMMUTABLE_KEYS]).toEqual(entries.rawImmutableKeys.value);
   });
   test("storageOfficeExts", () => {
     expect<string[]>([...STORAGE_OFFICE_EXTS]).toEqual(entries.storageOfficeExts.value);
+  });
+  test("managedFileRules", () => {
+    expect({
+      memexLane: MANAGED_MEMEX_LANE,
+      plainLane: MANAGED_PLAIN_LANE,
+      collisionSuffix: managedCollisionName("sample", ".docx", 2).slice("sample".length, -".docx".length),
+      extensions: [...MANAGED_FILE_EXTS] as string[],
+    }).toEqual(entries.managedFileRules.value);
   });
   test("documentEditMaxActions", () => {
     expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);

@@ -76,6 +76,10 @@ export function currentWebFileStore(): WebFileStoreShape | null {
 /** Connected-folder user file/metadata commands. Boot registers the concrete
  * adapter; the IPC seam does not import browser startup or its dependencies. */
 export interface WebVaultIoShape<Frontmatter, Stat, Versioned> {
+  createManagedFile(name: string, base64: string): Promise<string>;
+  discardPristineManagedFile(id: string): Promise<void>;
+  moveFileToSink(id: string, sink: "Archive" | "Trash"): Promise<string>;
+  restoreFile(id: string): Promise<string>;
   assetUrl(id: string, temporary: boolean): Promise<string>;
   text(id: string, max?: number): Promise<string>;
   bytes(id: string, max?: number): Promise<string>;

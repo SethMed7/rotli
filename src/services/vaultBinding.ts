@@ -187,10 +187,11 @@ export async function resolveVault(link: HelperLink | null): Promise<ResolvedVau
   }
   const status = await folderVaultStatus();
   if (status.kind === "granted") {
+    const folderId = await vaultFolderId();
     return {
       connection: { status: "connected", via: "folder", name: status.name },
-      dir: new FsaVaultDir(status.handle),
-      identity: `folder:${await vaultFolderId()}`,
+      dir: new FsaVaultDir(status.handle, folderId),
+      identity: `folder:${folderId}`,
     };
   }
   if (status.kind === "prompt")

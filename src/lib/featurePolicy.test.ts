@@ -44,7 +44,7 @@ test("public builds keep notes, chat, Sheets (Beta) and the Chat window while ev
   });
 });
 
-test("the web platform withholds every capability that needs the desktop shell, on both channels", () => {
+test("the web platform withholds every capability that needs the desktop shell, on both channels, and edits office files", () => {
   for (const development of [false, true]) {
     const web = launchFeatures(development, "web");
     expect(web.notes).toBe(true);
@@ -52,9 +52,9 @@ test("the web platform withholds every capability that needs the desktop shell, 
     expect(web.chat).toBe(false);
     expect(web.breve).toBe(false);
     expect(web.agents).toBe(false);
-    expect(web.sheets).toBe(false);
-    // DOCX needs the desktop document lane; the web names it coming soon
-    expect(web.documents).toBe(false);
+    // XLSX and DOCX edit in the connected folder (Beta), as on the Mac
+    expect(web.sheets).toBe(true);
+    expect(web.documents).toBe(true);
     expect(web.voice).toBe(false);
     // a second browser tab would be a second writer with no coordination
     expect(web.chatWindow).toBe(false);

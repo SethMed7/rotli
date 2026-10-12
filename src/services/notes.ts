@@ -27,6 +27,7 @@ import {
   webVaultIsFreshFolder,
   webVaultKey,
 } from "./webNotes";
+import { holdOfficeEditingSession, replayOfficeDrafts } from "./webOfficeRecovery";
 import { journalKey, replayJournal } from "./webUnsavedJournal";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
@@ -100,6 +101,7 @@ export async function hydrateWebVault(): Promise<boolean> {
   notesService = activeWebNotesService(notesService);
   const vault = webVaultKey();
   if (connected && vault && typeof window !== "undefined") {
+    await holdOfficeEditingSession(vault);
     // typing the last page couldn't save before it unloaded
     try {
       const { keptAside } = await replayJournal(window.localStorage, journalKey(vault), notesService);
@@ -111,6 +113,20 @@ export async function hydrateWebVault(): Promise<boolean> {
       showFileNotice(
         `Couldn’t finish saving edits from last time — they are kept and retried next time (${String(cause)})`,
       );
+    }
+    const dir = activeWebVaultDir();
+    if (dir) {
+      try {
+        const office = await replayOfficeDrafts(window.localStorage, vault, dir);
+        if (office.keptAside.length)
+          showFileNotice(`Kept unsaved office edits beside the changed file: ${office.keptAside.join(", ")}`);
+        if (office.unresolved)
+          showFileNotice(`${office.unresolved} office draft(s) could not be saved yet and will be retried.`);
+      } catch (cause) {
+        showFileNotice(
+          `Couldn’t finish saving office edits from last time — they remain queued (${String(cause)})`,
+        );
+      }
     }
   }
   // the model's view of this vault, and the helper that runs the model

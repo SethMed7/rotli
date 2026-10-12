@@ -12,6 +12,7 @@ import {
   folderFileText,
   folderWriteFileBytes,
 } from "./folderFileIo";
+import { createManagedFile, discardPristineManagedFile } from "./folderManagedFiles";
 import { readFolderRawMetadata, writeFolderRawMetadata, setFolderProtection } from "./folderMetadata";
 import type { FolderNotesService } from "./folderNotes";
 import type { VaultDir } from "./vaultDir";
@@ -39,8 +40,23 @@ const notePath = async (id: string) => {
   if (!active) throw new Error("Connect a vault first");
   return active.filePathOf(id);
 };
+const notesService = () => {
+  const notes = connectedNotes?.();
+  if (!notes) throw new Error("Connect a vault first");
+  return notes;
+};
 
 export const webVaultIo = {
+  createManagedFile: (name: string, base64: string) =>
+    createManagedFile(
+      directory(),
+      name,
+      Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
+    ),
+  discardPristineManagedFile: (id: string) => discardPristineManagedFile(directory(), id),
+  moveFileToSink: async (id: string, sink: "Archive" | "Trash") =>
+    (await notesService().moveNote(id, sink)).id,
+  restoreFile: async (id: string) => (await notesService().restoreNote(id)).id,
   async protection(
     id: string,
     key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",

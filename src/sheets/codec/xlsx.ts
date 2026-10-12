@@ -4,6 +4,8 @@ import ExcelJS from "exceljs";
 import type { Workbook } from "exceljs";
 import JSZip from "jszip";
 
+import { bytesFromBase64, bytesToBase64 } from "../../lib/base64Bytes";
+
 const SPREADSHEET_NAMESPACE = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SPREADSHEET_NAMESPACE = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
@@ -44,7 +46,11 @@ export function newWorkbook(): Workbook {
 
 /** Load an xlsx from raw bytes. */
 export async function loadXlsx(bytes: ArrayBuffer): Promise<Workbook> {
-  const zip = await JSZip.loadAsync(bytes);
+  const zip = await JSZip.loadAsync(bytes).catch(() => {
+    throw new Error(
+      "This file isn’t a readable Excel workbook — it may be damaged, or another format saved with an .xlsx name.",
+    );
+  });
   const unsupported = Object.keys(zip.files).filter((name) => {
     const path = name.toLowerCase();
     return (
@@ -122,19 +128,11 @@ export function fillFromCsvRows(wb: Workbook, sheetName: string, rows: string[][
 }
 
 export function b64FromBytes(bytes: Uint8Array): string {
-  let bin = "";
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(bin);
+  return bytesToBase64(bytes);
 }
 
 export function bytesFromB64(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  return bytesFromBase64(b64);
 }
 
 export function b64FromText(text: string): string {

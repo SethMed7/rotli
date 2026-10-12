@@ -12,7 +12,7 @@
 import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { extOf, fileName, isSkippedDir, userFileName } from "../lib/fileKind";
+import { isSkippedDir } from "../lib/fileKind";
 import {
   type NoteFrontmatter,
   composeNoteDocument,
@@ -39,6 +39,7 @@ import {
 } from "./destinations";
 import { BOARD_LANE } from "./folderBoards";
 import { isCanvasFile } from "./folderCanvases";
+import { renameFolderFile } from "./folderFileRename";
 import { folderFileSummary } from "./folderFileSummary";
 import {
   assertSafeStem,
@@ -584,13 +585,12 @@ export class FolderNotesService implements NotesService {
    * the Rust command use. */
   async renameFile(id: string, name: string): Promise<string> {
     const path = await this.pathOf(id);
-    const next = userFileName(name, extOf(fileName(path)));
-    const newPath = joinVaultPath(parentPath(path), next);
-    if (newPath === path) return id;
-    if (newPath.toLowerCase() !== path.toLowerCase() && (await this.dir.exists(newPath))) {
-      throw new Error(`a file named “${next}” already exists here`);
-    }
-    const note = await this.moveFile(id, path, newPath);
-    return note.id;
+    return renameFolderFile(
+      this.dir,
+      path,
+      name,
+      id,
+      async (from, to) => (await this.moveFile(id, from, to)).id,
+    );
   }
 }

@@ -6,6 +6,9 @@
 // Paths are relative POSIX strings: "" is the vault root, "wiki/_inbox/a.md" a
 // file inside it. Text and binary files share the revision-gated write seam.
 
+import { bytesRevision } from "../lib/contentRevision";
+export { bytesRevision, contentRevision } from "../lib/contentRevision";
+
 export interface VaultDirEntry {
   name: string;
   kind: "file" | "directory";
@@ -43,38 +46,6 @@ export interface VaultDir {
    * A content gate applies only to an existing file; a directory or missing
    * path conflicts, including when the supplied revision is "0". */
   remove(path: string, expectedContent?: string): Promise<void>;
-}
-
-/** Desktop-compatible FNV-1a 64 revision of the exact UTF-8 text observed. */
-export function contentRevision(text: string): string {
-  return bytesRevision(new TextEncoder().encode(text));
-}
-
-/** The same desktop FNV-1a 64 revision over exact bytes, including binaries. */
-export function bytesRevision(bytes: Uint8Array): string {
-  // the 64-bit hash as four 16-bit words, in plain integer arithmetic:
-  // listing a vault hashes every note, and BigInt per byte is slow in V8.
-  // The FNV prime is 2^40 + 0x1b3: each word times 0x1b3, plus the low two
-  // words shifted 8 bits into the high two (the 2^40 term), then carry.
-  let v0 = 0x2325;
-  let v1 = 0x8422;
-  let v2 = 0x9ce4;
-  let v3 = 0xcbf2;
-  for (const byte of bytes) {
-    v0 ^= byte;
-    const t0 = v0 * 0x1b3;
-    let t1 = v1 * 0x1b3;
-    let t2 = v2 * 0x1b3 + (v0 << 8);
-    const t3 = v3 * 0x1b3 + (v1 << 8);
-    t1 += t0 >>> 16;
-    v0 = t0 & 0xffff;
-    t2 += t1 >>> 16;
-    v1 = t1 & 0xffff;
-    v3 = (t3 + (t2 >>> 16)) & 0xffff;
-    v2 = t2 & 0xffff;
-  }
-  const word = (v: number) => v.toString(16).padStart(4, "0");
-  return `fnv1a64:${word(v3)}${word(v2)}${word(v1)}${word(v0)}`;
 }
 
 /** Trim the separators a caller may pass ("/wiki/", "wiki//a.md") down to the
@@ -214,7 +185,7 @@ export class MemoryVaultDir implements VaultDir {
     const key = normalizeVaultPath(path);
     const file = this.files.get(key);
     if (!file) throw new Error(`no such file: ${key}`);
-    return file.text;
+    return file.bytes ? new TextDecoder().decode(file.bytes) : file.text;
   }
 
   async writeText(path: string, text: string, expectedContent?: string): Promise<void> {
