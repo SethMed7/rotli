@@ -718,6 +718,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
   from normal organizer areas while the sidebar exposes it deliberately.
   Protection is also stored on each Markdown file as `secure: true`.
+  AI reads classify the physical secure home even when a plain text file there
+  has no frontmatter; the organizer independently skips the same location.
 - Marking an existing note secure records its prior physical folder, moves the
   stable note id into `wiki/_secure/`, and updates its gitignore protection
   before either path changes. Removing protection moves it back before dropping

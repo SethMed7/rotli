@@ -1014,7 +1014,7 @@ export async function corpusFileTextAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
   maxBytes?: number,
 ): Promise<string> {
-  if (!isTauri()) return corpusFileText(id, maxBytes);
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
   return invoke<string>("corpus_file_text_ai", { id, modelId: model.id, endpoint: model.endpoint, maxBytes });
 }
 
@@ -1023,7 +1023,7 @@ export async function corpusFileBytesAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
   maxBytes?: number,
 ): Promise<string> {
-  if (!isTauri()) return corpusFileBytes(id, maxBytes);
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
   return invoke<string>("corpus_file_bytes_ai", {
     id,
     modelId: model.id,

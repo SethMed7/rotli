@@ -15,12 +15,13 @@ import * as realTauri from "../lib/tauri";
 import { b64FromBytes, saveXlsx } from "../sheets/codec/xlsx";
 import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
-import { makeFileTools } from "./hostFiles";
+import { aiFileAccessById, makeFileTools } from "./hostFiles";
 import { registeredToolSpecs } from "./toolSchemas";
 
 const files: Record<string, string> = {};
 const reads: string[] = [];
 const documentReads: string[] = [];
+let omitNextList = false;
 const listed = (path: string) => ({
   id: path.includes("/") ? path : `storage/rotli/${path}`,
   title: path.split("/").at(-1),
@@ -33,7 +34,13 @@ const mockAiRead = async (id: string) => {
 
 void mock.module("../lib/tauri", () => ({
   ...realTauri,
-  corpusList: async () => ({ folders: [], notes: Object.keys(files).map(listed) }),
+  corpusList: async () => {
+    if (omitNextList) {
+      omitNextList = false;
+      return { folders: [], notes: [] };
+    }
+    return { folders: [], notes: Object.keys(files).map(listed) };
+  },
   corpusFileBytesAi: mockAiRead,
   corpusFileTextAi: mockAiRead,
 }));
@@ -133,16 +140,29 @@ test("a secure keyword in an ordinary folder blocks a remote file read", async (
   }
 });
 
-test("every registered file-reading chat tool refuses a secure-home target", async () => {
-  const fileTools = registeredToolSpecs()
-    .filter(({ name }) => /^(read|edit|apply|extract|convert)_.*(file|document|sheet|csv)$/.test(name))
-    .map(({ name }) => name);
-  expect(fileTools.sort()).toEqual(["edit_document", "read_file"]);
+test("every registered vault-content tool refuses a remote secure-home target", async () => {
+  expect(registeredToolSpecs().map(({ name }) => name)).toEqual([
+    "search_memory",
+    "read_memory",
+    "search_notes",
+    "read_note",
+    "create_note",
+    "update_note",
+    "open_note",
+    "read_file",
+    "web_search",
+    "web_fetch",
+    "generate_image",
+    "create_document",
+    "edit_document",
+    "create_artifact",
+    "draw_board",
+  ]);
   files["wiki/_secure/plan.docx"] = "ordinary project data";
   reads.length = 0;
   documentReads.length = 0;
   const tools = makeFileTools(remote, {});
-  for (const name of fileTools) {
+  for (const name of ["read_file", "edit_document"] as const) {
     const response =
       name === "read_file"
         ? await tools.readFile("wiki/_secure/plan.docx")
@@ -151,6 +171,16 @@ test("every registered file-reading chat tool refuses a secure-home target", asy
   }
   expect(reads).toEqual([]);
   expect(documentReads).toEqual([]);
+});
+
+test("an exact just-written file refreshes a stale list once; an unknown id stays blocked", async () => {
+  files["storage/rotli/fresh.csv"] = "task,status\nDraft,ready";
+  omitNextList = true;
+  expect(await aiFileAccessById("storage/rotli/fresh.csv", false)).toBeNull();
+  files["wiki/_secure/fresh.csv"] = "task,status\nDraft,ready";
+  omitNextList = true;
+  expect(await aiFileAccessById("wiki/_secure/fresh.csv", false)).toMatch(/^blocked:/);
+  expect(await aiFileAccessById("storage/rotli/unknown.csv", false)).toMatch(/^blocked:/);
 });
 
 test("a workbook arrives by cell address, its dates as dates", async () => {

@@ -3873,8 +3873,8 @@ impl CorpusStore {
     ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
     ///   The per-note bit wins over the vault default in BOTH directions.
     ///
-    /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
-    /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
+    /// Location in either secure home is checked even without frontmatter.
+    /// The secret DETECTOR also runs on the body (#21, audit 2026-07) — the auto-flag only fires when
     /// the metadata panel is opened, so a never-inspected note with detectable
     /// secrets must not slip through on the flag alone.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
@@ -3890,7 +3890,8 @@ impl CorpusStore {
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+        let secure = self.file_is_protected(rel)
+            || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
             || fm
                 .foreign
                 .iter()
@@ -3938,6 +3939,19 @@ impl CorpusStore {
             return Err("not a file".into());
         }
         Ok(abs)
+    }
+
+    pub(crate) fn read_file_bytes_for_ai(
+        &self,
+        rel: &str,
+        model_is_local: bool,
+    ) -> Result<Vec<u8>, String> {
+        let abs = self.file_for_ai(rel, model_is_local)?;
+        let data = fs::read(abs).map_err(|e| e.to_string())?;
+        if model_is_local && self.file_is_protected(rel) {
+            crate::secret::remember_secure_text(&String::from_utf8_lossy(&data));
+        }
+        Ok(data)
     }
 
     /// May an ON-DEVICE model read this secure note? Default yes (2026-08-01);
@@ -7618,8 +7632,7 @@ pub fn corpus_file_text_ai(
 ) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
     let local = crate::chat::model_is_local(&model_id, &endpoint);
-    let abs = state.route(&root, |store| store.file_for_ai(&rel, local))?;
-    let data = fs::read(abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
     let cap = max_bytes.unwrap_or(200_000);
     let text = String::from_utf8_lossy(&data[..data.len().min(cap)]).into_owned();
     if !local && crate::secret::blocked_for_remote(&text) {
@@ -7639,8 +7652,7 @@ pub fn corpus_file_bytes_ai(
     use base64::Engine;
     let (root, rel) = split_root_id(&id);
     let local = crate::chat::model_is_local(&model_id, &endpoint);
-    let abs = state.route(&root, |store| store.file_for_ai(&rel, local))?;
-    let data = fs::read(abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
     let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..data.len().min(cap)]))
 }
@@ -8281,14 +8293,21 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        let body = s.read_for_ai(&rel, model_is_local)?;
-        Ok(CorpusAiRead {
-            revision: crate::fsutil::revision(body.as_bytes()),
-            editor: with_editor
-                .unwrap_or(false)
-                .then(|| ai_journal::editor_text(&body).to_string()),
-            body,
-        })
+        read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
+    })
+}
+
+fn read_ai_versioned(
+    store: &mut CorpusStore,
+    rel: &str,
+    model_is_local: bool,
+    with_editor: bool,
+) -> Result<CorpusAiRead, String> {
+    let body = store.read_for_ai(rel, model_is_local)?;
+    Ok(CorpusAiRead {
+        revision: crate::fsutil::revision(body.as_bytes()),
+        editor: with_editor.then(|| ai_journal::editor_text(&body).to_string()),
+        body,
     })
 }
 
@@ -12063,6 +12082,50 @@ mod tests {
             .unwrap();
         assert!(store.file_for_ai(named, false).is_err());
         assert!(store.file_for_ai(named, true).is_err());
+    }
+
+    #[test]
+    fn ai_note_read_gate_refuses_plain_text_in_secure_homes() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
+            fs::create_dir_all(store.root().join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
+            assert!(store.read_for_ai(rel, false).is_err(), "remote read: {rel}");
+            assert!(store.read_for_ai(rel, true).is_ok(), "local read: {rel}");
+        }
+        store.dot_write("settings", "{\"secureLocalAi\":false}").unwrap();
+        assert!(store.read_for_ai("Secure notes/plan.txt", true).is_err());
+    }
+
+    #[test]
+    fn corpus_read_ai_route_uses_the_shared_gate_for_plain_text_files() {
+        let tmp = TempDir::new().unwrap();
+        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
+            fs::create_dir_all(store.root().join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(store.root().join(rel), "task,status\nDraft,ready").unwrap();
+            assert!(read_ai_versioned(&mut store, rel, false, false).is_err(), "{rel}");
+            assert_eq!(
+                read_ai_versioned(&mut store, rel, true, false).unwrap().body,
+                "task,status\nDraft,ready"
+            );
+        }
+    }
+
+    #[test]
+    fn allowed_local_secure_file_text_enters_remote_overlap_ledger() {
+        let tmp = TempDir::new().unwrap();
+        let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        let rel = "Secure notes/plan.txt";
+        fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+        let prose = "The amber orchard schedule moves to the thirteenth of November.";
+        fs::write(store.root().join(rel), prose).unwrap();
+        let bytes = store.read_file_bytes_for_ai(rel, true).unwrap();
+        assert_eq!(bytes, prose.as_bytes());
+        assert!(crate::secret::blocked_for_remote(prose));
     }
 
     /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can

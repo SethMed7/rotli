@@ -208,10 +208,12 @@ export async function handToAiFor(
   const { secureKeywords } = useLibrarianRules.getState().rules;
   const embedded = embeddedFileReferences(note.body);
   for (const { source, rootId } of embedded) {
-    if (rootId && rootId !== rootIdOf(note.id)) return { kind: "secureAttachment", title };
-    if (attachmentIsSecure(source, secureKeywords)) return { kind: "secureAttachment", title };
     const rel = attachmentRel(source);
-    if (!rel || (await locate(rootIdOf(note.id), rel)).status !== "found") {
+    if (!rel) continue;
+    if (
+      (await locate(rootId ?? rootIdOf(note.id), rel)).status === "found" &&
+      attachmentIsSecure(source, secureKeywords)
+    ) {
       return { kind: "secureAttachment", title };
     }
   }

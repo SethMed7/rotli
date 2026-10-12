@@ -36,11 +36,13 @@ async function findVaultFile(query: string) {
   return matches.length === 1 ? matches[0] : undefined;
 }
 
+export function aiPathIsProtected(rel: string, title: string): boolean {
+  return inSecureHome(rel) || secureByName(title, rel, useLibrarianRules.getState().rules.secureKeywords);
+}
+
 function fileIsProtected(file: NonNullable<Awaited<ReturnType<typeof findVaultFile>>>): boolean {
   const { rel } = splitRootId(file.id);
-  return (
-    inSecureHome(rel) || secureByName(file.title, rel, useLibrarianRules.getState().rules.secureKeywords)
-  );
+  return aiPathIsProtected(rel, file.title);
 }
 
 /** Every chat file tool must pass this before any read, decode, or edit. */
@@ -55,7 +57,8 @@ function fileAccess(file: Awaited<ReturnType<typeof findVaultFile>>, local: bool
 
 /** Exact-id form for AI workflows that embed a previously generated file. */
 export async function aiFileAccessById(id: string, local: boolean): Promise<string | null> {
-  const file = await findVaultFile(id);
+  let file = await findVaultFile(id);
+  if (!file) file = await findVaultFile(id);
   return file?.id === id ? fileAccess(file, local) : "blocked: the exact file cannot be resolved safely.";
 }
 
@@ -66,9 +69,9 @@ export function makeFileTools(
   const tools: Pick<Host, "readFile"> & Required<Pick<Host, "editDocument">> = {
     async readFile(query: string): Promise<string> {
       const file = await findVaultFile(query);
+      if (!file) return "blocked: the exact file cannot be resolved safely.";
       const refusal = fileAccess(file, modelIsOnDevice(model));
       if (refusal) return refusal;
-      if (!file) return "blocked: the exact file cannot be resolved safely.";
       const protectedFile = fileIsProtected(file);
       const ext = extOf(file.title);
       let text: string;

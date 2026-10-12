@@ -19,8 +19,10 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
+import { inSecureHome } from "../security/secureNotes";
 import type { SearchHit } from "../types";
 import type { WebSearchProvider } from "./searchProvider";
+import { registeredToolSpecs } from "./toolSchemas";
 import type { Host } from "./types";
 
 const LOCAL: ChatModelInfo = {
@@ -59,6 +61,7 @@ interface Row {
   locked?: boolean;
   reference?: boolean;
   aiBodyEdit?: AiBodyEdit;
+  kind?: "note" | "file";
 }
 
 let rows: Row[] = [];
@@ -83,7 +86,7 @@ const meta = (row: Row): CorpusNoteMeta => ({
   updatedAt: 0,
   pinned: false,
   origin: null,
-  kind: "note",
+  kind: row.kind ?? "note",
 });
 
 /** The ONE policy the fake Rust side enforces — the real `read_for_ai`: a
@@ -96,6 +99,10 @@ void mock.module("../lib/tauri", () => ({
     folders: [],
     notes: rows.filter((r) => !r.reference).map(meta),
   }),
+  corpusNotePath: async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    return row ? (id.includes("/") ? id : `${row.folderId}/${id}.md`) : id;
+  },
   // The AI lanes are GATED IN RUST since 2026-08-01 (GAP 1): the command
   // itself applies `read_for_ai` per hit, so the fake enforces `readable`
   // here — a secure row never crosses the boundary for a frontier model, with
@@ -357,6 +364,82 @@ describe("the brain's memory lanes are retrievable by BOTH classes", () => {
   test("read_note opens a reference note by its path id", async () => {
     expect(await makeTauriHost(FRONTIER).readNote("identity/00-identity.md")).toContain("quokkanaut");
   });
+});
+
+test("read_note and read_memory refuse secret-free paths inside either secure home", async () => {
+  for (const id of ["wiki/_secure/plan.csv", "Secure notes/plan.txt"]) {
+    rows.push({
+      id,
+      title: "Plan",
+      body: "task,status\nDraft,ready",
+      folderId: id.split("/").slice(0, -1).join("/"),
+    });
+    expect(inSecureHome(id)).toBe(true);
+    await expect(makeTauriHost(FRONTIER).readNote(id)).rejects.toThrow(/secure|blocked/i);
+    const host = makeTauriHost(FRONTIER);
+    if (!host.readMemory) throw new Error("the host must register read_memory");
+    await expect(host.readMemory(id)).rejects.toThrow(/secure|blocked/i);
+  }
+});
+
+test("a local AI edit reading secure-home text taints its chat", async () => {
+  const id = "Secure notes/plan.txt";
+  rows.push({ id, title: "Plan", body: "task,status\nDraft,ready", folderId: "Secure notes" });
+  let tainted = false;
+  const host = makeTauriHost(LOCAL, {
+    onSecureNoteRead: () => {
+      tainted = true;
+    },
+  });
+  await updateVia(host, id, "updated plan");
+  expect(tainted).toBe(true);
+});
+
+test("every registered vault-content tool refuses secure-home content for a remote model", async () => {
+  const registered = registeredToolSpecs().map(({ name }) => name);
+  const contentTools = [
+    "search_memory",
+    "read_memory",
+    "search_notes",
+    "read_note",
+    "read_file",
+    "edit_document",
+  ];
+  expect(registered.filter((name) => contentTools.includes(name))).toEqual(contentTools);
+  rows.push(
+    {
+      id: "wiki/_secure/plan.csv",
+      title: "Plan CSV",
+      body: "quokka project status",
+      folderId: "wiki/_secure",
+      kind: "file",
+    },
+    {
+      id: "Secure notes/plan.txt",
+      title: "Plan text",
+      body: "quokka project status",
+      folderId: "Secure notes",
+    },
+    {
+      id: "wiki/_secure/plan.docx",
+      title: "Plan Word",
+      body: "quokka project status",
+      folderId: "wiki/_secure",
+      kind: "file",
+    },
+  );
+  const host = makeTauriHost(FRONTIER);
+  if (!host.searchMemory || !host.readMemory) throw new Error("the host must register memory tools");
+  expect(await host.searchNotes("quokka", 20)).not.toContainEqual(
+    expect.objectContaining({ id: "Secure notes/plan.txt" }),
+  );
+  expect(await host.searchMemory("quokka", 20)).not.toContainEqual(
+    expect.objectContaining({ id: "Secure notes/plan.txt" }),
+  );
+  await expect(host.readNote("Secure notes/plan.txt")).rejects.toThrow(/secure|blocked/i);
+  await expect(host.readMemory("Secure notes/plan.txt")).rejects.toThrow(/secure|blocked/i);
+  expect(await host.readFile("wiki/_secure/plan.csv")).toMatch(/^blocked:/);
+  expect(await host.editDocument?.("wiki/_secure/plan.docx", [])).toMatch(/^blocked:/);
 });
 
 // 2026-09-29: a note a PERSON wrote is theirs — no class rewrites it without

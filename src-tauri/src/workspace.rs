@@ -303,10 +303,12 @@ impl Workspace {
                     .read_board(&meta.id)
                     .map(|b| Self::board_egress_allowed(&b.body).is_ok())
                     .unwrap_or(false),
-                // a surfaced FILE carries no frontmatter to mark, so the
-                // surface predicate is the whole policy: never offer a remote
-                // agent something out of a Hidden lane (audit 2026-08-01).
-                _ => self.store.agent_listable(&meta.id),
+                // Files carry no frontmatter: omit both hidden and protected
+                // locations before a remote agent sees title or path.
+                _ => {
+                    self.store.agent_listable(&meta.id)
+                        && !self.store.file_is_protected(&meta.id)
+                }
             };
             if visible {
                 kept.push(meta);
@@ -3735,6 +3737,24 @@ mod tests {
         assert!(workspace
             .create_note("Token", "sk-ant-abcdefghijklmnop", MAIN_ROOT)
             .is_err());
+    }
+
+    #[test]
+    fn remote_listing_omits_secure_home_file_titles_and_paths() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        for rel in ["Secure notes/plan.csv", "wiki/_secure/plan.txt"] {
+            fs::create_dir_all(workspace.store.root().join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(workspace.store.root().join(rel), "task,status\nDraft,ready").unwrap();
+        }
+        fs::create_dir_all(workspace.store.root().join("Storage")).unwrap();
+        fs::write(workspace.store.root().join("Storage/public.csv"), "task,status\nDraft,ready").unwrap();
+        let listed = workspace.list_remote(100).unwrap();
+        assert!(listed.notes.iter().any(|meta| meta.id == "Storage/public.csv"));
+        assert!(!listed.notes.iter().any(|meta| {
+            meta.id.contains("plan") || meta.title == "plan.csv" || meta.title == "plan.txt"
+        }));
     }
 
     /// AUDIT 2026-08-01, GAP 6 — `compare_revision` reports the FNV-1a hash of

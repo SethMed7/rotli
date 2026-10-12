@@ -24,6 +24,7 @@ const plan = (text: string): EditableDocument => ({
 let disk = plan("Ship it");
 let revision = "r1";
 const created: { title: string; agent?: string | undefined }[] = [];
+const editModels: unknown[] = [];
 
 const session = async () => ({
   kind: "ready" as const,
@@ -40,7 +41,10 @@ const session = async () => ({
 void mock.module("../documents/composition", () => ({
   ...realDocuments,
   readAiManagedDocument: session,
-  editAiDocument: session,
+  editAiDocument: async (_id: string, model: unknown) => {
+    editModels.push(model);
+    return session();
+  },
 }));
 void mock.module("../lib/tauri", () => ({
   ...realTauri,
@@ -71,6 +75,7 @@ beforeEach(() => {
   disk = plan("Ship it");
   revision = "r1";
   created.length = 0;
+  editModels.length = 0;
 });
 
 const ask = (tool: string, args: Record<string, unknown>) =>
@@ -97,6 +102,7 @@ test("an edit applies over the revision read, and a newer file refuses it", asyn
     ok: true,
     result: { revision: "r2", blocks: "[1] paragraph: Ship it [today](https://rotli.co)" },
   });
+  expect(editModels[0]).toEqual({ id: "agent", endpoint: "" });
   // the same edit again names a revision the file has moved past
   expect(await ask("apply_document", { file: FILE, expectedRevision: "r1", actions })).toEqual({
     ok: false,
