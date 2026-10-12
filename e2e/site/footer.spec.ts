@@ -37,6 +37,23 @@ test("with the list open, a sign-up goes through the site's own endpoint", async
   await expect(form.getByRole("status")).toHaveText(/You’re on the list\./);
 });
 
+// WebMCP (2026-10-12): the sign-up is a declarative tool a browser agent can fill in, never send.
+test("the sign-up is a WebMCP tool that leaves sending to the person", async ({ page }) => {
+  await page.goto("/about/");
+  const form = page.locator("[data-subscribe]");
+  await expect(form).toHaveAttribute("toolname", "subscribe_to_rotli_updates");
+  await expect(form).toHaveAttribute("tooldescription", /the person sends it themselves/);
+  await expect(form).not.toHaveAttribute("toolautosubmit");
+  await expect(form.getByRole("textbox", { name: "Email address" })).toHaveAttribute(
+    "toolparamdescription",
+    "The email address to send updates to.",
+  );
+  await expect(form.locator('input[name="website"]')).toHaveAttribute(
+    "toolparamdescription",
+    "Always leave this empty.",
+  );
+});
+
 test("the maker line links to the maker on X", async ({ page }) => {
   await page.goto("/");
   const link = page.locator(".footer-bottom").getByRole("link", { name: "Seth Medina on X" });

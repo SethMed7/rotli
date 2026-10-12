@@ -1166,7 +1166,16 @@ agents; every sentence in it restates a claim the pages already make.
 - **`/llms.txt`** ([llmstxt.org](https://llmstxt.org)): a title, a one-line
   summary, the key facts, and links to the pages and to each resource's
   Markdown twin, built from the published writing so a link cannot go stale.
-  It is also served as `/index.md`, the landing page's twin.
+  It is also served as `/index.md`, the landing page's twin. It links
+  `/resources/developers/` (honest about MCP: "coming soon" on the launch site,
+  where it is a development-build feature) and `/llms-full.txt`.
+- **`/llms-full.txt`** (`llmsFullText`): the whole site in one Markdown file
+  for an agent that would rather read once than follow links. The `llms.txt`
+  head, then every visible feature in full (what it does, how to use it, its
+  limits, its page), the FAQ, the roadmap twin, and every published post's
+  twin, the parts split by `---`. The privacy page is linked by its twin rather
+  than repeated (that twin is made after the build). Both files are served as
+  `text/plain` so a browser shows them inline.
 - **Markdown twins.** Every writing page has `index.md` beside its
   `index.html` (the source Markdown under a title and summary), declared with
   `<link rel="alternate" type="text/markdown">`. The Caddyfile answers a request
@@ -1185,7 +1194,21 @@ agents; every sentence in it restates a claim the pages already make.
 - **JSON-LD.** The landing page carries `WebSite`, `SoftwareApplication`, and
   `FAQPage` (the FAQ's own list, `src/faq.ts`); `/download/` carries
   `SoftwareApplication`; writing pages carry `Article` or `BlogPosting` with a
-  `BreadcrumbList`.
+  `BreadcrumbList`. `/features/` carries `SoftwareApplication`, and each
+  feature's page a `WebPage` about it with a `BreadcrumbList` (`featureGraph`).
+  `SoftwareApplication.featureList` names every shipped and beta feature this
+  build shows, never one coming soon or in development.
+- **WebMCP** (an experiment, 2026-10-12). The footer's sign-up carries the
+  declarative WebMCP attributes (`toolname`, `tooldescription`,
+  `toolparamdescription`; a W3C Web Machine Learning group draft, in Chrome
+  behind an origin trial or `chrome://flags/#enable-webmcp-testing`), so a
+  browser agent can fill in an address for the person it works for. There is
+  no `toolautosubmit`: the browser stops at the arrow, and the person sends it.
+  The spam-trap field is described as "Always leave this empty." because every
+  named control becomes a tool parameter. Browsers without WebMCP ignore the
+  attributes; `src/env.d.ts` declares them for `astro check`, and
+  `e2e/site/footer.spec.ts` holds them. Not to be confused with webmcp.dev, a
+  third-party widget library the site does not use.
 - The build fails if an `llms.txt` link points at a page it did not emit, or if
   a JSON-LD block does not parse (`astro.config.mjs`, `rotli-agent-files-guard`).
 - To check reachability as agents see it, scan with
