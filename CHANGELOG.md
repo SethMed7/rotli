@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   number, so Rotli refused the whole board to connected agents ("secret-shaped
   content"). Digits after a decimal point no longer count; a real card number
   in a board's text is still refused.
+- **rotli.co and Breve take their pending security updates.** The site moved
+  to Astro 7.2.8 and Sharp 0.35.5 (with seven smaller repairs), and Breve to
+  `ip-address` 10.7.1. Every security fix now available within the current
+  version ranges is applied; the rest wait on upstream libraries, recorded in
+  `docs/development/security.md`.
 - **New images and embeds are written so Obsidian shows them too.** A dropped
   or pasted image is now linked with a normal Markdown path from the note
   (instead of Rotli's `storage:` shorthand), and `/sheet`, `/document`, and
