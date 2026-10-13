@@ -5,7 +5,12 @@
 // is state/onboarding.ts reonboardingFor (unit-tested; the Mac app only);
 // this drives the development `?onboarding` route as someone set up on 1.7.1.
 
+import { readFileSync } from "node:fs";
+
 import { expect, type Page, test } from "@playwright/test";
+
+/** What's new opens on the version being built, whatever release that is. */
+const WHATS_NEW = `What’s new in Rotli ${JSON.parse(readFileSync("package.json", "utf8")).version}`;
 
 /** The development setup review, as someone who finished setup on 1.7.1. */
 async function returningSetup(page: Page): Promise<void> {
@@ -30,7 +35,7 @@ test("someone set up before 1.8.0 finishes setup at what's new, not the thank-yo
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
 
-  await expect(page.getByRole("dialog", { name: "What’s new in Rotli 1.8.0" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: WHATS_NEW })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Thank you for trying Rotli" })).toHaveCount(0);
 });
 
@@ -43,7 +48,7 @@ test("Skip setup keeps a returning person's own look", async ({ page }) => {
   // the browser review has no vault yet: the one prompt for a folder
   await page.getByRole("button", { name: "Choose a folder" }).click();
 
-  await expect(page.getByRole("dialog", { name: "What’s new in Rotli 1.8.0" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: WHATS_NEW })).toBeVisible();
   const family = await page.evaluate(async () => {
     const url = performance
       .getEntriesByType("resource")
