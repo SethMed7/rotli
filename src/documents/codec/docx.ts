@@ -63,11 +63,22 @@ export interface DocxSource {
 
 const RUN = /<w:r\b[^>]*>[\s\S]*?<\/w:r>/gi;
 
+function runText(xml: string): string {
+  let text = "";
+  let cursor = 0;
+  for (const match of xml.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)) {
+    text += decodeXml(xml.slice(cursor, match.index));
+    text += match[1] ?? "";
+    cursor = match.index + match[0].length;
+  }
+  return text + decodeXml(xml.slice(cursor));
+}
+
 function parseRun(runXml: string): DocumentRun {
   let text = "";
   const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:br\b[^>]*\/?\s*>/gi;
   for (const match of runXml.matchAll(tokens)) {
-    text += match[1] !== undefined ? decodeXml(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
+    text += match[1] !== undefined ? runText(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
   }
   const style = parseRunStyle(runXml);
   return { text, ...(style ? { style } : {}) };

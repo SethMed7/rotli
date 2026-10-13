@@ -49,7 +49,7 @@ describe("fillFromCsvRows", () => {
 });
 
 describe("round-trip safety", () => {
-  test("edits a prefixed Strict workbook and saves a package ExcelJS can reopen", async () => {
+  test("edits a workbook with one prefixed Strict worksheet and saves a package ExcelJS can reopen", async () => {
     const wb = new ExcelJS.Workbook();
     wb.addWorksheet("Data").getCell("A1").value = "Before";
     const zip = await JSZip.loadAsync(await wb.xlsx.writeBuffer());

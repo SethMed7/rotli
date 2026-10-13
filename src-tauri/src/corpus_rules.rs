@@ -21,15 +21,20 @@ impl CorpusStore {
             .unwrap_or_default()
     }
 
+    /// Missing settings mean the documented empty keyword list. An unreadable
+    /// or malformed settings file cannot prove that a name is public.
+    fn secure_keywords_for_classification(&self) -> Result<Vec<String>, String> {
+        let settings = self.dot_read("settings")?;
+        crate::librarian_rules::classifiable_secure_keywords(&settings)
+    }
+
     /// Is this note named with one of the vault's secure keywords? Its title or
     /// file name only — never the body, never a model (Librarian rules).
     pub(crate) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
         self.layout == Layout::Memex
-            && crate::librarian_rules::secure_by_name(
-                title,
-                rel,
-                &self.librarian_rules().secure_keywords,
-            )
+            && self.secure_keywords_for_classification().is_ok_and(|keywords| {
+                crate::librarian_rules::secure_by_name(title, rel, &keywords)
+            })
     }
 
     /// Does this path sit in a secure home in either layout?
@@ -44,11 +49,9 @@ impl CorpusStore {
             .and_then(|name| name.to_str())
             .unwrap_or_default();
         self.in_secure_home(rel)
-            || crate::librarian_rules::secure_by_name(
-                title,
-                rel,
-                &self.librarian_rules().secure_keywords,
-            )
+            || self.secure_keywords_for_classification().map_or(true, |keywords| {
+                crate::librarian_rules::secure_by_name(title, rel, &keywords)
+            })
     }
 
     /// Protect every Library note already named with a secure keyword (the
@@ -57,7 +60,7 @@ impl CorpusStore {
     /// Returns how many notes it protected.
     pub(crate) fn secure_by_keywords(&mut self) -> Result<usize, String> {
         self.mutation_allowed()?;
-        if self.layout != Layout::Memex || self.librarian_rules().secure_keywords.is_empty() {
+        if self.layout != Layout::Memex || self.secure_keywords_for_classification()?.is_empty() {
             return Ok(0);
         }
         let mut rels: Vec<String> = self
@@ -140,6 +143,31 @@ mod tests {
             fs::create_dir_all(root.join(d)).unwrap();
         }
         fs::write(root.join("inbox.md"), "# Inbox\n\n").unwrap();
+    }
+
+    #[test]
+    fn unreadable_keyword_settings_refuse_remote_classification() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        let note = store.create("wiki/_inbox", "# Ordinary\n\nPlain words").unwrap();
+        let settings = root.join(".rotli/settings.json");
+        if settings.exists() {
+            fs::remove_file(&settings).unwrap();
+        }
+        fs::create_dir(&settings).unwrap();
+        assert!(store.file_is_protected("Storage/ordinary.csv"));
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        assert!(store.secure_by_keywords().is_err());
+        assert!(store.path_of(&note.id).unwrap().starts_with("wiki/_inbox/"));
+        fs::remove_dir(&settings).unwrap();
+        fs::write(&settings, "{malformed").unwrap();
+        assert!(store.read_for_ai(&note.id, false).is_err());
+        assert!(store.file_is_protected("Storage/ordinary.csv"));
+        fs::write(&settings, r#"{"librarianRules":{"secureKeywords":[42]}}"#).unwrap();
+        assert!(store.read_for_ai(&note.id, false).is_err());
     }
 
     // the Librarian rules (librarian_rules.rs): secure keywords match the NAME

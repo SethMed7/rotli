@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Secure Office comments and other package text now reach the local AI egress guard; uppercase secure Markdown stays out of agent results, and protected boards and files no longer add to agent counts.
+- Secure Office formulas, sheet names, comments, and secondary package text now reach the local AI egress guard; unreadable parts refuse the read. Agent listings and counts omit secret-shaped files and protected boards, and uppercase Markdown and board changes refresh correctly.
 - **A big folder no longer takes gigabytes of memory.** Opening a folder
   with tens of thousands of files as a vault, such as a code folder, could push
   rotli past 10 GB and keep it busy at full CPU: the sidebar built every row

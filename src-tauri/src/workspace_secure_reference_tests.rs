@@ -105,3 +105,22 @@ fn uppercase_board_with_secret_shaped_scene_is_not_a_remote_file() {
     assert!(!workspace.reference_visible_to_remote(rel));
     assert!(!workspace.list_remote(100).unwrap().notes.iter().any(|meta| meta.id == rel));
 }
+
+#[test]
+fn remote_listing_and_metrics_hide_secret_shaped_ordinary_files() {
+    let temp = TempDir::new().unwrap();
+    let mut workspace = test_workspace(&temp);
+    fs::create_dir_all(workspace.store.root().join("Storage")).unwrap();
+    let rel = "Storage/ordinary.csv";
+    fs::write(workspace.store.root().join(rel), "card,4242 4242 4242 4242").unwrap();
+    assert!(!workspace.reference_visible_to_remote(rel));
+    assert!(!workspace.list_remote(100).unwrap().notes.iter().any(|meta| meta.id == rel));
+    assert_eq!(workspace.metrics().unwrap().files, 0);
+}
+
+#[test]
+fn workspace_policy_describes_secure_home_and_keyword_board_protection() {
+    let privacy = workspace_policy()["privacy"].as_str().unwrap().to_lowercase();
+    assert!(privacy.contains("secure homes"));
+    assert!(privacy.contains("keyword"));
+}

@@ -21,5 +21,27 @@ export function editorWordXml(xml: string): string {
       `xmlns:w="${WORD_NAMESPACE}"`,
     );
   }
+  if (new RegExp(`xmlns=["']${WORD_NAMESPACE}["']`).test(normalized)) {
+    const wordDefaults: boolean[] = [];
+    normalized = normalized.replace(
+      /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<(\/?)((?:[A-Za-z_][\w.:-]*))([^>]*)>/g,
+      (whole, closing: string | undefined, name: string | undefined, rest: string | undefined) => {
+        if (!name || rest === undefined) return whole;
+        if (closing) {
+          const word = wordDefaults.pop() ?? false;
+          return word && !name.includes(":") ? `</w:${name}${rest}>` : whole;
+        }
+        const inherited = wordDefaults.at(-1) ?? false;
+        const declaration = /\sxmlns=["']([^"']+)["']/.exec(rest)?.[1];
+        const word = declaration === undefined ? inherited : declaration === WORD_NAMESPACE;
+        if (!/\/\s*$/.test(rest)) wordDefaults.push(word);
+        if (!word || name.includes(":")) return whole;
+        const attributes = declaration
+          ? rest.replace(/\sxmlns=["'][^"']+["']/, ` xmlns:w="${WORD_NAMESPACE}"`)
+          : rest;
+        return `<w:${name}${attributes}>`;
+      },
+    );
+  }
   return normalized;
 }

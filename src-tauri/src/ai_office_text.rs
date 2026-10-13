@@ -5,7 +5,7 @@
 use std::io::Read;
 
 use quick_xml::escape::unescape;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
 /// The largest XML package part the check will inflate.
@@ -96,7 +96,7 @@ fn zip_xml_names(bytes: &[u8], prefix: &str) -> Result<Vec<String>, String> {
         let comment_len = u16_at(bytes, at + 32).ok_or_else(bad)? as usize;
         let name = bytes.get(at + 46..at + 46 + name_len).ok_or_else(bad)?;
         let name = std::str::from_utf8(name).map_err(|_| bad())?;
-        if name.starts_with(prefix) && name.ends_with(".xml") {
+        if name.starts_with(prefix) && (name.ends_with(".xml") || name.ends_with(".rels")) {
             names.push(name.to_string());
         }
         at = at
@@ -113,29 +113,55 @@ fn zip_xml_names(bytes: &[u8], prefix: &str) -> Result<Vec<String>, String> {
 /// cached values are included too; the ledger only retains hashes of phrases.
 pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
     let mut text = String::new();
-    for name in zip_xml_names(bytes, "xl/")? {
+    for name in zip_xml_names(bytes, "")? {
         let kind = if name == "xl/sharedStrings.xml" {
             Some(b"sst".as_slice())
         } else if name.starts_with("xl/worksheets/") {
             Some(b"worksheet".as_slice())
-        } else if name.starts_with("xl/comments") {
+        } else if spreadsheet_comments_part(&name) {
             Some(b"comments".as_slice())
         } else if name == "xl/workbook.xml" {
             Some(b"workbook".as_slice())
         } else {
             None
         };
-        let Some(root) = kind else { continue };
+        if name == "[Content_Types].xml" || spreadsheet_metadata_part(&name) {
+            continue;
+        }
         let xml = zip_entry(bytes, &name).map_err(|_| "not a readable spreadsheet".to_string())?;
         if xml.len() > MAX_XML_BYTES as usize {
             return Err("the spreadsheet's text is too large to check".into());
         }
-        spreadsheet_part_text(&xml, root, &mut text)?;
+        if let Some(root) = kind {
+            spreadsheet_part_text(&xml, root, &mut text)?;
+        } else {
+            generic_part_text(&xml, &mut text, "not a readable spreadsheet")?;
+        }
     }
     if text.trim().is_empty() {
         return Err("not a readable spreadsheet".into());
     }
     Ok(text)
+}
+
+fn spreadsheet_comments_part(name: &str) -> bool {
+    let Some(("xl", tail)) = name.split_once('/') else {
+        return false;
+    };
+    let tail = tail.strip_prefix("comments/").unwrap_or(tail);
+    let number = tail
+        .strip_prefix("comments")
+        .or_else(|| tail.strip_prefix("comment"));
+    number
+        .and_then(|value| value.strip_suffix(".xml"))
+        .is_some_and(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
+}
+
+fn spreadsheet_metadata_part(name: &str) -> bool {
+    matches!(
+        name,
+        "xl/commentsExtended.xml" | "xl/commentsIds.xml" | "xl/commentsExtensible.xml"
+    )
 }
 
 /// OOXML permits arbitrary namespace prefixes; Strict OOXML also uses a
@@ -167,9 +193,12 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
                     in_item = true;
                     item_text.clear();
                 }
+                if root == b"workbook" && local == b"sheet" {
+                    sheet_name(&start, text, &bad)?;
+                }
                 let field = (in_item && local == b"t")
                     || (root == b"worksheet"
-                        && (local == b"v" || header_footer.contains(&local)))
+                        && (local == b"v" || local == b"f" || header_footer.contains(&local)))
                     || (root == b"comments" && local == b"t")
                     || (root == b"workbook" && local == b"definedName");
                 if field {
@@ -182,6 +211,11 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
                     }
                 } else {
                     depth += 1;
+                }
+            }
+            Event::Empty(start) => {
+                if root == b"workbook" && start.local_name().as_ref() == b"sheet" {
+                    sheet_name(&start, text, &bad)?;
                 }
             }
             Event::End(end) => {
@@ -206,6 +240,104 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
     }
     if !seen_root || depth != 0 || in_item {
         return Err(bad());
+    }
+    Ok(())
+}
+
+fn sheet_name(
+    start: &BytesStart<'_>,
+    text: &mut String,
+    bad: &impl Fn() -> String,
+) -> Result<(), String> {
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|_| bad())?;
+        if attribute.key.local_name().as_ref() == b"name" {
+            let raw = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| bad())?;
+            text.push_str(&unescape(raw).map_err(|_| bad())?);
+            text.push(' ');
+        }
+    }
+    Ok(())
+}
+
+/// Unknown XML parts are still security-relevant. Include their text and
+/// attribute values (for example pivot shared items) and refuse malformed XML.
+fn generic_part_text(xml: &[u8], text: &mut String, error: &str) -> Result<(), String> {
+    let bad = || error.to_string();
+    let mut reader = Reader::from_reader(xml);
+    let mut stack: Vec<Vec<u8>> = Vec::new();
+    let mut seen_root = false;
+    loop {
+        match reader.read_event().map_err(|_| bad())? {
+            Event::Start(start) => {
+                if stack.is_empty() && seen_root {
+                    return Err(bad());
+                }
+                seen_root = true;
+                append_attributes(&start, text, &bad)?;
+                stack.push(start.name().as_ref().to_vec());
+            }
+            Event::Empty(start) => {
+                if stack.is_empty() && seen_root {
+                    return Err(bad());
+                }
+                seen_root = true;
+                append_attributes(&start, text, &bad)?;
+            }
+            Event::Text(part) => {
+                let decoded = part.decode().map_err(|_| bad())?;
+                if stack.is_empty() && !decoded.trim().is_empty() {
+                    return Err(bad());
+                }
+                text.push_str(&unescape(&decoded).map_err(|_| bad())?);
+                text.push(' ');
+            }
+            Event::CData(part) => {
+                let decoded = part.decode().map_err(|_| bad())?;
+                if stack.is_empty() && !decoded.trim().is_empty() {
+                    return Err(bad());
+                }
+                text.push_str(&decoded);
+                text.push(' ');
+            }
+            Event::GeneralRef(part) => {
+                if stack.is_empty() {
+                    return Err(bad());
+                }
+                let reference = format!("&{};", part.decode().map_err(|_| bad())?);
+                text.push_str(&unescape(&reference).map_err(|_| bad())?);
+            }
+            Event::End(end) => {
+                if stack.pop().as_deref() != Some(end.name().as_ref()) {
+                    return Err(bad());
+                }
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        if text.len() > MAX_XML_BYTES as usize {
+            return Err(error.to_string());
+        }
+    }
+    if !seen_root || !stack.is_empty() {
+        return Err(bad());
+    }
+    Ok(())
+}
+
+fn append_attributes(
+    start: &BytesStart<'_>,
+    text: &mut String,
+    bad: &impl Fn() -> String,
+) -> Result<(), String> {
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|_| bad())?;
+        if attribute.key.as_ref().starts_with(b"xmlns") {
+            continue;
+        }
+        let raw = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| bad())?;
+        text.push_str(&unescape(raw).map_err(|_| bad())?);
+        text.push(' ');
     }
     Ok(())
 }
@@ -241,17 +373,20 @@ fn read_element_text(
 /// the secret check reads (never the frontend's word for it).
 pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
     let bad = || "not a readable Word document".to_string();
-    let names = zip_xml_names(bytes, "word/").map_err(|_| bad())?;
+    let names = zip_xml_names(bytes, "").map_err(|_| bad())?;
     if !names.iter().any(|name| name == "word/document.xml") {
         return Err(bad());
     }
     let mut text = String::new();
     for name in names {
+        if name == "[Content_Types].xml" || name == "word/commentsExtended.xml" {
+            continue;
+        }
         let root = if name == "word/document.xml" {
             Some(b"document".as_slice())
-        } else if name.starts_with("word/header") {
+        } else if numbered_word_part(&name, "header") {
             Some(b"hdr".as_slice())
-        } else if name.starts_with("word/footer") {
+        } else if numbered_word_part(&name, "footer") {
             Some(b"ftr".as_slice())
         } else if name == WORD_FOOTNOTES {
             Some(b"footnotes".as_slice())
@@ -262,11 +397,14 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         } else {
             None
         };
-        let Some(root) = root else { continue };
         let xml = zip_entry(bytes, &name).map_err(|_| bad())?;
         if xml.len() > MAX_XML_BYTES as usize {
             return Err("the document's text is too large to check".into());
         }
+        let Some(root) = root else {
+            generic_part_text(&xml, &mut text, "not a readable Word document")?;
+            continue;
+        };
         let mut reader = Reader::from_reader(xml.as_slice());
         let mut depth = 0usize;
         let mut seen_root = false;
@@ -280,7 +418,7 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
                         }
                         seen_root = true;
                     }
-                    if local.as_ref() == b"t" {
+                    if matches!(local.as_ref(), b"t" | b"delText" | b"instrText") {
                         text.push_str(&read_element_text(&mut reader, start.name().as_ref(), &bad)?);
                     } else {
                         depth += 1;
@@ -315,4 +453,11 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         }
     }
     Ok(text)
+}
+
+fn numbered_word_part(name: &str, stem: &str) -> bool {
+    name.strip_prefix("word/")
+        .and_then(|tail| tail.strip_prefix(stem))
+        .and_then(|tail| tail.strip_suffix(".xml"))
+        .is_some_and(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
 }

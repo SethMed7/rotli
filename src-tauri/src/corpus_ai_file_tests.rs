@@ -193,6 +193,132 @@ fn prefixed_strict_workbook_text_enters_remote_overlap_ledger() {
 }
 
 #[test]
+fn secure_workbook_formula_enters_remote_overlap_ledger() {
+    let formula_secret = "The violet formula records a private winter meeting.";
+    let sheet = format!("<worksheet><sheetData><row><c><f>N(&quot;{formula_secret}&quot;)</f><v>0</v></c></row></sheetData></worksheet>");
+    remember_secure_workbook(&[("xl/worksheets/sheet1.xml", sheet.as_bytes())], "formula.xlsx");
+    assert!(crate::secret::blocked_for_remote(formula_secret));
+}
+
+#[test]
+fn secure_workbook_tab_name_enters_remote_overlap_ledger() {
+    let tab_secret = "The amber tab records a private summer meeting.";
+    let sheet = b"<worksheet><sheetData><row><c><v>0</v></c></row></sheetData></worksheet>";
+    let book = format!("<workbook><sheets><sheet name=\"{tab_secret}\" sheetId=\"1\"/></sheets></workbook>");
+    remember_secure_workbook(&[("xl/worksheets/sheet1.xml", sheet), ("xl/workbook.xml", book.as_bytes())], "tabs.xlsx");
+    assert!(crate::secret::blocked_for_remote(tab_secret));
+}
+
+fn remember_secure_workbook(parts: &[(&str, &[u8])], name: &str) {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let rel = format!("Secure notes/{name}");
+    fs::write(store.root().join(&rel), crate::ai_files::tests::zip_with(parts, true)).unwrap();
+    store.read_file_bytes_for_ai(&rel, true).unwrap();
+}
+
+#[test]
+fn secure_workbook_with_extended_comment_metadata_reads() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let comment = "The lavender numbered comment remains in the secure ledger.";
+    let comment_xml = format!("<comments><commentList><comment><text><t>{comment}</t></text></comment></commentList></comments>");
+    let sheet = b"<worksheet><sheetData><row><c><v>1</v></c></row></sheetData></worksheet>";
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("xl/worksheets/sheet1.xml", sheet),
+        ("xl/comments1.xml", comment_xml.as_bytes()),
+        ("xl/commentsExtended.xml", b"<commentsExtended/>"),
+    ], true);
+    fs::write(store.root().join("Secure notes/metadata.xlsx"), bytes).unwrap();
+    assert!(store.read_file_bytes_for_ai("Secure notes/metadata.xlsx", true).is_ok());
+    assert!(crate::secret::blocked_for_remote(comment));
+}
+
+#[test]
+fn secure_workbook_records_other_text_parts() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let threaded = "The threaded coral message stays inside the local ledger.";
+    let drawing = "The drawing cobalt label stays inside the local ledger.";
+    let pivot = "The pivot silver item stays inside the local ledger.";
+    let chart = "The chart green heading stays inside the local ledger.";
+    let chartsheet = "The chartsheet amber caption stays inside the local ledger.";
+    let custom = "The custom blue payload stays inside the local ledger.";
+    let sheet = b"<worksheet><sheetData><row><c><v>1</v></c></row></sheetData></worksheet>";
+    let thread_xml = format!("<ThreadedComments><threadedComment><text>{threaded}</text></threadedComment></ThreadedComments>");
+    let drawing_xml = format!("<xdr:wsDr><a:t>{drawing}</a:t></xdr:wsDr>");
+    let pivot_xml = format!("<pivotCacheDefinition><cacheFields><cacheField><sharedItems><s v=\"{pivot}\"/></sharedItems></cacheField></cacheFields></pivotCacheDefinition>");
+    let chart_xml = format!("<c:chartSpace><c:title><a:t>{chart}</a:t></c:title></c:chartSpace>");
+    let chartsheet_xml = format!("<chartsheet><a:t>{chartsheet}</a:t></chartsheet>");
+    let custom_xml = format!("<custom><text>{custom}</text></custom>");
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("xl/worksheets/sheet1.xml", sheet),
+        ("xl/threadedComments/threadedComment1.xml", thread_xml.as_bytes()),
+        ("xl/drawings/drawing1.xml", drawing_xml.as_bytes()),
+        ("xl/pivotCache/pivotCacheDefinition1.xml", pivot_xml.as_bytes()),
+        ("xl/charts/chart1.xml", chart_xml.as_bytes()),
+        ("xl/chartsheets/sheet1.xml", chartsheet_xml.as_bytes()),
+        ("customXml/item1.xml", custom_xml.as_bytes()),
+    ], true);
+    fs::write(store.root().join("Secure notes/parts.xlsx"), bytes).unwrap();
+    store.read_file_bytes_for_ai("Secure notes/parts.xlsx", true).unwrap();
+    for secret in [threaded, drawing, pivot, chart, chartsheet, custom] {
+        assert!(crate::secret::blocked_for_remote(secret), "{secret}");
+    }
+}
+
+#[test]
+fn malformed_unknown_office_xml_refuses_secure_local_read() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let sheet = b"<worksheet><sheetData><row><c><v>1</v></c></row></sheetData></worksheet>";
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("xl/worksheets/sheet1.xml", sheet),
+        ("customXml/item1.xml", b"<custom><text>unclosed"),
+    ], true);
+    fs::write(store.root().join("Secure notes/unknown.xlsx"), bytes).unwrap();
+    assert!(store.read_file_bytes_for_ai("Secure notes/unknown.xlsx", true).is_err());
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("xl/worksheets/sheet1.xml", sheet),
+        ("customXml/item1.xml", b"<first/><second/>"),
+    ], true);
+    fs::write(store.root().join("Secure notes/two-roots.xlsx"), bytes).unwrap();
+    assert!(store.read_file_bytes_for_ai("Secure notes/two-roots.xlsx", true).is_err());
+}
+
+#[test]
+fn secure_word_records_deleted_field_and_secondary_part_text() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let deleted = "The deleted crimson paragraph remains private forever.";
+    let field = "The field indigo instruction remains private forever.";
+    let drawing = "The diagram copper label remains private forever.";
+    let diagram = "The Word diagram teal label remains private forever.";
+    let glossary = "The glossary jade entry remains private forever.";
+    let document = format!("<w:document><w:body><w:p><w:t>Public</w:t><w:delText>{deleted}</w:delText><w:instrText>{field}</w:instrText></w:p></w:body></w:document>");
+    let drawing_xml = format!("<wsp:wordprocessingShape><a:t>{drawing}</a:t></wsp:wordprocessingShape>");
+    let diagram_xml = format!("<dgm:dataModel><a:t>{diagram}</a:t></dgm:dataModel>");
+    let glossary_xml = format!("<w:glossaryDocument><w:docPart><w:t>{glossary}</w:t></w:docPart></w:glossaryDocument>");
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("word/document.xml", document.as_bytes()),
+        ("word/commentsExtended.xml", b"<w:commentsEx/>"),
+        ("word/drawings/drawing1.xml", drawing_xml.as_bytes()),
+        ("word/diagrams/data1.xml", diagram_xml.as_bytes()),
+        ("word/glossary/document.xml", glossary_xml.as_bytes()),
+    ], true);
+    fs::write(store.root().join("Secure notes/parts.docx"), bytes).unwrap();
+    store.read_file_bytes_for_ai("Secure notes/parts.docx", true).unwrap();
+    for secret in [deleted, field, drawing, diagram, glossary] {
+        assert!(crate::secret::blocked_for_remote(secret), "{secret}");
+    }
+}
+
+#[test]
 fn a_workbook_with_undecodable_sheet_text_refuses_a_secure_local_read() {
     let tmp = TempDir::new().unwrap();
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
