@@ -29,6 +29,12 @@ pub(super) fn assert_fixture(cases: &serde_json::Value) {
         .unwrap();
         let expected = super::string_list(&sample["tokens"]);
         let actual = crate::secret::prose_tokens(&extracted);
+        if let Some(passages) = sample["viewContains"].as_array() {
+            for passage in passages {
+                let passage = passage.as_str().unwrap();
+                assert!(extracted.contains(passage), "{file} missing view passage: {passage}");
+            }
+        }
         for phrase in expected.windows(5) {
             assert!(
                 actual.windows(5).any(|window| window == phrase),

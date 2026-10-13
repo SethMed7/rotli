@@ -98,6 +98,24 @@ fn allowed_local_secure_docx_text_enters_remote_overlap_ledger() {
 }
 
 #[test]
+fn secure_docx_heading_framing_refuses_remote_egress_after_local_read() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    let rel = "Secure notes/headings.docx";
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let bytes = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        include_str!("../../scripts/fixtures/secure-office-word.b64").trim(),
+    )
+    .unwrap();
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(
+        "Heading 1: The silver orchard meeting."
+    ));
+}
+
+#[test]
 fn secure_docx_image_alt_text_enters_remote_overlap_ledger() {
     let tmp = TempDir::new().unwrap();
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();

@@ -9,11 +9,16 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
 mod view;
+mod word_view;
+
+#[cfg(test)]
+pub(crate) use word_view::word_style_label;
 
 use view::{
-    append_word_model_view, rendered_date, workbook_date_formats, workbook_model_view,
+    rendered_date, workbook_date_formats, workbook_model_view,
     workbook_uses_1904_dates,
 };
+use word_view::{append_word_model_view, word_list_kinds};
 
 /// The largest XML package part the check will inflate.
 const MAX_XML_BYTES: u64 = 16 * 1024 * 1024;
@@ -467,6 +472,11 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
     }
     let mut text = String::new();
     let mut model_view = String::new();
+    let lists = if names.iter().any(|name| name == "word/numbering.xml") {
+        word_list_kinds(&zip_entry(bytes, "word/numbering.xml").map_err(|_| bad())?)?
+    } else {
+        std::collections::HashMap::new()
+    };
     for name in names {
         if name == "[Content_Types].xml" || name == "word/commentsExtended.xml" {
             continue;
@@ -491,7 +501,7 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
             return Err("the document's text is too large to check".into());
         }
         if name == "word/document.xml" {
-            append_word_model_view(&xml, &mut model_view)?;
+            append_word_model_view(&xml, &lists, &mut model_view)?;
         }
         let Some(root) = root else {
             generic_part_text(&xml, &mut text, "not a readable Word document")?;

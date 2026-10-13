@@ -31,6 +31,19 @@ fn secure_office_ai_view_phrases_match_extracted_ledger_text() {
 }
 
 #[test]
+fn word_style_labels_match_model_view() {
+    for sample in entry("wordStyleLabels").as_array().unwrap() {
+        let id = sample["id"].as_str().unwrap();
+        let expected = sample["label"].as_str().unwrap();
+        assert_eq!(
+            crate::ai_office_text::word_style_label(id).unwrap_or("paragraph"),
+            expected,
+            "{id}"
+        );
+    }
+}
+
+#[test]
 fn byte_revision_vector_matches_fixture() {
     let vector = entry("byteRevisionVector");
     let bytes: Vec<u8> = vector["bytes"]

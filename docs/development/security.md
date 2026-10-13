@@ -116,16 +116,22 @@ tool call or count as mutation confirmation.
 For a secure local Office read, the overlap ledger must receive every decoded
 text surface the on-device model can see. Known workbook and Word parts use
 their format-aware extractors. The ledger also records the model's Word block
-order and workbook cell view, including whitespace between Word runs, tabs and
-breaks, formatted dates in either workbook date system, formulas with cached
-results, booleans, rich text, sheet names, and cell addresses. Word image alt
-text (`wp:docPr descr`) and its visible name fallback enter the ledger.
+order and framing (paragraph style labels, list kinds, table and cell labels,
+and image placeholders) and workbook cell view, including whitespace between
+Word runs, tabs and breaks, formatted dates in either workbook date system,
+formulas with cached results, booleans, rich text, sheet names, and cell
+addresses. Word image alt text (`wp:docPr descr`) and its visible name fallback
+enter the ledger.
 Relationship targets and text nodes in secondary XML parts (including
 comments, DrawingML, charts, diagrams, glossary, and custom XML) enter the
 ledger; attributes are limited to image alt/name and relationship targets, so
 style IDs, run IDs, and other metadata cannot evict visible prose from the
 bounded 50,000-phrase ledger. Only known text-free package metadata, such as
 `[Content_Types].xml` and extended comment metadata, is skipped explicitly.
+The ledger records five-token phrases of what the local model is shown. A quote
+shorter than five tokens is out of its reach by design; the primary protection
+for a chat that read secure content is its taint, which refuses remote sends
+from that chat.
 The synthetic Office packages in `scripts/fixtures/secure-office-*.b64` pin
 the normalized TS AI-view tokens in `parity.json`; Rust must cover every
 five-token phrase from those views and keep the metadata-heavy case bounded.

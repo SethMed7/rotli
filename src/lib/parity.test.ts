@@ -21,6 +21,7 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { decodeDocx } from "../documents/codec/docx";
+import { namedStyle } from "../documents/codec/paragraphStyles";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
@@ -320,5 +321,23 @@ test("secureOfficeAiView", async () => {
         .match(/[\p{L}\p{N}][\p{L}\p{N}'’-]{2,}/gu) ?? [],
     );
     expect(tokens).toEqual(sample.tokens);
+    for (const passage of sample.viewContains ?? []) expect(view).toContain(passage);
+  }
+});
+
+test("wordStyleLabels", () => {
+  for (const { id, label } of entries.wordStyleLabels.value) {
+    const style = namedStyle(id);
+    const view = editableDocumentForAi({
+      id: "style-fixture",
+      title: "Style fixture",
+      content: [
+        {
+          kind: "paragraph",
+          paragraph: { runs: [{ text: "sample" }], ...(style ? { namedStyle: style } : {}) },
+        },
+      ],
+    });
+    expect(view).toBe(`[1] ${label}: sample`);
   }
 });

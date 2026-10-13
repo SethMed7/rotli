@@ -6,7 +6,7 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 
 use super::{
-    attribute_value, read_element_text, zip_entry, ALT_DESCRIPTION, DOC_PR, RELATIONSHIP,
+    attribute_value, read_element_text, zip_entry, RELATIONSHIP,
     RELATIONSHIP_TARGET,
 };
 
@@ -399,69 +399,4 @@ pub(super) fn rendered_date(value: &str, pattern: &str, date1904: bool) -> Optio
     } else {
         Some(day)
     }
-}
-
-/// Model framing can join a visible phrase to a block label or the next
-/// block. Record the local view in document order as well as raw secondary
-/// parts, which include comments, fields, and tracked deletions.
-pub(super) fn append_word_model_view(xml: &[u8], out: &mut String) -> Result<(), String> {
-    let bad = || "not a readable Word document".to_string();
-    let mut reader = Reader::from_reader(xml);
-    let mut paragraph: Option<(String, Option<String>)> = None;
-    loop {
-        match reader.read_event().map_err(|_| bad())? {
-            Event::Start(start) => match start.local_name().as_ref() {
-                b"p" => paragraph = Some((String::new(), None)),
-                b"t" if paragraph.is_some() => {
-                    let value = read_element_text(&mut reader, start.name().as_ref(), &bad)?;
-                    if let Some((body, _)) = &mut paragraph {
-                        body.push_str(&value);
-                    }
-                }
-                b"tab" | b"br" | b"cr" => {
-                    if let Some((body, _)) = &mut paragraph {
-                        body.push(' ');
-                    }
-                }
-                DOC_PR => {
-                    if let Some((_, image)) = &mut paragraph {
-                        *image = attribute_value(&start, ALT_DESCRIPTION, &bad)?
-                            .filter(|value| !value.is_empty())
-                            .or(attribute_value(&start, b"name", &bad)?);
-                    }
-                }
-                _ => {}
-            },
-            Event::Empty(start) => match start.local_name().as_ref() {
-                b"tab" | b"br" | b"cr" => {
-                    if let Some((body, _)) = &mut paragraph {
-                        body.push(' ');
-                    }
-                }
-                DOC_PR => {
-                    if let Some((_, image)) = &mut paragraph {
-                        *image = attribute_value(&start, ALT_DESCRIPTION, &bad)?
-                            .filter(|value| !value.is_empty())
-                            .or(attribute_value(&start, b"name", &bad)?);
-                    }
-                }
-                _ => {}
-            },
-            Event::End(end) if end.local_name().as_ref() == b"p" => {
-                if let Some((body, image)) = paragraph.take() {
-                    if let Some(alt) = image {
-                        out.push_str("image ");
-                        out.push_str(&alt);
-                    } else {
-                        out.push_str("paragraph ");
-                        out.push_str(&body);
-                    }
-                    out.push('\n');
-                }
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    Ok(())
 }
