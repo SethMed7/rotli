@@ -47,6 +47,15 @@ describe("routing a queued open request", () => {
     expect(h.failures).toEqual([]);
   });
 
+  test("a file opened from Finder opens in a tab by its full id, with no vault switch", async () => {
+    const h = harness(true);
+    await routeOpenRequest({ id: "finder_00ab12cd34ef5678:Trip notes.md", kind: "note" }, h.deps);
+    expect(h.calls).toEqual(["open"]);
+    expect(h.opened).toEqual([{ id: "finder_00ab12cd34ef5678:Trip notes.md", kind: "note" }]);
+    expect(canOpenVaultInPanes(contentVaultId(h.opened[0]!.id))).toBe(true);
+    expect(canOpenVaultInPanes("work")).toBe(false);
+  });
+
   test("a switch that throws or changes nothing opens nothing and says why", async () => {
     for (const result of [new Error("no such connected vault"), false]) {
       const h = harness(result);

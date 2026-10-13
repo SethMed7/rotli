@@ -1,4 +1,5 @@
 import { type WorkspaceOpenRequest, splitRootId } from "../lib/tauri";
+import { RAW_ROOT_PREFIX } from "./paneVaults";
 
 /** What routing an open request needs from the app, injected so the policy
  * stays testable without the shell. */
@@ -19,7 +20,9 @@ export interface OpenRequestDeps {
  * switch that fails or changes nothing opens nothing. */
 export async function routeOpenRequest(request: WorkspaceOpenRequest, deps: OpenRequestDeps): Promise<void> {
   const { rootId, rel } = splitRootId(request.id);
-  if (rootId === "default") {
+  // a file opened from Finder opens in its own tab, by its full id: it is not
+  // a vault, so there is nothing to switch to (docs/design/open-in-rotli.md)
+  if (rootId === "default" || rootId.startsWith(RAW_ROOT_PREFIX)) {
     deps.open(request);
     return;
   }

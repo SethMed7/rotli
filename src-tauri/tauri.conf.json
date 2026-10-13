@@ -107,7 +107,48 @@
     "macOS": {
       "entitlements": "entitlements.plist",
       "minimumSystemVersion": "11.0"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md"
+        ],
+        "name": "Markdown note",
+        "role": "Editor",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "excalidraw"
+        ],
+        "name": "Excalidraw board",
+        "role": "Editor",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "png",
+          "jpg",
+          "jpeg",
+          "gif",
+          "webp",
+          "heic"
+        ],
+        "name": "Image",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "mp4",
+          "mov",
+          "m4v"
+        ],
+        "name": "Video",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ]
   },
   "plugins": {
     "deep-link": {

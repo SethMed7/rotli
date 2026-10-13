@@ -676,6 +676,10 @@
         { "text": "amex 371449635398431", "secret": true }
       ]
     },
+    "rawRootPrefix": {
+      "sourceOfTruth": "src-tauri/src/corpus_raw.rs RAW_ROOT_PREFIX ↔ src/state/paneVaults.ts RAW_ROOT_PREFIX — the root id prefix of a file opened from Finder, which opens in a tab without switching vaults",
+      "value": "finder_"
+    },
     "noteImageLink": {
       "sourceOfTruth": "behavioral: src/editor/imageSource.ts noteImageLink ↔ src-tauri/src/corpus_link_convert.rs note_image_link (the link a new image gets, and what the link converter writes)",
       "value": [

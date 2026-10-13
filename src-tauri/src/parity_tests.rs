@@ -489,6 +489,12 @@ fn note_date_stamps_match_fixture() {
     }
 }
 
+/// A file opened from Finder mounts under the same root prefix on both sides.
+#[test]
+fn raw_root_prefix_matches() {
+    assert_eq!(entry("rawRootPrefix"), crate::corpus::raw::RAW_ROOT_PREFIX);
+}
+
 /// The Graph view's edges: both link readers agree on every fixture body.
 #[test]
 fn wikilink_targets_fixtures_agree() {

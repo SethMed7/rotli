@@ -17,6 +17,10 @@
 pub enum DeepLink {
     Open { id: String, kind: String },
     Reveal { rel: String, vault: Option<String> },
+    /// A file or folder macOS handed Rotli (Finder's Open With, a Quick
+    /// Action, a Dock drop) — docs/design/open-in-rotli.md. The OS is the only
+    /// sender: the webview can never produce one.
+    OpenPath { path: std::path::PathBuf },
 }
 
 fn valid_id(id: &str) -> bool {
@@ -31,6 +35,10 @@ fn valid_id(id: &str) -> bool {
 }
 
 pub fn parse(url: &tauri::Url) -> Option<DeepLink> {
+    if url.scheme() == "file" {
+        let path = url.to_file_path().ok()?;
+        return (path.is_absolute() && !path.as_os_str().is_empty()).then_some(DeepLink::OpenPath { path });
+    }
     if url.scheme() != "rotli" {
         return None;
     }
@@ -88,6 +96,24 @@ mod tests {
             open("rotli://open?id=Board%2Fsketch.excalidraw&kind=board"),
             Some(("Board/sketch.excalidraw".into(), "board".into()))
         );
+    }
+
+    fn path(s: &str) -> Option<std::path::PathBuf> {
+        match parse(&s.parse::<tauri::Url>().unwrap()) {
+            Some(DeepLink::OpenPath { path }) => Some(path),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn a_file_finder_hands_over_becomes_its_decoded_absolute_path() {
+        assert_eq!(
+            path("file:///Users/sam/Downloads/Trip%20notes.md"),
+            Some("/Users/sam/Downloads/Trip notes.md".into())
+        );
+        assert_eq!(path("file:///Users/sam/Plans/"), Some("/Users/sam/Plans/".into()));
+        assert_eq!(path("file://example.com/share/a.md"), None, "a remote host is never a local path");
+        assert_eq!(path("rotli://open?id=a.md"), None, "a rotli:// link never names a disk path");
     }
 
     #[test]

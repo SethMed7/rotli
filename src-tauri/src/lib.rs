@@ -26,6 +26,7 @@ mod compute;
 mod containment;
 mod corpus;
 mod deep_link;
+mod open_requests;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
@@ -374,50 +375,6 @@ mod reopen_tests {
         assert!(!reopen_should_show_main(false, true, None));
     }
 }
-
-/// One accepted deep link → write the one-shot mailbox at the default root,
-/// surface the window, and let the webview consume it (the exact flow of
-/// `rotli open`, minus the redundant `open -a rotli` — we ARE the app).
-fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
-    let (id, kind) = match deep_link::parse(url) {
-        Some(deep_link::DeepLink::Open { id, kind }) => (id, kind),
-        Some(deep_link::DeepLink::Reveal { rel, vault }) => {
-            reveal_deep_link(app, &rel, vault.as_deref());
-            return;
-        }
-        None => return,
-    };
-    let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() else {
-        return;
-    };
-    let path = root.join(".rotli").join("workspace-open.json");
-    let Some(parent) = path.parent() else { return };
-    if std::fs::create_dir_all(parent).is_err() {
-        return;
-    }
-    let body = serde_json::json!({ "id": id, "kind": kind }).to_string();
-    if fsutil::atomic_write(&path, &body, ".rotli-open-").is_err() {
-        return;
-    }
-    show_main(app);
-    let _ = app.emit_to("main", "rotli:open-request", ());
-}
-
-/// `rotli://reveal`: Finder at a vault file, for Rotli Web (2026-09-17). Only
-/// the default vault answers, and only when the link names it (or names none):
-/// the page is connected to ONE folder by name, and a copy of some other vault
-/// must not reveal this one's files. Same guard as "Show in Finder".
-fn reveal_deep_link(app: &AppHandle, rel: &str, vault: Option<&str>) {
-    let state = app.state::<corpus::CorpusState>();
-    if let Some(name) = vault {
-        let Ok(root) = state.default_root_path() else { return };
-        if root.file_name().and_then(|n| n.to_str()) != Some(name) {
-            return;
-        }
-    }
-    let _ = corpus::corpus_reveal_file(state, rel.to_string());
-}
-
 
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
@@ -2703,7 +2660,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
                     for url in event.urls() {
-                        handle_deep_link(&handle, &url);
+                        open_requests::handle_deep_link(&handle, &url);
                     }
                 });
                 // cold start: a click LAUNCHED the app — sweep the URLs that
@@ -2711,7 +2668,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 if let Ok(Some(urls)) = app.deep_link().get_current() {
                     for url in urls {
-                        handle_deep_link(&handle, &url);
+                        open_requests::handle_deep_link(&handle, &url);
                     }
                 }
             }
