@@ -43,7 +43,8 @@ describes.
   imported note fills a missing `id`, `created`, and `updated`. A rename adds
   the old title to `aliases` (`docs/architecture/memex-data-contract.md`,
   Metadata ownership). That is expected when someone edits a note, but it is
-  still a change to the original.
+  still a change to the original. *Fixed by slice 1b, along with the Mac
+  renaming a saved note's file to its title slug.*
 - **The copy primitive exists but nothing calls it.**
   `corpus_import_vault_copy` + `copy_vault_tree` (`src-tauri/src/lib.rs`)
   copy a vault into an **empty** folder outside the source. The copy keeps
@@ -163,9 +164,13 @@ An adopted folder, and the source of any import, is **protected**:
 
 1. Protected originals: close Gap 1 for adopted folders, plus tests on both
    the Mac and web. This is the safety fix and is useful on its own.
-   **In review** (`fix/protected-originals`). Decision B (no `id`/`created`/
-   `updated` stamps on in-place edits) and decision C (the one-time offer) are
-   separate slices.
+   **Merged (#212).**
+1b. Decision B, built: a person's note in a folder opened in place (`id` not a
+   ULID) keeps its file name and frontmatter bytes on every save, move, and
+   metadata control; only the asked-for line changes. Found while building it:
+   Mac saves also **renamed the file to a title slug**, breaking Obsidian's
+   file-name links. That is fixed too. Notes Rotli creates there still follow
+   their title. Decision C (the one-time offer) remains its own slice.
 2. The compatibility audit script, plus a run over the owner's vaults
    (read-only report).
 3. The copy flow: choice screen, copy with progress, verification, and
