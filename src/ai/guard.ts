@@ -41,10 +41,21 @@ function luhnOk(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+/** A run right after `<digit>.` is the FRACTION of a decimal number, never a
+ * card (2026-10-13: an Excalidraw coordinate `17.140276393692147` passed Luhn
+ * and locked a board away from agents). A full stop after a card still counts.
+ * The Rust twin is `is_decimal_fraction`; parity fixture `looksSecure`. */
+function isDecimalFraction(text: string, start: number): boolean {
+  return text[start - 1] === "." && /\d/.test(text[start - 2] ?? "");
+}
+
 /** True when the text trips a high-signal secret pattern. */
 export function looksSecret(text: string): boolean {
   if (PATTERNS.some((re) => re.test(text))) return true;
-  return (text.match(PAN) ?? []).some(luhnOk);
+  for (const match of text.matchAll(PAN)) {
+    if (!isDecimalFraction(text, match.index) && luhnOk(match[0])) return true;
+  }
+  return false;
 }
 
 const PRIVATE_OVERLAP_WORDS = 5;

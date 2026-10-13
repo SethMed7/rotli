@@ -17,7 +17,7 @@ import {
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
 import { editableDocumentForAi } from "../ai/artifacts";
-import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
+import { containsPrivateDataOverlap, endpointIsLocal, looksSecret } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { decodeDocx } from "../documents/codec/docx";
@@ -250,6 +250,12 @@ describe("parity.json ↔ TS constants", () => {
         outbound,
         overlaps: false,
       });
+    }
+  });
+
+  test("looksSecure", () => {
+    for (const { text, secret } of entries.looksSecure.value) {
+      expect({ text, secret: looksSecret(text) }).toEqual({ text, secret });
     }
   });
 

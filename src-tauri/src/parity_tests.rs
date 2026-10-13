@@ -489,6 +489,16 @@ fn note_date_stamps_match_fixture() {
     }
 }
 
+/// What counts as secret-shaped agrees on both sides, decimals included.
+#[test]
+fn looks_secure_fixtures_agree() {
+    for case in entry("looksSecure").as_array().expect("looksSecure is an array") {
+        let text = case["text"].as_str().expect("text is a string");
+        let secret = case["secret"].as_bool().expect("secret is a bool");
+        assert_eq!(crate::secret::looks_secure(text), secret, "{text}");
+    }
+}
+
 /// The link a new image gets (and the link converter writes) agrees on both sides.
 #[test]
 fn note_image_link_fixtures_agree() {

@@ -50,9 +50,24 @@ pub fn looks_secure(text: &str) -> bool {
     // too common (ids, phone-ish strings) to flag on shape alone, so each
     // candidate must ALSO pass Luhn — the checksum every real PAN carries.
     // (`\b` never splits two word chars, so a digit run inside a ULID is safe.)
+    // A run right after `<digit>.` is the FRACTION of a decimal number, never a
+    // card (2026-10-13: an Excalidraw coordinate `17.140276393692147` passed
+    // Luhn and locked a board away from agents); `\b` alone sits between `.`
+    // and a digit. A full stop after a card ("… 4242424242424242.") still
+    // counts — only the digits after the point are exempt.
     static PAN: OnceLock<regex::Regex> = OnceLock::new();
     let pan = PAN.get_or_init(|| regex::Regex::new(r"\b\d{15,16}\b").expect("valid PAN regex"));
-    pan.find_iter(text).any(|m| luhn_ok(m.as_str()))
+    pan.find_iter(text)
+        .any(|m| !is_decimal_fraction(text, m.start()) && luhn_ok(m.as_str()))
+}
+
+/// Whether the digit run starting at `start` follows `<digit>.` — the
+/// fractional part of a decimal number. The TS twin is `isDecimalFraction` in
+/// src/ai/guard.ts; parity fixture `looksSecure` pins both.
+fn is_decimal_fraction(text: &str, start: usize) -> bool {
+    let before = text.as_bytes()[..start].iter().rev();
+    let mut before = before.copied();
+    before.next() == Some(b'.') && before.next().is_some_and(|c| c.is_ascii_digit())
 }
 
 /// MARKER backstop. A secure note read includes its managed frontmatter marker,
@@ -392,6 +407,32 @@ mod tests {
         // too short / too long runs don't match the PAN shape
         assert!(!looks_secure("n 42424242424242"));
         assert!(!looks_secure("n 42424242424242424242"));
+    }
+
+    #[test]
+    fn the_fractional_digits_of_a_decimal_are_never_a_card_number() {
+        // real Excalidraw coordinates (2026-10-13): each fraction is a 15–16
+        // digit run, and the first passes Luhn on its own
+        assert!(luhn_ok("140276393692147"));
+        for scene in [
+            r#"{"x": 12, "y": 17.140276393692147}"#,
+            r#"{"x": -2045.6097236063079, "width": 3935.2297743867343}"#,
+            r#"{"height": 1436.7200927734375}"#,
+            "points [[0, 0], [-0.140276393692147, 2.5]]",
+        ] {
+            assert!(!looks_secure(scene), "{scene}");
+        }
+        // a real card number is still a card number, wherever it sits
+        for text in [
+            "4242 4242 4242 4242",
+            "4242-4242-4242-4242",
+            "4242424242424242",
+            r#"{"number":"4242424242424242"}"#,
+            r#"{"text": "pay with 4242424242424242."}"#,
+            "card 4242424242424242.",
+        ] {
+            assert!(looks_secure(text), "{text}");
+        }
     }
 
     // The ledger is process-global and every test in this binary shares it, so

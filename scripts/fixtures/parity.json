@@ -661,6 +661,21 @@
         ]
       }
     },
+    "looksSecure": {
+      "sourceOfTruth": "behavioral: src/ai/guard.ts looksSecret ↔ src-tauri/src/secret.rs looks_secure (independent implementations, fixture-aligned: what counts as secret-shaped on every egress seam). The decimal-fraction cases pin the 2026-10-13 board fix.",
+      "value": [
+        { "text": "{\"x\": 12, \"y\": 17.140276393692147}", "secret": false },
+        { "text": "{\"x\": -2045.6097236063079, \"width\": 3935.2297743867343, \"height\": 1436.7200927734375}", "secret": false },
+        { "text": "order 1234567890123456", "secret": false },
+        { "text": "id a4242424242424242z", "secret": false },
+        { "text": "4242 4242 4242 4242", "secret": true },
+        { "text": "4242-4242-4242-4242", "secret": true },
+        { "text": "4242424242424242", "secret": true },
+        { "text": "{\"number\":\"4242424242424242\"}", "secret": true },
+        { "text": "pay with 4242424242424242.", "secret": true },
+        { "text": "amex 371449635398431", "secret": true }
+      ]
+    },
     "noteImageLink": {
       "sourceOfTruth": "behavioral: src/editor/imageSource.ts noteImageLink ↔ src-tauri/src/corpus_link_convert.rs note_image_link (the link a new image gets, and what the link converter writes)",
       "value": [
