@@ -421,7 +421,10 @@ the editor's clean-buffer gate preserves unsaved typing.
   vault-and-session Web Lock for its lifetime. Boot skips another live tab's
   draft without encoding, writing, or clearing it. A failed liveness check
   also leaves the record untouched; without Web Locks, boot defers peer drafts
-  rather than guessing they are abandoned. A dead session replays in place
+  rather than guessing they are abandoned. Boot holds one vault-scoped replay
+  Web Lock through each save and journal clear; the next tab reads the journal
+  after taking that lock, so one abandoned draft cannot produce a duplicate
+  conflict copy. A dead session replays in place
   only when it is the file's sole draft and its base still matches. Competing
   drafts become separate `unsaved copy` siblings. A draft added during
   asynchronous replay remains queued. If a later edit exceeds the journal

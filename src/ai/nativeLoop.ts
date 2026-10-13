@@ -108,10 +108,10 @@ export async function* runNativeAgent(
     {
       model: opts.modelId,
       systemPrompt: renderNativeSystem({
+        offeredTools: allowed,
         web: input.web,
         knowledge,
         maxSteps,
-        ...(input.documentTool ? { documentTool: true } : {}),
         ...(input.userName ? { userName: input.userName } : {}),
       }),
       userText: renderNativeUser(

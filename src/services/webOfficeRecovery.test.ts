@@ -143,6 +143,84 @@ test("a dead session's draft replays after its Web Lock is released", async () =
   }
 });
 
+test("two tabs replay one abandoned draft with one save and no sibling", async () => {
+  const store = storage();
+  const dir = new MemoryVaultDir();
+  await dir.writeBytes("storage/plan.csv", original);
+  writeOfficeDraft(store, "A", { ...draft(), sessionId: "closed-tab" });
+  let releaseFirstWrite!: () => void;
+  let firstWriteStarted!: () => void;
+  const firstWriteGate = new Promise<void>((resolve) => {
+    releaseFirstWrite = resolve;
+  });
+  const firstWriteSeen = new Promise<void>((resolve) => {
+    firstWriteStarted = resolve;
+  });
+  const write = dir.writeBytes.bind(dir);
+  let writes = 0;
+  dir.writeBytes = async (path, bytes, revision) => {
+    if (path === "storage/plan.csv" && revision) {
+      writes += 1;
+      if (writes === 1) {
+        firstWriteStarted();
+        await firstWriteGate;
+      }
+    }
+    return write(path, bytes, revision);
+  };
+  const prior = Object.getOwnPropertyDescriptor(navigator, "locks");
+  const tails = new Map<string, Promise<void>>();
+  let secondReplayQueued!: () => void;
+  const secondQueued = new Promise<void>((resolve) => {
+    secondReplayQueued = resolve;
+  });
+  let requests = 0;
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request: async (
+        name: string,
+        _options: { mode: string },
+        callback: (lock: object) => Promise<unknown>,
+      ) => {
+        requests += 1;
+        if (requests === 2) secondReplayQueued();
+        const previous = tails.get(name) ?? Promise.resolve();
+        let release!: () => void;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        tails.set(
+          name,
+          previous.then(() => held),
+        );
+        await previous;
+        try {
+          return await callback({});
+        } finally {
+          release();
+        }
+      },
+    },
+  });
+  try {
+    const first = replayAbandoned(store, "A", dir, encode);
+    await firstWriteSeen;
+    const second = replayAbandoned(store, "A", dir, encode);
+    await secondQueued;
+    releaseFirstWrite();
+    const results = await Promise.all([first, second]);
+    expect(results.reduce((count, result) => count + result.saved, 0)).toBe(1);
+    expect(results.flatMap((result) => result.keptAside)).toEqual([]);
+    expect(writes).toBe(1);
+    expect(await dir.readBytes("storage/plan.csv")).toEqual(edited);
+    expect(readOfficeDrafts(store, "A")).toEqual([]);
+  } finally {
+    if (prior) Object.defineProperty(navigator, "locks", prior);
+    else Reflect.deleteProperty(navigator, "locks");
+  }
+});
+
 test("a failed peer liveness check leaves its journal record byte-for-byte intact", async () => {
   const store = storage();
   const dir = new MemoryVaultDir();
