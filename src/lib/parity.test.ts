@@ -45,6 +45,7 @@ import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { workbookForAi } from "../sheets/view";
+import { RAW_ROOT_PREFIX } from "../state/paneVaults";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
@@ -257,6 +258,10 @@ describe("parity.json ↔ TS constants", () => {
     for (const { text, secret } of entries.looksSecure.value) {
       expect({ text, secret: looksSecret(text) }).toEqual({ text, secret });
     }
+  });
+
+  test("rawRootPrefix", () => {
+    expect(RAW_ROOT_PREFIX).toBe(entries.rawRootPrefix.value);
   });
 
   test("noteImageLink", () => {

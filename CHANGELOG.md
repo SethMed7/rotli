@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   excalidraw.com) is copied into your vault's boards, added to Main, and
   opened in a tab, on the Mac and on Rotli Web. The file you dropped stays
   where it was. Before, it was filed as a read-only asset.
+- **Open a file from Finder in Rotli.** Right-click a Markdown file, an
+  Excalidraw board, an image, or a video and choose Open With → Rotli. It opens
+  in a tab and your edits save to that file. Rotli adds nothing beside it, never
+  looks at the other files in its folder, and never sends it to a cloud model.
+  Opening a folder this way is coming next.
 - **Convert older notes' links in one step.** Settings → General → Link format
   counts the images and embeds still written in Rotli's own format, shows a
   few before → after examples, and on a click rewrites them so Obsidian and

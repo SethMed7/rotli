@@ -56,6 +56,7 @@ import {
 import {
   onCorpusChanged,
   onVaultChanged,
+  onOpenNotice,
   onOpenRequest,
   onNativeCloseTab,
   onNativeEditHistory,
@@ -317,6 +318,7 @@ function MainShell() {
       unlisten();
     };
   }, []);
+  useEffect(() => onOpenNotice((message) => useUiStore.getState().setRowActionError(message)), []);
 
   // Agents reach Word documents through this window (ai/agentRequests.ts).
   useEffect(() => (LAUNCH_FEATURES.agents ? attachAgentBridge() : undefined), []);

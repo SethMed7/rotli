@@ -1,6 +1,7 @@
 # Open in Rotli: a file or folder from Finder
 
-Status: **accepted direction, not yet built** (owner decisions 2026-10-13).
+Status: **stage 1 built** (Open With for a file; owner decisions 2026-10-13).
+Stages 2–4 are not built yet.
 Roadmap item `open-with-rotli`. Builds on the protected-originals rule in
 [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md).
 
@@ -67,6 +68,27 @@ Decisions (2026-10-13):
 
 ### 3. A file opens in a tab (stage 1)
 
+**As built (2026-10-13):** no new tab kind and no grants set were needed.
+macOS hands Rotli the file, and Rust mounts it as a **single-file raw root**
+(`src-tauri/src/corpus_raw.rs`). It's an adopted store over the file's folder
+that walks only that one file, with its own root id `finder_<hash>` (parity
+fixture `rawRootPrefix`). Its tab is an ordinary tab whose id is
+`finder_<hash>:<name>`. Only a path macOS handed over is ever mounted, because the
+webview has no command that mounts one.
+
+- Its `.rotli/` sidecar (index, locks) lives in the app cache
+  (`opened-files/finder_<hash>/`), never beside the file. The file's siblings are
+  never walked, searched, or shown.
+- Rotli refuses to delete, move, mark secure, or create anything beside it:
+  "Copy it into a vault first."
+- **Every reader treats it as protected** (`file_is_protected`), so no cloud
+  model reads it. On-device models follow the usual secure-note knobs.
+- A raw root is a pane route only (`canOpenVaultInPanes`). It's never a vault
+  switch, a ⌘N target, or the Librarian's.
+- A folder handed over in stage 1 shows a notice that folder windows are coming.
+
+The original design follows:
+
 - **A new tab kind, `external`,** keyed by its granted absolute path, with its
   own color and the full path in the header.
 - **Markdown and text** open in the editor. Saves write only the new words,
@@ -108,8 +130,9 @@ Rotli Web keeps its own Open folder flow.
 
 ## Stages (one PR each, held for review)
 
-1. Registration (Open With) plus the `file://` handler plus `ExternalGrants`.
-   **External tabs for Markdown, text, boards, images, and video.**
+1. Registration (Open With) plus the `file://` handler. **Built:** tabs for
+   Markdown, boards, images, and video, through a single-file raw root. Plain
+   `.txt` and ⌘S **Copy into vault…** move to stage 2.
 2. **Folder windows** in raw mode, plus **Add as vault**.
 3. **The Quick Action** with its opt-in Settings install.
 4. DOCX, XLSX, and CSV in external tabs.

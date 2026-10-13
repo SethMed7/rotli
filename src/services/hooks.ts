@@ -1,7 +1,7 @@
 // The seam components actually consume: TanStack Query hooks over the typed
 // service. No component touches notesService directly.
 
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { looksSecret } from "../ai/guard";
@@ -300,6 +300,19 @@ export function useNote(id: string, options: { enabled?: boolean } = {}) {
     queryKey: keys.note(id),
     queryFn: () => notesService.getNote(id),
     enabled: options.enabled ?? true,
+  });
+}
+
+/** Titles for open notes no vault listing holds (a file opened from Finder,
+ * src/state/paneVaults.ts), from the same cached read the editor makes. */
+export function useUnlistedNoteTitles(ids: readonly string[]): ReadonlyMap<string, string> {
+  return useQueries({
+    queries: ids.map((id) => ({ queryKey: keys.note(id), queryFn: () => notesService.getNote(id) })),
+    combine: (results) => {
+      const titles = new Map<string, string>();
+      for (const result of results) if (result.data) titles.set(result.data.id, result.data.title);
+      return titles;
+    },
   });
 }
 

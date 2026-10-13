@@ -48,6 +48,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:native-drag` | R→W | A native drag is hovering (physical pointer, item count) or has left; the editor under the pointer draws its drop line. A pathless drag that promises a file or carries image bytes (the macOS screenshot thumbnail, a browser image) counts as one item so the line still draws. |
 | `rotli:native-drop-authorized` | R→W | The host issued one-shot import grants for a native drop and reports the paths plus drop position. A file promise resolves after the drop, so this can arrive a moment later, always with the ORIGINAL drop position. |
 | `rotli:native-drop-refused` | R→W | A native drop delivered nothing that could be granted (folders, files gone mid-drag, a drag with no path, promise, or image bytes); the webview shows a notice instead of doing nothing. |
+| `rotli:open-notice` | R→W | Something Finder handed Rotli can't open yet (a folder, until folder windows ship); the main webview says so instead of doing nothing. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |
 | `rotli:organizer-progress` | R→W | Librarian run progress for the live Activity lane. |
 | `rotli:quick-created` | W→W | A note was born in the Quick Note window; main files it into Main so it is a full note, never a capture. |

@@ -33,6 +33,14 @@ export function onOpenRequest(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** Rust → main window: something handed over from Finder can't open yet (a
+ * folder, until folder windows ship) — say so instead of doing nothing. */
+export function onOpenNotice(cb: (message: string) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listenHere<string>("rotli:open-notice", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** macOS File → Close Tab. ⌘W intentionally stays in the frontend registry so
  * it closes during the original key event instead of taking a native event
  * round trip; pointer selection of the menu item still forwards here. */

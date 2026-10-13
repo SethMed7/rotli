@@ -2736,6 +2736,8 @@ pub struct CorpusStore {
     /// vault-copy-and-obsidian-compatibility.md). Set only by `open_adopted`;
     /// pre-memex Rotli folders share LegacyRotli but are not adopted.
     adopted: bool,
+    /// A file opened from Finder (corpus_raw.rs): sidecar redirected, one file seen.
+    raw: Option<raw::RawMount>,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2905,6 +2907,7 @@ impl CorpusStore {
             band_read_only: false,
             perms_read_only: false,
             adopted: true,
+            raw: None,
             list_cache: None,
             search_index: None,
         };
@@ -2961,6 +2964,7 @@ impl CorpusStore {
             band_read_only: false,
             perms_read_only: read_only,
             adopted: false,
+            raw: None,
             list_cache: None,
             search_index: None,
         };
@@ -3005,6 +3009,7 @@ impl CorpusStore {
             band_read_only,
             perms_read_only: read_only,
             adopted: false,
+            raw: None,
             list_cache: None,
             search_index: None,
         };
@@ -3560,95 +3565,6 @@ impl CorpusStore {
                 self.gitignore_remove(&rel)?;
             }
             Ok(crate::fsutil::revision(out.as_bytes()))
-        })
-    }
-
-    /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
-    /// never be pushed when the corpus is a git repo. The write error PROPAGATES: a
-    /// note marked secure whose `.gitignore` write failed would silently stay
-    /// committable, so set_secure must learn about it (the maintainer, 2026-06-30 — audit).
-    fn gitignore_add(&self, rel: &str) -> Result<(), String> {
-        self.mutation_allowed()?;
-        let path = self.guard_rel(".gitignore")?;
-        crate::fsutil::with_file_lock(&path, || {
-            // an unreadable .gitignore must not be rewritten from empty — that
-            // would drop every OTHER secure note's ignore line
-            let existing = read_existing_text(&path)?;
-            if existing.lines().any(|l| l.trim() == rel) {
-                return Ok(());
-            }
-            let mut out = existing;
-            if !out.is_empty() && !out.ends_with('\n') {
-                out.push('\n');
-            }
-            out.push_str(rel);
-            out.push('\n');
-            atomic_write(&path, &out)
-        })
-    }
-
-    /// Remove a path from the corpus `.gitignore` — called when a note's secure flag
-    /// is cleared, so it isn't left needlessly ignored (the symmetric counterpart of
-    /// gitignore_add). No-op when there's no `.gitignore` or the line isn't present.
-    fn gitignore_remove(&self, rel: &str) -> Result<(), String> {
-        self.mutation_allowed()?;
-        let path = self.guard_rel(".gitignore")?;
-        crate::fsutil::with_file_lock(&path, || {
-            let Ok(existing) = fs::read_to_string(&path) else {
-                return Ok(());
-            };
-            if !existing.lines().any(|l| l.trim() == rel) {
-                return Ok(());
-            }
-            let kept: Vec<&str> = existing.lines().filter(|l| l.trim() != rel).collect();
-            let mut out = kept.join("\n");
-            if !out.is_empty() {
-                out.push('\n');
-            }
-            atomic_write(&path, &out)
-        })
-    }
-
-    /// Make the hand-arranged Main and named-view manifests git-committable while
-    /// the rest of `.rotli/` stays ignored. Unlike index/settings sidecars, these
-    /// arrangements are user work that should travel with the memex.
-    /// A bare `.rotli/` line ignores the whole dir — and git CANNOT re-include a file
-    /// under an ignored dir — so narrow it to `.rotli/*` and add `!.rotli/main.json`.
-    /// Idempotent; a no-op outside a git corpus.
-    fn ensure_main_committable(&self) -> Result<(), String> {
-        self.mutation_allowed()?;
-        let path = self.guard_rel(".gitignore")?;
-        if !path.exists() && !self.root.join(".git").exists() {
-            return Ok(());
-        }
-        crate::fsutil::with_file_lock(&path, || {
-            let existing = read_existing_text(&path)?;
-            let mut lines: Vec<String> = existing.lines().map(str::to_string).collect();
-            let mut changed = false;
-            for l in lines.iter_mut() {
-                if l.trim() == ".rotli/" || l.trim() == ".rotli" {
-                    *l = ".rotli/*".to_string();
-                    changed = true;
-                }
-            }
-            if !lines.iter().any(|l| l.trim() == ".rotli/*") {
-                lines.push(".rotli/*".to_string());
-                changed = true;
-            }
-            if !lines.iter().any(|l| l.trim() == "!.rotli/main.json") {
-                lines.push("!.rotli/main.json".to_string());
-                changed = true;
-            }
-            if !lines.iter().any(|l| l.trim() == "!.rotli/views.json") {
-                lines.push("!.rotli/views.json".to_string());
-                changed = true;
-            }
-            if changed {
-                let mut out = lines.join("\n");
-                out.push('\n');
-                atomic_write(&path, &out)?;
-            }
-            Ok(())
         })
     }
 
@@ -4397,6 +4313,9 @@ impl CorpusStore {
     /// Call this at every read boundary; mutation boundaries receive the same
     /// check centrally through `writable` / `filer_writable`.
     pub(crate) fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
+        if let Some(guarded) = self.raw.as_ref().and_then(|raw| raw.guard(rel)) {
+            return guarded;
+        }
         crate::containment::resolve_beneath(&self.root, Path::new(rel))
     }
 
@@ -4551,6 +4470,7 @@ impl CorpusStore {
         Some(WalkPlan {
             generation,
             layout: self.layout,
+            only: self.raw.as_ref().map(|raw| raw.only.clone()),
             root: self.root.clone(),
             reverse: self
                 .index
@@ -5375,6 +5295,7 @@ impl CorpusStore {
     /// fs-atomic, preserves id/created/foreign, does NOT bump `updated`, rewrites
     /// the id→path index.
     fn relocate(&mut self, id: &str, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "move or delete")?;
         let abs = self.abs(rel);
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
@@ -6045,6 +5966,7 @@ impl CorpusStore {
         secure: bool,
         creator: Option<crate::ai_edit_policy::Creator>,
     ) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "create notes beside")?;
         let secure = secure
             || folder_id == "Secure notes"
             || folder_id.starts_with("Secure notes/")
@@ -6645,6 +6567,8 @@ fn validate_component(name: &str) -> Result<(), String> {
 struct WalkPlan {
     generation: u64,
     layout: Layout,
+    /// A raw mount walks only these top-level names (corpus_raw.rs).
+    only: Option<HashSet<String>>,
     root: PathBuf,
     reverse: HashMap<String, String>,
 }
@@ -6671,6 +6595,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
         plan.layout,
         &plan.root,
         "",
+        plan.only.as_ref(),
         &plan.reverse,
         &mut index,
         &mut folders,
@@ -6720,6 +6645,7 @@ fn walk(
     layout: Layout,
     root: &Path,
     prefix: &str,
+    only: Option<&HashSet<String>>,
     reverse: &HashMap<String, String>,
     new_index: &mut HashMap<String, String>,
     folders: &mut Vec<FolderMeta>,
@@ -6748,6 +6674,9 @@ fn walk(
         } else {
             format!("{prefix}/{name}")
         };
+        if only.is_some_and(|names| !names.contains(&rel)) {
+            continue;
+        }
         let kind = match entry.file_type() {
             Ok(k) => k,
             Err(_) => continue,
@@ -6771,7 +6700,7 @@ fn walk(
         if surface == Surface::Reference {
             if kind.is_dir() {
                 walk(
-                    layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
+                    layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
                 )?;
             } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
                 let abs = entry.path();
@@ -6848,7 +6777,7 @@ fn walk(
                 });
             }
             walk(
-                layout, root, &rel, reverse, new_index, folders, notes, reference, texts,
+                layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
             )?;
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
             let abs = entry.path();
@@ -7038,6 +6967,14 @@ impl CorpusRegistry {
         }
     }
 
+    /// Whether a root is mounted, and the one file a raw mount shows.
+    pub fn contains(&self, id: &str) -> bool {
+        self.stores.contains_key(id)
+    }
+    pub fn raw_item(&mut self, id: &str) -> Option<(String, &'static str)> {
+        self.stores.get_mut(id)?.raw_item().ok()
+    }
+
     pub fn insert(&mut self, id: String, store: CorpusStore) -> Result<(), String> {
         if id.is_empty() || id.contains(':') {
             return Err(format!("invalid corpus root id: {id:?}"));
@@ -7190,9 +7127,12 @@ impl CorpusState {
             .0
             .lock()
             .map_err(|_| "corpus lock poisoned".to_string())?;
+        // a file opened from Finder mounts its folder, but that folder is never
+        // a vault route (corpus_raw.rs)
         Ok(reg
             .stores
             .iter()
+            .filter(|(_, store)| store.raw.is_none())
             .find_map(|(id, store)| (canon(store.root()) == target).then(|| id.clone())))
     }
 
@@ -7349,7 +7289,8 @@ impl CorpusState {
         reg.stores
             .values()
             .find(|store| {
-                fs::canonicalize(store.root()).is_ok_and(|candidate| candidate == canonical)
+                store.raw.is_none()
+                    && fs::canonicalize(store.root()).is_ok_and(|candidate| candidate == canonical)
             })
             .map(CorpusStore::suppress_set)
             .ok_or_else(|| format!("corpus root unavailable: {}", canonical.display()))
@@ -8928,6 +8869,10 @@ pub mod links;
 /// to Archive/Trash and back — a child module.
 #[path = "corpus_files.rs"]
 pub mod files;
+#[path = "corpus_gitignore.rs"]
+mod gitignore;
+#[path = "corpus_raw.rs"]
+pub mod raw;
 pub(crate) use files::is_canvas_path;
 /// The Librarian rules' store side (secure keywords, the batch) — a child module.
 #[path = "corpus_rules.rs"]
