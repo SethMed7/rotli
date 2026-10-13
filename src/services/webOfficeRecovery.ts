@@ -39,6 +39,7 @@ export const officeEditingSessionId = crypto.randomUUID();
 const heldSessions = new Map<string, Promise<void>>();
 const sessionLockName = (vault: string, sessionId: string) =>
   `rotli-office-session:${encodeURIComponent(vault)}:${encodeURIComponent(sessionId)}`;
+const replayLockName = (vault: string) => `rotli-office-replay:${encodeURIComponent(vault)}`;
 
 /** A tab holds its session lock until the browser tears down the page. Boot
  * awaits acquisition before editors can create drafts under this session. */
@@ -207,6 +208,21 @@ export async function replayOfficeDrafts(
   dir: VaultDir,
   encode: (draft: OfficeDraft) => Promise<Uint8Array> = encodeOfficeDraft,
   sessionIsAbandoned: (vault: string, sessionId: string) => Promise<boolean> = abandonedOfficeSession,
+): Promise<{ saved: number; keptAside: string[]; unresolved: number }> {
+  const replay = () => replayOfficeDraftsWithinLock(store, vault, dir, encode, sessionIsAbandoned);
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  // Hold one vault lock through the last confirmed write and journal clear.
+  // The next tab reads the records only after that point.
+  // Without Web Locks, the liveness probe never treats a peer draft as abandoned.
+  return locks ? locks.request(replayLockName(vault), { mode: "exclusive" }, replay) : replay();
+}
+
+async function replayOfficeDraftsWithinLock(
+  store: SyncStore,
+  vault: string,
+  dir: VaultDir,
+  encode: (draft: OfficeDraft) => Promise<Uint8Array>,
+  sessionIsAbandoned: (vault: string, sessionId: string) => Promise<boolean>,
 ): Promise<{ saved: number; keptAside: string[]; unresolved: number }> {
   const drafts = readOfficeDrafts(store, vault);
   let saved = 0;

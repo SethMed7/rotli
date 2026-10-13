@@ -5,8 +5,22 @@
 import { describe, expect, test } from "bun:test";
 
 import { answeredHistory, frontierAdapter, gemmaAdapter, withoutFailedExchanges } from "./prompt";
+import type { ToolName } from "./types";
+
+const baseTools = new Set<ToolName>([
+  "search_memory",
+  "read_memory",
+  "search_notes",
+  "read_note",
+  "create_note",
+  "update_note",
+  "open_note",
+  "read_file",
+]);
+const withTools = (...names: ToolName[]) => new Set<ToolName>([...baseTools, ...names]);
 
 const base = {
+  offeredTools: baseTools,
   web: false,
   knowledge: "",
   history: [],
@@ -26,6 +40,7 @@ describe("userName in the prompt", () => {
   test("teaches every model lane the visible long-running progress grammar", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const prompt = adapter.renderPrompt({
+        offeredTools: baseTools,
         web: false,
         knowledge: "",
         history: [],
@@ -390,7 +405,11 @@ describe("update_note in the prompts", () => {
 describe("artifact format fidelity", () => {
   test("both adapters expose native DOCX creation and forbid substituting a Markdown note", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
-      const prompt = adapter.renderPrompt({ ...base, documentTool: true });
+      const prompt = adapter.renderPrompt({
+        ...base,
+        documentTool: true,
+        offeredTools: withTools("create_document", "edit_document"),
+      });
       expect(prompt).toContain('"tool":"create_document"');
       expect(prompt).toContain("Word document");
       expect(prompt).toMatch(/never substitute|do not substitute/i);
@@ -402,7 +421,11 @@ describe("artifact format fidelity", () => {
 
   test("both adapters expose one bounded clarification protocol", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
-      const prompt = adapter.renderPrompt({ ...base, documentTool: true });
+      const prompt = adapter.renderPrompt({
+        ...base,
+        documentTool: true,
+        offeredTools: withTools("create_document", "edit_document"),
+      });
       expect(prompt).toContain('"question":"…"');
       expect(prompt).toMatch(/2–3|2-3/);
       expect(prompt).toMatch(/materially change/i);
@@ -426,10 +449,20 @@ describe("editable artifact generation", () => {
   test("both adapters expose the tool only when the desktop host enables it", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       expect(adapter.renderPrompt({ ...base })).not.toContain('"tool":"create_artifact"');
-      const enabled = adapter.renderPrompt({ ...base, artifactTool: true, documentTool: true });
+      const enabled = adapter.renderPrompt({
+        ...base,
+        artifactTool: true,
+        documentTool: true,
+        offeredTools: withTools("create_artifact", "create_document", "edit_document"),
+      });
       expect(enabled).toContain('"tool":"create_artifact"');
       expect(enabled.includes('"kind":"pdf"')).toBe(true);
-      const withSheets = adapter.renderPrompt({ ...base, artifactTool: true, sheetArtifacts: true });
+      const withSheets = adapter.renderPrompt({
+        ...base,
+        artifactTool: true,
+        sheetArtifacts: true,
+        offeredTools: withTools("create_artifact"),
+      });
       expect(withSheets.includes('"kind":"sheet|pdf"')).toBe(true);
       expect(enabled).toMatch(/editable Markdown source/i);
       expect(enabled).toContain('"tool":"create_document"');

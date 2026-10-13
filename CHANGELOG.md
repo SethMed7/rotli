@@ -364,6 +364,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Secure Office formulas, sheet names, comments, and secondary package text now reach the local AI egress guard; unreadable parts refuse the read. Agent listings and counts omit secret-shaped files and protected boards, and uppercase Markdown and board changes refresh correctly.
+- **Rotli Web chat now names only the AI tools available in that chat.** It no
+  longer suggests reading files or creating and editing Word documents when
+  those tools are unavailable in the browser.
+- **Rotli Web no longer creates a duplicate unsaved office copy when two tabs recover the same abandoned edit.**
 - **rotli.co's film plays everywhere, and screen readers describe the film
   you see.** Its description still told of the earlier film; an error page
   could also be kept by the site's cache for a day, which hid the new film
