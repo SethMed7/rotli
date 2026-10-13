@@ -46,6 +46,9 @@ COPY scripts ./scripts
 # tsc type-checks the parity and scheduler tests, which import breve-runtime
 # sources; the runtime is not bundled into the web app.
 COPY breve-runtime ./breve-runtime
+# …and the Helper tests, which import e2e/web's fake Helper (nothing from e2e
+# is bundled either; scripts/site-docker-context.test.ts keeps this list honest)
+COPY e2e ./e2e
 RUN bun run build:web
 
 FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
