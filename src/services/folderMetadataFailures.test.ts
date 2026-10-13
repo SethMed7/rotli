@@ -8,6 +8,8 @@ import { writeFolderViews } from "./folderViewSync";
 import { MemoryVaultDir } from "./vaultDir";
 
 const text = "---\nid: untouched-id\ncustom: survives\n---\n# Before rename\n\nKeep this prose.\n";
+/** A Rotli vault is marked by memex.json; without it a folder was opened in place. */
+const MARKER = `${JSON.stringify({ id: "mx_test123", contract: "3.4" })}\n`;
 
 test("a failed git exclusion aborts secure marking before any note write or move", async () => {
   const dir = new MemoryVaultDir();
@@ -18,11 +20,35 @@ test("a failed git exclusion aborts secure marking before any note write or move
   expect(await dir.exists("wiki/_secure/keep.md")).toBe(false);
 });
 
-test("an imported path-addressed note cannot claim a secure move without durable identity", async () => {
+test("a Rotli vault note cannot claim a secure move without durable identity", async () => {
   const dir = new MemoryVaultDir();
-  await dir.writeText("plain.md", "# Imported without provenance\n");
-  await expect(setFolderSecure(dir, "plain.md", true)).rejects.toThrow(/stable frontmatter id/);
-  expect(await dir.readText("plain.md")).toBe("# Imported without provenance\n");
+  await dir.writeText("memex.json", MARKER);
+  await dir.writeText("wiki/plain.md", "# Imported without provenance\n");
+  await expect(setFolderSecure(dir, "wiki/plain.md", true)).rejects.toThrow(/stable frontmatter id/);
+  expect(await dir.readText("wiki/plain.md")).toBe("# Imported without provenance\n");
+});
+
+test("a folder opened in place keeps a secure note where it is, byte-for-byte around the flag", async () => {
+  const dir = new MemoryVaultDir();
+  // an Obsidian vault, even one with a wiki/ folder, has no Rotli marker
+  const obsidian = "---\ntags: [travel]\naliases: [Lisbon trip]\n---\n# Trip\n";
+  await dir.writeText("wiki/trip.md", obsidian);
+  await dir.writeText("Diary/today.md", "# Diary\n\nQuiet day.\n");
+  expect(await setFolderSecure(dir, "wiki/trip.md", true)).toBe("wiki/trip.md");
+  expect(await dir.readText("wiki/trip.md")).toBe(
+    "---\ntags: [travel]\naliases: [Lisbon trip]\nsecure: true\n---\n# Trip\n",
+  );
+  expect(await setFolderSecure(dir, "Diary/today.md", true)).toBe("Diary/today.md");
+  expect(await dir.readText("Diary/today.md")).toBe("---\nsecure: true\n---\n# Diary\n\nQuiet day.\n");
+  expect(await dir.exists("wiki/_secure")).toBe(false);
+  expect(await dir.exists("Secure notes")).toBe(false);
+  expect(await dir.readText(".gitignore")).toContain("Diary/today.md");
+
+  await setFolderSecure(dir, "wiki/trip.md", false);
+  await setFolderSecure(dir, "Diary/today.md", false);
+  expect(await dir.readText("wiki/trip.md")).toBe(obsidian);
+  expect(await dir.readText("Diary/today.md")).toBe("# Diary\n\nQuiet day.\n");
+  expect(await dir.readText(".gitignore")).not.toContain("Diary/today.md");
 });
 
 test("a raw secure flag synchronizes git exclusion while preserving the exact body", async () => {
@@ -42,6 +68,7 @@ test("a raw secure flag synchronizes git exclusion while preserving the exact bo
 
 test("secure title renames preserve aliases and move the git exclusion to the final path", async () => {
   const dir = new MemoryVaultDir();
+  await dir.writeText("memex.json", MARKER);
   await dir.writeText("wiki/before-rename.md", text);
   await setFolderSecure(dir, "wiki/before-rename.md", true);
   const notes = new FolderNotesService(dir);
@@ -184,6 +211,7 @@ test("view exclusion narrowing retries a concurrent secure exclusion edit", asyn
 
 test("a secure move succeeds when removing its old git exclusion fails", async () => {
   const dir = new MemoryVaultDir();
+  await dir.writeText("memex.json", MARKER);
   await dir.writeText("wiki/keep.md", text);
   const write = dir.writeText.bind(dir);
   let moved = false;

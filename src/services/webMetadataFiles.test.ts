@@ -35,6 +35,8 @@ const original =
   "---\nid: durable\ncreated: 2026-01-01\nowner: person\ncustom: keep me\n---\n# First title\n\nBody stays.\n";
 beforeEach(async () => {
   dir = new MemoryVaultDir();
+  // a Rotli vault: its marker is what lets a secure note move into wiki/_secure
+  await dir.writeText("memex.json", `${JSON.stringify({ id: "mx_webmeta01", contract: "3.4" })}\n`);
   await dir.writeText("wiki/first-title.md", original);
   notes = new FolderNotesService(dir);
   configureWebVaultIo(dir, notes);

@@ -740,6 +740,21 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   before either path changes. Removing protection moves it back before dropping
   the ignore rule. The organizer's Rust gate refuses this lane independently of
   the remote-model read gate.
+- **A folder opened in place is never rearranged (2026-10-13, owner rule:
+  Rotli is never the cause of note loss).** In a folder the person brought and
+  opened without a marker (Obsidian, ZenNotes, plain Markdown), marking a note
+  secure adds only a `secure: true` line and the note's gitignore line; the
+  note keeps its path, and no `id`, `created`, or `updated` is minted (a fence
+  is added only to hold the flag). Removing protection removes that line (with
+  any `local_ai_allowed` / `secure_origin`) and the ignore line, so the file
+  returns byte-for-byte. The secret detector never writes or moves there:
+  remote-model reads already refuse a detected note from its content alone.
+  The Librarian never sweeps, queues, or models a folder that is not a Rotli
+  vault. Mac: `CorpusStore.adopted` and `with_secure_line_only`
+  (`src-tauri/src/corpus.rs`); web: `setFolderSecure` decides by the `mx_`
+  marker, not the `wiki/` folder, with the `withSecureLineOnly` twin
+  (`src/lib/frontmatterRaw.ts`). Writer policy: the contract version does not
+  move.
 - **Secure keywords (2026-09-28, the Librarian rules).** The vault's rules
   (`librarianRules.secureKeywords` in `.rotli/settings.json`) list words that
   make a note secure when they appear in its **title or file name** as whole
