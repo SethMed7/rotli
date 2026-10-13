@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AliasCleanupSettings, cleanupSummary } from "./aliasCleanupSettings";
+import { ALIAS_PASS, cleanupSummary } from "./aliasCleanupSettings";
+import { VaultPassSettings } from "./vaultPass";
 
 test("the summary says what a check found and what a clean-up did", () => {
   const found = { notes: 12, aliases: 31, keptLinked: 0 };
@@ -18,6 +19,10 @@ test("the summary says what a check found and what a clean-up did", () => {
 });
 
 test("outside the Mac app the row says where it works; inside, it checks first", () => {
-  expect(renderToStaticMarkup(<AliasCleanupSettings native={false} />)).toContain("In the Mac app.");
-  expect(renderToStaticMarkup(<AliasCleanupSettings native />)).toContain("Checking your notes…");
+  expect(renderToStaticMarkup(<VaultPassSettings native={false} pass={ALIAS_PASS} />)).toContain(
+    "In the Mac app.",
+  );
+  expect(renderToStaticMarkup(<VaultPassSettings native pass={ALIAS_PASS} />)).toContain(
+    "Checking your notes…",
+  );
 });

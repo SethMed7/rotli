@@ -24,6 +24,7 @@ import { decodeDocx } from "../documents/codec/docx";
 import { namedStyle } from "../documents/codec/paragraphStyles";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { noteImageLink } from "../editor/imageSource";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
@@ -249,6 +250,12 @@ describe("parity.json ↔ TS constants", () => {
         outbound,
         overlaps: false,
       });
+    }
+  });
+
+  test("noteImageLink", () => {
+    for (const { wire, folder, link } of entries.noteImageLink.value) {
+      expect({ wire, folder, link: noteImageLink(wire, folder) }).toEqual({ wire, folder, link });
     }
   });
 

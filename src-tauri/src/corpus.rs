@@ -8916,6 +8916,10 @@ pub mod file_rename;
 /// Leftover-alias cleanup (placeholders, typing trails) — a child module.
 #[path = "corpus_alias_cleanup.rs"]
 pub mod alias_cleanup;
+#[path = "corpus_link_convert.rs"]
+pub mod link_convert;
+#[path = "corpus_note_pass.rs"]
+pub mod note_pass;
 /// The Graph view's Links projection — a child module.
 #[path = "corpus_links.rs"]
 pub mod links;

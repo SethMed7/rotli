@@ -144,7 +144,7 @@ import {
   SunGlyph,
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
-import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
+import { ALIAS_PASS } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
@@ -152,12 +152,14 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
+import { LINK_PASS } from "./settings/linkFormatSettings";
 import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
+import { VaultPassSettings } from "./settings/vaultPass";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
@@ -874,7 +876,8 @@ function GeneralPane() {
 
       <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
-      <AliasCleanupSettings native={isTauri()} />
+      <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
+      <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>

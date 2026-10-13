@@ -18,7 +18,7 @@ use serde::Serialize;
 
 use super::{
     alias_values, compose_document, filename_stem, is_placeholder_alias, parse_document, slugify,
-    CorpusState, CorpusStore, NoteKind,
+    CorpusStore, NoteKind,
 };
 
 #[derive(Debug, Default, Serialize, PartialEq)]
@@ -135,47 +135,15 @@ impl CorpusStore {
             if leftovers.is_empty() {
                 continue;
             }
-            if apply {
-                // a read-only location keeps its aliases; everything else is
-                // re-read under the file lock so a concurrent save isn't lost
-                if self.writable(&rel).is_err() {
-                    continue;
-                }
-                let path = self.abs(&rel);
-                let removed = crate::fsutil::with_file_lock(&path, || {
-                    let current = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-                    let Some(next) = without_aliases(&current, &leftovers) else {
-                        return Ok(false);
-                    };
-                    self.suppress.mark(&path);
-                    super::atomic_write(&path, &next)?;
-                    Ok(true)
-                })?;
-                if !removed {
-                    continue;
-                }
+            // a read-only location keeps its aliases (rewrite_note_locked)
+            if apply && !self.rewrite_note_locked(&rel, |_, current| without_aliases(current, &leftovers))? {
+                continue;
             }
             report.notes += 1;
             report.aliases += leftovers.len();
         }
         Ok(report)
     }
-}
-
-/// Settings → General → Leftover note names: count, or clean up, in the
-/// default vault.
-#[tauri::command]
-pub fn corpus_alias_cleanup(
-    state: tauri::State<'_, CorpusState>,
-    apply: bool,
-) -> Result<AliasCleanupReport, String> {
-    let default_id = state
-        .0
-        .lock()
-        .map_err(|_| "corpus lock poisoned".to_string())?
-        .default_id
-        .clone();
-    state.route(&default_id, |store| store.alias_cleanup(apply))
 }
 
 #[cfg(test)]

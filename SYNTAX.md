@@ -371,6 +371,10 @@ imports.
     from the note, then as the one file with that name. A name two files share
     shows a notice instead of guessing.
 
+  Older notes convert on request: Settings → General → **Link format** shows
+  what it would change and rewrites `storage:` links and the three embed
+  fences into these forms (a Rotli vault only, never a folder opened in place).
+
   `/sheet`, `/document`, and `/board` **write** `![[path]]` with the file's
   vault path (`![[storage/rotli/budget.xlsx]]`), and so does converting a
   Mermaid diagram to a board; fences written before keep working. A
