@@ -67,7 +67,7 @@ impl CorpusStore {
     ) -> Result<NoteMeta, String> {
         crate::fsutil::require_revision(expected_revision)?;
         let rel = self.resolve_note_rel(id)?;
-        if !rel.ends_with(".md") {
+        if !rel.to_ascii_lowercase().ends_with(".md") {
             return Err("agents trash Markdown notes only".into());
         }
         let trash = lifecycle_disk_folder(self.layout, "Trash");
@@ -110,4 +110,3 @@ pub fn corpus_insert_ai(
         })
         .map(|result| prefix_write_result(&root, result))
 }
-

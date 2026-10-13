@@ -231,8 +231,11 @@ mod tests {
     fn the_live_zone_reads_a_fresh_note_as_fresh() {
         let now = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64;
         let today = today_stamp();
-        assert_eq!(stamp_to_ms(&today, Some(now - MINUTE_MS)), Some(now - MINUTE_MS));
         let midnight = stamp_to_ms(&today, None).unwrap();
+        // within a minute after midnight, "a minute ago" was yesterday (CI hit
+        // this at 00:00:33Z, 2026-10-13); keep the probe inside today
+        let fresh = (now - MINUTE_MS).max(midnight);
+        assert_eq!(stamp_to_ms(&today, Some(fresh)), Some(fresh));
         assert!(midnight <= now && now - midnight < 25 * HOUR_MS, "{today} → {midnight}");
     }
 }

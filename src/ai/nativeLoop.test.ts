@@ -215,7 +215,21 @@ describe("native Claude loop", () => {
 
 describe("native prompt and tool definitions", () => {
   test("the system prompt keeps the frontier rules without the JSON protocol", () => {
-    const system = renderNativeSystem({ web: true, knowledge: "{}", maxSteps: 8, userName: "Sam" });
+    const system = renderNativeSystem({
+      offeredTools: new Set<ToolName>([
+        "search_memory",
+        "read_memory",
+        "search_notes",
+        "read_note",
+        "read_file",
+        "web_search",
+        "web_fetch",
+      ]),
+      web: true,
+      knowledge: "{}",
+      maxSteps: 8,
+      userName: "Sam",
+    });
     expect(system).toContain("WORLD QUESTIONS");
     expect(system).toContain("Sam");
     expect(system).toContain("8 tool calls");
@@ -246,5 +260,12 @@ describe("native prompt and tool definitions", () => {
       expect(s.name).toMatch(/^[a-z_]{1,40}$/);
       expect(s.inputSchema.type).toBe("object");
     }
+  });
+
+  test("artifact schema mentions Word creation only when its tool is offered", () => {
+    const withoutDocument = toolSpecsFor(new Set<ToolName>(["create_artifact"]));
+    expect(withoutDocument[0]?.description).not.toContain("create_document");
+    const withDocument = toolSpecsFor(new Set<ToolName>(["create_artifact", "create_document"]));
+    expect(withDocument[0]?.description).toContain("create_document");
   });
 });

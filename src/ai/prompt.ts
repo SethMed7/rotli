@@ -7,9 +7,11 @@
 // server-side coercion). `adapterFor` picks by the model's budget family.
 
 import { type ModelMeta, contextWindowFor } from "./budget";
-import type { ChatTurn, ScratchStep } from "./types";
+import type { ChatTurn, ScratchStep, ToolName } from "./types";
 
 export interface PromptCtx {
+  /** The same registry that validates calls for this turn. */
+  offeredTools: ReadonlySet<ToolName>;
   web: boolean;
   knowledge: string;
   history: ChatTurn[];
@@ -155,6 +157,12 @@ const UNAVAILABLE_DOCUMENT_RULE =
 const PROGRESS_LIST_RULE =
   "LONG-RUNNING WORK: when a multi-step task benefits from a visible plan, format the plan as a short Markdown task list using - [ ] pending, - [~] current, and - [x] complete. Update the states in later user-visible progress replies. Do not add a checklist to a simple answer.";
 
+const offered = (ctx: PromptCtx, name: ToolName): boolean => ctx.offeredTools.has(name);
+const fileAttachmentRule = (hasFileTool: boolean): string =>
+  hasFileTool
+    ? "A storage: or rotli://open reference in the user's message is an explicit work-file attachment. Use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it."
+    : "A storage: or rotli://open reference to a note in the user's message is an explicit attachment. Use its id with read_note before answering about it; explain that file attachments cannot be read in this chat.";
+
 // Default adapter, tuned for Gemma: no system role (everything in one user turn),
 // and JSON coercion on the MLX generate shape.
 export const gemmaAdapter: Adapter = {
@@ -162,7 +170,9 @@ export const gemmaAdapter: Adapter = {
   webStrategy: "research",
 
   renderPrompt(ctx) {
-    const artifactFormatRule = ctx.documentTool ? ARTIFACT_FORMAT_RULE : UNAVAILABLE_DOCUMENT_RULE;
+    const hasFileTool = offered(ctx, "read_file");
+    const hasDocumentTool = offered(ctx, "create_document");
+    const artifactFormatRule = hasDocumentTool ? ARTIFACT_FORMAT_RULE : UNAVAILABLE_DOCUMENT_RULE;
     const webTools = ctx.web
       ? `- {"thought":"…","tool":"research_web","args":{"query":"…"}} → search the selected provider, read the top public pages, and return numbered evidence sources`
       : "";
@@ -182,16 +192,16 @@ export const gemmaAdapter: Adapter = {
     const researchReasoning = ctx.web
       ? `\nWEB RESEARCH REASONING ORDER — follow this sequence inside your private "thought" checkpoint after research_web returns:\n1. INVENTORY: list which source ids actually contain evidence for each part of the question.\n2. EXTRACT: copy exact names, numbers, dates, clock times, time zones, units, and qualifiers from those sources. Keep each value attached to its original context.\n3. RECONCILE: compare sources. Different time zones may describe one instant, but their calendar dates can differ. Never combine one source's date with another source's time unless the evidence explicitly supports that pairing.\n4. CLAIM LEDGER: before finalizing, map every factual sentence to one or more individual source ids. Multiple citations are written [S1][S2], never [S1, S2].\n5. ANSWER: state only claims that survived the ledger. If evidence conflicts or a pairing is unsupported, say so or omit it.\nThis checkpoint is private working memory, not text for the user. Keep it concise and decision-focused; do not narrate a long chain of thought.`
       : "";
-    const imageTool = ctx.imageTool
+    const imageTool = offered(ctx, "generate_image")
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
-    const documentTool = ctx.documentTool
+    const documentTool = hasDocumentTool
       ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} → create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat. Its body may use headings, paragraphs, lists, and one table; do not put Markdown image embeds in it.\n- {"thought":"…","tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"},{"op":"insert_after","block":2,"kind":"bullet","text":"…"}]}} → edit a Word document Rotli's AI created, after read_file; actions use its block numbers (replace, insert_after with block 0 for the top, delete, set_cell with row and column, set_kind). Rotli refuses a document the user made — say so plainly.`
       : "";
-    const artifactTool = ctx.artifactTool
-      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} → create a user-owned work file.${ctx.sheetArtifacts ? " Use valid CSV (including a header row) for a sheet." : ""} PDF always creates an editable Markdown source beside the exported copy. Use create_document, not this tool, for Word files.`
+    const artifactTool = offered(ctx, "create_artifact")
+      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} → create a user-owned work file.${ctx.sheetArtifacts ? " Use valid CSV (including a header row) for a sheet." : ""} PDF always creates an editable Markdown source beside the exported copy.${hasDocumentTool ? " Use create_document, not this tool, for Word files." : ""}`
       : "";
-    const boardTool = ctx.boardTool
+    const boardTool = offered(ctx, "draw_board")
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
       : "";
 
@@ -213,13 +223,13 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} → create a NEW note in the user's memex (it lands in their intake; the organizer files it)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
-- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text; an .xlsx as A1-addressed cells with formulas; a Word document as numbered blocks)
+${hasFileTool ? '- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text; an .xlsx as A1-addressed cells with formulas; a Word document as numbered blocks)' : ""}
 ${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
 When you can answer, reply: {"thought":"a concise evidence/decision checkpoint","final":"your answer to the user"}
 When a material choice is missing, reply: {"thought":"…","question":"…","options":["…","…"]}
 
 HOW YOU WORK (one JSON object per step):
-1. ROUTE first using SOURCE ROUTING above. For a public/external question use research_web, not note search. For a personal/memex question, search_memory (or search_notes) for the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Note search finds notes containing your EXACT words in that exact order, so query with ONE distinctive word ("people", "camino") — a phrase or a whole question usually returns nothing. No hits? Retry ONCE with one different, distinctive word.
+1. ROUTE first using SOURCE ROUTING above. ${ctx.web ? "For a public/external question use research_web, not note search." : "For a public/external question, follow the WORLD-question rule above."} For a personal/memex question, search_memory (or search_notes) for the user's notes, past, decisions, or people. (Pure small talk needs no tools — reply with "final" directly.) Note search finds notes containing your EXACT words in that exact order, so query with ONE distinctive word ("people", "camino") — a phrase or a whole question usually returns nothing. No hits? Retry ONCE with one different, distinctive word.
 2. READ before answering — search results are only titles and short teasers, NEVER the content. Pick the most relevant hit and read_note / read_memory it; the answer is in the note's BODY. Never answer a question about the user's notes straight from search results.
 3. REASON from what you read — keep a concise "thought" checkpoint on each tool step so the next step remembers what you were trying to establish, what the result proved, and what remains unresolved. This is private scratch, never user-visible.
 4. ANSWER from what you read — the "final" text is what the user sees: the actual names and facts, complete and direct.
@@ -228,7 +238,7 @@ HOW YOU WORK (one JSON object per step):
 ANSWER STYLE — how to write every "final" (this is exactly what the user reads):
 - Keep "thought" concise and decision-focused. For a web final, use it as the private claim ledger from the reasoning order above. Rotli does not show it to the user.
 - Lead with the answer itself in the first sentence: the names, dates, facts. Answer the question that was asked, then stop.
-- When your answer came from the web, cite each factual claim with the supplied source identifier, such as [S1]. Use only identifiers that research_web returned. Write multiple citations separately as [S1][S2], never inside one grouped bracket.
+- When your answer came from the web, cite each factual claim with the supplied source identifier, such as [S1]. ${ctx.web ? "Use only identifiers that research_web returned." : ""} Write multiple citations separately as [S1][S2], never inside one grouped bracket.
 - NEVER answer with where information lives. BAD: "Your family members are documented in the family/ subfolder." GOOD: "Your family: **Morgan**, **Diego**, and **Lucia**." If you haven't read the note that holds the answer yet, read it instead of describing it.
 - Format in Markdown: a "- " bulleted list for 3+ items, **bold** for names and key terms, short paragraphs with a blank line between them. Skip headings on short answers.
 - STRUCTURE when it genuinely clarifies: a Markdown table (| col | col |) for comparisons and anything column-shaped; a \`\`\`mermaid flowchart fence for a process, flow, or architecture. Both render as a real table/diagram right in the chat — and they work the same inside notes you create_note or update_note. Prose stays the default; never force a table onto two facts.
@@ -240,14 +250,14 @@ RULES:
 - ${clarificationRule('{"thought":"…","question":"…","options":["…","…"]}')}
 - ${webRule}
 - ${artifactFormatRule}
-- A storage: or rotli://open reference in the user's message is an explicit work-file attachment. Use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it.
+- ${fileAttachmentRule(hasFileTool)}
 - When the user asks you to change, clean up, rewrite, or add to a note — ACTUALLY EDIT IT: read_note it, then update_note with the complete improved body. Don't just show the new text in chat.
 - For "all/every/who are" questions, an index or overview note holds the full roster in its body — read it; search results and the index below show only a few top matches. A search hit marked "role":"area-index" IS that area's generated roster (its body lists everything filed there) — read that one first. A folder's own README only EXPLAINS the folder and often names nobody.
 - On a follow-up, your earlier answer is a summary, NOT a source: to give names, items, or details, read the note that holds them. If a note you already read did not contain what's asked, read a DIFFERENT note (the area's index/list note) instead of the same one again.
 - A note may open with metadata between --- lines (id, tags, links, summary): that is FILING metadata, not content. The "links:" line — and every [[name]] anywhere in a note — is a POINTER to another note, and those pointers mix people, projects, and reference material indiscriminately. NEVER build a list or an answer out of them: if the BODY of the note you read doesn't hold the answer, read another note instead. Answering from a links line is how a project ends up in a list of people.
 - If a RESULT ends with "[…truncated", the content continues beyond what you saw — don't claim a list from it is complete.
 - ${UNTRUSTED_DATA_RULE}
-- Never put secrets, API keys, or tokens into research_web.
+${ctx.web ? "- Never put secrets, API keys, or tokens into research_web." : ""}
 - Use at most ${ctx.maxSteps} steps. If unsure, give your best answer and note what you couldn't verify.
 
 YOUR KNOWLEDGE BASE (an abbreviated index of the user's notes — each area's "count" is the true total, so search for what isn't listed):
@@ -302,7 +312,8 @@ export const FRONTIER_ANSWER_STYLE =
   'leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names; a | table | for comparisons and a ```mermaid flowchart for processes both render in chat and in notes — use them when they clarify)';
 
 /** Working rules for the user's notes, the same for every frontier transport. */
-export const FRONTIER_NOTE_RULES = `A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. A storage: or rotli://open reference in the user's message is an explicit work-file attachment: use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it. For the user's own past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args.`;
+export const frontierNoteRules = (hasFileTool: boolean): string =>
+  `A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. ${fileAttachmentRule(hasFileTool)} For the user's own past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args.`;
 
 /** The frontier lane's scope, web, freshness, and format rules — one source
  * for the JSON loop below and Claude's native protocol (nativePrompt.ts). */
@@ -336,21 +347,23 @@ export const frontierAdapter: Adapter = {
   webStrategy: "primitives",
 
   renderPrompt(ctx) {
-    const rules = frontierRules(ctx);
+    const hasFileTool = offered(ctx, "read_file");
+    const hasDocumentTool = offered(ctx, "create_document");
+    const rules = frontierRules({ ...ctx, documentTool: hasDocumentTool });
     const webTools = ctx.web
       ? `\n- {"tool":"web_search","args":{"query":"…"}} — search the public web; results carry numbered source ids
 - {"tool":"web_fetch","args":{"url":"…"}} — read a result page before relying on it`
       : "";
-    const imageTool = ctx.imageTool
+    const imageTool = offered(ctx, "generate_image")
       ? `\n- {"tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
-    const documentTool = ctx.documentTool
+    const documentTool = hasDocumentTool
       ? `\n- {"tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} — create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat; headings, paragraphs, lists, and one table are supported, but do not put Markdown image embeds in it\n- {"tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"}]}} — edit a Word document Rotli's AI created, after read_file, by its block numbers (replace, insert_after, delete, set_cell, set_kind); Rotli refuses one the user made`
       : "";
-    const artifactTool = ctx.artifactTool
-      ? `\n- {"tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} — create ${ctx.sheetArtifacts ? "an editable sheet or " : ""}a PDF with an editable Markdown source; use create_document for Word files`
+    const artifactTool = offered(ctx, "create_artifact")
+      ? `\n- {"tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} — create ${ctx.sheetArtifacts ? "an editable sheet or " : ""}a PDF with an editable Markdown source${hasDocumentTool ? "; use create_document for Word files" : ""}`
       : "";
-    const boardTool = ctx.boardTool
+    const boardTool = offered(ctx, "draw_board")
       ? `\n- {"tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A --> B"}} — turn a Mermaid flowchart into an editable visual board (use when the user asks for a board/canvas/editable diagram; keep it a simple flowchart)`
       : "";
 
@@ -366,11 +379,11 @@ Tools:
 - {"tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
 - {"tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
-- {"tool":"read_file","args":{"query":"report.csv"}} — read a file by name (an .xlsx arrives as A1-addressed cells with formulas, a Word document as numbered blocks)${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
+${hasFileTool ? '- {"tool":"read_file","args":{"query":"report.csv"}} — read a file by name (an .xlsx arrives as A1-addressed cells with formulas, a Word document as numbered blocks)' : ""}${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
 To answer the user: {"final":"your answer"} — the final text ${FRONTIER_ANSWER_STYLE}.
 To ask for a material choice: {"question":"…","options":["…","…"]}.
 
-Rules: This tool-less completion subprocess has no Rotli or shell bindings of its own. To request an application action, return one of the JSON tool-call shapes above; do not attempt or request CLI-native tools because the host denies them. ${clarificationRule('{"question":"…","options":["…","…"]}')} ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${FRONTIER_NOTE_RULES} You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: This tool-less completion subprocess has no Rotli or shell bindings of its own. To request an application action, return one of the JSON tool-call shapes above; do not attempt or request CLI-native tools because the host denies them. ${clarificationRule('{"question":"…","options":["…","…"]}')} ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${frontierNoteRules(hasFileTool)} You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}

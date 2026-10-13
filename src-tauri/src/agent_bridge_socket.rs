@@ -3,6 +3,9 @@
 //! running app. One JSON line in, one answer line out, over a Unix socket in a
 //! user-only folder of Rotli's app-support folder (never a vault). The app
 //! side caps requests in flight and hands each to `agent_bridge::dispatch`.
+//! The socket is Unix-only; elsewhere (the Windows Rotli Helper build) there
+//! is no app to reach, so asking says so and listening declines.
+#![cfg_attr(not(unix), allow(dead_code, unused_imports))]
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -42,6 +45,12 @@ pub(crate) fn socket_path() -> Result<PathBuf, String> {
     Ok(dir.join("agent-bridge").join("bridge.sock"))
 }
 
+#[cfg(not(unix))]
+pub(crate) fn ask_over_socket(_path: &Path, _request: &BridgeRequest) -> Result<Value, String> {
+    Err(NOT_RUNNING.to_string())
+}
+
+#[cfg(unix)]
 pub(crate) fn ask_over_socket(path: &Path, request: &BridgeRequest) -> Result<Value, String> {
     use std::os::unix::net::UnixStream;
     let mut stream = UnixStream::connect(path).map_err(|_| NOT_RUNNING.to_string())?;
@@ -66,6 +75,7 @@ pub(crate) fn ask_over_socket(path: &Path, request: &BridgeRequest) -> Result<Va
 /// Bind the socket inside a folder only this user can enter (0700), so it is
 /// private from the moment it exists, whatever the umask; the socket itself
 /// is then 0600. Another Rotli already answering keeps its socket.
+#[cfg(unix)]
 fn bind_private(path: &Path) -> Result<std::os::unix::net::UnixListener, String> {
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::{UnixListener, UnixStream};
@@ -113,6 +123,12 @@ fn write_answer(stream: &mut impl Write, answer: &BridgeAnswer) {
     }
 }
 
+#[cfg(not(unix))]
+pub(crate) fn listen(_app: &AppHandle, _path: &Path) -> Result<(), String> {
+    Err("the agent bridge needs a Unix socket".into())
+}
+
+#[cfg(unix)]
 pub(crate) fn listen(app: &AppHandle, path: &Path) -> Result<(), String> {
     let listener = bind_private(path)?;
     let gate = std::sync::Arc::new(InFlight { count: AtomicUsize::new(0), max: IN_FLIGHT_MAX });
@@ -136,6 +152,7 @@ fn refusal(error: &str) -> BridgeAnswer {
     BridgeAnswer { ok: false, result: Value::Null, error: Some(error.into()) }
 }
 
+#[cfg(unix)]
 fn serve(app: &AppHandle, stream: std::os::unix::net::UnixStream) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
     let Ok(mut writer) = stream.try_clone() else { return };
@@ -171,6 +188,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn the_socket_is_private_from_the_moment_it_exists() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::TempDir::new().unwrap();
@@ -205,6 +223,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn a_headless_agent_hears_when_rotli_isnt_running() {
         let dir = tempfile::TempDir::new().unwrap();
         let error = ask_over_socket(&dir.path().join("none.sock"), &request("read_document", dir.path()))
@@ -213,6 +232,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn the_socket_carries_one_request_and_one_answer() {
         use std::os::unix::net::UnixListener;
         let dir = tempfile::TempDir::new().unwrap();

@@ -109,7 +109,7 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
   },
   create_artifact: {
     description:
-      "Create a user-owned work file: an editable sheet (CSV with a header row) or a PDF with an editable Markdown source. Use create_document for Word files.",
+      "Create a user-owned work file: an editable sheet (CSV with a header row) or a PDF with an editable Markdown source.",
     inputSchema: object(
       {
         kind: { type: "string", enum: ["sheet", "pdf"] },
@@ -129,7 +129,7 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
   },
 };
 
-/** Registry inventory for the file-access regression guard. */
+/** Registry inventory for the prompt's offered-tool regression guard. */
 export function registeredToolSpecs(): NativeToolSpec[] {
   return Object.entries(SPECS).map(([name, spec]) => ({ name, ...spec }));
 }
@@ -138,6 +138,11 @@ export function registeredToolSpecs(): NativeToolSpec[] {
 export function toolSpecsFor(allowed: ReadonlySet<ToolName>): NativeToolSpec[] {
   return [...allowed].flatMap((name) => {
     const spec = SPECS[name];
-    return spec ? [{ name, ...spec }] : [];
+    if (!spec) return [];
+    const description =
+      name === "create_artifact" && allowed.has("create_document")
+        ? `${spec.description} Use create_document for Word files.`
+        : spec.description;
+    return [{ name, ...spec, description }];
   });
 }

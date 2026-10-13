@@ -29,6 +29,8 @@ use crate::loopback_http::{
 
 #[path = "workspace_attachments.rs"]
 mod attachments;
+#[path = "workspace_file_visibility.rs"]
+mod file_visibility;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
 
@@ -294,18 +296,7 @@ impl Workspace {
         let CorpusList { folders, notes } = self.store.list()?;
         let mut kept = Vec::with_capacity(notes.len());
         for meta in notes {
-            let visible = match meta.kind {
-                NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
-                // boards get the same secret gate the reads enforce — a
-                // scene the agent can't read shouldn't be offered to it
-                NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
-                // Files carry no frontmatter: omit both hidden and protected
-                // locations before a remote agent sees title or path.
-                _ => {
-                    self.store.agent_listable(&meta.id)
-                        && !self.store.file_is_protected(&meta.id)
-                }
-            };
+            let visible = self.remote_meta_visible(&meta);
             if visible {
                 kept.push(meta);
             }
@@ -330,6 +321,14 @@ impl Workspace {
             .map(|folder| self.prefix_folder(folder))
             .collect();
         Ok(list)
+    }
+
+    fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
+        match meta.kind {
+            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
+            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
+            NoteKind::File => self.file_visible_to_remote(&meta.id),
+        }
     }
 
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
@@ -545,9 +544,8 @@ impl Workspace {
 
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
-        list.notes.retain(|meta| {
-            meta.kind != NoteKind::Note || self.store.read_for_ai(&meta.id, false).is_ok()
-        });
+        list.notes.retain(|meta| self.remote_meta_visible(meta));
+        list.folders.retain(|folder| self.store.agent_listable(&folder.id));
         let visible_notes = list
             .notes
             .iter()
@@ -633,13 +631,13 @@ impl Workspace {
             let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
                 return false;
             };
-            if rel.ends_with(".md") {
+            if rel.to_ascii_lowercase().ends_with(".md") {
                 return self.store.read_for_ai(wire_id, false).is_ok();
             }
-            if rel.ends_with(".excalidraw") {
+            if rel.to_ascii_lowercase().ends_with(".excalidraw") {
                 return self.read_board_for_remote(wire_id).is_ok();
             }
-            return self.store.agent_listable(&rel) && !self.store.file_is_protected(&rel);
+            return self.file_visible_to_remote(&rel);
         }
         let Ok((mut workspace, local)) = Workspace::open_for_item(wire_id, None) else {
             return false;
@@ -785,7 +783,7 @@ impl Workspace {
     fn view_writable(&mut self, item_id: &str) -> Result<(), String> {
         let text = self.store.read_for_ai(item_id, false)?;
         let rel = self.store.resolve_note_rel(item_id)?;
-        if !rel.ends_with(".md") {
+        if !rel.to_ascii_lowercase().ends_with(".md") {
             return Ok(()); // no frontmatter to write; the read gate is the whole gate
         }
         if crate::corpus::has_locked_frontmatter(&text) {
@@ -2245,7 +2243,7 @@ fn workspace_policy() -> Value {
         "organization": "Main is the global reference view. Named views are singular subset projections; Markdown view_tag is synchronized and boards/binaries stay frontmatter-free. All view folders are virtual. Physical folders and moves require an explicit disk operation and corpus policy approval.",
         "concurrency": "Every note, board, or document write requires the revision from an immediately preceding read.",
         "documents": "Word documents travel through the running Rotli app (its codec, its rules): agents count as remote, so secure or secret-shaped documents are refused, and agents edit only documents an AI created.",
-        "privacy": "Secure, locked, and secret-shaped Markdown is omitted or refused. Board scenes have no secure classification and must not contain secrets.",
+        "privacy": "Secure and secret-shaped notes, boards, and files are omitted or refused. Secure homes and keyword-protected names hide boards and files; secret-shaped board scenes and file content are refused. Locked notes remain readable but cannot be edited.",
         "mutations": "Write tools require client-side approval. Complete replacement, removal, move, view reassignment, and board action tools advertise destructiveHint so a host can require confirmation.",
         "limits": { "requestBytes": MCP_MAX_REQUEST_BYTES, "outputBytes": MCP_MAX_OUTPUT_BYTES, "boardActions": crate::board::BOARD_MAX_ACTIONS },
         "transport": "Stdio remains local. Optional HTTP binds loopback only and requires a bearer token. Cloud clients reach an explicitly connected app through the stateless relay; the Mac never opens a public listener.",
