@@ -34,6 +34,11 @@ impl CorpusStore {
         if self.mutation_allowed().is_err() {
             return Some("read-only vault");
         }
+        // a folder opened in place keeps its files where they are: an image there
+        // may be shared by many of the person's notes (owner rule 2026-10-13)
+        if self.adopted {
+            return Some("a folder opened in place keeps its files where they are");
+        }
         if !self.guard_rel(rel).is_ok_and(|path| path.is_file()) {
             return Some("not a file");
         }

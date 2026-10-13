@@ -15,7 +15,7 @@ import {
 import { createManagedFile, discardPristineManagedFile } from "./folderManagedFiles";
 import { readFolderRawMetadata, writeFolderRawMetadata, setFolderProtection } from "./folderMetadata";
 import type { FolderNotesService } from "./folderNotes";
-import type { VaultDir } from "./vaultDir";
+import { type VaultDir, vaultHasRotliMarker } from "./vaultDir";
 
 let connectedDir: VaultDir | null = null;
 let connectedNotes: (() => FolderNotesService | null) | null = null;
@@ -54,8 +54,13 @@ export const webVaultIo = {
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
     ),
   discardPristineManagedFile: (id: string) => discardPristineManagedFile(directory(), id),
-  moveFileToSink: async (id: string, sink: "Archive" | "Trash") =>
-    (await notesService().moveNote(id, sink)).id,
+  moveFileToSink: async (id: string, sink: "Archive" | "Trash") => {
+    // the Rust storage_file_lifecycle_block twin: a folder opened in place keeps
+    // its files where they are (owner rule 2026-10-13)
+    if (!(await vaultHasRotliMarker(directory())))
+      throw new Error("this file can't move (a folder opened in place keeps its files where they are)");
+    return (await notesService().moveNote(id, sink)).id;
+  },
   restoreFile: async (id: string) => (await notesService().restoreNote(id)).id,
   async protection(
     id: string,
