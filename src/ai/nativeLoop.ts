@@ -112,7 +112,6 @@ export async function* runNativeAgent(
         web: input.web,
         knowledge,
         maxSteps,
-        ...(input.documentTool ? { documentTool: true } : {}),
         ...(input.userName ? { userName: input.userName } : {}),
       }),
       userText: renderNativeUser(

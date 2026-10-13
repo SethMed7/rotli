@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { frontierAdapter } from "./prompt";
+import type { ToolName } from "./types";
 
 interface EvalCase {
   name: string;
@@ -56,6 +57,7 @@ describe("frontier scope eval (globe off)", () => {
   for (const c of CASES) {
     test(c.name, () => {
       const prompt = frontierAdapter.renderPrompt({
+        offeredTools: new Set<ToolName>(["search_memory", "read_memory", "search_notes", "read_note"]),
         web: false,
         knowledge: "",
         history: [],

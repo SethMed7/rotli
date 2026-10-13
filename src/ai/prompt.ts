@@ -11,7 +11,7 @@ import type { ChatTurn, ScratchStep, ToolName } from "./types";
 
 export interface PromptCtx {
   /** The same registry that validates calls for this turn. */
-  offeredTools?: ReadonlySet<ToolName>;
+  offeredTools: ReadonlySet<ToolName>;
   web: boolean;
   knowledge: string;
   history: ChatTurn[];
@@ -157,10 +157,7 @@ const UNAVAILABLE_DOCUMENT_RULE =
 const PROGRESS_LIST_RULE =
   "LONG-RUNNING WORK: when a multi-step task benefits from a visible plan, format the plan as a short Markdown task list using - [ ] pending, - [~] current, and - [x] complete. Update the states in later user-visible progress replies. Do not add a checklist to a simple answer.";
 
-// Direct prompt tests may omit the registry; live turns always pass the one
-// allowedTools set used to validate and execute model calls.
-const offered = (ctx: PromptCtx, name: ToolName, legacy = false): boolean =>
-  ctx.offeredTools?.has(name) ?? legacy;
+const offered = (ctx: PromptCtx, name: ToolName): boolean => ctx.offeredTools.has(name);
 const fileAttachmentRule = (hasFileTool: boolean): string =>
   hasFileTool
     ? "A storage: or rotli://open reference in the user's message is an explicit work-file attachment. Use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it."
@@ -173,8 +170,8 @@ export const gemmaAdapter: Adapter = {
   webStrategy: "research",
 
   renderPrompt(ctx) {
-    const hasFileTool = offered(ctx, "read_file", true);
-    const hasDocumentTool = offered(ctx, "create_document", ctx.documentTool);
+    const hasFileTool = offered(ctx, "read_file");
+    const hasDocumentTool = offered(ctx, "create_document");
     const artifactFormatRule = hasDocumentTool ? ARTIFACT_FORMAT_RULE : UNAVAILABLE_DOCUMENT_RULE;
     const webTools = ctx.web
       ? `- {"thought":"…","tool":"research_web","args":{"query":"…"}} → search the selected provider, read the top public pages, and return numbered evidence sources`
@@ -195,16 +192,16 @@ export const gemmaAdapter: Adapter = {
     const researchReasoning = ctx.web
       ? `\nWEB RESEARCH REASONING ORDER — follow this sequence inside your private "thought" checkpoint after research_web returns:\n1. INVENTORY: list which source ids actually contain evidence for each part of the question.\n2. EXTRACT: copy exact names, numbers, dates, clock times, time zones, units, and qualifiers from those sources. Keep each value attached to its original context.\n3. RECONCILE: compare sources. Different time zones may describe one instant, but their calendar dates can differ. Never combine one source's date with another source's time unless the evidence explicitly supports that pairing.\n4. CLAIM LEDGER: before finalizing, map every factual sentence to one or more individual source ids. Multiple citations are written [S1][S2], never [S1, S2].\n5. ANSWER: state only claims that survived the ledger. If evidence conflicts or a pairing is unsupported, say so or omit it.\nThis checkpoint is private working memory, not text for the user. Keep it concise and decision-focused; do not narrate a long chain of thought.`
       : "";
-    const imageTool = offered(ctx, "generate_image", ctx.imageTool)
+    const imageTool = offered(ctx, "generate_image")
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}}  → create an image (saved into this chat's assets) — describe the IMAGE, never a file path`
       : "";
     const documentTool = hasDocumentTool
       ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} → create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat. Its body may use headings, paragraphs, lists, and one table; do not put Markdown image embeds in it.\n- {"thought":"…","tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"},{"op":"insert_after","block":2,"kind":"bullet","text":"…"}]}} → edit a Word document Rotli's AI created, after read_file; actions use its block numbers (replace, insert_after with block 0 for the top, delete, set_cell with row and column, set_kind). Rotli refuses a document the user made — say so plainly.`
       : "";
-    const artifactTool = offered(ctx, "create_artifact", ctx.artifactTool)
+    const artifactTool = offered(ctx, "create_artifact")
       ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} → create a user-owned work file.${ctx.sheetArtifacts ? " Use valid CSV (including a header row) for a sheet." : ""} PDF always creates an editable Markdown source beside the exported copy.${hasDocumentTool ? " Use create_document, not this tool, for Word files." : ""}`
       : "";
-    const boardTool = offered(ctx, "draw_board", ctx.boardTool)
+    const boardTool = offered(ctx, "draw_board")
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
       : "";
 
@@ -350,23 +347,23 @@ export const frontierAdapter: Adapter = {
   webStrategy: "primitives",
 
   renderPrompt(ctx) {
-    const hasFileTool = offered(ctx, "read_file", true);
-    const hasDocumentTool = offered(ctx, "create_document", ctx.documentTool);
+    const hasFileTool = offered(ctx, "read_file");
+    const hasDocumentTool = offered(ctx, "create_document");
     const rules = frontierRules({ ...ctx, documentTool: hasDocumentTool });
     const webTools = ctx.web
       ? `\n- {"tool":"web_search","args":{"query":"…"}} — search the public web; results carry numbered source ids
 - {"tool":"web_fetch","args":{"url":"…"}} — read a result page before relying on it`
       : "";
-    const imageTool = offered(ctx, "generate_image", ctx.imageTool)
+    const imageTool = offered(ctx, "generate_image")
       ? `\n- {"tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
     const documentTool = hasDocumentTool
       ? `\n- {"tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} — create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat; headings, paragraphs, lists, and one table are supported, but do not put Markdown image embeds in it\n- {"tool":"edit_document","args":{"file":"plan.docx","actions":[{"op":"replace","block":2,"text":"…"}]}} — edit a Word document Rotli's AI created, after read_file, by its block numbers (replace, insert_after, delete, set_cell, set_kind); Rotli refuses one the user made`
       : "";
-    const artifactTool = offered(ctx, "create_artifact", ctx.artifactTool)
+    const artifactTool = offered(ctx, "create_artifact")
       ? `\n- {"tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} — create ${ctx.sheetArtifacts ? "an editable sheet or " : ""}a PDF with an editable Markdown source${hasDocumentTool ? "; use create_document for Word files" : ""}`
       : "";
-    const boardTool = offered(ctx, "draw_board", ctx.boardTool)
+    const boardTool = offered(ctx, "draw_board")
       ? `\n- {"tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A --> B"}} — turn a Mermaid flowchart into an editable visual board (use when the user asks for a board/canvas/editable diagram; keep it a simple flowchart)`
       : "";
 

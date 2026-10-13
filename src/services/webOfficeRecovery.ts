@@ -213,6 +213,7 @@ export async function replayOfficeDrafts(
   const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
   // Hold one vault lock through the last confirmed write and journal clear.
   // The next tab reads the records only after that point.
+  // Without Web Locks, the liveness probe never treats a peer draft as abandoned.
   return locks ? locks.request(replayLockName(vault), { mode: "exclusive" }, replay) : replay();
 }
 

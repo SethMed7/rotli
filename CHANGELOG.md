@@ -363,6 +363,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web chat now names only the AI tools available in that chat.** It no
+  longer suggests reading files or creating and editing Word documents when
+  those tools are unavailable in the browser.
 - **Rotli Web no longer creates a duplicate unsaved office copy when two tabs recover the same abandoned edit.**
 - **rotli.co's film plays everywhere, and screen readers describe the film
   you see.** Its description still told of the earlier film; an error page

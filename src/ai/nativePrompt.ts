@@ -15,9 +15,8 @@ import {
 import type { ChatTurn, ToolName } from "./types";
 
 export interface NativePromptCtx {
-  offeredTools?: ReadonlySet<ToolName>;
+  offeredTools: ReadonlySet<ToolName>;
   web: boolean;
-  documentTool?: boolean;
   userName?: string;
   knowledge: string;
   maxSteps: number;
@@ -26,12 +25,12 @@ export interface NativePromptCtx {
 export function renderNativeSystem(ctx: NativePromptCtx): string {
   const rules = frontierRules({
     ...ctx,
-    documentTool: ctx.offeredTools?.has("create_document") ?? ctx.documentTool ?? false,
+    documentTool: ctx.offeredTools.has("create_document"),
   });
   return `You are the assistant inside Rotli, a local-first notes app.
 ${rules.scope}
 
-TOOLS: the rotli tools are the only tools you have — call them directly when they add facts. ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${frontierNoteRules(ctx.offeredTools?.has("read_file") ?? true)} You have ${ctx.maxSteps} tool calls for this turn.
+TOOLS: the rotli tools are the only tools you have — call them directly when they add facts. ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${frontierNoteRules(ctx.offeredTools.has("read_file"))} You have ${ctx.maxSteps} tool calls for this turn.
 
 ANSWER: your reply ${FRONTIER_ANSWER_STYLE}. When one missing choice would materially change the result, ask one concise question with 2–3 short options instead of guessing.
 

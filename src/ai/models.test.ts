@@ -402,6 +402,7 @@ describe("the frontier/local split (budget + adapter)", () => {
   test("the frontier scaffold keeps the one-JSON protocol and never asks for coercion", () => {
     expect(frontierAdapter.wantsFormatJson).toBe(false);
     const prompt = frontierAdapter.renderPrompt({
+      offeredTools: new Set(["search_memory", "read_memory", "search_notes", "read_note", "read_file"]),
       web: false,
       knowledge: "AREAS: projects",
       history: [],
