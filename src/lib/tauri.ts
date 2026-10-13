@@ -361,6 +361,18 @@ export const corpusList: () => Promise<CorpusListPayload> = sameTaskRequest(() =
   corpusInvoke<CorpusListPayload>("corpus_list"),
 );
 
+/** A folder window's listing: the ONE folder opened from Finder it shows
+ * (corpus_raw.rs). Every id comes back prefixed with that folder's mount. */
+export function corpusListRoot(root: string): Promise<CorpusListPayload> {
+  return invoke<CorpusListPayload>("corpus_list_root", { root });
+}
+
+/** A folder window hands its folder to the main window as a vault. Rust reads
+ * the folder from this window's own mount; the page never names a path. */
+export function folderWindowAddAsVault(): Promise<void> {
+  return invoke<void>("folder_window_add_as_vault");
+}
+
 /** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
 export function corpusListFresh(): Promise<CorpusListPayload> {
   return corpusInvoke("corpus_list", { fresh: true });

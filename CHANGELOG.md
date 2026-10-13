@@ -21,7 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Excalidraw board, an image, or a video and choose Open With → Rotli. It opens
   in a tab and your edits save to that file. Rotli adds nothing beside it, never
   looks at the other files in its folder, and never sends it to a cloud model.
-  Opening a folder this way is coming next.
+- **Open a folder from Finder in its own window.** Drag a folder onto Rotli in
+  the Dock and it opens raw, like an editor looking at that folder: its files
+  on the left, tabs on the right.
+  Edits save to the files, and nothing else in the folder changes. **Add as
+  vault** in the title bar turns it into your vault, using the same choices as
+  connecting one from the sidebar.
 - **Convert older notes' links in one step.** Settings → General → Link format
   counts the images and embeds still written in Rotli's own format, shows a
   few before → after examples, and on a click rewrites them so Obsidian and

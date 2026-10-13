@@ -9,32 +9,26 @@
 // does listen for vault changes itself: a shell that never hears
 // `rotli:corpus-changed` shows a stale chat and then fails its next save.
 
-import { type CSSProperties, useEffect } from "react";
+import { useEffect } from "react";
 
 import { dispatch } from "../../keys/registry";
 import { attachChatShell, dragChatWindow, zoomChatWindow } from "../../services/chatWindowShell";
 import { regroupChat } from "../../state/chatWindow";
 import { leaves, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
-import { ContextMenu } from "../contextMenu";
-import { FileNotice } from "../fileNotice";
 import { ChatGlyph, PlusGlyph, SidebarGlyph } from "../glyphs";
 import { IconButton } from "../iconButton";
-import { PaneTree } from "../paneTree";
 import { RenameDialog } from "../renameDialog";
 import { SidebarChat } from "../sidebar/sidebarChat";
 import { useChatFolders } from "../sidebar/useChatFolders";
+import { SideWindowFrame } from "../sideWindowFrame";
 import { RegroupGlyph } from "./windowGlyphs";
 
 export function ChatShell() {
   const sidebarZoom = useUiStore((state) => state.sidebarZoom);
-  const rowActionError = useUiStore((state) => state.rowActionError);
-  const setRowActionError = useUiStore((state) => state.setRowActionError);
-  const sidebarWidth = useUiStore((state) => state.sidebarWidth);
   // the same sidebar toggle as main (the owner, 2026-09-21): this window's own
   // store, so hiding the chat list here never hides main's sidebar
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
-  const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
   const chats = useChatFolders();
   const empty = usePanesStore((state) => leaves(state.root).every((leaf) => leaf.tabs.length === 0));
 
@@ -47,15 +41,11 @@ export function ChatShell() {
   useEffect(() => attachChatShell({ closeTab: () => dispatch("tabs.close") }), []);
 
   return (
-    <div className="app-window chat-window">
-      <header className="titlebar">
-        <div
-          className="tb-inset"
-          onMouseDown={(event) => {
-            if (event.button === 0 && event.detail <= 1) dragChatWindow();
-          }}
-          onDoubleClick={zoomChatWindow}
-        />
+    <SideWindowFrame
+      className="chat-window"
+      drag={dragChatWindow}
+      zoom={zoomChatWindow}
+      lead={
         <IconButton
           className="tb-lead"
           label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
@@ -64,72 +54,54 @@ export function ChatShell() {
         >
           <SidebarGlyph size={16} />
         </IconButton>
-        <div
-          className="tb-mid chat-window-title"
-          onMouseDown={(event) => {
-            if (event.button === 0 && event.detail <= 1) dragChatWindow();
-          }}
-          onDoubleClick={zoomChatWindow}
-        >
+      }
+      title={
+        <>
           <ChatGlyph size={14} />
           <span>Chat</span>
-        </div>
-        <div className="tb-actions">
-          <IconButton
-            className="tb-trail"
-            label="New chat"
-            hotkey="chat.new"
-            onClick={() => dispatch("chat.new")}
-          >
-            <PlusGlyph size={16} />
-          </IconButton>
-        </div>
-      </header>
-      <main className="app-content">
-        <div className="threepane" style={railVars} data-sidebar-side="left">
-          {!sidebarCollapsed && (
-            <div className="rail-wrap">
-              <aside className="sidebar chat-window-rail" aria-label="Chats">
-                {rowActionError && (
-                  <div className="sb-error" role="alert">
-                    <span className="sb-error-text">⚠ {rowActionError}</span>
-                    <button
-                      type="button"
-                      className="sb-error-x"
-                      aria-label="Dismiss"
-                      onClick={() => setRowActionError(null)}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-                {/* where main has its Home | Chat switch, this window has its way
-                  home (the owner, 2026-09-21) */}
-                <button type="button" className="chat-window-regroup" onClick={regroupChat}>
-                  <RegroupGlyph size={14} />
-                  Put Chat back in the main window
+        </>
+      }
+      actions={
+        <IconButton
+          className="tb-trail"
+          label="New chat"
+          hotkey="chat.new"
+          onClick={() => dispatch("chat.new")}
+        >
+          <PlusGlyph size={16} />
+        </IconButton>
+      }
+      rail={
+        sidebarCollapsed ? null : (
+          <>
+            {/* where main has its Home | Chat switch, this window has its way
+              home (the owner, 2026-09-21) */}
+            <button type="button" className="chat-window-regroup" onClick={regroupChat}>
+              <RegroupGlyph size={14} />
+              Put Chat back in the main window
+            </button>
+            <SidebarChat chats={chats} zoom={sidebarZoom} />
+          </>
+        )
+      }
+      railLabel="Chats"
+      railClassName="chat-window-rail"
+      empty={
+        empty
+          ? {
+              title: "No chat open",
+              body: "Pick a chat on the left, or start a new one.",
+              action: (
+                <button type="button" className="btn" onClick={() => dispatch("chat.new")}>
+                  <PlusGlyph size={14} />
+                  New chat
                 </button>
-                <SidebarChat chats={chats} zoom={sidebarZoom} />
-              </aside>
-            </div>
-          )}
-          {empty ? (
-            <div className="list-empty empty-stage">
-              <div className="et">No chat open</div>
-              <div className="es">Pick a chat on the left, or start a new one.</div>
-              <button type="button" className="btn" onClick={() => dispatch("chat.new")}>
-                <PlusGlyph size={14} />
-                New chat
-              </button>
-            </div>
-          ) : (
-            <PaneTree />
-          )}
-        </div>
-      </main>
-      <FileNotice />
-      <ContextMenu />
+              ),
+            }
+          : null
+      }
+    >
       <RenameDialog />
-    </div>
+    </SideWindowFrame>
   );
 }

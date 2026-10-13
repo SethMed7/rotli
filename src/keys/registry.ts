@@ -17,7 +17,7 @@ import { leaderConsumes } from "./leader";
  * its own surface (global actions are handled OS-side in Rust and skipped).
  * "quick" is the floating Quick Note window; "chat" is Chat pulled out into its
  * own window. */
-export type Surface = "main" | "capture" | "quick" | "chat";
+export type Surface = "main" | "capture" | "quick" | "chat" | "folder";
 
 export interface KeyAction {
   id: string;

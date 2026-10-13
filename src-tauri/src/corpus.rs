@@ -3061,6 +3061,7 @@ impl CorpusStore {
     /// path. The sanctioned binary-asset write (model.md: a dropped file routes to
     /// storage/) — NOT a note write; it can only ever land in the binary area.
     pub fn import_file(&self, src: &Path) -> Result<String, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         self.mutation_allowed()?;
         let subdir = match self.layout {
             Layout::Memex => "storage",
@@ -3198,6 +3199,7 @@ impl CorpusStore {
     /// live in a dedicated storage/rotli lane, keeping the foreign storage tree
     /// read-only while giving generated assets an explicit ownership boundary.
     pub fn create_managed_file(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         self.mutation_allowed()?;
         validate_component(name)?;
         let ext = Path::new(name)
@@ -3230,6 +3232,7 @@ impl CorpusStore {
     /// in the managed lane but behind a dedicated boundary so the generic
     /// DOCX/XLSX byte command cannot start accepting passive formats.
     pub fn create_exported_pdf(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         self.mutation_allowed()?;
         validate_component(name)?;
         if Path::new(name)
@@ -3288,6 +3291,7 @@ impl CorpusStore {
     /// Persist bytes selected through Chat as a conventional image asset. The
     /// transcript keeps a portable reference; this lane owns only copied bytes.
     pub fn create_image_asset(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         self.mutation_allowed()?;
         validate_component(name)?;
         if bytes.is_empty() {
@@ -4228,6 +4232,7 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
     ) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         if looks_secure(body) {
             return Err(
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
@@ -4470,7 +4475,7 @@ impl CorpusStore {
         Some(WalkPlan {
             generation,
             layout: self.layout,
-            only: self.raw.as_ref().map(|raw| raw.only.clone()),
+            only: self.raw.as_ref().and_then(|raw| raw.only.clone()),
             root: self.root.clone(),
             reverse: self
                 .index
@@ -5240,6 +5245,7 @@ impl CorpusStore {
     /// moves the file and nothing else; a board's identity IS its path
     /// (`rename_board` has always worked this way).
     fn relocate_opaque(&mut self, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "move or delete")?;
         let abs = self.abs(rel);
         if !abs.is_file() {
             return Err(format!("not found: {rel}"));
@@ -6152,6 +6158,7 @@ impl CorpusStore {
         name: &str,
         body: Option<&str>,
     ) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         let stem = board_name_stem(name)?;
         self.create_board_with_stem(folder_id, &stem, body)
     }
@@ -6208,6 +6215,7 @@ impl CorpusStore {
     /// (its id IS the new relpath). Boards carry no index, so this is a pure file
     /// move + a fresh meta — no id remap to chase elsewhere (the maintainer, 2026-06-26).
     pub fn rename_board(&mut self, id: &str, new_name: &str) -> Result<NoteMeta, String> {
+        raw::refuse_in_raw(self, "rename")?;
         if !id.to_ascii_lowercase().ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
         }
@@ -6268,6 +6276,7 @@ impl CorpusStore {
     /// leaves the corpus — emptying the trash (the hard delete) is `purge`.
     /// (the maintainer, 2026-06-13)
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
+        raw::refuse_in_raw(self, "move or delete")?;
         // Soft-delete slides the note into the reserved `Trash` folder. In a
         // memex there is no writable `Trash`, so move_note's target gate refuses
         // it — gate here too so the error is explicit (chats aren't deleted into
@@ -6376,6 +6385,7 @@ impl CorpusStore {
         name: &str,
         parent_id: Option<&str>,
     ) -> Result<FolderMeta, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         validate_component(name)?;
         let parent = parent_id.filter(|p| !p.is_empty());
         if let Some(p) = parent {

@@ -33,11 +33,19 @@ export function onOpenRequest(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
-/** Rust → main window: something handed over from Finder can't open yet (a
- * folder, until folder windows ship) — say so instead of doing nothing. */
+/** Rust → a window: something handed over from Finder couldn't open (or a
+ * folder window couldn't save before closing) — say so instead of doing nothing. */
 export function onOpenNotice(cb: (message: string) => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listenHere<string>("rotli:open-notice", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Rust → main window: a folder window's "Add as vault" — the folder (already
+ * authorized like a picked one) runs main's ordinary connect flow. */
+export function onAddVault(cb: (path: string) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listenHere<string>("rotli:add-vault", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

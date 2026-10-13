@@ -34,6 +34,7 @@ impl CorpusStore {
     /// the board lane in a vault, `Board/` in a plain folder — named after the
     /// file. The source on disk is never touched. Returns the board's meta.
     pub fn import_board(&mut self, src: &Path) -> Result<NoteMeta, String> {
+        super::raw::refuse_in_raw(self, "add files to")?;
         let is_board = src
             .extension()
             .and_then(|ext| ext.to_str())
@@ -87,6 +88,7 @@ impl CorpusStore {
     /// original relative path below that sink. The breadcrumb is therefore
     /// durable user-visible structure, not `.rotli/` state.
     pub fn move_file_to_sink(&mut self, rel: &str, sink: &str) -> Result<String, String> {
+        super::raw::refuse_in_raw(self, "move or delete")?;
         validate_rel(rel)?;
         if sink != "Archive" && sink != "Trash" {
             return Err(format!("not a file lifecycle destination: {sink}"));
@@ -121,6 +123,7 @@ impl CorpusStore {
     /// Restore a file from Archive/Trash to the storage path nested beneath the
     /// sink. Collisions are renamed safely; no restore overwrites another file.
     pub fn restore_file(&mut self, rel: &str) -> Result<String, String> {
+        super::raw::refuse_in_raw(self, "move or delete")?;
         validate_rel(rel)?;
         self.mutation_allowed()?;
         self.guard_rel(rel)?;
@@ -163,6 +166,7 @@ impl CorpusStore {
     /// (a memex's hidden root Inbox, Storage, a reference lane) lands it where
     /// a new note would: the capture folder.
     pub fn create_canvas(&mut self, folder: &str, name: &str) -> Result<String, String> {
+        super::raw::refuse_in_raw(self, "add files to")?;
         crate::feature_policy::require_canvas()?;
         self.mutation_allowed()?;
         // a typed "/" never makes a folder: it reads as "-" (Rotli Web's rule)

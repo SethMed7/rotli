@@ -49,6 +49,7 @@ import { registerChatWindowActions } from "./chatWindowActions";
 import { registerEditHistoryActions } from "./editHistoryActions";
 import { EDITOR_ACTION, EDITOR_ACTION_LABEL as label } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
+import { registerFolderWindowActions } from "./folderWindowActions";
 import { registerGraphActions } from "./graphActions";
 import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
@@ -888,4 +889,5 @@ export function registerDefaultActions(): void {
   registerQuickNoteActions();
   // LAST: it opts already-registered tab/pane/chat actions into the Chat window
   registerChatWindowActions();
+  registerFolderWindowActions();
 }

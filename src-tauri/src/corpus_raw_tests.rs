@@ -101,8 +101,90 @@ fn a_file_opened_from_finder_is_never_moved_secured_or_given_neighbours() {
         assert!(refused.contains("Finder"), "{refused}");
     }
     assert_eq!(snapshot(&folder), before);
+    // a board or image opened from Finder is never moved either
+    fs::write(folder.join("plan.excalidraw"), "{\"type\":\"excalidraw\",\"elements\":[]}").unwrap();
+    let before = snapshot(&folder);
+    let mut board = CorpusStore::open_raw_file(&folder.join("plan.excalidraw"), &cache).unwrap();
+    for refused in [
+        board.move_note("plan.excalidraw", "Trash").map(|_| ()).unwrap_err(),
+        board.rename_board("plan.excalidraw", "Map").map(|_| ()).unwrap_err(),
+    ] {
+        assert!(refused.contains("Finder"), "{refused}");
+    }
+    assert_eq!(snapshot(&folder), before);
     assert!(CorpusStore::open_raw_file(&folder.join("photos"), &cache).is_err(), "a folder is not a file mount");
     let mut photo = CorpusStore::open_raw_file(&folder.join("photos/beach.png"), &cache).unwrap();
     assert_eq!(photo.raw_item().unwrap(), ("beach.png".to_string(), "file"));
     assert_eq!(snapshot(&folder), before, "previewing an image writes nothing either");
+}
+
+/// Stage 2: a folder opened from Finder gets its whole tree in its own window,
+/// under the same rules — its listing routes back to it alone, edits land in
+/// place, and nothing is added, moved, or sent to a cloud model.
+#[test]
+fn a_folder_opened_from_finder_lists_its_tree_and_changes_only_by_the_edit() {
+    let (temp, folder, cache) = downloads();
+    fs::create_dir_all(folder.join(".rotli")).unwrap();
+    fs::write(folder.join(".rotli/settings.json"), "{\"theirs\":true}").unwrap();
+    fs::write(folder.join("photos/caption.md"), "# Caption\n\nSunset at the pier.\n").unwrap();
+    let before = snapshot(&folder);
+
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.into());
+    registry.insert(DEFAULT_ROOT_ID.into(), CorpusStore::open(temp.path().join("vault")).unwrap()).unwrap();
+    let state = CorpusState(std::sync::Mutex::new(registry));
+    let root = raw_root_id(&fs::canonicalize(&folder).unwrap());
+    state.insert_root(root.clone(), CorpusStore::open_raw_folder(&folder, &cache).unwrap()).unwrap();
+
+    let list = list_raw_folder(&state, &root).unwrap();
+    assert!(list.folders.iter().any(|f| f.id == format!("{root}:photos")), "{:?}", list.folders);
+    let titles: Vec<&str> = list.notes.iter().map(|n| n.title.as_str()).collect();
+    assert!(titles.contains(&"Caption") && titles.contains(&"Trip notes"), "{titles:?}");
+    for note in &list.notes {
+        assert!(note.id.starts_with(&format!("{root}:")), "{} routes back to the mount", note.id);
+    }
+    let caption = list.notes.iter().find(|n| n.title == "Caption").unwrap();
+    let (at, rel) = split_root_id(&caption.id);
+    assert_eq!(state.route(&at, |s| s.read(&rel)).unwrap().body, "# Caption\n\nSunset at the pier.\n");
+    assert!(state.route(&at, |s| s.read_for_ai(&rel, false)).is_err(), "never sent to a cloud model");
+    state.route(&at, |s| s.write(&rel, "# Caption\n\nSunset at the pier, 7pm.\n").map(|_| ())).unwrap();
+
+    let mut after = snapshot(&folder);
+    assert_eq!(
+        after.remove("photos/caption.md").as_deref(),
+        Some(&b"# Caption\n\nSunset at the pier, 7pm.\n"[..])
+    );
+    let mut was = before.clone();
+    was.remove("photos/caption.md");
+    assert_eq!(after, was, "nothing else changed, the folder's own .rotli/ included");
+
+    assert!(list_raw_folder(&state, DEFAULT_ROOT_ID).is_err(), "never a way to list a vault");
+    assert_eq!(state.root_id_for_path(&folder).unwrap(), None, "never a vault route");
+    state.unmount_raw(&root).unwrap();
+    state.unmount_raw(DEFAULT_ROOT_ID).unwrap();
+    assert!(!state.contains_root(&root).unwrap());
+    assert!(state.contains_root(DEFAULT_ROOT_ID).unwrap(), "unmounting never drops a vault");
+}
+
+#[test]
+fn a_folder_opened_from_finder_is_never_added_to() {
+    let (temp, folder, cache) = downloads();
+    let before = snapshot(&folder);
+    let mut store = CorpusStore::open_raw_folder(&folder, &cache).unwrap();
+    let outside = temp.path().join("elsewhere.png");
+    fs::write(&outside, b"png").unwrap();
+    for refused in [
+        store.create("photos", "# New\n").map(|_| ()).unwrap_err(),
+        store.create_folder("New folder", None).map(|_| ()).unwrap_err(),
+        store.create_canvas("photos", "Plan").map(|_| ()).unwrap_err(),
+        store.create_image_asset("shot.png", b"png").map(|_| ()).unwrap_err(),
+        store.import_file(&outside).map(|_| ()).unwrap_err(),
+        store.move_note("photos/beach.png", "Archive").map(|_| ()).unwrap_err(),
+        store.move_file_to_sink("photos/beach.png", "Trash").map(|_| ()).unwrap_err(),
+        store.rename_managed_file("photos/beach.png", "shore.png").map(|_| ()).unwrap_err(),
+    ] {
+        assert!(refused.contains("A folder opened from Finder"), "{refused}");
+    }
+    assert_eq!(snapshot(&folder), before);
+    assert!(CorpusStore::open_raw_folder(&folder.join("Trip notes.md"), &cache).is_err(), "a file is not a folder mount");
+    assert!(CorpusStore::open_raw_folder(Path::new("/"), &cache).is_err(), "never the whole disk");
 }

@@ -26,6 +26,7 @@ import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
 import { ChatShell } from "./components/chatWindow/chatShell";
+import { FolderShell } from "./components/folderWindow/folderShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
@@ -135,6 +136,7 @@ function surfaceFromUrl(): Surface {
   if (param === "capture") return "capture";
   if (param === "quick") return "quick";
   if (param === "chat" && PLATFORM !== "web") return "chat"; // a NATIVE window: nothing on the web
+  if (param === "folder" && PLATFORM !== "web") return "folder"; // a folder opened from Finder
   return "main";
 }
 
@@ -485,12 +487,15 @@ export default function App() {
   useEffect(() => attachChatWindow(addFragmentToMain, openNoteChatFromQuickNote), []);
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.
+  // A folder window shows its own folder, never the vault: a switch leaves it be.
   useEffect(
     () =>
-      onVaultChanged(() => {
-        void refreshActiveVault();
-      }),
-    [],
+      surface === "folder"
+        ? undefined
+        : onVaultChanged(() => {
+            void refreshActiveVault();
+          }),
+    [surface],
   );
 
   useMainWindowWork(surface);
@@ -506,6 +511,7 @@ export default function App() {
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;
   if (surface === "chat") return <ChatShell />;
+  if (surface === "folder") return <FolderShell />;
   return (
     <>
       <MainShell />

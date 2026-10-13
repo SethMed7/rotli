@@ -29,15 +29,10 @@ pub(crate) fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
 /// A file macOS handed Rotli opens in a tab without joining a vault (the
 /// raw mount, corpus_raw.rs; docs/design/open-in-rotli.md stage 1). The root
 /// id is the grant: only this OS event mounts a path. A folder opens in its
-/// own window in stage 2; until then it is told so, never mounted.
+/// own window (stage 2, folder_window.rs).
 fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
     if path.is_dir() {
-        let _ = app.emit_to(
-            "main",
-            "rotli:open-notice",
-            "Opening a folder from Finder comes in the next Rotli update. Open a file inside it for now.",
-        );
-        show_main(app);
+        crate::folder_window::open(app, path);
         return;
     }
     let Ok(cache) = app.path().app_cache_dir() else { return };
