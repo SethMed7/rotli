@@ -48,4 +48,16 @@ describe("editorWordXml", () => {
     const xml = `<w:document xmlns:w="${TRANSITIONAL}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><r:id/></w:body></w:document>`;
     expect(editorWordXml(xml)).toBe(xml);
   });
+
+  test("maps two Word prefixes at once and spares a prefix that only starts like one", () => {
+    const xml = `<x:document xmlns:x="${TRANSITIONAL}" xmlns:y="${STRICT}" xmlns:xx="urn:other"><x:body><y:p xx:keep="1" y:rsid="2"><x:t x:space="preserve">Hi</x:t></y:p></x:body></x:document>`;
+    expect(editorWordXml(xml)).toBe(
+      `<w:document xmlns:w="${TRANSITIONAL}" xmlns:w="${TRANSITIONAL}" xmlns:xx="urn:other"><w:body><w:p xx:keep="1" w:rsid="2"><w:t w:space="preserve">Hi</w:t></w:p></w:body></w:document>`,
+    );
+  });
+
+  test("a namespace that differs only where a dot belongs is not Word's", () => {
+    const xml = `<document xmlns="http://schemasXopenxmlformats.org/wordprocessingml/2006/main"><body/></document>`;
+    expect(editorWordXml(xml)).toBe(xml);
+  });
 });

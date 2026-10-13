@@ -442,8 +442,11 @@ fn secure_workbook_records_other_text_parts() {
     ], true);
     fs::write(store.root().join("Secure notes/parts.xlsx"), bytes).unwrap();
     store.read_file_bytes_for_ai("Secure notes/parts.xlsx", true).unwrap();
-    for secret in [threaded, drawing, pivot, chart, chartsheet, custom] {
-        assert!(crate::secret::blocked_for_remote(secret), "{secret}");
+    for (part, secret) in ["threaded comment", "drawing", "pivot cache", "chart", "chartsheet", "custom XML"]
+        .into_iter()
+        .zip([threaded, drawing, pivot, chart, chartsheet, custom])
+    {
+        assert!(crate::secret::blocked_for_remote(secret), "the {part} text reached a remote model");
     }
 }
 
@@ -490,8 +493,11 @@ fn secure_word_records_deleted_field_and_secondary_part_text() {
     ], true);
     fs::write(store.root().join("Secure notes/parts.docx"), bytes).unwrap();
     store.read_file_bytes_for_ai("Secure notes/parts.docx", true).unwrap();
-    for secret in [deleted, field, drawing, diagram, glossary] {
-        assert!(crate::secret::blocked_for_remote(secret), "{secret}");
+    for (part, secret) in ["deleted run", "field", "drawing", "diagram", "glossary"]
+        .into_iter()
+        .zip([deleted, field, drawing, diagram, glossary])
+    {
+        assert!(crate::secret::blocked_for_remote(secret), "the {part} text reached a remote model");
     }
 }
 
