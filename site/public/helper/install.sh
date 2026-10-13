@@ -37,7 +37,7 @@ if [ -n "$OPEN_URL" ] && { [ "$(printf '%s' "$OPEN_URL" | wc -l | tr -d ' ')" !=
   exit 1
 fi
 
-VERSION="${ROTLI_HELPER_VERSION:-1.4.0}"
+VERSION="${ROTLI_HELPER_VERSION:-1.8.1}"
 RELEASES="${ROTLI_HELPER_RELEASES:-https://github.com/SethMed7/rotli-releases/releases/download}"
 DEST_DIR="${ROTLI_HELPER_DIR:-$HOME/.rotli/bin}"
 DEST="$DEST_DIR/rotli-helper"

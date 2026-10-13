@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Chat works again on Rotli Web for a vault opened through Rotli Helper.**
+  Since 1.8.1, Rotli Web asks Rotli Helper to confirm which vault a chat
+  belongs to, but the installers still downloaded Helper 1.4.0, which can't,
+  so chat said "Update Rotli Helper" with no update to get. The installers now
+  download Rotli Helper 1.8.1; run the install line from Rotli Web's setup
+  screen again to update. Your vault files were never affected.
 - **Secure Office reads guard the text local AI actually sees.** Word tabs and
   line breaks, heading and list labels, table cells, image descriptions, and
   Excel dates now enter the private-text guard as displayed. Large amounts of
