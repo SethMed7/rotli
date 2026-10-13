@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Editing a note in a folder you opened in place no longer renames it or adds
+  Rotli's fields.** Saving a note from an Obsidian vault used to rename its file
+  after its title (breaking `[[links]]` to it in Obsidian) and add `id`,
+  `created`, and `updated` lines. Now the file keeps its name and its own
+  frontmatter; locking, pinning, a field, a view, or Trash adds just that one
+  line, and undoing it puts the file back exactly. Notes Rotli creates there
+  still follow their title.
+- **A notes folder you open in place is never rearranged.** When you open an
+  Obsidian vault or any folder of notes as it is, Rotli no longer moves a note
+  into a "Secure notes" folder, whether you mark it secure or Rotli spots
+  something that looks like a password or key. The note stays where it is and
+  gets one `secure: true` line; removing protection puts the file back exactly
+  as it was. Secure notes there are still never sent to a cloud model, and the
+  Librarian never organizes a folder that isn't a Rotli vault.
 - **Chat works again on Rotli Web for a vault opened through Rotli Helper.**
   Since 1.8.1, Rotli Web asks Rotli Helper to confirm which vault a chat
   belongs to, but the installers still downloaded Helper 1.4.0, which can't,

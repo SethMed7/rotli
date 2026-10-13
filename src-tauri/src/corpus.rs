@@ -1527,6 +1527,10 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
     &text[..text.len() - body.len()]
 }
 
+#[path = "corpus_in_place.rs"]
+mod in_place;
+use in_place::{compose_in_place, rotli_made, with_secure_line_only};
+
 pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
 pub(crate) const MANAGED_FILE_EXTS: [&str; 2] = ["xlsx", "docx"];
 pub(crate) const MANAGED_MEMEX_LANE: &str = "storage/rotli";
@@ -2726,6 +2730,12 @@ pub struct CorpusStore {
     /// into the store so the Rust gates enforce it, not only the TS `canWrite`
     /// (#3, audit 2026-07). Never cleared below the band verdict.
     perms_read_only: bool,
+    /// A folder the person brought (Obsidian, ZenNotes, plain Markdown) and
+    /// opened in place. Rotli never rearranges it: no secure-folder moves and
+    /// no detector writes (owner rule 2026-10-13, docs/design/
+    /// vault-copy-and-obsidian-compatibility.md). Set only by `open_adopted`;
+    /// pre-memex Rotli folders share LegacyRotli but are not adopted.
+    adopted: bool,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2894,6 +2904,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
+            adopted: true,
             list_cache: None,
             search_index: None,
         };
@@ -2949,6 +2960,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
+            adopted: false,
             list_cache: None,
             search_index: None,
         };
@@ -2992,6 +3004,7 @@ impl CorpusStore {
             layout: Layout::Memex,
             band_read_only,
             perms_read_only: read_only,
+            adopted: false,
             list_cache: None,
             search_index: None,
         };
@@ -3333,7 +3346,10 @@ impl CorpusStore {
             && (looks_secure(body) || self.secure_by_name(&title_of(editor_body(body)), &rel))
         {
             fm.foreign.push("secure: true".to_string());
-            if self.mutation_allowed().is_ok() {
+            // An adopted folder is never rewritten or rearranged: read_for_ai
+            // refuses this body from the detector itself, so the flag adds no
+            // protection there — only a change the person didn't ask for.
+            if !self.adopted && self.mutation_allowed().is_ok() {
                 // not the error: it can carry the path, and a secure note's name is private
                 if self.set_secure(&rel, true).is_err() {
                     eprintln!("auto-secure-flag (read) failed; the note is still refused to AI by its name");
@@ -3377,6 +3393,22 @@ impl CorpusStore {
     /// SANCTIONED writable() exception (#22): `locked` is a rotli-managed CONTROL
     /// flag, and locking a curated wiki note against the filer must work even
     /// where the user can't edit the note itself.
+    /// A note in a folder opened in place that the person wrote (not one Rotli
+    /// made): Rotli never renames it or mints its own facts into it.
+    fn keeps_as_written(&self, original: &str) -> bool {
+        self.adopted && !rotli_made(&parse_document(original).0.unwrap_or_default())
+    }
+
+    /// A metadata write: Rotli's full frontmatter in a vault; in a folder
+    /// opened in place, only the lines the action changed (decision B).
+    pub(crate) fn compose_for(&self, original: &str, fm: &Frontmatter, body: &str) -> String {
+        if self.keeps_as_written(original) {
+            compose_in_place(original, fm)
+        } else {
+            compose_document(fm, body)
+        }
+    }
+
     fn set_locked(&mut self, id_or_rel: &str, locked: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
@@ -3389,7 +3421,7 @@ impl CorpusStore {
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -3410,7 +3442,7 @@ impl CorpusStore {
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.pinned = Some(pinned);
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -3448,7 +3480,7 @@ impl CorpusStore {
                 fm.foreign.push(format!("{key}: {value}"));
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -3649,6 +3681,21 @@ impl CorpusStore {
                 "Remove the detected secret from the note before removing secure protection".into(),
             );
         }
+        if self.adopted {
+            // A folder opened in place keeps the note where it is (owner rule
+            // 2026-10-13): no move, so no id to key one by, and no Rotli fields
+            // minted. The person asked for the flag; the ignore line protects
+            // its path. Protect the path before the write, unprotect after.
+            if secure {
+                self.gitignore_add(rel)?;
+            }
+            self.suppress.mark(&path);
+            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            if !secure {
+                self.gitignore_remove(rel)?;
+            }
+            return Ok(None);
+        }
         let note_id = fm
             .id
             .clone()
@@ -3797,6 +3844,9 @@ impl CorpusStore {
     /// slug-bearing rel, a summary, or tags.
     fn secure_repair_note(&mut self, id_or_rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
+        if self.adopted {
+            return Err("A folder opened in place keeps its notes where they are; there is nothing to move.".into());
+        }
         let rel = self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, _) = parse_document(&text);
@@ -3863,7 +3913,7 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -5065,6 +5115,8 @@ impl CorpusStore {
         // frontmatter from "empty" would drop secure/locked/tags/created
         let existing = read_existing_text(&abs)?;
         let (old_fm, old_raw) = parse_document(&existing);
+        let had_fence = old_fm.is_some();
+        let as_written = self.keeps_as_written(&existing);
         let (file_created, _) = file_stamps(&abs);
         let old_body = if old_fm.is_some() {
             editor_body(old_raw)
@@ -5074,7 +5126,9 @@ impl CorpusStore {
         let old_title = title_of(old_body);
         let mut old_fm = old_fm.unwrap_or_default();
         let title = title_of(body);
-        if old_title != title || filename_stem(&rel) != slugify(&old_title) {
+        // a folder opened in place keeps its file names, so there is no rename
+        // history to record (decision B, 2026-10-13)
+        if !as_written && (old_title != title || filename_stem(&rel) != slugify(&old_title)) {
             preserve_rename_aliases(&mut old_fm, &rel, &old_title, &title, id)?;
         }
         let created = old_fm
@@ -5100,7 +5154,25 @@ impl CorpusStore {
             origin: old_fm.origin,
             foreign: old_fm.foreign,
         };
-        let text = compose_document(&fm, &format!("\n{body}"));
+        let text = if as_written {
+            // Decision B (owner, 2026-10-13): in a folder opened in place only the
+            // words the person changed are written. Their frontmatter block (or
+            // its absence) and its separator line come back byte-for-byte; Rotli's
+            // own facts stay in memory and `.rotli/`.
+            let block = raw_frontmatter_block(&existing);
+            let separator = if !had_fence {
+                ""
+            } else if old_raw.starts_with("\r\n") {
+                "\r\n"
+            } else if old_raw.starts_with('\n') {
+                "\n"
+            } else {
+                ""
+            };
+            format!("{block}{separator}{body}")
+        } else {
+            compose_document(&fm, &format!("\n{body}"))
+        };
 
         // disk_folder routes the file (rename/free_name/origin); the wire
         // folder_id is the shelf-PROJECTED view, so the optimistic UI update after a
@@ -5115,7 +5187,9 @@ impl CorpusStore {
         // The welcome preset is the one sanctioned root note. Its Markdown is
         // fully editable, but its path stays stable so changing the H1 cannot
         // rename it into the otherwise hidden root-document namespace.
-        let target_rel = if rel == crate::memex::WELCOME_PRESET_FILE || current_name == desired {
+        // a folder opened in place keeps the person's file name: Obsidian links
+        // by file name, so a title slug would break every `[[link]]` to it
+        let target_rel = if as_written || rel == crate::memex::WELCOME_PRESET_FILE || current_name == desired {
             rel.clone()
         } else {
             self.free_note_name(&disk_folder, &desired, Some(&rel))
@@ -5311,9 +5385,10 @@ impl CorpusStore {
         }
         .to_string();
         let mut old_fm = fm.unwrap_or_default();
+        let as_written = self.keeps_as_written(&text);
         let current_folder = folder_of(rel);
         let title = title_of(&body);
-        if filename_stem(rel) != slugify(&title) {
+        if !as_written && filename_stem(rel) != slugify(&title) {
             preserve_rename_aliases(&mut old_fm, rel, &title, &title, id)?;
         }
 
@@ -5352,7 +5427,11 @@ impl CorpusStore {
         }
 
         // stable identity, fresh-but-collision-safe filename in the new folder
-        let desired = filename_for(&title, id);
+        // a folder opened in place keeps the person's file name on a move
+        let desired = match Path::new(rel).file_name() {
+            Some(name) if as_written => name.to_string_lossy().into_owned(),
+            _ => filename_for(&title, id),
+        };
         let target_rel = self.free_note_name(target_folder, &desired, None);
         let target_abs = self.abs(&target_rel);
 
@@ -5380,7 +5459,9 @@ impl CorpusStore {
         // A move is metadata-only: everything after the frontmatter fence lands
         // byte-for-byte as it was (2026-09-29). Only a note that had no
         // frontmatter gains the one separator line the new block needs.
-        let out = if had_frontmatter {
+        let out = if as_written {
+            compose_in_place(&text, &fm)
+        } else if had_frontmatter {
             compose_document(&fm, raw)
         } else {
             compose_document(&fm, &format!("\n{raw}"))
@@ -5535,7 +5616,7 @@ impl CorpusStore {
                 fm.foreign.push(format!("{key}: {value}"));
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -5880,7 +5961,11 @@ impl CorpusStore {
                 // Librarian edit that landed while the view transaction waited.
                 let original = fs::read_to_string(path)
                     .map_err(|error| format!("read {}: {error}", path.display()))?;
-                let updated = with_view_tag(&original, tag.as_deref());
+                let updated = if self.keeps_as_written(&original) {
+                    in_place::with_top_level_line(&original, "view_tag", tag.as_deref())
+                } else {
+                    with_view_tag(&original, tag.as_deref())
+                };
                 if updated == original {
                     return Ok(None);
                 }
@@ -8871,6 +8956,10 @@ mod ai_write_tests;
 #[cfg(test)]
 #[path = "corpus_ai_file_tests.rs"]
 mod ai_file_tests;
+
+#[cfg(test)]
+#[path = "corpus_adopted_tests.rs"]
+mod adopted_tests;
 
 #[cfg(test)]
 mod tests {
@@ -13449,6 +13538,7 @@ mod tests {
                 if folder == "Rotli" && children.len() == 1
         )));
     }
+
 
     #[test]
     fn fresh_install_stays_unconfigured_until_a_real_or_legacy_root_exists() {

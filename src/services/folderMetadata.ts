@@ -7,11 +7,19 @@ import {
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
+import { composeInPlace, rotliMade, withSecureLineOnly } from "../lib/frontmatterInPlace";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
-import { type VaultDir, baseName, freeVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
+import {
+  type VaultDir,
+  baseName,
+  freeVaultPath,
+  parentPath,
+  vaultHasRotliMarker,
+  vaultIsMemex,
+} from "./vaultDir";
 
 const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
   const line = fm.foreign.find((line) => line.slice(0, line.indexOf(":")).trim() === key);
@@ -36,8 +44,17 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   const opened = await readVersionedFile(dir, path);
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
-  if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
   if (!secure) assertSecureRemoval(body);
+  if (!(await vaultHasRotliMarker(dir))) {
+    // A folder opened in place keeps the note where it is (owner rule
+    // 2026-10-13): only the secure line changes, and its ignore line protects
+    // the path. Protect before the write, unprotect after.
+    if (secure) await updateGitExclusions(dir, [path]);
+    await writeVersionedFile(dir, path, withSecureLineOnly(opened.contents, secure), opened.revision);
+    if (!secure) await updateGitExclusions(dir, [], [path]);
+    return path;
+  }
+  if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
   const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
   const current = parentPath(path);
   const inHome = current === home || current.startsWith(`${home}/`);
@@ -109,7 +126,10 @@ export async function setFolderProtection(
     }
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
-  await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
+  // a person's note in a folder opened in place gains only the line asked for
+  const inPlace = !rotliMade(frontmatter) && !(await vaultHasRotliMarker(dir));
+  const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  await writeVersionedFile(dir, path, text, opened.revision);
 }
 
 export async function readFolderRawMetadata(dir: VaultDir, path: string) {

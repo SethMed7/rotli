@@ -22,6 +22,7 @@ const CURATED = ["guides/welcome-to-rotli.md", "ideas/note-taking-that-lasts.md"
  * lifecycle sinks a Mac vault always has. */
 async function memexVault(): Promise<MemoryVaultDir> {
   const dir = new MemoryVaultDir();
+  await dir.writeText("memex.json", `${JSON.stringify({ id: "mx_fixture02", contract: "3.4" })}\n`);
   for (const rel of [...CAPTURES, ...CURATED]) await dir.writeText(`wiki/${rel}`, seedText(rel));
   await dir.mkdir("wiki/_secure");
   await dir.mkdir("archive");
@@ -226,6 +227,7 @@ describe("the web's memex note lane (Rust write_note_at)", () => {
 
   test("the contract read answers missing files with empty text", async () => {
     const dir = await memexVault();
+    await dir.remove("memex.json"); // the missing file under test
     await dir.writeText("users.json", '{"primary":"seth"}');
     const bridge = webMemexBridge(new FolderChatStore(dir), new FolderNotesService(dir));
     expect(await bridge("memex_read_contract", { root: "~/vault" })).toEqual({
