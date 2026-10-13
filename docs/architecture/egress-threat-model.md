@@ -124,7 +124,7 @@ Everything in the tables below reduces to which question a seam asks.
 
 | Predicate | Catches | Misses |
 |---|---|---|
-| `secret::looks_secure` | credential SHAPES — API keys, PEM, JWT, SSN, Luhn-valid PANs | ordinary private prose |
+| `secret::looks_secure` | credential SHAPES — API keys, PEM, JWT, SSN, Luhn-valid PANs (never the fractional digits after `<digit>.`, so a board's float coordinates are not cards; 2026-10-13, parity fixture `looksSecure`) | ordinary private prose |
 | `secret::protected_for_remote` | the above **+ markers**: `secure: true`, `local_ai_allowed:`, `secureContext: true` | prose whose markers were stripped |
 | `secret::blocked_for_remote` | the above **+ the secure-prose ledger**; **everything** while the ledger is still warming at launch (fail closed) | prose that never entered the vault |
 

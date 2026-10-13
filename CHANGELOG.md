@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Agents can read and edit boards again when their shapes sit at decimal
+  coordinates.** A board Excalidraw saves stores positions like
+  `17.140276393692147`, and the digits after the point could look like a card
+  number, so Rotli refused the whole board to connected agents ("secret-shaped
+  content"). Digits after a decimal point no longer count; a real card number
+  in a board's text is still refused.
 - **New images and embeds are written so Obsidian shows them too.** A dropped
   or pasted image is now linked with a normal Markdown path from the note
   (instead of Rotli's `storage:` shorthand), and `/sheet`, `/document`, and
