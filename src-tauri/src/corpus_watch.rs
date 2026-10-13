@@ -159,7 +159,12 @@ pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
     // directories (a dropped folder), .md notes and .excalidraw boards matter;
     // foreign files don't
     match normalized_path.extension() {
-        Some(ext) => ext == "md" || ext == "excalidraw" || normalized_path.is_dir(),
+        Some(ext) => {
+            let ext = ext.to_string_lossy();
+            ext.eq_ignore_ascii_case("md")
+                || ext.eq_ignore_ascii_case("excalidraw")
+                || normalized_path.is_dir()
+        }
         None => true,
     }
 }
@@ -181,6 +186,8 @@ mod tests {
         let root = PathBuf::from("/corpus");
         let s = SuppressSet::default();
         assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.md")));
+        assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.MD")));
+        assert!(path_relevant(&root, &s, Path::new("/corpus/Board/ideas.EXCALIDRAW")));
         assert!(path_relevant(
             &root,
             &s,
@@ -254,7 +261,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
 
         let before = store.list().unwrap().notes.len();
-        fs::write(root.join("external.md"), "# From another app\n").unwrap();
+        fs::write(root.join("external.MD"), "# From another app\n").unwrap();
         // wait for the debounced fire (poll watcher 100ms + debounce 300ms)
         let deadline = Instant::now() + Duration::from_secs(5);
         while fired.load(Ordering::SeqCst) == 0 && Instant::now() < deadline {

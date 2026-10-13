@@ -9,19 +9,13 @@
 //! one-time `.bak`.
 
 use std::collections::BTreeMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use quick_xml::escape::unescape;
-use quick_xml::events::Event;
-use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::{compose_root_id, split_root_id, CorpusState};
 
 const GRANTS: &str = ".rotli/file-grants.json";
-/// The largest `word/document.xml` the check will inflate.
-const MAX_XML_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Default, Serialize, Deserialize)]
 struct Grants {
@@ -83,227 +77,7 @@ pub(crate) fn ai_may_edit(root: &Path, rel: &str) -> bool {
         .is_some_and(|grant| matches!(grant.created_by.as_str(), "ai" | "agent") && grant.ai_edit)
 }
 
-fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
-    Some(u16::from_le_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
-}
-
-fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
-}
-
-/// One entry of a zip package, stored or deflated (a .docx is a zip).
-fn zip_entry(bytes: &[u8], wanted: &str) -> Result<Vec<u8>, String> {
-    let bad = || "not a readable Word document".to_string();
-    // the end-of-central-directory record sits in the last 64 KiB + 22 bytes
-    let floor = bytes.len().saturating_sub(65_557);
-    let eocd = (floor..bytes.len().saturating_sub(21))
-        .rev()
-        .find(|&at| u32_at(bytes, at) == Some(0x0605_4b50))
-        .ok_or_else(bad)?;
-    let count = u16_at(bytes, eocd + 10).ok_or_else(bad)? as usize;
-    let mut at = u32_at(bytes, eocd + 16).ok_or_else(bad)? as usize;
-    for _ in 0..count {
-        if u32_at(bytes, at) != Some(0x0201_4b50) {
-            return Err(bad());
-        }
-        let method = u16_at(bytes, at + 10).ok_or_else(bad)?;
-        let size = u32_at(bytes, at + 20).ok_or_else(bad)? as usize;
-        let name_len = u16_at(bytes, at + 28).ok_or_else(bad)? as usize;
-        let extra_len = u16_at(bytes, at + 30).ok_or_else(bad)? as usize;
-        let comment_len = u16_at(bytes, at + 32).ok_or_else(bad)? as usize;
-        let local = u32_at(bytes, at + 42).ok_or_else(bad)? as usize;
-        let name = bytes.get(at + 46..at + 46 + name_len).ok_or_else(bad)?;
-        if name == wanted.as_bytes() {
-            if u32_at(bytes, local) != Some(0x0403_4b50) {
-                return Err(bad());
-            }
-            let skip = u16_at(bytes, local + 26).ok_or_else(bad)? as usize
-                + u16_at(bytes, local + 28).ok_or_else(bad)? as usize;
-            let data = bytes
-                .get(local + 30 + skip..local + 30 + skip + size)
-                .ok_or_else(bad)?;
-            return match method {
-                0 => Ok(data.to_vec()),
-                8 => {
-                    let mut out = Vec::new();
-                    flate2::read::DeflateDecoder::new(data)
-                        .take(MAX_XML_BYTES + 1)
-                        .read_to_end(&mut out)
-                        .map_err(|_| bad())?;
-                    if out.len() as u64 > MAX_XML_BYTES {
-                        return Err("the document's text is too large to check".into());
-                    }
-                    Ok(out)
-                }
-                _ => Err(bad()),
-            };
-        }
-        at += 46 + name_len + extra_len + comment_len;
-    }
-    Err(bad())
-}
-
-/// Enumerate package parts for the ledger's XLSX text pass. The same bounded
-/// entry reader above inflates each matching part; a malformed package refuses
-/// the secure local read rather than recording arbitrary zip bytes.
-fn zip_xml_names(bytes: &[u8]) -> Result<Vec<String>, String> {
-    let bad = || "not a readable spreadsheet".to_string();
-    let floor = bytes.len().saturating_sub(65_557);
-    let eocd = (floor..bytes.len().saturating_sub(21))
-        .rev()
-        .find(|&at| u32_at(bytes, at) == Some(0x0605_4b50))
-        .ok_or_else(bad)?;
-    let count = u16_at(bytes, eocd + 10).ok_or_else(bad)? as usize;
-    let mut at = u32_at(bytes, eocd + 16).ok_or_else(bad)? as usize;
-    let mut names = Vec::new();
-    for _ in 0..count {
-        if u32_at(bytes, at) != Some(0x0201_4b50) {
-            return Err(bad());
-        }
-        let name_len = u16_at(bytes, at + 28).ok_or_else(bad)? as usize;
-        let extra_len = u16_at(bytes, at + 30).ok_or_else(bad)? as usize;
-        let comment_len = u16_at(bytes, at + 32).ok_or_else(bad)? as usize;
-        let name = bytes.get(at + 46..at + 46 + name_len).ok_or_else(bad)?;
-        let name = std::str::from_utf8(name).map_err(|_| bad())?;
-        if name == "xl/sharedStrings.xml"
-            || name.starts_with("xl/worksheets/") && name.ends_with(".xml")
-        {
-            names.push(name.to_string());
-        }
-        at = at
-            .checked_add(46 + name_len + extra_len + comment_len)
-            .ok_or_else(bad)?;
-    }
-    if names.is_empty() || names.len() > 256 {
-        return Err(bad());
-    }
-    Ok(names)
-}
-
-/// Cell and shared-string text from a spreadsheet package. Numbers/formula
-/// cached values are included too; the ledger only retains hashes of phrases.
-pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
-    let mut text = String::new();
-    for name in zip_xml_names(bytes)? {
-        let xml = zip_entry(bytes, &name).map_err(|_| "not a readable spreadsheet".to_string())?;
-        if xml.len() > MAX_XML_BYTES as usize {
-            return Err("the spreadsheet's text is too large to check".into());
-        }
-        spreadsheet_part_text(&xml, name == "xl/sharedStrings.xml", &mut text)?;
-    }
-    if text.trim().is_empty() {
-        return Err("not a readable spreadsheet".into());
-    }
-    Ok(text)
-}
-
-/// OOXML permits arbitrary namespace prefixes; Strict OOXML also uses a
-/// different namespace URI. Only the local element name carries this text
-/// policy. Parse XML rather than matching literal `<t>` or `<x:t>` strings.
-fn spreadsheet_part_text(xml: &[u8], shared: bool, text: &mut String) -> Result<(), String> {
-    let bad = || "not a readable spreadsheet".to_string();
-    let mut reader = Reader::from_reader(xml);
-    let mut depth = 0usize;
-    let mut seen_root = false;
-    let mut in_item = false;
-    let mut item_text = String::new();
-    let root = if shared {
-        b"sst".as_slice()
-    } else {
-        b"worksheet".as_slice()
-    };
-    loop {
-        match reader.read_event().map_err(|_| bad())? {
-            Event::Start(start) => {
-                let local = start.local_name();
-                let local = local.as_ref();
-                if depth == 0 {
-                    if seen_root || local != root {
-                        return Err(bad());
-                    }
-                    seen_root = true;
-                }
-                if (shared && local == b"si") || (!shared && local == b"is") {
-                    in_item = true;
-                    item_text.clear();
-                }
-                if (in_item && local == b"t") || (!shared && local == b"v") {
-                    let raw = reader.read_text(start.name()).map_err(|_| bad())?;
-                    let decoded = raw.decode().map_err(|_| bad())?;
-                    let value = unescape(&decoded).map_err(|_| bad())?;
-                    if local == b"t" {
-                        item_text.push_str(&value);
-                    } else {
-                        text.push_str(&value);
-                        text.push(' ');
-                    }
-                } else {
-                    depth += 1;
-                }
-            }
-            Event::End(end) => {
-                let local = end.local_name();
-                if in_item
-                    && ((shared && local.as_ref() == b"si")
-                        || (!shared && local.as_ref() == b"is"))
-                {
-                    text.push_str(&item_text);
-                    text.push(' ');
-                    in_item = false;
-                    item_text.clear();
-                }
-                depth = depth.checked_sub(1).ok_or_else(bad)?;
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-        if text.len() + item_text.len() > MAX_XML_BYTES as usize {
-            return Err("the spreadsheet's text is too large to check".into());
-        }
-    }
-    if !seen_root || depth != 0 || in_item {
-        return Err(bad());
-    }
-    Ok(())
-}
-
-/// The visible text of a .docx, paragraph by paragraph: what the secret
-/// check reads (never the frontend's word for it).
-pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
-    let xml = String::from_utf8(zip_entry(bytes, "word/document.xml")?)
-        .map_err(|_| "not a readable Word document".to_string())?;
-    let mut text = String::new();
-    for paragraph in xml.split("</w:p>") {
-        let mut rest = paragraph;
-        while let Some(start) = rest.find("<w:t") {
-            rest = &rest[start + 4..];
-            // `<w:t>` or `<w:t xml:space=…>`, never `<w:tbl…>` / `<w:tc…>`
-            if !(rest.starts_with('>') || rest.starts_with(' ')) {
-                continue;
-            }
-            let Some(open_end) = rest.find('>') else { break };
-            rest = &rest[open_end + 1..];
-            let Some(close) = rest.find("</w:t>") else { break };
-            text.push_str(&rest[..close]);
-            rest = &rest[close..];
-        }
-        text.push('\n');
-    }
-    // a link's address lives in the relationships part, not the body
-    if let Ok(rels) = zip_entry(bytes, "word/_rels/document.xml.rels") {
-        let rels = String::from_utf8_lossy(&rels);
-        for target in rels.split("Target=\"").skip(1) {
-            text.push_str(target.split('"').next().unwrap_or(""));
-            text.push('\n');
-        }
-    }
-    Ok(text
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&"))
-}
+pub(crate) use crate::ai_office_text::{docx_text, xlsx_text};
 
 fn refuse_secret(bytes: &[u8]) -> Result<(), String> {
     if crate::secret::blocked_for_remote(&docx_text(bytes)?) {
@@ -379,6 +153,7 @@ pub fn corpus_write_file_ai(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::ai_office_text::{WORD_COMMENTS, WORD_ENDNOTES, WORD_FOOTNOTES};
     use std::io::Write;
 
     /// A one-entry zip, deflated or stored (the CRC isn't checked here).
@@ -450,6 +225,78 @@ pub(crate) mod tests {
         assert!(xlsx_text(&bytes)
             .unwrap()
             .contains("The opal bridge crossing opens before autumn twilight."));
+    }
+
+    #[test]
+    fn numeric_only_workbook_text_is_readable() {
+        let sheet = b"<worksheet><sheetData><row><c><v>123456789</v></c></row></sheetData></worksheet>";
+        let bytes = zip_of("xl/worksheets/sheet1.xml", sheet, true);
+        assert!(xlsx_text(&bytes).unwrap().contains("123456789"));
+    }
+
+    #[test]
+    fn exceljs_saved_strict_roundtrip_is_readable_by_rust() {
+        let saved = include_bytes!("../fixtures/strict-roundtrip-saved.xlsx");
+        assert!(xlsx_text(saved).unwrap().contains("After"));
+    }
+
+    #[test]
+    fn workbook_comments_headers_footers_and_defined_names_enter_the_ledger_text() {
+        let sheet = b"<worksheet><headerFooter><oddHeader>The amber orchard header waits beyond autumn twilight.</oddHeader><oddFooter>The cobalt harbor footer waits beyond winter twilight.</oddFooter></headerFooter><sheetData><row><c><v>7</v></c></row></sheetData></worksheet>";
+        let comments = b"<comments><commentList><comment><text><t>The violet orchard comment waits beyond spring twilight.</t></text></comment></commentList></comments>";
+        let book = b"<workbook><definedNames><definedName name=\"Private\">The silver harbor name waits beyond summer twilight.</definedName></definedNames></workbook>";
+        let bytes = zip_with(
+            &[
+                ("xl/worksheets/sheet1.xml", sheet),
+                ("xl/comments/comment1.xml", comments),
+                ("xl/workbook.xml", book),
+            ],
+            true,
+        );
+        let text = xlsx_text(&bytes).unwrap();
+        for phrase in [
+            "amber orchard header",
+            "cobalt harbor footer",
+            "violet orchard comment",
+            "silver harbor name",
+        ] {
+            assert!(text.contains(phrase), "missing {phrase}: {text}");
+        }
+    }
+
+    #[test]
+    fn docx_reads_prefixed_strict_cdata_and_secondary_parts() {
+        let main = b"<x:document xmlns:x=\"http://purl.oclc.org/ooxml/wordprocessingml/main\"><x:body><x:p><x:r><x:t><![CDATA[The amber bridge crossing opens before autumn twilight.]]></x:t></x:r></x:p></x:body></x:document>";
+        let parts: [(&str, &[u8]); 5] = [
+            ("word/header1.xml", b"<x:hdr><x:p><x:t>The violet harbor header arrives before winter twilight.</x:t></x:p></x:hdr>"),
+            ("word/footer1.xml", b"<x:ftr><x:p><x:t>The copper orchard footer arrives before winter twilight.</x:t></x:p></x:ftr>"),
+            (WORD_FOOTNOTES, b"<x:footnotes><x:footnote><x:p><x:t>The silver garden footnote arrives before winter twilight.</x:t></x:p></x:footnote></x:footnotes>"),
+            (WORD_ENDNOTES, b"<x:endnotes><x:endnote><x:p><x:t>The teal lighthouse endnote arrives before winter twilight.</x:t></x:p></x:endnote></x:endnotes>"),
+            (WORD_COMMENTS, b"<x:comments><x:comment><x:p><x:t>The crimson harbor comment arrives before winter twilight.</x:t></x:p></x:comment></x:comments>"),
+        ];
+        let mut entries = vec![("word/document.xml", main.as_slice())];
+        entries.extend(parts);
+        let text = docx_text(&zip_with(&entries, true)).unwrap();
+        for phrase in [
+            "amber bridge crossing",
+            "violet harbor header",
+            "copper orchard footer",
+            "silver garden footnote",
+            "teal lighthouse endnote",
+            "crimson harbor comment",
+        ] {
+            assert!(text.contains(phrase), "missing {phrase}: {text}");
+        }
+    }
+
+    #[test]
+    fn docx_main_part_without_readable_text_is_refused() {
+        let bytes = zip_of(
+            "word/document.xml",
+            b"<w:document><w:body><w:p/></w:body></w:document>",
+            true,
+        );
+        assert!(docx_text(&bytes).is_err());
     }
 
     #[test]

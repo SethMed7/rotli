@@ -26,7 +26,9 @@ import {
   withHyperlinkStyle,
 } from "./hyperlinks";
 import { type ListKinds, NO_LISTS, listKindOf, listKinds, listProps } from "./lists";
+import { alignment, namedStyle } from "./paragraphStyles";
 import { RUN_STYLE_TAGS, parseRunStyle, runStyleXml } from "./runStyle";
+import { editorWordXml } from "./wordNamespaces";
 import { decodeXml, encodeXml, innerXml, topLevelNodes, val } from "./xml";
 
 type LayoutNode =
@@ -61,32 +63,25 @@ export interface DocxSource {
 
 const RUN = /<w:r\b[^>]*>[\s\S]*?<\/w:r>/gi;
 
+function runText(xml: string): string {
+  let text = "";
+  let cursor = 0;
+  for (const match of xml.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)) {
+    text += decodeXml(xml.slice(cursor, match.index));
+    text += match[1] ?? "";
+    cursor = match.index + match[0].length;
+  }
+  return text + decodeXml(xml.slice(cursor));
+}
+
 function parseRun(runXml: string): DocumentRun {
   let text = "";
-  const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:br\b[^>]*\/?\s*>/gi;
+  const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:(?:br|cr)\b[^>]*\/?\s*>/gi;
   for (const match of runXml.matchAll(tokens)) {
-    text += match[1] !== undefined ? decodeXml(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
+    text += match[1] !== undefined ? runText(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
   }
   const style = parseRunStyle(runXml);
   return { text, ...(style ? { style } : {}) };
-}
-
-function namedStyle(styleId?: string): DocumentNamedStyle | undefined {
-  const key = styleId?.toLowerCase().replace(/[\s_-]/g, "");
-  if (key === "title") return "title";
-  if (key === "subtitle") return "subtitle";
-  if (key === "heading1") return "heading1";
-  if (key === "heading2") return "heading2";
-  if (key === "heading3") return "heading3";
-  return undefined;
-}
-
-function alignment(value?: string): DocumentAlignment | undefined {
-  if (value === "center") return "center";
-  if (value === "right" || value === "end") return "right";
-  if (value === "both" || value === "distribute") return "justify";
-  if (value === "left" || value === "start") return "left";
-  return undefined;
 }
 
 function parseParagraph(xml: string, parts: FileParts = NO_PARTS): DocumentParagraph {
@@ -584,14 +579,15 @@ export async function decodeDocx(base64: string, fileId: string): Promise<Decode
       "This file isn’t a readable Word document — it may be damaged, or another format saved with a .docx name.",
     );
   });
-  const documentXml = await zip.file("word/document.xml")?.async("string");
-  if (!documentXml) throw new Error("This DOCX has no editable Word document body");
+  const originalXml = await zip.file("word/document.xml")?.async("string");
+  if (!originalXml) throw new Error("This DOCX has no editable Word document body");
+  const documentXml = editorWordXml(originalXml);
   const body = /(<w:body\b[^>]*>)([\s\S]*?)(<\/w:body>)/i.exec(documentXml);
   if (!body) throw new Error("This DOCX has an unreadable Word document body");
   const children = topLevelNodes(body[2] ?? "");
   const relationshipXml = (await zip.file("word/_rels/document.xml.rels")?.async("string")) ?? "";
   const relationships = relationshipTargets(relationshipXml);
-  const lists = listKinds((await zip.file("word/numbering.xml")?.async("string")) ?? "");
+  const lists = listKinds(editorWordXml((await zip.file("word/numbering.xml")?.async("string")) ?? ""));
   const parts: FileParts = { lists, links: hyperlinks(relationshipXml) };
   const content: DocumentContent[] = [];
   const layout: LayoutNode[] = [];

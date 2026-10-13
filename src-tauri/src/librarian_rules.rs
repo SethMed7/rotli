@@ -108,6 +108,38 @@ pub(crate) fn parse_rules(settings_json: &str) -> LibrarianRules {
     }
 }
 
+/// A missing field has the documented empty default. Malformed security
+/// settings cannot establish that a name is safe for a remote recipient.
+pub(crate) fn classifiable_secure_keywords(settings_json: &str) -> Result<Vec<String>, String> {
+    let bad = || "cannot classify secure keywords in settings".to_string();
+    let value: Value = serde_json::from_str(settings_json).map_err(|_| bad())?;
+    if !value.is_object() {
+        return Err(bad());
+    }
+    if value.get("librarianRules").is_some_and(|rules| !rules.is_object()) {
+        return Err(bad());
+    }
+    if let Some(keywords) = value
+        .get("librarianRules")
+        .and_then(|rules| rules.get("secureKeywords"))
+    {
+        let Some(keywords) = keywords.as_array() else {
+            return Err(bad());
+        };
+        if keywords.len() > MAX_KEYWORDS
+            || keywords.iter().any(|word| {
+                !word.as_str().is_some_and(|word| {
+                    let word = word.trim();
+                    !word.is_empty() && word.chars().count() <= MAX_WORD
+                })
+            })
+        {
+            return Err(bad());
+        }
+    }
+    Ok(parse_rules(settings_json).secure_keywords)
+}
+
 /// The vault's secure keywords, read from `<root>/.rotli/settings.json` and
 /// cached against the file's modification time: the organizer snapshots many
 /// notes per cycle, and the settings file changes rarely.

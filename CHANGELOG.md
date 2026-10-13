@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Secure Office reads guard the text local AI actually sees.** Word tabs and
+  line breaks, heading and list labels, table cells, image descriptions, and
+  Excel dates now enter the private-text guard as displayed. Large amounts of
+  hidden document metadata no longer crowd visible text out of that guard.
+- **Secure Word and Excel files remain safe to read with on-device AI.** Image
+  descriptions in Word files now enter the private-text guard before an AI read
+  returns, and ordinary Excel files with hyperlinks no longer fail that read.
+
 ### Changed
 
 - **rotli.co's film is a one-minute tour of the Mac app.** The landing hero
@@ -363,6 +373,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Secure Office formulas, sheet names, comments, and secondary package text now reach the local AI egress guard; unreadable parts refuse the read. Agent listings and counts omit secret-shaped files and protected boards, and uppercase Markdown and board changes refresh correctly.
 - **Rotli Web chat now names only the AI tools available in that chat.** It no
   longer suggests reading files or creating and editing Word documents when
   those tools are unavailable in the browser.

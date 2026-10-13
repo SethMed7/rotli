@@ -61,7 +61,7 @@ from every diagnostics path. Full record: egress threat model O7, design in
 | `web_fetch` | arbitrary public web | model-chosen URL text | secret scan + `vetted_resolve` IP-pinned SSRF block + same-host redirects + 2 MB / 2048-char caps (fixtures) |
 | `web_search` | selected literal provider: `lite.duckduckgo.com` / `html.duckduckgo.com`, or `api.search.brave.com` | query | always for connected models, the per-chat globe for the on-device model; never in a secure chat + per-vault provider selection + `blocked_for_remote` secret/private-prose scan + 512-char cap + redirect/body/time caps; Brave credential is read from Keychain in Rust at request time |
 | `chat_messages` | registered loopback model server | conversation transcript + images | `endpoint_permitted` accepts only registered on-device loopback destinations; direct Gemini/remote HTTP is unavailable |
-| Chat `read_note` / `read_memory` / `read_file` / `edit_document` and agent bridge `read_document` | on-device or connected model/agent | vault note and file text, workbook cells, Word blocks | shared secure-home location checks on note and file read paths in TypeScript and Rust; remote refusal is unconditional; local secure office-package reads feed decoded text to the overlap ledger and refuse packages with no readable text; the chat is tainted; the agent bridge treats every agent as remote |
+| Chat `read_note` / `read_memory` / `read_file` / `edit_document` and agent bridge `read_document` | on-device or connected model/agent | vault note and file text, workbook cells, Word blocks | shared secure-home location checks on note and file read paths in TypeScript and Rust; remote refusal is unconditional; local secure Office-package reads feed decoded text to the overlap ledger, including formulas, sheet names, comments, headers/footers, Word tracked deletions and field instructions, and text in secondary XML parts; unreadable parts refuse the read; the chat is tainted; the agent bridge treats every agent as remote |
 | Refined Hand to AI | selected remote model | note text and file paths | secure note and linked-file checks before the request; fenced/embedded paths refuse only when a protected vault file resolves, so ordinary missing code paths pass |
 | `generate_image` | none | model-authored prompt | native command returns the provider-image policy error before root/path resolution, credential lookup, or process spawn |
 | CLI lanes (`claude` / `codex` / `cursor` / `antigravity`) | Anthropic/OpenAI/Cursor/Google through their official local clients or agents | transcript | native provider allowlist before binary lookup; binary allowlist (parity-pinned) and a model allowlist of static ids plus the ids the client itself reports (`provider_models.rs`: Claude's `initialize` control request under the lane's safe-mode/tools-off posture, Codex's own `models_cache.json`, `agent models`, Antigravity's `session/new` model option — no prompt, 20 s deadline, 1 MB cap, strict id shape), safe/tool-less/read-only argv or ACP protocol fields, secret scan; a desktop Claude chat turn instead runs Claude Code's stream-json control protocol (`claude_session.rs`, [ADR](../decisions/2026-09-28-claude-native-agent-protocol.md)) with Claude's own tools, ambient MCP, and session files off, Rotli's tools served as an in-process MCP server, every `can_use_tool` answered in Rust (only offered `mcp__rotli__*` tools), and `blocked_for_remote` on each tool call's arguments and result; Cursor runs ACP Ask mode from an empty scratch workspace with client capabilities off and permission requests rejected; Antigravity runs Google's registry-listed ACP agent from a managed install with the same client posture (no fs/terminal capability, permissions rejected, native questions cancelled, no-tools override) and its own Google sign-in |
@@ -101,13 +101,43 @@ key or returns a saved value through IPC.
 The workspace MCP server itself performs no network request, but a connected
 Claude or Codex process may be remote. It therefore treats every agent as remote:
 secure flags and secret-shaped bodies are omitted/refused even when a provider
-CLI happens to run on localhost. Board metadata/scenes currently have no secure
-classification; users must not place secrets on an agent-managed board.
-Agent-visible workspace metrics are computed only after that same note filter and
-do not disclose a count of withheld secure notes. `rotli agent doctor` forces a
+CLI happens to run on localhost. Boards have no frontmatter secure flag; secure
+homes and keyword-protected names hide them, and secret-shaped scenes are refused.
+Ordinary file titles and paths are also omitted from remote listings and counts
+when the file content is secret-shaped or cannot be checked within the bounded
+read.
+Agent-visible workspace metrics count only items that pass the note, board, and
+file read/list gates, so protected items do not add to the visible counts.
+`rotli agent doctor` forces a
 read-only store, while `rotli agent self-test` uses only a temporary memex.
 Every returned note/board value is labeled untrusted data: it cannot authorize a
 tool call or count as mutation confirmation.
+
+For a secure local Office read, the overlap ledger must receive every decoded
+text surface the on-device model can see. Known workbook and Word parts use
+their format-aware extractors. The ledger also records the model's Word block
+order and framing (paragraph style labels, list kinds, table and cell labels,
+and image placeholders) and workbook cell view, including whitespace between
+Word runs, tabs and breaks, formatted dates in either workbook date system,
+formulas with cached results, booleans, rich text, sheet names, and cell
+addresses. Word image alt text (`wp:docPr descr`) and its visible name fallback
+enter the ledger.
+Relationship targets and text nodes in secondary XML parts (including
+comments, DrawingML, charts, diagrams, glossary, and custom XML) enter the
+ledger; attributes are limited to image alt/name and relationship targets, so
+style IDs, run IDs, and other metadata cannot evict visible prose from the
+bounded 50,000-phrase ledger. Only known text-free package metadata, such as
+`[Content_Types].xml` and extended comment metadata, is skipped explicitly.
+The ledger records five-token phrases of what the local model is shown. A quote
+shorter than five tokens is out of its reach by design; the primary protection
+for a chat that read secure content is its taint, which refuses remote sends
+from that chat.
+The synthetic Office packages in `scripts/fixtures/secure-office-*.b64` pin
+the normalized TS AI-view tokens in `parity.json`; Rust must cover every
+five-token phrase from those views and keep the metadata-heavy case bounded.
+Malformed or oversized XML fails closed: the local AI read is refused before its
+bytes reach the model. If the vault's keyword settings cannot be read or parsed,
+remote classification also fails closed until the settings are repaired.
 
 Local-model reasoning checkpoints are ephemeral loop scratch, not durable
 memory: Rotli caps and budgets them, defuses them before prompt re-entry, and

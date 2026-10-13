@@ -6,6 +6,7 @@
 // through their own independent implementation.
 
 import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
 
 import {
   CLAUDE_BIN_CANDIDATES,
@@ -15,9 +16,12 @@ import {
 } from "../../breve-runtime/scripts/cli-paths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
+import { editableDocumentForAi } from "../ai/artifacts";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
+import { decodeDocx } from "../documents/codec/docx";
+import { namedStyle } from "../documents/codec/paragraphStyles";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
@@ -39,6 +43,7 @@ import {
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
+import { workbookForAi } from "../sheets/view";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
@@ -300,4 +305,39 @@ describe("parity.json ↔ TS constants", () => {
       expect(noteStem(title, "ignored-id")).toBe(slug);
     }
   });
+});
+
+test("secureOfficeAiView", async () => {
+  for (const sample of entries.secureOfficeAiView.value) {
+    const base64 = await readFile(new URL(`../../scripts/fixtures/${sample.file}`, import.meta.url), "utf8");
+    const view =
+      sample.kind === "docx"
+        ? editableDocumentForAi((await decodeDocx(base64, sample.file)).document)
+        : await workbookForAi(base64, sample.file);
+    const tokens = Array.from(
+      view
+        .normalize("NFKC")
+        .toLocaleLowerCase("en-US")
+        .match(/[\p{L}\p{N}][\p{L}\p{N}'’-]{2,}/gu) ?? [],
+    );
+    expect(tokens).toEqual(sample.tokens);
+    for (const passage of sample.viewContains ?? []) expect(view).toContain(passage);
+  }
+});
+
+test("wordStyleLabels", () => {
+  for (const { id, label } of entries.wordStyleLabels.value) {
+    const style = namedStyle(id);
+    const view = editableDocumentForAi({
+      id: "style-fixture",
+      title: "Style fixture",
+      content: [
+        {
+          kind: "paragraph",
+          paragraph: { runs: [{ text: "sample" }], ...(style ? { namedStyle: style } : {}) },
+        },
+      ],
+    });
+    expect(view).toBe(`[1] ${label}: sample`);
+  }
 });
