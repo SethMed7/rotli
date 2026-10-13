@@ -5,6 +5,8 @@ import { plantOpfsFiles, readOpfsFile, startWithFolder } from "./support";
 const NOTE =
   "---\nid: parity-note\ncreated: 2026-03-01\ncustom: original\n---\n# Parity note\n\nA synthetic note.\n";
 const MAIN = '{"version":1,"tree":[{"note":"parity-note"}]}';
+// A Rotli vault carries its marker; without it the folder was opened in place.
+const MARKER = '{"id":"mx_e2emetadata01","contract":"3.4"}\n';
 
 async function openThroughSearch(page: Page, title: string) {
   await page.getByRole("button", { name: /Search notes and actions/ }).click();
@@ -26,7 +28,11 @@ async function assets(page: Page) {
 // The direct web AI corpus exclusion is covered by webMetadataFiles.test.ts;
 // this proves the real menu writes the durable security fact across reboot.
 test("mark secure writes frontmatter and protected home, and survives reload", async ({ page }) => {
-  await startWithFolder(page, { "wiki/parity-note.md": NOTE, ".rotli/main.json": MAIN });
+  await startWithFolder(page, {
+    "memex.json": MARKER,
+    "wiki/parity-note.md": NOTE,
+    ".rotli/main.json": MAIN,
+  });
   await booted(page);
   const row = page.locator('.main-tree [data-main-id="parity-note"]').first();
   await row.click({ button: "right" });
@@ -46,6 +52,24 @@ test("mark secure writes frontmatter and protected home, and survives reload", a
   await expect(page.getByRole("dialog", { name: "Hand to AI" })).toContainText(
     "secure notes never go to a remote AI",
   );
+});
+
+test("in a folder opened in place, mark secure keeps the note where it is", async ({ page }) => {
+  // no marker: an Obsidian or Markdown folder the person brought
+  await startWithFolder(page, { "wiki/parity-note.md": NOTE, ".rotli/main.json": MAIN });
+  await booted(page);
+  await page.locator('.main-tree [data-main-id="parity-note"]').first().click({ button: "right" });
+  await page.getByRole("menuitemcheckbox", { name: "Mark secure — block remote AI", exact: true }).click();
+  await expect.poll(() => readOpfsFile(page, "wiki/parity-note.md")).toContain("secure: true");
+  expect(await readOpfsFile(page, "wiki/parity-note.md")).not.toContain("secure_origin");
+  expect(await readOpfsFile(page, "wiki/_secure/parity-note.md")).toBe("");
+  await expect.poll(() => readOpfsFile(page, ".gitignore")).toContain("wiki/parity-note.md");
+  await page.reload();
+  await booted(page);
+  await page.locator('.main-tree [data-main-id="parity-note"]').first().click({ button: "right" });
+  await expect(
+    page.getByRole("menuitemcheckbox", { name: "Remove secure protection", exact: true }),
+  ).toBeVisible();
 });
 
 test("Show file metadata persists an edit and visibly refuses reserved fields", async ({ page }) => {

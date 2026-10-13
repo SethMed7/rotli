@@ -7,7 +7,8 @@ import {
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
-import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import { mergeRawFrontmatter, rawFrontmatterBlock, withSecureLineOnly } from "../lib/frontmatterRaw";
+import { isMemexId, parseMemexInfo } from "../memex/contract";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -30,14 +31,30 @@ function assertSecureRemoval(body: string): void {
     throw new Error("Remove the detected secret from the note before removing secure protection");
 }
 
+/** A Rotli vault carries a valid `mx_` marker (the Rust `is_memex_root`
+ * twin). Any other folder was opened in place and is never rearranged. */
+async function hasRotliMarker(dir: VaultDir): Promise<boolean> {
+  if (!(await dir.exists("memex.json"))) return false;
+  return isMemexId(parseMemexInfo(await dir.readText("memex.json"))?.id);
+}
+
 /** Returns the resulting path for relocation bookkeeping. Identity is stable;
  * protect the target BEFORE moving, and leave the old ignore on any failure. */
 export async function setFolderSecure(dir: VaultDir, path: string, secure: boolean): Promise<string> {
   const opened = await readVersionedFile(dir, path);
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
-  if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
   if (!secure) assertSecureRemoval(body);
+  if (!(await hasRotliMarker(dir))) {
+    // A folder opened in place keeps the note where it is (owner rule
+    // 2026-10-13): only the secure line changes, and its ignore line protects
+    // the path. Protect before the write, unprotect after.
+    if (secure) await updateGitExclusions(dir, [path]);
+    await writeVersionedFile(dir, path, withSecureLineOnly(opened.contents, secure), opened.revision);
+    if (!secure) await updateGitExclusions(dir, [], [path]);
+    return path;
+  }
+  if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
   const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
   const current = parentPath(path);
   const inHome = current === home || current.startsWith(`${home}/`);

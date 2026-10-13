@@ -1527,6 +1527,38 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
     &text[..text.len() - body.len()]
 }
 
+/// Add or remove only the secure lines of a document, keeping every other
+/// byte as it was: no Rotli fields are minted, a fence is added only to hold
+/// `secure: true`, and a fence left empty by removal goes. Used in a folder
+/// opened in place, where Rotli changes nothing the person didn't ask for.
+fn with_secure_line_only(text: &str, secure: bool) -> String {
+    let block = raw_frontmatter_block(text);
+    let body = &text[block.len()..];
+    let nl = if block.contains("\r\n") || (block.is_empty() && text.contains("\r\n")) {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let mut lines: Vec<&str> = block.lines().collect();
+    if !lines.is_empty() {
+        lines.remove(0); // opening ---
+        lines.pop(); // closing ---
+    }
+    // top-level keys only, untrimmed — an indented line belongs to a nested map
+    let drop = |line: &str, key: &str| line.split_once(':').is_some_and(|(k, _)| k == key);
+    lines.retain(|line| {
+        !drop(line, "secure")
+            && (secure || (!drop(line, "local_ai_allowed") && !drop(line, "secure_origin")))
+    });
+    if secure {
+        lines.push("secure: true");
+    }
+    if lines.is_empty() {
+        return body.to_string();
+    }
+    format!("---{nl}{}{nl}---{nl}{body}", lines.join(nl))
+}
+
 pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
 pub(crate) const MANAGED_FILE_EXTS: [&str; 2] = ["xlsx", "docx"];
 pub(crate) const MANAGED_MEMEX_LANE: &str = "storage/rotli";
@@ -2726,6 +2758,12 @@ pub struct CorpusStore {
     /// into the store so the Rust gates enforce it, not only the TS `canWrite`
     /// (#3, audit 2026-07). Never cleared below the band verdict.
     perms_read_only: bool,
+    /// A folder the person brought (Obsidian, ZenNotes, plain Markdown) and
+    /// opened in place. Rotli never rearranges it: no secure-folder moves and
+    /// no detector writes (owner rule 2026-10-13, docs/design/
+    /// vault-copy-and-obsidian-compatibility.md). Set only by `open_adopted`;
+    /// pre-memex Rotli folders share LegacyRotli but are not adopted.
+    adopted: bool,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2894,6 +2932,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
+            adopted: true,
             list_cache: None,
             search_index: None,
         };
@@ -2949,6 +2988,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
+            adopted: false,
             list_cache: None,
             search_index: None,
         };
@@ -2992,6 +3032,7 @@ impl CorpusStore {
             layout: Layout::Memex,
             band_read_only,
             perms_read_only: read_only,
+            adopted: false,
             list_cache: None,
             search_index: None,
         };
@@ -3333,7 +3374,10 @@ impl CorpusStore {
             && (looks_secure(body) || self.secure_by_name(&title_of(editor_body(body)), &rel))
         {
             fm.foreign.push("secure: true".to_string());
-            if self.mutation_allowed().is_ok() {
+            // An adopted folder is never rewritten or rearranged: read_for_ai
+            // refuses this body from the detector itself, so the flag adds no
+            // protection there — only a change the person didn't ask for.
+            if !self.adopted && self.mutation_allowed().is_ok() {
                 // not the error: it can carry the path, and a secure note's name is private
                 if self.set_secure(&rel, true).is_err() {
                     eprintln!("auto-secure-flag (read) failed; the note is still refused to AI by its name");
@@ -3649,6 +3693,21 @@ impl CorpusStore {
                 "Remove the detected secret from the note before removing secure protection".into(),
             );
         }
+        if self.adopted {
+            // A folder opened in place keeps the note where it is (owner rule
+            // 2026-10-13): no move, so no id to key one by, and no Rotli fields
+            // minted. The person asked for the flag; the ignore line protects
+            // its path. Protect the path before the write, unprotect after.
+            if secure {
+                self.gitignore_add(rel)?;
+            }
+            self.suppress.mark(&path);
+            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            if !secure {
+                self.gitignore_remove(rel)?;
+            }
+            return Ok(None);
+        }
         let note_id = fm
             .id
             .clone()
@@ -3797,6 +3856,9 @@ impl CorpusStore {
     /// slug-bearing rel, a summary, or tags.
     fn secure_repair_note(&mut self, id_or_rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
+        if self.adopted {
+            return Err("A folder opened in place keeps its notes where they are; there is nothing to move.".into());
+        }
         let rel = self.resolve_note_rel(id_or_rel)?;
         let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, _) = parse_document(&text);
@@ -8873,6 +8935,10 @@ mod ai_write_tests;
 mod ai_file_tests;
 
 #[cfg(test)]
+#[path = "corpus_adopted_tests.rs"]
+mod adopted_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -13449,6 +13515,7 @@ mod tests {
                 if folder == "Rotli" && children.len() == 1
         )));
     }
+
 
     #[test]
     fn fresh_install_stays_unconfigured_until_a_real_or_legacy_root_exists() {

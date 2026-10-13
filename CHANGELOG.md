@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A notes folder you open in place is never rearranged.** When you open an
+  Obsidian vault or any folder of notes as it is, Rotli no longer moves a note
+  into a "Secure notes" folder, whether you mark it secure or Rotli spots
+  something that looks like a password or key. The note stays where it is and
+  gets one `secure: true` line; removing protection puts the file back exactly
+  as it was. Secure notes there are still never sent to a cloud model, and the
+  Librarian never organizes a folder that isn't a Rotli vault.
 - **Chat works again on Rotli Web for a vault opened through Rotli Helper.**
   Since 1.8.1, Rotli Web asks Rotli Helper to confirm which vault a chat
   belongs to, but the installers still downloaded Helper 1.4.0, which can't,

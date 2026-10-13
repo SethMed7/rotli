@@ -1304,10 +1304,10 @@ pub(crate) fn run_cycle(
     let mut report = CycleReport::default();
     let model_label = inner.model_label.lock().unwrap().clone();
     let knobs = read_knobs(corpus_state, root_id, inner);
-    if inner.brain_off.load(Ordering::SeqCst) {
-        // a RAW vault has no Brain at all (vault-vs-brain, 2026-07-26) —
-        // harder off than Trust::Off: the queue and review hints drain so
-        // nothing accumulates or nags while the vault stays untouched.
+    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.is_memex())).unwrap_or(false) {
+        // a RAW vault (vault-vs-brain, 2026-07-26) or a folder opened in place (2026-10-13)
+        // has no Brain — harder off than Trust::Off: the queue and review hints drain so
+        // nothing accumulates, is modeled, or nags while the folder stays untouched.
         inner.queue.lock().unwrap().clear();
         inner.status.lock().unwrap().secure_pending.clear();
         return Ok(report);
@@ -2267,10 +2267,10 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             };
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
-            if inner.brain_off.load(Ordering::SeqCst) {
-                // RAW vault: consume every wake signal and park — no sweep, no
-                // cycle, and nothing left queued to act on if the Brain later
-                // returns (re-enabling starts fresh from its own sweep).
+            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_is_memex().unwrap_or(false) {
+                // RAW vault or a folder opened in place (2026-10-13): consume every wake
+                // signal and park — no sweep, no cycle, and nothing left queued to act on if
+                // the Brain later returns (re-enabling starts fresh from its own sweep).
                 inner.run_now.store(false, Ordering::SeqCst);
                 inner.sweep_at.lock().unwrap().take();
                 inner.queue.lock().unwrap().clear();
@@ -2624,6 +2624,9 @@ pub fn organizer_learn_field(
 
 #[path = "organizer_secure.rs"]
 pub mod secure;
+#[cfg(test)]
+#[path = "organizer_adopted_tests.rs"]
+mod adopted_tests;
 #[cfg(test)]
 use secure::{dismiss_secure, secure_hints};
 
