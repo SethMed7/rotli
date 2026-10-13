@@ -28,6 +28,33 @@ pub(crate) fn is_canvas_path(rel: &str) -> bool {
 pub(crate) const EMPTY_CANVAS: &str = "{\n\t\"nodes\":[],\n\t\"edges\":[]\n}";
 
 impl CorpusStore {
+    /// A dropped `.excalidraw` file becomes a board (owner, 2026-10-13: "users
+    /// should be able to just drop in excalidraw boards and they work"): its
+    /// scene is checked like any board save, then COPIED into the board home —
+    /// the board lane in a vault, `Board/` in a plain folder — named after the
+    /// file. The source on disk is never touched. Returns the board's meta.
+    pub fn import_board(&mut self, src: &Path) -> Result<NoteMeta, String> {
+        let is_board = src
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("excalidraw"));
+        if !is_board {
+            return Err("not an Excalidraw board".into());
+        }
+        let size = fs::metadata(src).map_err(|e| format!("read the board: {e}"))?.len();
+        if size > crate::board::BOARD_MAX_BYTES as u64 {
+            return Err("this board is larger than Rotli opens".into());
+        }
+        let body = fs::read_to_string(src).map_err(|e| format!("read the board: {e}"))?;
+        let name = src
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .filter(|stem| !stem.trim().is_empty())
+            .unwrap_or("Board");
+        let home = if self.layout == Layout::Memex { BOARD_LANE } else { "Board" };
+        self.create_named_board(home, name, Some(&body))
+    }
+
     /// Why a surfaced storage asset cannot enter Rotli's in-memex Archive/Trash
     /// (None = it can). Markdown and boards keep their own lifecycle.
     pub(super) fn storage_file_lifecycle_block(&self, rel: &str) -> Option<&'static str> {
@@ -181,6 +208,50 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
+    fn a_dropped_excalidraw_file_becomes_an_editable_board_and_the_source_stays() {
+        let dir = TempDir::new().unwrap();
+        let outside = dir.path().join("Downloads");
+        fs::create_dir_all(&outside).unwrap();
+        // an excalidraw.com export: version, source, appState, files
+        let scene = r##"{"type":"excalidraw","version":2,"source":"https://excalidraw.com","elements":[{"id":"a","type":"rectangle","x":10.5,"y":-3.25,"width":80,"height":40}],"appState":{"viewBackgroundColor":"#ffffff"},"files":{}}"##;
+        let src = outside.join("Team Map.excalidraw");
+        fs::write(&src, scene).unwrap();
+
+        let mut plain = CorpusStore::open(dir.path().join("notes")).unwrap();
+        let board = plain.import_board(&src).unwrap();
+        assert_eq!(board.kind, NoteKind::Board);
+        assert!(board.id.starts_with("Board/"), "{}", board.id);
+        assert_eq!(plain.read_board(&board.id).unwrap().body, scene);
+        // it saves like any board
+        plain.write_board(&board.id, scene).unwrap();
+        // the dropped original is untouched, and a second drop doesn't overwrite
+        assert_eq!(fs::read_to_string(&src).unwrap(), scene);
+        let again = plain.import_board(&src).unwrap();
+        assert_ne!(again.id, board.id);
+    }
+
+    #[test]
+    fn a_dropped_board_lands_in_the_vault_board_lane_and_bad_files_are_refused() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("vault");
+        fs::create_dir_all(root.join("wiki")).unwrap();
+        fs::write(root.join("memex.json"), "{\"id\":\"mx_dropboard1\",\"contract\":\"3.4\"}").unwrap();
+        let mut vault = CorpusStore::open(root).unwrap();
+        assert!(vault.is_memex());
+        let src = dir.path().join("plan.excalidraw");
+        fs::write(&src, EMPTY_EXCALIDRAW).unwrap();
+        let board = vault.import_board(&src).unwrap();
+        assert!(board.id.starts_with(&format!("{BOARD_LANE}/")), "{}", board.id);
+
+        let not_a_board = dir.path().join("notes.txt");
+        fs::write(&not_a_board, "hello").unwrap();
+        assert!(vault.import_board(&not_a_board).is_err());
+        let broken = dir.path().join("broken.excalidraw");
+        fs::write(&broken, "{\"type\":\"something-else\"}").unwrap();
+        assert!(vault.import_board(&broken).is_err(), "a scene that isn't a board is refused");
+    }
+
+    #[test]
     fn a_canvas_is_born_beside_notes_named_like_a_board_and_moves_like_a_note() {
         if !crate::feature_policy::canvas_enabled() {
             // the public binary refuses, and a .canvas is an ordinary file
@@ -300,4 +371,18 @@ mod tests {
         assert!(!locked.lifecycle_mutable);
         assert_eq!(locked.lifecycle_reason.as_deref(), Some("read-only vault"));
     }
+}
+
+/// Import a dropped `.excalidraw` file as a board in `root_id` (the native
+/// drag event grants this exact source path once, as for any dropped file).
+#[tauri::command]
+pub fn corpus_import_board(
+    state: tauri::State<'_, CorpusState>,
+    authorizations: tauri::State<'_, ImportAuthorizations>,
+    root_id: String,
+    path: String,
+) -> Result<NoteMeta, String> {
+    let src = authorizations.consume(Path::new(&path))?;
+    let meta = state.route(&root_id, |s| s.import_board(&src))?;
+    Ok(NoteMeta { id: compose_root_id(&root_id, &meta.id), ..meta })
 }

@@ -957,6 +957,13 @@ export async function corpusImportFile(rootId: string, path: string): Promise<st
   return invoke<string>("corpus_import_file", { rootId, path });
 }
 
+/** Import a dropped `.excalidraw` file as an editable board (copied into the
+ * vault's board home; the original is untouched). Uses the drop's one-shot
+ * grant, like any dropped file. Mac app only. */
+export function corpusImportBoard(rootId: string, path: string): Promise<CorpusNoteMeta> {
+  return invoke<CorpusNoteMeta>("corpus_import_board", { rootId, path });
+}
+
 /** Open Finder for one or more images. Rust returns only canonical paths with
  * fresh single-use import grants, so the webview still cannot read arbitrary
  * filesystem paths. */

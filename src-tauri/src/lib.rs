@@ -2348,6 +2348,7 @@ pub fn run() {
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
+            corpus::files::corpus_import_board,
             corpus_pick_images,
             pasteboard::clipboard_has_files,
             pasteboard::clipboard_file_paths,
