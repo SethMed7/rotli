@@ -8,11 +8,22 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
+mod view;
+
+use view::{
+    append_word_model_view, rendered_date, workbook_date_formats, workbook_model_view,
+    workbook_uses_1904_dates,
+};
+
 /// The largest XML package part the check will inflate.
 const MAX_XML_BYTES: u64 = 16 * 1024 * 1024;
 pub(crate) const WORD_FOOTNOTES: &str = "word/footnotes.xml";
 pub(crate) const WORD_ENDNOTES: &str = "word/endnotes.xml";
 pub(crate) const WORD_COMMENTS: &str = "word/comments.xml";
+const DOC_PR: &[u8] = b"docPr";
+const ALT_DESCRIPTION: &[u8] = b"descr";
+const RELATIONSHIP: &[u8] = b"Relationship";
+const RELATIONSHIP_TARGET: &[u8] = b"Target";
 
 fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_le_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
@@ -113,6 +124,16 @@ fn zip_xml_names(bytes: &[u8], prefix: &str) -> Result<Vec<String>, String> {
 /// cached values are included too; the ledger only retains hashes of phrases.
 pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
     let mut text = String::new();
+    let date_formats = if let Ok(styles) = zip_entry(bytes, "xl/styles.xml") {
+        workbook_date_formats(&styles)?
+    } else {
+        Vec::new()
+    };
+    let date1904 = if let Ok(workbook) = zip_entry(bytes, "xl/workbook.xml") {
+        workbook_uses_1904_dates(&workbook)?
+    } else {
+        false
+    };
     for name in zip_xml_names(bytes, "")? {
         let kind = if name == "xl/sharedStrings.xml" {
             Some(b"sst".as_slice())
@@ -133,13 +154,21 @@ pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
             return Err("the spreadsheet's text is too large to check".into());
         }
         if let Some(root) = kind {
-            spreadsheet_part_text(&xml, root, &mut text)?;
+            spreadsheet_part_text(&xml, root, &mut text, &date_formats, date1904)?;
         } else {
             generic_part_text(&xml, &mut text, "not a readable spreadsheet")?;
         }
     }
     if text.trim().is_empty() {
         return Err("not a readable spreadsheet".into());
+    }
+    // The model sees addressed cells and tab framing, not the raw shared-
+    // string indices. Include that view so phrases across cells and sheets
+    // are covered too; the pass above still records hidden secondary text.
+    text.push('\n');
+    text.push_str(&workbook_model_view(bytes, &date_formats, date1904)?);
+    if text.len() > MAX_XML_BYTES as usize {
+        return Err("the spreadsheet's text is too large to check".into());
     }
     Ok(text)
 }
@@ -173,7 +202,13 @@ fn spreadsheet_metadata_part(name: &str) -> bool {
 /// OOXML permits arbitrary namespace prefixes; Strict OOXML also uses a
 /// different namespace URI. Only the local element name carries this text
 /// policy. Parse XML rather than matching literal `<t>` or `<x:t>` strings.
-fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(), String> {
+fn spreadsheet_part_text(
+    xml: &[u8],
+    root: &[u8],
+    text: &mut String,
+    date_formats: &[Option<String>],
+    date1904: bool,
+) -> Result<(), String> {
     let bad = || "not a readable spreadsheet".to_string();
     let mut reader = Reader::from_reader(xml);
     let mut depth = 0usize;
@@ -181,6 +216,8 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
     let mut in_item = false;
     let mut item_text = String::new();
     let shared = root == b"sst";
+    let mut cell_style = None;
+    let mut cell_boolean = false;
     let header_footer: [&[u8]; 6] = [
         b"oddHeader", b"oddFooter", b"evenHeader", b"evenFooter", b"firstHeader", b"firstFooter",
     ];
@@ -199,6 +236,11 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
                     in_item = true;
                     item_text.clear();
                 }
+                if root == b"worksheet" && local == b"c" {
+                    cell_style = attribute_value(&start, b"s", &bad)?
+                        .and_then(|value| value.parse::<usize>().ok());
+                    cell_boolean = attribute_value(&start, b"t", &bad)?.as_deref() == Some("b");
+                }
                 if root == b"workbook" && local == b"sheet" {
                     sheet_name(&start, text, &bad)?;
                 }
@@ -214,6 +256,20 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
                     } else {
                         text.push_str(&value);
                         text.push(' ');
+                        if root == b"worksheet" && local == b"v" {
+                            if cell_boolean {
+                                text.push_str(if value == "1" { "true " } else { "false " });
+                            }
+                            if let Some(pattern) = cell_style
+                                .and_then(|index| date_formats.get(index))
+                                .and_then(Option::as_deref)
+                            {
+                                if let Some(date) = rendered_date(&value, pattern, date1904) {
+                                    text.push_str(&date);
+                                    text.push(' ');
+                                }
+                            }
+                        }
                     }
                 } else {
                     depth += 1;
@@ -226,6 +282,10 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
             }
             Event::End(end) => {
                 let local = end.local_name();
+                if root == b"worksheet" && local.as_ref() == b"c" {
+                    cell_style = None;
+                    cell_boolean = false;
+                }
                 if in_item
                     && ((shared && local.as_ref() == b"si")
                         || (root == b"worksheet" && local.as_ref() == b"is"))
@@ -250,6 +310,23 @@ fn spreadsheet_part_text(xml: &[u8], root: &[u8], text: &mut String) -> Result<(
     Ok(())
 }
 
+fn attribute_value(
+    start: &BytesStart<'_>,
+    wanted: &[u8],
+    bad: &impl Fn() -> String,
+) -> Result<Option<String>, String> {
+    let mut value = None;
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|_| bad())?;
+        let raw = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| bad())?;
+        let decoded = unescape(raw).map_err(|_| bad())?;
+        if attribute.key.local_name().as_ref() == wanted {
+            value = Some(decoded.into_owned());
+        }
+    }
+    Ok(value)
+}
+
 fn sheet_name(
     start: &BytesStart<'_>,
     text: &mut String,
@@ -266,8 +343,8 @@ fn sheet_name(
     Ok(())
 }
 
-/// Unknown XML parts are still security-relevant. Include their text and
-/// attribute values (for example pivot shared items) and refuse malformed XML.
+/// Unknown XML parts are still security-relevant. Include text nodes and the
+/// few attributes the model can see, while validating every attribute.
 fn generic_part_text(xml: &[u8], text: &mut String, error: &str) -> Result<(), String> {
     let bad = || error.to_string();
     let mut reader = Reader::from_reader(xml);
@@ -280,7 +357,7 @@ fn generic_part_text(xml: &[u8], text: &mut String, error: &str) -> Result<(), S
                     return Err(bad());
                 }
                 seen_root = true;
-                append_attributes(&start, text, &bad)?;
+                append_visible_attributes(&start, text, &bad)?;
                 stack.push(start.name().as_ref().to_vec());
             }
             Event::Empty(start) => {
@@ -288,7 +365,7 @@ fn generic_part_text(xml: &[u8], text: &mut String, error: &str) -> Result<(), S
                     return Err(bad());
                 }
                 seen_root = true;
-                append_attributes(&start, text, &bad)?;
+                append_visible_attributes(&start, text, &bad)?;
             }
             Event::Text(part) => {
                 let decoded = part.decode().map_err(|_| bad())?;
@@ -331,19 +408,24 @@ fn generic_part_text(xml: &[u8], text: &mut String, error: &str) -> Result<(), S
     Ok(())
 }
 
-fn append_attributes(
+fn append_visible_attributes(
     start: &BytesStart<'_>,
     text: &mut String,
     bad: &impl Fn() -> String,
 ) -> Result<(), String> {
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|_| bad())?;
-        if attribute.key.as_ref().starts_with(b"xmlns") {
-            continue;
-        }
         let raw = std::str::from_utf8(attribute.value.as_ref()).map_err(|_| bad())?;
-        text.push_str(&unescape(raw).map_err(|_| bad())?);
-        text.push(' ');
+        let decoded = unescape(raw).map_err(|_| bad())?;
+        let element = start.local_name();
+        let key = attribute.key.local_name();
+        let visible = (element.as_ref() == DOC_PR
+            && (key.as_ref() == ALT_DESCRIPTION || key.as_ref() == b"name"))
+            || (element.as_ref() == RELATIONSHIP && key.as_ref() == RELATIONSHIP_TARGET);
+        if visible {
+            text.push_str(&decoded);
+            text.push(' ');
+        }
     }
     Ok(())
 }
@@ -384,6 +466,7 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         return Err(bad());
     }
     let mut text = String::new();
+    let mut model_view = String::new();
     for name in names {
         if name == "[Content_Types].xml" || name == "word/commentsExtended.xml" {
             continue;
@@ -407,6 +490,9 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         if xml.len() > MAX_XML_BYTES as usize {
             return Err("the document's text is too large to check".into());
         }
+        if name == "word/document.xml" {
+            append_word_model_view(&xml, &mut model_view)?;
+        }
         let Some(root) = root else {
             generic_part_text(&xml, &mut text, "not a readable Word document")?;
             continue;
@@ -425,20 +511,28 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
                         }
                         seen_root = true;
                     }
-                    // The document codec exposes drawing metadata (notably
-                    // wp:docPr descr/name) as image text to the local model.
-                    // Record all attributes so another visible Word field
-                    // cannot bypass the overlap ledger.
-                    // Keep metadata separate until body text is complete: a
-                    // Word paragraph may split one phrase across styled runs.
-                    append_attributes(&start, &mut attributes, &bad)?;
+                    // Image alt text and its name fallback are model-visible.
+                    // Keep them separate so styled runs retain their phrases.
+                    append_visible_attributes(&start, &mut attributes, &bad)?;
                     if matches!(local.as_ref(), b"t" | b"delText" | b"instrText") {
-                        text.push_str(&read_element_text(&mut reader, start.name().as_ref(), &bad)?);
+                        text.push_str(&read_element_text(
+                            &mut reader,
+                            start.name().as_ref(),
+                            &bad,
+                        )?);
                     } else {
+                        if matches!(local.as_ref(), b"tab" | b"br" | b"cr") {
+                            text.push(' ');
+                        }
                         depth += 1;
                     }
                 }
-                Event::Empty(start) => append_attributes(&start, &mut attributes, &bad)?,
+                Event::Empty(start) => {
+                    append_visible_attributes(&start, &mut attributes, &bad)?;
+                    if matches!(start.local_name().as_ref(), b"tab" | b"br" | b"cr") {
+                        text.push(' ');
+                    }
+                }
                 Event::End(end) => {
                     if end.local_name().as_ref() == b"p" {
                         text.push('\n');
@@ -448,7 +542,7 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
                 Event::Eof => break,
                 _ => {}
             }
-            if text.len() + attributes.len() > MAX_XML_BYTES as usize {
+            if text.len() + attributes.len() + model_view.len() > MAX_XML_BYTES as usize {
                 return Err("the document's text is too large to check".into());
             }
         }
@@ -461,13 +555,10 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
     if text.trim().is_empty() {
         return Err(bad());
     }
-    // a link's address lives in the relationships part, not the body
-    if let Ok(rels) = zip_entry(bytes, "word/_rels/document.xml.rels") {
-        let rels = String::from_utf8_lossy(&rels);
-        for target in rels.split("Target=\"").skip(1) {
-            text.push_str(target.split('"').next().unwrap_or(""));
-            text.push('\n');
-        }
+    text.push('\n');
+    text.push_str(&model_view);
+    if text.len() > MAX_XML_BYTES as usize {
+        return Err("the document's text is too large to check".into());
     }
     Ok(text)
 }

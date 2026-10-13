@@ -76,7 +76,7 @@ function runText(xml: string): string {
 
 function parseRun(runXml: string): DocumentRun {
   let text = "";
-  const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:br\b[^>]*\/?\s*>/gi;
+  const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:(?:br|cr)\b[^>]*\/?\s*>/gi;
   for (const match of runXml.matchAll(tokens)) {
     text += match[1] !== undefined ? runText(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
   }

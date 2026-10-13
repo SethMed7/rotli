@@ -133,6 +133,48 @@ fn secure_docx_run_attributes_do_not_split_model_visible_prose() {
 }
 
 #[test]
+fn secure_docx_tabs_breaks_and_carriage_returns_preserve_visible_phrases() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let xml = b"<w:document><w:body><w:p><w:r><w:t>The silver</w:t><w:tab/><w:t>orchard meeting</w:t><w:br/><w:t>moves before</w:t><w:cr/><w:t>winter arrives.</w:t></w:r></w:p></w:body></w:document>";
+    let rel = "Secure notes/whitespace.docx";
+    fs::write(
+        store.root().join(rel),
+        crate::ai_files::tests::zip_with(&[("word/document.xml", xml)], true),
+    )
+    .unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(
+        "The silver orchard meeting moves before winter arrives."
+    ));
+}
+
+#[test]
+fn non_visible_word_metadata_cannot_evict_prose_from_one_read() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let prose = "The violet lighthouse schedule changes before the autumn tide arrives.";
+    let mut xml = format!("<w:document><w:body><w:p><w:r><w:t>{prose}</w:t></w:r></w:p>");
+    for id in 0..52_000 {
+        xml.push_str(&format!("<w:p w:rsidR=\"{id:08}abcdefgh\"/>"));
+    }
+    xml.push_str("</w:body></w:document>");
+    let bytes = crate::ai_files::tests::zip_with(&[("word/document.xml", xml.as_bytes())], true);
+    let rel = "Secure notes/metadata.docx";
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(prose));
+    assert!(
+        crate::ai_files::docx_text(&fs::read(store.root().join(rel)).unwrap())
+            .unwrap()
+            .len()
+            < 500
+    );
+}
+
+#[test]
 fn secure_workbook_hyperlink_relationship_reads_and_enters_ledger() {
     let tmp = TempDir::new().unwrap();
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
@@ -208,6 +250,36 @@ fn allowed_local_secure_xlsx_text_enters_remote_overlap_ledger() {
     fs::write(store.root().join(rel), bytes).unwrap();
     store.read_file_bytes_for_ai(rel, true).unwrap();
     assert!(crate::secret::blocked_for_remote(prose));
+}
+
+#[test]
+fn secure_workbook_date_displays_enter_remote_overlap_ledger() {
+    for (date1904, serial) in [(false, 45306), (true, 43844)] {
+        let tmp = TempDir::new().unwrap();
+        let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+        fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+        let workbook = format!(
+            "<workbook><workbookPr date1904=\"{}\"/><sheets><sheet name=\"Private Plans\" sheetId=\"1\"/></sheets></workbook>",
+            if date1904 { 1 } else { 0 }
+        );
+        let styles = b"<styleSheet><numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"yyyy-mm-dd\"/></numFmts><cellXfs count=\"2\"><xf numFmtId=\"0\"/><xf numFmtId=\"164\" applyNumberFormat=\"1\"/></cellXfs></styleSheet>";
+        let sheet = format!("<worksheet><sheetData><row r=\"1\"><c r=\"A1\" s=\"1\"><v>{serial}</v></c><c r=\"B1\" t=\"inlineStr\"><is><t>winter planning review approved</t></is></c></row></sheetData></worksheet>");
+        let bytes = crate::ai_files::tests::zip_with(
+            &[
+                ("xl/workbook.xml", workbook.as_bytes()),
+                ("xl/styles.xml", styles),
+                ("xl/worksheets/sheet1.xml", sheet.as_bytes()),
+            ],
+            true,
+        );
+        let rel = "Secure notes/dates.xlsx";
+        fs::write(store.root().join(rel), bytes).unwrap();
+        store.read_file_bytes_for_ai(rel, true).unwrap();
+        assert!(
+            crate::secret::blocked_for_remote("2024-01-15 winter planning review approved"),
+            "date1904={date1904}"
+        );
+    }
 }
 
 #[test]

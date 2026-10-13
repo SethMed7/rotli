@@ -143,7 +143,7 @@ fn ledger() -> &'static Mutex<Ledger> {
 /// is a letter/digit followed by at least two more letter/digit/apostrophe/
 /// hyphen characters, so punctuation, markdown syntax and 1–2 char words drop
 /// out and only real words remain to be matched on.
-fn prose_tokens(text: &str) -> Vec<String> {
+pub(crate) fn prose_tokens(text: &str) -> Vec<String> {
     static TOKEN: OnceLock<regex::Regex> = OnceLock::new();
     let re = TOKEN.get_or_init(|| {
         regex::Regex::new(r"[\p{L}\p{N}][\p{L}\p{N}'\u{2019}\-]{2,}").expect("valid token regex")

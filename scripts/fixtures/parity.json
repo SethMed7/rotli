@@ -839,6 +839,32 @@
         "dotm"
       ]
     },
+    "secureOfficeAiView": {
+      "sourceOfTruth": "src/documents/codec/docx.ts + src/ai/artifacts.ts and src/sheets/view.ts + src/sheets/aiView.ts ↔ src-tauri/src/ai_office_text.rs; synthetic base64 packages in scripts/fixtures/secure-office-*.b64",
+      "value": [
+        {
+          "file": "secure-office-word.b64",
+          "kind": "docx",
+          "tokens": ["paragraph", "the", "silver", "orchard", "meeting", "moves", "before", "winter", "arrives", "paragraph", "the", "cobalt", "harbor", "plan", "continues", "tomorrow", "image", "the", "saffron", "observatory", "appointment", "moves", "before", "next", "winter"]
+        },
+        {
+          "file": "secure-office-word-metadata.b64",
+          "kind": "docx",
+          "maxRustTokens": 100,
+          "tokens": ["paragraph", "the", "silver", "orchard", "meeting", "moves", "before", "winter", "arrives", "paragraph", "the", "cobalt", "harbor", "plan", "continues", "tomorrow", "image", "the", "saffron", "observatory", "appointment", "moves", "before", "next", "winter"]
+        },
+        {
+          "file": "secure-office-workbook1900.b64",
+          "kind": "xlsx",
+          "tokens": ["sheet", "private", "plans", "rows", "columns", "used", "2024-01-15", "winter", "planning", "review", "approved", "1200", "sum", "1200", "true", "the", "copper", "harbor", "report", "remains", "private", "sheet", "winter", "archive", "rows", "columns", "used", "the", "amber", "lighthouse", "meeting", "follows", "next", "spring"]
+        },
+        {
+          "file": "secure-office-workbook1904.b64",
+          "kind": "xlsx",
+          "tokens": ["sheet", "private", "plans", "rows", "columns", "used", "2024-01-15", "winter", "planning", "review", "approved", "1200", "sum", "1200", "true", "the", "copper", "harbor", "report", "remains", "private", "sheet", "winter", "archive", "rows", "columns", "used", "the", "amber", "lighthouse", "meeting", "follows", "next", "spring"]
+        }
+      ]
+    },
     "skippedDirs": {
       "sourceOfTruth": "src/lib/fileKind.ts SKIPPED_DIRS ↔ src-tauri/src/corpus.rs SKIPPED_DIRS",
       "value": [
