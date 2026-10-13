@@ -355,6 +355,12 @@ imports.
   name. Rotli repairs the link in place only for its own `storage:` form; any
   other link is the person's, so a found image is shown and the note is left
   as written.
+
+  A dropped, pasted, or attached image is **written** as a standard Markdown
+  path from the note's folder (`../../storage/images/rose.png` from a note in
+  `wiki/_inbox`), each segment escaped so a space or a parenthesis can't end
+  the link (`my%20rose.png`). Images an AI tool or a chat writes, which don't
+  know the note, keep `storage:`.
 - **File embeds.** A sheet, document, or board shows its live editor inside a
   note, written either way:
   - A fenced block whose language is `sheet` (`.xlsx`, `.xlsm`, `.csv`),
@@ -364,6 +370,12 @@ imports.
     `.excalidraw`): the file is found by its vault path, then by the path
     from the note, then as the one file with that name. A name two files share
     shows a notice instead of guessing.
+
+  `/sheet`, `/document`, and `/board` **write** `![[path]]` with the file's
+  vault path (`![[storage/rotli/budget.xlsx]]`), and so does converting a
+  Mermaid diagram to a board; fences written before keep working. A
+  `[[…]]` that names a file by its extension (`.png`, `.xlsx`, `.excalidraw`,
+  …) is a file reference, not a link to a note, in the link index and graph.
 
   A caret on the line reveals the source. Other Markdown readers show the
   fence as a code block; Obsidian shows `![[file]]` as its own embed (a board

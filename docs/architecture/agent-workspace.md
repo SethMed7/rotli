@@ -83,9 +83,11 @@ maintaining separate file-manipulation implementations.
   made secure while the call waits on the lock is refused.
 - `rotli notes attachments ID` and `rotli_note_attachments` list the files a
   note's Markdown links and images name, resolved as the editor resolves them
-  (`storage:NAME` is `storage/NAME`; a bare relative path is vault-relative;
-  traversal and absolute paths are refused; external URLs are listed, never
-  fetched). The note passes the remote read gate first, so a secure note's
+  (`storage:NAME` is `storage/NAME`; a bare relative path is read from the
+  vault root when that file exists, else from the note's folder, Markdown's
+  reading, which Rotli writes since 2026-10-13; `![[path]]` embeds count too;
+  a path that leaves the vault and absolute paths are refused; external URLs
+  are listed, never fetched). The note passes the remote read gate first, so a secure note's
   attachments are never enumerated. Each file then takes the document lane's
   records gate (agent-visible surface, no secure keyword in its name) and the
   secure-home check (nothing under `wiki/_secure/` or `Secure notes/`, any

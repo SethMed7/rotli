@@ -674,6 +674,12 @@
           ]
         },
         {
+          "body": "![[storage/rotli/plan.docx|400]] and [[rose.PNG]] embed files; [[v1.2 notes]] and ![[Map.excalidraw#x]] differ: [[Budget.xlsx|the budget]].",
+          "targets": [
+            "v1.2 notes"
+          ]
+        },
+        {
           "body": "[[a [[b]] c]] and [[unclosed",
           "targets": []
         },

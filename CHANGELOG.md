@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **New images and embeds are written so Obsidian shows them too.** A dropped
+  or pasted image is now linked with a normal Markdown path from the note
+  (instead of Rotli's `storage:` shorthand), and `/sheet`, `/document`, and
+  `/board` insert Obsidian's `![[file]]` embed. Older links keep working.
+  Trashing a note in a folder you opened in place never moves an image along
+  with it, and Hand to AI no longer refuses a note just because its image is
+  linked from a subfolder.
 - **Images and embeds from an Obsidian vault show up in Rotli.** An image linked
   relative to its note, or written Obsidian's way as `![[rose.png]]`, now
   displays on the Mac and the web, and `![[budget.xlsx]]`, `![[plan.docx]]`,

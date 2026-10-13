@@ -187,11 +187,18 @@ An adopted folder, and the source of any import, is **protected**:
      where the file is found and never rewritten. Deferred to 5b: the link
      index and graph still count `![[file]]` as a note link, and inline
      (mid-sentence) `![[x.png]]` stays text.
-   - **5b, writing:** new images and embeds use the new forms, and every reader
-     that knows only `storage:` (chat media, Hand to AI, clipboard, cleanup when
-     a note is deleted) learns them. **Constraint:** deleting a note never
-     deletes an image it links in a protected folder — Obsidian attachments are
-     shared across notes and are the person's files.
+   - **5b, writing (in review):** dropped, pasted, and attached images write a
+     standard path from the note; `/sheet`, `/board`, `/document`, and the
+     Mermaid-to-board swap write `![[path]]`. Readers learned the new forms:
+     image tidy-up after Trash/Archive (decodes `%20`, resolves from the note,
+     never cascades a `![[name]]`), Hand to AI (resolves from the note; a link
+     is secure if either reading is; `![[file]]` embeds of secure files are
+     refused), image copy, and the agent attachments tool (Rust). The link
+     index and graph treat `[[file.ext]]` as a file (parity fixture). AI tool
+     and chat images keep `storage:` (they don't know the note). **The
+     constraint holds:** in a folder opened in place no file is ever moved to
+     Trash or Archive (Mac `storage_file_lifecycle_block`, web
+     `moveFileToSink`).
    - **5c, the converter:** a Settings action that previews every change and
      rewrites only Rotli vaults, never a folder opened in place.
 

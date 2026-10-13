@@ -8,6 +8,7 @@
 // from Trash/Archive returns it to its original path and the link simply
 // works again.
 
+import { escapeLinkSegment, noteRelativePath } from "../editor/imageSource";
 import { corpusMoveFileToSink, corpusSearch, isTauri, rootIdOf } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -17,16 +18,31 @@ import { notesService } from "./notes";
 
 const IMAGE_MD_RE = /!\[[^\]]*\]\(([^)\s]+)\)/g;
 
-/** Image srcs a note body references — rel-normalized, deduped; remote and
- * already-resolved urls are never lifecycle candidates. Pure. */
-export function noteImageRels(body: string): string[] {
+/** Image srcs a note body references — vault paths, decoded, deduped; remote
+ * and already-resolved urls are never lifecycle candidates. `storage:` and a
+ * `storage/…` path are vault-root (Rotli's forms); any other path is read from
+ * the note's folder, the way Rotli now writes it. An Obsidian `![[name]]`
+ * names a file anywhere, so it never cascades: tidy-up acts only on a file it
+ * can name for certain. Pure. */
+export function noteImageRels(body: string, noteFolder = ""): string[] {
   const out = new Set<string>();
   for (const match of body.matchAll(IMAGE_MD_RE)) {
     const src = match[1] ?? "";
     if (!src || /^(https?:|data:|blob:|asset:)/i.test(src)) continue;
-    out.add(imageSrcToRel(src));
+    const rel = src.startsWith("storage:")
+      ? imageSrcToRel(src)
+      : noteRelativePath(/^storage\//i.test(src) ? "" : noteFolder, src);
+    if (rel) out.add(src.startsWith("storage:") ? safeDecode(rel) : rel);
   }
   return [...out];
+}
+
+function safeDecode(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
 }
 
 /** Whether any OTHER note references this image. Pure over an injected
@@ -38,20 +54,28 @@ export async function referencedElsewhere(
 ): Promise<boolean> {
   const name = rel.slice(rel.lastIndexOf("/") + 1);
   if (!name) return true;
+  // a link may spell the name escaped (`my%20pic.png`) or not: look for both
+  const spellings = [...new Set([name, escapeLinkSegment(name)])];
   try {
-    const hits = await search(name);
-    return hits.some((hit) => hit.id !== excludeNoteId);
+    for (const spelling of spellings) {
+      if ((await search(spelling)).some((hit) => hit.id !== excludeNoteId)) return true;
+    }
+    return false;
   } catch {
     return true;
   }
 }
 
-async function cascadeImages(noteId: string, body: string, sink: "Archive" | "Trash"): Promise<void> {
+async function cascadeImages(
+  noteId: string,
+  { body, folder }: { body: string; folder: string },
+  sink: "Archive" | "Trash",
+): Promise<void> {
   // browser twin: no file lifecycle exists — nothing to tidy
   if (!isTauri()) return;
   if (!useUiStore.getState().tidyImagesWithNote) return;
   const rootId = rootIdOf(noteId);
-  const rels = noteImageRels(body);
+  const rels = noteImageRels(body, folder);
   // Every reference check is its own full-corpus walk (perf audit 2026-07-30,
   // finding 16). Each image searches for its OWN file name, so one search can't
   // stand in for K. The batch issues all K checks up front — but corpus_search
@@ -71,28 +95,29 @@ async function cascadeImages(noteId: string, body: string, sink: "Archive" | "Tr
   }
 }
 
-async function noteBodySafe(id: string): Promise<string> {
+async function noteBodySafe(id: string): Promise<{ body: string; folder: string }> {
   try {
-    return (await notesService.getNote(id))?.body ?? "";
+    const note = await notesService.getNote(id);
+    return { body: note?.body ?? "", folder: note ? (note.diskFolderId ?? note.folderId) : "" };
   } catch {
-    return "";
+    return { body: "", folder: "" };
   }
 }
 
 /** Trash a note and tidy its solely-referenced images along with it. */
 export async function trashNoteWithImages(id: string): Promise<Note> {
-  const body = await noteBodySafe(id);
+  const before = await noteBodySafe(id);
   const note = await notesService.trashNote(id);
   // its tabs close with it, in every pane (Round Three, 2026-09-26)
   usePanesStore.getState().closeNoteTabs(id);
-  if (body) void cascadeImages(id, body, "Trash");
+  if (before.body) void cascadeImages(id, before, "Trash");
   return note;
 }
 
 /** Archive a note and tidy its solely-referenced images along with it. */
 export async function archiveNoteWithImages(id: string): Promise<Note> {
-  const body = await noteBodySafe(id);
+  const before = await noteBodySafe(id);
   const note = await notesService.archiveNote(id);
-  if (body) void cascadeImages(id, body, "Archive");
+  if (before.body) void cascadeImages(id, before, "Archive");
   return note;
 }
