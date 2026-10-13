@@ -116,7 +116,7 @@ pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
     for name in zip_xml_names(bytes, "")? {
         let kind = if name == "xl/sharedStrings.xml" {
             Some(b"sst".as_slice())
-        } else if name.starts_with("xl/worksheets/") {
+        } else if worksheet_part(&name) {
             Some(b"worksheet".as_slice())
         } else if spreadsheet_comments_part(&name) {
             Some(b"comments".as_slice())
@@ -142,6 +142,12 @@ pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
         return Err("not a readable spreadsheet".into());
     }
     Ok(text)
+}
+
+fn worksheet_part(name: &str) -> bool {
+    name.strip_prefix("xl/worksheets/").is_some_and(|tail| {
+        !tail.contains('/') && tail.ends_with(".xml")
+    })
 }
 
 fn spreadsheet_comments_part(name: &str) -> bool {
@@ -408,6 +414,7 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         let mut reader = Reader::from_reader(xml.as_slice());
         let mut depth = 0usize;
         let mut seen_root = false;
+        let mut attributes = String::new();
         loop {
             match reader.read_event().map_err(|_| bad())? {
                 Event::Start(start) => {
@@ -418,12 +425,20 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
                         }
                         seen_root = true;
                     }
+                    // The document codec exposes drawing metadata (notably
+                    // wp:docPr descr/name) as image text to the local model.
+                    // Record all attributes so another visible Word field
+                    // cannot bypass the overlap ledger.
+                    // Keep metadata separate until body text is complete: a
+                    // Word paragraph may split one phrase across styled runs.
+                    append_attributes(&start, &mut attributes, &bad)?;
                     if matches!(local.as_ref(), b"t" | b"delText" | b"instrText") {
                         text.push_str(&read_element_text(&mut reader, start.name().as_ref(), &bad)?);
                     } else {
                         depth += 1;
                     }
                 }
+                Event::Empty(start) => append_attributes(&start, &mut attributes, &bad)?,
                 Event::End(end) => {
                     if end.local_name().as_ref() == b"p" {
                         text.push('\n');
@@ -433,13 +448,15 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
                 Event::Eof => break,
                 _ => {}
             }
-            if text.len() > MAX_XML_BYTES as usize {
+            if text.len() + attributes.len() > MAX_XML_BYTES as usize {
                 return Err("the document's text is too large to check".into());
             }
         }
         if !seen_root || depth != 0 {
             return Err(bad());
         }
+        text.push('\n');
+        text.push_str(&attributes);
     }
     if text.trim().is_empty() {
         return Err(bad());

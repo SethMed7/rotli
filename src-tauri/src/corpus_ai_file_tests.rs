@@ -1,6 +1,7 @@
 // AI file read gates and extracted-text egress ledger coverage.
 
 use super::*;
+use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
@@ -95,6 +96,103 @@ fn allowed_local_secure_docx_text_enters_remote_overlap_ledger() {
     fs::write(store.root().join(rel), bytes).unwrap();
     store.read_file_bytes_for_ai(rel, true).unwrap();
     assert!(crate::secret::blocked_for_remote(prose));
+}
+
+#[test]
+fn secure_docx_image_alt_text_enters_remote_overlap_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let alt = "The saffron observatory appointment moves before next winter.";
+    let name = "The lilac lighthouse picture belongs to the private archive.";
+    let drawing = "The cobalt drawing caption stays inside the local vault.";
+    let document = format!(
+        "<w:document><w:body><w:p><w:r><w:t>Public plan</w:t></w:r></w:p><w:p><w:r><w:drawing><wp:inline><wp:docPr id=\"1\" name=\"{name}\" descr=\"{alt}\"/><a:graphic><a:t>{drawing}</a:t></a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>"
+    );
+    let bytes = crate::ai_files::tests::zip_with(&[("word/document.xml", document.as_bytes())], true);
+    let rel = "Secure notes/image.docx";
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    for phrase in [alt, name, drawing] {
+        assert!(crate::secret::blocked_for_remote(phrase), "missing {phrase}");
+    }
+}
+
+#[test]
+fn secure_docx_run_attributes_do_not_split_model_visible_prose() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let prose = "The hidden silver orchard meeting moves before winter.";
+    let document = b"<w:document><w:body><w:p><w:r w:rsidR=\"001\"><w:t xml:space=\"preserve\">The hidden silver orchard </w:t></w:r><w:r w:rsidR=\"002\"><w:t>meeting moves before winter.</w:t></w:r></w:p></w:body></w:document>";
+    let bytes = crate::ai_files::tests::zip_with(&[("word/document.xml", document)], true);
+    let rel = "Secure notes/split-runs.docx";
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(prose));
+}
+
+#[test]
+fn secure_workbook_hyperlink_relationship_reads_and_enters_ledger() {
+    let tmp = TempDir::new().unwrap();
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    let label = "The amber garden itinerary changes before the final snowfall.";
+    let target = "https://example.com/private/indigo-harbor-meeting-next-thursday";
+    let sheet = format!("<worksheet><sheetData><row><c t=\"inlineStr\"><is><t>{label}</t></is></c></row></sheetData><hyperlinks><hyperlink ref=\"A1\" r:id=\"rId1\"/></hyperlinks></worksheet>");
+    let rels = format!("<Relationships><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"{target}\" TargetMode=\"External\"/></Relationships>");
+    let bytes = crate::ai_files::tests::zip_with(&[
+        ("xl/worksheets/sheet1.xml", sheet.as_bytes()),
+        ("xl/worksheets/_rels/sheet1.xml.rels", rels.as_bytes()),
+    ], true);
+    let rel = "Secure notes/hyperlink.xlsx";
+    fs::write(store.root().join(rel), bytes).unwrap();
+    store.read_file_bytes_for_ai(rel, true).unwrap();
+    assert!(crate::secret::blocked_for_remote(label));
+    assert!(crate::secret::blocked_for_remote(target));
+}
+
+#[test]
+fn generated_office_packages_remain_readable_for_secure_local_ai() {
+    let tmp = TempDir::new().unwrap();
+    let output = Command::new("bun")
+        .arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/fixtures/office-ledger-packages.ts"
+        ))
+        .arg(tmp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "Office fixture generator failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
+    fs::create_dir_all(store.root().join("Secure notes")).unwrap();
+    for name in [
+        "hyperlink.xlsx",
+        "hyperlink-comment.xlsx",
+        "hyperlink-comment-image.xlsx",
+        "image-hyperlink-header.docx",
+    ] {
+        let rel = format!("Secure notes/{name}");
+        fs::copy(tmp.path().join(name), store.root().join(&rel)).unwrap();
+        store
+            .read_file_bytes_for_ai(&rel, true)
+            .unwrap_or_else(|error| panic!("{name} refused: {error}"));
+    }
+    for phrase in [
+        "The amber garden itinerary changes before the final snowfall.",
+        "https://example.com/private/indigo-harbor-meeting-next-thursday",
+        "The violet orchard comment stays inside the local workbook.",
+        "The saffron observatory appointment moves before next winter.",
+        "The silver lighthouse guide waits beyond the autumn tide.",
+        "https://example.com/private/silver-lighthouse-guide-autumn-tide",
+        "The indigo harbor header remains inside the private document.",
+    ] {
+        assert!(crate::secret::blocked_for_remote(phrase), "missing {phrase}");
+    }
 }
 
 #[test]

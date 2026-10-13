@@ -115,9 +115,13 @@ tool call or count as mutation confirmation.
 
 For a secure local Office read, the overlap ledger must receive every decoded
 text surface the on-device model can see. Known workbook and Word parts use
-their format-aware extractors; other XML package parts contribute all text nodes
-and attribute values (including DrawingML, charts, pivot shared items, diagrams,
-glossary, and custom XML). Only known text-free package metadata, such as
+their format-aware extractors; Word parts also contribute attributes, including
+image alt text (`wp:docPr descr`) and its visible name fallback, and DrawingML
+`a:t` in the main document. Relationship parts, including worksheet hyperlink
+targets, pass through the generic extractor rather than a worksheet root check.
+Other XML package parts contribute all text nodes and attribute values
+(including DrawingML, charts, pivot shared items, diagrams, glossary, and
+custom XML). Only known text-free package metadata, such as
 `[Content_Types].xml` and extended comment metadata, is skipped explicitly.
 Malformed or oversized XML fails closed: the local AI read is refused before its
 bytes reach the model. If the vault's keyword settings cannot be read or parsed,

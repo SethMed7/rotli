@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Secure Word and Excel files remain safe to read with on-device AI.** Image
+  descriptions in Word files now enter the private-text guard before an AI read
+  returns, and ordinary Excel files with hyperlinks no longer fail that read.
+
 ### Changed
 
 - **rotli.co's film is a one-minute tour of the Mac app.** The landing hero
