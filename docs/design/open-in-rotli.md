@@ -1,7 +1,7 @@
 # Open in Rotli: a file or folder from Finder
 
-Status: **stage 1 built** (Open With for a file; owner decisions 2026-10-13).
-Stages 2–4 are not built yet.
+Status: **stages 1 and 2 built** (a file in a tab, a folder in its own
+window; owner decisions 2026-10-13). Stages 3–4 are not built yet.
 Roadmap item `open-with-rotli`. Builds on the protected-originals rule in
 [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md).
 
@@ -85,7 +85,6 @@ webview has no command that mounts one.
   model reads it. On-device models follow the usual secure-note knobs.
 - A raw root is a pane route only (`canOpenVaultInPanes`). It's never a vault
   switch, a ⌘N target, or the Librarian's.
-- A folder handed over in stage 1 shows a notice that folder windows are coming.
 
 The original design follows:
 
@@ -105,6 +104,43 @@ The original design follows:
   Hand to AI refuses external tabs in stage 1.
 
 ### 4. A folder opens in its own window (stage 2)
+
+**As built (2026-10-13):** the same Finder mount as a file, over the whole
+folder (`CorpusStore::open_raw_folder`, `src-tauri/src/folder_window.rs`).
+
+- The mount and its first walk run off the main thread. Rotli refuses a home
+  folder, any folder above one, and private dot-folders
+  (`reject_privileged_root`), as well as the disk root.
+- **The window's label is its root id** (`finder_<hash>`), so the window can
+  only reach its own folder. "Add as vault" takes no path from the page; Rust
+  reads it from the window's own mount. The window has its own capability
+  (`capabilities/folder-windows.json`): core IPC and clipboard writes only.
+- The page (`?window=folder`, `src/components/folderWindow/`) installs a notes
+  service that lists only that folder (`corpus_list_root`, which refuses any
+  other root). It shows the folder's tree, tabs, and **Add as vault**. It
+  answers only tab, pane, and zoom keys, and ignores vault switches.
+- Every write that would add, move, rename, or trash a file is refused in the
+  store, for boards and files as well as notes. Edits save in place.
+- Its images and video preview over `asset://` for as long as Rotli runs.
+  Tauri's asset scope can't take a grant back, and forbidding the folder
+  would also break a vault that contains it.
+- **Closing** asks the window to save what's typing (the quit-save
+  handshake), then closes and unmounts. The sidecar stays in the app cache.
+- **Add as vault** authorizes the folder like a picked one and hands it to
+  main's ordinary connect flow: an empty folder becomes a new vault, a Rotli
+  vault is connected, and anything else opens in place. **Work on a copy**
+  arrives with the copy-flow slice of
+  [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md);
+  its Rust side exists, but no screen offers it yet.
+- Finder registration: a `public.folder` association (rank `Alternate`) is in
+  `bundle.fileAssociations`. A debug bundle's Info.plist carries it
+  (`LSItemContentTypes = public.folder`, `LSHandlerRank = Alternate`), so a
+  folder dropped on the Dock icon reaches Rotli. Finder's right-click menu
+  for folders usually has no Open With; that path is stage 3's Quick Action.
+- There's no file watcher: the tree re-reads when the window comes forward.
+- There's no search in a folder window yet.
+
+The original design follows:
 
 - **A new window**, `folder-<hash>`, created at runtime, titled with the
   folder's name. It shows only that folder: its tree in the sidebar, tabs, and
@@ -133,7 +169,8 @@ Rotli Web keeps its own Open folder flow.
 1. Registration (Open With) plus the `file://` handler. **Built:** tabs for
    Markdown, boards, images, and video, through a single-file raw root. Plain
    `.txt` and ⌘S **Copy into vault…** move to stage 2.
-2. **Folder windows** in raw mode, plus **Add as vault**.
+2. **Built:** folder windows in raw mode, plus **Add as vault** (connect
+   flow; copy-first comes with the copy-flow slice).
 3. **The Quick Action** with its opt-in Settings install.
 4. DOCX, XLSX, and CSV in external tabs.
 

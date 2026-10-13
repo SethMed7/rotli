@@ -11,6 +11,7 @@ import { registerWebAiCorpus, registerWebFileStore, registerWebMemexBridge } fro
 import { showFileNotice } from "../state/fileNotice";
 import { useHelperLink } from "../state/helperLink";
 import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
+import { FolderWindowNotesService, folderWindowRoot } from "./folderWindow";
 import { FsNotesService } from "./fsNotes";
 import { adoptPairingFromUrl, hydrateHelperLink, pairOfferedCode } from "./helperLink";
 import { InMemoryNotesService } from "./inMemoryNotes";
@@ -78,7 +79,13 @@ export const initialNoteId = firstNoteId;
 // A `let`, not a `const`: Rotli Web retargets it at boot when the browser
 // still trusts a remembered folder (hydrateWebVault, before the first render).
 // Consumers read the live binding at call time, never a captured copy.
-export let notesService: NotesService = FS_MODE ? new FsNotesService() : svc;
+// A folder window (opened from Finder) lists its one folder, never the vault.
+const FOLDER_ROOT = FS_MODE ? folderWindowRoot() : null;
+export let notesService: NotesService = FS_MODE
+  ? FOLDER_ROOT
+    ? new FolderWindowNotesService(FOLDER_ROOT)
+    : new FsNotesService()
+  : svc;
 
 /** Rebind the FSA folder reader so external additions and moves enter its index. */
 export function refreshWebFolderNotes(): boolean {

@@ -27,6 +27,7 @@ mod containment;
 mod corpus;
 mod deep_link;
 mod open_requests;
+mod folder_window;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
@@ -104,7 +105,7 @@ enum NativeCloseAction {
 
 fn native_close_action(window_label: &str) -> NativeCloseAction {
     // the two shell windows own tabs; every other window is a visitor
-    if chat_window::SHELL_LABELS.contains(&window_label) {
+    if chat_window::SHELL_LABELS.contains(&window_label) || folder_window::is_folder_window(window_label) {
         NativeCloseAction::CloseMainTab
     } else {
         NativeCloseAction::HideWindow
@@ -519,10 +520,20 @@ fn record_quit_flush(app: &AppHandle, label: &str, attempt_id: u64, ok: bool, er
 /// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
 /// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
 fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
-    let labels: Vec<&str> = ["main", "quick", "capture", chat_window::LABEL]
+    let mut labels: Vec<String> = ["main", "quick", "capture", chat_window::LABEL]
         .into_iter()
         .filter(|label| app.get_webview_window(label).is_some())
+        .map(str::to_string)
         .collect();
+    labels.extend(app.webview_windows().into_keys().filter(|label| folder_window::is_folder_window(label)));
+    flush_windows(app, &labels).inspect_err(|detail| {
+        show_main(app);
+        let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
+    })
+}
+
+/// Ask each window in `labels` to save what's typing, and wait (bounded).
+fn flush_windows(app: &AppHandle, labels: &[String]) -> Result<(), String> {
     if labels.is_empty() {
         return Ok(());
     }
@@ -539,6 +550,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
         status.attempt_id
     };
     for label in labels {
+        let label = label.as_str();
         if app
             .emit_to(
                 label,
@@ -587,8 +599,6 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     status.pending.clear();
     drop(status);
     if timed_out || failed {
-        show_main(app);
-        let _ = app.emit_to("main", "rotli:quit-flush-failed", &detail);
         Err(detail)
     } else {
         Ok(())
@@ -2284,6 +2294,8 @@ pub fn run() {
             app_settings::app_settings_read,
             app_settings::app_settings_write,
             corpus::corpus_list,
+            corpus::raw::corpus_list_root,
+            folder_window::folder_window_add_as_vault,
             corpus::corpus_search,
             corpus::corpus_read,
             corpus::corpus_open_file,
@@ -2862,10 +2874,18 @@ pub fn run() {
                         chat_window::request_regroup(window.app_handle());
                         return;
                     }
+                    if folder_window::is_folder_window(window.label()) {
+                        folder_window::close(window.app_handle(), window.label());
+                        return;
+                    }
                     let _ = window.hide();
                     return;
                 }
                 WindowEvent::Focused(false) => {}
+                WindowEvent::Destroyed if folder_window::is_folder_window(window.label()) => {
+                    folder_window::unmount(window.app_handle(), window.label());
+                    return;
+                }
                 _ => return,
             }
             match window.label() {

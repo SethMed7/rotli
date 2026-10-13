@@ -65,6 +65,7 @@ impl CorpusStore {
         id: &str,
         expected_revision: &str,
     ) -> Result<NoteMeta, String> {
+        super::raw::refuse_in_raw(self, "move or delete")?;
         crate::fsutil::require_revision(expected_revision)?;
         let rel = self.resolve_note_rel(id)?;
         if !rel.to_ascii_lowercase().ends_with(".md") {

@@ -211,6 +211,46 @@
   padding-top: 8px;
 }
 
+/* A folder opened from Finder in its own window (docs/design/open-in-rotli.md,
+   stage 2): the folder's tree in the rail, "Add as vault" in the title strip.
+   Flat material — rows reuse .frow, depth is indentation only. */
+.folder-window .tabplus {
+  display: none;
+}
+.folder-window-rail {
+  padding-top: 8px;
+}
+.folder-window-add {
+  margin-right: 12px;
+}
+.folder-window-note,
+.folder-window-status {
+  margin: 0 16px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.folder-window-retry {
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.folder-window-row {
+  padding-left: calc(10px + var(--depth, 0) * 14px);
+}
+.folder-window-item {
+  padding-left: calc(28px + var(--depth, 0) * 14px);
+}
+.folder-window-caret {
+  color: var(--text-muted);
+}
+.folder-window-caret.open {
+  transform: rotate(90deg);
+}
+
 /* Chat can live in its own window: the segment plus a small sibling button
    (a button cannot hold a button), tucked into the segment's top-right corner
    and deliberately faint (the owner, 2026-09-21: "way more subtle, top

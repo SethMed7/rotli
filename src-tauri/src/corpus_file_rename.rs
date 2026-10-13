@@ -63,6 +63,7 @@ impl CorpusStore {
     /// Rename a document/sheet within its folder. Returns the NEW relpath (its
     /// id), so the caller retargets open tabs and Main/view references.
     pub fn rename_managed_file(&mut self, rel: &str, new_name: &str) -> Result<String, String> {
+        super::raw::refuse_in_raw(self, "rename")?;
         let ext = Path::new(rel)
             .extension()
             .and_then(|value| value.to_str())

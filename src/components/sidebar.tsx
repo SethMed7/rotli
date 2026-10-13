@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useRef, useState } from "react";
+import { type MouseEvent, useEffect, useEffectEvent, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 // The sidebar SHELL. It owns the chrome that is true of every front — the vault
 // header row, the create/collapse toolbar, the inline error lane, the front
@@ -27,6 +27,7 @@ import {
   useSwitchVault,
 } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
+import { onFolderAddedAsVault } from "../services/folderWindow";
 import { mainFolderIds, mainFoldersOpenByDefault, mainTreeSize } from "../services/mainTree";
 import {
   connectPlan,
@@ -125,7 +126,12 @@ export function Sidebar() {
       return;
     }
     const path = await pickVaultFolder("Connect a vault, or make a new folder for one");
-    if (!path) return;
+    if (path) await connectPath(path);
+  };
+
+  /** A picked folder (or one a folder window hands over) becomes a vault:
+   * made fresh when empty, linked when it's a vault, else opened in place. */
+  const connectPath = async (path: string) => {
     const plan = connectPlan((await corpusInspectFolder(path)).kind);
     if (plan === "create") {
       await initMemexAsCorpus(path);
@@ -137,6 +143,12 @@ export function Sidebar() {
       await chooseFolderMut.mutateAsync(path);
     }
   };
+
+  // a folder window's "Add as vault" lands here, already authorized by Rust
+  const addFolderAsVault = useEffectEvent((path: string) => {
+    void connectPath(path).catch(vaultErr("add that folder as a vault"));
+  });
+  useEffect(() => onFolderAddedAsVault(addFolderAsVault), []);
 
   const refreshVault = async (id: string, active: boolean) => {
     if (refreshingVaultId) return;

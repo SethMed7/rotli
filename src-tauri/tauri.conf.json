@@ -139,6 +139,15 @@
         "rank": "Alternate"
       },
       {
+        "ext": [],
+        "contentTypes": [
+          "public.folder"
+        ],
+        "name": "Folder",
+        "role": "Editor",
+        "rank": "Alternate"
+      },
+      {
         "ext": [
           "mp4",
           "mov",
