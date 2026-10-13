@@ -5,7 +5,7 @@
 // declares a source of truth, and every entry key is referenced by BOTH test
 // files — so an entry can never silently fall out of coverage.
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -34,11 +34,17 @@ for (const [key, entry] of Object.entries(entries)) {
   if (entry?.value === undefined) violations.push(`${fixturePath}: "${key}" has no value`);
 }
 
-const consumers = ["src-tauri/src/parity_tests.rs", "src/lib/parity.test.ts"];
-for (const rel of consumers) {
+// The Rust suite is parity_tests.rs plus its child modules (parity_*_tests.rs,
+// split out at the file-size ceiling); together they are one consumer.
+const rustChildren = readdirSync(join(root, "src-tauri/src"))
+  .filter((name) => /^parity_.+_tests\.rs$/.test(name))
+  .map((name) => `src-tauri/src/${name}`);
+const consumers = [["src-tauri/src/parity_tests.rs", ...rustChildren], ["src/lib/parity.test.ts"]];
+for (const files of consumers) {
+  const rel = files[0];
   let text;
   try {
-    text = readFileSync(join(root, rel), "utf8");
+    text = files.map((file) => readFileSync(join(root, file), "utf8")).join("\n");
   } catch {
     violations.push(`missing parity test file: ${rel}`);
     continue;
