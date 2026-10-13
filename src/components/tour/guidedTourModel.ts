@@ -1,3 +1,6 @@
+import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
+import { hotkeyHint } from "../../lib/hotkeyHint";
+
 // The guided tour's steps and geometry, kept pure so the overlay component
 // stays a thin renderer and the model unit-tests without a DOM.
 
@@ -15,7 +18,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "new",
     anchor: '[data-tour="new"]',
     title: "New notes start here",
-    body: "This makes a Markdown note in Main. The titlebar's + also offers documents and boards.",
+    body: `This makes a Markdown note in Main. The titlebar's + also offers ${LAUNCH_FEATURES.documents ? "documents and boards" : "boards"}.`,
   },
   {
     id: "views",
@@ -27,7 +30,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "search",
     anchor: '[data-tour="search"]',
     title: "Find anything",
-    body: "Search notes, files, chats, and actions from here, or press ⌘K anywhere.",
+    body: `Search notes, files, chats, and actions from here${hotkeyHint(", or press ⌘K anywhere")}.`,
   },
   {
     id: "typography",
@@ -46,7 +49,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
     // the sidebar footer's Settings, or the titlebar's when the footer is gone
     anchor: ['.sb-foot [data-tour="settings"]', '.titlebar [data-hotkey="app.settings"]'],
     title: "Everything can change later",
-    body: "Theme, shortcuts, window behavior, and this tour live in Settings.",
+    body: LAUNCH_FEATURES.hotkeys
+      ? "Theme, shortcuts, window behavior, and this tour live in Settings."
+      : "Theme and this tour live in Settings.",
   },
 ];
 

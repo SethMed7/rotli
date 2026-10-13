@@ -18,23 +18,32 @@ import fixture from "../../scripts/fixtures/parity.json";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
-import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
+import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
-import { AI_KEYS } from "../memex/contract";
+import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
-import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
+import { SECURE_NOTES_FOLDER, inSecureHome } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
+import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
+import {
+  MANAGED_FILE_EXTS,
+  MANAGED_MEMEX_LANE,
+  MANAGED_PLAIN_LANE,
+  managedCollisionName,
+} from "../services/folderManagedFiles";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
-import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
+import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
-import { VIDEO_EXTS } from "./fileKind";
+import { bytesRevision } from "./contentRevision";
+import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
+import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
@@ -42,6 +51,24 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("byteRevisionVector", () => {
+    const { bytes, revision } = entries.byteRevisionVector.value;
+    expect(bytesRevision(new Uint8Array(bytes))).toBe(revision);
+  });
+  test("rawImmutableKeys", () => {
+    expect<string[]>([...RAW_IMMUTABLE_KEYS]).toEqual(entries.rawImmutableKeys.value);
+  });
+  test("storageOfficeExts", () => {
+    expect<string[]>([...STORAGE_OFFICE_EXTS]).toEqual(entries.storageOfficeExts.value);
+  });
+  test("managedFileRules", () => {
+    expect({
+      memexLane: MANAGED_MEMEX_LANE,
+      plainLane: MANAGED_PLAIN_LANE,
+      collisionSuffix: managedCollisionName("sample", ".docx", 2).slice("sample".length, -".docx".length),
+      extensions: [...MANAGED_FILE_EXTS] as string[],
+    }).toEqual(entries.managedFileRules.value);
+  });
   test("documentEditMaxActions", () => {
     expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);
   });
@@ -56,6 +83,18 @@ describe("parity.json ↔ TS constants", () => {
 
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
+  });
+
+  test("sheetPackageExts", () => {
+    expect([...SHEET_BIN]).toEqual(entries.sheetPackageExts.value);
+  });
+
+  test("docxPackageExts", () => {
+    expect<string[]>([...DOCX_EDITABLE_EXTS]).toEqual(entries.docxPackageExts.value);
+  });
+
+  test("skippedDirs", () => {
+    expect<string[]>([...SKIPPED_DIRS]).toEqual(entries.skippedDirs.value);
   });
 
   test("chatImageAssetExts", () => {
@@ -99,6 +138,10 @@ describe("parity.json ↔ TS constants", () => {
   test("secureNotesFolder", () => {
     expect<string>(SECURE_NOTES_FOLDER).toBe(entries.secureNotesFolder.value);
     expect<string>(DEST.secure).toBe(entries.secureNotesFolder.value);
+  });
+
+  test("secureHomeCases", () => {
+    for (const c of entries.secureHomeCases.value) expect(inSecureHome(c.path)).toBe(c.secure);
   });
 
   test("stripMarkers", () => {
@@ -248,6 +291,13 @@ describe("parity.json ↔ TS constants", () => {
     }
     for (const { nowMs, timeZone, day } of days) {
       expect({ timeZone, day: today(new Date(nowMs), timeZone) }).toEqual({ timeZone, day });
+    }
+  });
+
+  test("noteFilenameSlugs", () => {
+    for (const { title, slug } of entries.noteFilenameSlugs.value) {
+      expect({ title, slug: noteSlugify(title) }).toEqual({ title, slug });
+      expect(noteStem(title, "ignored-id")).toBe(slug);
     }
   });
 });

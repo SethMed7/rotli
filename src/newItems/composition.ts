@@ -4,10 +4,11 @@ import {
   adoptPendingDocument,
   ensurePendingDocument,
   evictDocument,
+  getDocumentText,
   pendingNoteDocumentId,
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -380,8 +381,12 @@ export function createManagedItemInTabOptimistically(kind: Exclude<NewItemKind, 
     // have moved it. If the user already closed it, there is nothing to do.
     const latest = usePanesStore.getState();
     const owner = leaves(latest.root).find((leaf) => leaf.tabs.some((tab) => tab.id === pending.tabId));
-    if (owner) latest.closeTabById(owner.id, pending.tabId, { record: false });
-    if (pendingNote) evictDocument(pendingNoteDocumentId(pending.tabId));
+    const pendingId = pendingNoteDocumentId(pending.tabId);
+    const hasDraft = PLATFORM === "web" && pendingNote && (getDocumentText(pendingId)?.trim() ?? "") !== "";
+    if (!hasDraft) {
+      if (owner) latest.closeTabById(owner.id, pending.tabId, { record: false });
+      if (pendingNote) evictDocument(pendingId);
+    }
     useUiStore
       .getState()
       .setRowActionError(

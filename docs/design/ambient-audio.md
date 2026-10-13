@@ -82,7 +82,7 @@ again. With the setting off, the player shows only while something plays."
 ## Knowing what a tab plays (`src-tauri/src/private_browser_media.rs`)
 
 A browser tab's page is an untrusted guest with no channel to Rotli, so the
-app asks. Once a second, while browser tabs are open, the main window calls
+app asks. While browser tabs are open, the main window calls
 `private_browser_media_state(tabId)` for each; Rust asks the tab's WKWebView
 (`requestMediaPlaybackStateWithCompletionHandler`, which covers iframes such as
 video embeds) and answers `none`, `playing`, `paused` or `suspended` within
@@ -159,8 +159,11 @@ playing and pausing is extremely laggy".
 - **Responsiveness.** A button's result shows at once (the expected state is
   set before WebKit answers, then two quick polls confirm it); ambient fades
   out over ~0.1 s and starts audible, ramping over ~0.3 s; tabs are asked every
-  0.4 s while anything has media (1.5 s otherwise), one round at a time so
-  slow answers never pile up; the track loads on the first Play (since
+  0.4 s while something plays (or Claude FM or a tucked tab is up), 1.5 s
+  otherwise, one round at a time so slow answers never pile up; with no
+  browser tab, tucked tab, or Claude FM there is nothing to ask and the poll
+  parks until one appears (audit 2026-10-12: it used to tick every 1.5 s all
+  session, and every 0.4 s while any tab sat paused); the track loads on the first Play (since
   2026-10-01, when the player began showing for everyone).
 
 ## In setup (2026-09-28; retired 2026-10-01)

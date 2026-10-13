@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { bytesRevision } from "../lib/contentRevision";
 import type {
   DocumentEditorCodec,
   DocumentEncoder,
@@ -110,7 +111,7 @@ describe("document application workflows", () => {
     const writes: string[] = [];
     const reader: DocumentFileReader = {
       stat: async () => ({ len: 5, revision: "r1" }),
-      readBase64: async (_id, maxBytes) => `bytes:${maxBytes}`,
+      readBase64: async () => btoa("bytes"),
     };
     const writer: DocumentFileWriter = {
       writeBase64: async (_id, base64, backup, expectedRevision) => {
@@ -135,10 +136,13 @@ describe("document application workflows", () => {
     const result = await editDocument({ reader, writer, codec, maxBytes: 100 }, "brief.docx");
     expect(result.kind).toBe("ready");
     if (result.kind !== "ready") throw new Error("expected an editable document");
+    expect(result.revision).toBe(bytesRevision(new TextEncoder().encode("bytes")));
     await result.save({
       ...result.document,
       content: [{ kind: "paragraph", paragraph: { runs: [{ text: "after" }] } }],
     });
-    expect(writes).toEqual(["source:bytes:101:after:true:r1"]);
+    expect(writes).toEqual([
+      `source:${btoa("bytes")}:after:true:${bytesRevision(new TextEncoder().encode("bytes"))}`,
+    ]);
   });
 });

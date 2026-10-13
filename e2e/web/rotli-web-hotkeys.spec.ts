@@ -75,6 +75,36 @@ test("Rotli Web names no app chord anywhere it can be seen", async ({ page }) =>
   await expect(page.locator(".cm-content").first()).toBeVisible();
   expect(await chordsOnScreen(page)).toEqual([]);
   await page
+    .getByRole("button", { name: /Search notes and actions/ })
+    .first()
+    .click();
+  await expect(page.getByRole("combobox")).toBeVisible();
+  expect(await chordsOnScreen(page), "Recent and Suggested palette rows").toEqual([]);
+  await page.getByRole("combobox").fill("Welcome");
+  await expect(page.getByRole("option").first()).toBeVisible();
+  expect(await chordsOnScreen(page), "Open-tab palette rows").toEqual([]);
+  await page.getByRole("combobox").fill("Switch view");
+  await expect(page.getByRole("option", { name: /Switch view/ })).toBeVisible();
+  expect(await chordsOnScreen(page), "Leader-action titles").toEqual([]);
+  await page.getByRole("option", { name: /Switch view/ }).click();
+  // a fresh vault has no named views yet: the menu offers New view… alone
+  await expect(page.getByRole("menuitem", { name: /New view/ })).toBeVisible();
+  expect(await chordsOnScreen(page), "View switcher choices").toEqual([]);
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: /Search notes and actions/ })
+    .first()
+    .click();
+  await page.getByRole("combobox").fill("Show me around");
+  await page.getByRole("option", { name: /Show me around/ }).click();
+  const tour = page.getByRole("region", { name: "Guided tour" });
+  await expect(tour).toBeVisible();
+  for (let step = 0; step < 6 && (await tour.count()); step += 1) {
+    expect(await chordsOnScreen(page), "Guided tour").toEqual([]);
+    await tour.getByRole("button", { name: /^(Next|Done)$/ }).click();
+  }
+  await expect(tour).toHaveCount(0);
+  await page
     .getByRole("button", { name: /^Settings/ })
     .first()
     .click();

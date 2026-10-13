@@ -9,9 +9,10 @@
 // listing read a chat while the model backfill rewrote it, the whole notes
 // query rejected, and the window opened on "Untitled"). Every writer to the
 // folder — chats, notes, `.rotli/` — shares this one adapter, so the lock
-// lives here, per path, and never serializes unrelated files.
+// lives here, per path, and never serializes unrelated files. Web Locks extend
+// those turns across tabs for the same browser-bound vault identity.
 
-import type { VaultDir, VaultDirEntry, VaultStat } from "../services/vaultDir";
+import { bytesRevision, type VaultDir, type VaultDirEntry, type VaultStat } from "../services/vaultDir";
 
 function segments(path: string): string[] {
   return path.split("/").filter((part) => part.length > 0 && part !== ".");
@@ -20,25 +21,47 @@ function segments(path: string): string[] {
 export class FsaVaultDir implements VaultDir {
   private readonly turns = new Map<string, Promise<void>>();
 
-  constructor(readonly root: FileSystemDirectoryHandle) {}
+  constructor(
+    readonly root: FileSystemDirectoryHandle,
+    private readonly vaultId: string = crypto.randomUUID(),
+  ) {}
 
-  /** Run `task` after every earlier read or write of the same path settles. */
-  private async inTurn<T>(path: string, task: () => Promise<T>): Promise<T> {
-    const key = segments(path).join("/");
-    const before = this.turns.get(key) ?? Promise.resolve();
+  private async inWebLocks<T>(keys: string[], task: () => Promise<T>): Promise<T> {
+    const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+    if (!locks) return task(); // Chromium FSA normally has Web Locks; retain local turns if absent.
+    const names = keys.map((key) => `rotli-fsa:${this.vaultId}:${key}`).sort();
+    const acquire = (index: number): Promise<T> => {
+      const name = names[index];
+      if (!name) return task();
+      // File writes are bounded, and the browser releases locks when a tab
+      // closes. A deadline would turn a long but valid queued write into an
+      // avoidable save failure, so wait for this path's turn.
+      return locks.request(name, () => acquire(index + 1));
+    };
+    return acquire(0);
+  }
+
+  /** Reserve every path before yielding; opposing moves cannot deadlock. */
+  private async inTurns<T>(paths: string[], task: () => Promise<T>): Promise<T> {
+    const keys = [...new Set(paths.map((path) => segments(path).join("/")))];
+    const before = keys.map((key) => this.turns.get(key) ?? Promise.resolve());
     let done!: () => void;
     const mine = new Promise<void>((resolve) => {
       done = resolve;
     });
-    const turn = before.then(() => mine);
-    this.turns.set(key, turn);
-    await before;
+    const turn = Promise.all(before).then(() => mine);
+    for (const key of keys) this.turns.set(key, turn);
+    await Promise.all(before);
     try {
-      return await task();
+      return await this.inWebLocks(keys, task);
     } finally {
       done();
-      if (this.turns.get(key) === turn) this.turns.delete(key);
+      for (const key of keys) if (this.turns.get(key) === turn) this.turns.delete(key);
     }
+  }
+
+  private inTurn<T>(path: string, task: () => Promise<T>): Promise<T> {
+    return this.inTurns([path], task);
   }
 
   private async dir(path: string, create = false): Promise<FileSystemDirectoryHandle | null> {
@@ -81,12 +104,14 @@ export class FsaVaultDir implements VaultDir {
   }
 
   async stat(path: string): Promise<VaultStat | null> {
-    return this.inTurn(path, async () => {
-      const handle = await this.file(path);
-      if (!handle) return null;
-      const file = await handle.getFile();
-      return { lastModified: file.lastModified, size: file.size };
-    });
+    return this.inTurn(path, () => this.statUnlocked(path));
+  }
+
+  private async statUnlocked(path: string): Promise<VaultStat | null> {
+    const handle = await this.file(path);
+    if (!handle) return null;
+    const file = await handle.getFile();
+    return { lastModified: file.lastModified, size: file.size };
   }
 
   async readText(path: string): Promise<string> {
@@ -97,8 +122,14 @@ export class FsaVaultDir implements VaultDir {
     });
   }
 
-  async writeText(path: string, text: string): Promise<void> {
-    await this.writeFile(path, text);
+  async writeText(path: string, text: string, expectedContent?: string): Promise<void> {
+    await this.inTurn(path, async () => {
+      if (expectedContent !== undefined) {
+        const current = await this.contentRevisionUnlocked(path);
+        if (current !== expectedContent) throw new Error(`revision conflict on ${path}`);
+      }
+      await this.writeFileUnlocked(path, text);
+    });
   }
 
   async readBytes(path: string): Promise<Uint8Array> {
@@ -109,21 +140,30 @@ export class FsaVaultDir implements VaultDir {
     });
   }
 
-  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
-    await this.writeFile(path, bytes.slice().buffer as ArrayBuffer);
+  async writeBytes(path: string, bytes: Uint8Array, expectedContent?: string): Promise<void> {
+    await this.inTurn(path, async () => {
+      if (expectedContent !== undefined) {
+        const current = await this.contentRevisionUnlocked(path);
+        if (current !== expectedContent) throw new Error(`revision conflict on ${path}`);
+      }
+      await this.writeFileUnlocked(path, bytes.slice().buffer as ArrayBuffer);
+    });
   }
 
-  private async writeFile(path: string, contents: string | ArrayBuffer): Promise<void> {
-    await this.inTurn(path, async () => {
-      const handle = await this.file(path, true);
-      if (!handle) throw new Error(`cannot create: ${path}`);
-      const writable = await handle.createWritable();
-      try {
-        await writable.write(contents);
-      } finally {
-        await writable.close(); // the swap happens here; readers wait for it
-      }
-    });
+  private async contentRevisionUnlocked(path: string): Promise<string> {
+    const handle = await this.file(path);
+    return handle ? bytesRevision(new Uint8Array(await (await handle.getFile()).arrayBuffer())) : "0";
+  }
+
+  private async writeFileUnlocked(path: string, contents: string | ArrayBuffer): Promise<void> {
+    const handle = await this.file(path, true);
+    if (!handle) throw new Error(`cannot create: ${path}`);
+    const writable = await handle.createWritable();
+    try {
+      await writable.write(contents);
+    } finally {
+      await writable.close(); // the swap happens here; readers wait for it
+    }
   }
 
   async mkdir(path: string): Promise<void> {
@@ -132,26 +172,48 @@ export class FsaVaultDir implements VaultDir {
 
   /** read → write → remove, so a failure at any step leaves the original. */
   async move(from: string, to: string): Promise<void> {
+    if (segments(from).join("/") === segments(to).join("/")) return;
+    await this.inTurns([from, to], () => this.moveUnlocked(from, to));
+  }
+
+  private async moveUnlocked(from: string, to: string): Promise<void> {
     // "a.md" → "A.md" on a case-insensitive disk names the SAME file: writing
     // the target and removing the source would delete the note. Go through a
     // unique temporary name instead, so the file exists at every step.
     if (from !== to && from.toLowerCase() === to.toLowerCase()) {
       const via = `${to}.rotli-rename-${crypto.randomUUID()}`;
-      await this.move(from, via);
-      await this.move(via, to);
+      await this.moveUnlocked(from, via);
+      await this.moveUnlocked(via, to);
       return;
     }
     // never replace what is already there (a stale listing must not destroy
     // a note); the caller picks a free name. Residual: the browser API has no
     // no-replace write, so another writer creating `to` in this instant wins.
-    if (await this.exists(to)) throw new Error(`${to} already exists`);
+    if ((await this.statUnlocked(to)) || (await this.dir(to))) throw new Error(`${to} already exists`);
     // bytes, so an image moves intact (text is bytes too)
-    const bytes = await this.readBytes(from);
-    await this.writeBytes(to, bytes);
-    await this.remove(from);
+    const handle = await this.file(from);
+    if (!handle) throw new Error(`not found: ${from}`);
+    const bytes = await (await handle.getFile()).arrayBuffer();
+    await this.writeFileUnlocked(to, bytes);
+    if ((await this.contentRevisionUnlocked(from)) !== bytesRevision(new Uint8Array(bytes)))
+      throw new Error(`revision conflict on ${from}: source changed during move; destination copy kept`);
+    await this.removeUnlocked(from);
   }
 
-  async remove(path: string): Promise<void> {
+  async remove(path: string, expectedContent?: string): Promise<void> {
+    await this.inTurn(path, async () => {
+      if (expectedContent !== undefined) {
+        // A directory and an absent file both fail the file-content gate,
+        // including the "0" revision used for a previously missing file.
+        if (!(await this.file(path))) throw new Error(`revision conflict on ${path}`);
+        const current = await this.contentRevisionUnlocked(path);
+        if (current !== expectedContent) throw new Error(`revision conflict on ${path}`);
+      }
+      await this.removeUnlocked(path);
+    });
+  }
+
+  private async removeUnlocked(path: string): Promise<void> {
     const parts = segments(path);
     const name = parts.pop();
     if (!name) return;

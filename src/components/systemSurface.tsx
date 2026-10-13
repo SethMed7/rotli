@@ -53,7 +53,7 @@ import {
   libraryPathOfChat,
 } from "../services/systemBrowser";
 import { systemCwdMemo } from "../services/systemNav";
-import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
+import { emptyTrash, emptyTrashConfirmation, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -420,8 +420,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           sortItem("created", "Date created"),
         ],
       },
-      // Empty Trash (2026-07-31): the confirm lives INSIDE the drill — two
-      // deliberate clicks, and every item still lands in the macOS Trash
+      // Empty Trash: the confirm lives inside the drill, two deliberate clicks.
       ...(isTrash && trashCount > 0
         ? [
             { kind: "sep" as const },
@@ -432,7 +431,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                 {
                   kind: "action" as const,
                   danger: true,
-                  label: `Delete ${trashCount} ${trashCount === 1 ? "item" : "items"} forever (they land in the macOS Trash)`,
+                  label: emptyTrashConfirmation(trashCount, "menu"),
                   onClick: () => runEmptyTrash(),
                 },
               ],
@@ -734,8 +733,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             <NewFolderGlyph size={15} />
           </button>
         )}
-        {/* Empty Trash (2026-07-31): armed two-step, header-visible — every
-            item still lands in the macOS Trash, so "forever" stays honest */}
+        {/* Empty Trash: armed two-step confirmation in the header. */}
         {isTrash &&
           trashCount > 0 &&
           (emptyArmed ? (
@@ -749,9 +747,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                 disabled={emptying}
                 onClick={runEmptyTrash}
               >
-                {emptying
-                  ? "Emptying…"
-                  : `Delete ${trashCount} ${trashCount === 1 ? "item" : "items"} (recoverable in the macOS Trash)`}
+                {emptying ? "Emptying…" : emptyTrashConfirmation(trashCount, "header")}
               </button>
             </>
           ) : (

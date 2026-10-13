@@ -1,9 +1,12 @@
 // Parked dirty sheet sessions + hide/quit flush (#4). Engine-agnostic — only
 // knows SheetModel + exceljs codec; never imports @univerjs/*.
 
+import { PLATFORM } from "../lib/featurePolicy";
 import { fileNameStem } from "../lib/fileKind";
 import { onQuitFlush } from "../lib/quitFlush";
 import { corpusCreateManagedFile, corpusWriteFileBytes, rootIdOf } from "../lib/tauri";
+import { webVaultKey } from "../services/webNotes";
+import { snapshotBase64, writeOfficeDraft } from "../services/webOfficeRecovery";
 import { useUiStore } from "../state/ui";
 import type { Workbook } from "./codec/xlsx";
 import { b64FromBytes, b64FromText, saveXlsx } from "./codec/xlsx";
@@ -20,6 +23,7 @@ interface ParkedSheet {
   diskLen: number;
   revision: string;
   mode: SheetFileMode;
+  sourceBase64?: string | undefined;
 }
 
 interface LiveDirty {
@@ -30,6 +34,7 @@ interface LiveDirty {
   idMap: Map<string, number>;
   diskLen: number;
   revision: string;
+  sourceBase64?: string | undefined;
   dirtyGen: () => number;
   onFlushed: (gen: number) => void;
 }
@@ -61,17 +66,64 @@ export async function writeSheetModel(
   model: SheetModel,
   idMap: Map<string, number>,
   expectedRevision: string,
-): Promise<{ len: number; revision: string }> {
+): Promise<{ len: number; revision: string; base64: string }> {
   if (mode === "csv") {
     const text = csvTextFromRows(csvRowsFromSnapshot(model));
     const bytes = new TextEncoder().encode(text);
-    const revision = await corpusWriteFileBytes(fileId, b64FromText(text), true, expectedRevision);
-    return { len: bytes.length, revision };
+    const base64 = b64FromText(text);
+    const revision = await corpusWriteFileBytes(fileId, base64, true, expectedRevision);
+    return { len: bytes.length, revision, base64 };
   }
   applyModelToWorkbook(wb, model, idMap);
   const bytes = await saveXlsx(wb);
-  const revision = await corpusWriteFileBytes(fileId, b64FromBytes(bytes), true, expectedRevision);
-  return { len: bytes.length, revision };
+  const base64 = b64FromBytes(bytes);
+  const revision = await corpusWriteFileBytes(fileId, base64, true, expectedRevision);
+  return { len: bytes.length, revision, base64 };
+}
+
+export function protectSheetDraft(
+  fileId: string,
+  mode: SheetFileMode,
+  model: SheetModel,
+  revision: string,
+  sourceBase64: string,
+  idMap: Map<string, number>,
+): string | null {
+  if (PLATFORM !== "web") return "";
+  const vault = webVaultKey();
+  if (!vault || !sourceBase64) return null;
+  try {
+    const result = writeOfficeDraft(window.localStorage, vault, {
+      fileId,
+      kind: mode,
+      baseRevision: revision,
+      sourceBase64,
+      snapshotBase64: snapshotBase64(model),
+      sheetIdMap: [...idMap],
+    });
+    return result.protected ? result.token : null;
+  } catch {
+    return null;
+  }
+}
+
+function protectLiveSheets(): void {
+  if (PLATFORM !== "web") return;
+  for (const entry of liveDirty.values()) {
+    if (!entry.dirtyGen()) continue;
+    try {
+      protectSheetDraft(
+        entry.fileId,
+        entry.mode,
+        entry.saveModel(),
+        entry.revision,
+        entry.sourceBase64 ?? "",
+        entry.idMap,
+      );
+    } catch {
+      /* the editor already warns when synchronous storage refuses */
+    }
+  }
 }
 
 let activeFlush: Promise<void> | null = null;
@@ -91,6 +143,7 @@ export function flushDirtySheets(): Promise<void> {
           diskLen: live.diskLen,
           revision: live.revision,
           mode: live.mode,
+          sourceBase64: live.sourceBase64,
         });
       } catch (error) {
         failures.push(
@@ -109,12 +162,14 @@ export function flushDirtySheets(): Promise<void> {
           session.idMap,
           session.revision,
         );
+        session.sourceBase64 = saved.base64;
         const still = parked.get(fileId);
         if (still === session) parked.delete(fileId);
         const live = liveDirty.get(fileId);
         if (live && live.dirtyGen() === genBefore) {
           live.diskLen = saved.len;
           live.revision = saved.revision;
+          live.sourceBase64 = saved.base64;
           live.onFlushed(genBefore);
         }
       } catch (error) {
@@ -135,6 +190,7 @@ export interface ParkedSession {
   diskLen: number;
   revision: string;
   mode: SheetFileMode;
+  sourceBase64?: string | undefined;
 }
 
 export function getParked(fileId: string): ParkedSession | undefined {
@@ -238,6 +294,7 @@ if (typeof document !== "undefined") {
     if (document.visibilityState === "hidden") void flushOnHide(flushDirtySheets, reportBackgroundSave);
   });
   window.addEventListener("pagehide", () => {
+    protectLiveSheets();
     void flushOnHide(flushDirtySheets, reportBackgroundSave);
   });
 }

@@ -48,6 +48,7 @@ fn the_picker_chooses_the_root_and_a_closed_picker_changes_nothing() {
     let (_unused, config, served) = served(Some(folder.path().to_path_buf()));
     let info = call(&served, "vault_choose", json!({})).unwrap();
     assert_eq!(info["empty"], true);
+    assert_eq!(info["completionVaultBinding"], true);
     let id = info["id"].as_str().unwrap().to_string();
     assert!(id.starts_with("hv_"));
     // the choice is persisted owner-only and survives a restart
@@ -74,6 +75,65 @@ fn the_same_root_keeps_its_id_and_a_new_root_gets_a_new_one() {
     // the running helper follows a config rewritten by `--vault`
     std::thread::sleep(std::time::Duration::from_millis(20));
     assert_eq!(served.current().unwrap().root, fs::canonicalize(other.path()).unwrap());
+}
+
+#[test]
+fn a_config_change_during_completion_scan_is_seen_by_current() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    served.guard_completion_with_scan("ordinary prompt", None, Some("folder"), |_, _| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        choose_config(&path, other.path()).unwrap();
+        Ok(false)
+    }).unwrap();
+    assert_ne!(served.current().unwrap().id, old.id);
+}
+
+#[test]
+fn a_bound_completion_rechecks_its_vault_after_scan() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let result = served.guard_completion_with_scan("ordinary prompt", Some(&old.id), None, |_, _| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        choose_config(&path, other.path()).unwrap();
+        Ok(false)
+    });
+    assert_eq!(result.unwrap_err().0, 409);
+}
+
+/// Rewrite the config to serve `root`, keeping the file's old mtime — two
+/// quick `--vault` writes can share one on a coarse-clock filesystem.
+fn switch_keeping_mtime(path: &std::path::Path, root: &std::path::Path) {
+    let stamp = fs::metadata(path).unwrap().modified().unwrap();
+    choose_config(path, root).unwrap();
+    fs::File::options().write(true).open(path).unwrap().set_times(fs::FileTimes::new().set_modified(stamp)).unwrap();
+}
+
+#[test]
+fn current_follows_a_vault_switch_that_kept_the_config_mtime() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    switch_keeping_mtime(&config.path().join(CONFIG_FILE), other.path());
+    assert_ne!(served.current().unwrap().id, old.id);
+}
+
+#[test]
+fn a_refused_completion_leaves_current_on_the_new_vault_even_with_the_old_mtime() {
+    let (_vault, config, served) = serving();
+    let old = served.current().unwrap();
+    let other = TempDir::new().unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let result = served.guard_completion_with_scan("ordinary prompt", Some(&old.id), None, |_, _| {
+        switch_keeping_mtime(&path, other.path());
+        Ok(false)
+    });
+    assert_eq!(result.unwrap_err().0, 409);
+    assert_ne!(served.current().unwrap().id, old.id, "a 409 must not pin the old vault");
 }
 
 #[test]
@@ -148,6 +208,16 @@ fn move_mkdir_and_remove_follow_the_page_port() {
     call(&served, "vault_remove", json!({ "path": "wiki/Welcome" })).unwrap();
     assert_eq!(call(&served, "vault_remove", json!({ "path": "" })).unwrap_err().0, 400);
     assert_eq!(call(&served, "vault_move", json!({ "from": "nope.md", "to": "b.md" })).unwrap_err().0, 404);
+}
+
+#[test]
+fn content_gated_remove_refuses_a_directory_or_missing_path() {
+    let (vault, _config, served) = serving();
+    fs::create_dir(vault.path().join(".gitignore")).unwrap();
+    let gated = json!({ "path": ".gitignore", "expectedContent": "0" });
+    assert_eq!(call(&served, "vault_remove", gated).unwrap_err().0, 409);
+    assert!(vault.path().join(".gitignore").is_dir());
+    assert_eq!(call(&served, "vault_remove", json!({ "path": "missing", "expectedContent": "0" })).unwrap_err().0, 409);
 }
 
 #[test]
@@ -352,4 +422,116 @@ fn a_page_can_never_create_a_writers_lock_sidecar() {
         assert_eq!(call(&served, command, args).unwrap_err().0, 403, "{command}");
     }
     assert!(!vault.path().join("wiki/a.md.lock").exists());
+}
+
+#[test]
+fn helper_regression_case_only_move_never_replaces_a_distinct_sibling() {
+    let (vault, _config, served) = serving();
+    for ext in ["md", "excalidraw"] {
+        let from = format!("plan.{ext}");
+        let to = format!("Plan.{ext}");
+        fs::write(vault.path().join(&from), "source").unwrap();
+        let created = fs::OpenOptions::new().write(true).create_new(true).open(vault.path().join(&to));
+        let mut target = match created {
+            Ok(target) => target,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                eprintln!("case-sensitive sibling test skipped: this volume folds case");
+                return;
+            }
+            Err(error) => panic!("couldn't create a distinct sibling: {error}"),
+        };
+        use std::io::Write as _;
+        target.write_all(b"destination").unwrap();
+        let refused = call(&served, "vault_move", json!({ "from": from, "to": to })).unwrap_err();
+        assert_eq!(refused.0, 409);
+        assert_eq!(fs::read_to_string(vault.path().join(&from)).unwrap(), "source");
+        assert_eq!(fs::read_to_string(vault.path().join(&to)).unwrap(), "destination");
+    }
+}
+
+#[test]
+fn helper_regression_reads_refuse_oversized_files_then_read_normal_files() {
+    let (vault, _config, served) = serving();
+    let large = fs::File::create(vault.path().join("large.md")).unwrap();
+    large.set_len((READ_ONE_LIMIT + 1) as u64).unwrap();
+    fs::write(vault.path().join("small.md"), "small").unwrap();
+    for encoding in ["text", "base64"] {
+        let result = call(&served, "vault_read", json!({ "path": "large.md", "encoding": encoding }));
+        assert!(result.is_err(), "oversized read must be refused");
+        let refused = result.unwrap_err();
+        assert_eq!(refused.0, 413);
+        assert!(refused.1.contains("too large"));
+    }
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["large.md", "small.md"] })).unwrap();
+    assert!(answer["files"].get("large.md").is_none());
+    assert_eq!(answer["more"], json!(["large.md"]));
+    assert_eq!(answer["files"]["small.md"], "small");
+    assert_eq!(call(&served, "vault_read", json!({ "path": "small.md" })).unwrap(), "small");
+}
+
+#[test]
+fn helper_regression_read_many_checks_remaining_budget_before_reading() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("first.md"), vec![b'a'; READ_MANY_BUDGET - 2]).unwrap();
+    fs::write(vault.path().join("next.md"), "next").unwrap();
+    fs::write(vault.path().join("last.md"), "ok").unwrap();
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["first.md", "next.md", "last.md"] })).unwrap();
+    assert_eq!(answer["more"], json!(["next.md"]));
+    assert!(answer["files"].get("next.md").is_none());
+    assert_eq!(answer["files"]["last.md"], "ok");
+}
+
+#[test]
+fn helper_regression_read_requires_a_regular_file() {
+    let (vault, _config, served) = serving();
+    fs::create_dir(vault.path().join("folder")).unwrap();
+    assert_eq!(call(&served, "vault_read", json!({ "path": "folder" })).unwrap_err().0, 400);
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt as _;
+        let path = std::ffi::CString::new(vault.path().join("pipe").as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(path.as_ptr(), 0o600) }, 0);
+        assert_eq!(call(&served, "vault_read", json!({ "path": "pipe" })).unwrap_err().0, 400);
+    }
+}
+
+#[test]
+fn helper_regression_mutations_refuse_every_lock_path_component() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("source.md"), "source").unwrap();
+    for (command, args) in [
+        ("vault_write", json!({ "path": "wiki/a.md.lock/child.txt", "text": "x" })),
+        ("vault_mkdir", json!({ "path": "wiki/a.md.lock" })),
+        ("vault_mkdir", json!({ "path": "wiki/a.md.LOCK/child" })),
+        ("vault_move", json!({ "from": "source.md", "to": "wiki/a.md.lock/child.txt" })),
+    ] {
+        assert_eq!(call(&served, command, args).unwrap_err().0, 403, "{command}");
+        assert!(!vault.path().join("wiki").exists());
+        assert_eq!(fs::read_to_string(vault.path().join("source.md")).unwrap(), "source");
+    }
+}
+
+#[test]
+fn file_identity_requires_an_existing_matching_file() {
+    let dir = TempDir::new().unwrap();
+    let first = dir.path().join("first.md");
+    let other = dir.path().join("other.md");
+    let alias = dir.path().join("alias.md");
+    fs::write(&first, "same contents").unwrap();
+    fs::write(&other, "same contents").unwrap();
+    fs::hard_link(&first, &alias).unwrap();
+    assert!(same_file(&first, &alias));
+    assert!(!same_file(&first, &other), "equal contents are not file identity");
+    assert!(!same_file(&first, &dir.path().join("absent.md")));
+}
+
+#[test]
+fn read_many_defers_lossy_text_that_would_exceed_the_budget() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("lossy.md"), vec![0xff; READ_MANY_BUDGET / 3 + 1]).unwrap();
+    fs::write(vault.path().join("normal.md"), "normal").unwrap();
+    let answer = call(&served, "vault_read_many", json!({ "paths": ["lossy.md", "normal.md"] })).unwrap();
+    assert_eq!(answer["more"], json!(["lossy.md"]));
+    assert_eq!(answer["files"]["normal.md"], "normal");
+    assert!(answer["files"].get("lossy.md").is_none());
 }

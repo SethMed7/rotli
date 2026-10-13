@@ -94,6 +94,11 @@ the connected folder or browser vault confirms the file is there
 Refined rewrite must keep every listed path, found and missing, as a whole
 token (`keepsPath`), or Basic is used instead.
 
+Rotli links and file-looking paths inside code fences are also checked before
+Refined runs. They refuse only when they resolve to an existing protected vault
+file; an ordinary code sample such as `src/foo.ts` remains in the prompt even
+when no such file exists in the vault.
+
 **Basic** (the default, and the fallback) is built from the note alone; no
 model runs. **Refined** sends the Basic handoff to the Librarian's model
 through the same `Host.complete` port the Librarian bar uses
@@ -176,7 +181,7 @@ other is removed, bypassed, or compromised.
 
 | Seam | Command / fn | Enforces |
 |---|---|---|
-| Read | `read_for_ai` | Hidden-surface refusal · secure ⇒ remote never · secure ⇒ local unless per-note deny or vault knob off |
+| Read | `read_for_ai` | Hidden-surface refusal · frontmatter, content, name, or secure-home location ⇒ remote never · secure ⇒ local unless per-note deny or vault knob off |
 | Read probe | `corpus_readable_ids` | the exact same `read_for_ai` per id; bodies never returned |
 | Search | `corpus_search_ai` | the reference lane only when asked, then **`read_for_ai` per hit, in Rust** — the AI never receives an unfiltered hit list (hardened 2026-08-01) |
 | Map | `corpus_notes_ai` | Notes tree + reference metas, filtered by the same gate before they cross the boundary |
@@ -204,8 +209,8 @@ gaps it found, and the ones deliberately left open — is
 
 | Seam | Site | Enforces |
 |---|---|---|
-| Retrieval filter | `aiReadableHits` (`src/ai/host.ts`) | drops any hit the Rust probe did not permit; a failed probe = **nothing readable** |
-| Read | `readNote` / `readMemory` | routes through `corpus_read_ai`; marks the chat's secure taint |
+| Retrieval filter | `aiReadableHits` (`src/ai/hostReadGate.ts`) | drops any hit the Rust probe did not permit and filters secure-home locations; a failed probe = **nothing readable** |
+| Read | `readNote` / `readMemory` | checks secure-home location, then routes through `corpus_read_ai`; marks the chat's secure taint |
 | Write | `updateNote` (`src/ai/host.ts`) | read gate → **locked refusal** → **body-edit policy** (`aiBodyEdit`) → secure-context laundering rule → strip frontmatter → write |
 | Chat memory | `syncManagedChatMemory` (`src/chatMemory/composition.ts`) | **locked refusal** before the per-turn note rewrite |
 | Chat memory | `chatSurface.tsx` | a tainted loose chat writes NO memory note |

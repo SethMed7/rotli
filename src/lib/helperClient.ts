@@ -3,7 +3,7 @@
 // Nothing here is reachable in the Mac app (the shell's CSP is ipc-only); on
 // the web the site's policy opens connect-src to 127.0.0.1 alone.
 
-import { type HelperLink, helperBaseUrl } from "./helperPairing";
+import { type HelperLink, HELPER_VAULT_COMMANDS, helperBaseUrl } from "./helperPairing";
 
 export interface HelperHealth {
   ok: boolean;
@@ -62,11 +62,13 @@ export async function helperRpc<T>(
   }
   if (!response.ok) {
     const message =
-      body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
-        ? (body as { error: string }).error
-        : response.status === 401
-          ? "Rotli Helper refused the pairing token — pair again."
-          : `Rotli Helper answered ${response.status}`;
+      response.status === 413 && cmd === "vault_write"
+        ? "file too large for Rotli Helper (24 MiB request limit; encoded files need more space)"
+        : body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string"
+          ? (body as { error: string }).error
+          : response.status === 401
+            ? "Rotli Helper refused the pairing token — pair again."
+            : `Rotli Helper answered ${response.status}`;
     throw new HelperHttpError(message, response.status);
   }
   if (body && typeof body === "object" && "result" in body) return (body as { result: T }).result;
@@ -79,4 +81,15 @@ export function helperUnreachable(error: unknown): boolean {
   if (error instanceof HelperHttpError) return false;
   if (error instanceof TypeError) return true; // fetch's "network error"
   return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+}
+
+/** Terminal connection failures are distinct from ordinary file conflicts.
+ * Vault verbs can change the vault gate; a CLI tool's 404 is a tool error. */
+export function helperConnectionError(error: unknown, cmd: string): boolean {
+  if (!HELPER_VAULT_COMMANDS.has(cmd) || !(error instanceof HelperHttpError)) return false;
+  return (
+    error.status === 401 ||
+    (error.status === 404 && !/^no such file\b/i.test(error.message)) ||
+    (error.status === 409 && /^(?:vault changed\b|Rotli Helper isn't serving a vault\b)/i.test(error.message))
+  );
 }

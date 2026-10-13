@@ -61,18 +61,27 @@ export async function loadEngine(): Promise<KokoroLike> {
   }
 }
 
-/** The app's single speaker. */
-class Speaker {
+/** The app's single speaker. The audio and engine factories are seams for tests. */
+export class Speaker {
   private state: SpeechState = "idle";
   /** Which message is being read — the UI lights only that row's button. */
   private owner: string | null = null;
   private listeners = new Set<Listener>();
   /** Bumped by stop() and by a new read; a stale run checks it and gives up. */
   private run = 0;
+  /** Opened on the first chunk, closed when the read ends or stops, so no
+   * audio render thread outlives speech. */
   private ctx: AudioContext | null = null;
   private source: AudioBufferSourceNode | null = null;
+  /** Settles the playing chunk: a closed context never fires `onended`. */
+  private ended: (() => void) | null = null;
   private queue: Float32Array[] = [];
   private draining = false;
+
+  constructor(
+    private readonly makeContext: () => AudioContext = () => new AudioContext(),
+    private readonly load: () => Promise<KokoroLike> = loadEngine,
+  ) {}
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -102,7 +111,16 @@ class Speaker {
       /* already ended */
     }
     this.source = null;
+    this.ended?.();
+    this.ended = null;
+    this.release();
     this.emit("idle", null);
+  }
+
+  private release(): void {
+    const ctx = this.ctx;
+    this.ctx = null;
+    void ctx?.close().catch(() => {});
   }
 
   /**
@@ -118,7 +136,7 @@ class Speaker {
     this.emit(engine ? "speaking" : "preparing", owner);
     let tts: KokoroLike;
     try {
-      tts = await loadEngine();
+      tts = await this.load();
     } catch {
       if (this.run === mine) this.emit("idle", null);
       throw new Error("the voice couldn't be prepared");
@@ -141,7 +159,9 @@ class Speaker {
     while (this.run === mine && (this.draining || this.queue.length > 0)) {
       await new Promise((r) => setTimeout(r, 60));
     }
-    if (this.run === mine) this.emit("idle", null);
+    if (this.run !== mine) return;
+    this.release();
+    this.emit("idle", null);
   }
 
   /** Play queued chunks back-to-back so sentences run together as speech. */
@@ -155,14 +175,14 @@ class Speaker {
         await this.play(chunk, mine);
       }
     } finally {
-      this.draining = false;
+      if (this.run === mine) this.draining = false; // stop() already reset it for a stale run
     }
   }
 
   private play(samples: Float32Array, mine: number): Promise<void> {
     return new Promise((resolve) => {
       if (this.run !== mine) return resolve();
-      this.ctx ??= new AudioContext();
+      this.ctx ??= this.makeContext();
       const ctx = this.ctx;
       // Kokoro renders 24 kHz mono
       const buffer = ctx.createBuffer(1, samples.length, 24_000);
@@ -174,6 +194,7 @@ class Speaker {
       source.connect(ctx.destination);
       source.onended = () => resolve();
       this.source = source;
+      this.ended = resolve;
       source.start();
     });
   }

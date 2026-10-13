@@ -145,6 +145,7 @@ let fmPausedSince: number | null = null;
 function openFm(url: string): void {
   if (fmOpen && fmUrl === url) return;
   fmOpen = true;
+  wakePoll();
   fmUrl = url;
   fmNudged = 0;
   fmState = "none";
@@ -293,9 +294,32 @@ function followFm(): void {
   else if (step === STREAM_STEP.nudge) reconcileFm(plays);
 }
 
-function busy(): boolean {
-  return fmOpen || Object.keys(useTabMedia.getState().media).length > 0 || !!useMediaDock.getState().tabId;
+/** How long until the next media poll; null when nothing can make sound (no
+ * browser tab, no tucked tab, no Claude FM) — Rotli's own elements report
+ * through DOM media events, so there is nothing to ask. Only something playing
+ * keeps the quick cadence: a paused tab left open used to hold it at 400 ms
+ * for the whole session, hidden or not (audit 2026-10-12). */
+export function pollDelay(now: {
+  fmOpen: boolean;
+  tabs: number;
+  docked: boolean;
+  playing: boolean;
+}): number | null {
+  if (now.fmOpen || now.docked || now.playing) return POLL_BUSY_MS;
+  return now.tabs > 0 ? POLL_IDLE_MS : null;
 }
+
+function nextPollDelay(): number | null {
+  return pollDelay({
+    fmOpen,
+    tabs: browserTabIds().length,
+    docked: !!useMediaDock.getState().tabId,
+    playing: Object.values(useTabMedia.getState().media).includes("playing"),
+  });
+}
+
+/** Restart a parked poll loop (a browser tab or Claude FM appeared). */
+let wakePoll: () => void = () => {};
 
 /** Silence everything the player can reach: the ambient track, Claude FM's
  * page, a tucked tab, and every browser tab (⌘K → Stop all sound). */
@@ -337,18 +361,32 @@ export function startAmbient(): () => void {
   for (const name of events) document.addEventListener(name, checkInApp, true);
   // one question at a time: the next waits for this one's answers
   let stopped = false;
+  let parked = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const loop = () => {
+    parked = false;
     void pollTabMedia().finally(() => {
-      if (!stopped) timer = setTimeout(loop, busy() ? POLL_BUSY_MS : POLL_IDLE_MS);
+      if (stopped) return;
+      const delay = nextPollDelay();
+      if (delay === null) parked = true;
+      else timer = setTimeout(loop, delay);
     });
   };
+  wakePoll = () => {
+    if (parked && !stopped) loop();
+  };
+  // a browser tab opening (or a tab tucked into the player) wakes the loop
+  unsubscribe.push(
+    usePanesStore.subscribe(() => wakePoll()),
+    useMediaDock.subscribe(() => wakePoll()),
+  );
   loop();
   // nothing loads until Play: the player shows for everyone from the first
   // run, and most launches never press it (the bundled track starts fast)
   applyAmbient();
   return () => {
     stopped = true;
+    wakePoll = () => {};
     if (timer) clearTimeout(timer);
     for (const name of events) document.removeEventListener(name, checkInApp, true);
     for (const stop of unsubscribe) stop();

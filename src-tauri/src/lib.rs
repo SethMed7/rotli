@@ -64,7 +64,9 @@ mod routines;
 mod search_index; mod search_match;
 mod secret;
 mod spellcheck;
+mod quit_flush;
 mod usage;
+mod usage_lines;
 mod vault_location;
 mod web;
 mod web_page;
@@ -75,6 +77,8 @@ mod workspace_documents;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
+
+use quit_flush::{QuitFlush, QuitFlushStatus};
 
 use tauri::image::Image;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -117,7 +121,7 @@ fn close_tab_from_native_menu(app: &AppHandle) {
     };
     match native_close_action(window.label()) {
         NativeCloseAction::CloseMainTab => {
-            let _ = window.emit("rotli:close-tab", ());
+            let _ = window.emit_to(window.label(), "rotli:close-tab", ());
         }
         NativeCloseAction::HideWindow => {
             let _ = window.hide();
@@ -131,7 +135,7 @@ fn close_tab_from_native_menu(app: &AppHandle) {
 /// way it handles the real key.
 fn edit_history_from_native_menu(app: &AppHandle, redo: bool) {
     if let Some(window) = focused_webview_window(app) {
-        let _ = window.emit("rotli:edit-history", if redo { "redo" } else { "undo" });
+        let _ = window.emit_to(window.label(), "rotli:edit-history", if redo { "redo" } else { "undo" });
     }
 }
 
@@ -528,34 +532,6 @@ mod capture_return_tests {
     }
 }
 
-/// The quit-flush handshake (#4 follow-up, review 2026-07). Dirty spreadsheet
-/// sessions flush on window-hide/pagehide, but BOTH real quit paths could fire
-/// with the window still up and no hide ever seen ("Stay open" mode): tray-Quit
-/// ran `app.exit(0)` directly, and ⌘Q rides the default menu's predefined Quit —
-/// native `terminate:`, which tao surfaces only as `applicationWillTerminate`,
-/// far too late for the webview's ASYNC serialize (exceljs) to finish. So both
-/// paths now route through `graceful_quit`: emit "rotli:flush-before-quit" to
-/// every webview, hold the exit until `quit_flush_done` acks (this condvar),
-/// and ABORT quit on a failed or timed-out save. A forced OS termination may
-/// still kill any process, but Rotli never translates "probably saved" into a
-/// normal successful quit.
-struct QuitFlush {
-    /// Webviews still owing a `quit_flush_done` ack. Every live webview (main,
-    /// quick, capture) gets the flush event — the quick window keeps its OWN
-    /// editor buffer in its own module instance, so main's ack alone never
-    /// proved the quick note's last keystrokes were on disk.
-    status: Mutex<QuitFlushStatus>,
-    cv: Condvar,
-}
-
-#[derive(Default)]
-struct QuitFlushStatus {
-    attempt_id: u64,
-    pending: usize,
-    failed: bool,
-    errors: Vec<String>,
-}
-
 /// The longest a quit will wait for the webview's flush ack. The idle ack is
 /// milliseconds (the listener lives in the always-loaded persist chunk); this
 /// bound only matters when a big workbook is mid-serialize or the webview hung.
@@ -564,20 +540,21 @@ const QUIT_FLUSH_MAX: Duration = Duration::from_secs(15);
 /// One webview finished its pre-quit flush — release `graceful_quit`'s wait
 /// once EVERY emitted webview has acked (saturating: a double ack never wraps).
 #[tauri::command]
-fn quit_flush_done(app: AppHandle, attempt_id: u64, ok: bool, error: Option<String>) {
+fn quit_flush_done(
+    webview: tauri::Webview,
+    attempt_id: u64,
+    ok: bool,
+    error: Option<String>,
+) {
+    record_quit_flush(webview.app_handle(), webview.label(), attempt_id, ok, error);
+}
+
+fn record_quit_flush(app: &AppHandle, label: &str, attempt_id: u64, ok: bool, error: Option<String>) {
     let state = app.state::<QuitFlush>();
     let mut status = state.status.lock().unwrap();
-    if status.attempt_id != attempt_id || status.pending == 0 {
-        return;
+    if status.ack(attempt_id, label, ok, error) {
+        state.cv.notify_all();
     }
-    status.pending = status.pending.saturating_sub(1);
-    if !ok {
-        status.failed = true;
-        if let Some(error) = error.filter(|value| !value.trim().is_empty()) {
-            status.errors.push(error);
-        }
-    }
-    state.cv.notify_all();
 }
 
 /// Quit, but let every live webview flush dirty state first (see QuitFlush).
@@ -588,18 +565,17 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
         .into_iter()
         .filter(|label| app.get_webview_window(label).is_some())
         .collect();
-    let expected = labels.len();
-    if expected == 0 {
+    if labels.is_empty() {
         return Ok(());
     }
     let state = app.state::<QuitFlush>();
     let attempt_id = {
         let mut status = state.status.lock().unwrap();
-        if status.pending > 0 {
+        if !status.pending.is_empty() {
             return Err("another quit or restart is already waiting for saves".into());
         }
         status.attempt_id = status.attempt_id.wrapping_add(1).max(1);
-        status.pending = expected;
+        status.pending = labels.iter().map(|label| label.to_string()).collect();
         status.failed = false;
         status.errors.clear();
         status.attempt_id
@@ -613,8 +589,9 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
             )
             .is_err()
         {
-            quit_flush_done(
-                app.clone(),
+            record_quit_flush(
+                app,
+                label,
                 attempt_id,
                 false,
                 Some(format!("{label} did not receive the save request")),
@@ -623,7 +600,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     }
     let deadline = Instant::now() + QUIT_FLUSH_MAX;
     let mut status = state.status.lock().unwrap();
-    while status.attempt_id == attempt_id && status.pending > 0 {
+    while status.attempt_id == attempt_id && !status.pending.is_empty() {
         let now = Instant::now();
         if now >= deadline {
             break;
@@ -634,7 +611,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     if status.attempt_id != attempt_id {
         return Err("save handshake was superseded".into());
     }
-    let timed_out = status.pending > 0;
+    let timed_out = !status.pending.is_empty();
     let failed = status.failed;
     let detail = if timed_out {
         "Rotli did not quit because one or more windows did not finish saving. Your files remain open; try Save again or resolve the shown error."
@@ -649,7 +626,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     } else {
         String::new()
     };
-    status.pending = 0;
+    status.pending.clear();
     drop(status);
     if timed_out || failed {
         show_main(app);
@@ -894,7 +871,7 @@ fn hide_quick_window(app: AppHandle) {
 fn corpus_reveal(app: AppHandle) {
     let root = corpus::resolve_corpus(&app);
     #[cfg(target_os = "macos")]
-    let _ = std::process::Command::new("open").arg(&root).spawn();
+    let _ = child_run::spawn_reaped(std::process::Command::new("open").arg(&root));
     #[cfg(not(target_os = "macos"))]
     let _ = root;
 }
@@ -1244,6 +1221,9 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
             if kind.is_symlink() {
                 symlinks += 1;
             } else if kind.is_dir() {
+                if corpus::is_skipped_dir(&name) {
+                    continue;
+                }
                 folders += 1;
                 stack.push(entry.path());
             } else if kind.is_file() {
@@ -1342,7 +1322,7 @@ fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> R
                 continue;
             }
             let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() {
+            if kind.is_symlink() || (kind.is_dir() && corpus::is_skipped_dir(&name.to_string_lossy())) {
                 continue;
             }
             let target = to.join(&name);
@@ -1374,9 +1354,14 @@ mod vault_activation_tests {
         std::fs::write(source.join(".obsidian/app.json"), "{}").unwrap();
         std::fs::write(source.join(".rotli/main.json"), "old rotli state").unwrap();
 
+        std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
+        std::fs::create_dir_all(source.join(".git/objects")).unwrap();
+        std::fs::write(source.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+        std::fs::write(source.join("Projects/node_modules/dep/README.md"), "# Dep\n").unwrap();
+
         let report = inspect_vault_path(&source).unwrap();
         assert_eq!(report.source, "Obsidian vault");
-        assert_eq!(report.markdown_files, 1);
+        assert_eq!(report.markdown_files, 1, "node_modules is never part of a vault");
         assert_eq!(report.folders, 2);
         assert_eq!(
             std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(),
@@ -1389,6 +1374,8 @@ mod vault_activation_tests {
             "# Plan\n"
         );
         assert!(destination.join(".obsidian/app.json").is_file());
+        assert!(!destination.join("Projects/node_modules").exists(), "dependency folders never copy");
+        assert!(!destination.join(".git").exists(), "history folders never copy");
         assert!(
             !destination.join(".rotli").exists(),
             "source-specific Rotli state must not copy"
@@ -1670,6 +1657,13 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// A watcher's root is still one of the registry's roots (a lookup error
+/// keeps watching — only a definite "gone" stops it).
+fn root_still_registered(app: &AppHandle, root: &std::path::Path) -> bool {
+    app.try_state::<corpus::CorpusState>()
+        .is_none_or(|state| !matches!(state.root_id_for_path(root), Ok(None)))
+}
+
 fn install_live_root_watcher(
     app: &AppHandle,
     root: std::path::PathBuf,
@@ -1680,16 +1674,20 @@ fn install_live_root_watcher(
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     let active_root = root.clone();
     if let Err(error) = corpus::spawn_watcher(root, suppress, move |paths| {
+        if !root_still_registered(&handle, &active_root) {
+            return false;
+        }
         if recover_missing_active_vault(&handle, &active_root) {
-            return;
+            return true;
         }
         let active = handle
             .try_state::<corpus::CorpusState>()
             .and_then(|state| state.default_root_path().ok());
         if active.as_ref() == Some(&active_root) {
             organizer.enqueue(&active_root, paths);
+            chat_window::emit_corpus_changed(&handle);
         }
-        chat_window::emit_corpus_changed(&handle);
+        true
     }) {
         eprintln!(
             "rotli: new active vault has no live watcher ({error}) — refresh remains available"
@@ -1898,8 +1896,13 @@ fn mount_connected_brain(
         state.insert_root(root_id.clone(), store)?;
         let _ = app.asset_protocol_scope().allow_directory(&root, true);
         let handle = app.clone();
+        let watched = root.clone();
         if let Err(error) = corpus::spawn_watcher(root, suppress, move |_| {
+            if !root_still_registered(&handle, &watched) {
+                return false;
+            }
             chat_window::emit_corpus_changed(&handle);
+            true
         }) {
             eprintln!(
                 "rotli: connected vault {root_id} has no live watcher ({error}) — refresh remains available"
@@ -2328,6 +2331,8 @@ pub fn run() {
             corpus::corpus_open_file,
             corpus::corpus_file_text,
             corpus::corpus_file_bytes,
+            corpus::corpus_file_text_ai,
+            corpus::corpus_file_bytes_ai,
             corpus::corpus_file_stat,
             corpus::corpus_move_file_to_sink,
             corpus::corpus_restore_file,
@@ -2540,6 +2545,8 @@ pub fn run() {
                     std::collections::HashMap::new()
                 };
             let roots = corpus::startup_roots(app.handle());
+            let mut warm_roots: Vec<(String, bool)> = Vec::new();
+            secret::begin_ledger_warmup();
             for root in roots {
                 let opened = if development_read_only(app.handle()) {
                     corpus::CorpusStore::open_read_only(root.abs_path.clone())
@@ -2567,9 +2574,13 @@ pub fn run() {
                         let handle = app.handle().clone();
                         let org = organizer_handle.clone();
                         let org_root = store.root().to_path_buf();
+                        let is_brain = brain_perms.contains_key(&root.id);
                         if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| {
+                            if !root_still_registered(&handle, &org_root) {
+                                return false;
+                            }
                             if recover_missing_active_vault(&handle, &org_root) {
-                                return;
+                                return true;
                             }
                             // Only the currently active/default vault feeds the
                             // Librarian. The comparison is live so a vault switch
@@ -2581,39 +2592,29 @@ pub fn run() {
                             let active = handle
                                 .try_state::<corpus::CorpusState>()
                                 .and_then(|state| state.default_root_path().ok());
-                            if active.as_ref() == Some(&org_root) {
+                            let is_active = active.as_ref() == Some(&org_root);
+                            if is_active {
                                 org.enqueue(&org_root, paths);
                             }
-                            chat_window::emit_corpus_changed(&handle);
+                            // a vault that is only a switch target is not on
+                            // screen: its cache is already marked stale (the
+                            // watcher's bump), so the windows needn't re-read
+                            if is_active || is_brain {
+                                chat_window::emit_corpus_changed(&handle);
+                            }
+                            true
                         }) {
                             eprintln!(
                                 "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",
                                 root.id
                             );
                         }
-                        // FEED THE SECURE-PROSE LEDGER before this root can
-                        // serve any egress command (audit follow-up 2026-08-01,
-                        // finding #2). open() loads the index but does NOT walk,
-                        // so without this a fresh process holds none of a
-                        // never-browsed root's secure prose and the ungated file
-                        // lanes could launder its stripped body out before the
-                        // first list. Non-fatal: read_for_ai is still the primary
-                        // gate; a warm failure only loses the backstop, and the
-                        // walk also warms the list cache the perf audit wants.
-                        if let Err(e) = store.warm_secure_ledger() {
-                            eprintln!(
-                                "rotli: could not warm the secure-note ledger for root {} ({e}) — egress backstop degraded to read_for_ai only",
-                                root.id
-                            );
-                        }
-                        if root.adopted {
-                            if let Err(e) = store.seed_main_from_disk_if_missing() {
-                                eprintln!(
-                                    "rotli: could not mirror adopted vault {} into Main ({e})",
-                                    root.id
-                                );
-                            }
-                        }
+                        // The secure-prose ledger is fed by walking this root —
+                        // now on a background thread after setup (below), so a
+                        // huge vault no longer holds the window back. Until
+                        // that walk finishes, `secret::blocked_for_remote`
+                        // refuses everything (fail closed).
+                        warm_roots.push((root.id.clone(), root.adopted));
                         if let Err(error) = registry.insert(root.id.clone(), store) {
                             eprintln!("rotli: corpus root {} disabled ({error})", root.id);
                         }
@@ -2627,6 +2628,34 @@ pub fn run() {
                 }
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
+            // FEED THE SECURE-PROSE LEDGER (audit follow-up 2026-08-01, finding
+            // #2) — open() loads the index but does not walk — and warm each
+            // list cache, off the launch path. The walk also mirrors a freshly
+            // adopted folder into Main. Egress stays refused until it is done.
+            let warm_app = app.handle().clone();
+            std::thread::spawn(move || {
+                let state = warm_app.state::<corpus::CorpusState>();
+                let try_warm = |(id, adopted): &(String, bool)| {
+                    if !state.contains_root(id).unwrap_or(true) {
+                        return secret::Warm::Gone;
+                    }
+                    // walk with the corpus lock released; the locked warm is
+                    // then a cache hit (or re-walks a vault changed meanwhile)
+                    let _ = state.walk_unlocked(id);
+                    if let Err(e) = state.route(id, |store| store.warm_secure_ledger()) {
+                        eprintln!("rotli: secure-note ledger not warm for root {id} ({e}); egress stays closed, retrying");
+                        return secret::Warm::Failed;
+                    }
+                    if *adopted {
+                        if let Err(e) = state.route(id, |store| store.seed_main_from_disk_if_missing()) {
+                            eprintln!("rotli: could not mirror adopted vault {id} into Main ({e})");
+                        }
+                    }
+                    secret::Warm::Done
+                };
+                let wait = || std::thread::sleep(std::time::Duration::from_secs(30));
+                secret::warm_until_done(warm_roots, try_warm, wait, secret::finish_ledger_warmup);
+            });
             // agents reach Word documents through this app (agent_bridge.rs)
             agent_bridge::start(app.handle());
             if let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() {

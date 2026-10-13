@@ -1,6 +1,6 @@
 // The site's films. The landing hero plays the product film
-// (public/media/hero/): a real Rotli Web session on synthetic notes, recorded by
-// `bun run capture:hero`, silent, its captions in a band under the picture. The
+// (public/media/hero/): a one-minute tour of the real Mac app on synthetic notes, recorded
+// natively (site/README.md "Films"), silent, its captions in a band under the picture. The
 // studio's illustrated films (public/media/story/, encoded for the web from
 // rotli-studio/motion/out/video) are no longer played by any page: visitors asked
 // for the real product over the story (2026-10-05). Posters are frames of the films.
@@ -23,12 +23,12 @@ const media = (slug: string) => ({
 // address means no cache (a browser's, or Cloudflare's edge, which held the 404 the old site gave
 // this path when the film first went live, 2026-10-10) can serve an old answer for it.
 export const hero: Film = {
-  src: '/media/hero/rotli-hero.mp4?v=2026-10-09',
-  poster: '/media/hero/rotli-hero-poster.webp?v=2026-10-09',
+  src: '/media/hero/rotli-hero.mp4?v=2026-10-10',
+  poster: '/media/hero/rotli-hero-poster.webp?v=2026-10-10',
   silent: true,
   captioned: true,
   label:
-    "A screen recording of rotli, under a minute, without sound: a quick note about a call with Dana, written in Main; the Vault view showing the same file once, in the vault's inbox folder; on the Mac, the Librarian filing it into Clients while the words stay as typed; the note in its new place and still where it was in Main; and a chat asking what Dana wanted and what is left, answered from that note and the discount policy.",
+    'A one-minute screen recording of the rotli Mac app on synthetic notes, without sound: a note about a call with Dana written in Markdown, with a checklist and a link to Jo Park; the Librarian, on the Mac, filing it into Clients and setting its summary, tags, and links while the words stay as typed; tasks ticked in a checklist and gathered in the Tasks view; search finding notes and opening a board; a spreadsheet recalculating, a document, and the board; Claude answering what is still open before the pricing review and what is owed to Dana, from those notes; and the seven themes, light and dark.',
 };
 
 /** The studio's 60-second story film, which the hero played until the product film. */

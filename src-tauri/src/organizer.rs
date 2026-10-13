@@ -518,7 +518,7 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let fm = fm.unwrap_or_default();
     let mut fields = BTreeMap::new();
     let mut locked = false;
-    let mut secure = false;
+    let mut secure = corpus::rules_store::in_secure_home_path(rel);
     for line in &fm.foreign {
         if corpus::locked_field(line) == Some(true) {
             locked = true;
@@ -1091,8 +1091,26 @@ fn supersede(s: &corpus::CorpusStore, old_id: &str) -> Result<bool, String> {
 
 // ─── pure core: gates ────────────────────────────────────────────────────────
 
-/// One sampled view of the §2 gates. `run_now` (the manual nudge) bypasses
-/// power/thermal/idle — but never barges in on an interactive chat.
+/// The §2 gates, sampled cheapest-first. `run_now` (the manual nudge) bypasses
+/// power/thermal/idle — but never barges in on an interactive chat. The probes
+/// are lazy: the in-process idle/focus checks run first, and the `pmset`
+/// power/thermal shell-outs only when their answer can still open the gate.
+fn gates_pass_lazy(
+    interactive_busy: bool,
+    run_now: bool,
+    user_idle: impl FnOnce() -> bool,
+    app_backgrounded: impl FnOnce() -> bool,
+    on_ac: impl FnOnce() -> bool,
+    thermal_ok: impl FnOnce() -> bool,
+) -> bool {
+    if interactive_busy {
+        return false; // yielding to chat is unconditional — even for run-now
+    }
+    run_now || ((user_idle() || app_backgrounded()) && on_ac() && thermal_ok())
+}
+
+/// One eager sample of the gates (tests pin the verdict table through it).
+#[cfg(test)]
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct GateSnapshot {
     pub on_ac: bool,
@@ -1103,14 +1121,10 @@ pub(crate) struct GateSnapshot {
     pub run_now: bool,
 }
 
+#[cfg(test)]
 fn gates_pass(g: &GateSnapshot) -> bool {
-    if g.interactive_busy {
-        return false; // yielding to chat is unconditional — even for run-now
-    }
-    if g.run_now {
-        return true;
-    }
-    g.on_ac && g.thermal_ok && (g.user_idle || g.app_backgrounded)
+    let (busy, now, idle, bg) = (g.interactive_busy, g.run_now, g.user_idle, g.app_backgrounded);
+    gates_pass_lazy(busy, now, || idle, || bg, || g.on_ac, || g.thermal_ok)
 }
 
 // ─── the wait planner (the energy law) ───────────────────────────────────────
@@ -2037,38 +2051,26 @@ fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
 
 // ─── the worker thread ───────────────────────────────────────────────────────
 
-/// Cached system probes — the `pmset`/`ioreg` shell-outs aren't free, so each
-/// result lives ~60s. Fail-open: an unreadable probe never bricks the daemon
-/// (the trust ladder, not the power gate, is the safety boundary).
-struct GateProbes {
+/// One cached system probe — the `pmset` shell-outs aren't free, so each result
+/// lives for the caller's staleness budget, and is sampled only when the lazy
+/// gate chain reaches it. Fail-open: an unreadable probe never bricks the
+/// daemon (the trust ladder, not the power gate, is the safety boundary).
+struct CachedProbe {
     at: Option<Instant>,
-    on_ac: bool,
-    thermal_ok: bool,
-    user_idle: bool,
+    value: bool,
 }
 
-impl GateProbes {
-    fn new() -> Self {
-        GateProbes {
-            at: None,
-            on_ac: true,
-            thermal_ok: true,
-            user_idle: true,
-        }
+impl CachedProbe {
+    const fn new() -> Self {
+        CachedProbe { at: None, value: true }
     }
 
-    /// `max_age` is the caller's staleness budget: ~60s between cycles, a much
-    /// shorter leash for the per-candidate re-check INSIDE a cycle (each model
-    /// call runs up to 45s — a user who returned or unplugged mid-queue must
-    /// stop the next candidate, not the next cycle).
-    fn refresh(&mut self, max_age: Duration) {
-        if self.at.is_some_and(|t| t.elapsed() < max_age) {
-            return;
+    fn get(&mut self, max_age: Duration, probe: impl FnOnce() -> bool) -> bool {
+        if !self.at.is_some_and(|t| t.elapsed() < max_age) {
+            self.value = probe();
+            self.at = Some(Instant::now());
         }
-        self.on_ac = probe_on_ac();
-        self.thermal_ok = probe_thermal_ok();
-        self.user_idle = probe_user_idle();
-        self.at = Some(Instant::now());
+        self.value
     }
 }
 
@@ -2118,27 +2120,29 @@ fn probe_thermal_ok() -> bool {
     true
 }
 
-/// No keyboard/mouse for 60s ⇒ idle (HIDIdleTime is in nanoseconds).
+/// No keyboard/mouse for 60s ⇒ idle. Fail-open: an unreadable or nonsense
+/// reading counts as idle (the same as the old `ioreg` parse failing).
+fn user_idle_from(seconds: Option<f64>) -> bool {
+    seconds.is_none_or(|s| !(0.0..60.0).contains(&s)) // NaN / negative ⇒ idle
+}
+
 #[cfg(target_os = "macos")]
-fn probe_user_idle() -> bool {
-    let Ok(o) = std::process::Command::new("ioreg")
-        .args(["-c", "IOHIDSystem"])
-        .output()
-    else {
-        return true;
-    };
-    let text = String::from_utf8_lossy(&o.stdout);
-    text.lines()
-        .find(|l| l.contains("HIDIdleTime"))
-        .and_then(|l| l.rsplit('=').next())
-        .and_then(|v| v.trim().parse::<u64>().ok())
-        .map(|ns| ns >= 60_000_000_000)
-        .unwrap_or(true)
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceSecondsSinceLastEventType(state: i32, event_type: u32) -> f64;
+}
+
+/// Seconds since the last keyboard/mouse event, read in-process (no spawn):
+/// HID system state (1) × any input event type (`!0`).
+#[cfg(target_os = "macos")]
+fn hid_idle_seconds() -> Option<f64> {
+    // SAFETY: a pure CoreGraphics query with plain scalar arguments.
+    Some(unsafe { CGEventSourceSecondsSinceLastEventType(1, !0u32) })
 }
 
 #[cfg(not(target_os = "macos"))]
-fn probe_user_idle() -> bool {
-    true
+fn hid_idle_seconds() -> Option<f64> {
+    None
 }
 
 /// rotli hidden or behind another app counts as backgrounded — organizing while
@@ -2182,7 +2186,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
         // RefCell: the per-candidate gates closure must be able to REFRESH the
         // probes (it only gets &self through &dyn Fn), while the cache lives
         // across cycles. Single worker thread — no contention.
-        let probes = std::cell::RefCell::new(GateProbes::new());
+        let probes = std::cell::RefCell::new((CachedProbe::new(), CachedProbe::new()));
         let mut backoff = BACKOFF_MIN;
         let mut next_model_try: Option<Instant> = None;
         // a sweep ran but its follow-up cycle hasn't: the index membership diff
@@ -2339,23 +2343,22 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             if !run_now && next_model_try.is_some_and(|t| Instant::now() < t) {
                 continue; // the planner sleeps out the remainder
             }
-            probes.borrow_mut().refresh(Duration::from_secs(60));
             let gates = || {
                 // the LIVE re-check per candidate: a chat can start, the user
                 // can return / unplug / heat the machine mid-cycle — so idle,
                 // power, thermal, and focus are all re-sampled here (short
                 // probe leash), not just interactive_busy. Only run_now stays
                 // a cycle-start value (the user's explicit nudge).
-                let mut p = probes.borrow_mut();
-                p.refresh(Duration::from_secs(10));
-                gates_pass(&GateSnapshot {
-                    on_ac: p.on_ac,
-                    thermal_ok: p.thermal_ok,
-                    user_idle: p.user_idle,
-                    app_backgrounded: app_backgrounded(&app),
-                    interactive_busy: inner.interactive.load(Ordering::SeqCst) > 0,
+                let (ac, therm) = &mut *probes.borrow_mut();
+                let leash = Duration::from_secs(10);
+                gates_pass_lazy(
+                    inner.interactive.load(Ordering::SeqCst) > 0,
                     run_now,
-                })
+                    || user_idle_from(hid_idle_seconds()),
+                    || app_backgrounded(&app),
+                    || ac.get(leash, probe_on_ac),
+                    || therm.get(leash, probe_thermal_ok),
+                )
             };
             if !gates() {
                 gate_closed_at = Some(Instant::now()); // retry on the GATE_RECHECK leash
@@ -3013,6 +3016,18 @@ mod tests {
     }
 
     #[test]
+    fn secure_home_plain_text_is_never_an_organizer_candidate() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path();
+        for rel in ["wiki/_secure/plan.csv", "Secure notes/plan.txt"] {
+            fs::create_dir_all(root.join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(root.join(rel), "task,status\nDraft,ready").unwrap();
+            assert!(snapshot_note(root, rel).unwrap().secure, "{rel}");
+        }
+    }
+
+    #[test]
     fn proposal_json_matches_journal_shape() {
         let row = JournalRow {
             action: "file",
@@ -3153,6 +3168,51 @@ mod tests {
             interactive_busy: true,
             ..base
         }));
+    }
+
+    #[test]
+    fn an_active_user_in_rotli_spawns_no_power_or_thermal_probe() {
+        let spawned = std::cell::Cell::new(0);
+        let probe = |v: bool| {
+            spawned.set(spawned.get() + 1);
+            v
+        };
+        // typing in Rotli (not idle, foregrounded): closed with zero pmset spawns
+        let active = |bg| gates_pass_lazy(false, false, || false, || bg, || probe(true), || probe(true));
+        assert!(!active(false));
+        assert_eq!(spawned.get(), 0);
+        // backgrounded Rotli still needs power + thermal (the `||` in the law)
+        assert!(active(true));
+        assert_eq!(spawned.get(), 2);
+        // on battery the thermal probe is skipped too
+        spawned.set(0);
+        assert!(!gates_pass_lazy(false, false, || true, || false, || probe(false), || probe(true)));
+        assert_eq!(spawned.get(), 1);
+        // the idle threshold: 60 s, fail-open on an unreadable reading
+        assert!(!user_idle_from(Some(59.9)));
+        assert!(user_idle_from(Some(60.0)));
+        assert!(user_idle_from(None));
+        assert!(user_idle_from(Some(f64::NAN)));
+        #[cfg(target_os = "macos")] // the in-process CoreGraphics read links and answers
+        assert!(hid_idle_seconds().is_some_and(|s| s.is_finite() && s >= 0.0));
+    }
+
+    #[test]
+    fn lazy_gates_agree_with_the_eager_verdict_table() {
+        for bits in 0u8..64 {
+            let b = |i: u8| bits & (1 << i) != 0;
+            let g = GateSnapshot {
+                on_ac: b(0),
+                thermal_ok: b(1),
+                user_idle: b(2),
+                app_backgrounded: b(3),
+                interactive_busy: b(4),
+                run_now: b(5),
+            };
+            let eager = !g.interactive_busy
+                && (g.run_now || (g.on_ac && g.thermal_ok && (g.user_idle || g.app_backgrounded)));
+            assert_eq!(gates_pass(&g), eager, "{g:?}");
+        }
     }
 
     #[test]

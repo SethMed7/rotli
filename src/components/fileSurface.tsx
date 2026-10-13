@@ -12,22 +12,16 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  Suspense,
-  lazy,
   useEffect,
   useRef,
   useState,
 } from "react";
 
-import {
-  DOCX_EDITABLE,
-  DOCUMENT_CONVERTIBLE,
-  DOCUMENT_EDIT_MAX_BYTES,
-  DOCUMENT_EXTS,
-  DOCUMENT_OPEN_WITH_APPS,
-} from "../documents/kinds";
+import { DOCX_EDITABLE, DOCUMENT_CONVERTIBLE } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
-import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { PLATFORM } from "../lib/featurePolicy";
+import { extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { kindOf, OPEN_WITH_BY_KIND } from "../lib/fileSurfaceKinds";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
@@ -43,57 +37,19 @@ import {
   fileAssetUrl,
   isTauri,
 } from "../lib/tauri";
-import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheets/facts";
+import { deriveSheetFacts, describeShape, formatStamp, sizeLine, truncatedRowsNote } from "../sheets/facts";
 import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { FileHeaderMarks } from "./fileHeaderMarks";
+import { OfficeMount } from "./fileOffice/officeMount";
+import { officeEditability, probeOffice } from "./fileOffice/officeProbe";
 
-// Univer + exceljs are heavy — code-split like CanvasSurface, loaded only when an editor mounts.
-const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
-const DocumentEditor = lazy(() => import("./documentEditor"));
+/** The build, not the runtime, decides which native file actions exist: the
+ * desktop twin lane runs this outside Tauri and must still see them. */
+const DESKTOP = PLATFORM === "desktop";
 
-export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "document" | "text" | "html" | "other";
-
-/** Slot at the end of the file header for the sheet's own controls (Raw / Save). */
-
-const AUDIO = new Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "oga", "opus"]);
-const VIDEO = VIDEO_EXTS;
-// the image viewer handles svg/ico too, so it broadens the shared raster set.
-const IMAGE = new Set([...IMAGE_EXTS, "svg", "ico"]);
-// html gets its own two-mode kind (Preview ⇄ Code) — it used to sit in TEXT.
-const HTML = new Set(["html", "htm", "xhtml"]);
-const TEXT = new Set(["txt", "text", "log", "json", "md", "markdown", "yaml", "yml", "xml", "vtt", "srt"]);
-
-// exceljs only round-trips real .xlsx; csv is the values-only text path. The
-// rest of the sheet family (xls/xlsm/ods/tsv) stays the read-only viewer.
-
-// which installed "Open with …" apps make sense per kind (Rust reports what exists)
-const OPEN_WITH_BY_KIND: Record<FileKind, string[]> = {
-  sheet: ["Numbers", "Microsoft Excel"],
-  document: [...DOCUMENT_OPEN_WITH_APPS],
-  text: ["TextEdit"],
-  html: ["Safari", "TextEdit"],
-  image: ["Preview"],
-  pdf: ["Preview"],
-  audio: [],
-  video: [],
-  other: [],
-};
-
-/** Exported for tests — the pure ext → viewer-kind decision. */
-export function kindOf(name: string): FileKind {
-  const ext = extOf(name);
-  if (AUDIO.has(ext)) return "audio";
-  if (VIDEO.has(ext)) return "video";
-  if (IMAGE.has(ext)) return "image";
-  if (ext === "pdf") return "pdf";
-  if (sheetKinds.SHEET_TEXT.has(ext) || sheetKinds.SHEET_BIN.has(ext)) return "sheet";
-  if (DOCUMENT_EXTS.has(ext)) return "document";
-  if (HTML.has(ext)) return "html";
-  if (TEXT.has(ext) || name.toLowerCase().endsWith(".audio.txt")) return "text";
-  return "other";
-}
+export { kindOf } from "../lib/fileSurfaceKinds";
 
 // ── image zoom (fit / 100% / steps) — pure math, exported for tests ──────────
 // Scale 1 = "actual size" in POINTS (natural px ÷ devicePixelRatio), matching
@@ -196,13 +152,26 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const [pathCopied, setPathCopied] = useState(false);
   const detailsRef = useRef<HTMLDivElement | null>(null);
 
-  const sheetEditable = kind === "sheet" && sheetKinds.sheetEditableFile(ext, stat);
+  const sheetEditable = kind === "sheet" && officeEditability("sheet", ext, stat);
   const withheld = kind === "sheet" && sheetKinds.workbookWithheld(ext);
-  const documentEditable =
-    kind === "document" && DOCX_EDITABLE.has(ext) && !!stat?.writable && stat.len <= DOCUMENT_EDIT_MAX_BYTES;
+  const documentEditable = kind === "document" && officeEditability("document", ext, stat);
 
   useEffect(() => {
     let cancelled = false;
+    let ownedUrl = "";
+    const receiveUrl = (u: string) => {
+      if (u.startsWith("blob:")) {
+        if (cancelled) {
+          URL.revokeObjectURL(u);
+          return;
+        }
+        ownedUrl = u;
+      }
+      if (!cancelled) {
+        if (u) setUrl(u);
+        else setErr("couldn’t resolve the file");
+      }
+    };
     setUrl("");
     setText(null);
     setTables(null);
@@ -237,9 +206,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       // so stat first and refuse past the cap honestly — a capped read would
       // show a source cut mid-tag with no notice. The asset URL only feeds the
       // srcdoc <base> (relative-URL resolution), never the frame itself.
-      fileAssetUrl(fileId)
-        .then((u) => !cancelled && (u ? setUrl(u) : setErr("couldn't resolve the file")))
-        .catch(fail);
+      fileAssetUrl(fileId, true).then(receiveUrl).catch(fail);
       corpusFileStat(fileId)
         .catch(() => null)
         .then((s) => {
@@ -253,56 +220,28 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             .catch(fail);
         })
         .catch(fail);
-    } else if (kind === "sheet" && !sheetKinds.workbookWithheld(ext)) {
-      // probe first: an editable sheet mounts the editor (which loads its own
-      // data); everything else falls back to the read-only table
-      corpusFileStat(fileId)
-        .catch(() => null)
-        .then((s) => {
+    } else if (kind === "sheet" || kind === "document") {
+      void probeOffice(kind, ext, {
+        stat: () => corpusFileStat(fileId),
+        bytes: () => corpusFileBytes(fileId),
+        text: () => corpusFileText(fileId, READ_MAX_BYTES),
+        parse: parseWorkbook,
+      })
+        .then((result) => {
           if (cancelled) return;
-          setStat(s);
-          setProbed(true);
-          const editable = sheetKinds.sheetEditableFile(ext, s);
-          if (editable) return;
-          // past the read cap the bytes arrive truncated — an xlsx dies with a
-          // cryptic zip-parse error, a csv shows a silent cut. Refuse up front.
-          if (s && s.len > READ_MAX_BYTES) {
-            setTooLarge(true);
-            return;
-          }
-          const load = sheetKinds.SHEET_BIN.has(ext)
-            ? corpusFileBytes(fileId).then((b64) => parseWorkbook({ base64: b64 }))
-            : corpusFileText(fileId, READ_MAX_BYTES).then((csv) =>
-                parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
-              );
-          load.then((t) => !cancelled && setTables(t)).catch(fail);
+          setStat(result.stat);
+          setProbed(result.probed);
+          setTooLarge(result.tooLarge);
+          setTables(result.tables);
         })
         .catch(fail);
-    } else if (kind === "document" && DOCX_EDITABLE.has(ext)) {
-      // Probe before mounting the editor. Only Rotli-managed storage is a
-      // writable lane; linked and secure roots keep their existing policy.
-      corpusFileStat(fileId)
-        .catch(() => null)
-        .then((s) => {
-          if (cancelled) return;
-          setStat(s);
-          setProbed(true);
-          if (s && s.len > DOCUMENT_EDIT_MAX_BYTES) setTooLarge(true);
-        })
-        .catch(fail);
-    } else if (kind === "document") {
-      // Legacy documents never enter a passive preview. The supported local
-      // conversion family gets an explicit copy-to-DOCX action; every other
-      // legacy format is labeled unsupported and stays untouched.
-      setProbed(true);
-    } else if (kind !== "sheet") {
+    } else {
       // audio / video / image / pdf / other → an asset:// URL for the tag
-      fileAssetUrl(fileId)
-        .then((u) => !cancelled && (u ? setUrl(u) : setErr("couldn't resolve the file")))
-        .catch(fail);
+      fileAssetUrl(fileId, true).then(receiveUrl).catch(fail);
     }
     return () => {
       cancelled = true;
+      if (ownedUrl) URL.revokeObjectURL(ownedUrl);
     };
   }, [fileId, kind, ext]);
 
@@ -510,7 +449,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         {kind === "document" && documentEditable && (
           <div ref={documentChromeRef} className="file-document-chrome" />
         )}
-        {kind === "pdf" && (
+        {kind === "pdf" && DESKTOP && (
           <button
             type="button"
             className="file-open-ext file-convert-pdf"
@@ -582,18 +521,20 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             )}
           </div>
         )}
-        <button
-          type="button"
-          className="file-open-ext"
-          title={
-            kind === "document"
-              ? "Open in another document app, choose an app, or reveal in Finder"
-              : "Open in the default app / reveal in Finder / open with…"
-          }
-          onClick={openExternally}
-        >
-          Open externally <span aria-hidden="true">▾</span>
-        </button>
+        {DESKTOP && (
+          <button
+            type="button"
+            className="file-open-ext"
+            title={
+              kind === "document"
+                ? "Open in another document app, choose an app, or reveal in Finder"
+                : "Open in the default app / reveal in Finder / open with…"
+            }
+            onClick={openExternally}
+          >
+            Open externally <span aria-hidden="true">▾</span>
+          </button>
+        )}
         {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
       </header>
       {kind === "pdf" && conversionError && (
@@ -685,57 +626,22 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {!err && kind === "document" && probed && documentEditable && (
-          <Suspense fallback={<p className="file-loading">Opening editor…</p>}>
-            <DocumentEditor key={fileId} fileId={fileId} paneId={paneId} chromeSlotRef={documentChromeRef} />
-          </Suspense>
-        )}
-        {!err &&
-          kind === "document" &&
-          probed &&
-          DOCX_EDITABLE.has(ext) &&
-          !documentEditable &&
-          !tooLarge && (
-            <div className="file-document-fallback">
-              <p>This document is in a protected location. Move it into Assets to edit it.</p>
-            </div>
-          )}
-        {!err && kind === "document" && probed && !DOCX_EDITABLE.has(ext) && (
-          <div className="file-document-fallback">
-            {DOCUMENT_CONVERTIBLE.has(ext) ? (
-              <>
-                <h2>Convert a copy to edit here</h2>
-                <p>
-                  Rotli can use the local macOS document converter for .{ext}. It creates a new managed DOCX
-                  in Assets and leaves the original unchanged.
-                </p>
-                <button
-                  type="button"
-                  className="file-convert-document"
-                  disabled={converting}
-                  onClick={() => void convertDocument()}
-                >
-                  {converting ? "Converting…" : "Convert copy to DOCX"}
-                </button>
-                {conversionError && (
-                  <p className="file-conversion-error" role="alert">
-                    {conversionError}
-                  </p>
-                )}
-                <p className="file-conversion-note">
-                  Complex layout, embedded objects, and legacy fields may need review after conversion.
-                </p>
-              </>
-            ) : (
-              <>
-                <h2>.{ext || "unknown"} is unsupported</h2>
-                <p>
-                  Rotli does not have a faithful local conversion path for this format. Open the original
-                  externally and export a DOCX copy to edit it in Rotli.
-                </p>
-              </>
-            )}
-          </div>
+        {(kind === "document" || kind === "sheet") && (
+          <OfficeMount
+            kind={kind}
+            ext={ext}
+            fileId={fileId}
+            paneId={paneId}
+            probed={probed}
+            editable={kind === "document" ? documentEditable : sheetEditable}
+            tooLarge={tooLarge}
+            withheld={withheld}
+            error={err}
+            chromeSlotRef={kind === "document" ? documentChromeRef : sheetChromeRef}
+            converting={converting}
+            conversionError={conversionError}
+            convertDocument={() => void convertDocument()}
+          />
         )}
 
         {/* html Preview: a SANDBOXED srcdoc iframe, same model as the ```html
@@ -754,33 +660,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {withheld && (
-          <div className="file-document-fallback">
-            <h2>.{ext} is unsupported in this build</h2>
-            <p>
-              Spreadsheets aren’t available in this build yet. Open the original externally, or save a CSV
-              copy to edit it in Rotli.
-            </p>
-          </div>
-        )}
-        {!err && kind === "sheet" && probed && sheetEditable && (
-          <Suspense fallback={<p className="file-loading">Loading…</p>}>
-            <SheetEditor
-              key={fileId}
-              fileId={fileId}
-              paneId={paneId}
-              mode={ext === "csv" ? "csv" : "xlsx"}
-              chromeSlotRef={sheetChromeRef}
-            />
-          </Suspense>
-        )}
-
-        {!err && tooLarge && (
-          <p className="file-loading">
-            {kind === "document"
-              ? "This document is too large to edit safely in Rotli — open it externally instead."
-              : "this file is too large to view in rotli — Open externally shows the whole thing"}
-          </p>
+        {!err && kind === "html" && tooLarge && (
+          <p className="file-loading">This file is too large to view in Rotli.</p>
         )}
 
         {!err && kind === "sheet" && !sheetEditable && tables && (
@@ -800,9 +681,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
               </div>
             )}
             {sheet?.truncated && (
-              <div className="file-sheet-note">
-                showing the first {sheet.rows.length.toLocaleString()} rows — Open externally for the rest
-              </div>
+              <div className="file-sheet-note">{truncatedRowsNote(sheet.rows.length, DESKTOP)}</div>
             )}
             <div className="file-sheet-scroll">
               {sheet && sheet.rows.length > 0 ? (

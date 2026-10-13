@@ -17,6 +17,9 @@ use serde_json::{json, Value};
 use tauri::Manager;
 
 pub(crate) use crate::remote_agent_url::relay_base;
+use crate::remote_agent_url::{
+    next_relay_retry, sleep_unless_stopped, RELAY_MIN_POLL_GAP, RELAY_RETRY_MIN,
+};
 use crate::keychain::REMOTE_AGENT_TOKEN_ACCOUNT;
 
 const PAIRING_VERSION: u8 = 2;
@@ -356,7 +359,9 @@ fn connector_loop(
     let poll_url = format!("{base}/device/poll");
     let response_url = format!("{base}/device/respond");
     let agent = relay_agent();
+    let mut retry = RELAY_RETRY_MIN;
     while !stop.load(Ordering::Acquire) {
+        let polled_at = std::time::Instant::now();
         let response = agent
             .post(&poll_url)
             .set("Authorization", &format!("Bearer {}", pairing.device_token))
@@ -367,7 +372,9 @@ fn connector_loop(
             }));
         match response {
             Ok(response) if response.status() == 204 => {
-                set_connected(&status, &active_generation, generation, true, None)
+                retry = RELAY_RETRY_MIN;
+                set_connected(&status, &active_generation, generation, true, None);
+                sleep_unless_stopped(&stop, RELAY_MIN_POLL_GAP.saturating_sub(polled_at.elapsed()));
             }
             Ok(response) => match read_relay_json(response) {
                 Ok(envelope) => {
@@ -380,7 +387,9 @@ fn connector_loop(
                         break;
                     }
                     set_connected(&status, &active_generation, generation, true, None);
-                    let Some(request_id) = envelope.get("requestId").and_then(Value::as_str) else {
+                    let request_id = envelope.get("requestId").and_then(Value::as_str);
+                    let (Some(request_id), Some(request)) = (request_id, envelope.get("request"))
+                    else {
                         set_connected(
                             &status,
                             &active_generation,
@@ -388,18 +397,11 @@ fn connector_loop(
                             false,
                             Some("relay returned an invalid request envelope"),
                         );
+                        sleep_unless_stopped(&stop, retry);
+                        retry = next_relay_retry(retry);
                         continue;
                     };
-                    let Some(request) = envelope.get("request") else {
-                        set_connected(
-                            &status,
-                            &active_generation,
-                            generation,
-                            false,
-                            Some("relay returned an invalid request envelope"),
-                        );
-                        continue;
-                    };
+                    retry = RELAY_RETRY_MIN; // a well-formed frame: the relay is healthy
                     // Hold this guard through dispatch AND response delivery.
                     // A disconnect or vault switch first invalidates the
                     // generation, then waits here, so no old-root result can
@@ -452,16 +454,22 @@ fn connector_loop(
                         );
                     }
                 }
-                Err(_) => set_connected(
-                    &status,
-                    &active_generation,
-                    generation,
-                    false,
-                    Some("relay returned invalid JSON"),
-                ),
+                Err(_) => {
+                    set_connected(
+                        &status,
+                        &active_generation,
+                        generation,
+                        false,
+                        Some("relay returned invalid JSON"),
+                    );
+                    sleep_unless_stopped(&stop, retry);
+                    retry = next_relay_retry(retry);
+                }
             },
             Err(ureq::Error::Status(408, _)) => {
-                set_connected(&status, &active_generation, generation, true, None)
+                retry = RELAY_RETRY_MIN;
+                set_connected(&status, &active_generation, generation, true, None);
+                sleep_unless_stopped(&stop, RELAY_MIN_POLL_GAP.saturating_sub(polled_at.elapsed()));
             }
             Err(_) => {
                 set_connected(
@@ -471,7 +479,8 @@ fn connector_loop(
                     false,
                     Some("could not reach the relay"),
                 );
-                std::thread::sleep(Duration::from_secs(2));
+                sleep_unless_stopped(&stop, retry);
+                retry = next_relay_retry(retry);
             }
         }
     }

@@ -1,3 +1,4 @@
+import { PLATFORM } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
 /** Open, create, or list the durable chats attached to one Markdown note. A
  * note owns MANY chats (the maintainer, 2026-07-30): the default open continues the most
@@ -10,6 +11,9 @@ import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/se
 import { invalidateMemex } from "../memex/useMemex";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import { notesService } from "../services/notes";
+import { webNoteFilePath } from "../services/webNotes";
+import { useChatSetupGuide } from "../state/chatSetupGuide";
+import { helperReady } from "../state/helperLink";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
@@ -31,6 +35,13 @@ interface NoteChatContext {
   attached: AttachedChatSummary[];
 }
 
+/** Every note-chat entry point shares the chip's web setup route. */
+export function noteChatReady(): boolean {
+  if (PLATFORM !== "web" || helperReady()) return true;
+  useChatSetupGuide.getState().show();
+  return false;
+}
+
 /** Resolve the note's chat identity: the writable brain, the attachment stem
  * (secure notes collapse to secure-note-<id6> so their name never leaks into
  * chats/), and every chat already attached to it. */
@@ -43,7 +54,8 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
     throw new Error("Choose a writable vault before starting a note chat.");
   }
 
-  const notePath = await corpusNotePath(note.id);
+  const notePath = PLATFORM === "web" ? await webNoteFilePath(note.id) : await corpusNotePath(note.id);
+  if (!notePath) throw new Error("This note is no longer in the connected vault.");
   const folder = noteDiskFolder(note);
   const secure =
     (await corpusFrontmatter(note.id).catch(() => null))?.secure === true ||
@@ -59,6 +71,7 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
 
 /** The note's attached chats, newest work first — the chat chip's picker. */
 export async function listChatsForNote(note: NoteSummary): Promise<AttachedChatSummary[]> {
+  if (!noteChatReady()) return [];
   return (await noteChatContext(note)).attached;
 }
 
@@ -79,6 +92,7 @@ export function openNoteChat(note: NoteSummary, slug: string): void {
  * the Quick Note's request to main). A note that is gone opens nothing and
  * answers false. */
 export async function openChatForNoteId(id: string, opts?: { create?: boolean }): Promise<boolean> {
+  if (!noteChatReady()) return false;
   const note = (await notesService.listNotes()).find((n) => n.id === id);
   if (!note) return false;
   await openChatForNote(note, opts);
@@ -86,6 +100,7 @@ export async function openChatForNoteId(id: string, opts?: { create?: boolean })
 }
 
 export async function openChatForNote(note: NoteSummary, opts?: { create?: boolean }): Promise<void> {
+  if (!noteChatReady()) return;
   const { instance, stem, secure, chats, attached } = await noteChatContext(note);
 
   let slug = opts?.create ? null : (attached[0]?.slug ?? null);

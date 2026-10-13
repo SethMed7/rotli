@@ -6,7 +6,7 @@
 // Global chords are registered with the OS in Rust; rebinding them round-trips
 // through the set_summon_shortcut invoke.
 
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM, type Platform } from "../lib/featurePolicy";
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
@@ -21,6 +21,8 @@ export type Surface = "main" | "capture" | "quick" | "chat";
 
 export interface KeyAction {
   id: string;
+  /** Shells that can actually execute this action. */
+  platforms?: readonly Platform[];
   title: string;
   /** Default chord like "Esc", "Alt+Space", "Meta+0"; null = unbound. */
   defaultChord: string | null;
@@ -52,7 +54,11 @@ type KeyActionInput = Omit<KeyAction, "surface"> & { surface?: Surface };
 
 const actions = new Map<string, KeyAction>();
 
-export function registerAction(action: KeyActionInput): void {
+export function registerAction(action: KeyActionInput, platform: Platform = PLATFORM): void {
+  if (action.platforms && !action.platforms.includes(platform)) {
+    actions.delete(action.id);
+    return;
+  }
   actions.set(action.id, { surface: "main", ...action });
 }
 
@@ -83,9 +89,18 @@ const WEB_KEPT_CHORDS: ReadonlySet<string> = new Set(Object.values(EDITOR_ACTION
  * — nothing dispatches it and no hint shows it — unless it formats text; bare
  * keys (Esc, Enter) still answer. */
 export function currentChord(actionId: string): string | null {
+  return currentChordFromBindings(actionId, useBindingsStore.getState().overrides);
+}
+
+/** The same build policy over a subscribed bindings snapshot, for memoized
+ * presentation whose hints must update when an override changes. */
+export function currentChordFromBindings(
+  actionId: string,
+  overrides: Record<string, string | null>,
+): string | null {
   const action = actions.get(actionId);
   if (!action) return null;
-  const chord = resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+  const chord = resolveChord(overrides, actionId, action.defaultChord);
   return chordInBuild(chord, actionId, LAUNCH_FEATURES.hotkeys);
 }
 

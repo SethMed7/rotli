@@ -177,8 +177,9 @@ describe("creating notes", () => {
     const dir = await memexVault();
     const notes = new FolderNotesService(dir);
     await notes.createNote(DEST.inbox, "# Keys\n", { secure: true });
-    const fm = parseNoteDocument(await dir.readText("wiki/_inbox/keys.md")).frontmatter;
+    const fm = parseNoteDocument(await dir.readText("wiki/_secure/keys.md")).frontmatter;
     expect(fm?.foreign).toContain("secure: true");
+    expect((await dir.readText(".gitignore")).split("\n")).toContain("wiki/_secure/keys.md");
   });
 });
 
@@ -423,6 +424,26 @@ describe("a plain folder of Markdown files", () => {
     expect(chat?.aliases?.[0]).toBe("planning");
     expect((await svc.listNotes()).some((n) => n.folderId === "chats")).toBe(false);
     expect((await svc.searchNotes("launch")).map((h) => h.folderId)).toEqual(["wiki"]);
+  });
+
+  test("node_modules and .git are skipped at any depth, the memory lanes only at the root", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("app/node_modules/x/README.md", "# Vendored\n");
+    await dir.writeText("app/NODE_MODULES/y.md", "# Vendored too\n");
+    await dir.writeText("app/.git/notes.md", "# Git internals\n");
+    await dir.writeText("node_modules notes/a.md", "# Real note\n");
+    await dir.writeText("identity/me.md", "# Spine\n");
+    await dir.writeText("work/identity/brand.md", "# Brand identity\n");
+    const svc = new FolderNotesService(dir);
+    expect((await svc.listAll()).map((n) => n.id).sort()).toEqual([
+      "node_modules notes/a.md",
+      "work/identity/brand.md",
+    ]);
+    const folders = (await svc.listFolders()).map((f) => f.id);
+    expect(folders).toContain("app");
+    expect(folders).toContain("node_modules notes");
+    expect(folders).toContain("work/identity");
+    expect(folders.some((id) => /node_modules\/|NODE_MODULES|\.git|^identity/.test(id))).toBe(false);
   });
 });
 

@@ -13,6 +13,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { notesService } from "../services/notes";
 import {
+  unsavedDrafts,
   adoptPendingDocument,
   documentSaveError,
   editDocument,
@@ -22,8 +23,11 @@ import {
   flushNote,
   flushNoteAfterPaint,
   flushSyncs,
+  getDocumentText,
+  onDocumentChange,
   reloadDocumentIfClean,
   setReadNoteForTests,
+  setReleaseDelayForTests,
   setWriteNoteBodyForTests,
 } from "./model";
 
@@ -51,6 +55,7 @@ afterEach(() => {
   touched.clear();
   setWriteNoteBodyForTests(null);
   setReadNoteForTests(null);
+  setReleaseDelayForTests(null);
 });
 
 describe("ensureDocument", () => {
@@ -408,5 +413,98 @@ describe("conflicts resolve themselves (2026-09-03)", () => {
     // the open note now shows the disk version, clean
     expect(read(seeded.id)).toEqual(["# Plan", "", "Notes, theirs."]);
     expect(documentSaveError(seeded.id)).toBeNull();
+  });
+});
+
+test("non-empty pending typing is included in the synchronous unload journal", () => {
+  touched.add("pending:journal");
+  ensurePendingDocument("pending:journal");
+  editDocument("pending:journal", () => ["typed while creation was pending"]);
+  expect(unsavedDrafts().find((draft) => draft.noteId === "pending:journal")?.body).toBe(
+    "typed while creation was pending",
+  );
+  expect(unsavedDrafts().find((draft) => draft.noteId === "pending:journal")?.protection).toEqual({
+    secure: false,
+    locked: false,
+  });
+});
+
+test("a quit conflict copy keeps a secure locked note protected", async () => {
+  const folder = await notesService.createFolder("Protected conflicts");
+  const note = await notesService.createNote(folder.id, "# Private\n\nbefore", {
+    secure: true,
+    locked: true,
+  });
+  touched.add(note.id);
+  setWriteNoteBodyForTests(() => Promise.reject(new Error("revision conflict: changed")));
+  setReadNoteForTests(() => notesService.getNote(note.id));
+  ensureDocument(note.id, note.body, note.revision, note);
+  editDocument(note.id, () => ["# Private", "", "mine"]);
+  await flushNote(note.id);
+  await flushSyncs();
+  const copy = (await notesService.listNotes(folder.id)).find((item) => item.id !== note.id);
+  expect(copy).toMatchObject({ secure: true, locked: true });
+});
+
+// Released buffers (audit 2026-10-12): a note's buffer used to stay for the
+// life of the window after its last editor closed. A CLEAN buffer with no
+// viewer is now dropped after a grace period; anything unsaved, saving,
+// failed, or still on screen stays.
+describe("releasing closed buffers", () => {
+  const settle = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
+  const view = (id: string) => {
+    buffer(id, `# ${id}\nbody`);
+    return onDocumentChange(id, () => {});
+  };
+
+  test("a clean buffer nobody views is released after the grace period", async () => {
+    setReleaseDelayForTests(0);
+    view("release-clean")();
+    await settle();
+    expect(getDocumentText("release-clean")).toBeUndefined();
+  });
+
+  test("a second pane on the same note keeps the buffer", async () => {
+    setReleaseDelayForTests(0);
+    const closeFirst = view("release-two-panes");
+    const closeSecond = onDocumentChange("release-two-panes", () => {});
+    closeFirst();
+    await settle();
+    expect(getDocumentText("release-two-panes")).toBe("# release-two-panes\nbody");
+    closeSecond();
+  });
+
+  test("an unsaved buffer is never released", async () => {
+    setReleaseDelayForTests(0);
+    setWriteNoteBodyForTests(() => new Promise(() => {})); // a save that never lands
+    const close = view("release-dirty");
+    editDocument("release-dirty", (lines) => [...lines, "typed"]);
+    close();
+    await settle();
+    expect(getDocumentText("release-dirty")).toBe("# release-dirty\nbody\ntyped");
+  });
+
+  test("a buffer closed while saving is released once the save lands", async () => {
+    setReleaseDelayForTests(10);
+    let land: () => void = () => {};
+    setWriteNoteBodyForTests(() => new Promise<void>((resolve) => (land = resolve)));
+    const close = view("release-after-save");
+    editDocument("release-after-save", (lines) => [...lines, "typed"]);
+    close();
+    void flushNote("release-after-save");
+    await settle(30);
+    expect(getDocumentText("release-after-save")).toBeDefined(); // still saving
+    land();
+    await settle(40);
+    expect(getDocumentText("release-after-save")).toBeUndefined();
+  });
+
+  test("reopening before the grace period ends keeps the live buffer", async () => {
+    setReleaseDelayForTests(20);
+    view("release-reopen")();
+    const reopen = onDocumentChange("release-reopen", () => {});
+    await settle(40);
+    expect(getDocumentText("release-reopen")).toBe("# release-reopen\nbody");
+    reopen();
   });
 });

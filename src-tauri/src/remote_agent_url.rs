@@ -1,6 +1,30 @@
-//! Relay URL policy for the remote-agent connector: HTTPS only (loopback HTTP
-//! for development), no query, fragment, or credentials. Pure; tested below
-//! and through `remote_agent.rs`.
+//! Relay URL and retry policy for the remote-agent connector: HTTPS only
+//! (loopback HTTP for development), no query, fragment, or credentials; an
+//! unreachable relay is retried on a capped exponential backoff. Pure; tested
+//! below and through `remote_agent.rs`.
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
+/// First retry after a failed poll; doubles per consecutive failure up to the cap.
+pub(crate) const RELAY_RETRY_MIN: Duration = Duration::from_secs(2);
+const RELAY_RETRY_MAX: Duration = Duration::from_secs(60);
+/// The relay holds each poll ~25 s; an idle reply faster than this never loops hot.
+pub(crate) const RELAY_MIN_POLL_GAP: Duration = Duration::from_secs(1);
+
+pub(crate) fn next_relay_retry(current: Duration) -> Duration {
+    current.saturating_mul(2).min(RELAY_RETRY_MAX)
+}
+
+/// Sleep in short slices so a disconnect stays prompt during a long backoff.
+pub(crate) fn sleep_unless_stopped(stop: &AtomicBool, total: Duration) {
+    let slice = Duration::from_millis(100);
+    let mut left = total;
+    while !left.is_zero() && !stop.load(Ordering::Acquire) {
+        let step = left.min(slice);
+        std::thread::sleep(step);
+        left -= step;
+    }
+}
 pub(crate) fn relay_base(value: &str) -> Result<String, String> {
     let value = value.trim().trim_end_matches('/');
     let base = value.strip_suffix("/mcp").unwrap_or(value);
@@ -26,7 +50,26 @@ pub(crate) fn relay_base(value: &str) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::relay_base;
+    use super::*;
+
+    #[test]
+    fn relay_retries_double_from_two_seconds_to_a_one_minute_cap() {
+        let mut d = RELAY_RETRY_MIN;
+        let mut schedule = vec![d.as_secs()];
+        for _ in 0..7 {
+            d = next_relay_retry(d);
+            schedule.push(d.as_secs());
+        }
+        assert_eq!(schedule, [2, 4, 8, 16, 32, 60, 60, 60]);
+    }
+
+    #[test]
+    fn a_stopped_connector_does_not_sit_out_its_backoff() {
+        let stop = AtomicBool::new(true);
+        let t = std::time::Instant::now();
+        sleep_unless_stopped(&stop, Duration::from_secs(60));
+        assert!(t.elapsed() < Duration::from_millis(50));
+    }
 
     #[test]
     fn https_relays_pass_and_keep_their_base() {

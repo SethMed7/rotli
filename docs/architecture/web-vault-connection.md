@@ -19,7 +19,26 @@ Decided by the owner on 2026-09-22; the history is in
    names another host, and `e2e/web/rotli-web-privacy.spec.ts` proves the app
    never asks. The one outbound path is a chat the user starts, which runs the
    user's own AI CLI through the helper; secure notes are refused before it
-   runs (`blocked_for_remote`, with the ledger warmed from the served vault).
+   runs (`blocked_for_remote`). Before every completion on the Helper vault
+   road, the page sends its bound vault id. The Helper checks that id before
+   starting a provider, then re-reads its vault config and refreshes the
+   served vault's secure-prose ledger,
+   including helper writes and external edits. An unavailable vault or a
+   failed scan (an unreadable or oversized Markdown file) refuses the
+   completion before a provider process starts; a note that isn't UTF-8 is
+   read lossily, so its markers still count. The refresh is a full,
+   read-only scan; it does not rely on cached timestamps. During the scan the
+   Helper also compares the prompt directly with each secure body using the
+   ledger's phrase rule, so an early note remains protected even when a large
+   vault exceeds the ledger's 50,000-phrase capacity. If the served-vault
+   configuration changes during the scan, the Helper rechecks a bound vault
+   id before completing the request.
+   On the browser folder road (`vaultRoad: "folder"`) the Helper cannot see
+   the page's folder, so that refresh covers only a vault the Helper itself
+   serves, if any. There the page is the enforcer: a chat that has read a
+   secure note is refused for a remote model (`ai/host.ts`), and the Helper
+   adds only `blocked_for_remote` (secure markers and secret shapes), not a
+   body comparison against the page's vault.
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own
@@ -27,7 +46,16 @@ Decided by the owner on 2026-09-22; the history is in
    every author token (only a plain `<!doctype html>` precedes it), so not even the
    site's own origin can receive note text in a request URL. The no-egress
    E2E counts only requests that left the page and allows same-origin ones
-   only for files the build ships.
+   only for files the build ships. Mermaid source is checked by the pure
+   `lib/mermaidPolicy.ts` rule **before** either vendor renderer/converter runs:
+   images/icons, Markdown images, links/clicks, HTML, URL-bearing tokens,
+   escaped tokens, and author configuration are refused inline. HTML and
+   Mermaid entities are decoded to a fixed point with a bounded fail-closed
+   limit before these checks. Ordinary labels such as `click`, `Link`, and
+   `C://Users` remain readable. Sanitizing the finished SVG would
+   be too late: Mermaid's image loader can make a request during rendering.
+   Ordinary diagrams remain available; this conservative refusal can also
+   withhold harmless source containing those tokens.
 3. **A lost connection is a reconnect screen, never a stand-in vault.**
    Nothing is written anywhere but the bound vault.
 4. **Typing is never lost** to an outage, a closed tab, or a hard refresh.
@@ -44,6 +72,39 @@ Both roads implement the same `VaultDir` port (`services/vaultDir.ts`), so the
 notes service (`FolderNotesService`), the `.rotli/` store, chats, and files are
 identical above it. `lib/helperVaultDir.test.ts` runs the port's contract
 against the in-memory reference and the helper adapter.
+Note and `.rotli/` manifest reads derive their revision from the exact text
+returned. Their writes present that content revision to the folder adapter,
+which checks it in the write turn; a concurrent edit is a conflict. A
+file editor's revision is likewise FNV-1a 64 over the exact bytes it opened,
+including CSV text encoded as UTF-8. File stats use the same complete-byte
+revision for reload and parked-edit comparisons. A save passes that revision
+to `VaultDir.writeBytes`, which compares it inside its write turn, and returns
+the revision of the newly saved bytes; `"0"` permits creation only when the
+path is missing. The first user save keeps a one-time `.bak` of the prior bytes.
+Chromium's folder road holds a vault-and-path keyed Web Lock across each
+revision check and write, so tabs using this browser's vault identity take
+turns, including behind a long write rather than failing after a wait deadline.
+Moves acquire both path locks in sorted order through source removal.
+If Web Locks are unexpectedly unavailable, the adapter falls back to its
+per-instance turns; another tab can then race it.
+Rotli Helper reads up to 256 MiB per file, but its 24 MiB JSON request cap
+also counts base64 expansion on writes; an oversized save reports the Helper
+file limit to the page.
+A content-gated removal also compares exact bytes in its removal turn, so a
+rollback refuses a newer file it observes then. Chromium checks the source
+again after publishing a move destination; if it changed, both files remain
+and the move reports a conflict. An outside app can still write between a
+check and the filesystem operation: Web Locks cover Rotli tabs, not other
+processes, and the browser folder API has no atomic compare-and-swap.
+When an outside edit is detected, Rotli leaves both copies for the person to
+compare; a retry should reopen the current file first. An undetected write in
+that final gap remains a limitation of the browser folder road.
+An ungated removal of a missing path succeeds without changing anything;
+a content-gated removal of a missing or changed file is a revision conflict.
+The Helper adapter decides its removal gate after earlier queued writes and
+refreshes an invalidated walk before deciding whether the path exists.
+Secure note relocation adds the destination to `.gitignore` before moving and
+removes the source exclusion after the move succeeds.
 
 ## The binding and the boot
 
@@ -82,9 +143,104 @@ revision-gated like notes (`${lastModified}:${size}`, then the helper's own
 gate). `FolderNotesService` lists boards by stat alone (they never join the
 note index as notes) and moves them through Archive/Trash like the Mac corpus.
 Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
-Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
-`launchFeatures(…, "web").documents` is false, so the chooser shows Document as
-coming soon and every create path refuses it.
+Not on the web: Reveal in Finder (hidden). The connected-folder managed-file
+adapter can create DOCX and XLSX bytes in `storage/rotli` for a memex vault or
+`Storage` for a plain vault. It accepts only those two extensions, collides as
+`stem-2.ext`, and uses the `"0"` content gate at every candidate, including
+after a racing create. Surfaced file Archive/Trash moves and restores use the
+folder notes lifecycle path; the file stat enables those menu actions. A new pristine document is hard-discarded on close only
+while its exact creation bytes remain; a changed or missing file is kept and
+the refusal is reported. Rename carries a first-save `.bak` beside the new
+name without replacing an existing backup. Both folder roads use the same
+rules. **Documents and sheets ship on the web (Beta, 2026-10-12).**
+`launchFeatures(…, "web")` turns `documents` and `sheets` on, so the chooser,
+the titlebar and sidebar New menus, the palette, `/document` and `/sheet` (with
+their Create rows, offered by build capability and a connected vault — never by
+runtime), and existing `document`/`sheet` fences mount the same editors and
+codecs as the Mac, with the same Beta badge. CSV embeds are never withheld:
+the sheet embed saves through the same byte-revision adapter on both shells.
+Every creation entry names a document before its file exists, so the pristine
+hard-discard lane above is reached by no current control on either shell; its
+proof is `folderManagedFiles.test.ts`. A Rotli Helper vault is not re-read on
+window focus (only the chosen-folder road is), so a file another app adds there
+appears after a reload. Proof: `e2e/web/rotli-web-office.spec.ts` runs create,
+type, save, reload, unzip, formula/format/second-sheet and heading/bold/table
+preservation, the same-size outside-change conflict, and rename-with-backup on
+the browser folder road and a binary-safe in-memory Helper fake. The fake
+enforces the Helper's 24 MiB JSON request cap. A Rust HTTP integration test in
+`src-tauri/src/helper_tests.rs` covers an office-sized binary round trip,
+content gates, and the real Helper's over-cap refusal; `helperClient.test.ts`
+covers the page's file-limit message. `rotli-web-privacy.spec.ts` proves
+editing both makes no off-origin request.
+
+Settings exposes `launchFeatures`' desktop-only `librarian` and `localModels`
+capabilities as one-line Mac availability states on web, without Run now,
+hardware scanning, or model install/default/uninstall controls. Helper-supported
+connected CLI configuration stays available.
+
+`/attach` uses a browser `image/*` file picker on web and the existing
+`importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
+land in the bound vault and Markdown receives only a portable `storage:` link;
+cancelling adds nothing. Desktop keeps its native image/video picker.
+An image pasted into a web note uses that same byte-backed lane at the caret.
+No file path or source image URL is stored in the Markdown link.
+
+## Metadata, views, and assets
+
+Protection controls and the raw metadata banner write through the connected
+`VaultDir`, using complete-file revisions and the note-document codec. Unknown
+fields and note bodies survive. The raw editor refuses changes to the same
+reserved keys Rust protects (`id`, `created`, `owner`, `local_ai_allowed`,
+`view_tag`, `created_by`, `ai_edit`); the web shows the refusal instead of
+silently restoring those lines. Lock, AI-edit permission, and local-AI access
+use their explicit commands. Local-AI access remains portable metadata even
+though the web's AI corpus has no on-device exception.
+
+Marking secure requires a stable frontmatter id, records `secure_origin`,
+protects both paths in `.gitignore` before relocation, and moves the note into
+`wiki/_secure` (a plain vault uses `Secure notes`). Clearing protection restores
+the prior home before removing the flag and ignore entry; detected secrets
+refuse removal. `folderMetadata.setFolderSecure` returns the resulting path
+for relocation bookkeeping. Raw `secure` edits synchronize the git exclusion,
+as Rust's raw lane does; relocation belongs to the explicit protection command.
+After a successful move, failure to remove the obsolete exclusion leaves that
+safe extra line in place without reporting the move as failed.
+
+Named-view writes validate names and singular membership, ensure Main references,
+and synchronize each changed Markdown `view_tag`. Boards and binaries never
+receive frontmatter. Failed writes roll back only bytes this transaction wrote,
+including `.gitignore` exclusion edits. The one revision-gated exclusion writer
+also narrows `.rotli/` to `.rotli/*` while preserving concurrent secure entries;
+a newer external edit wins. Main may retain safe additional references after
+failure, as on desktop. Durable aliases resolve alongside current filename and
+title selectors; renaming a stable-id note preserves earlier selectors on disk.
+The first H1 typed into a new blank note replaces its `untitled.md` staging
+filename with the title slug, retaining the same frontmatter id and Main/view
+references. A placeholder is not recorded as an alias.
+
+The folder walk lists ordinary files by stat alone. Memex files surface from
+`wiki`, `chats`, lifecycle sinks, and `storage`; plumbing, memory lanes, and
+dot entries stay hidden. Storage Markdown outside the Excalidraw lane stays
+out of the note index. File summaries never read binary contents or join the
+note text index; filename search uses their names. Local file text, bytes, and
+stat come from the connected vault. Media panes own temporary blob URLs and
+revoke them on unmount; cached thumbnail consumers use data URLs. HTML keeps
+its sandbox and no-egress policy. CSV and other editable text-file saves refuse
+source bytes that are not valid UTF-8 before writing a backup or saving, and
+pass the observed content revision into the adapter's write turn. Binary saves pass
+the revision of their observed bytes through the same gate. CSV saves preserve a
+first-save backup. If another tab creates that backup first, its exclusive
+create conflict is harmless and the save still reaches the main file's own
+revision gate. DOCX and XLSX open in their editors (Beta). A package that
+isn't a readable zip says so in plain words, never the zip library's message.
+Finder, default-app, PDF export, and macOS conversion actions are hidden there
+(gated by `PLATFORM`); a PDF or a legacy `.doc`/`.rtf`/`.odt` instead says to
+save a `.docx` copy in another app and open that copy here.
+
+The browser folder's Web Lock serializes Rotli tabs on the same origin; it
+cannot lock other apps writing the folder. The helper additionally enforces
+its server-side revision and lock. Multi-file
+view and protection operations cannot be made atomic by Chromium's folder API.
 
 ## Keys on the web
 
@@ -93,8 +249,27 @@ Rotli Web has no app hotkeys (`launchFeatures(…, "web").hotkeys` is false,
 rest. `keys/registry.ts` `currentChord` answers null for every modifier chord
 except the editor's text formatting (`EDITOR_ACTION` — ⌘B, ⌘I…), so nothing
 dispatches it and no hint names it (`lib/hotkeyHint.ts` for hard-coded hints);
-bare keys (Esc, Enter) still answer. Every action stays in the ⌘K palette —
-reached from the search field — and Settings has no Keybindings pane.
+bare keys (Esc, Enter) still answer. Platform availability is separate from
+transient action enablement: the registry excludes desktop-only actions from
+web registration, dispatch, and search. Available actions stay in the palette,
+reached from the search field; Settings has no Keybindings pane. Palette row
+hints use `currentChord`, and hard-coded footer, leader, navigation, and tour
+hints use the same build policy.
+
+The palette omits desktop browser, Finder, window, and numbered-sidebar actions;
+Escape still closes the current web view. Note chat commands and row menus use
+the chat chip's Helper setup route until the Helper is ready, then resolve the
+note's path through the connected web vault.
+
+The Welcome catalog in `src/assets/welcome.json` remains shared with Rust.
+Its web replacements change lessons that teach desktop chords, document
+creation, or the desktop-only Librarian; web seeding writes those variants as
+ordinary Markdown.
+Empty Trash in the web vault removes files permanently, so both confirmations
+say so. Finder-only row actions are absent. On focus or return to a visible tab,
+the File System Access road rebuilds its note listing and refetches notes;
+metadata and protection commands resolve paths through that refreshed listing;
+the editor's clean-buffer gate preserves unsaved typing.
 
 ## Rotli Helper's vault lane
 
@@ -102,7 +277,8 @@ reached from the search field — and Settings has no Keybindings pane.
 
 - **Chosen by a person, never by the page.** `rotli-helper --vault <dir>`
   writes `~/.rotli-helper/vault.json` (0600) and exits; the running helper
-  follows the file. `vault_choose` opens the OS picker (`helper_picker.rs`).
+  re-reads that file on every request (never trusting its mtime alone), so it
+  follows the switch at once. `vault_choose` opens the OS picker (`helper_picker.rs`).
   The page learns only the folder's name and id.
 - **Confined.** Every path is relative and resolved by
   `containment::resolve_beneath`; `..`, absolute paths, drive prefixes,
@@ -112,19 +288,30 @@ reached from the search field — and Settings has no Keybindings pane.
   contains the helper's own directory (`~/.rotli-helper`, e.g. the home
   folder) is refused, so the page can never rewrite the config that names the
   root or read the pairing token.
-- **Bound to one vault per page.** Every verb carries the `vaultId` the page
-  bound to; a helper since pointed at another folder answers 409 "vault
-  changed" before touching disk, and the page reloads into setup.
+- **Bound to one vault per page.** Every vault verb and every completion from a
+  page on the Helper vault road carries the `vaultId` the page bound to; a helper
+  since pointed at another folder answers 409 "vault changed" before touching
+  disk, and the page re-probes into setup. A page on the browser folder road
+  sends `vaultRoad: "folder"` instead. If the helper serves a vault, it refuses
+  a completion with neither marker and tells an older page to reload. With no
+  served vault, legacy completions may run because there is no Helper vault to
+  mix up; an unreadable or invalid vault configuration still fails closed.
+  `vault_info` advertises `completionVaultBinding: true` only when the helper
+  enforces this rule. A page paired to an older helper can still use its vault
+  files, but keeps Helper-road chat unavailable and asks for a Helper update.
 - **Atomic, locked, revision-gated, no-clobber.** Writes use
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
-  content revision (`fnv1a64`, `expectedContent`) when the page knows the text
+  content revision (`fnv1a64`, `expectedContent`) when the page knows the bytes
   it edited, else by `${mtimeMs}:${size}`; a stale write is 409, and a write
   or delete of an EXISTING file with no gate at all is refused (only creating
   a file needs none), so no token holder can clobber without saying what it
   saw. A page can never create a `<file>.lock` sidecar (the desktop writers'
-  lock), and Windows junctions are skipped in listings like symlinks. Deletes of a
-  file take the same lock and gate, so a delete decided against an older
+  lock), including a directory or ancestor component ending in `.lock`
+  (in any letter case); reads may still inspect these ordinary files, as on
+  desktop. Windows junctions are skipped in listings like symlinks. Deletes of a
+  file take the same lock and gate; a content-gated delete refuses a directory
+  or missing path even if the supplied revision is `"0"`, so a delete decided against an older
   version never removes a newer one, and a folder removal never deletes a file
   that has taken the folder's name. A move never replaces an existing file —
   atomically in the helper (hard link, then unlink, both under the source's
@@ -132,11 +319,14 @@ reached from the search field — and Settings has no Keybindings pane.
   by refusal in every `VaultDir` (the port's contract). A case-only rename
   (`a.md` → `A.md`) renames the file itself (helper) or goes through a unique
   temporary name (browser folder), never copy-then-delete, which on a
-  case-insensitive disk deletes the only copy.
+  case-insensitive disk deletes the only copy. The helper uses that rename
+  branch only when the destination identifies the source file (device/inode
+  on Unix, volume/file index on Windows); a distinct differently-cased sibling
+  is a 409 conflict, and an absent destination uses the ordinary no-replace move.
 - **Residual, documented:** in Chromium's folder mode the browser offers no
   no-replace write, so another writer creating a move's target in the same
-  instant as the check wins. A write whose text the page never read (a binary,
-  or a `.rotli/` file written after a stat) is gated by `${mtimeMs}:${size}`
+  instant as the check wins. A write whose content the page never read (for
+  example, a `.rotli/` file written after a stat) is gated by `${mtimeMs}:${size}`
   only; an external edit of the same size in the same millisecond would pass
   it (still under the lock). Checks resolve a path and the operation then
   reopens it. Another process running as the same user that swaps a folder
@@ -144,7 +334,13 @@ reached from the search field — and Settings has no Keybindings pane.
   operation; such a process can already read and write everything the user
   can, and the page has no way to create a link.
 - **Few round trips.** `vault_walk` answers every list/stat in one call and
-  `vault_read_many` batches reads (12 MB per answer). Measured 2026-09-22 on
+  `vault_read_many` batches reads (12 MiB of text per answer). Reads require
+  regular files, check their size before allocating, and read at most the
+  allowed bytes plus one to catch growth after stat. An individual read (an
+  image, a video) has a 256 MiB cap and refuses larger files with 413; a batch also
+  checks its remaining budget and lists oversized or deferred files in its
+  existing `more` array. The client can then read on demand and receive the
+  individual refusal. Measured 2026-09-22 on
   a 900-note, 14 MB vault in Firefox: about 1.3 s per full reload, 11–12
   helper calls.
 - **Behind the same defences as chat**: loopback bind, origin allowlist,
@@ -190,15 +386,60 @@ reached from the search field — and Settings has no Keybindings pane.
   replay couldn't finish moves to a per-vault "kept" record — written before
   the record it came from is cleared — that no unload overwrites, retried
   every boot.
+- **A terminal answer mid-session** (401/refused token, 404 on an unavailable vault verb (not a missing file),
+  no-vault 409, or "vault changed" 409) re-probes the bound Helper and switches
+  to its setup gate. Before the editor unmounts, unsaved note buffers are
+  journaled synchronously and unacknowledged mutations are retained per vault.
+  No reload is needed to expose the failure. Stale-revision 409s remain file
+  errors and never change the connection gate; transient network outages keep
+  the retry cover described above.
 - **A hard refresh or closed tab** can't finish an async file write, so on
   `pagehide` the editor's unsaved text is journaled synchronously to
   localStorage and written into the vault on the next boot, before the editor
   opens (`services/webUnsavedJournal.ts`), under the same never-overwrite rule.
+  The journal includes secure and locked policy; a conflict copy keeps both,
+  and an unknown policy leaves the draft queued. Nonempty typing in a new
+  tab is journaled even while file creation is pending and becomes a note on
+  the next boot if creation did not finish.
   The journal is keyed by the vault's identity on this browser (the helper's
   vault id, or an id this browser mints for a chosen folder and finds again
   whenever that folder is chosen again, even after others — a small map of
   folder handles to ids), never by folder name; a draft that can be
   neither saved nor kept as a note waits under its own "kept" key.
+- **Office recovery.** CSV, XLSX, and DOCX edit in the web office editors. Each user
+  change in an office editor synchronously stores its engine-neutral snapshot
+  and the exact opened file bytes as base64 in a browser-local journal keyed by
+  the connected vault identity. This happens before the 800 ms autosave timer,
+  and `pagehide` takes one more synchronous snapshot of live dirty editors;
+  async hide/quit flushes remain best effort. The draft records the complete
+  byte revision of its base. Boot re-encodes the conventional file and writes
+  only through that revision gate; if the source changed, the draft becomes a
+  free `unsaved copy` sibling and the changed original stays untouched. A
+  failed replay moves to a separate kept record for that editing session,
+  retried on boot; only a confirmed save or confirmed conflict copy clears
+  that exact draft. Each tab's editing session has its own key and holds a
+  vault-and-session Web Lock for its lifetime. Boot skips another live tab's
+  draft without encoding, writing, or clearing it. A failed liveness check
+  also leaves the record untouched; without Web Locks, boot defers peer drafts
+  rather than guessing they are abandoned. A dead session replays in place
+  only when it is the file's sole draft and its base still matches. Competing
+  drafts become separate `unsaved copy` siblings. A draft added during
+  asynchronous replay remains queued. If a later edit exceeds the journal
+  limit, the last protected token is retained so a confirmed save clears the
+  older snapshot instead of recovering already-saved work. The
+  journal permits 1,000,000 ASCII characters per entry and 1,200,000 in total
+  for this vault. Even when each character counts as two UTF-16 bytes, that is
+  under 2.4 MiB of the usual approximately 5 MiB origin quota, leaving room
+  for note and pending-operation journals. A larger edit or blocked
+  storage displays “This change isn't protected until it saves” in the editor;
+  it is still offered to normal autosave. The web build does not prompt on tab
+  close, matching notes: a synchronous journal, rather than an unload-time
+  promise or prompt, guards dirty typing. `e2e/web/rotli-web-office-recovery.spec.ts`
+  types into each editor and hard-refreshes inside the autosave window; its
+  second-tab case checks that a live workbook draft remains untouched. A
+  document embed in a note is the same editor and is journaled; a **sheet
+  embed** is not (its live entry carries no source bytes), so its edits rely
+  on the 500 ms autosave and the `pagehide` flush.
 
 ## Migration
 

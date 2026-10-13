@@ -16,7 +16,6 @@ import {
   type ICustomTable,
   type IParagraph,
   type ITable,
-  type ITableCell,
   type ITextRun,
 } from "@univerjs/presets";
 import { UniverDocsDrawingPreset } from "@univerjs/preset-docs-drawing";
@@ -44,6 +43,8 @@ import UniverPresetDocsCoreEnUS from "@univerjs/preset-docs-core/locales/en-US";
 import "@univerjs/preset-docs-core/lib/index.css";
 import "@univerjs/preset-docs-hyper-link/lib/index.css";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
+import { pauseRenderWhileHidden } from "../../lib/pauseWhileHidden";
+import { documentTableSource } from "./tableSource";
 import { documentFitZoom } from "../layout";
 import { keepCaretStyleThroughNoopMutations } from "./caretStyle";
 import { linkRange, paragraphRuns, routeDocumentLinks } from "./links";
@@ -213,54 +214,6 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
         cl: { rgb: `#${GENERATED_DOCX_THEME.bodyColor}` },
       },
     },
-  };
-}
-
-function tableCellSource(cell: DocumentTableCell): ITableCell {
-  return {
-    margin: {
-      start: { v: 10 },
-      end: { v: 10 },
-      top: { v: 5 },
-      bottom: { v: 5 },
-    },
-    ...(cell.rowSpan !== undefined ? { rowSpan: cell.rowSpan } : {}),
-    ...(cell.columnSpan !== undefined ? { columnSpan: cell.columnSpan } : {}),
-  };
-}
-
-function documentTableSource(table: DocumentTable): ITable {
-  const columnCount = Math.max(
-    1,
-    table.columnWidths?.length ?? 0,
-    ...table.rows.map((row) => row.cells.length),
-  );
-  const widths =
-    table.columnWidths?.length === columnCount
-      ? table.columnWidths
-      : Array.from({ length: columnCount }, () => 648 / columnCount);
-  return {
-    tableId: table.id,
-    tableRows: table.rows.map((row) => ({
-      tableCells: row.cells.map(tableCellSource),
-      trHeight: { val: { v: 30 }, hRule: 0 },
-    })),
-    tableColumns: widths.map((width) => ({ size: { type: 1, width: { v: width } } })),
-    align: 0,
-    indent: { v: 0 },
-    textWrap: 0,
-    position: {
-      positionH: { relativeFrom: 5, posOffset: 0 },
-      positionV: { relativeFrom: 3, posOffset: 0 },
-    },
-    dist: { distB: 0, distL: 0, distR: 0, distT: 0 },
-    cellMargin: {
-      start: { v: 10 },
-      end: { v: 10 },
-      top: { v: 5 },
-      bottom: { v: 5 },
-    },
-    size: { type: 0, width: { v: widths.reduce((sum, width) => sum + width, 0) } },
   };
 }
 
@@ -479,6 +432,8 @@ export function mountDocumentEditor(
   const selectionManager = injector.get(DocSelectionManagerService);
   const contentInsertService = injector.get(DocContentInsertService);
   const renderManager = injector.get(IRenderManagerService);
+  // a warm tab or folded embed has no box: stop the 60 fps redraw until shown
+  const releaseRenderPause = pauseRenderWhileHidden(host, renderManager);
   let disposed = false;
   const structureChangeCallbacks = new Set<() => void>();
 
@@ -782,6 +737,7 @@ export function mountDocumentEditor(
       keepCanvasConventional.dispose();
       structureChangeCallbacks.clear();
       releaseLinks();
+      releaseRenderPause();
       univer.dispose();
     },
   };

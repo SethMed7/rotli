@@ -134,6 +134,41 @@
   color: var(--accent-text);
   font-weight: 600;
 }
+
+/* a phone-narrow window: the header wraps at word boundaries instead of
+   clipping mid-word; above this it stays one line so the note keeps its height */
+@media (max-width: 680px) {
+  .ed-head {
+    white-space: normal;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-inline: 16px;
+  }
+  .ed-context,
+  .ed-head .slot,
+  .status-inline {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .ed-context,
+  .ed-head .slot {
+    flex: 1 1 100%;
+    overflow: visible;
+  }
+  .ed-head .slot {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+  .ed-date {
+    flex: 1 1 auto;
+    overflow-wrap: normal;
+  }
+  .status-inline {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow: visible;
+  }
+}
 /* header actions are plain glyphs, not cards (the maintainer, 2026-09-16): no
    surface behind them; hover brings the ink up, "on" is the accent — the same
    grammar as the location chip beside them. Hit area stays ≥ 28px tall

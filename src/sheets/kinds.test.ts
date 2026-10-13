@@ -8,6 +8,8 @@ const dev = { sheets: true };
 test("stable withholds binary workbooks but keeps CSV editing", () => {
   expect(workbookWithheld("xlsx", stable)).toBe(true);
   expect(workbookWithheld("xlsm", stable)).toBe(true);
+  expect(workbookWithheld("xltx", stable)).toBe(true);
+  expect(workbookWithheld("xltm", stable)).toBe(true);
   expect(workbookWithheld("csv", stable)).toBe(false);
   expect(workbookWithheld("xlsx", dev)).toBe(false);
   expect(sheetFormatEditable("csv", stable)).toBe(true);
@@ -31,4 +33,12 @@ test("every read-only sheet names its reason", () => {
   expect(sheetReadOnlyReason({ writable: false }, "csv").label).toBe("read-only");
   expect(sheetReadOnlyReason({ writable: true }, "tsv").label).toBe("view only · .tsv");
   expect(sheetReadOnlyReason({ writable: true }, "csv").title.startsWith("Too large")).toBe(true);
+});
+
+test("web read-only sheet help names an available action for xlsm and oversized files", () => {
+  for (const ext of ["xlsm", "xlsx"]) {
+    const title = sheetReadOnlyReason({ writable: true }, ext, "web").title;
+    expect(title).toContain("open the original in another app");
+    expect(title).not.toContain("Open externally");
+  }
 });

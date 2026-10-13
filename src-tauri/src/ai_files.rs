@@ -12,6 +12,9 @@ use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use quick_xml::escape::unescape;
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 
 use crate::corpus::{compose_root_id, split_root_id, CorpusState};
@@ -138,6 +141,130 @@ fn zip_entry(bytes: &[u8], wanted: &str) -> Result<Vec<u8>, String> {
         at += 46 + name_len + extra_len + comment_len;
     }
     Err(bad())
+}
+
+/// Enumerate package parts for the ledger's XLSX text pass. The same bounded
+/// entry reader above inflates each matching part; a malformed package refuses
+/// the secure local read rather than recording arbitrary zip bytes.
+fn zip_xml_names(bytes: &[u8]) -> Result<Vec<String>, String> {
+    let bad = || "not a readable spreadsheet".to_string();
+    let floor = bytes.len().saturating_sub(65_557);
+    let eocd = (floor..bytes.len().saturating_sub(21))
+        .rev()
+        .find(|&at| u32_at(bytes, at) == Some(0x0605_4b50))
+        .ok_or_else(bad)?;
+    let count = u16_at(bytes, eocd + 10).ok_or_else(bad)? as usize;
+    let mut at = u32_at(bytes, eocd + 16).ok_or_else(bad)? as usize;
+    let mut names = Vec::new();
+    for _ in 0..count {
+        if u32_at(bytes, at) != Some(0x0201_4b50) {
+            return Err(bad());
+        }
+        let name_len = u16_at(bytes, at + 28).ok_or_else(bad)? as usize;
+        let extra_len = u16_at(bytes, at + 30).ok_or_else(bad)? as usize;
+        let comment_len = u16_at(bytes, at + 32).ok_or_else(bad)? as usize;
+        let name = bytes.get(at + 46..at + 46 + name_len).ok_or_else(bad)?;
+        let name = std::str::from_utf8(name).map_err(|_| bad())?;
+        if name == "xl/sharedStrings.xml"
+            || name.starts_with("xl/worksheets/") && name.ends_with(".xml")
+        {
+            names.push(name.to_string());
+        }
+        at = at
+            .checked_add(46 + name_len + extra_len + comment_len)
+            .ok_or_else(bad)?;
+    }
+    if names.is_empty() || names.len() > 256 {
+        return Err(bad());
+    }
+    Ok(names)
+}
+
+/// Cell and shared-string text from a spreadsheet package. Numbers/formula
+/// cached values are included too; the ledger only retains hashes of phrases.
+pub(crate) fn xlsx_text(bytes: &[u8]) -> Result<String, String> {
+    let mut text = String::new();
+    for name in zip_xml_names(bytes)? {
+        let xml = zip_entry(bytes, &name).map_err(|_| "not a readable spreadsheet".to_string())?;
+        if xml.len() > MAX_XML_BYTES as usize {
+            return Err("the spreadsheet's text is too large to check".into());
+        }
+        spreadsheet_part_text(&xml, name == "xl/sharedStrings.xml", &mut text)?;
+    }
+    if text.trim().is_empty() {
+        return Err("not a readable spreadsheet".into());
+    }
+    Ok(text)
+}
+
+/// OOXML permits arbitrary namespace prefixes; Strict OOXML also uses a
+/// different namespace URI. Only the local element name carries this text
+/// policy. Parse XML rather than matching literal `<t>` or `<x:t>` strings.
+fn spreadsheet_part_text(xml: &[u8], shared: bool, text: &mut String) -> Result<(), String> {
+    let bad = || "not a readable spreadsheet".to_string();
+    let mut reader = Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut seen_root = false;
+    let mut in_item = false;
+    let mut item_text = String::new();
+    let root = if shared {
+        b"sst".as_slice()
+    } else {
+        b"worksheet".as_slice()
+    };
+    loop {
+        match reader.read_event().map_err(|_| bad())? {
+            Event::Start(start) => {
+                let local = start.local_name();
+                let local = local.as_ref();
+                if depth == 0 {
+                    if seen_root || local != root {
+                        return Err(bad());
+                    }
+                    seen_root = true;
+                }
+                if (shared && local == b"si") || (!shared && local == b"is") {
+                    in_item = true;
+                    item_text.clear();
+                }
+                if (in_item && local == b"t") || (!shared && local == b"v") {
+                    let raw = reader.read_text(start.name()).map_err(|_| bad())?;
+                    let decoded = raw.decode().map_err(|_| bad())?;
+                    let value = unescape(&decoded).map_err(|_| bad())?;
+                    if local == b"t" {
+                        item_text.push_str(&value);
+                    } else {
+                        text.push_str(&value);
+                        text.push(' ');
+                    }
+                } else {
+                    depth += 1;
+                }
+            }
+            Event::End(end) => {
+                let local = end.local_name();
+                if in_item
+                    && ((shared && local.as_ref() == b"si")
+                        || (!shared && local.as_ref() == b"is"))
+                {
+                    text.push_str(&item_text);
+                    text.push(' ');
+                    in_item = false;
+                    item_text.clear();
+                }
+                depth = depth.checked_sub(1).ok_or_else(bad)?;
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        if text.len() + item_text.len() > MAX_XML_BYTES as usize {
+            return Err("the spreadsheet's text is too large to check".into());
+        }
+    }
+    if !seen_root || depth != 0 || in_item {
+        return Err(bad());
+    }
+    Ok(())
 }
 
 /// The visible text of a .docx, paragraph by paragraph: what the secret
@@ -307,6 +434,23 @@ pub(crate) mod tests {
     }
 
     pub(crate) const XML: &str = r#"<w:document><w:body><w:p><w:r><w:t>Launch &amp; land</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t xml:space="preserve">Owner </w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#;
+
+    #[test]
+    fn xlsx_text_joins_rich_text_runs_before_remembering_phrases() {
+        let shared = b"<sst><si><r><t>The opal bridge</t></r><r><t> crossing opens before autumn twilight.</t></r></si></sst>";
+        let sheet =
+            b"<worksheet><sheetData><row><c t=\"s\"><v>0</v></c></row></sheetData></worksheet>";
+        let bytes = zip_with(
+            &[
+                ("xl/sharedStrings.xml", shared),
+                ("xl/worksheets/sheet1.xml", sheet),
+            ],
+            true,
+        );
+        assert!(xlsx_text(&bytes)
+            .unwrap()
+            .contains("The opal bridge crossing opens before autumn twilight."));
+    }
 
     #[test]
     fn a_documents_text_is_read_from_the_package_itself_deflated_or_stored() {

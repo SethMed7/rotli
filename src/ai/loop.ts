@@ -8,7 +8,7 @@
 // answer — a tool step's JSON scaffolding never reaches the user. Persistence is the
 // caller's job — only the final answer is written to the chat file.
 
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM, type Platform } from "../lib/featurePolicy";
 import { artifactClarification } from "./artifactIntent";
 import { type Budget, budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
@@ -34,8 +34,8 @@ const NOTE_TOOLS: ToolName[] = [
   "create_note",
   "update_note",
   "open_note",
-  "read_file",
 ];
+const FILE_TOOLS: ToolName[] = ["read_file"];
 const DOCUMENT_TOOLS: ToolName[] = ["create_document", "edit_document"];
 const ARTIFACT_TOOLS: ToolName[] = ["create_artifact"];
 const NOTE_SEARCH_TOOLS: ToolName[] = ["search_memory", "search_notes"];
@@ -56,10 +56,15 @@ export const DUPLICATE_CALL_RESULT = "(already requested above — use that resu
 
 /** The tools a turn may call — one rule for every transport (the JSON loop
  * here and Claude's native protocol in nativeLoop.ts). */
-export function allowedTools(input: RunInput, webStrategy: "research" | "primitives"): ReadonlySet<ToolName> {
+export function allowedTools(
+  input: RunInput,
+  webStrategy: "research" | "primitives",
+  platform: Platform = PLATFORM,
+): ReadonlySet<ToolName> {
   return new Set<ToolName>([
     ...NOTE_TOOLS,
-    ...(input.documentTool ? DOCUMENT_TOOLS : []),
+    ...(platform === "desktop" ? FILE_TOOLS : []),
+    ...(platform === "desktop" && input.documentTool ? DOCUMENT_TOOLS : []),
     ...(input.artifactTool ? ARTIFACT_TOOLS : []),
     ...(input.web ? (webStrategy === "research" ? WEB_RESEARCH_TOOLS : WEB_PRIMITIVE_TOOLS) : []),
     ...(input.imageTool ? IMAGE_TOOLS : []),

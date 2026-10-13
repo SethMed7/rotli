@@ -115,9 +115,16 @@ export function fenceBodyRange(
 }
 
 /** The copy a withheld embed fence shows instead of mounting its editor. The
- * fence text stays in the note untouched; the caret still reveals it. */
-export const SHEET_EMBED_WITHHELD = "Spreadsheets aren’t available in this build yet.";
-
-export function withheldEmbedMessage(lang: string, features: { sheets: boolean }): string | null {
-  return lang === "sheet" && !features.sheets ? SHEET_EMBED_WITHHELD : null;
+ * fence text stays in the note untouched; the caret still reveals it. A CSV
+ * embed is never withheld: CSV editing ships in every build, and the embed
+ * saves through the same byte-revision adapter on the Mac and the web. */
+export function withheldEmbedMessage(
+  lang: string,
+  features: { sheets: boolean; documents?: boolean },
+  target = "",
+): string | null {
+  if (lang === "document" && features.documents === false) return "This document opens in Rotli for Mac.";
+  if (lang === "sheet" && !features.sheets && !/\.csv$/i.test(target.trim()))
+    return "This spreadsheet opens in Rotli for Mac.";
+  return null;
 }

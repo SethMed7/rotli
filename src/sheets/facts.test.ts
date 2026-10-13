@@ -7,7 +7,14 @@ import { describe, expect, test } from "bun:test";
 
 import { formatBytes } from "../lib/formatBytes";
 import type { FileStat } from "../lib/tauri";
-import { deriveSheetFacts, describeShape, formatStamp, sheetFormatLabel, sizeLine } from "./facts";
+import {
+  deriveSheetFacts,
+  describeShape,
+  formatStamp,
+  sheetFormatLabel,
+  sizeLine,
+  truncatedRowsNote,
+} from "./facts";
 import type { SheetTable } from "./view";
 
 const table = (over: Partial<SheetTable>): SheetTable => ({
@@ -104,4 +111,9 @@ describe("size and stamp formatting refuse to fabricate", () => {
     };
     expect(sizeLine(stat)).toBe("2.0 KB");
   });
+});
+
+test("a cut table names Open externally only where the Mac offers it", () => {
+  expect(truncatedRowsNote(5000, true)).toBe("showing the first 5,000 rows — Open externally for the rest");
+  expect(truncatedRowsNote(5000, false)).toBe("showing the first 5,000 rows");
 });

@@ -9,6 +9,7 @@ import { useState } from "react";
 
 import { type GuideOs, guideOs } from "../ai/connectorGuides";
 import { PROVIDER_LABELS, type ProviderId } from "../ai/models";
+import { currentWebHelperVaultId } from "../lib/webAiSeam";
 import { type CliDetect, connectorDetectionQuery } from "../services/connectorSetup";
 import { pairHelper, unpairHelper, verifyHelper } from "../services/helperLink";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
@@ -156,6 +157,7 @@ export function WebChatSetupDialog() {
   const install = helperInstall(guideOs(navigator.platform || navigator.userAgent));
   const hide = useChatSetupGuide((s) => s.hide);
   const linked = useHelperLink((s) => s.link !== null);
+  const completionVaultBinding = useHelperLink((s) => s.completionVaultBinding);
   const [lane, setLane] = useState<ProviderId>("claude");
   if (!open) return null;
   return (
@@ -175,6 +177,12 @@ export function WebChatSetupDialog() {
         your notes. Nothing goes through Rotli's servers; what you send a tool goes to that tool's provider,
         as it does in your terminal. On the web that takes three things:
       </p>
+      {linked && currentWebHelperVaultId() && !completionVaultBinding && (
+        <p role="alert">
+          Update Rotli Helper to chat with this vault, then reload Rotli Web. Your vault files remain
+          available.
+        </p>
+      )}
       <GuideSteps>
         <GuideStep n={1} done={linked} title="Install and start Rotli Helper">
           <span className="guide-step-detail">

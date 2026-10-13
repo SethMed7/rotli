@@ -149,9 +149,8 @@ fn document_records_gate(
     if !store.agent_listable(rel) {
         return Err("that document isn't available to agents".into());
     }
-    let title = Path::new(rel).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-    if store.secure_by_name(title, rel) {
-        return Err("blocked: that document is named as secure; Rotli never gives it to an agent".into());
+    if store.file_is_protected(rel) {
+        return Err("blocked: that document is secure; Rotli never gives it to an agent".into());
     }
     let path = store.guard_rel(rel)?;
     if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
@@ -415,10 +414,13 @@ mod tests {
         let bank = store.create_managed_file("bank details.docx", &docx(XML)).unwrap();
         let secret = XML.replace("Launch &amp; land", "sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         let keys = store.create_managed_file("keys.docx", &docx(&secret)).unwrap();
+        std::fs::create_dir_all(root.join("wiki/_secure")).unwrap();
+        std::fs::write(root.join("wiki/_secure/plan.docx"), docx(XML)).unwrap();
 
         assert!(document_gate(&mut store, &plan, false).is_ok());
         assert!(document_gate(&mut store, &bank, false).unwrap_err().contains("secure"));
         assert!(document_gate(&mut store, &keys, false).unwrap_err().contains("secret-shaped"));
+        assert!(document_gate(&mut store, "wiki/_secure/plan.docx", false).is_err());
         assert!(document_gate(&mut store, "storage/rotli/missing.docx", false).is_err());
         // a person's document reads, but never edits
         assert!(document_gate(&mut store, &plan, true).unwrap_err().contains("a person's"));

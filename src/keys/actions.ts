@@ -8,12 +8,11 @@ import {
 // only capabilities enabled in this build.
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
 import { sendChatWindow } from "../lib/chatWindowBridge";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import {
   corpusFrontmatter,
   corpusSetPinned,
   hideMainWindow,
-  isTauri,
   openUrl,
   summon,
   toggleMainWindow,
@@ -33,7 +32,6 @@ import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLife
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
 import { toggleAaPanel } from "../state/aaPanel";
-import { reconnectActiveVault } from "../state/activeVault";
 import { useChatWindowStore } from "../state/chatWindowStore";
 import { frontOn } from "../state/fronts";
 import { chatRuntimeEnabled } from "../state/helperLink";
@@ -49,7 +47,7 @@ import { registerCanvasActions } from "./canvasActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { registerEditHistoryActions } from "./editHistoryActions";
-import { EDITOR_ACTION } from "./editorActionIds";
+import { EDITOR_ACTION, EDITOR_ACTION_LABEL as label } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
 import { registerGraphActions } from "./graphActions";
 import { captureHandle, setupHandle } from "./handles";
@@ -59,6 +57,7 @@ import { registerNoteProtectionActions } from "./noteProtectionActions";
 import { registerQuickNoteActions } from "./quickNoteActions";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
+import { registerVaultActions } from "./vaultActions";
 
 function focusedTabNow() {
   const { root, focusedPaneId } = usePanesStore.getState();
@@ -126,21 +125,7 @@ function zoomReset(): void {
 }
 
 export function registerDefaultActions(): void {
-  registerAction({
-    id: "vault.refresh",
-    title: "Refresh current vault",
-    defaultChord: "Meta+R",
-    enabled: () => isTauri(),
-    run: () => {
-      void reconnectActiveVault().catch((error: unknown) =>
-        useUiStore
-          .getState()
-          .setRowActionError(
-            `Couldn’t refresh the vault — ${error instanceof Error ? error.message : String(error)}`,
-          ),
-      );
-    },
-  });
+  registerVaultActions();
 
   registerAction({
     id: "setup.continue",
@@ -165,7 +150,8 @@ export function registerDefaultActions(): void {
 
   registerAction({
     id: "app.hide",
-    title: "Hide Rotli",
+    title: PLATFORM === "web" ? "Close current view" : "Hide Rotli",
+    transient: PLATFORM === "web",
     defaultChord: "Esc",
     run: () => {
       // Esc unwinds one layer at a time (quokka rule): topmost transient
@@ -197,6 +183,7 @@ export function registerDefaultActions(): void {
   // the maintainer's law (2026-06-12): ⌥Space opens the APP; capture has its own chord. —
   registerAction({
     id: "app.toggleWindow",
+    platforms: ["desktop"],
     title: "Open or hide Rotli",
     defaultChord: "Alt+Space",
     global: true,
@@ -204,6 +191,7 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "capture.summon",
+    platforms: ["desktop"],
     title: "Quick capture",
     defaultChord: "Alt+C",
     global: true, // lives in Rust; dispatch() works for review automation
@@ -211,6 +199,7 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "quick.summon",
+    platforms: ["desktop"],
     title: "Quick note",
     defaultChord: "Alt+Q",
     global: true, // the floating Quick Note window; toggle lives in Rust
@@ -620,13 +609,13 @@ export function registerDefaultActions(): void {
   // — editor formatting (the r5 format bar's 11 controls + highlight; chords
   //   from the r3 gate footer, the rest unbound-but-rebindable) —
   const marks: [string, string, InlineMark, string | null][] = [
-    [EDITOR_ACTION.bold, "Bold", "bold", "Meta+B"],
-    [EDITOR_ACTION.italic, "Italic", "italic", "Meta+I"],
-    [EDITOR_ACTION.underline, "Underline", "underline", "Meta+U"],
-    [EDITOR_ACTION.strike, "Strikethrough", "strike", "Meta+Shift+X"],
-    [EDITOR_ACTION.code, "Inline code", "code", "Meta+E"],
-    [EDITOR_ACTION.highlight, "Highlight", "highlight", "Meta+Shift+H"],
-    [EDITOR_ACTION.link, "Link", "link", null],
+    [EDITOR_ACTION.bold, label.bold, "bold", "Meta+B"],
+    [EDITOR_ACTION.italic, label.italic, "italic", "Meta+I"],
+    [EDITOR_ACTION.underline, label.underline, "underline", "Meta+U"],
+    [EDITOR_ACTION.strike, label.strike, "strike", "Meta+Shift+X"],
+    [EDITOR_ACTION.code, label.code, "code", "Meta+E"],
+    [EDITOR_ACTION.highlight, label.highlight, "highlight", "Meta+Shift+H"],
+    [EDITOR_ACTION.link, label.link, "link", null],
   ];
   for (const [id, title, mark, defaultChord] of marks) {
     // shared: the format chords act on activeEditor(), which resolves per
@@ -665,10 +654,10 @@ export function registerDefaultActions(): void {
     });
   }
   const blocks: [string, string, BlockToggle][] = [
-    [EDITOR_ACTION.quote, "Quote", "quote"],
-    [EDITOR_ACTION.bulletList, "Bulleted list", "bullet"],
-    [EDITOR_ACTION.numberedList, "Numbered list", "numbered"],
-    [EDITOR_ACTION.checklist, "Checklist", "checklist"],
+    [EDITOR_ACTION.quote, label.quote, "quote"],
+    [EDITOR_ACTION.bulletList, label.bulletList, "bullet"],
+    [EDITOR_ACTION.numberedList, label.numberedList, "numbered"],
+    [EDITOR_ACTION.checklist, label.checklist, "checklist"],
   ];
   for (const [id, title, kind] of blocks) {
     registerAction({
@@ -767,6 +756,7 @@ export function registerDefaultActions(): void {
   registerAction({
     enabled: () => chatRuntimeEnabled() && frontOn("chat"),
     id: "chat.summon",
+    platforms: ["desktop"],
     title: "Summon chat",
     defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)
     global: true, // the OS chord lives in Rust (show_main + rotli:summon-chat);
@@ -775,6 +765,7 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "palette.summon",
+    platforms: ["desktop"],
     title: "Summon search",
     defaultChord: "Alt+F", // "find" — the ⌥-letter global family's search twin
     global: true, // Rust shows the window + emits rotli:summon-search;
@@ -783,6 +774,7 @@ export function registerDefaultActions(): void {
   });
   registerAction({
     id: "browser.open",
+    platforms: ["desktop"],
     title: "Open web browser",
     defaultChord: "Alt+T",
     run: () => void openUrl("https://www.google.com/"),
@@ -803,7 +795,14 @@ export function registerDefaultActions(): void {
     ["view.allNotes", "All notes", () => openView("allNotes", ALL_NOTES)],
     ["browser.private", "Open a private browser", () => usePanesStore.getState().openBrowser()],
   ] as const;
-  for (const [id, title, run] of views) registerAction({ id, title, defaultChord: null, run });
+  for (const [id, title, run] of views)
+    registerAction({
+      id,
+      title,
+      ...(id === "browser.private" ? { platforms: ["desktop"] as const } : {}),
+      defaultChord: null,
+      run,
+    });
   // — note ↔ chat: a note owns MANY chats (the maintainer, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);
   //   the New variant always adds another. The editor's chat chip is the

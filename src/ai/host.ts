@@ -13,14 +13,13 @@ import {
   chatMessages,
   chatMessagesStream,
   cliComplete,
-  corpusFileBytes,
+  corpusFileBytesAi,
   corpusFrontmatter,
   corpusCreateManagedFile,
   corpusExportNotePdf,
   corpusNotesAi,
   corpusReadAi,
   corpusReadAiVersioned,
-  corpusReadableIds,
   corpusSearchAi,
   corpusWriteAi,
   webFetch as tauriWebFetch,
@@ -36,6 +35,7 @@ import {
   createPopulatedManagedItem,
   registerPopulatedManagedItem,
 } from "../newItems/composition";
+import { inSecureHome } from "../security/secureNotes";
 import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
@@ -43,7 +43,8 @@ import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
-import { makeFileTools } from "./hostFiles";
+import { aiFileAccessById, makeFileTools } from "./hostFiles";
+import { aiReadableHits, assertAiNoteLocation, noteLocationIsProtected } from "./hostReadGate";
 import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
@@ -70,41 +71,30 @@ function flattenWire(messages: CompleteReq["messages"]): string {
   return `${labeled.join("\n\n")}\n\nAssistant:`;
 }
 
-const chatBodyCache = new Map<string, { modifiedMs: number; body: string }>();
+/** Memory search reads only this many newest chats, so the body cache holds no more. */
+export const CHAT_MEMORY_WINDOW = 100;
+type ChatBody = { modifiedMs: number; body: string };
+const CHAT_BOUNDS = { entries: CHAT_MEMORY_WINDOW, chars: 8_000_000 };
+const chatBodyCache = new Map<string, ChatBody>();
 
-async function cachedChatBody(
-  root: string,
-  slug: string,
-  modifiedMs: number,
-  read: () => Promise<string>,
-): Promise<string> {
-  const key = `${root}\0${slug}`;
-  const cached = chatBodyCache.get(key);
-  if (cached?.modifiedMs === modifiedMs) return cached.body;
-  const body = await read();
-  chatBodyCache.set(key, { modifiedMs, body });
-  if (chatBodyCache.size > 500) chatBodyCache.delete(chatBodyCache.keys().next().value ?? "");
-  return body;
+/** (Re)insert `key` as newest, then evict oldest-first until both bounds hold (Map order = recency). */
+export function touchBounded(map: Map<string, ChatBody>, key: string, value: ChatBody, max = CHAT_BOUNDS) {
+  map.delete(key);
+  map.set(key, value);
+  let chars = [...map.values()].reduce((sum, entry) => sum + entry.body.length, 0);
+  for (const [oldest, entry] of map) {
+    if (map.size <= max.entries && chars <= max.chars) return;
+    map.delete(oldest);
+    chars -= entry.body.length;
+  }
 }
 
-async function aiReadableHits<T extends { id: string }>(hits: T[], model: ChatModelInfo): Promise<T[]> {
-  if (hits.length === 0) return hits;
-  // ONE batched probe (perf audit 2026-07-30, #4) — the per-note corpusReadAi
-  // loop was ~350 serial IPC reads holding a chat's first token. Rust remains
-  // the enforcement point (read_for_ai per id, secure detector included);
-  // this side only filters with the answer. A failed probe reads as "none
-  // readable" — fail closed, never open.
-  try {
-    const readable = new Set(
-      await corpusReadableIds(
-        hits.map((hit) => hit.id),
-        model,
-      ),
-    );
-    return hits.filter((hit) => readable.has(hit.id));
-  } catch {
-    return [];
-  }
+async function cachedChatBody(root: string, slug: string, modifiedMs: number, read: () => Promise<string>) {
+  const key = `${root}\0${slug}`;
+  const cached = chatBodyCache.get(key);
+  const body = cached?.modifiedMs === modifiedMs ? cached.body : await read();
+  touchBounded(chatBodyCache, key, { modifiedMs, body });
+  return body;
 }
 
 export type HostArtifactKind = "note" | "file" | "canvas";
@@ -145,6 +135,10 @@ export function makeTauriHost(
     if (!opts?.onSecureNoteRead || !modelIsOnDevice(model) || ids.length === 0) return;
     for (const id of new Set(ids)) {
       try {
+        if (await noteLocationIsProtected(id)) {
+          opts.onSecureNoteRead();
+          return;
+        }
         const frontmatter = await corpusFrontmatter(id);
         if (!frontmatter || frontmatter.secure) {
           opts.onSecureNoteRead();
@@ -263,7 +257,9 @@ export function makeTauriHost(
     async readNote(id) {
       // Rust verifies model id + provider registration + loopback endpoint.
       // A localhost proxy for a frontier provider therefore remains remote.
+      const protectedLocation = await assertAiNoteLocation(id, model);
       const text = await corpusReadAi(id, model);
+      if (protectedLocation) opts?.onSecureNoteRead?.();
       if (opts?.onSecureNoteRead) {
         try {
           const frontmatter = await corpusFrontmatter(id);
@@ -310,6 +306,8 @@ export function makeTauriHost(
       try {
         images = await Promise.all(
           generatedImagePaths.map(async (path, index) => {
+            const refusal = await aiFileAccessById(path, modelIsOnDevice(model));
+            if (refusal) throw new Error(refusal);
             const extension = extOf(path);
             const mimeType: DocumentImage["mimeType"] | null =
               extension === "png"
@@ -322,7 +320,7 @@ export function makeTauriHost(
                       ? "image/bmp"
                       : null;
             if (!mimeType) throw new Error(`unsupported generated image format: .${extension || "unknown"}`);
-            const base64 = await corpusFileBytes(path, 24 * 1024 * 1024);
+            const base64 = await corpusFileBytesAi(path, model, 24 * 1024 * 1024);
             if (!base64) throw new Error(`generated image is unavailable: ${path}`);
             return documentImageFromBase64(`generated-image-${index + 1}`, fileName(path), mimeType, base64);
           }),
@@ -347,7 +345,9 @@ export function makeTauriHost(
       // remote models and knob-denied local ones, and its refusal is final here
       // too. The read also marks the chat's secure taint exactly like read_note.
       let readRevision: string;
+      let protectedLocation: boolean;
       try {
+        protectedLocation = await assertAiNoteLocation(id, model);
         const read = await corpusReadAiVersioned(id, model);
         readRevision = read.revision;
       } catch (e) {
@@ -361,14 +361,14 @@ export function makeTauriHost(
       // unreadable, LOCKED, or a person's note without a grant (editGate.ts)
       const editBlock = aiEditBlock(frontmatter);
       if (editBlock || !frontmatter) return editBlock ?? UNREADABLE_PROTECTION;
-      if (opts?.onSecureNoteRead && frontmatter.secure === true) {
+      if (opts?.onSecureNoteRead && (frontmatter.secure === true || protectedLocation)) {
         opts.onSecureNoteRead();
       }
       // the create_note taint law's edit twin (PR #4 P1): a chat carrying
       // secure-note content must not launder prose into an OPEN note — it may
       // only edit notes that are THEMSELVES secure. (Re-evaluated AFTER the
       // taint call above, against the same one frontmatter read.)
-      if (opts?.isSecureContext?.() === true && frontmatter.secure !== true) {
+      if (opts?.isSecureContext?.() === true && frontmatter.secure !== true && !protectedLocation) {
         return "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.";
       }
       // the model reads full file text (fences included) and often echoes the
@@ -407,7 +407,7 @@ export function makeTauriHost(
       }));
       const instance = activeInstance(await loadConfig());
       if (!instance) return noteHits.slice(0, limit);
-      const summaries = (await listChats(instance)).slice(0, 100);
+      const summaries = (await listChats(instance)).slice(0, CHAT_MEMORY_WINDOW);
       const documents = await Promise.all(
         summaries.map(async (summary) => ({
           slug: summary.slug,
@@ -445,6 +445,7 @@ export function makeTauriHost(
     },
     async readMemory(id) {
       if (!id.startsWith("chat:")) {
+        await assertAiNoteLocation(id, model);
         const body = await corpusReadAi(id, model);
         await markSecureIds([id]);
         return body;
@@ -563,7 +564,12 @@ export function makeTauriHost(
       // same ids through `corpus_readable_ids` — pure duplication on THIS path.
       // (The SEARCH lane still probes: it unions folder-name hits the listing gate
       // never saw, so those need their own read check.) (perf audit, 2026-08)
-      const readable = await corpusNotesAi(model);
+      const listed = await corpusNotesAi(model);
+      const readable = modelIsOnDevice(model)
+        ? listed
+        : listed.filter(
+            (note) => ![note.id, note.folderId, note.diskFolderId].some((path) => path && inSecureHome(path)),
+          );
       await markSecureIds(readable.map((note) => note.id));
       return buildModelMap(readable, contextWindowFor(model), maxChars);
     },

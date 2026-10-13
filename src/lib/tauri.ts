@@ -1,7 +1,6 @@
 import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
-// Tauri seam — every Tauri API call in the frontend goes through here, guarded
-// by isTauri(), so the whole UI renders in a plain browser (vite dev, no shell).
-import { emit, listen } from "@tauri-apps/api/event";
+// Tauri seam: native IPC and connected-folder browser twins.
+import { type Event, type UnlistenFn, emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
@@ -15,8 +14,14 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
-import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
+import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
+import type { FrontmatterView } from "./corpusFrontmatter";
+export type { FrontmatterView } from "./corpusFrontmatter";
+import { splitRootId } from "./corpusWireId";
+export { rootIdOf, splitRootId } from "./corpusWireId";
+import { PLATFORM } from "./featurePolicy";
+import { sameTaskRequest } from "./sameTaskRequest";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
   type WebAiCorpusShape,
@@ -24,7 +29,26 @@ import {
   currentWebAiCorpus,
   currentWebFileStore,
   currentWebMemexBridge,
+  currentWebVaultIo,
+  hasWebVaultIo,
 } from "./webAiSeam";
+
+/** The desktop browser twin has no connected folder; focused unit tests may
+ * install the web adapter explicitly. The web build always requires it. */
+export const usesWebVaultIo = (): boolean => PLATFORM === "web" || hasWebVaultIo();
+
+/** This webview's label. A bare `listen()` hears an event emitted to ANY
+ * window (Tauri's default `Any` target); pass `{ target: currentWindowLabel() }`
+ * for events Rust addresses per window with `emit_to`. */
+export function currentWindowLabel(): string {
+  return getCurrentWindow().label;
+}
+
+/** `listen` for an event Rust addresses to one window (`emit_to`): only this
+ * window's copy, never another window's (audit 2026-10-12). */
+export function listenHere<T>(event: string, handler: (event: Event<T>) => void): Promise<UnlistenFn> {
+  return listen<T>(event, handler, { target: currentWindowLabel() });
+}
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -330,8 +354,16 @@ function corpusInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   });
 }
 
-export function corpusList(): Promise<CorpusListPayload> {
-  return corpusInvoke("corpus_list");
+/** The whole-vault listing. Callers in one synchronous run (a refetch wave
+ * after one invalidation) share a single IPC answer instead of each parsing a
+ * full copy; treat the payload as read-only — it may be shared. */
+export const corpusList: () => Promise<CorpusListPayload> = sameTaskRequest(() =>
+  corpusInvoke<CorpusListPayload>("corpus_list"),
+);
+
+/** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
+export function corpusListFresh(): Promise<CorpusListPayload> {
+  return corpusInvoke("corpus_list", { fresh: true });
 }
 
 /** FULL-TEXT note search (corpus_search): Rust walks + reads + matches every
@@ -586,7 +618,7 @@ export function localQueueCancel(requestId: string): Promise<void> {
  * never has to infer state. */
 export function onLocalQueue(cb: (q: LocalQueueSnapshot) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<LocalQueueSnapshot>("rotli:local-queue", (e) => cb(e.payload));
+  const unlisten = listenHere<LocalQueueSnapshot>("rotli:local-queue", (e) => cb(e.payload));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -962,27 +994,11 @@ export async function resolveImageSrc(src: string, rootId = "default"): Promise<
   return abs ? convertFileSrc(abs) : "";
 }
 
-/** The corpus root a wire id belongs to ("default" for bare ids) — for
- * callers that must resolve RELATIVE resources (images) against the same
- * corpus the note lives in, not blindly against the default root. */
-export function rootIdOf(id: string): string {
-  return splitRootId(id).rootId;
-}
-
-/** Split a corpus wire id into its root + relative path. The default LOCAL root
- * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
- * where rootid has no slash. Mirrors Rust `split_root_id`. */
-export function splitRootId(id: string): { rootId: string; rel: string } {
-  const i = id.indexOf(":");
-  if (i > 0 && !id.slice(0, i).includes("/")) {
-    return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
-  }
-  return { rootId: "default", rel: id };
-}
-
-/** Asset-protocol URL for a surfaced file note (kind "file"), to feed an
- * <audio>/<img>/<video>/<iframe>. "" outside Tauri or when it can't resolve. */
-export async function fileAssetUrl(id: string): Promise<string> {
+/** Display URL for a surfaced file. Web callers requesting `temporary` own
+ * its blob URL and must revoke it; cached thumbnails use durable data URLs. */
+export async function fileAssetUrl(id: string, temporary = false): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().assetUrl(id, temporary);
   if (!isTauri()) return "";
   const { rootId, rel } = splitRootId(id);
   const abs = await corpusAbs(rootId, rel);
@@ -997,18 +1013,45 @@ export async function corpusCreateCanvas(folderId: string, name: string): Promis
   return invoke<string>("corpus_create_canvas", { folderId, name });
 }
 
-/** Read a surfaced FILE's text content (for the in-app text viewer). Capped on
- * the Rust side. "" outside Tauri. */
+/** Read a surfaced file through the native or connected-folder adapter. */
 export async function corpusFileText(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().text(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_text", { id, maxBytes });
 }
 
-/** Read a surfaced FILE as BASE64 (for a binary the viewer must parse, e.g. a
- * `.xlsx` spreadsheet). Capped on the Rust side. "" outside Tauri. */
+/** Read surfaced file bytes as base64, with the adapter's size gate. */
 export async function corpusFileBytes(id: string, maxBytes?: number): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().bytes(id, maxBytes)
+      : "";
   return invoke<string>("corpus_file_bytes", { id, maxBytes });
+}
+
+export async function corpusFileTextAi(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+  maxBytes?: number,
+): Promise<string> {
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
+  return invoke<string>("corpus_file_text_ai", { id, modelId: model.id, endpoint: model.endpoint, maxBytes });
+}
+
+export async function corpusFileBytesAi(
+  id: string,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+  maxBytes?: number,
+): Promise<string> {
+  if (!isTauri()) throw new Error("AI file reads require the native policy gate.");
+  return invoke<string>("corpus_file_bytes_ai", {
+    id,
+    modelId: model.id,
+    endpoint: model.endpoint,
+    maxBytes,
+  });
 }
 
 export interface FileStat {
@@ -1027,22 +1070,28 @@ export interface FileStat {
   modifiedMs: number | null;
 }
 
-/** Size + writability probe for a surfaced file — the sheet editor decides
- * read-only vs editable up front. null outside Tauri (browser demo = read-only). */
+/** Size, revision, and writability for a surfaced file. */
 export async function corpusFileStat(id: string): Promise<FileStat | null> {
-  if (!isTauri()) return null;
+  if (!isTauri())
+    return usesWebVaultIo() ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().stat(id) : null;
   return invoke<FileStat>("corpus_file_stat", { id });
 }
 
 /** Move a surfaced storage asset into an in-memex lifecycle sink. */
 export async function corpusMoveFileToSink(id: string, sink: "Archive" | "Trash"): Promise<string> {
-  if (!isTauri()) return id;
+  if (!isTauri()) return currentWebVaultIo().moveFileToSink(id, sink);
   return invoke<string>("corpus_move_file_to_sink", { id, sink });
+}
+
+/** A newly created document can be discarded only while its exact bytes remain. */
+export async function corpusDiscardPristineManagedFile(id: string): Promise<void> {
+  if (!isTauri()) return currentWebVaultIo().discardPristineManagedFile(id);
+  await corpusMoveFileToSink(id, "Trash");
 }
 
 /** Restore a surfaced file from Archive/Trash to its original storage path. */
 export async function corpusRestoreFile(id: string): Promise<string> {
-  if (!isTauri()) return id;
+  if (!isTauri()) return currentWebVaultIo().restoreFile(id);
   return invoke<string>("corpus_restore_file", { id });
 }
 
@@ -1054,6 +1103,13 @@ export async function corpusWriteFileBytes(
   bak: boolean,
   expectedRevision: string,
 ): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeBytes(
+      id,
+      base64,
+      bak,
+      expectedRevision,
+    );
   if (!isTauri()) return expectedRevision;
   return invoke<string>("corpus_write_file_bytes", {
     id,
@@ -1069,7 +1125,7 @@ export async function corpusCreateManagedFile(
   base64: string,
   rootId?: string,
 ): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri()) return currentWebVaultIo().createManagedFile(name, base64);
   return invoke<string>("corpus_create_managed_file", { name, base64, rootId });
 }
 
@@ -1086,9 +1142,10 @@ export async function corpusConvertDocument(id: string): Promise<string> {
   return invoke<string>("corpus_convert_document", { id });
 }
 
-/** False for genuinely read-only roots or unsupported vault contracts. */
+/** False for genuinely read-only roots or unsupported vault contracts. A
+ * connected web folder is writable: connecting asks for readwrite access. */
 export async function corpusManagedFileCreationAvailable(): Promise<boolean> {
-  if (!isTauri()) return false;
+  if (!isTauri()) return hasWebVaultIo();
   return invoke<boolean>("corpus_managed_file_creation_available");
 }
 
@@ -1110,25 +1167,6 @@ export async function corpusOpenFileWith(id: string, app: string): Promise<void>
   await invoke("corpus_open_file_with", { id, app });
 }
 
-export interface FrontmatterView {
-  id: string;
-  created: string;
-  updated: string;
-  locked: boolean;
-  /** Secrets detected (auto-flagged) → never sent to a remote model + gitignored. */
-  secure: boolean;
-  /** The EFFECTIVE verdict for loopback-local AI on a secure note (note override
-   * → vault `secureLocalAi` knob → the default, allow). Rust resolves the policy
-   * once; the UI only reflects it (2026-08-01). */
-  localAiAllowed: boolean;
-  /** Pinned to the top of every list (pinned → updated → id sort). */
-  pinned: boolean;
-  /** May an AI rewrite this note's text? Rust's ai_edit_policy verdict. */
-  aiBodyEdit: AiBodyEdit;
-  /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
-  fields: string[];
-}
-
 /** Read a note's frontmatter for the metadata panel (display + lock state). */
 export type WebAiCorpus = WebAiCorpusShape<
   CorpusNoteMeta,
@@ -1139,7 +1177,15 @@ export type WebAiCorpus = WebAiCorpusShape<
 >;
 const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
-  if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
+  if (!isTauri()) {
+    let io;
+    try {
+      io = currentWebVaultIo<FrontmatterView, FileStat, VersionedText>();
+    } catch {
+      return webCorpus()?.frontmatter(id) ?? null;
+    }
+    return io.frontmatter(id);
+  }
   return invoke<FrontmatterView>("corpus_frontmatter", { id });
 }
 
@@ -1152,9 +1198,12 @@ export async function corpusSetPinned(id: string, pinned: boolean): Promise<void
 
 /** The note's frontmatter as RAW TEXT (fences included), byte-exact from disk —
  * the "Show file metadata" view renders this above the body. "" when the note
- * has none (or outside Tauri). */
+ * has none. */
 export async function corpusRawFrontmatter(id: string): Promise<VersionedText> {
-  if (!isTauri()) return { contents: "", revision: "browser" };
+  if (!isTauri())
+    return usesWebVaultIo()
+      ? currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().rawMetadata(id)
+      : { contents: "", revision: "browser" };
   return invoke<VersionedText>("corpus_raw_frontmatter", { id });
 }
 
@@ -1166,6 +1215,12 @@ export async function corpusWriteFrontmatterRaw(
   block: string,
   expectedRevision: string,
 ): Promise<string> {
+  if (!isTauri() && usesWebVaultIo())
+    return currentWebVaultIo<FrontmatterView, FileStat, VersionedText>().writeMetadata(
+      id,
+      block,
+      expectedRevision,
+    );
   if (!isTauri()) return "browser";
   return invoke<string>("corpus_write_frontmatter_raw", {
     id,
@@ -1732,67 +1787,6 @@ export function workspaceTakeOpenRequest(): Promise<WorkspaceOpenRequest | null>
   return invoke<WorkspaceOpenRequest | null>("workspace_take_open_request");
 }
 
-/** Rust → main window: the corpus changed UNDER the app (a folder dropped in,
- * a note edited in another editor). Debounced Rust-side; the frontend just
- * invalidates and refetches — content appears when ready, no spinners. */
-export function onCorpusChanged(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:corpus-changed", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** Rust → every webview: the active vault route changed while the process and
- * native windows stayed alive. Each frontend drops vault-scoped caches and
- * rehydrates its own surface from the new default store. */
-export function onVaultChanged(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:vault-changed", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** Rust → main window: `rotli open <id>` wrote its mailbox and activated the
- * app (the Reopen event) — consume the request NOW. Replaces the app-lifetime
- * 750ms workspaceTakeOpenRequest poll (perf audit 2026-07-30, #15). */
-export function onOpenRequest(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:open-request", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** macOS File → Close Tab. ⌘W intentionally stays in the frontend registry so
- * it closes during the original key event instead of taking a native event
- * round trip; pointer selection of the menu item still forwards here. */
-export function onNativeCloseTab(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:close-tab", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** macOS Edit → Undo / Redo picked with the pointer (⌘Z / ⇧⌘Z reach the page as
- * key presses instead; keys/editHistoryActions.ts). */
-export function onNativeEditHistory(cb: (redo: boolean) => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen<string>("rotli:edit-history", (event) => cb(event.payload === "redo"));
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** Rust → main window: the organizer daemon appended to the brain journal (a
- * new proposal or an auto-applied action) — refetch it so Activity + the
- * sidebar badge update within a beat, no polling. */
-export function onBrainJournal(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:brain-journal", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
-/** Rust → main window: the ⌥F global chord fired — surface the window with the
- * ⌘K palette open ("find", the search twin of ⌥A's "ask"). */
-export function onSummonSearch(cb: () => void): () => void {
-  if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:summon-search", () => cb());
-  return () => void unlisten.then((fn) => fn());
-}
-
 /** One live organizer-progress beat (2026-07-31): the daemon narrates a cycle
  * — start (queue size), each note it looks at (title only, never content),
  * and the end tally. The Activity surface renders these as the working feed. */
@@ -1811,7 +1805,7 @@ export interface OrganizerProgress {
 
 export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
+  const unlisten = listenHere<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -1824,14 +1818,18 @@ export interface AuthorizedNativeDrop {
  * matching single-use import capabilities. */
 export function onNativeDropAuthorized(cb: (drop: AuthorizedNativeDrop) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) => cb(event.payload));
+  const unlisten = listenHere<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) =>
+    cb(event.payload),
+  );
   return () => void unlisten.then((fn) => fn());
 }
 
 /** A Finder drop none of whose items could be granted (folders, gone files). */
 export function onNativeDropRefused(cb: (count: number) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<{ count: number }>("rotli:native-drop-refused", (event) => cb(event.payload.count));
+  const unlisten = listenHere<{ count: number }>("rotli:native-drop-refused", (event) =>
+    cb(event.payload.count),
+  );
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -2026,14 +2024,14 @@ export function onCaptureAck(cb: (id: string) => void): () => void {
 /** Rust → capture webview: the card was just summoned (refocus the field). */
 export function onCaptureShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:capture-show", () => cb());
+  const unlisten = listenHere("rotli:capture-show", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
 /** Rust → quick webview: the card was just summoned (refocus the editor). */
 export function onQuickShow(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:quick-show", () => cb());
+  const unlisten = listenHere("rotli:quick-show", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 
@@ -2041,7 +2039,7 @@ export function onQuickShow(cb: () => void): () => void {
  * is already shown Rust-side; the webview only picks/creates the chat tab. */
 export function onSummonChat(cb: () => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen("rotli:summon-chat", () => cb());
+  const unlisten = listenHere("rotli:summon-chat", () => cb());
   return () => void unlisten.then((fn) => fn());
 }
 

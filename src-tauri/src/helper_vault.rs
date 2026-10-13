@@ -18,8 +18,9 @@
 //! - A root that CONTAINS the helper's own directory (`~/.rotli-helper`, e.g.
 //!   the home folder) is refused, so the page can never rewrite the config
 //!   that names the root, or read the pairing token.
-//! - Every verb names the vault id the page bound to; a helper since pointed
-//!   at another folder refuses before touching disk (409 "vault changed").
+//! - Every vault verb and Helper-road completion names the vault id the page
+//!   bound to; a helper since pointed at another folder refuses before disk
+//!   or a provider (409 "vault changed"). Folder-road completions say so.
 //! - Writes are atomic (temp file + rename), taken under the SAME `.lock`
 //!   sidecar the desktop app's writes hold (`fsutil::with_file_lock`), and
 //!   revision-gated: by content (`fnv1a64`, the desktop's own revision) when
@@ -33,8 +34,8 @@
 //! user can; the page itself has no way to create a link.
 //!
 //! Nothing here touches the network. The secure-prose ledger is warmed from
-//! the served vault so `cli_complete`'s `blocked_for_remote` gate guards the
-//! notes this vault actually holds.
+//! the served vault and refreshed before every completion, so the
+//! `blocked_for_remote` gate guards the notes this vault actually holds.
 
 use std::fs;
 use std::io::ErrorKind;
@@ -49,18 +50,18 @@ use crate::containment::resolve_beneath;
 
 pub(crate) const CONFIG_FILE: &str = "vault.json";
 const WRITE_PREFIX: &str = ".rotli-write-";
-/// Build output and history nobody edits from Rotli: never walked or listed
-/// (compared without letter case: `.GIT` on a case-insensitive disk is `.git`).
-const SKIPPED_DIRS: [&str; 2] = [".git", "node_modules"];
-
+/// Build output and history nobody edits from Rotli: the native corpus rule.
 fn skipped_dir(name: &str) -> bool {
-    SKIPPED_DIRS.iter().any(|skip| skip.eq_ignore_ascii_case(name))
+    crate::corpus::is_skipped_dir(name)
 }
 /// A walk that finds more than this is not a notes vault (a home folder, a
 /// drive root); it is refused rather than streamed.
 const MAX_WALK_ENTRIES: usize = 200_000;
-/// One `vault_read_many` answer's text budget; the page asks again for the rest.
+/// Per-file byte cap and one `vault_read_many` answer's text budget.
 const READ_MANY_BUDGET: usize = 12 * 1024 * 1024;
+/// One file read on its own (an image, a video the page shows): bounded so a
+/// huge file can't exhaust the helper, yet roomy enough for vault media.
+const READ_ONE_LIMIT: usize = 256 * 1024 * 1024;
 
 pub(crate) type Refusal = (u16, String);
 pub(crate) type Picker = Box<dyn Fn() -> Result<Option<PathBuf>, String> + Send + Sync>;
@@ -76,9 +77,11 @@ pub(crate) struct VaultConfig {
 
 pub(crate) struct ServedVault {
     config_path: PathBuf,
-    /// The config as last read, keyed by the file's mtime: `rotli-helper
-    /// --vault` in a terminal rewrites the file and the running helper follows.
-    cached: Mutex<(Option<SystemTime>, Option<VaultConfig>)>,
+    /// The config as last read, only to warm the ledger once per new vault.
+    /// Every request re-reads the (tiny) file instead of trusting its mtime:
+    /// `rotli-helper --vault` in a terminal rewrites it, and two quick
+    /// rewrites can share an mtime.
+    cached: Mutex<Option<VaultConfig>>,
     picker: Picker,
     picking: Mutex<bool>,
 }
@@ -87,39 +90,83 @@ impl ServedVault {
     pub(crate) fn new(config_dir: &Path, picker: Picker) -> Self {
         let served = Self {
             config_path: config_dir.join(CONFIG_FILE),
-            cached: Mutex::new((None, None)),
+            cached: Mutex::new(None),
             picker,
             picking: Mutex::new(false),
         };
-        if let Some(config) = served.current() {
-            warm_ledger(&config.root);
-        }
+        served.current(); // warms the served vault's ledger
         served
     }
 
-    /// The vault being served now, re-read when the config file changed.
+    /// The vault being served now, read fresh from the config file.
     pub(crate) fn current(&self) -> Option<VaultConfig> {
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
+        let config = read_config(&self.config_path);
+        self.remember(config.as_ref());
+        config
+    }
+
+    /// Warm the ledger when the served vault is new to this process.
+    fn remember(&self, config: Option<&VaultConfig>) {
         let mut cached = self.cached.lock().unwrap_or_else(|p| p.into_inner());
-        if cached.0 != stamp || (stamp.is_some() && cached.1.is_none()) {
-            let config = stamp.and_then(|_| read_config(&self.config_path));
-            if config.is_some() && cached.1 != config {
-                if let Some(config) = &config {
-                    warm_ledger(&config.root);
-                }
+        if cached.as_ref() != config {
+            if let Some(config) = config {
+                warm_ledger(&config.root);
             }
-            *cached = (stamp, config);
+            *cached = config.cloned();
         }
-        cached.1.clone()
+    }
+
+    /// Fresh disk truth before every remote completion, including external
+    /// edits and config changes whose timestamps happen to be unchanged.
+    pub(crate) fn guard_completion(&self, prompt: &str, vault_id: Option<&str>, vault_road: Option<&str>) -> Result<(), Refusal> {
+        self.guard_completion_with_scan(prompt, vault_id, vault_road, read_verbs::refresh_secure_ledger)
+    }
+
+    fn guard_completion_with_scan(
+        &self,
+        prompt: &str,
+        vault_id: Option<&str>,
+        vault_road: Option<&str>,
+        scan: impl FnOnce(&Path, Option<&str>) -> Result<bool, Refusal>,
+    ) -> Result<(), Refusal> {
+        let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
+        let Some(config) = read_config(&self.config_path) else {
+            // FSA pages can use a helper with no served vault. A missing config
+            // has no vault to confuse; a broken one may hide secure notes.
+            if self.config_path.exists() || vault_id.is_some() || vault_road.is_some_and(|road| road != "folder") {
+                return Err(unavailable());
+            }
+            if crate::secret::blocked_for_remote(prompt) {
+                return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
+            }
+            return Ok(());
+        };
+        if vault_id.is_some_and(|bound| bound != config.id) {
+            return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+        }
+        if (vault_id.is_none() && vault_road != Some("folder")) || (vault_id.is_some() && vault_road.is_some()) {
+            return Err((409, "completion vault road is unclear — reload Rotli Web before chatting".into()));
+        }
+        let quoted = scan(&config.root, Some(prompt)).map_err(|_| unavailable())?;
+        // --vault may rewrite the config while we scan: a bound page must
+        // still be on the vault it named once the scan is done.
+        if let Some(bound) = vault_id {
+            let current = self.current().ok_or_else(unavailable)?;
+            if current.id != bound {
+                return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+            }
+        }
+        if quoted || crate::secret::blocked_for_remote(prompt) {
+            return Err((400, crate::provider_lane::SECRET_MESSAGE.into()));
+        }
+        Ok(())
     }
 
     /// Serve `folder` from now on. The same root keeps its id; a new one
     /// gets a new id, so a page bound to the old vault notices.
     pub(crate) fn choose(&self, folder: &Path) -> Result<VaultConfig, String> {
         let config = choose_config(&self.config_path, folder)?;
-        warm_ledger(&config.root);
-        let stamp = fs::metadata(&self.config_path).and_then(|m| m.modified()).ok();
-        *self.cached.lock().unwrap_or_else(|p| p.into_inner()) = (stamp, Some(config.clone()));
+        self.remember(Some(&config));
         Ok(config)
     }
 
@@ -223,19 +270,17 @@ fn contains_helper_dir(root: &Path, config_path: &Path) -> bool {
     dir.starts_with(root)
 }
 
-/// The Mac app's own warm-up, read-only: the ledger then holds this vault's
-/// secure prose, so a chat turn that echoes it is refused before any CLI runs.
+/// Read-only startup warm-up; completions repeat it and refuse on failure.
 fn warm_ledger(root: &Path) {
-    let warmed = crate::corpus::CorpusStore::open_read_only(root.to_path_buf())
-        .and_then(|mut store| store.warm_secure_ledger());
-    if let Err(error) = warmed {
+    let warmed = read_verbs::refresh_secure_ledger(root, None);
+    if let Err((_, error)) = warmed {
         eprintln!("rotli-helper: couldn't read the vault's secure notes: {error}");
     }
 }
 
 fn info(config: &VaultConfig) -> Value {
     let name = config.root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    json!({ "name": name, "id": config.id, "empty": folder_is_empty(&config.root) })
+    json!({ "name": name, "id": config.id, "empty": folder_is_empty(&config.root), "completionVaultBinding": true })
 }
 
 /// The page's `folderIsEmpty` rule: Finder droppings and `.rotli/` don't count.
@@ -293,7 +338,7 @@ fn refuse_git(rel: &[String]) -> Result<(), Refusal> {
     }
     // `<file>.lock` is the desktop writers' lock sidecar: a page that could
     // create one could stall every desktop save of that file
-    if rel.last().is_some_and(|name| name.to_ascii_lowercase().ends_with(".lock")) {
+    if rel.iter().any(|name| name.to_ascii_lowercase().ends_with(".lock")) {
         return Err((403, "lock files belong to Rotli's writers".into()));
     }
     Ok(())
@@ -416,7 +461,7 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
     let target = resolve(root, to)?;
     // "a.md" → "A.md" on a case-insensitive disk names the SAME file: a
     // plain rename changes its spelling; a copy-then-delete would lose it
-    let case_only = joined(from).eq_ignore_ascii_case(&joined(to));
+    let case_only = joined(from).eq_ignore_ascii_case(&joined(to)) && same_file(&source, &target);
     if !case_only && fs::symlink_metadata(&target).is_ok() {
         // never replace: a stale listing must not destroy the note already there
         return Err((409, format!("{} already exists", joined(to))));
@@ -433,6 +478,47 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
     })
     .map(|()| Value::Null)
     .map_err(|e| (if e.starts_with("already exists") { 409 } else { 500 }, e))
+}
+
+/// Case-folded names alone do not establish identity on a case-sensitive disk.
+fn same_file(source: &Path, target: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        match (fs::symlink_metadata(source), fs::symlink_metadata(target)) {
+            (Ok(a), Ok(b)) => a.dev() == b.dev() && a.ino() == b.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle as _;
+        #[repr(C)]
+        struct FileInfo {
+            _attributes: u32, _times: [u32; 6], volume: u32,
+            _size: [u32; 2], _links: u32, index: [u32; 2],
+        }
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetFileInformationByHandle(handle: *mut std::ffi::c_void, info: *mut FileInfo) -> i32;
+        }
+        let identity = |path: &Path| {
+            let file = fs::File::open(path).ok()?;
+            let mut info = std::mem::MaybeUninit::<FileInfo>::uninit();
+            // The OS initializes BY_HANDLE_FILE_INFORMATION only on success.
+            if unsafe { GetFileInformationByHandle(file.as_raw_handle(), info.as_mut_ptr()) } == 0 {
+                return None;
+            }
+            let info = unsafe { info.assume_init() };
+            Some((info.volume, info.index))
+        };
+        matches!((identity(source), identity(target)), (Some(a), Some(b)) if a == b)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (source, target);
+        false
+    }
 }
 
 /// Make `target` the source's content without ever replacing a file already
@@ -465,6 +551,9 @@ fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
         return Err((400, "the vault itself can't be removed".into()));
     }
     let path = resolve(root, rel)?;
+    if args.get("expectedContent").is_some() && !path.is_file() {
+        return Err((409, format!("revision conflict on {}: expected a file", joined(rel))));
+    }
     // a folder removal never deletes a file that has since taken its name
     if path.is_file() && args.get("directory").and_then(Value::as_bool) == Some(true) {
         return Err((409, format!("{} is a file now, not a folder", joined(rel))));

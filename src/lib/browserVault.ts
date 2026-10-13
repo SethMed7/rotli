@@ -17,6 +17,10 @@ import { PLATFORM } from "./featurePolicy";
 
 /** The narrow port: string keys, string values, all-or-nothing writes. */
 export interface VaultStore {
+  /** A folder adapter derives the revision from these exact returned bytes. */
+  readVersioned?(key: string): Promise<VersionedValue>;
+  /** The revision assigned to a successful write of these bytes. */
+  writtenRevision?(value: string): string;
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
@@ -177,9 +181,14 @@ export class BrowserVault {
   }
 
   async readVersioned(key: string): Promise<VersionedValue> {
-    const contents = (await this.store.get(key)) ?? "";
-    const revision = (await this.store.get(`${key}#rev`)) ?? "0";
-    return { contents, revision };
+    if (this.store.readVersioned) return this.store.readVersioned(key);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const before = (await this.store.get(`${key}#rev`)) ?? "0";
+      const contents = (await this.store.get(key)) ?? "";
+      const revision = (await this.store.get(`${key}#rev`)) ?? "0";
+      if (before === revision) return { contents, revision };
+    }
+    throw new Error(`revision conflict reading ${key}`);
   }
 
   /** Refuses a stale write; a first write must present revision "0". The
@@ -191,8 +200,7 @@ export class BrowserVault {
       const current = (await this.store.get(`${key}#rev`)) ?? "0";
       throw new RevisionConflict(key, expectedRevision, current);
     }
-    // a folder-backed store stamps its own revision (the file's mtime+size)
-    return (await this.store.get(`${key}#rev`)) ?? next;
+    return this.store.writtenRevision?.(contents) ?? next;
   }
 }
 

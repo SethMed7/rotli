@@ -363,7 +363,7 @@ pub fn local_model_install_cancel(
     request_id: String,
 ) -> Result<(), String> {
     if let Some(mut child) = state.children.lock().unwrap().remove(&request_id) {
-        let _ = child.kill();
+        let _ = (child.kill(), child.wait()); // stop it, then reap it (nothing else will)
     }
     Ok(())
 }

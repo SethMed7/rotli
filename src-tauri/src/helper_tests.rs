@@ -1,4 +1,5 @@
 use std::io::{Read as _, Write as _};
+use base64::Engine as _;
 
 use super::*;
 use crate::helper_args::DEFAULT_ORIGINS;
@@ -170,12 +171,17 @@ fn a_completion_with_images_is_refused_before_anything_is_staged() {
 #[test]
 fn an_oversized_body_is_refused_on_the_header() {
     let (port, token, _) = helper();
-    // 26 MB > the 24 MiB cap, and no body follows: the length alone ends it
+    // A 20 MiB workbook becomes 27,962,028 base64 bytes before JSON overhead,
+    // exceeding the 24 MiB request cap. The header alone must refuse it.
+    let workbook_bytes: usize = 20 * 1024 * 1024;
+    let encoded_bytes = workbook_bytes.div_ceil(3) * 4;
+    assert!(encoded_bytes > HELPER_MAX_REQUEST_BYTES);
     let answer = raw_request(
         port,
-        &format!("POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: 26000000\r\n\r\n"),
+        &format!("POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: {encoded_bytes}\r\n\r\n"),
     );
     assert!(answer.starts_with("HTTP/1.1 413"), "{answer}");
+    assert!(answer.contains("request too large"), "{answer}");
 }
 
 #[test]
@@ -250,4 +256,223 @@ fn a_paired_page_writes_a_real_file_in_the_chosen_vault_and_nothing_without_the_
         &format!("{{\"cmd\":\"vault_read\",\"args\":{{\"path\":\"../../etc/passwd\",\"vaultId\":\"{id}\"}}}}"),
     );
     assert!(escape.starts_with("HTTP/1.1 400"), "{escape}");
+}
+
+/// Office packages travel as base64 through the same HTTP listener as the
+/// page, including its body limit and the served vault's content gate.
+#[test]
+fn an_office_sized_binary_round_trips_through_the_real_helper_http_path() {
+    let (port, token, service) = helper();
+    let folder = tempfile::TempDir::new().unwrap();
+    let id = service.vault.choose(folder.path()).unwrap().id;
+    let auth = format!("Authorization: Bearer {token}\r\n");
+    let bytes: Vec<u8> = (0..2 * 1024 * 1024).map(|index| (index % 251) as u8).collect();
+    let base64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let write = json!({"cmd":"vault_write","args":{
+        "path":"storage/budget.xlsx", "base64":base64, "expectedContent":"0", "vaultId":id
+    }}).to_string();
+    let written = rpc(port, &auth, &write);
+    assert!(written.starts_with("HTTP/1.1 200"), "{}", &written[..written.len().min(300)]);
+    assert_eq!(std::fs::read(folder.path().join("storage/budget.xlsx")).unwrap(), bytes);
+
+    let read = json!({"cmd":"vault_read","args":{
+        "path":"storage/budget.xlsx", "encoding":"base64", "vaultId":id
+    }}).to_string();
+    let answer = rpc(port, &auth, &read);
+    assert!(answer.starts_with("HTTP/1.1 200"), "{}", &answer[..answer.len().min(300)]);
+    let body = answer.split_once("\r\n\r\n").unwrap().1;
+    let value: Value = serde_json::from_str(body).unwrap();
+    assert_eq!(base64::engine::general_purpose::STANDARD.decode(value["result"].as_str().unwrap()).unwrap(), bytes);
+
+    let stale = rpc(port, &auth, &write);
+    assert!(stale.starts_with("HTTP/1.1 409"), "{}", &stale[..stale.len().min(300)]);
+    assert!(stale.contains("revision conflict"));
+    let current = crate::fsutil::revision(&bytes);
+    let replacement = json!({"cmd":"vault_write","args":{
+        "path":"storage/budget.xlsx", "base64":base64, "expectedContent":current, "vaultId":id
+    }}).to_string();
+    assert!(rpc(port, &auth, &replacement).starts_with("HTTP/1.1 200"));
+
+    let over_cap = raw_request(port, &format!(
+        "POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{auth}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+        HELPER_MAX_REQUEST_BYTES + 1
+    ));
+    assert!(over_cap.starts_with("HTTP/1.1 413"), "{over_cap}");
+    assert!(over_cap.contains("request too large"), "{over_cap}");
+}
+
+/// Completion regressions call the dispatcher directly: no listener or CLI.
+fn completion_helper() -> (tempfile::TempDir, tempfile::TempDir, Helper) {
+    let folder = tempfile::TempDir::new().unwrap();
+    let config = tempfile::TempDir::new().unwrap();
+    let vault = ServedVault::new(config.path(), Box::new(|| Ok(None)));
+    vault.choose(folder.path()).unwrap();
+    let helper = Helper {
+        port: 0, origins: vec![], token: "synthetic".into(),
+        children: Arc::new(Mutex::new(HashMap::new())),
+        in_flight: Mutex::new(HashSet::new()), vault,
+    };
+    (folder, config, helper)
+}
+
+fn completion_refusal(helper: &Helper, prompt: &str) -> (u16, String) {
+    let error = helper.dispatch("cli_complete", &json!({
+        "requestId": "offline-regression", "provider": "definitely-not-a-cli",
+        "model": "synthetic", "prompt": prompt, "vaultRoad": "folder",
+    })).unwrap_err();
+    assert!(helper.children.lock().unwrap().is_empty());
+    assert!(helper.in_flight.lock().unwrap().is_empty());
+    error
+}
+
+#[test]
+fn helper_completion_checks_the_page_vault_before_starting_a_provider() {
+    let (_folder, config, helper) = completion_helper();
+    let original_id = helper.vault.current().unwrap().id;
+    let other = tempfile::TempDir::new().unwrap();
+    crate::helper_vault::choose_config(&config.path().join(CONFIG_FILE), other.path()).unwrap();
+    let args = |vault_id: Option<&str>| {
+        let mut args = json!({
+            "requestId": "bound-vault-test", "provider": "definitely-not-a-cli",
+            "model": "synthetic", "prompt": "ordinary synthetic prompt",
+        });
+        if let Some(id) = vault_id { args["vaultId"] = json!(id); }
+        args
+    };
+    let mismatched = helper.dispatch("cli_complete", &args(Some(&original_id))).unwrap_err();
+    assert_eq!(mismatched.0, 409);
+    assert!(mismatched.1.starts_with("vault changed"));
+    assert!(helper.children.lock().unwrap().is_empty());
+    assert!(helper.in_flight.lock().unwrap().is_empty());
+
+    let served_id = helper.vault.current().unwrap().id;
+    let matched = helper.dispatch("cli_complete", &args(Some(&served_id))).unwrap_err();
+    assert_ne!(matched.0, 409);
+    let legacy = helper.dispatch("cli_complete", &args(None)).unwrap_err();
+    assert_eq!(legacy.0, 409);
+    assert!(legacy.1.contains("reload Rotli Web"));
+    let mut folder = args(None);
+    folder["vaultRoad"] = json!("folder");
+    assert_ne!(helper.dispatch("cli_complete", &folder).unwrap_err().0, 409);
+    let mut ambiguous = args(Some(&served_id));
+    ambiguous["vaultRoad"] = json!("folder");
+    assert_eq!(helper.dispatch("cli_complete", &ambiguous).unwrap_err().0, 409);
+}
+
+#[test]
+fn legacy_completion_without_a_served_vault_reaches_provider_validation() {
+    let (_folder, config, helper) = completion_helper();
+    std::fs::remove_file(config.path().join(CONFIG_FILE)).unwrap();
+    let refused = helper.dispatch("cli_complete", &json!({
+        "requestId": "legacy-no-vault", "provider": "definitely-not-a-cli",
+        "model": "synthetic", "prompt": "ordinary synthetic prompt",
+    })).unwrap_err();
+    assert!(refused.1.contains("unknown provider"), "{refused:?}");
+}
+
+#[test]
+fn helper_regression_completion_refreshes_notes_written_through_the_vault() {
+    let (_folder, _config, helper) = completion_helper();
+    let body = "Synthetic amber observatory postpones imaginary telescope delivery until winter.";
+    helper.dispatch("vault_write", &json!({
+        "vaultId": helper.vault.current().unwrap().id, "path": "wiki/secure.md",
+        "text": format!("---\nsecure: true\n---\n{body}"),
+    })).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.0, 400);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_refreshes_external_edits() {
+    let (folder, _config, helper) = completion_helper();
+    let path = folder.path().join("external.md");
+    std::fs::write(&path, "ordinary original note").unwrap();
+    let body = "Synthetic violet submarine reschedules imaginary harbor inspection until autumn.";
+    std::fs::write(&path, format!("---\nsecure: true\n---\n{body}")).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_rereads_config_even_with_unchanged_mtime() {
+    let (_folder, config, helper) = completion_helper();
+    let other = tempfile::TempDir::new().unwrap();
+    let body = "Synthetic copper airship schedules imaginary glacier expedition after springtime.";
+    std::fs::write(other.path().join("secure.md"), format!("---\nsecure: true\n---\n{body}")).unwrap();
+    let path = config.path().join(CONFIG_FILE);
+    let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
+    crate::helper_vault::choose_config(&path, other.path()).unwrap();
+    std::fs::File::open(&path).unwrap().set_times(std::fs::FileTimes::new().set_modified(stamp)).unwrap();
+    let refused = completion_refusal(&helper, body);
+    assert_eq!(refused.1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn helper_regression_completion_fails_closed_when_refresh_cannot_read_the_vault() {
+    let (folder, _config, helper) = completion_helper();
+    drop(folder);
+    let refused = completion_refusal(&helper, "ordinary synthetic prompt");
+    assert_eq!(refused.0, 503);
+    assert!(refused.1.contains("secure notes"), "{}", refused.1);
+}
+
+#[test]
+fn helper_regression_completion_reads_an_oddly_encoded_note_lossily() {
+    let (folder, _config, helper) = completion_helper();
+    // an ordinary note that isn't UTF-8 doesn't switch chat off…
+    std::fs::write(folder.path().join("latin1.md"), [b'c', b'a', b'f', 0xe9]).unwrap();
+    assert!(completion_refusal(&helper, "another ordinary synthetic prompt").1.contains("unknown provider"));
+    // …and a secure one still reads as secure
+    let body = "Synthetic amber lantern guides fictional harbour pilots past the breakwater.";
+    let mut bytes = format!("---\nsecure: true\n---\n{body}\n").into_bytes();
+    bytes.push(0xff);
+    std::fs::write(folder.path().join("odd-secure.md"), bytes).unwrap();
+    assert_eq!(completion_refusal(&helper, body).1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn completion_accepts_ordinary_prompts_and_does_not_write_a_vault_index() {
+    let (folder, _config, helper) = completion_helper();
+    std::fs::write(folder.path().join("ordinary.md"), "A public synthetic note.").unwrap();
+    let refused = completion_refusal(&helper, "A public synthetic question.");
+    assert!(refused.1.contains("unknown provider"));
+    assert!(!folder.path().join(".rotli").exists());
+}
+
+#[test]
+fn completion_refresh_preserves_malformed_secure_and_chat_taint_policy() {
+    let (folder, _config, helper) = completion_helper();
+    for (index, field, body) in [
+        (0, "secure: maybe", "Synthetic indigo balloon delays fictional meadow survey until midsummer."),
+        (1, "secureContext: true", "Synthetic silver caravan postpones fictional desert crossing until midwinter."),
+    ] {
+        std::fs::write(folder.path().join(format!("secure-{index}.MARKDOWN")), format!("---\n{field}\n---\n{body}")).unwrap();
+        assert_eq!(completion_refusal(&helper, body).1, crate::provider_lane::SECRET_MESSAGE);
+    }
+}
+
+#[test]
+fn completion_refuses_early_secure_prose_after_ledger_capacity() {
+    let (folder, _config, helper) = completion_helper();
+    let quoted = "Synthetic indigo balloon delays fictional meadow survey until midsummer.";
+    // Each distinct word creates another five-word phrase. The quoted start
+    // of this secure body ages out of the bounded ledger during this scan.
+    let filler = (0..50_010).map(|i| format!("fillerword{i}")).collect::<Vec<_>>().join(" ");
+    std::fs::write(folder.path().join("first.md"), format!("---\nsecure: true\n---\n{quoted} {filler}")).unwrap();
+    for i in 0..32 {
+        std::fs::write(folder.path().join(format!("other-{i}.md")), format!("---\nsecure: true\n---\nSynthetic harbor ledger note number {i} stays private.")).unwrap();
+    }
+    assert_eq!(completion_refusal(&helper, quoted).1, crate::provider_lane::SECRET_MESSAGE);
+}
+
+#[test]
+fn completion_refuses_an_oversized_note_or_unreadable_config() {
+    let (folder, config, helper) = completion_helper();
+    let file = std::fs::File::create(folder.path().join("large.md")).unwrap();
+    file.set_len(256 * 1024 * 1024 + 1).unwrap();
+    assert_eq!(completion_refusal(&helper, "A synthetic oversized note check.").0, 503);
+    std::fs::remove_file(folder.path().join("large.md")).unwrap();
+    std::fs::write(config.path().join(CONFIG_FILE), "invalid synthetic config").unwrap();
+    assert_eq!(completion_refusal(&helper, "A synthetic invalid config check.").0, 503);
 }

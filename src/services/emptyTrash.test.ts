@@ -33,7 +33,13 @@ afterAll(() => {
   void mock.module("../lib/tauri", () => realTauri);
 });
 
-const { emptyTrash } = await import("./systemTrash");
+const { emptyTrash, emptyTrashConfirmation } = await import("./systemTrash");
+
+test("Empty Trash confirmation names permanent web deletion and desktop recovery", () => {
+  expect(emptyTrashConfirmation(2, "header", "web")).toBe("Delete 2 items permanently");
+  expect(emptyTrashConfirmation(1, "menu", "web")).toBe("Delete 1 item permanently");
+  expect(emptyTrashConfirmation(1, "header", "desktop")).toContain("recoverable in the macOS Trash");
+});
 
 async function trashed(titles: string[]): Promise<string[]> {
   const ids: string[] = [];

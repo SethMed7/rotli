@@ -1,0 +1,236 @@
+import { expect, test } from "bun:test";
+
+import { parseNoteDocument } from "../lib/frontmatter";
+import { folderFileStat, folderWriteFileBytes } from "./folderFileIo";
+import { readFolderRawMetadata, setFolderSecure, writeFolderRawMetadata } from "./folderMetadata";
+import { FolderNotesService } from "./folderNotes";
+import { writeFolderViews } from "./folderViewSync";
+import { MemoryVaultDir } from "./vaultDir";
+
+const text = "---\nid: untouched-id\ncustom: survives\n---\n# Before rename\n\nKeep this prose.\n";
+
+test("a failed git exclusion aborts secure marking before any note write or move", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  await dir.mkdir(".gitignore");
+  await expect(setFolderSecure(dir, "wiki/keep.md", true)).rejects.toThrow();
+  expect(await dir.readText("wiki/keep.md")).toBe(text);
+  expect(await dir.exists("wiki/_secure/keep.md")).toBe(false);
+});
+
+test("an imported path-addressed note cannot claim a secure move without durable identity", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("plain.md", "# Imported without provenance\n");
+  await expect(setFolderSecure(dir, "plain.md", true)).rejects.toThrow(/stable frontmatter id/);
+  expect(await dir.readText("plain.md")).toBe("# Imported without provenance\n");
+});
+
+test("a raw secure flag synchronizes git exclusion while preserving the exact body", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/raw.md", text);
+  const { revision } = await readFolderRawMetadata(dir, "wiki/raw.md");
+  await writeFolderRawMetadata(
+    dir,
+    "wiki/raw.md",
+    "id: untouched-id\ncustom: survives\nsecure: true",
+    revision,
+  );
+  const out = await dir.readText("wiki/raw.md");
+  expect(parseNoteDocument(out).body).toBe(parseNoteDocument(text).body);
+  expect(await dir.readText(".gitignore")).toContain("wiki/raw.md");
+});
+
+test("secure title renames preserve aliases and move the git exclusion to the final path", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/before-rename.md", text);
+  await setFolderSecure(dir, "wiki/before-rename.md", true);
+  const notes = new FolderNotesService(dir);
+  const note = (await notes.getNote("untouched-id"))!;
+  const saved = await notes.updateNote(note.id, "# Completely changed\n\nKeep this prose.\n", note.revision);
+  expect(saved.aliases).toContain("Before rename");
+  expect(await dir.readText(".gitignore")).toContain("wiki/_secure/completely-changed.md");
+  expect(await dir.readText(".gitignore")).not.toContain("wiki/_secure/before-rename.md");
+});
+
+test("views reject duplicate membership and future schemas without changing note bytes", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  for (const contents of [
+    '{"version":2,"views":[]}',
+    '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"},{"note":"untouched-id"}]}]}',
+  ])
+    await expect(writeFolderViews(dir, contents, "0")).rejects.toThrow();
+  expect(await dir.readText("wiki/keep.md")).toBe(text);
+  expect(await dir.exists(".rotli/views.json")).toBe(false);
+});
+
+test("a manifest write failure restores notes but never overwrites an intervening edit", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  const write = dir.writeText.bind(dir);
+  dir.writeText = async (path, contents) => {
+    if (path === ".rotli/views.json") {
+      await write("wiki/keep.md", "# A newer external edit\n");
+      throw new Error("manifest denied");
+    }
+    await write(path, contents);
+  };
+  await expect(
+    writeFolderViews(dir, '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"}]}]}', "0"),
+  ).rejects.toThrow("manifest denied");
+  expect(await dir.readText("wiki/keep.md")).toBe("# A newer external edit\n");
+  expect(await dir.exists(".rotli/views.json")).toBe(false);
+});
+
+test("binary write gates protect read-only storage and create the first CSV backup only once", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.mkdir("wiki");
+  await dir.writeText("storage/original.png", "synthetic bytes");
+  const image = (await folderFileStat(dir, "storage/original.png"))!;
+  expect(image.writable).toBe(false);
+  await expect(
+    folderWriteFileBytes(dir, "storage/original.png", btoa("replace"), false, image.revision),
+  ).rejects.toThrow(/not writable/);
+  await dir.writeText("storage/grid.csv", "Column\nBefore\n");
+  const first = (await folderFileStat(dir, "storage/grid.csv"))!;
+  const next = await folderWriteFileBytes(
+    dir,
+    "storage/grid.csv",
+    btoa("Column\nAfter\n"),
+    true,
+    first.revision,
+  );
+  await folderWriteFileBytes(dir, "storage/grid.csv", btoa("Column\nFinal\n"), true, next);
+  expect(new TextDecoder().decode(await dir.readBytes("storage/grid.csv.bak"))).toBe("Column\nBefore\n");
+  await expect(folderFileStat(dir, ".rotli/settings.json")).rejects.toThrow(/not a vault file/);
+  await expect(folderFileStat(dir, "storage/../outside.csv")).rejects.toThrow(/not a vault file/);
+});
+
+test("a file save refuses an external edit inside the adapter write turn", async () => {
+  for (const path of ["rows.csv", "picture.png"]) {
+    const dir = new MemoryVaultDir();
+    await dir.writeText(path, "before");
+    const opened = (await folderFileStat(dir, path))!;
+    const writeText = dir.writeText.bind(dir);
+    const writeBytes = dir.writeBytes.bind(dir);
+    dir.writeText = async (target, contents, expected) => {
+      if (target === path && contents !== "before") await writeText(path, "external");
+      await writeText(target, contents, expected);
+    };
+    dir.writeBytes = async (target, bytes, expected) => {
+      if (target === path) await writeText(path, "external");
+      await writeBytes(target, bytes, expected);
+    };
+    await expect(folderWriteFileBytes(dir, path, btoa("ours"), false, opened.revision)).rejects.toThrow(
+      /revision conflict/,
+    );
+    expect(await dir.readText(path)).toBe("external");
+  }
+});
+
+test("a CSV save refuses invalid UTF-8 without changing its original bytes", async () => {
+  const dir = new MemoryVaultDir();
+  const original = new Uint8Array([0x4e, 0x61, 0x6d, 0x65, 0x0a, 0x63, 0x61, 0x66, 0xe9, 0x0a]);
+  await dir.writeBytes("rows.csv", original);
+  const opened = (await folderFileStat(dir, "rows.csv"))!;
+  await expect(
+    folderWriteFileBytes(dir, "rows.csv", btoa("Name\nupdated\n"), true, opened.revision),
+  ).rejects.toThrow(/UTF-8/);
+  expect(await dir.readBytes("rows.csv")).toEqual(original);
+  expect(await dir.exists("rows.csv.bak")).toBe(false);
+});
+
+test("a failed view manifest restores its gitignore edit unless a newer edit won", async () => {
+  for (const external of [false, true]) {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki/keep.md", text);
+    const originalIgnore = ".rotli\nuser-rule\n";
+    await dir.writeText(".gitignore", originalIgnore);
+    const write = dir.writeText.bind(dir);
+    dir.writeText = async (path, contents, expected) => {
+      if (path === ".rotli/views.json") {
+        if (external) await write(".gitignore", `${await dir.readText(".gitignore")}external-rule\n`);
+        throw new Error("manifest denied");
+      }
+      await write(path, contents, expected);
+    };
+    await expect(
+      writeFolderViews(dir, '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"}]}]}', "0"),
+    ).rejects.toThrow("manifest denied");
+    expect(await dir.readText(".gitignore")).toBe(
+      external
+        ? "user-rule\n.rotli/*\n!.rotli/main.json\n!.rotli/views.json\nexternal-rule\n"
+        : originalIgnore,
+    );
+  }
+});
+
+test("view exclusion narrowing retries a concurrent secure exclusion edit", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText(".gitignore", ".rotli/\n");
+  const write = dir.writeText.bind(dir);
+  let injected = false;
+  dir.writeText = async (path, contents, expected) => {
+    if (path === ".gitignore" && !injected) {
+      injected = true;
+      await write(path, ".rotli/\nwiki/_secure/concurrent.md\n");
+    }
+    await write(path, contents, expected);
+  };
+  expect(await writeFolderViews(dir, '{"version":1,"views":[]}', "0")).toBe(true);
+  expect(await dir.readText(".gitignore")).toContain("wiki/_secure/concurrent.md\n");
+  expect(await dir.readText(".gitignore")).toContain(".rotli/*\n");
+});
+
+test("a secure move succeeds when removing its old git exclusion fails", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  const write = dir.writeText.bind(dir);
+  let moved = false;
+  const move = dir.move.bind(dir);
+  dir.move = async (from, to) => {
+    await move(from, to);
+    moved = true;
+  };
+  dir.writeText = async (path, contents, expected) => {
+    if (moved && path === ".gitignore") throw new Error("old exclusion unavailable");
+    await write(path, contents, expected);
+  };
+  expect(await setFolderSecure(dir, "wiki/keep.md", true)).toBe("wiki/_secure/keep.md");
+  expect(await dir.exists("wiki/keep.md")).toBe(false);
+  expect(await dir.exists("wiki/_secure/keep.md")).toBe(true);
+  expect(await dir.readText(".gitignore")).toContain("wiki/keep.md\n");
+});
+
+test("a created gitignore survives an external edit between rollback read and remove", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("wiki/keep.md", text);
+  await dir.mkdir(".git");
+  const write = dir.writeText.bind(dir);
+  dir.writeText = async (path, contents, expected) => {
+    if (path === ".rotli/views.json") throw new Error("manifest denied");
+    await write(path, contents, expected);
+  };
+  const remove = dir.remove.bind(dir);
+  dir.remove = async (path, expected) => {
+    if (path === ".gitignore") await write(path, `${await dir.readText(path)}external-rule\n`);
+    await remove(path, expected);
+  };
+  await expect(
+    writeFolderViews(dir, '{"version":1,"views":[{"name":"Work","tree":[{"note":"untouched-id"}]}]}', "0"),
+  ).rejects.toThrow("manifest denied");
+  expect(await dir.readText(".gitignore")).toContain("external-rule\n");
+});
+
+test("detected secrets refuse secure removal through the explicit and raw lanes", async () => {
+  const dir = new MemoryVaultDir();
+  // Public synthetic test-card fixture, never a real account.
+  const note = "---\nid: test-card-fixture\nsecure: true\n---\n# Checkout\n\ncard 4242 4242 4242 4242\n";
+  await dir.writeText("wiki/_secure/checkout.md", note);
+  await expect(setFolderSecure(dir, "wiki/_secure/checkout.md", false)).rejects.toThrow(/detected secret/);
+  const { revision } = await readFolderRawMetadata(dir, "wiki/_secure/checkout.md");
+  await expect(
+    writeFolderRawMetadata(dir, "wiki/_secure/checkout.md", "id: test-card-fixture", revision),
+  ).rejects.toThrow(/detected secret/);
+  expect(await dir.readText("wiki/_secure/checkout.md")).toBe(note);
+});

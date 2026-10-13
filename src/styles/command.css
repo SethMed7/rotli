@@ -115,6 +115,18 @@
 .pal-foot kbd {
   margin-right: 2px;
 }
+@media (max-width: 760px) {
+  .pal-foot {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+  .pal-foot > span {
+    white-space: nowrap;
+  }
+  .pal-foot > span:first-child {
+    display: none;
+  }
+}
 
 /* ——— Quick Look preview (the maintainer, 2026-07-29): a modal PEEK at an item without
    opening its full surface. Same flat scrim + bordered surface as ⌘K; the

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import { MemoryVaultDir, type VaultDir } from "../services/vaultDir";
+import { memoryBackedRoad, testByteEditorRoad } from "../services/folderFileIo.test";
+import { FolderNotesService } from "../services/folderNotes";
+import { MemoryVaultDir, bytesRevision, type VaultDir } from "../services/vaultDir";
 import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 
 /** Rotli Helper's vault verbs, served from a MemoryVaultDir: the wire the
@@ -8,6 +10,8 @@ import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 function fakeHelper(disk = new MemoryVaultDir()) {
   const calls: string[] = [];
   let down = false;
+  let loseWriteAck = false;
+  let replaceAfterLostAck: Uint8Array | null = null;
   const walk = async (path: string, out: object[]): Promise<void> => {
     for (const entry of await disk.list(path)) {
       const child = path ? `${path}/${entry.name}` : entry.name;
@@ -49,7 +53,7 @@ function fakeHelper(disk = new MemoryVaultDir()) {
       case "vault_stat":
         return disk.stat(path);
       case "vault_write": {
-        const onDisk = (await disk.exists(path)) ? contentRevision(await disk.readText(path)) : "0";
+        const onDisk = (await disk.exists(path)) ? bytesRevision(await disk.readBytes(path)) : "0";
         const stale =
           typeof args.expectedContent === "string"
             ? args.expectedContent !== onDisk
@@ -63,6 +67,14 @@ function fakeHelper(disk = new MemoryVaultDir()) {
             path,
             Uint8Array.from(atob(String(args.base64)), (c) => c.charCodeAt(0)),
           );
+        if (loseWriteAck) {
+          loseWriteAck = false;
+          if (replaceAfterLostAck) {
+            await disk.writeBytes(path, replaceAfterLostAck);
+            replaceAfterLostAck = null;
+          }
+          throw new TypeError("Failed to fetch");
+        }
         return disk.stat(path);
       }
       case "vault_mkdir":
@@ -80,7 +92,7 @@ function fakeHelper(disk = new MemoryVaultDir()) {
             throw Object.assign(new Error("revision conflict: the file changed on disk"), { status: 409 });
           }
         }
-        return disk.remove(path);
+        return disk.remove(path, typeof args.expectedContent === "string" ? args.expectedContent : undefined);
       }
       default:
         throw new Error(`unknown ${cmd}`);
@@ -105,8 +117,27 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     setDown: (value: boolean) => {
       down = value;
     },
+    loseNextWriteAck: (replaceWith?: Uint8Array) => {
+      loseWriteAck = true;
+      replaceAfterLostAck = replaceWith ?? null;
+    },
   };
 }
+
+testByteEditorRoad("Helper", () => {
+  const { dir, disk } = fakeHelper();
+  return memoryBackedRoad(dir, disk);
+});
+
+test("Helper managed rename moves a backup through a case-only rename", async () => {
+  const { dir, disk } = fakeHelper();
+  await disk.writeBytes("Outline.docx", new Uint8Array([71]));
+  await disk.writeBytes("Outline.docx.bak", new Uint8Array([72]));
+  const notes = new FolderNotesService(dir);
+  const renamed = await notes.renameFile("Outline.docx", "OUTLINE");
+  expect(renamed).toBe("OUTLINE.docx");
+  expect(await disk.readBytes(`${renamed}.bak`)).toEqual(new Uint8Array([72]));
+});
 
 // The same cases the port promises, run against the reference and the adapter.
 const contract: Array<[string, () => VaultDir]> = [
@@ -156,6 +187,42 @@ for (const [name, make] of contract) {
       await dir.remove("wiki/Welcome");
       expect(await dir.exists("wiki/Welcome")).toBe(false);
     });
+
+    test("a content-gated remove refuses an empty directory", async () => {
+      const dir = make();
+      await dir.mkdir(".gitignore");
+      await expect(dir.remove(".gitignore", "0")).rejects.toThrow(/revision conflict/);
+      expect(await dir.exists(".gitignore")).toBe(true);
+    });
+
+    test("a content-gated remove refuses a missing file", async () => {
+      await expect(make().remove("absent-note.md", "0")).rejects.toThrow(/revision conflict/);
+    });
+
+    test("an ungated remove of a missing file is a no-op", async () => {
+      await expect(make().remove("absent-note.md")).resolves.toBeUndefined();
+    });
+
+    test("a content-gated remove refuses a changed file", async () => {
+      const dir = make();
+      await dir.writeText("note.md", "old");
+      await dir.writeText("note.md", "new");
+      await expect(dir.remove("note.md", contentRevision("old"))).rejects.toThrow(/revision conflict/);
+      expect(await dir.readText("note.md")).toBe("new");
+    });
+
+    test("binary writes compare the exact bytes in the adapter write turn", async () => {
+      const dir = make();
+      const first = new Uint8Array([0, 1, 255]);
+      await dir.writeBytes("storage/p.png", first);
+      await expect(
+        dir.writeBytes("storage/p.png", new Uint8Array([2]), bytesRevision(first)),
+      ).resolves.toBeUndefined();
+      await expect(
+        dir.writeBytes("storage/p.png", new Uint8Array([3]), bytesRevision(first)),
+      ).rejects.toThrow(/revision conflict/);
+      expect([...(await dir.readBytes("storage/p.png"))]).toEqual([2]);
+    });
   });
 }
 
@@ -203,6 +270,14 @@ describe("never overwriting another writer", () => {
     expect(await fake.disk.readText("wiki/a.md")).toBe("edited in the Mac app");
   });
 
+  test("an explicit content gate protects rollback removes", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText(".gitignore", "ours");
+    await fake.disk.writeText(".gitignore", "external");
+    await expect(fake.dir.remove(".gitignore", contentRevision("ours"))).rejects.toThrow(/revision conflict/);
+    expect(await fake.disk.readText(".gitignore")).toBe("external");
+  });
+
   test("rapid saves of one note each land: every write is gated on the one before it", async () => {
     const fake = fakeHelper();
     await Promise.all([
@@ -211,6 +286,38 @@ describe("never overwriting another writer", () => {
       fake.dir.writeText("wiki/a.md", "123"),
     ]);
     expect(await fake.disk.readText("wiki/a.md")).toBe("123");
+  });
+
+  test("a remove queued behind a write uses the landed version", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText("wiki/a.md", "old");
+    await Promise.all([fake.dir.writeText("wiki/a.md", "new"), fake.dir.remove("wiki/a.md")]);
+    expect(await fake.disk.exists("wiki/a.md")).toBe(false);
+  });
+
+  test("an invalidated cache does not turn an externally deleted file into a conflict", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText("wiki/a.md", "old");
+    await fake.disk.remove("wiki/a.md");
+    fake.dir.invalidate();
+    await expect(fake.dir.remove("wiki/a.md")).resolves.toBeUndefined();
+  });
+
+  test("a binary write recovers when its acknowledgement is lost", async () => {
+    const fake = fakeHelper();
+    const bytes = new Uint8Array([0, 255, 128]);
+    fake.loseNextWriteAck();
+    await expect(fake.dir.writeBytes("storage/p.bin", bytes)).resolves.toBeUndefined();
+    expect([...(await fake.disk.readBytes("storage/p.bin"))]).toEqual([...bytes]);
+  });
+
+  test("a lost binary acknowledgement still conflicts if another writer changed the bytes", async () => {
+    const fake = fakeHelper();
+    fake.loseNextWriteAck(new Uint8Array([4, 5, 6]));
+    await expect(fake.dir.writeBytes("storage/p.bin", new Uint8Array([0, 255, 128]))).rejects.toThrow(
+      /revision conflict/,
+    );
+    expect([...(await fake.disk.readBytes("storage/p.bin"))]).toEqual([4, 5, 6]);
   });
 });
 

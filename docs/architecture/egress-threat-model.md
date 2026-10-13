@@ -126,7 +126,7 @@ Everything in the tables below reduces to which question a seam asks.
 |---|---|---|
 | `secret::looks_secure` | credential SHAPES — API keys, PEM, JWT, SSN, Luhn-valid PANs | ordinary private prose |
 | `secret::protected_for_remote` | the above **+ markers**: `secure: true`, `local_ai_allowed:`, `secureContext: true` | prose whose markers were stripped |
-| `secret::blocked_for_remote` | the above **+ the secure-prose ledger** | prose that never entered the vault |
+| `secret::blocked_for_remote` | the above **+ the secure-prose ledger**; **everything** while the ledger is still warming at launch (fail closed) | prose that never entered the vault |
 
 **The ledger is the new thing, and it is what made most of the fixes possible.**
 Before it, Rust could only refuse text that ANNOUNCED itself. A secure note is
@@ -191,13 +191,13 @@ way a compromised loop would.
 
 | # | Path | Verdict | Enforced by |
 |---|---|---|---|
-| 10 | `corpus_read_ai` (read by id) | SAFE | `read_for_ai` — locality re-derived in Rust; refusals quote nothing |
+| 10 | `corpus_read_ai` (read by id) | SAFE | `read_for_ai` — locality re-derived in Rust; frontmatter, detector, name, and secure-home location all classify a read, including plain CSV/text reached through the note path; refusals quote nothing |
 | 11 | `corpus_readable_ids` (batch probe) | SAFE | the exact same `read_for_ai` per id; bodies never returned |
 | 12 | `corpus_search` + TS filter | **GAP → FIXED** | Rust supplied the verdict, **TypeScript applied it**. A loop that skipped the probe got the titles and snippets of every matching secure note. New `corpus_search_ai` applies `read_for_ai` per hit **in Rust**, before anything crosses the boundary — one round trip instead of two, so it is also faster |
 | 13 | `corpus_list` / `corpus_reference_notes` → knowledge map | **GAP → FIXED** | same shape: secure TITLES reached the map through a TS-side filter. New `corpus_notes_ai` filters in Rust |
 | 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED, NOT CLOSED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body. The ledger is warm before commands run and blocks verbatim overlap at Rust egress seams, but a hostile webview that obtained the plaintext can transform it before invoking those seams. This is the unresolved trust-boundary contradiction described above |
 | 15 | Workspace `notes list` / `search` / `query` / `read` | SAFE | `read_for_ai(id, false)` per item, filter-before-truncate |
-| 16 | Workspace `list` — files and folders | **GAP → FIXED** | `NoteKind::File` metas and the whole folder tree bypassed every filter (`_ => true`), shipping the reserved `Secure notes/` folder name to a remote agent. Both now pass `agent_listable` |
+| 16 | Workspace `list` and Main/view references — files and folders | **GAP → FIXED** | Folder metas pass `agent_listable`; file and board metas and references also pass `file_is_protected`, so secure-home and keyword-protected titles and paths never appear in remote listings or projections. Board reads and edits repeat the check |
 | 16a | Remote relay connector | SAFE | every response is produced by the same workspace dispatcher and `read_for_ai`/write gates; the outbound transport adds no alternate corpus reads, starts only by explicit user action, serializes disconnect/vault switch against in-flight dispatch and delivery, binds separate client/device credentials to their minted relay base, bounds the complete response envelope, and logs no frames |
 
 ### Writes — persistence and laundering
@@ -319,6 +319,16 @@ This is stated plainly rather than glossed. Three things bound it:
   any support-bundle/diagnostics path — the same as the rest of `.rotli/` derived
   state (`index.json`, the journal, organizer state).
 
+**Launch warm-up (2026-10-12).** App setup walks every registered root on a
+background thread so a huge vault no longer holds the window back. Until that
+walk has fed the ledger from EVERY registered root (`secret::warm_until_done`:
+a root whose walk fails is retried every 30 s and keeps the gate shut; a root
+removed from the registry stops holding it), `blocked_for_remote` answers true
+for ANY text: no remote send, no AI write of unprotected text (refused with a
+"still reading this vault" message), no history diff. Walks themselves now read the disk
+with the corpus lock released (`CorpusState::walk_unlocked`); a walk the vault
+changed under is discarded, and every walk feeds the ledger, discarded or not.
+
 The **secure-prose ledger stays walk-fed and warm**: this change did not replace
 the walk with index-driven listing. `corpus_list`, `tasks`, and
 `warm_secure_ledger` still walk, and `search` still calls `ensure_walked` (which
@@ -336,8 +346,20 @@ cold because search now uses an index.
 - **The ledger stops only bulk verbatim copying.** ≤4-word chunking, paraphrase,
   translation, reordering, and any encoding defeat it — by design; it is a layer
   over `read_for_ai`, not a covert-channel defense. Stated in full above.
-- **Storage FILES carry no `secure:` flag**, so `read_file` has only the
-  heuristic. Files are not notes and the matrix does not cover them.
+- **Storage FILES carry no `secure:` flag.** Chat file tools resolve an exact
+  id and check the secure home and secure keyword before extraction in
+  TypeScript; an exact-id miss invalidates the Rust corpus walk once before
+  failing closed. Dedicated Rust AI file reads repeat the location check. The
+  note read gate also checks location, since plain text files can enter through
+  `read_note`. Allowed local secure file reads feed the Rust prose-overlap
+  ledger with decoded DOCX-family and spreadsheet-package text, rather than ZIP
+  bytes. Spreadsheet XML is parsed by local element name, including prefixed
+  Strict OOXML; a package with worksheet/shared-string parts but no readable
+  text refuses its secure local read, as does malformed XML. The TS sheet codec
+  normalizes these namespaces before ExcelJS reads the workbook. If an office
+  package cannot be decoded for the ledger, its secure local read refuses.
+  The secret-pattern detector still checks extracted text. Files
+  outside those locations have no per-file secure flag.
 - **DNS exfil**: `vetted_resolve` emits the lookup before vetting the address,
   so an encoded subdomain leaves over DNS even when the connection is then
   refused. Closing it needs a resolver that vets the NAME first — a real change

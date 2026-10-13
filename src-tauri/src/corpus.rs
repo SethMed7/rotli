@@ -22,7 +22,6 @@ pub use crate::search_match::{leading_snippet, search_match, sort_hits, SearchHi
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::RecvTimeoutError;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -1289,7 +1288,7 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
-fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+pub(crate) fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
         || fm
             .foreign
@@ -1528,11 +1527,24 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
     &text[..text.len() - body.len()]
 }
 
+pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
+pub(crate) const MANAGED_FILE_EXTS: [&str; 2] = ["xlsx", "docx"];
+pub(crate) const MANAGED_MEMEX_LANE: &str = "storage/rotli";
+pub(crate) const MANAGED_PLAIN_LANE: &str = "Storage";
+
+pub(crate) fn managed_collision_name(stem: &str, ext: &str, n: usize) -> String {
+    format!("{stem}-{n}{ext}")
+}
+/// AI byte reads extract these package families before remembering secure prose.
+/// Byte-identical to SHEET_BIN and DOCX_EDITABLE_EXTS (parity.json).
+pub(crate) const SHEET_PACKAGE_EXTS: &[&str] = &["xlsx", "xlsm", "xltx", "xltm"];
+pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
+
 /// The reserved PROVENANCE keys the raw-metadata editor must never change —
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-const RAW_IMMUTABLE_KEYS: [&str; 7] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "id",
     "created",
     "owner",
@@ -3168,7 +3180,6 @@ impl CorpusStore {
     /// live in a dedicated storage/rotli lane, keeping the foreign storage tree
     /// read-only while giving generated assets an explicit ownership boundary.
     pub fn create_managed_file(&mut self, name: &str, bytes: &[u8]) -> Result<String, String> {
-        const GENERATED_FILE_EXTS: &[&str] = &["xlsx", "docx"];
         self.mutation_allowed()?;
         validate_component(name)?;
         let ext = Path::new(name)
@@ -3177,18 +3188,18 @@ impl CorpusStore {
             .map(str::to_ascii_lowercase);
         if !ext
             .as_deref()
-            .is_some_and(|value| GENERATED_FILE_EXTS.contains(&value))
+            .is_some_and(|value| MANAGED_FILE_EXTS.contains(&value))
         {
             return Err(format!(
                 "managed files must use one of: {}",
-                GENERATED_FILE_EXTS.join(", ")
+                MANAGED_FILE_EXTS.join(", ")
             ));
         }
         let folder = match self.layout {
-            Layout::Memex => "storage/rotli",
-            Layout::LegacyRotli => "Storage",
+            Layout::Memex => MANAGED_MEMEX_LANE,
+            Layout::LegacyRotli => MANAGED_PLAIN_LANE,
         };
-        let rel = self.free_name(folder, name, None);
+        let rel = self.free_name_with(folder, name, None, managed_collision_name);
         self.guard_rel(&rel)?;
         fs::create_dir_all(self.abs(folder)).map_err(|e| format!("create {folder}: {e}"))?;
         let abs = self.abs(&rel);
@@ -3871,8 +3882,8 @@ impl CorpusStore {
     ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
     ///   The per-note bit wins over the vault default in BOTH directions.
     ///
-    /// The `secure:` flag is checked first; when it's ABSENT the secret DETECTOR
-    /// runs on the body too (#21, audit 2026-07) — the auto-flag only fires when
+    /// Location in either secure home is checked even without frontmatter.
+    /// The secret DETECTOR also runs on the body (#21, audit 2026-07) — the auto-flag only fires when
     /// the metadata panel is opened, so a never-inspected note with detectable
     /// secrets must not slip through on the flag alone.
     /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
@@ -3888,7 +3899,8 @@ impl CorpusStore {
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+        let secure = self.file_is_protected(rel)
+            || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
             || fm
                 .foreign
                 .iter()
@@ -3915,6 +3927,52 @@ impl CorpusStore {
             crate::secret::remember_secure_text(body);
         }
         Ok(text)
+    }
+
+    /// AI-purpose access to a frontmatter-free file. The editor's file reads
+    /// remain separate; this check runs before any AI decoder sees bytes.
+    pub(crate) fn file_for_ai(&self, rel: &str, model_is_local: bool) -> Result<PathBuf, String> {
+        validate_rel(rel)?;
+        if surfaced(self.layout, rel) == Surface::Hidden {
+            return Err("not available to AI".into());
+        }
+        let secure = self.file_is_protected(rel);
+        if secure && !model_is_local {
+            return Err("blocked: a secure file cannot be sent to a remote model".into());
+        }
+        if secure && !self.secure_local_ai() {
+            return Err("blocked: local AI access to secure files is off for this vault".into());
+        }
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err("not a file".into());
+        }
+        Ok(abs)
+    }
+
+    pub(crate) fn read_file_bytes_for_ai(
+        &self,
+        rel: &str,
+        model_is_local: bool,
+    ) -> Result<Vec<u8>, String> {
+        let abs = self.file_for_ai(rel, model_is_local)?;
+        let data = fs::read(abs).map_err(|e| e.to_string())?;
+        if model_is_local && self.file_is_protected(rel) {
+            let ext = Path::new(rel)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let text = if DOCX_PACKAGE_EXTS.contains(&ext.as_str()) {
+                crate::ai_files::docx_text(&data)?
+            } else if SHEET_PACKAGE_EXTS.contains(&ext.as_str()) {
+                crate::ai_files::xlsx_text(&data)?
+            } else {
+                String::from_utf8_lossy(&data).into_owned()
+            };
+            crate::secret::remember_secure_text(&text);
+        }
+        Ok(data)
     }
 
     /// May an ON-DEVICE model read this secure note? Default yes (2026-08-01);
@@ -3987,11 +4045,8 @@ impl CorpusStore {
         // let protected prose land anywhere it would stop being protected.
         let target_secure =
             fm.foreign.iter().any(|l| secure_field(l) == Some(true)) || looks_secure(target_body);
-        if !target_secure && crate::secret::blocked_for_remote(body) {
-            return Err(
-                "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
-                    .into(),
-            );
+        if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
+            return Err(refusal.into());
         }
         self.writable(&rel)?;
         self.write_resolved(id_or_rel, body, rel)
@@ -4052,11 +4107,8 @@ impl CorpusStore {
             }
             let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
                 || looks_secure(target_body);
-            if !target_secure && crate::secret::blocked_for_remote(body) {
-                return Err(
-                    "This text came out of a secure note, so it can only be written into a note that is itself secure. Use create_note instead — the new note will be marked secure."
-                        .into(),
-                );
+            if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
+                return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
@@ -4351,7 +4403,6 @@ impl CorpusStore {
         if self.layout != Layout::Memex || self.band_read_only || self.perms_read_only {
             return false;
         }
-        // excalidraw is already its own writable lane — this is for foreign sheets.
         if rel == "storage/excalidraw" || rel.starts_with("storage/excalidraw/") {
             return false;
         }
@@ -4362,10 +4413,9 @@ impl CorpusStore {
             .extension()
             .and_then(|e| e.to_str())
             .map(str::to_ascii_lowercase);
-        matches!(
-            ext.as_deref(),
-            Some("xlsx") | Some("csv") | Some("docx") | Some("docm") | Some("dotx") | Some("dotm")
-        ) && self.guard_rel(rel).is_ok_and(|path| path.is_file())
+        ext.as_deref()
+            .is_some_and(|ext| STORAGE_OFFICE_EXTS.contains(&ext))
+            && self.guard_rel(rel).is_ok_and(|path| path.is_file())
     }
 
     /// Scan the disk (the truth), reconciling the id↔path index as we go:
@@ -4424,6 +4474,20 @@ impl CorpusStore {
     /// `suppress.mark()`; external changes bump it from the watcher — an
     /// unchanged generation means the disk is exactly as last walked.
     fn ensure_walked(&mut self) -> Result<(), String> {
+        let Some(plan) = self.walk_plan() else {
+            return Ok(());
+        };
+        // the stale cache goes before the walk, not after: holding both made
+        // every re-walk briefly keep two copies of every note body
+        self.list_cache = None;
+        let walked = run_walk(plan)?;
+        self.install_walk(walked, true);
+        Ok(())
+    }
+
+    /// What a walk needs, copied out so the disk can be read WITHOUT the
+    /// corpus lock (`CorpusState::walk_unlocked`). None = the cache is current.
+    fn walk_plan(&self) -> Option<WalkPlan> {
         // read the generation BEFORE walking: a write landing mid-walk makes
         // the stored generation stale and the next call re-walks — the safe side
         let generation = self.suppress.generation();
@@ -4432,46 +4496,25 @@ impl CorpusStore {
             .as_ref()
             .is_some_and(|c| c.generation == generation)
         {
-            return Ok(());
+            return None;
         }
-        let mut folders: Vec<FolderMeta> = Vec::new();
-        let mut notes: Vec<NoteMeta> = Vec::new();
-        let mut reference: Vec<NoteMeta> = Vec::new();
-        let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
-        let reverse: HashMap<String, String> = self
-            .index
-            .iter()
-            .map(|(id, p)| (p.clone(), id.clone()))
-            .collect();
-        let mut new_index: HashMap<String, String> = HashMap::new();
+        Some(WalkPlan {
+            generation,
+            layout: self.layout,
+            root: self.root.clone(),
+            reverse: self
+                .index
+                .iter()
+                .map(|(id, p)| (p.clone(), id.clone()))
+                .collect(),
+        })
+    }
 
-        walk(
-            self.layout,
-            &self.root,
-            "",
-            &reverse,
-            &mut new_index,
-            &mut folders,
-            &mut notes,
-            &mut reference,
-            &mut texts,
-        )?;
-
-        if new_index != self.index {
-            self.index = new_index;
-            self.persist_index();
-        }
-        // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
-        // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
-        ensure_backing_folders(&mut folders, &notes);
-        folders.sort_by(|a, b| a.id.cmp(&b.id));
-        notes.sort_by(|a, b| {
-            b.pinned
-                .cmp(&a.pinned)
-                .then(b.updated_at.cmp(&a.updated_at))
-                .then(a.id.cmp(&b.id))
-        });
-        reference.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.id.cmp(&b.id)));
+    /// Adopt a finished walk. The secure-prose ledger is fed from EVERY walk
+    /// (additive, so a discarded walk still guards). An unlocked walk is
+    /// discarded when the generation moved meanwhile — a write under the lock
+    /// may have changed the index it would overwrite; the next call re-walks.
+    fn install_walk(&mut self, walked: Walked, force: bool) -> bool {
         // Feed the secure-prose ledger from the WALK, not from a read (audit
         // 2026-08-01, GAP 2). Deriving it from `read_for_ai` alone would have
         // left the real hole open: `corpus_read` — the editor's ungated read —
@@ -4479,21 +4522,28 @@ impl CorpusStore {
         // handed to a remote lane carries no `secure: true` marker for the
         // egress detector to find. The vault itself is the honest source: if a
         // note in this corpus is secure, its prose may not leave, whichever
-        // command went and got it. This holds from PROCESS START because the
-        // lib.rs setup loop calls `warm_secure_ledger` (this same walk) on every
-        // registered root before any command runs — otherwise a never-browsed
-        // root's secure prose would be absent until its first list (the boot
-        // race, follow-up finding #2). Idempotent, so re-walks cost nothing.
-        for text in texts.values().filter(|t| t.secure) {
+        // command went and got it. App setup walks every registered root before
+        // egress opens (`secret::finish_ledger_warmup`); idempotent.
+        for text in walked.texts.values().filter(|t| t.secure) {
             crate::secret::remember_secure_text(&text.body);
         }
+        if !force && self.suppress.generation() != walked.generation {
+            return false;
+        }
+        if walked.index != self.index {
+            self.index = walked.index;
+            self.persist_index();
+        }
         self.list_cache = Some(ListCache {
-            generation,
-            list: CorpusList { folders, notes },
-            reference,
-            texts,
+            generation: walked.generation,
+            list: CorpusList {
+                folders: walked.folders,
+                notes: walked.notes,
+            },
+            reference: walked.reference,
+            texts: walked.texts,
         });
-        Ok(())
+        true
     }
 
     /// The `Surface::Reference` lane — the brain's memory notes, which the AI
@@ -6506,8 +6556,78 @@ fn validate_component(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A walk's inputs, copied from a store (`CorpusStore::walk_plan`).
+struct WalkPlan {
+    generation: u64,
+    layout: Layout,
+    root: PathBuf,
+    reverse: HashMap<String, String>,
+}
+
+/// A finished walk, before a store adopts it (`CorpusStore::install_walk`).
+struct Walked {
+    generation: u64,
+    index: HashMap<String, String>,
+    folders: Vec<FolderMeta>,
+    notes: Vec<NoteMeta>,
+    reference: Vec<NoteMeta>,
+    texts: HashMap<String, CachedNoteText>,
+}
+
+/// Read the vault for a plan. Touches no store: callers may run it with the
+/// corpus lock released.
+fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
+    let mut folders: Vec<FolderMeta> = Vec::new();
+    let mut notes: Vec<NoteMeta> = Vec::new();
+    let mut reference: Vec<NoteMeta> = Vec::new();
+    let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
+    let mut index: HashMap<String, String> = HashMap::new();
+    walk(
+        plan.layout,
+        &plan.root,
+        "",
+        &plan.reverse,
+        &mut index,
+        &mut folders,
+        &mut notes,
+        &mut reference,
+        &mut texts,
+    )?;
+    // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
+    // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
+    ensure_backing_folders(&mut folders, &notes);
+    folders.sort_by(|a, b| a.id.cmp(&b.id));
+    notes.sort_by(|a, b| {
+        b.pinned
+            .cmp(&a.pinned)
+            .then(b.updated_at.cmp(&a.updated_at))
+            .then(a.id.cmp(&b.id))
+    });
+    reference.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then(a.id.cmp(&b.id)));
+    Ok(Walked {
+        generation: plan.generation,
+        index,
+        folders,
+        notes,
+        reference,
+        texts,
+    })
+}
+
+/// Dependency and history folders nobody edits from Rotli: never walked,
+/// listed, inspected, or watched, at any depth and in any letter case (`.GIT`
+/// on a case-insensitive disk is `.git`). The one rule shared by the native
+/// corpus walk, vault inspection, the watcher, and the Rotli Web helper. A code
+/// folder chosen as a vault otherwise surfaced every package file as a note
+/// row (RAM review 2026-10-12: 133k rows, a 44 MB listing per refetch).
+pub(crate) const SKIPPED_DIRS: [&str; 2] = [".git", "node_modules"];
+
+pub(crate) fn is_skipped_dir(name: &str) -> bool {
+    SKIPPED_DIRS.iter().any(|skip| skip.eq_ignore_ascii_case(name))
+}
+
 /// Recursive scan. Skips dot-entries everywhere (`.rotli`, `.DS_Store`, temp
-/// files). Unreadable / non-UTF-8 files are skipped, never fatal.
+/// files) and `SKIPPED_DIRS`. Unreadable / non-UTF-8 files are skipped, never fatal.
 // The params ARE the recursion's accumulators — bundling them into a struct
 // would rename, not reduce, the coupling.
 #[allow(clippy::too_many_arguments)]
@@ -6547,6 +6667,9 @@ fn walk(
             Ok(k) => k,
             Err(_) => continue,
         };
+        if kind.is_dir() && is_skipped_dir(&name) {
+            continue;
+        }
         // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
         // surfaced in the Notes tree; every control file is Hidden, so
         // memex-vault's root docs never appear as notes. A Hidden DIRECTORY is
@@ -6801,128 +6924,11 @@ fn ms_to_stamp(ms: i64) -> String {
         .unwrap_or_default()
 }
 
-// ─── watcher ─────────────────────────────────────────────────────────────────
+// ─── watcher (corpus_watch.rs) ───────────────────────────────────────────────
 
-const DEBOUNCE: Duration = Duration::from_millis(300);
-
-/// Watch the corpus for EXTERNAL changes (a folder dropped in, a note edited
-/// in another app) and fire `on_change` once per quiet burst, carrying the
-/// burst's relevant paths (deduped) so the organizer daemon can enqueue exactly
-/// what changed. `.rotli/`, dot-files and our own in-flight writes (the
-/// suppress set) never fire — so they never reach the daemon's queue either.
-pub fn spawn_watcher(
-    root: PathBuf,
-    suppress: SuppressSet,
-    on_change: impl Fn(&[PathBuf]) + Send + 'static,
-) -> notify::Result<()> {
-    use notify::{RecursiveMode, Watcher};
-    let (tx, rx) = std::sync::mpsc::channel();
-    let handler = move |res: notify::Result<notify::Event>| {
-        let _ = tx.send(res);
-    };
-    // Sandboxed macOS test processes do not receive FSEvents reliably. The
-    // polling backend exercises the same filter/debounce/suppression pipeline;
-    // production keeps the native recommended watcher.
-    #[cfg(test)]
-    let mut watcher = notify::PollWatcher::new(
-        handler,
-        notify::Config::default().with_poll_interval(Duration::from_millis(100)),
-    )?;
-    #[cfg(not(test))]
-    let mut watcher = notify::recommended_watcher(handler)?;
-    watcher.watch(&root, RecursiveMode::Recursive)?;
-    std::thread::spawn(move || {
-        let _keep_alive = watcher;
-        while let Ok(res) = rx.recv() {
-            let mut paths = relevant_paths(&root, &suppress, &res);
-            if paths.is_empty() {
-                continue;
-            }
-            // trailing debounce: absorb the burst, fire once when it goes quiet
-            loop {
-                match rx.recv_timeout(DEBOUNCE) {
-                    Ok(res) => {
-                        paths.extend(relevant_paths(&root, &suppress, &res));
-                        continue;
-                    }
-                    Err(RecvTimeoutError::Timeout) => {
-                        paths.sort();
-                        paths.dedup();
-                        // stale-cache order: bump BEFORE the notify, so the
-                        // frontend's refetch can never hit a pre-change cache
-                        suppress.bump();
-                        on_change(&paths);
-                        break;
-                    }
-                    Err(RecvTimeoutError::Disconnected) => return,
-                }
-            }
-        }
-    });
-    Ok(())
-}
-
-/// The paths of one fs event that matter (suppress + dot filters applied).
-/// Access events never matter.
-fn relevant_paths(
-    root: &Path,
-    suppress: &SuppressSet,
-    res: &notify::Result<notify::Event>,
-) -> Vec<PathBuf> {
-    let Ok(event) = res else { return Vec::new() };
-    if matches!(event.kind, notify::EventKind::Access(_)) {
-        return Vec::new();
-    }
-    // A file create/remove updates its parent directory's mtime. Polling and
-    // some native backends emit that as a second event carrying only the
-    // directory; treating it as content bypasses the exact-file suppress set
-    // and makes every app-authored write echo as "external". Metadata-only
-    // changes contain no note bytes and never require a corpus refresh.
-    if matches!(
-        event.kind,
-        notify::EventKind::Modify(notify::event::ModifyKind::Metadata(_))
-    ) {
-        return Vec::new();
-    }
-    event
-        .paths
-        .iter()
-        .filter(|p| path_relevant(root, suppress, p))
-        .cloned()
-        .collect()
-}
-
-/// The unit-testable core of the watcher's filter.
-pub fn path_relevant(root: &Path, suppress: &SuppressSet, path: &Path) -> bool {
-    if suppress.contains(path) {
-        return false;
-    }
-    let normalized_root = normalized_watch_path(root);
-    let normalized_path = normalized_watch_path(path);
-    let Ok(rel) = normalized_path.strip_prefix(&normalized_root) else {
-        return false;
-    };
-    // Main, named views, and chat folders are portable hand-arranged sidecars.
-    // Another Rotli process may write them, so every resident window must
-    // observe them; every other dot-file remains private runtime state.
-    if rel == Path::new(".rotli/main.json")
-        || rel == Path::new(".rotli/views.json")
-        || rel == Path::new(".rotli/chat-folders.json")
-    {
-        return true;
-    }
-    for comp in rel.components() {
-        if comp.as_os_str().to_string_lossy().starts_with('.') {
-            return false; // .rotli/, .DS_Store, .rotli-write-* temp files
-        }
-    }
-    // directories (a dropped folder), .md notes and .excalidraw boards matter;
-    // foreign files don't
-    match normalized_path.extension() {
-        Some(ext) => ext == "md" || ext == "excalidraw" || normalized_path.is_dir(),
-        None => true,
-    }
-}
+#[path = "corpus_watch.rs"]
+mod watch;
+pub use watch::spawn_watcher;
 
 // ─── tauri state + commands ──────────────────────────────────────────────────
 
@@ -7086,6 +7092,7 @@ impl CorpusState {
             .ok_or_else(|| "no such connected vault".to_string())?;
         persist()?;
         reg.stores.remove(root_id);
+        watch::stop_watching(&root);
         Ok(root)
     }
 
@@ -7147,8 +7154,12 @@ impl CorpusState {
             .remove(incoming_id)
             .ok_or_else(|| format!("corpus root unavailable: {incoming_id}"))?;
         incoming.set_perms_read_only(false);
-        if let Some(outgoing_id) = outgoing_id {
-            reg.stores.insert(outgoing_id, outgoing);
+        match outgoing_id {
+            Some(outgoing_id) => {
+                reg.stores.insert(outgoing_id, outgoing);
+            }
+            // a folder that isn't kept leaves the registry: stop watching it now
+            None => watch::stop_watching(outgoing.root()),
         }
         reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
         reg.default_id = DEFAULT_ROOT_ID.to_string();
@@ -7186,9 +7197,13 @@ impl CorpusState {
         }) {
             return Err("the outgoing vault could not be assigned a safe route".into());
         }
-        let outgoing = reg.stores.remove(DEFAULT_ROOT_ID);
-        if let (Some(outgoing_id), Some(outgoing)) = (outgoing_id, outgoing) {
-            reg.stores.insert(outgoing_id, outgoing);
+        match (outgoing_id, reg.stores.remove(DEFAULT_ROOT_ID)) {
+            (Some(outgoing_id), Some(outgoing)) => {
+                reg.stores.insert(outgoing_id, outgoing);
+            }
+            // the outgoing vault leaves the registry: stop watching it now
+            (None, Some(outgoing)) => watch::stop_watching(outgoing.root()),
+            _ => {}
         }
         incoming.set_perms_read_only(false);
         reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
@@ -7279,6 +7294,34 @@ impl CorpusState {
     /// stored id) — never a panic. pub(crate): the organizer daemon's writes
     /// (journal / dot-state / applies) serialize on this same mutex, so the two
     /// journal writers (TS command + daemon) can never interleave a line.
+    /// Bring one root's walk cache up to date WITHOUT holding the corpus lock
+    /// while the disk is read: plan under the lock, walk with it released,
+    /// install under it again. A huge vault's walk used to hold every corpus
+    /// command — sync ones on the main thread included — for its whole length
+    /// (audit 2026-10-12). One walker at a time (`UNLOCKED_WALK`); a walk the
+    /// vault changed under is discarded and the locked path re-walks.
+    pub(crate) fn walk_unlocked(&self, root_id: &str) -> Result<(), String> {
+        static UNLOCKED_WALK: Mutex<()> = Mutex::new(());
+        let _one_walker = UNLOCKED_WALK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let plan = self.route(root_id, |store| {
+            let plan = store.walk_plan();
+            // a stale cache is never served (every reader re-walks on a moved
+            // generation), so drop it now: never two copies of every body
+            if plan.is_some() {
+                store.list_cache = None;
+            }
+            Ok(plan)
+        })?;
+        let Some(plan) = plan else {
+            return Ok(());
+        };
+        let walked = run_walk(plan)?;
+        self.route(root_id, |store| {
+            store.install_walk(walked, false);
+            Ok(())
+        })
+    }
+
     pub(crate) fn route<T>(
         &self,
         root_id: &str,
@@ -7321,23 +7364,39 @@ fn prefix_write_result(root_id: &str, mut result: CorpusWriteResult) -> CorpusWr
 /// under the corpus mutex. Connected vaults are registered switch targets, not
 /// simultaneous data sources. The walk stays off Tauri's main thread.
 #[tauri::command]
-pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
+pub async fn corpus_list(app: tauri::AppHandle, fresh: Option<bool>) -> Result<CorpusList, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        corpus_list_inner(&state)
+        corpus_list_inner(&state, fresh.unwrap_or(false))
     })
     .await
     .map_err(|e| format!("corpus list worker failed ({e})"))?
 }
 
 /// The active-vault half of `corpus_list`, shared with `corpus_notes_ai`.
-fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
+fn corpus_list_inner(state: &CorpusState, fresh: bool) -> Result<CorpusList, String> {
+    let default_id = {
+        let reg = state
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        let default_id = reg.default_id.clone();
+        if fresh {
+            reg.stores
+                .get(&default_id)
+                .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?
+                .suppress
+                .bump();
+        }
+        default_id
+    };
+    // walk with the lock released; list() below is then a cache hit
+    state.walk_unlocked(&default_id)?;
     let mut reg = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?;
-    let default_id = reg.default_id.clone();
     reg.stores
         .get_mut(&default_id)
         .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?
@@ -7483,7 +7542,7 @@ pub async fn corpus_notes_ai(
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let listed = corpus_list_inner(&state)?;
+        let listed = corpus_list_inner(&state, false)?;
         let reference = corpus_reference_notes_inner(&state)?;
         let mut permitted = Vec::new();
         for meta in listed.notes.into_iter().chain(reference) {
@@ -7526,9 +7585,7 @@ pub fn corpus_open_file(state: tauri::State<'_, CorpusState>, id: String) -> Res
         return Err(format!("not a file: {}", abs.display()));
     }
     #[cfg(target_os = "macos")]
-    std::process::Command::new("open")
-        .arg(&abs)
-        .spawn()
+    crate::child_run::spawn_reaped(std::process::Command::new("open").arg(&abs))
         .map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
     let _ = abs;
@@ -7583,6 +7640,43 @@ pub fn corpus_file_bytes(
     let data = fs::read(&abs).map_err(|e| e.to_string())?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
+}
+
+/// AI file reads use their own Rust policy before opening the file. The model
+/// identity is checked here, not accepted as a caller-supplied boolean.
+#[tauri::command]
+pub fn corpus_file_text_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
+    let cap = max_bytes.unwrap_or(200_000);
+    let text = String::from_utf8_lossy(&data[..data.len().min(cap)]).into_owned();
+    if !local && crate::secret::blocked_for_remote(&text) {
+        return Err("blocked: this file contains secret-shaped content".into());
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+pub fn corpus_file_bytes_ai(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    model_id: String,
+    endpoint: String,
+    max_bytes: Option<usize>,
+) -> Result<String, String> {
+    use base64::Engine;
+    let (root, rel) = split_root_id(&id);
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let data = state.route(&root, |store| store.read_file_bytes_for_ai(&rel, local))?;
+    let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
+    Ok(base64::engine::general_purpose::STANDARD.encode(&data[..data.len().min(cap)]))
 }
 
 /// Import a dropped external file into the corpus's binary area (the memex
@@ -7867,10 +7961,7 @@ pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> R
         return Err(format!("not a file: {}", abs.display()));
     }
     #[cfg(target_os = "macos")]
-    std::process::Command::new("open")
-        .arg("-R")
-        .arg(&abs)
-        .spawn()
+    crate::child_run::spawn_reaped(std::process::Command::new("open").arg("-R").arg(&abs))
         .map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
     let _ = abs;
@@ -7923,11 +8014,7 @@ pub fn corpus_open_file_with(
         return Err(format!("not a file: {}", abs.display()));
     }
     #[cfg(target_os = "macos")]
-    std::process::Command::new("open")
-        .arg("-a")
-        .arg(&app)
-        .arg(&abs)
-        .spawn()
+    crate::child_run::spawn_reaped(std::process::Command::new("open").arg("-a").arg(&app).arg(&abs))
         .map_err(|e| e.to_string())?;
     #[cfg(not(target_os = "macos"))]
     let _ = (abs, app);
@@ -8221,14 +8308,21 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        let body = s.read_for_ai(&rel, model_is_local)?;
-        Ok(CorpusAiRead {
-            revision: crate::fsutil::revision(body.as_bytes()),
-            editor: with_editor
-                .unwrap_or(false)
-                .then(|| ai_journal::editor_text(&body).to_string()),
-            body,
-        })
+        read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
+    })
+}
+
+fn read_ai_versioned(
+    store: &mut CorpusStore,
+    rel: &str,
+    model_is_local: bool,
+    with_editor: bool,
+) -> Result<CorpusAiRead, String> {
+    let body = store.read_for_ai(rel, model_is_local)?;
+    Ok(CorpusAiRead {
+        revision: crate::fsutil::revision(body.as_bytes()),
+        editor: with_editor.then(|| ai_journal::editor_text(&body).to_string()),
+        body,
     })
 }
 
@@ -8775,10 +8869,13 @@ mod injection_evals;
 mod ai_write_tests;
 
 #[cfg(test)]
+#[path = "corpus_ai_file_tests.rs"]
+mod ai_file_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
 
     #[test]
@@ -10867,53 +10964,6 @@ mod tests {
         s.mark(&p);
         assert!(s.contains(&p));
         assert!(!s.contains(Path::new("/tmp/other.md")));
-    }
-
-    #[test]
-    fn path_relevance_filter() {
-        let root = PathBuf::from("/corpus");
-        let s = SuppressSet::default();
-        assert!(path_relevant(&root, &s, Path::new("/corpus/Work/note.md")));
-        assert!(path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/Inbox/excalidraw/ideas.excalidraw")
-        )); // a board
-        assert!(path_relevant(&root, &s, Path::new("/corpus/Dropped"))); // a folder
-        assert!(path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/.rotli/main.json")
-        ));
-        assert!(path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/.rotli/views.json")
-        ));
-        assert!(path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/.rotli/chat-folders.json")
-        ));
-        assert!(!path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/.rotli/index.json")
-        ));
-        assert!(!path_relevant(
-            &root,
-            &s,
-            Path::new("/corpus/.rotli-write-abc")
-        ));
-        assert!(!path_relevant(&root, &s, Path::new("/corpus/.DS_Store")));
-        assert!(!path_relevant(&root, &s, Path::new("/corpus/photo.png")));
-        assert!(!path_relevant(&root, &s, Path::new("/elsewhere/x.md")));
-        let ours = PathBuf::from("/corpus/Work/ours.md");
-        s.mark(&ours);
-        assert!(
-            !path_relevant(&root, &s, &ours),
-            "our own write must not echo"
-        );
     }
 
     // ── Increment 3: the corpus can BE a memex instance ──
@@ -13317,6 +13367,38 @@ mod tests {
     }
 
     #[test]
+    fn walk_skips_dependency_folders_at_any_depth() {
+        // RAM review 2026-10-12: a code folder chosen as a vault surfaced every
+        // node_modules file as a note row (133k rows, 44 MB per listing).
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("code");
+        fs::create_dir_all(root.join("node_modules/left-pad")).unwrap();
+        fs::create_dir_all(root.join("app/NODE_MODULES/dep")).unwrap();
+        fs::create_dir_all(root.join("node_modules notes")).unwrap();
+        fs::write(root.join("node_modules/left-pad/README.md"), "# Pad\n").unwrap();
+        fs::write(root.join("app/NODE_MODULES/dep/index.js"), "x").unwrap();
+        fs::write(root.join("app/plan.md"), "# Plan\n").unwrap();
+        fs::write(root.join("node_modules notes/kept.md"), "# Kept\n").unwrap();
+
+        let mut store = CorpusStore::open_adopted(root.clone()).unwrap();
+        let list = store.list().unwrap();
+        let titles: Vec<&str> = list.notes.iter().map(|n| n.title.as_str()).collect();
+        assert!(titles.contains(&"Plan"));
+        assert!(titles.contains(&"Kept"));
+        assert!(!titles.contains(&"Pad"), "{titles:?}");
+        assert!(!titles.contains(&"index.js"), "{titles:?}");
+        assert!(
+            list.folders
+                .iter()
+                .all(|f| !f.id.to_ascii_lowercase().split('/').any(|seg| seg == "node_modules")),
+            "{:?}",
+            list.folders
+        );
+        // skipping is a VIEW decision: nothing on disk moves
+        assert!(root.join("node_modules/left-pad/README.md").is_file());
+    }
+
+    #[test]
     fn adopted_markdown_tree_keeps_visible_files_and_seeds_nested_main_references() {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("obsidian-vault");
@@ -13406,6 +13488,20 @@ mod tests {
     // ─── the walk cache (perf audit 2026-07-30, #1/#5) ───────────────────────
 
     #[test]
+    fn fresh_corpus_list_invalidates_the_cached_walk_once() {
+        let (_dir, store) = bare();
+        let root = store.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+        let before = corpus_list_inner(&state, false).unwrap().notes.len();
+        fs::write(root.join("new.md"), "# New\n").unwrap();
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before);
+        assert_eq!(corpus_list_inner(&state, true).unwrap().notes.len(), before + 1);
+        assert_eq!(corpus_list_inner(&state, false).unwrap().notes.len(), before + 1);
+    }
+
+    #[test]
     fn walk_cache_holds_until_the_generation_moves() {
         let (_dir, mut store) = bare();
         store.create("", "# First\n").unwrap();
@@ -13427,6 +13523,33 @@ mod tests {
             n + 1,
             "bump did not refresh the walk"
         );
+    }
+
+    #[test]
+    fn an_unlocked_walk_the_vault_changed_under_is_discarded() {
+        // audit 2026-10-12: walks now read the disk with the corpus lock
+        // released; a write that lands meanwhile must never be overwritten
+        let (_dir, mut store) = bare();
+        store.create("", "# First\n").unwrap();
+        let plan = store.walk_plan().expect("cold cache needs a walk");
+        let walked = super::run_walk(plan).unwrap();
+        let fresh = store.create("", "# Written during the walk\n").unwrap();
+        assert!(!store.install_walk(walked, false), "a stale walk was installed");
+        assert!(store.index.contains_key(&fresh.id), "the newer index entry was lost");
+        assert!(store.list().unwrap().notes.iter().any(|n| n.id == fresh.id));
+    }
+
+    #[test]
+    fn an_unlocked_walk_fills_the_cache_and_feeds_the_ledger() {
+        let (_dir, mut store) = bare();
+        let secret_line = "the quarterly harbor lease renegotiation memo stays private";
+        store.os_trash = false;
+        store.create_with_policy("Secure notes", &format!("# Lease\n\n{secret_line}\n"), true).unwrap();
+        store.suppress_set().bump();
+        let plan = store.walk_plan().expect("bumped generation needs a walk");
+        assert!(store.install_walk(super::run_walk(plan).unwrap(), false));
+        assert!(store.walk_plan().is_none(), "cache should be current");
+        assert!(crate::secret::echoes_secure_text(secret_line));
     }
 
     #[test]
@@ -13467,74 +13590,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn external_change_refreshes_through_the_watcher() {
-        let (_dir, mut store) = bare();
-        let root = store.root().to_path_buf();
-        let suppress = store.suppress_set();
-        let fired = Arc::new(AtomicUsize::new(0));
-        let counter = fired.clone();
-        spawn_watcher(root.clone(), suppress, move |_paths: &[PathBuf]| {
-            counter.fetch_add(1, Ordering::SeqCst);
-        })
-        .unwrap();
-        std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
-
-        let before = store.list().unwrap().notes.len();
-        fs::write(root.join("external.md"), "# From another app\n").unwrap();
-        // wait for the debounced fire (poll watcher 100ms + debounce 300ms)
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while fired.load(Ordering::SeqCst) == 0 && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        assert!(fired.load(Ordering::SeqCst) >= 1, "watcher never fired");
-        assert_eq!(
-            store.list().unwrap().notes.len(),
-            before + 1,
-            "the watcher's bump must refresh the cached walk"
-        );
-    }
-
-    #[test]
-    fn watcher_debounces_external_bursts_and_ignores_our_writes() {
-        let (_dir, store) = bare();
-        let root = store.root().to_path_buf();
-        let suppress = store.suppress_set();
-        let fired = Arc::new(AtomicUsize::new(0));
-        let counter = fired.clone();
-        spawn_watcher(
-            root.clone(),
-            suppress.clone(),
-            move |paths: &[PathBuf]| {
-                assert!(!paths.is_empty(), "a fire must carry the burst's paths");
-                counter.fetch_add(1, Ordering::SeqCst);
-            },
-        )
-        .unwrap();
-        std::thread::sleep(Duration::from_millis(400)); // watcher warm-up
-
-        // a burst of external writes → ONE notification (debounced)
-        for i in 0..5 {
-            fs::write(root.join(format!("ext-{i}.md")), "# external\n").unwrap();
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        std::thread::sleep(Duration::from_millis(1500));
-        let after_burst = fired.load(Ordering::SeqCst);
-        assert!(after_burst >= 1, "external change never reported");
-        assert!(
-            after_burst <= 2,
-            "debounce failed: {after_burst} fires for one burst"
-        );
-
-        // our own write (suppressed path) → no new notification
-        let ours = root.join("ours.md");
-        suppress.mark(&ours);
-        fs::write(&ours, "---\nid: x\n---\n\n# ours\n").unwrap();
-        std::thread::sleep(Duration::from_millis(900));
-        assert_eq!(
-            fired.load(Ordering::SeqCst),
-            after_burst,
-            "our own in-flight write echoed back as external"
-        );
-    }
 }

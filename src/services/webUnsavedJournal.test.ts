@@ -90,3 +90,116 @@ test("a draft that can be neither saved nor kept aside stays in the journal for 
   // the next boot tries it again
   expect((await replayJournal(store, key, failing)).unresolved).toBe(1);
 });
+
+test("a secure locked conflict keeps its protection on the recovered note", async () => {
+  const { FolderNotesService } = await import("./folderNotes");
+  const { MemoryVaultDir } = await import("./vaultDir");
+  const dir = new MemoryVaultDir();
+  await dir.mkdir("wiki");
+  await dir.writeText(
+    "wiki/_secure/a.md",
+    "---\nid: protected\nsecure: true\nlocked: true\nlocal_ai_allowed: false\nai_edit: false\n---\nbefore",
+  );
+  const svc = new FolderNotesService(dir);
+  const note = (await svc.getNote("protected"))!;
+  const store = storage();
+  const key = journalKey("secure-vault");
+  writeJournal(store, key, [
+    { noteId: note.id, body: "mine", expectedRevision: note.revision, expectedBody: note.body },
+  ]);
+  await svc.updateNote(note.id, "external", note.revision);
+  expect((await replayJournal(store, key, svc)).unresolved).toBe(0);
+  const copy = (await svc.listAll()).find((n) => n.id !== note.id)!;
+  expect(copy.secure).toBe(true);
+  expect(copy.locked).toBe(true);
+  expect(copy.diskFolderId).toBe("wiki/_secure");
+  expect((await dir.readText(".gitignore")).split("\n")).toContain(await svc.filePathOf(copy.id));
+  expect((await svc.getNote(copy.id))?.body).toBe("mine");
+});
+
+test("a missing note with unknown protection retains its draft instead of downgrading it", async () => {
+  const svc = new InMemoryNotesService();
+  const store = storage();
+  const key = journalKey("unknown-vault");
+  const draft = { noteId: "missing", body: "private draft", expectedRevision: "old", expectedBody: "before" };
+  writeJournal(store, key, [draft]);
+  expect(await replayJournal(store, key, svc)).toEqual({ saved: 0, keptAside: [], unresolved: 1 });
+  expect(await svc.listAll()).toHaveLength(0);
+  expect(JSON.parse(store.values.get(`${key}:kept`) ?? "[]")).toEqual([draft]);
+});
+
+test("a pending tab's journaled words become a note after reload", async () => {
+  const svc = new InMemoryNotesService();
+  const store = storage();
+  const key = journalKey("new-vault");
+  writeJournal(store, key, [
+    {
+      noteId: "rotli-pending-note:tab",
+      body: "# Written before creation finished",
+      expectedRevision: "0",
+      expectedBody: "",
+      protection: { secure: false, locked: false },
+    },
+  ]);
+  expect((await replayJournal(store, key, svc)).keptAside).toEqual(["Written before creation finished"]);
+  expect((await svc.listAll())[0]?.title).toBe("Written before creation finished");
+});
+
+test("a deleted secure note can recover from its journaled protection", async () => {
+  const svc = new InMemoryNotesService();
+  const store = storage();
+  const key = journalKey("deleted-secure-vault");
+  writeJournal(store, key, [
+    {
+      noteId: "deleted",
+      body: "# Private draft",
+      expectedRevision: "old",
+      expectedBody: "before",
+      protection: { secure: true, locked: true },
+    },
+  ]);
+  expect((await replayJournal(store, key, svc)).unresolved).toBe(0);
+  expect((await svc.listAll())[0]).toMatchObject({ secure: true, locked: true });
+});
+
+test("a newer disk protection cannot be downgraded by an older draft", async () => {
+  const svc = new InMemoryNotesService();
+  const folder = seedReservedRoots(svc);
+  const note = await svc.createNote(folder, "before", { secure: true, locked: true });
+  const store = storage();
+  const key = journalKey("newly-protected-vault");
+  writeJournal(store, key, [
+    {
+      noteId: note.id,
+      body: "mine",
+      expectedRevision: "stale",
+      expectedBody: "before",
+      protection: { secure: false, locked: false },
+    },
+  ]);
+  expect((await replayJournal(store, key, svc)).unresolved).toBe(0);
+  expect((await svc.listAll()).find((item) => item.id !== note.id)).toMatchObject({
+    secure: true,
+    locked: true,
+  });
+});
+
+test("malformed policy for a missing note leaves the journal intact", async () => {
+  const svc = new InMemoryNotesService();
+  const store = storage();
+  const key = journalKey("bad-policy-vault");
+  store.setItem(
+    key,
+    JSON.stringify([
+      {
+        noteId: "missing",
+        body: "private draft",
+        expectedRevision: "old",
+        expectedBody: "before",
+        protection: { secure: "false", locked: false },
+      },
+    ]),
+  );
+  expect((await replayJournal(store, key, svc)).unresolved).toBe(1);
+  expect(await svc.listAll()).toHaveLength(0);
+});

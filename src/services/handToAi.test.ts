@@ -196,6 +196,45 @@ describe("Hand to AI, Refined — what reaches the model", () => {
     expect(model.sent).toHaveLength(0);
   });
 
+  test("rotli file links and fenced file references refuse Refined before the model", async () => {
+    const protectedLocate: LocateAttachment = (_rootId, rel) =>
+      Promise.resolve({
+        status: "found",
+        rel,
+        path: `/Synthetic Vault/${rel}`,
+      });
+    for (const reference of [
+      "[plan](rotli://open?kind=file&id=wiki%2F_secure%2Fplan.docx)",
+      "```text\nwiki/_secure/plan.docx\n```",
+      '```sh\ncat "Secure notes/plan.docx"\n```',
+    ]) {
+      const note = await notesService.createNote(DEST.inbox, `# Work\n\nPlease review.\n\n${reference}`);
+      const model = stubModel(faithful);
+      expect((await refineHandToAiFor(note.id, model.host, protectedLocate)).kind).toBe("secureAttachment");
+      expect(model.sent).toHaveLength(0);
+    }
+  });
+
+  test("a fenced code sample with an unknown path reaches Refined", async () => {
+    const note = await notesService.createNote(
+      DEST.inbox,
+      "# Work\n\nPlease review.\n\n```ts\nimport x from 'src/foo.ts'\n```",
+    );
+    const model = stubModel(() => "## Task\nReview the code sample and report any changes needed.\n");
+    expect((await refineHandToAiFor(note.id, model.host, locate)).kind).toBe("refined");
+    expect(model.sent).toHaveLength(1);
+  });
+
+  test("a fenced secure-looking path that is absent from the vault reaches Refined", async () => {
+    const note = await notesService.createNote(
+      DEST.inbox,
+      "# Work\n\nExplain this example.\n\n```text\nwiki/_secure/example.csv\n```",
+    );
+    const model = stubModel(() => "## Task\nExplain the example path as a literal code sample.\n");
+    expect((await refineHandToAiFor(note.id, model.host, locate)).kind).toBe("refined");
+    expect(model.sent).toHaveLength(1);
+  });
+
   test("an answer that drops a path falls back to Basic, with the reason", async () => {
     const note = await notesService.createNote(DEST.inbox, "# Login\n\nFix it.\n\n![](storage:shot.png)");
     const model = stubModel(() => "## Task\nFix the login page, see the screenshot attached.\n");

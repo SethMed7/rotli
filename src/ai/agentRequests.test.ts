@@ -10,6 +10,7 @@ import { afterAll, beforeEach, expect, mock, test } from "bun:test";
 import * as realDocuments from "../documents/composition";
 import type { EditableDocument } from "../documents/model";
 import { registerLiveDocument, unregisterLiveDocument } from "../documents/session";
+import * as realTauri from "../lib/tauri";
 import * as realNewItems from "../newItems/composition";
 import { answerAgentRequest } from "./agentRequests";
 
@@ -23,6 +24,7 @@ const plan = (text: string): EditableDocument => ({
 let disk = plan("Ship it");
 let revision = "r1";
 const created: { title: string; agent?: string | undefined }[] = [];
+const editModels: unknown[] = [];
 
 const session = async () => ({
   kind: "ready" as const,
@@ -38,8 +40,21 @@ const session = async () => ({
 
 void mock.module("../documents/composition", () => ({
   ...realDocuments,
-  editManagedDocument: session,
-  editAiDocument: session,
+  readAiManagedDocument: session,
+  editAiDocument: async (_id: string, model: unknown) => {
+    editModels.push(model);
+    return session();
+  },
+}));
+void mock.module("../lib/tauri", () => ({
+  ...realTauri,
+  corpusList: async () => ({
+    folders: [],
+    notes: [
+      { id: FILE, title: "launch.docx", kind: "file" },
+      { id: "wiki/_secure/launch.docx", title: "launch.docx", kind: "file" },
+    ],
+  }),
 }));
 void mock.module("../newItems/composition", () => ({
   ...realNewItems,
@@ -52,6 +67,7 @@ void mock.module("../newItems/composition", () => ({
 
 afterAll(() => {
   void mock.module("../documents/composition", () => realDocuments);
+  void mock.module("../lib/tauri", () => realTauri);
   void mock.module("../newItems/composition", () => realNewItems);
 });
 
@@ -59,6 +75,7 @@ beforeEach(() => {
   disk = plan("Ship it");
   revision = "r1";
   created.length = 0;
+  editModels.length = 0;
 });
 
 const ask = (tool: string, args: Record<string, unknown>) =>
@@ -71,6 +88,13 @@ test("an agent reads numbered blocks and the revision its edit must name", async
   });
 });
 
+test("the webview refuses an agent's secure-home document before decoding", async () => {
+  expect(await ask("read_document", { file: "wiki/_secure/launch.docx" })).toMatchObject({
+    ok: false,
+    error: expect.stringContaining("blocked:"),
+  });
+});
+
 test("an edit applies over the revision read, and a newer file refuses it", async () => {
   const actions = [{ op: "replace", block: 1, text: "Ship it [today](https://rotli.co)" }];
   const saved = await ask("apply_document", { file: FILE, expectedRevision: "r1", actions });
@@ -78,6 +102,7 @@ test("an edit applies over the revision read, and a newer file refuses it", asyn
     ok: true,
     result: { revision: "r2", blocks: "[1] paragraph: Ship it [today](https://rotli.co)" },
   });
+  expect(editModels[0]).toEqual({ id: "agent", endpoint: "" });
   // the same edit again names a revision the file has moved past
   expect(await ask("apply_document", { file: FILE, expectedRevision: "r1", actions })).toEqual({
     ok: false,

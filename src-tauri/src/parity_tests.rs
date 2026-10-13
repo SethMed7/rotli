@@ -24,6 +24,21 @@ fn string_list(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn byte_revision_vector_matches_fixture() {
+    let vector = entry("byteRevisionVector");
+    let bytes: Vec<u8> = vector["bytes"]
+        .as_array()
+        .expect("byte revision vector has bytes")
+        .iter()
+        .map(|byte| byte.as_u64().expect("byte is unsigned") as u8)
+        .collect();
+    assert_eq!(
+        crate::fsutil::revision(&bytes),
+        vector["revision"].as_str().expect("vector has revision")
+    );
+}
+
+#[test]
 fn document_edit_limits_match_fixture() {
     assert_eq!(
         entry("documentEditMaxActions").as_u64(),
@@ -52,6 +67,22 @@ fn sheet_edit_max_bytes_matches_fixture() {
 }
 
 #[test]
+fn sheet_package_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("sheetPackageExts")),
+        crate::corpus::SHEET_PACKAGE_EXTS
+    );
+}
+
+#[test]
+fn docx_package_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("docxPackageExts")),
+        crate::corpus::DOCX_PACKAGE_EXTS
+    );
+}
+
+#[test]
 fn chat_image_asset_exts_match_fixture() {
     assert_eq!(
         string_list(&entry("chatImageAssetExts")),
@@ -60,11 +91,26 @@ fn chat_image_asset_exts_match_fixture() {
 }
 
 #[test]
+fn skipped_dirs_match_fixture() {
+    assert_eq!(string_list(&entry("skippedDirs")), crate::corpus::SKIPPED_DIRS);
+}
+
+#[test]
 fn secure_notes_folder_matches_fixture() {
     assert_eq!(
         entry("secureNotesFolder").as_str(),
         Some(crate::corpus::SECURE_NOTES_FOLDER)
     );
+}
+
+#[test]
+fn secure_home_cases_match_fixture() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let store = crate::corpus::CorpusStore::open(temp.path().join("corpus")).unwrap();
+    for case in entry("secureHomeCases").as_array().expect("cases") {
+        let path = case["path"].as_str().unwrap();
+        assert_eq!(store.in_secure_home(path), case["secure"].as_bool().unwrap(), "{path}");
+    }
 }
 
 #[test]
@@ -124,6 +170,33 @@ fn empty_board_scene_matches_fixture() {
 #[test]
 fn board_lane_matches_fixture() {
     assert_eq!(entry("boardLane").as_str(), Some(crate::corpus::BOARD_LANE));
+}
+
+#[test]
+fn managed_file_rules_match_fixture() {
+    let rules = entry("managedFileRules");
+    assert_eq!(
+        rules["memexLane"].as_str(),
+        Some(crate::corpus::MANAGED_MEMEX_LANE)
+    );
+    assert_eq!(
+        rules["plainLane"].as_str(),
+        Some(crate::corpus::MANAGED_PLAIN_LANE)
+    );
+    let collision = crate::corpus::managed_collision_name("stem", ".docx", 2);
+    assert_eq!(
+        rules["collisionSuffix"].as_str(),
+        collision
+            .strip_prefix("stem")
+            .and_then(|value| value.strip_suffix(".docx"))
+    );
+    let extensions: Vec<&str> = rules["extensions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|value| value.as_str().unwrap())
+        .collect();
+    assert_eq!(extensions, crate::corpus::MANAGED_FILE_EXTS);
 }
 
 #[test]
@@ -457,5 +530,33 @@ fn metadata_link_targets_fixtures_agree() {
             expected,
             "metadata_link_targets({fields:?})"
         );
+    }
+}
+
+#[test]
+fn raw_immutable_keys_match_fixture() {
+    assert_eq!(
+        crate::corpus::RAW_IMMUTABLE_KEYS.to_vec(),
+        string_list(&entry("rawImmutableKeys"))
+    );
+}
+
+#[test]
+fn storage_office_exts_match_fixture() {
+    assert_eq!(
+        crate::corpus::STORAGE_OFFICE_EXTS.to_vec(),
+        string_list(&entry("storageOfficeExts"))
+    );
+}
+
+#[test]
+fn note_filename_slugs_match_fixture() {
+    for case in entry("noteFilenameSlugs")
+        .as_array()
+        .expect("noteFilenameSlugs is an array")
+    {
+        let title = case["title"].as_str().expect("title is a string");
+        let slug = case["slug"].as_str().expect("slug is a string");
+        assert_eq!(crate::corpus::slugify(title), slug, "{title:?}");
     }
 }

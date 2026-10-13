@@ -10,6 +10,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { modelLabel, modelProvider } from "../../ai/models";
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
@@ -33,7 +34,7 @@ import { useViewsStore } from "../../state/views";
 import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
-import { chatFileMenuItems } from "./chatFileActions";
+import { chatFileMenuItems, chatFinderMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
 import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
@@ -285,20 +286,15 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             },
           ]
         : []),
-      {
-        kind: "action" as const,
-        label: "Show in Finder",
-        disabled: !isTauri(),
-        onClick: () => {
-          if (!activeMemex) return;
-          setRowActionError(null);
-          void revealChat(activeMemex, c.slug).catch((err) =>
-            setRowActionError(
-              `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
-            ),
-          );
-        },
-      },
+      ...chatFinderMenuItems(PLATFORM, isTauri(), () => {
+        if (!activeMemex) return;
+        setRowActionError(null);
+        void revealChat(activeMemex, c.slug).catch((err) =>
+          setRowActionError(
+            `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+      }),
       {
         kind: "action" as const,
         label: "Copy file path",

@@ -298,15 +298,13 @@ impl Workspace {
                 NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
                 // boards get the same secret gate the reads enforce — a
                 // scene the agent can't read shouldn't be offered to it
-                NoteKind::Board => self
-                    .store
-                    .read_board(&meta.id)
-                    .map(|b| Self::board_egress_allowed(&b.body).is_ok())
-                    .unwrap_or(false),
-                // a surfaced FILE carries no frontmatter to mark, so the
-                // surface predicate is the whole policy: never offer a remote
-                // agent something out of a Hidden lane (audit 2026-08-01).
-                _ => self.store.agent_listable(&meta.id),
+                NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
+                // Files carry no frontmatter: omit both hidden and protected
+                // locations before a remote agent sees title or path.
+                _ => {
+                    self.store.agent_listable(&meta.id)
+                        && !self.store.file_is_protected(&meta.id)
+                }
             };
             if visible {
                 kept.push(meta);
@@ -639,13 +637,9 @@ impl Workspace {
                 return self.store.read_for_ai(wire_id, false).is_ok();
             }
             if rel.ends_with(".excalidraw") {
-                return self
-                    .store
-                    .read_board(wire_id)
-                    .map(|board| Self::board_egress_allowed(&board.body).is_ok())
-                    .unwrap_or(false);
+                return self.read_board_for_remote(wire_id).is_ok();
             }
-            return self.store.agent_listable(&rel);
+            return self.store.agent_listable(&rel) && !self.store.file_is_protected(&rel);
         }
         let Ok((mut workspace, local)) = Workspace::open_for_item(wire_id, None) else {
             return false;
@@ -979,9 +973,18 @@ impl Workspace {
         Ok(())
     }
 
-    fn read_board(&mut self, local_id: &str) -> Result<BoardReadResult, String> {
-        let mut board = self.store.read_board(local_id)?;
+    fn read_board_for_remote(&mut self, local_id: &str) -> Result<CorpusBoardDoc, String> {
+        let rel = self.store.resolve_note_rel(local_id)?;
+        if self.store.file_is_protected(&rel) {
+            return Err("blocked: a secure board cannot be sent to a remote agent".into());
+        }
+        let board = self.store.read_board(&rel)?;
         Self::board_egress_allowed(&board.body)?;
+        Ok(board)
+    }
+
+    fn read_board(&mut self, local_id: &str) -> Result<BoardReadResult, String> {
+        let mut board = self.read_board_for_remote(local_id)?;
         let revision = revision(board.body.as_bytes());
         let scene = validate_board(&board.body)
             .map_err(|error| format!("board cannot be opened safely: {error}"))?;
@@ -1017,9 +1020,8 @@ impl Workspace {
         expected_revision: &str,
     ) -> Result<NoteMeta, String> {
         require_revision(expected_revision)?;
-        let current = self.store.read_board(local_id)?;
         // a board a connected agent may not read, it may not blindly rewrite
-        Self::board_egress_allowed(&current.body)?;
+        self.read_board_for_remote(local_id)?;
         validate_board(scene_body)?;
         self.store
             .write_board_if_revision(local_id, scene_body, expected_revision)
@@ -1035,8 +1037,7 @@ impl Workspace {
         tags: Option<&str>,
     ) -> Result<NoteMeta, String> {
         require_revision(expected_revision)?;
-        let current = self.store.read_board(local_id)?;
-        Self::board_egress_allowed(&current.body)?;
+        let current = self.read_board_for_remote(local_id)?;
         let mut scene = validate_board(&current.body)
             .map_err(|error| format!("board cannot be edited safely: {error}"))?;
         apply_board_actions(&mut scene, actions)?;
@@ -3034,6 +3035,10 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
 }
 
 #[cfg(test)]
+#[path = "workspace_secure_reference_tests.rs"]
+mod secure_reference_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::net::TcpStream;
@@ -3735,6 +3740,24 @@ mod tests {
         assert!(workspace
             .create_note("Token", "sk-ant-abcdefghijklmnop", MAIN_ROOT)
             .is_err());
+    }
+
+    #[test]
+    fn remote_listing_omits_secure_home_file_titles_and_paths() {
+        let temp = TempDir::new().unwrap();
+        let mut workspace = test_workspace(&temp);
+        for rel in ["Secure notes/plan.csv", "wiki/_secure/plan.txt"] {
+            fs::create_dir_all(workspace.store.root().join(Path::new(rel).parent().unwrap()))
+                .unwrap();
+            fs::write(workspace.store.root().join(rel), "task,status\nDraft,ready").unwrap();
+        }
+        fs::create_dir_all(workspace.store.root().join("Storage")).unwrap();
+        fs::write(workspace.store.root().join("Storage/public.csv"), "task,status\nDraft,ready").unwrap();
+        let listed = workspace.list_remote(100).unwrap();
+        assert!(listed.notes.iter().any(|meta| meta.id == "Storage/public.csv"));
+        assert!(!listed.notes.iter().any(|meta| {
+            meta.id.contains("plan") || meta.title == "plan.csv" || meta.title == "plan.txt"
+        }));
     }
 
     /// AUDIT 2026-08-01, GAP 6 — `compare_revision` reports the FNV-1a hash of

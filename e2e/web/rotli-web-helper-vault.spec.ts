@@ -8,158 +8,10 @@
 // served folder, a reload stays connected, and an outage is waited out —
 // never answered with a stand-in vault.
 
-import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
+import { PORT, TOKEN, connectThroughHelper, fakeHelperVault, withoutFolderApi } from "./fake-helper";
 import { APP, vaultGate } from "./support";
-
-const PORT = 43120;
-const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
-
-interface Served {
-  name: string;
-  id: string;
-}
-
-/** The helper's side, shared by every page of the context. */
-function fakeHelperVault() {
-  const files = new Map<string, { text: string; mtime: number }>();
-  const dirs = new Set<string>();
-  let clock = 1_700_000_000_000;
-  const state = {
-    down: false,
-    /** How long /health is held, as a browser holds a request while it asks
-     * whether the page may reach apps on this device (Firefox, Zen). */
-    healthDelayMs: 0,
-    served: null as Served | null,
-    chooses: { name: "notes", id: "hv_notes" } as Served,
-  };
-  const parent = (path: string) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");
-  const mkdirs = (path: string) => {
-    for (let dir = path; dir; dir = parent(dir)) dirs.add(dir);
-  };
-  const stat = (path: string) => {
-    const file = files.get(path);
-    if (file) return { lastModified: file.mtime, size: Buffer.byteLength(file.text) };
-    return dirs.has(path) ? { lastModified: 0, size: 0 } : null;
-  };
-  const verbs: Record<string, (args: Record<string, unknown>) => unknown> = {
-    chat_models: () => [],
-    vault_info: () =>
-      state.served
-        ? { ...state.served, empty: files.size === 0 && [...dirs].every((d) => d === ".rotli") }
-        : null,
-    vault_choose: () => {
-      state.served = state.chooses;
-      return verbs.vault_info!({});
-    },
-    vault_walk: () => [
-      ...[...dirs].map((path) => ({ path, kind: "directory", lastModified: 0, size: 0 })),
-      ...[...files.keys()].map((path) => ({ path, kind: "file", ...stat(path) })),
-    ],
-    vault_stat: (a) => stat(String(a.path)),
-    vault_read: (a) => {
-      const file = files.get(String(a.path));
-      if (!file) throw Object.assign(new Error(`no such file: ${String(a.path)}`), { status: 404 });
-      return a.encoding === "base64" ? Buffer.from(file.text).toString("base64") : file.text;
-    },
-    vault_read_many: (a) => ({
-      files: Object.fromEntries((a.paths as string[]).map((p) => [p, files.get(p)?.text ?? null])),
-      more: [],
-    }),
-    vault_write: (a) => {
-      const path = String(a.path);
-      const now = stat(path);
-      const current = now && files.has(path) ? `${now.lastModified}:${now.size}` : "0";
-      if (typeof a.expectedRevision === "string" && a.expectedRevision !== current) {
-        throw Object.assign(new Error("revision conflict: the file changed on disk"), { status: 409 });
-      }
-      mkdirs(parent(path));
-      const text = typeof a.text === "string" ? a.text : Buffer.from(String(a.base64), "base64").toString();
-      files.set(path, { text, mtime: (clock += 1000) });
-      return stat(path);
-    },
-    vault_mkdir: (a) => mkdirs(String(a.path)) ?? null,
-    vault_move: (a) => {
-      const from = files.get(String(a.from));
-      if (!from) throw Object.assign(new Error("no such file"), { status: 404 });
-      mkdirs(parent(String(a.to)));
-      files.set(String(a.to), from);
-      files.delete(String(a.from));
-      return null;
-    },
-    vault_remove: (a) => {
-      files.delete(String(a.path));
-      dirs.delete(String(a.path));
-      return null;
-    },
-  };
-  const install = (context: BrowserContext) =>
-    context.route(`http://127.0.0.1:${PORT}/**`, async (route) => {
-      const request = route.request();
-      const cors = {
-        "access-control-allow-origin": request.headers()["origin"] ?? "*",
-        "access-control-allow-headers": "authorization, content-type",
-        "access-control-allow-methods": "GET, POST, OPTIONS",
-        "content-type": "application/json",
-      };
-      if (state.down) return route.abort("connectionrefused");
-      if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-      if (new URL(request.url()).pathname === "/health") {
-        if (state.healthDelayMs) await new Promise((resolve) => setTimeout(resolve, state.healthDelayMs));
-        const health = { ok: true, name: "rotli-helper", version: "1.3.0" };
-        return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(health) });
-      }
-      if (request.headers()["authorization"] !== `Bearer ${TOKEN}`) {
-        return route.fulfill({ status: 401, headers: cors, body: JSON.stringify({ error: "unauthorized" }) });
-      }
-      const { cmd, args } = request.postDataJSON() as { cmd: string; args: Record<string, unknown> };
-      const verb = verbs[cmd];
-      if (!verb)
-        return route.fulfill({
-          status: 404,
-          headers: cors,
-          body: JSON.stringify({ error: "unknown command" }),
-        });
-      try {
-        return await route.fulfill({
-          status: 200,
-          headers: cors,
-          body: JSON.stringify({ result: verb(args ?? {}) ?? null }),
-        });
-      } catch (error) {
-        const status = (error as { status?: number }).status ?? 500;
-        return route.fulfill({
-          status,
-          headers: cors,
-          body: JSON.stringify({ error: (error as Error).message }),
-        });
-      }
-    });
-  return { files, state, install };
-}
-
-/** A browser without the File System Access API, like Zen or Firefox. */
-async function withoutFolderApi(context: BrowserContext): Promise<void> {
-  await context.addInitScript(() => {
-    Reflect.deleteProperty(window as unknown as Record<string, unknown>, "showDirectoryPicker");
-  });
-}
-
-/** Setup end to end: paste the code, choose the folder, land on Welcome. */
-async function connectThroughHelper(page: Page): Promise<void> {
-  await page.goto(APP);
-  await expect(vaultGate(page)).toHaveText("Set up Rotli Helper");
-  await page.getByLabel("Or paste the pairing code the installer printed:").fill(`${PORT}:${TOKEN}`);
-  await page.getByRole("button", { name: "Pair" }).click();
-  await expect(vaultGate(page)).toHaveText("Rotli Helper is paired");
-  await page.locator(".setup-button.primary", { hasText: "Continue" }).click();
-  await expect(vaultGate(page)).toHaveText("Choose your vault");
-  await page.locator(".setup-button.primary", { hasText: "Choose folder…" }).click();
-  // a reload plus Welcome seeding: allow a loaded runner its time
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli", {
-    timeout: 15_000,
-  });
-}
 
 test("the installer's #pair= tab offers the code, Pair shows success, and the waiting setup moves on", async ({
   context,
@@ -382,4 +234,99 @@ test("a helper now serving a different folder asks which vault, instead of writi
     page.getByText(/This browser opened “notes”, but Rotli Helper now serves a different folder/),
   ).toBeVisible();
   await expect(page.locator(".cm-content")).toHaveCount(0);
+});
+
+for (const failure of ["token-reset", "no-vault"] as const)
+  test(`${failure} mid-session opens setup and keeps unsaved typing locally`, async ({ context, page }) => {
+    const helper = fakeHelperVault();
+    await helper.install(context);
+    await withoutFolderApi(context);
+    await connectThroughHelper(page);
+    const editor = page.locator(".cm-content:visible").first();
+    await editor.click();
+    await page.keyboard.press("Control+End");
+    if (failure === "token-reset") helper.state.refused = true;
+    else helper.state.served = null;
+    await page.keyboard.type("\nsynthetic-terminal-draft");
+    await expect(page.locator(".cm-content")).toHaveCount(0);
+    await expect(vaultGate(page)).toHaveText(
+      failure === "token-reset" ? "Set up Rotli Helper" : "Choose your vault",
+    );
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-unsaved:helper:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+    await expect
+      .poll(() => page.evaluate(() => window.localStorage.getItem("rotli-vault-pending:hv_notes") ?? ""))
+      .toContain("synthetic-terminal-draft");
+  });
+
+// Chat on the Helper vault road: the turn runs in the folder the helper
+// serves, so the page names that vault on the wire — never the "folder"
+// road a browser-held vault takes (review of #196).
+test("a chat turn names the served vault to the helper, and the reply comes back", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+  // the helper already answers, so Chat is a real front: switch a lane on in Settings
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  const lane = page.getByRole("switch", { name: "Use Claude Code" });
+  await lane.click();
+  await expect(lane).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Back to notes" }).click();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("Say hello");
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the helper's vault.")).toBeVisible({ timeout: 15_000 });
+  const complete = helper.calls.find((c) => c.cmd === "cli_complete");
+  expect(complete?.args.vaultId).toBe("hv_notes");
+  expect(complete?.args).not.toHaveProperty("vaultRoad");
+});
+
+test("an older helper still opens the vault's files, but chat asks for a helper update and sends nothing", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  helper.state.binding = false; // vault_info from before completionVaultBinding
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+  // the files are there
+  await expect(page.locator(".cm-content").first()).toContainText("Welcome to Rotli");
+  // a lane switched on doesn't make this helper a chat runtime
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  await page.getByRole("switch", { name: "Use Claude Code" }).click();
+  await page.getByRole("button", { name: "Back to notes" }).click();
+  // Chat stays behind the walkthrough, which says what to do
+  const gate = page.locator(".sb-switch-seg.desktop-only");
+  await expect(gate).toBeVisible();
+  await gate.click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Update Rotli Helper to chat with this vault, then reload Rotli Web. Your vault files remain available.",
+  );
+  await dialog.getByRole("button", { name: "Done" }).click();
+  // the other way in, the new-tab chooser's Chat, gets no composer either
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Chat/ })
+    .click();
+  // a chat pane opens, but on the walkthrough's way in, with nothing to type into
+  const setup = page.getByRole("button", { name: "Set up chat on the web" });
+  await expect(setup).toBeVisible();
+  await expect(page.getByPlaceholder(/Message rotli/)).toHaveCount(0);
+  await setup.click();
+  await expect(dialog.getByRole("alert")).toContainText("Update Rotli Helper to chat with this vault");
+  expect(helper.calls.some((c) => c.cmd === "cli_complete")).toBe(false);
 });

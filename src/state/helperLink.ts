@@ -6,6 +6,7 @@ import { create } from "zustand";
 
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import type { HelperLink } from "../lib/helperPairing";
+import { currentWebHelperVaultId } from "../lib/webAiSeam";
 
 /** What stands between a pairing and a working chat (2026-09-17, the owner:
  * "if there is ever a missing token for the helper or anything we shouldn't
@@ -25,6 +26,9 @@ interface HelperLinkState {
    * person to press Pair. Session-only: never stored. */
   offeredCode: string | null;
   hydrated: boolean;
+  /** Proved by vault_info; older helpers may still serve files. */
+  completionVaultBinding: boolean;
+  setCompletionVaultBinding: (enabled: boolean) => void;
   setLink: (link: HelperLink | null) => void;
   setReachable: (reachable: boolean | null) => void;
   setProblem: (problem: HelperProblem | null) => void;
@@ -39,7 +43,9 @@ export const useHelperLink = create<HelperLinkState>((set) => ({
   verifying: false,
   offeredCode: null,
   hydrated: false,
-  setLink: (link) => set({ link, hydrated: true, problem: null }),
+  completionVaultBinding: false,
+  setCompletionVaultBinding: (completionVaultBinding) => set({ completionVaultBinding }),
+  setLink: (link) => set({ link, hydrated: true, problem: null, completionVaultBinding: false }),
   setReachable: (reachable) => set({ reachable }),
   setProblem: (problem) => set({ problem }),
   setVerifying: (verifying) => set({ verifying }),
@@ -57,12 +63,20 @@ export function helperLinked(): boolean {
  * neither is one being checked — health answers before the authenticated
  * call does, and a reinstalled helper answers health while refusing the old
  * token (review of #19, twice). Unreachable or refused is not a chat runtime
- * either; the surfaces route to the setup dialog. Pure over the state shape
- * so the rule is testable. */
+ * either; the surfaces route to the setup dialog. On the Helper vault road,
+ * readiness also needs the capability proven by vault_info. */
 export function helperReadyFrom(
-  s: Pick<HelperLinkState, "link" | "reachable" | "problem" | "verifying">,
+  s: Pick<HelperLinkState, "link" | "reachable" | "problem" | "verifying"> & {
+    completionVaultBinding?: boolean;
+  },
 ): boolean {
-  return s.link !== null && s.problem === null && s.reachable === true && !s.verifying;
+  return (
+    s.link !== null &&
+    s.problem === null &&
+    s.reachable === true &&
+    !s.verifying &&
+    (currentWebHelperVaultId() === null || s.completionVaultBinding === true)
+  );
 }
 
 export function helperReady(): boolean {

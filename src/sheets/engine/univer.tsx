@@ -2,10 +2,16 @@
 // Replace this module (+ drop @univerjs from package.json) to swap engines.
 
 import { LocaleType, createUniver, defaultTheme, merge } from "@univerjs/presets";
-import { COPY_TYPE, ISheetClipboardService, UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
+import {
+  COPY_TYPE,
+  IRenderManagerService,
+  ISheetClipboardService,
+  UniverSheetsCorePreset,
+} from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import { isRedoChord, isUndoChord } from "../../lib/historyChords";
+import { pauseRenderWhileHidden } from "../../lib/pauseWhileHidden";
 import type { SheetModel, SheetThemeMode } from "./types";
 import { rotliUniverTheme, univerNeutralForTheme } from "./theme";
 
@@ -217,6 +223,8 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     locale: LocaleType.EN_US,
   }) as FWorkbookLike;
   if (opts.readOnly) fwb.setEditable?.(false);
+  // a warm tab or folded embed has no box: stop the 60 fps redraw until shown
+  const releaseRenderPause = pauseRenderWhileHidden(host, injector.get(IRenderManagerService));
 
   let themeMode = opts.themeMode;
   let darkMode = opts.darkMode;
@@ -251,6 +259,7 @@ export function mountSheet(host: HTMLElement, opts: MountSheetOptions): SheetHan
     dispose() {
       releaseMenuHistory();
       releaseMenuClipboard();
+      releaseRenderPause();
       univer.dispose();
     },
   };

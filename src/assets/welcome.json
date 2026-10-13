@@ -4,7 +4,21 @@
     "title": "Welcome to Rotli",
     "purpose": "Your vault, your first minute",
     "filename": "Welcome to Rotli.md",
-    "body": "# Welcome to Rotli\n\nThis is a real Markdown note in your vault. Edit it, experiment here, or delete it when you no longer need it.\n\n## Things to try\n\n1. Change this sentence. Rotli saves as you type: the small dot above the note dims while you write and fills in again once the change is on disk. There is nothing to press.\n2. Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes.\n3. Press **⌘K** to search notes, files, chats, and actions.\n4. Type `/` on an empty line to explore Markdown blocks.\n5. Press **⌥A** to open Chat and ask about one of your notes.\n6. Drop an image or file into **Assets**.\n\n## Guided lessons\n\nNot sure what New, Main, or Aa do? Settings → General → **Show me around** runs a short tour that points at each one.\n\nThe **Welcome** folder in Main holds three short lessons: **Writing**, **Organizing and finding**, and **AI and privacy**. Each one is an ordinary note with room to make mistakes. Click a control, then choose **Aa → Raw markdown** to see the same text underneath, and **Beautified** to return.\n\nEdit the lessons, or delete the folder when you are done. Settings → General → Open welcome folder brings it back.\n\n- [ ] Try a lesson\n- [ ] Inspect its Markdown\n- [ ] Delete what you do not need\n\n## Your vault\n\n- Your files stay in the folder you chose and work in other apps.\n- **Library** is where Rotli organizes lasting notes.\n- **Assets**, **Archive**, and **Trash** are system views of this same vault.\n- This welcome note sits at the vault root, outside Library.\n\n## When you're done\n\n- [ ] I can create, edit, find, rename, trash, and restore a note\n- [ ] I know Main and named views refer to the same files\n- [ ] I know the Welcome folder is mine to edit or delete\n\nMake it yours.\n"
+    "body": "# Welcome to Rotli\n\nThis is a real Markdown note in your vault. Edit it, experiment here, or delete it when you no longer need it.\n\n## Things to try\n\n1. Change this sentence. Rotli saves as you type: the small dot above the note dims while you write and fills in again once the change is on disk. There is nothing to press.\n2. Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes.\n3. Press **⌘K** to search notes, files, chats, and actions.\n4. Type `/` on an empty line to explore Markdown blocks.\n5. Press **⌥A** to open Chat and ask about one of your notes.\n6. Drop an image or file into **Assets**.\n\n## Guided lessons\n\nNot sure what New, Main, or Aa do? Settings → General → **Show me around** runs a short tour that points at each one.\n\nThe **Welcome** folder in Main holds three short lessons: **Writing**, **Organizing and finding**, and **AI and privacy**. Each one is an ordinary note with room to make mistakes. Click a control, then choose **Aa → Raw markdown** to see the same text underneath, and **Beautified** to return.\n\nEdit the lessons, or delete the folder when you are done. Settings → General → Open welcome folder brings it back.\n\n- [ ] Try a lesson\n- [ ] Inspect its Markdown\n- [ ] Delete what you do not need\n\n## Your vault\n\n- Your files stay in the folder you chose and work in other apps.\n- **Library** is where Rotli organizes lasting notes.\n- **Assets**, **Archive**, and **Trash** are system views of this same vault.\n- This welcome note sits at the vault root, outside Library.\n\n## When you're done\n\n- [ ] I can create, edit, find, rename, trash, and restore a note\n- [ ] I know Main and named views refer to the same files\n- [ ] I know the Welcome folder is mine to edit or delete\n\nMake it yours.\n",
+    "webReplacements": [
+      {
+        "desktop": "Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes.",
+        "web": "Click the tab strip’s **+** to create a note, or choose **New…** to pick another item."
+      },
+      {
+        "desktop": "Press **⌘K** to search notes, files, chats, and actions.",
+        "web": "Use the search field to find notes, files, chats, and actions."
+      },
+      {
+        "desktop": "Press **⌥A** to open Chat and ask about one of your notes.",
+        "web": "Open the **Chat** front to ask about one of your notes."
+      }
+    ]
   },
   {
     "id": "writing",
@@ -18,13 +32,37 @@
     "title": "Organizing and finding",
     "purpose": "Links, views, and files",
     "filename": "02 Organizing and finding.md",
-    "body": "# Organizing and finding\n\n## Links\n\nCreate a note titled **My first idea** (⌘T), come back, type `[[`, and pick it from the list. Click the link to open it; rename that note and the old title still resolves.\n\n- [ ] Link to My first idea\n- [ ] Find it with ⌘K search\n\n## Main and named views\n\nThis lesson sits in Main → Welcome and in All notes: two ways to reach one file. Use the **Main ▾** picker at the top of Main to make a named view and add this note to it. Removing a note from Main keeps the file; Trash is a separate step you can undo.\n\n- [ ] Make a named view and add this note\n- [ ] Remove the view and find the note in All notes\n\n## Files and attachments\n\nThese make real files, so start with disposable examples.\n\n- [ ] New → Document or Board: add something, close, and reopen\n- [ ] Attach an image to this note and resize it\n"
+    "body": "# Organizing and finding\n\n## Links\n\nCreate a note titled **My first idea** (⌘T), come back, type `[[`, and pick it from the list. Click the link to open it; rename that note and the old title still resolves.\n\n- [ ] Link to My first idea\n- [ ] Find it with ⌘K search\n\n## Main and named views\n\nThis lesson sits in Main → Welcome and in All notes: two ways to reach one file. Use the **Main ▾** picker at the top of Main to make a named view and add this note to it. Removing a note from Main keeps the file; Trash is a separate step you can undo.\n\n- [ ] Make a named view and add this note\n- [ ] Remove the view and find the note in All notes\n\n## Files and attachments\n\nThese make real files, so start with disposable examples.\n\n- [ ] New → Document or Board: add something, close, and reopen\n- [ ] Attach an image to this note and resize it\n",
+    "webReplacements": [
+      {
+        "desktop": "Create a note titled **My first idea** (⌘T)",
+        "web": "Create a note titled **My first idea** with the tab strip’s **+**"
+      },
+      {
+        "desktop": "Find it with ⌘K search",
+        "web": "Find it with the search field"
+      },
+      {
+        "desktop": "New → Document or Board",
+        "web": "New → Board"
+      }
+    ]
   },
   {
     "id": "privacy",
     "title": "AI and privacy",
     "purpose": "Choose when intelligence participates",
     "filename": "03 AI and privacy.md",
-    "body": "# AI and privacy\n\nWriting works without a model. Chat and the Librarian are optional capabilities.\n\nUse only disposable sample text for these checks. Connect a provider only when you choose to.\n\n- [ ] Write and find a note while offline\n- [ ] Review the Librarian setting and its explanation\n- [ ] Create a secure test note and confirm remote AI cannot read it\n- [ ] Lock a test note and confirm AI cannot edit it\n- [ ] Inspect a saved chat as ordinary Markdown\n\nSecure is an AI access boundary, not encryption at rest. Locked notes remain readable. Browser tests cannot prove Keychain, a provider's live behavior, or scheduled delivery.\n"
+    "body": "# AI and privacy\n\nWriting works without a model. Chat and the Librarian are optional capabilities.\n\nUse only disposable sample text for these checks. Connect a provider only when you choose to.\n\n- [ ] Write and find a note while offline\n- [ ] Review the Librarian setting and its explanation\n- [ ] Create a secure test note and confirm remote AI cannot read it\n- [ ] Lock a test note and confirm AI cannot edit it\n- [ ] Inspect a saved chat as ordinary Markdown\n\nSecure is an AI access boundary, not encryption at rest. Locked notes remain readable. Browser tests cannot prove Keychain, a provider's live behavior, or scheduled delivery.\n",
+    "webReplacements": [
+      {
+        "desktop": "Chat and the Librarian are optional capabilities.",
+        "web": "Chat is optional; the Librarian is available in Rotli for Mac."
+      },
+      {
+        "desktop": "- [ ] Review the Librarian setting and its explanation",
+        "web": "- [ ] Review Chat’s privacy settings before connecting a provider"
+      }
+    ]
   }
 ]

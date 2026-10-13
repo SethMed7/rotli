@@ -770,13 +770,13 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     const touched = sel.from <= block.to && sel.to >= block.from;
     if (touched) continue; // raw source shows (livePreview skips these lines too)
 
-    const withheld = withheldEmbedMessage(block.lang, LAUNCH_FEATURES);
+    const code = innerCode(state.doc, block.from, block.to);
+    const withheld = withheldEmbedMessage(block.lang, LAUNCH_FEATURES, code);
     if (withheld) {
       const widget = new WithheldEmbedWidget(block.lang, withheld);
       decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
       continue;
     }
-    const code = innerCode(state.doc, block.from, block.to);
     if (block.lang === "board" || block.lang === "sheet" || block.lang === "document") {
       const fileId = code.trim();
       if (!fileId) continue;

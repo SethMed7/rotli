@@ -34,6 +34,15 @@ describe("production build policy", () => {
     ).toBe(false);
   });
 
+  test("a slow-plugin timing report is machine load, not a bundle regression", () => {
+    const timing = { code: "PLUGIN_TIMINGS", message: "Your build spent significant time in plugins." };
+    expect(shouldIgnoreBuildWarning(timing)).toBe(true);
+    expect(buildWarningViolation(timing)).toBeNull();
+    expect(buildWarningViolation({ code: "PLUGIN_TIMINGS", message: "A plugin changed emitted code" })).toBe(
+      "PLUGIN_TIMINGS: A plugin changed emitted code",
+    );
+  });
+
   test("turns every unexpected Rolldown/Oxc warning into a build violation", () => {
     expect(
       buildWarningViolation({

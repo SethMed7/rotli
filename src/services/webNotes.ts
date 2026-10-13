@@ -20,6 +20,7 @@ import type { NotesService } from "./notesPort";
 import { resolveVault } from "./vaultBinding";
 import type { VaultDir } from "./vaultDir";
 import { scaffoldVault } from "./vaultScaffold";
+import { configureWebVaultIo } from "./webVaultIo";
 
 let folderService: FolderNotesService | null = null;
 let folderName: string | null = null;
@@ -60,6 +61,7 @@ export async function hydrateWebNotes(link: HelperLink | null): Promise<boolean>
   }
   configureBrowserVault(new FolderVaultStore(dir));
   folderService = new FolderNotesService(dir);
+  configureWebVaultIo(dir, () => folderService);
   folderName = name;
   setWebVaultName(name);
   folderDir = dir;
@@ -72,6 +74,14 @@ export async function hydrateWebNotes(link: HelperLink | null): Promise<boolean>
  * connected; otherwise the unmounted placeholder, which setup keeps unseen. */
 export function activeWebNotesService(fallback: NotesService): NotesService {
   return folderService ?? fallback;
+}
+
+/** A folder picked through FSA has no watcher. Rebuild its listing on focus;
+ * the query refresh decides which clean note buffers may reload. */
+export function refreshWebFolderService(): FolderNotesService | null {
+  if (mode !== "folder" || !folderDir || !folderService) return null;
+  folderService = new FolderNotesService(folderDir);
+  return folderService;
 }
 
 /** The connected vault's note writer (Rotli Web's memex note lane); null

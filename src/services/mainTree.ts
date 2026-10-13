@@ -95,6 +95,62 @@ export function buildMainTree(
   return { folders, notes };
 }
 
+/** Main folders open by default only while Main is hand-sized. A Main
+ * mirrored from a huge folder rendered every row (RAM review 2026-10-12: 145k
+ * rows, 1.48M DOM nodes, ~14 GB in WebKit; measured in WebKit, 3k open rows
+ * cost ~130 MB and 10k ~750 MB). Past the limit folders start folded; a folder
+ * the user opens stays open (`expandedDests` always wins). */
+export const MAIN_DEFAULT_OPEN_LIMIT = 2_000;
+
+export function mainFoldersOpenByDefault(itemCount: number): boolean {
+  return itemCount <= MAIN_DEFAULT_OPEN_LIMIT;
+}
+
+/** Every folder and note reference in the manifest — the count the open
+ * default is decided on, so the sidebar and collapse-all agree without a
+ * projection. */
+export function mainTreeSize(nodes: MainNode[]): number {
+  let size = 0;
+  for (const node of nodes) size += 1 + ("folder" in node ? mainTreeSize(node.children) : 0);
+  return size;
+}
+
+/** O(1) lookups over one projection: each parent's notes and folders in
+ * projection order, and a folder's name — what the sidebar used to recompute
+ * with a full filter per folder and a full find per row (F×N per render; RAM
+ * review 2026-10-12: ~1.6 billion checks and a 13 GB webview on a 145k-node
+ * Main). Results equal `notes.filter(folderId === p)`,
+ * `folders.filter(parentId === p)`, and `folders.find(id === p)?.name`. */
+export function indexMainProjection<N extends { folderId: string }>(projection: {
+  folders: Folder[];
+  notes: N[];
+}): {
+  notesIn: (parentId: string) => N[];
+  foldersIn: (parentId: string) => Folder[];
+  folderName: (folderId: string) => string | undefined;
+} {
+  const notes = new Map<string, N[]>();
+  const folders = new Map<string, Folder[]>();
+  const names = new Map<string, string>();
+  for (const n of projection.notes) {
+    const list = notes.get(n.folderId);
+    if (list) list.push(n);
+    else notes.set(n.folderId, [n]);
+  }
+  for (const f of projection.folders) {
+    const parent = f.parentId ?? "";
+    const list = folders.get(parent);
+    if (list) list.push(f);
+    else folders.set(parent, [f]);
+    if (!names.has(f.id)) names.set(f.id, f.name);
+  }
+  return {
+    notesIn: (parentId) => notes.get(parentId) ?? [],
+    foldersIn: (parentId) => folders.get(parentId) ?? [],
+    folderName: (folderId) => names.get(folderId),
+  };
+}
+
 /** Prune manifest note-refs whose id no longer exists (called on save so the file
  * doesn't accumulate dead ids). Empty folders are KEPT — an empty folder is a valid
  * "made it, will fill it later" gesture. */

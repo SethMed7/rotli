@@ -245,8 +245,8 @@ second user-visible product or storage location.
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
   round-trips supported OOXML while preserving unknown package parts and
-  unsupported Word objects; the Rust corpus boundary independently restricts
-  writes to the managed binary lane. The document editor always presents light
+  unsupported Word objects; the Rust corpus boundary (and on Rotli Web its TS
+  twin) independently restricts writes to the managed binary lane. The document editor always presents light
   Word-style chrome, literal white paper, and black Arial defaults when the file
   does not specify formatting. It settles at the document top with one complete
   page fitted to the pane and does not expose Markdown block handles or canvas
@@ -269,6 +269,21 @@ second user-visible product or storage location.
   exists as an editable DOCX. Formats without a faithful local route remain
   explicitly unsupported.
 - Sheets use the workbook editor/codec boundary; boards use the canvas boundary.
+- **Rotli Web edits and creates documents and sheets (Beta, 2026-10-12).** In a
+  connected folder — the folder API or Rotli Helper — DOCX and XLSX open in the
+  same editors and codecs, wear the same Beta badge, and are created in the
+  same managed lane (`storage/rotli/` in a memex vault, `Storage/` otherwise)
+  with the same `stem-2` collisions and first-save `.bak`, which a rename
+  carries. The TS twin (`src/services/folderFileIo.ts`) applies the Rust
+  corpus's writable-lane rule. Every save is gated on the exact bytes Rotli
+  opened, so an outside change of the same size and stamp is refused and
+  shown, never overwritten; unsaved typing survives a refresh through a
+  bounded browser journal (`web-vault-connection.md`). Legacy and PDF
+  conversion, PDF export, Finder, and open-externally stay on the Mac, gated by
+  the build's platform; on the web a PDF or legacy document says to save a
+  `.docx` copy in another app and open it here. Chat's AI file tools stay
+  withheld on the web. Same files, same formats: the contract version does not
+  move.
 - The **Tasks** view is a per-call projection of open `- [ ]` checkboxes across
   ordinary Markdown notes (fenced code skipped; Trash/Archive/chats excluded;
   secure and locked notes included — it is the user's own local screen and is
@@ -490,6 +505,13 @@ The Rust corpus boundary independently validates every write.
     UTC timestamp.
   So a note made on the Mac carries timestamps until its first edit there or
   on the web turns `updated` into a day; both shapes read the same age.
+- On a body save of an imported note that already has a frontmatter fence,
+  Rotli Web fills a missing `id` with a stable ULID and a missing or invalid
+  `created` from the file's modification time, then stamps `updated` with the
+  writer's calendar day. A lifecycle move of a fenced note fills missing or
+  invalid `created` and `updated` from the pre-move file time, but never bumps a
+  valid `updated`. An imported note without a fence stays fenceless on a body
+  save or move. Unknown frontmatter fields survive these writes.
 - A full timestamp is taken as written. A day is never read as an hour: Rotli
   shows a note's age from the file's own time when that time falls on the
   stamped day — the reader's local day, widened to the UTC day because Mac
@@ -711,6 +733,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
   from normal organizer areas while the sidebar exposes it deliberately.
   Protection is also stored on each Markdown file as `secure: true`.
+  AI reads classify the physical secure home even when a plain text file there
+  has no frontmatter; the organizer independently skips the same location.
 - Marking an existing note secure records its prior physical folder, moves the
   stable note id into `wiki/_secure/`, and updates its gitignore protection
   before either path changes. Removing protection moves it back before dropping
@@ -775,6 +799,13 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `local_ai_allowed` line overrides the vault knob in either direction. No knob
   exists, or will exist, that opens a secure note to a remote model. A frontier
   provider behind a localhost proxy still fails this gate.
+- Frontmatter-free files under `wiki/_secure/` or `Secure notes/`, and files
+  named with a secure keyword, inherit the secure visibility rule. Chat resolves
+  the exact file id before extraction; an ambiguous filename or unknown path is
+  refused. A remote model never reads these files. An on-device model may read
+  them while the vault's `secureLocalAi` setting allows it, and that read taints
+  the chat against later remote sends. The note-level `local_ai_allowed` override
+  applies to Markdown notes only. User editor reads remain available.
 - **A person's note refuses AI body edits without their grant** (2026-09-29):
   the same seams as `locked` below, in both layers, with Rotli Web running the
   TypeScript twin itself. A chat attached to such a note keeps its
@@ -880,6 +911,15 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
   same as picking a folder that already holds notes in setup. An open plain folder is still
   the switcher's current row and names its header.
+- **Dependency folders are never part of a vault** (2026-10-12). `.git` and
+  `node_modules` (any depth, any letter case) are skipped by the native corpus
+  walk, folder inspection, and the file watcher — one rule,
+  `corpus::SKIPPED_DIRS`, which the Rotli Web helper also uses (Rotli Web's own
+  folder reader skips the same two names at any depth). Their files
+  stay on disk untouched; they just never become rows, refs, or refreshes. A
+  code folder opened as a vault otherwise listed every package file (133k rows
+  and a 44 MB listing per refresh in the RAM review), and an install inside it
+  re-walked the whole vault.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —
