@@ -28,6 +28,7 @@ mod corpus;
 mod deep_link;
 mod open_requests;
 mod folder_window;
+mod finder_quick_action;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
@@ -2296,6 +2297,8 @@ pub fn run() {
             corpus::corpus_list,
             corpus::raw::corpus_list_root,
             folder_window::folder_window_add_as_vault,
+            finder_quick_action::finder_quick_action_status,
+            finder_quick_action::finder_quick_action_set,
             corpus::corpus_search,
             corpus::corpus_read,
             corpus::corpus_open_file,

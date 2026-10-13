@@ -172,6 +172,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
+  "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
   "connectorSetup.ts": "chat",
   "connectedModels.ts": "chat (the connected clients' own model lists)",
   "helperLink.ts": "chat",
