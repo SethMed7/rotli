@@ -119,7 +119,7 @@ fn board_coordinates_are_not_card_numbers_but_a_card_in_text_is() {
     let mut scene: Value = serde_json::from_str(&body).unwrap();
     let element = |text: &str| {
         json!({
-            "id": "el1", "type": "text", "text": text,
+            "id": "org-chart-title", "type": "text", "text": text,
             "x": -2045.6097236063079, "y": 17.140276393692147,
             "width": 3935.2297743867343, "height": 1436.7200927734375
         })
@@ -134,7 +134,7 @@ fn board_coordinates_are_not_card_numbers_but_a_card_in_text_is() {
     scene["elements"] = json!([element("pay with 4242424242424242")]);
     workspace.store.write_board(&local, &serde_json::to_string(&scene).unwrap()).unwrap();
     let err = workspace.read_board(&local).unwrap_err();
-    assert!(err.contains("secret-shaped"), "{err}");
+    assert!(err.contains("connected agents"), "{err}");
 }
 
 #[test]
