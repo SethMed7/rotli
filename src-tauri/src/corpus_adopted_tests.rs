@@ -208,3 +208,20 @@ fn a_note_rotli_makes_in_an_adopted_folder_still_follows_its_title() {
         "---\nid: 202310131200\n---\n# Bigger idea\n"
     );
 }
+
+/// No automatic tidy-up and no file lifecycle move happens in a folder opened
+/// in place: an image there may be shared by many of the person's notes.
+#[test]
+fn adopted_folder_never_moves_a_file_to_trash_or_archive() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("obsidian-vault");
+    fs::create_dir_all(root.join("Storage/images")).unwrap();
+    fs::write(root.join("Storage/images/rose.png"), b"png").unwrap();
+    let mut store = CorpusStore::open_adopted(root.clone()).unwrap();
+    for sink in ["Trash", "Archive"] {
+        let err = store.move_file_to_sink("Storage/images/rose.png", sink).unwrap_err();
+        assert!(err.contains("opened in place"), "{err}");
+    }
+    assert!(root.join("Storage/images/rose.png").is_file());
+    assert!(!root.join("Trash").exists());
+}

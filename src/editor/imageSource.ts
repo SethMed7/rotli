@@ -41,6 +41,29 @@ export function noteRelativePath(noteFolder: string, src: string): string | null
   return out.length > 0 ? out.join("/") : null;
 }
 
+/** The Markdown path from a note's folder to a vault file: the link Rotli
+ * writes for a new image (owner decision 2026-10-13) — standard Markdown that
+ * Obsidian, GitHub, and any Markdown app read relative to the note. A wire id's
+ * `root:` prefix is dropped; each segment is escaped so a space or a
+ * parenthesis can't end the link early. */
+export function noteImageLink(wire: string, noteFolder: string): string {
+  const target = wire
+    .replace(/^[^/:]+:(?=[^/])/, "")
+    .split("/")
+    .filter(Boolean);
+  const from = noteFolder.split("/").filter(Boolean);
+  let shared = 0;
+  while (shared < from.length && shared < target.length - 1 && from[shared] === target[shared]) shared++;
+  const up = from.slice(shared).map(() => "..");
+  return [...up, ...target.slice(shared).map(escapeLinkSegment)].join("/");
+}
+
+/** One path segment escaped for a Markdown link: a space or a parenthesis
+ * can't end the link early. */
+export function escapeLinkSegment(part: string): string {
+  return encodeURIComponent(part).replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
 /** Only Rotli's own `storage:` links are repaired by rewriting the note; every
  * other form is the person's, so a found image is shown and the link kept. */
 export function healable(src: string): boolean {

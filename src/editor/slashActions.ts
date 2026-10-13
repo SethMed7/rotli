@@ -1,3 +1,4 @@
+import { splitRootId } from "../lib/corpusWireId";
 import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
 import { ALIGN_CLOSE, alignOpenTag } from "./alignedLine";
 import { applyBlockToggle, applyHeading } from "./commands";
@@ -67,12 +68,15 @@ export function slashInsertion(
   return { insert: result.line, caret: result.line.length };
 }
 
+/** What /board, /sheet, and /document insert: Obsidian's `![[path]]` embed
+ * (owner decision 2026-10-13), which Obsidian shows too; Rotli renders it as
+ * the live editor and still reads the older ```board / ```sheet / ```document
+ * fences. The path is vault-relative, so it names exactly one file. */
 export function pickerFence(
-  mode: Exclude<SlashPickerMode, "linkNote" | "linkChat" | "insertTemplate" | "continueList">,
+  _mode: Exclude<SlashPickerMode, "linkNote" | "linkChat" | "insertTemplate" | "continueList">,
   fileId: string,
 ): string {
-  const lang = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
-  return `\`\`\`${lang}\n${fileId}\n\`\`\`\n\n`;
+  return `![[${splitRootId(fileId).rel}]]\n\n`;
 }
 
 /** What `/template` inserts from a template note's body. Into an EMPTY note it

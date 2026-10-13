@@ -21,7 +21,7 @@ import { type EditorState, type Range, StateEffect, StateField } from "@codemirr
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
-import { rootIdOf } from "../lib/corpusWireId";
+import { rootIdOf, splitRootId } from "../lib/corpusWireId";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { isTauri } from "../lib/tauri";
@@ -687,7 +687,7 @@ function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: num
         changes: {
           from: openLine.from,
           to: closeLine.to,
-          insert: `\`\`\`board\n${boardId}\n\`\`\``,
+          insert: `![[${splitRootId(boardId).rel}]]`,
         },
         scrollIntoView: true,
       });

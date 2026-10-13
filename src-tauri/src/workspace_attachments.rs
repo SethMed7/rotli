@@ -1,8 +1,10 @@
 //! A note's attachments for agents (docs/architecture/agent-workspace.md,
 //! "Attachments"): the files its Markdown links and images name, resolved the
 //! way the editor resolves them (`resolveImageSrc` in src/lib/tauri.ts):
-//! `storage:NAME` is `storage/NAME` and a bare relative path is
-//! corpus-relative. External URLs are listed, never fetched.
+//! `storage:NAME` is `storage/NAME`; a bare relative path is read from the
+//! vault root when that file exists, else from the note's folder (Markdown's
+//! reading, which Rotli writes since 2026-10-13); `![[path]]` embeds count too.
+//! External URLs are listed, never fetched.
 //!
 //! The note itself must pass the remote read gate first, so a secure note's
 //! attachments are never enumerated. Each file then takes the document lane's
@@ -52,8 +54,63 @@ pub(super) fn link_targets(body: &str) -> Vec<String> {
             }
             rest = &after[end + 1..];
         }
+        // Obsidian embeds, `![[path]]` / `![[path|size]]` (Rotli writes vault paths)
+        let mut rest = line;
+        while let Some(at) = rest.find("![[") {
+            let after = &rest[at + 3..];
+            let Some(end) = after.find("]]") else { break };
+            let target = after[..end].split(['|', '#']).next().unwrap_or_default().trim();
+            if !target.is_empty() {
+                targets.push(target.to_string());
+            }
+            rest = &after[end + 2..];
+        }
     }
     targets
+}
+
+/// A link read from the note's folder (`folder` is vault-relative): `.` and
+/// `..` resolved; `None` for Rotli's vault-root forms (`storage:`,
+/// `storage/…`), an external URL, or a path that leaves the vault.
+pub(super) fn attachment_rel_from(source: &str, folder: &str) -> Option<String> {
+    let decoded = decoded_link_path(source)?;
+    let lower = decoded.to_ascii_lowercase();
+    if lower.starts_with("storage:") || lower.starts_with("storage/") {
+        return None;
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    for part in folder.split('/').chain(decoded.split('/')) {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            _ => parts.push(part),
+        }
+    }
+    let rel = parts.join("/");
+    crate::corpus::validate_rel(&rel).ok()?;
+    (!rel.is_empty()).then_some(rel)
+}
+
+/// A link's path with its fragment/query dropped and escapes undone; `None`
+/// for an external URL, an anchor, or an absolute path.
+fn decoded_link_path(source: &str) -> Option<String> {
+    let lower = source.to_ascii_lowercase();
+    if source.starts_with('#')
+        || source.starts_with('/')
+        || lower.contains("://")
+        || ["mailto:", "data:", "tel:", "rotli:", "blob:", "asset:"]
+            .iter()
+            .any(|scheme| lower.starts_with(scheme))
+    {
+        return None;
+    }
+    let path = source.split(['#', '?']).next().unwrap_or_default();
+    percent_encoding::percent_decode_str(path)
+        .decode_utf8()
+        .ok()
+        .map(|decoded| decoded.into_owned())
 }
 
 /// The corpus-relative path a link names, or `None` for an external URL, an
@@ -80,7 +137,7 @@ pub(super) fn attachment_rel(source: &str) -> Option<String> {
 }
 
 /// Images by the clipboard lane's own table; the rest by extension here.
-pub(super) fn mime_of(rel: &str) -> &'static str {
+pub(crate) fn mime_of(rel: &str) -> &'static str {
     if let Some(image) = crate::clipboard_assets::mime_of(rel) {
         return image;
     }
@@ -123,11 +180,26 @@ impl Workspace {
         local: bool,
     ) -> Result<Value, String> {
         let note = self.read_note(local_id)?;
+        let folder = self
+            .store
+            .resolve_note_rel(&note.note.id)
+            .map(|rel| crate::corpus::folder_of(&rel))
+            .unwrap_or_default();
         let mut seen = std::collections::HashSet::new();
         let mut external = Vec::new();
         let mut files = Vec::new();
         for source in link_targets(&note.note.body) {
-            let Some(rel) = attachment_rel(&source) else {
+            // the vault-root reading when that file exists (as the editor), else
+            // the reading from the note's folder
+            let from_root = attachment_rel(&source);
+            let from_note = attachment_rel_from(&source, &folder);
+            let exists = |rel: &String| self.store.guard_rel(rel).is_ok_and(|path| path.is_file());
+            let chosen = match (from_root, from_note) {
+                (Some(root), _) if exists(&root) => Some(root),
+                (_, Some(note_rel)) if exists(&note_rel) => Some(note_rel),
+                (root, note_rel) => root.or(note_rel),
+            };
+            let Some(rel) = chosen else {
                 if source.contains("://") && external.len() < MAX_ATTACHMENTS {
                     external.push(source);
                 }
@@ -235,6 +307,19 @@ mod tests {
         assert_eq!(attachment_rel("wiki/x.pdf#page=2").as_deref(), Some("wiki/x.pdf"));
         for refused in ["https://e.test/a.png", "/etc/passwd", "../out.txt", "storage:../../x", "#anchor", "mailto:a@b.c"] {
             assert_eq!(attachment_rel(refused), None, "{refused}");
+        }
+    }
+
+    #[test]
+    fn a_link_from_the_note_and_an_embed_resolve_too() {
+        assert_eq!(
+            link_targets("![[storage/rotli/plan.docx|400]] and ![a](../img/a%20b.png)"),
+            ["../img/a%20b.png", "storage/rotli/plan.docx"]
+        );
+        assert_eq!(attachment_rel_from("../img/a%20b.png", "wiki/notes").as_deref(), Some("wiki/img/a b.png"));
+        assert_eq!(attachment_rel_from("img/x.png", "").as_deref(), Some("img/x.png"));
+        for refused in ["../../../out.png", "storage:x.png", "storage/x.png", "https://e.test/x.png"] {
+            assert_eq!(attachment_rel_from(refused, "wiki/notes"), None, "{refused}");
         }
     }
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { healable, noteRelativePath } from "./imageSource";
+import { healable, noteImageLink, noteRelativePath } from "./imageSource";
 
 test("a note-relative image path resolves against the note's folder", () => {
   expect(noteRelativePath("Garden/Roses", "img/rose.png")).toBe("Garden/Roses/img/rose.png");
@@ -29,4 +29,19 @@ test("only Rotli's own storage: links may be repaired by rewriting the note", ()
   expect(healable("img/rose.png")).toBe(false);
   expect(healable("rose.png")).toBe(false);
   expect(healable("../attachments/rose.png")).toBe(false);
+});
+
+test("a new image is linked from the note's folder, and the link reads back to the file", () => {
+  expect(noteImageLink("storage/images/rose.png", "wiki/_inbox")).toBe("../../storage/images/rose.png");
+  expect(noteImageLink("storage/images/rose.png", "")).toBe("storage/images/rose.png");
+  expect(noteImageLink("vault:storage/images/rose.png", "wiki")).toBe("../storage/images/rose.png");
+  expect(noteImageLink("Garden/img/my rose (2).png", "Garden")).toBe("img/my%20rose%20%282%29.png");
+  for (const [wire, folder] of [
+    ["storage/images/rose.png", "wiki/_inbox"],
+    ["Garden/img/my rose (2).png", "Garden/Beds"],
+    ["Storage/a b.png", ""],
+  ] as const) {
+    const rel = wire.replace(/^[^/:]+:(?=[^/])/, "");
+    expect(noteRelativePath(folder, noteImageLink(wire, folder))).toBe(rel);
+  }
 });

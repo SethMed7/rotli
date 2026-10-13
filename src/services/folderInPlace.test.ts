@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { corpusSetLocked, corpusSetAiEdit } from "../lib/noteProtection";
+import { corpusMoveFileToSink } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
 import { configureWebVaultIo } from "./webVaultIo";
@@ -72,4 +73,11 @@ test("a note Rotli makes there still follows its first title", async () => {
   const saved = await notes.updateNote(made.id, "# Planting plan\n\nRows.\n", made.revision);
   expect(await notes.filePathOf(saved.id)).toMatch(/planting-plan\.md$/);
   expect(await dir.readText("Garden/Beds.md")).toBe("# Beds\n");
+});
+
+test("no file is moved to Trash or Archive in a folder opened in place", async () => {
+  const { dir } = await openInPlace({ "attachments/rose.png": "png", "Garden/Roses.md": "![[rose.png]]\n" });
+  await expect(corpusMoveFileToSink("attachments/rose.png", "Trash")).rejects.toThrow(/opened in place/);
+  await expect(corpusMoveFileToSink("attachments/rose.png", "Archive")).rejects.toThrow(/opened in place/);
+  expect(await dir.exists("attachments/rose.png")).toBe(true);
 });

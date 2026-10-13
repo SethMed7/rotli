@@ -13,11 +13,14 @@ import { EditorView } from "@codemirror/view";
 import { corpusImageDataUrl, writeClipboardHtml } from "../lib/clipboard";
 import { rootIdOf } from "../lib/tauri";
 import { clipboardHtml, imageSourcesIn } from "./copyClipboard";
+import { noteFolderFacet, noteRelativePath } from "./imageSource";
 import { noteIdFacet } from "./livePreview";
 
 /** Resolved image bytes, kept across copies (bounded by count, not bytes:
- * the host already caps each image). */
+ * the host already caps each image). Keyed by root and note folder too: the
+ * same relative link names a different file in another folder. */
 const imageCache = new Map<string, string>();
+const cacheKey = (scope: string, src: string) => `${scope}\0${src}`;
 const IMAGE_CACHE_MAX = 24;
 const MAX_INLINED_IMAGES = 12;
 
@@ -38,7 +41,17 @@ export function copySelection(
   if (range.empty) return false;
   const markdown = view.state.sliceDoc(range.from, range.to);
   const text = markdown;
-  const known = new Map([...imageCache].filter(([src]) => markdown.includes(src)));
+  const rootId = rootIdOf(view.state.facet(noteIdFacet));
+  const folder = view.state.facet(noteFolderFacet);
+  const scope = `${rootId}\0${folder}`;
+  const cachedFor = () =>
+    new Map(
+      imageSourcesIn(markdown).flatMap((src) => {
+        const data = imageCache.get(cacheKey(scope, src));
+        return data ? [[src, data] as const] : [];
+      }),
+    );
+  const known = cachedFor();
   event.clipboardData?.setData("text/plain", text);
   event.clipboardData?.setData("text/html", clipboardHtml(markdown, known));
   event.preventDefault();
@@ -50,19 +63,21 @@ export function copySelection(
     });
   }
   const pending = imageSourcesIn(markdown)
-    .filter((src) => !imageCache.has(src))
+    .filter((src) => !imageCache.has(cacheKey(scope, src)))
     .slice(0, MAX_INLINED_IMAGES);
   if (pending.length > 0) {
-    const rootId = rootIdOf(view.state.facet(noteIdFacet));
-    void Promise.all(pending.map(async (src) => [src, await corpusImageDataUrl(rootId, src)] as const)).then(
-      (resolved) => {
-        const found = resolved.filter(([, data]) => data !== "");
-        if (found.length === 0) return;
-        for (const [src, data] of found) remember(src, data);
-        const images = new Map([...imageCache].filter(([src]) => markdown.includes(src)));
-        return writeClipboardHtml(clipboardHtml(markdown, images), text).catch(() => {});
-      },
-    );
+    // the vault-root reading first (as the editor), else the path from the note
+    const bytesOf = async (src: string) => {
+      const data = await corpusImageDataUrl(rootId, src);
+      const fromNote = noteRelativePath(folder, src);
+      return data || !fromNote || fromNote === src ? data : corpusImageDataUrl(rootId, fromNote);
+    };
+    void Promise.all(pending.map(async (src) => [src, await bytesOf(src)] as const)).then((resolved) => {
+      const found = resolved.filter(([, data]) => data !== "");
+      if (found.length === 0) return;
+      for (const [src, data] of found) remember(cacheKey(scope, src), data);
+      return writeClipboardHtml(clipboardHtml(markdown, cachedFor()), text).catch(() => {});
+    });
   }
   return true;
 }

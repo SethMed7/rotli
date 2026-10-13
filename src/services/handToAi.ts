@@ -10,6 +10,7 @@ import { looksSecret } from "../ai/guard";
 import { refineHandoff } from "../ai/handToAiRefine";
 import { qualifiedArtifactId } from "../ai/imageLinks";
 import type { Host } from "../ai/types";
+import { resolveWikiEmbed } from "../editor/fileEmbeds";
 import { flushNote } from "../editor/model";
 import {
   type AttachmentLink,
@@ -106,7 +107,7 @@ const hasControl = (text: string) =>
  * is null), `storage:` expanded, backslashes as slashes, and `.`/`..` resolved.
  * A path that climbs out of the vault is null. Null is unsafe: the caller
  * refuses, the way a secure link is refused. */
-export function attachmentRel(src: string): string | null {
+export function attachmentRel(src: string, noteFolder = ""): string | null {
   let text = src;
   for (let round = 0; ; round += 1) {
     let next: string;
@@ -120,8 +121,11 @@ export function attachmentRel(src: string): string | null {
     text = next;
   }
   if (hasControl(text)) return null;
+  // `storage:` and a `storage/…` path are vault-root (Rotli's forms); any other
+  // path is read from the note's folder, as Rotli now writes it (2026-10-13)
+  const fromNote = !/^storage(:|\/)/i.test(text) && noteFolder ? `${noteFolder}/` : "";
   const parts: string[] = [];
-  for (const part of imageSrcToRel(text).replace(/\\/g, "/").split("/")) {
+  for (const part of `${fromNote}${imageSrcToRel(text)}`.replace(/\\/g, "/").split("/")) {
     if (part === "" || part === ".") continue;
     if (part === "..") {
       if (parts.pop() === undefined) return null;
@@ -136,13 +140,20 @@ export function attachmentRel(src: string): string | null {
  * as secure as a note there; one Rotli can't read with certainty
  * (`attachmentRel` null) counts as secure. The Mac's disk ignores case, so the
  * folder test does too. */
-export function attachmentIsSecure(src: string, keywords: readonly string[]): boolean {
-  const rel = attachmentRel(src);
-  if (rel === null) return true;
-  const cut = rel.lastIndexOf("/");
-  if (inSecureHome(rel)) return true;
-  const name = rel.slice(cut + 1).replace(/\.[^.]*$/, "");
-  return keywords.length > 0 && secureByName(name, rel, keywords);
+export function attachmentIsSecure(src: string, keywords: readonly string[], noteFolder = ""): boolean {
+  // fail closed across readings: a path is read from the vault root (Rotli's
+  // reading) and from the note (Markdown's). Secure when any reading lands in a
+  // secure place, or when no reading can be made at all (escapes, control
+  // characters, a climb out of the vault from everywhere)
+  const readings = [attachmentRel(src), ...(noteFolder ? [attachmentRel(src, noteFolder)] : [])].filter(
+    (rel): rel is string => rel !== null,
+  );
+  if (readings.length === 0) return true;
+  return readings.some((rel) => {
+    if (inSecureHome(rel)) return true;
+    const name = rel.slice(rel.lastIndexOf("/") + 1).replace(/\.[^.]*$/, "");
+    return keywords.length > 0 && secureByName(name, rel, keywords);
+  });
 }
 
 /** File references retained verbatim in Context still reach Refined's model. */
@@ -179,13 +190,20 @@ async function placesOf(
   links: readonly AttachmentLink[],
   rootId: string,
   locate: LocateAttachment,
+  noteFolder: string,
 ): Promise<Map<string, AttachmentPlace>> {
   const places = await Promise.all(
     links.map(async (link) => {
-      // the refusal ran first, so every link here has a readable path
-      const rel = attachmentRel(link.src);
-      const place: AttachmentPlace =
-        rel === null ? { status: "missing", rel: link.src } : await locate(rootId, rel);
+      // the refusal ran first, so every link here has a readable path; the
+      // vault-root reading wins when it exists (as in the editor), else the note's
+      const fromRoot = attachmentRel(link.src);
+      const fromNote = attachmentRel(link.src, noteFolder);
+      let place: AttachmentPlace =
+        fromRoot === null ? { status: "missing", rel: link.src } : await locate(rootId, fromRoot);
+      if (place.status !== "found" && fromNote !== null && fromNote !== fromRoot) {
+        const there = await locate(rootId, fromNote);
+        if (there.status === "found") place = there;
+      }
       return [link.src, place] as const;
     }),
   );
@@ -206,6 +224,14 @@ export async function handToAiFor(
   if (!note.body.trim()) return { kind: "empty", title };
   const links = attachmentLinks(note.body);
   const { secureKeywords } = useLibrarianRules.getState().rules;
+  const folder = note.diskFolderId ?? note.folderId;
+  // an Obsidian ![[file]] names a file the Refined model can open by that name:
+  // resolve it as the editor does, and refuse when it is a secure file
+  for (const [, target = ""] of note.body.matchAll(/!\[\[([^\]|#\n]+)/g)) {
+    const id = await resolveWikiEmbed(target.trim(), rootIdOf(note.id), folder).catch(() => null);
+    if (id && attachmentIsSecure(splitRootId(id).rel, secureKeywords))
+      return { kind: "secureAttachment", title };
+  }
   const embedded = embeddedFileReferences(note.body);
   for (const { source, rootId } of embedded) {
     const rel = attachmentRel(source);
@@ -217,10 +243,10 @@ export async function handToAiFor(
       return { kind: "secureAttachment", title };
     }
   }
-  if (links.some((link) => attachmentIsSecure(link.src, secureKeywords))) {
+  if (links.some((link) => attachmentIsSecure(link.src, secureKeywords, folder))) {
     return { kind: "secureAttachment", title };
   }
-  const attachments = await placesOf(links, rootIdOf(note.id), locate);
+  const attachments = await placesOf(links, rootIdOf(note.id), locate, folder);
   // a refined prompt must keep every path the Attachments list names, missing ones too
   const paths = [...attachments.values()].map((place) =>
     place.status === "found" ? (place.path ?? place.rel) : place.rel,
