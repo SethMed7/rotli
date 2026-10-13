@@ -106,6 +106,7 @@ import {
 import { availableNewItems, withBetaLabel } from "../newItems/model";
 import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
+import { quickActionAvailable } from "../services/finderQuickAction";
 import { useFolders } from "../services/hooks";
 import { setLibrarianOn } from "../services/librarianSwitch";
 import { queryClient } from "../services/query";
@@ -150,6 +151,7 @@ import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLo
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { FinderQuickActionSettings } from "./settings/finderQuickActionSettings";
 import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { LINK_PASS } from "./settings/linkFormatSettings";
@@ -878,6 +880,7 @@ function GeneralPane() {
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
       <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
+      <FinderQuickActionSettings native={quickActionAvailable()} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>

@@ -1,7 +1,7 @@
 # Open in Rotli: a file or folder from Finder
 
-Status: **stages 1 and 2 built** (a file in a tab, a folder in its own
-window; owner decisions 2026-10-13). Stages 3–4 are not built yet.
+Status: **stages 1–3 built** (a file in a tab, a folder in its own window,
+the opt-in Quick Action; owner decisions 2026-10-13). Stage 4 is not built yet.
 Roadmap item `open-with-rotli`. Builds on the protected-originals rule in
 [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md).
 
@@ -53,6 +53,25 @@ Decisions (2026-10-13):
   `~/Library/Services`; **Remove** deletes it again. It's never installed
   silently: it writes outside the app, so the person opts in. It hands paths to
   the same open handler as Open With.
+
+**Quick Action as built (stage 3, 2026-10-13):** no resource ships. On the
+person's click, Rust (`src-tauri/src/finder_quick_action.rs`) generates
+`~/Library/Services/Open in Rotli.workflow`.
+
+- The workflow has one Run Shell Script step: `open -b <this build's bundle
+  id> "$@"`. The id is checked to letters, digits, dots, and hyphens. A dev
+  build's Quick Action opens the dev build.
+- It's offered in Finder only (`NSRequiredContext`), for any item
+  (`NSSendFileTypes = public.item`).
+- It's built beside the target and swapped in, so a half-written workflow is
+  never visible. `pbs -update` asks macOS to notice it right away.
+- An Info.plist marker key (`RotliQuickAction`) tells Rotli's workflow apart
+  from a same-named one the person made. Rotli never replaces or removes
+  theirs, and the row says so.
+- Proof: unit tests for install, update, remove, someone else's workflow,
+  and the bundle-id check. An `--ignored` macOS test lints both plists and runs
+  the workflow through `automator -i`, with the step's `open` swapped for a
+  `printf`. The selected path arrives as its argument.
 
 ### 2. The open handler
 
@@ -171,7 +190,8 @@ Rotli Web keeps its own Open folder flow.
    `.txt` and ⌘S **Copy into vault…** move to stage 2.
 2. **Built:** folder windows in raw mode, plus **Add as vault** (connect
    flow; copy-first comes with the copy-flow slice).
-3. **The Quick Action** with its opt-in Settings install.
+3. **Built:** the Quick Action with its opt-in Settings install
+   (Settings → General → Open in Rotli from Finder).
 4. DOCX, XLSX, and CSV in external tabs.
 
 ## Proof plan

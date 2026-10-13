@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Excalidraw board, an image, or a video and choose Open With → Rotli. It opens
   in a tab and your edits save to that file. Rotli adds nothing beside it, never
   looks at the other files in its folder, and never sends it to a cloud model.
+- **"Open in Rotli" in Finder's right-click menu.** Settings → General →
+  Open in Rotli from Finder adds a Quick Action. Right-click any file or
+  folder, choose Quick Actions → Open in Rotli, and a file opens in a tab while
+  a folder opens in its own window. Remove takes it back out. Rotli changes
+  nothing in Finder until you add it.
 - **Open a folder from Finder in its own window.** Drag a folder onto Rotli in
   the Dock and it opens raw, like an editor looking at that folder: its files
   on the left, tabs on the right.

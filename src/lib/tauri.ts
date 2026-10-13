@@ -373,6 +373,19 @@ export function folderWindowAddAsVault(): Promise<void> {
   return invoke<void>("folder_window_add_as_vault");
 }
 
+/** Finder's "Open in Rotli" Quick Action: `absent` · `installed` · `theirs`
+ * (a same-named workflow Rotli didn't make). src-tauri/src/finder_quick_action.rs */
+export type QuickActionStatus = "absent" | "installed" | "theirs";
+
+export function finderQuickActionStatus(): Promise<QuickActionStatus> {
+  return invoke<QuickActionStatus>("finder_quick_action_status");
+}
+
+/** Add or remove the Quick Action (writes ~/Library/Services) — Settings only. */
+export function finderQuickActionSet(installed: boolean): Promise<QuickActionStatus> {
+  return invoke<QuickActionStatus>("finder_quick_action_set", { installed });
+}
+
 /** Invalidate Rust's walk generation and list once after an exact AI file-id miss. */
 export function corpusListFresh(): Promise<CorpusListPayload> {
   return corpusInvoke("corpus_list", { fresh: true });
