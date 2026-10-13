@@ -12,7 +12,12 @@
     },
     {
       "title": "Quitting finishes saving first",
-      "body": "Every window now finishes saving before rotli quits, and secure documents, sheets, and CSV files never reach a cloud model."
+      "body": "Every window now finishes saving before rotli quits, so a large document or sheet is never cut off mid-save.",
+      "platform": "mac"
+    },
+    {
+      "title": "Secure files stay on your device",
+      "body": "Documents, sheets, and CSV files in a secure folder never reach a cloud model, and secure workbooks saved by other apps stay private too."
     },
     {
       "title": "Word and Excel files on the web (Beta)",
