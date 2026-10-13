@@ -10,7 +10,7 @@ import { listOpfsFiles, readOpfsBase64, readOpfsFile, startWithVault } from "./s
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-test("an image dropped on a note is stored in the vault, linked with storage:, and rendered", async ({
+test("an image dropped on a note is stored in the vault, linked with a standard path from the note, and rendered", async ({
   page,
 }) => {
   await startWithVault(page);
@@ -44,7 +44,7 @@ test("an image dropped on a note is stored in the vault, linked with storage:, a
   // …and the note itself carries the portable link (the autosave is debounced)
   await expect
     .poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md"), { timeout: 10_000 })
-    .toContain("![](storage:images/shot.png)");
+    .toContain("![](../../storage/images/shot.png)");
   // …and the image is back from the vault after a reload
   await page.reload();
   await expect(
@@ -77,7 +77,7 @@ test("Attach image opens a browser picker and stores chosen bytes and a portable
       const files = await listOpfsFiles(page, "wiki/_inbox");
       return (await Promise.all(files.map((file) => readOpfsFile(page, `wiki/_inbox/${file}`)))).join("\n");
     })
-    .toContain("![](storage:images/attached.png)");
+    .toContain("![](../../storage/images/attached.png)");
 });
 
 test("pasting image bytes into a note stores the image and inserts its portable link", async ({ page }) => {
@@ -97,5 +97,5 @@ test("pasting image bytes into a note stores the image and inserts its portable 
       const files = await listOpfsFiles(page, "wiki/_inbox");
       return (await Promise.all(files.map((file) => readOpfsFile(page, `wiki/_inbox/${file}`)))).join("\n");
     })
-    .toContain("![](storage:images/pasted.png)");
+    .toContain("![](../../storage/images/pasted.png)");
 });

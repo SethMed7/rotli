@@ -118,16 +118,12 @@ describe("slash command catalog", () => {
     expect(slashLineTarget("- ( ) /table")).toEqual({ from: 6, continuation: "      " });
   });
 
-  test("targeted embeds use explicit typed fences", () => {
+  test("targeted embeds write Obsidian's ![[path]], one vault path each", () => {
     expect(pickerFence("embedBoard", "storage/excalidraw/plan.excalidraw")).toBe(
-      "```board\nstorage/excalidraw/plan.excalidraw\n```\n\n",
+      "![[storage/excalidraw/plan.excalidraw]]\n\n",
     );
-    expect(pickerFence("embedSheet", "storage/forecast.xlsx")).toBe(
-      "```sheet\nstorage/forecast.xlsx\n```\n\n",
-    );
-    expect(pickerFence("embedDocument", "storage/brief.docx")).toBe(
-      "```document\nstorage/brief.docx\n```\n\n",
-    );
+    expect(pickerFence("embedSheet", "storage/forecast.xlsx")).toBe("![[storage/forecast.xlsx]]\n\n");
+    expect(pickerFence("embedDocument", "research:storage/brief.docx")).toBe("![[storage/brief.docx]]\n\n");
   });
 
   test("board, sheet, and document pickers offer creation where the build has the kind and the vault is writable", () => {
