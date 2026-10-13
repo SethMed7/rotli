@@ -73,14 +73,18 @@ export function topLevelNodes(body: string): string[] {
       cursor = start + openText.length;
       continue;
     }
-    const token = new RegExp(`<${tag}\\b[^>]*>|<\\/${tag}\\s*>`, "gi");
+    // One fixed pattern for every tag: the name is compared, never compiled
+    // into a regular expression from document text.
+    const name = tag.toLowerCase();
+    const token = /<(\/?)([\w:-]+)[^>]*>/g;
     token.lastIndex = start;
     let depth = 0;
     let end = -1;
     for (;;) {
       const match = token.exec(body);
       if (!match) break;
-      if (match[0].startsWith("</")) depth -= 1;
+      if (match[2]?.toLowerCase() !== name) continue;
+      if (match[1]) depth -= 1;
       else if (!/\/\s*>$/.test(match[0])) depth += 1;
       if (depth === 0) {
         end = token.lastIndex;
