@@ -199,8 +199,16 @@ An adopted folder, and the source of any import, is **protected**:
      constraint holds:** in a folder opened in place no file is ever moved to
      Trash or Archive (Mac `storage_file_lifecycle_block`, web
      `moveFileToSink`).
-   - **5c, the converter:** a Settings action that previews every change and
-     rewrites only Rotli vaults, never a folder opened in place.
+   - **5c, the converter (in review):** Settings → General → Link format
+     counts the Rotli-only links on open, shows up to five before → after lines,
+     and converts on a click: `](storage:X)` → the standard path from the note
+     (the same `noteImageLink` form new images get; Rust `note_image_link`,
+     parity fixture `noteImageLink`), and a whole ```` ```board ````/
+     ```` ```sheet ````/```` ```document ```` fence → `![[path]]`. Other code
+     blocks and inline code stay as written; frontmatter bytes are kept; each
+     note is re-read under its lock. A folder opened in place is refused. Mac
+     app only, like Leftover note names; both now share one Settings row
+     (`VaultPassSettings`) and one command (`corpus_vault_pass`).
 
 ## Decisions (owner, 2026-10-13)
 

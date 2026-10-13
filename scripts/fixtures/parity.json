@@ -661,6 +661,16 @@
         ]
       }
     },
+    "noteImageLink": {
+      "sourceOfTruth": "behavioral: src/editor/imageSource.ts noteImageLink ↔ src-tauri/src/corpus_link_convert.rs note_image_link (the link a new image gets, and what the link converter writes)",
+      "value": [
+        { "wire": "storage/images/rose.png", "folder": "wiki/_inbox", "link": "../../storage/images/rose.png" },
+        { "wire": "storage/images/rose.png", "folder": "", "link": "storage/images/rose.png" },
+        { "wire": "vault:storage/images/rose.png", "folder": "wiki", "link": "../storage/images/rose.png" },
+        { "wire": "Garden/img/my rose (2).png", "folder": "Garden", "link": "img/my%20rose%20%282%29.png" },
+        { "wire": "Storage/café&co!*'.png", "folder": "Notes/Deep", "link": "../../Storage/caf%C3%A9%26co!*'.png" }
+      ]
+    },
     "wikilinkTargets": {
       "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
       "value": [

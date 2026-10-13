@@ -2391,7 +2391,7 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
-            corpus::alias_cleanup::corpus_alias_cleanup,
+            corpus::note_pass::corpus_vault_pass,
             corpus::rules_store::corpus_secure_by_keywords,
             breve::breve_snapshot,
             breve::breve_import_legacy,

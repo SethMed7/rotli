@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Convert older notes' links in one step.** Settings → General → Link format
+  counts the images and embeds still written in Rotli's own format, shows a
+  few before → after examples, and on a click rewrites them so Obsidian and
+  any Markdown app read them too. Nothing changes until you click, and a folder
+  you opened in place is never converted.
+
 ### Fixed
 
 - **New images and embeds are written so Obsidian shows them too.** A dropped
