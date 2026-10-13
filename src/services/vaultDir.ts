@@ -7,6 +7,7 @@
 // file inside it. Text and binary files share the revision-gated write seam.
 
 import { bytesRevision } from "../lib/contentRevision";
+import { isMemexId, parseMemexInfo } from "../memex/contract";
 export { bytesRevision, contentRevision } from "../lib/contentRevision";
 
 export interface VaultDirEntry {
@@ -94,6 +95,15 @@ export async function freeSiblingPath(
  * folder is a plain vault of Markdown. */
 export function vaultIsMemex(dir: Pick<VaultDir, "exists">): Promise<boolean> {
   return dir.exists("wiki");
+}
+
+/** A Rotli vault carries a valid `mx_` marker (the Rust `is_memex_root` twin).
+ * Any other folder was opened in place, and the person's notes there are never
+ * rearranged or stamped (owner rule 2026-10-13). */
+export async function vaultHasRotliMarker(dir: Pick<VaultDir, "exists" | "readText">): Promise<boolean> {
+  if (!(await dir.exists("memex.json"))) return false;
+  // unreadable reads as "opened in place": the direction that writes less
+  return isMemexId(parseMemexInfo(await dir.readText("memex.json").catch(() => ""))?.id);
 }
 
 /** The first free path for `desired` inside `folder` — the Rust `free_name_with`

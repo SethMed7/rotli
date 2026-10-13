@@ -512,6 +512,22 @@ The Rust corpus boundary independently validates every write.
   invalid `created` and `updated` from the pre-move file time, but never bumps a
   valid `updated`. An imported note without a fence stays fenceless on a body
   save or move. Unknown frontmatter fields survive these writes.
+- **A folder opened in place stamps nothing (decision B, 2026-10-13).** In a
+  folder without a Rotli marker (Obsidian, ZenNotes, plain Markdown), a note the
+  person wrote — any note whose `id` is not a ULID, since every Rotli create path
+  mints one — changes only by what the person asked for, on the Mac and on the
+  web alike. A body save writes the new words between the note's own
+  frontmatter bytes (or none) and keeps its file name: no title-slug rename,
+  which would break Obsidian's file-name links, and no `aliases` history. Lock,
+  pin, a field, the AI edit grant, local-AI access, a view assignment, and the
+  Trash/Archive `origin` breadcrumb each add, change, or remove only their own
+  line; a move keeps the file name. No `id`, `created`, or `updated` is minted;
+  Rotli keeps those facts in memory and `.rotli/`. A note Rotli itself makes
+  there carries a ULID and behaves as in a vault (its file follows its first
+  title). Mac: `CorpusStore::keeps_as_written`, `compose_for`, and
+  `corpus_in_place.rs`; web: `FolderNotesService.inPlace`,
+  `vaultHasRotliMarker`, and `src/lib/frontmatterInPlace.ts`. Writer policy: the
+  contract version does not move.
 - A full timestamp is taken as written. A day is never read as an hour: Rotli
   shows a note's age from the file's own time when that time falls on the
   stamped day — the reader's local day, widened to the UTC day because Mac
