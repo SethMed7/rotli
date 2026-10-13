@@ -17,6 +17,7 @@ by name for the exact source commit.
 | Browser E2E | `ubuntu-24.04` | E2E typecheck, Playwright Chromium install, and the browser suite |
 | Dependency vulnerability audit | `ubuntu-24.04` | `bun audit` and RustSec; current accepted transitive findings remain advisory and are tracked in [`security.md`](security.md) |
 | Rust (Linux cargo check) | `ubuntu-24.04` | `cargo check --all-targets` over the `cfg(not(target_os = "macos"))` code |
+| Rust (Windows helper check) | `windows-2022` | `cargo check --bin rotli-helper`: the Rotli Helper ships for Windows, and no other lane compiles it there (a Unix-only socket broke it unnoticed from #149 until the helper-v1.8.1 release) |
 | Rust (clippy + tests) | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
 
 A **Change scope** job ([`scripts/ci-scope.ts`](../../scripts/ci-scope.ts))
