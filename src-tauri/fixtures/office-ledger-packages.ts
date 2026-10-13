@@ -1,6 +1,7 @@
-// Ordinary Office packages for the Rust secure local-read regression.
-// Generated at test time so the real ExcelJS and Rotli DOCX writers keep
-// exercising their current package layouts.
+// Ordinary Office packages for the Rust secure local-read regression, written
+// by the real ExcelJS and Rotli DOCX writers. The bytes are committed under
+// fixtures/office-ledger/ (CI's Rust job has no Bun); regenerate them with
+//   bun src-tauri/fixtures/office-ledger-packages.ts src-tauri/fixtures/office-ledger
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 

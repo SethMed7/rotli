@@ -1,7 +1,6 @@
 // AI file read gates and extracted-text egress ledger coverage.
 
 use super::*;
-use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
@@ -196,20 +195,10 @@ fn secure_workbook_hyperlink_relationship_reads_and_enters_ledger() {
 
 #[test]
 fn generated_office_packages_remain_readable_for_secure_local_ai() {
+    // written by the real ExcelJS and Rotli DOCX writers
+    // (fixtures/office-ledger-packages.ts); committed because CI's Rust job has no Bun
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/office-ledger");
     let tmp = TempDir::new().unwrap();
-    let output = Command::new("bun")
-        .arg(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/fixtures/office-ledger-packages.ts"
-        ))
-        .arg(tmp.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "Office fixture generator failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
     let store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
     fs::create_dir_all(store.root().join("Secure notes")).unwrap();
     for name in [
@@ -219,7 +208,7 @@ fn generated_office_packages_remain_readable_for_secure_local_ai() {
         "image-hyperlink-header.docx",
     ] {
         let rel = format!("Secure notes/{name}");
-        fs::copy(tmp.path().join(name), store.root().join(&rel)).unwrap();
+        fs::copy(fixtures.join(name), store.root().join(&rel)).unwrap();
         store
             .read_file_bytes_for_ai(&rel, true)
             .unwrap_or_else(|error| panic!("{name} refused: {error}"));
