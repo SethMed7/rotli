@@ -119,6 +119,17 @@ second user-visible product or storage location.
   `transparent` mean "not chosen", and such a board follows Settings →
   Appearance → Board background: Match theme (transparent over the theme's
   ground) or White (`src/brand/boardBackground.ts`).
+  Boards are plain Excalidraw files, readable on excalidraw.com and written in
+  its shape (`type`, `version`, `source`, `elements`, `appState`, `files`);
+  Obsidian's `.excalidraw.md` wrapper is not a Rotli format (owner,
+  2026-10-13). **A dropped `.excalidraw` file opens as a board** (2026-10-13):
+  its scene passes the same validation as any board save, then it is COPIED
+  into the board home (the Excalidraw lane in a vault, `Board/` in a plain
+  folder) under its own name, collision-safe, filed in Main like any new board,
+  and opened in a tab. The dropped original is never touched. Mac:
+  `CorpusStore::import_board` behind the drop's one-shot grant
+  (`corpus_import_board`); Rotli Web reads the dropped file's text and creates
+  the board in the connected vault (`openDroppedWebBoard`).
 - A populated item adds its one stable id/path to Main after durable creation
   and identity refresh; presentation may precede that structural work. A new
   plain Markdown note is the deliberate exception: its durable corpus file and

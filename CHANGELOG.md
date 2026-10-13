@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Drop an Excalidraw board onto Rotli and it opens, ready to edit.** A
+  `.excalidraw` file dragged onto the window (from Finder, or exported from
+  excalidraw.com) is copied into your vault's boards, added to Main, and
+  opened in a tab, on the Mac and on Rotli Web. The file you dropped stays
+  where it was. Before, it was filed as a read-only asset.
 - **Convert older notes' links in one step.** Settings → General → Link format
   counts the images and embeds still written in Rotli's own format, shows a
   few before → after examples, and on a click rewrites them so Obsidian and

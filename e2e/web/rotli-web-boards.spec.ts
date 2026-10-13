@@ -174,3 +174,53 @@ test("the Document card is offered on the web as Beta and asks for its name firs
   await page.getByPlaceholder("Search notes, files, chats, actions…").fill("New document");
   await expect(page.locator(".prow", { hasText: "New document" }).first()).toBeVisible();
 });
+
+test("an Excalidraw board dropped on Rotli Web opens as a board and is saved into the vault", async ({
+  page,
+}) => {
+  await startWithVault(page);
+  // an excalidraw.com export, with the float coordinates Excalidraw writes
+  const scene = JSON.stringify({
+    type: "excalidraw",
+    version: 2,
+    source: "https://excalidraw.com",
+    elements: [
+      {
+        id: "drop-rect",
+        type: "rectangle",
+        x: 17.140276393692147,
+        y: -2045.6097236063079,
+        width: 120,
+        height: 60,
+      },
+    ],
+    appState: { viewBackgroundColor: "#ffffff" },
+    files: {},
+  });
+  await page
+    .locator(".cm-content:visible")
+    .first()
+    .evaluate((host, text) => {
+      const data = new DataTransfer();
+      data.items.add(new File([text], "Team map.excalidraw", { type: "application/json" }));
+      const box = host.getBoundingClientRect();
+      host.dispatchEvent(
+        new DragEvent("drop", {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: data,
+          clientX: box.x + 10,
+          clientY: box.y + 10,
+        }),
+      );
+    }, scene);
+
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Team map");
+  await expect(page.locator(".canvas-surface canvas.interactive")).toBeVisible();
+  await expect
+    .poll(() => listOpfsFiles(page, "storage/excalidraw"), { timeout: 10_000 })
+    .toContain("Team map.excalidraw");
+  expect(JSON.parse(await readOpfsFile(page, "storage/excalidraw/Team map.excalidraw")).elements[0].id).toBe(
+    "drop-rect",
+  );
+});
