@@ -103,18 +103,31 @@ An adopted folder, and the source of any import, is **protected**:
 
 - No Librarian, ever.
 - The secret detector still refuses flagged notes to cloud models (that
-  protection stays), but records the flag in `.rotli/` only. It never writes
-  `secure: true` into the note and never moves it. Making a note secure by hand
-  in a protected folder says it will stay in place, and stores the flag in
-  `.rotli/`.
+  protection stays), but writes nothing: no `secure: true`, no move. Cloud
+  reads already refuse a detected note from its content alone, so no record is
+  needed.
+- **Making a note secure by hand** in a protected folder keeps it where it is
+  and adds one `secure: true` line plus its gitignore line. Nothing else
+  changes; un-securing restores the file byte-for-byte. *Amended 2026-10-13
+  from "store the flag in `.rotli/`":* a `.rotli/` record would have to be
+  keyed by path or content, and it would silently stop protecting the note
+  when Obsidian renames or edits it. Secure notes must fail closed, and only
+  frontmatter travels with the file. The person asked for this one line, so
+  decision B still holds.
 - Ordinary edits the person makes are allowed; that is what "open in place"
   means. **Rotli adds nothing to the note** (decision B): no `id`, `created`,
   `updated`, or rename `aliases` in a protected folder's frontmatter. Rotli
   keeps those facts in `.rotli/` instead. The note's text is exactly what the
   person wrote.
-- Rust enforces this in `mutation_allowed`-style checks, not only in the UI.
-  A protected root refuses `relocate`, `file_note`, and Librarian writes with a
-  plain reason.
+- Enforcement lives in the core, not only in the UI. The Mac marks an adopted
+  store (`CorpusStore.adopted`); Rotli Web decides by the `mx_` marker. The
+  person's own moves (a sidebar drag) still work. The Librarian already writes
+  only in a Rotli vault (`filer_writable`), and now it never sweeps, queues, or
+  models any other folder.
+- **Known web gap (not slice 1):** outside the secure toggle, Rotli Web still
+  treats any folder with a `wiki/` folder as a Rotli vault for layout
+  (`vaultIsMemex`), unlike the Mac's marker check. That doesn't move notes, but
+  it should be aligned with the marker.
 
 ## Obsidian compatibility
 
@@ -148,8 +161,11 @@ An adopted folder, and the source of any import, is **protected**:
 
 ## Slices
 
-1. Protected originals: close Gap 1 for adopted folders, plus Rust tests. This
-   is the safety fix and is useful on its own.
+1. Protected originals: close Gap 1 for adopted folders, plus tests on both
+   the Mac and web. This is the safety fix and is useful on its own.
+   **In review** (`fix/protected-originals`). Decision B (no `id`/`created`/
+   `updated` stamps on in-place edits) and decision C (the one-time offer) are
+   separate slices.
 2. The compatibility audit script, plus a run over the owner's vaults
    (read-only report).
 3. The copy flow: choice screen, copy with progress, verification, and
