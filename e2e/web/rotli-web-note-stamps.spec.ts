@@ -2,9 +2,15 @@ import { expect, test } from "@playwright/test";
 
 import { listOpfsFiles, readOpfsFile, startWithFolder, startWithVault } from "./support";
 
+// A Rotli vault carries its marker; without it the folder was opened in place.
+const MARKER = '{"id":"mx_e2estamps0001","contract":"3.4"}\n';
+
 test("editing a fenced note fills its missing identity and dates", async ({ page }) => {
   const path = "wiki/_inbox/no-id.md";
-  await startWithFolder(page, { [path]: "---\ntitle: NoId\ncustom: keep\n---\n# NoId\n" });
+  await startWithFolder(page, {
+    "memex.json": MARKER,
+    [path]: "---\ntitle: NoId\ncustom: keep\n---\n# NoId\n",
+  });
   await page.getByRole("button", { name: /Search notes and actions/ }).click();
   await page.getByPlaceholder("Search notes, files, chats, actions…").fill("NoId");
   await page.locator(".prow", { hasText: "NoId" }).first().click();
@@ -20,6 +26,25 @@ test("editing a fenced note fills its missing identity and dates", async ({ page
   expect(text).toMatch(/^updated: \d{4}-\d{2}-\d{2}$/m);
   expect(text).toContain("custom: keep");
   expect(text).not.toMatch(/^(?:id|created|updated):\s*$/m);
+});
+
+test("in a folder opened in place, editing keeps the note's name and frontmatter as written", async ({
+  page,
+}) => {
+  // an Obsidian vault: no Rotli marker, a note named by the person
+  const path = "Garden/Roses Today.md";
+  await startWithFolder(page, { [path]: "---\ntags: [garden]\n---\n# Roses Today\n" });
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Roses Today");
+  await page.locator(".prow", { hasText: "Roses Today" }).first().click();
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.locator(".cm-line").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText("\nPruned.");
+
+  await expect.poll(() => readOpfsFile(page, path), { timeout: 10_000 }).toContain("Pruned.");
+  expect(await readOpfsFile(page, path)).toBe("---\ntags: [garden]\n---\n# Roses Today\nPruned.");
+  expect(await listOpfsFiles(page, "Garden")).toEqual(["Roses Today.md"]);
 });
 
 test("a new Markdown note follows its first title on disk and reopens after reload", async ({ page }) => {
