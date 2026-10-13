@@ -22,6 +22,7 @@ import {
   isLockedFrontmatter,
   isSecureFrontmatter,
 } from "../lib/frontmatter";
+import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
@@ -60,7 +61,7 @@ import {
   under,
   withoutSinkPrefix,
 } from "./folderNoteRelocation";
-import { ownedNoteFacts } from "./folderNoteStamps";
+import { movedNoteText, ownedNoteFacts, savedNoteText } from "./folderNoteStamps";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import {
@@ -70,6 +71,7 @@ import {
   freeVaultPath,
   joinVaultPath,
   parentPath,
+  vaultHasRotliMarker,
   vaultIsMemex,
 } from "./vaultDir";
 
@@ -124,6 +126,8 @@ export class FolderNotesService implements NotesService {
   private index: Map<string, string> | null = null;
   private readonly cache = new Map<string, CachedFile>();
   private isMemex = false;
+  /** No Rotli marker: a folder opened in place, whose own notes stay as written. */
+  private inPlace = false;
 
   constructor(private readonly dir: VaultDir) {}
 
@@ -142,6 +146,7 @@ export class FolderNotesService implements NotesService {
 
   private async rebuildIndex(): Promise<Map<string, string>> {
     this.isMemex = await vaultIsMemex(this.dir);
+    this.inPlace = !(await vaultHasRotliMarker(this.dir));
     const paths: string[] = [];
     if (this.isMemex) {
       for (const root of MEMEX_NOTE_ROOTS) await this.collect(root, paths);
@@ -461,8 +466,11 @@ export class FolderNotesService implements NotesService {
     // sprout frontmatter the moment Rotli saves it.
     const modified = (await this.dir.stat(path))?.lastModified;
     if (frontmatter && modified === undefined) throw new Error(`unknown note: ${path}`);
-    const text = frontmatter ? composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body) : body;
-    const rename = await prepareFolderTitleRename(this.dir, path, text, titleOf(currentBody), titleOf(body));
+    const asWritten = this.inPlace && !rotliMade(frontmatter);
+    const text = savedNoteText(original, currentBody, frontmatter, body, modified, asWritten);
+    const rename = asWritten
+      ? { text, path }
+      : await prepareFolderTitleRename(this.dir, path, text, titleOf(currentBody), titleOf(body));
     await this.writeFile(path, rename.text, revision);
     // moveFile carries a secure note's .gitignore line to the new name
     if (rename.path !== path) return this.moveFile(id, path, rename.path);
@@ -498,7 +506,8 @@ export class FolderNotesService implements NotesService {
     if (!frontmatter) return this.moveFile(id, path, relocationTarget(path, targetFolder, this.isMemex));
     const modified = (await this.dir.stat(path))?.lastModified;
     if (modified === undefined) throw new Error(`unknown note: ${path}`);
-    let next = ownedNoteFacts(frontmatter, modified, false);
+    const asWritten = this.inPlace && !rotliMade(frontmatter);
+    let next = asWritten ? frontmatter : ownedNoteFacts(frontmatter, modified, false);
     const folderId = projectVaultFolder(parentPath(path), frontmatter, this.isMemex);
     if (isSink(targetFolder) && !isSink(folderId)) next = { ...next, origin: folderId };
     else if (!isSink(targetFolder) && next.origin !== null) next = { ...next, origin: null };
@@ -506,16 +515,8 @@ export class FolderNotesService implements NotesService {
     if (toDisk === path && !isSink(targetFolder) && diskDirFor(targetFolder, this.isMemex) === null) {
       next = withShelf(next, [targetFolder]);
     }
-    // A note with complete metadata keeps its hand-authored bytes on a plain
-    // wiki move; missing managed facts are stamped before the relocation.
-    if (
-      next.id !== frontmatter.id ||
-      next.created !== frontmatter.created ||
-      next.updated !== frontmatter.updated ||
-      next.origin !== frontmatter.origin ||
-      next.foreign !== frontmatter.foreign
-    )
-      await this.writeFile(path, composeNoteDocument(next, body), contentRevision(original));
+    const moved = movedNoteText(original, frontmatter, next, body, asWritten);
+    if (moved !== null) await this.writeFile(path, moved, contentRevision(original));
     return this.moveFile(id, path, toDisk);
   }
 
@@ -569,11 +570,11 @@ export class FolderNotesService implements NotesService {
     const { frontmatter, body } =
       original === null ? { frontmatter: null, body: "" } : parseNoteDocument(original);
     if (original !== null && frontmatter && frontmatter.origin !== null) {
-      await this.writeFile(
-        path,
-        composeNoteDocument({ ...frontmatter, origin: null }, body),
-        contentRevision(original),
-      );
+      const text =
+        this.inPlace && !rotliMade(frontmatter)
+          ? withTopLevelLine(original, "origin", null)
+          : composeNoteDocument({ ...frontmatter, origin: null }, body);
+      await this.writeFile(path, text, contentRevision(original));
     }
     const note = await this.noteAt(path);
     this.reindex(id, note.id, path);

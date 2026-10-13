@@ -7,7 +7,7 @@
 use std::fs;
 
 use super::{
-    atomic_write, compose_document, lifecycle_disk_folder, parse_document, prefix_write_result,
+    atomic_write, lifecycle_disk_folder, parse_document, prefix_write_result,
     split_root_id, CorpusState, CorpusStore, CorpusWriteResult, NoteMeta,
 };
 use crate::ai_edit_policy::ai_edit_field;
@@ -50,7 +50,7 @@ impl CorpusStore {
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| ai_edit_field(l).is_none());
             fm.foreign.push(format!("ai_edit: {allowed}"));
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 

@@ -17,32 +17,6 @@ export function rawFrontmatterBlock(text: string): string {
   return parsed.frontmatter ? text.slice(0, text.length - parsed.body.length) : "";
 }
 
-/** Add or remove only the secure lines, keeping every other byte (the Rust
- * `with_secure_line_only` twin). No Rotli fields are minted; a fence is added
- * only to hold `secure: true`, and a fence left empty by removal goes. Used in
- * a folder opened in place, where Rotli changes nothing it wasn't asked to. */
-export function withSecureLineOnly(text: string, secure: boolean): string {
-  const block = rawFrontmatterBlock(text);
-  const body = text.slice(block.length);
-  const nl = block.includes("\r\n") || (!block && text.includes("\r\n")) ? "\r\n" : "\n";
-  const lines = block
-    ? block
-        .replace(/\r?\n$/, "")
-        .split(/\r?\n/)
-        .slice(1, -1)
-    : [];
-  // top-level keys only, untrimmed — an indented line belongs to a nested map
-  const isKey = (line: string, key: string) => line.includes(":") && line.slice(0, line.indexOf(":")) === key;
-  const kept = lines.filter(
-    (line) =>
-      !isKey(line, "secure") &&
-      (secure || (!isKey(line, "local_ai_allowed") && !isKey(line, "secure_origin"))),
-  );
-  if (secure) kept.push("secure: true");
-  if (kept.length === 0) return body;
-  return `---${nl}${kept.join(nl)}${nl}---${nl}${body}`;
-}
-
 export function mergeRawFrontmatter(original: string, submitted: string): string {
   const block = rawFrontmatterBlock(original);
   const orig = block ? block.trimEnd().split(/\r?\n/).slice(1, -1) : [];

@@ -7,12 +7,19 @@ import {
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
-import { mergeRawFrontmatter, rawFrontmatterBlock, withSecureLineOnly } from "../lib/frontmatterRaw";
-import { isMemexId, parseMemexInfo } from "../memex/contract";
+import { composeInPlace, rotliMade, withSecureLineOnly } from "../lib/frontmatterInPlace";
+import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
-import { type VaultDir, baseName, freeVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
+import {
+  type VaultDir,
+  baseName,
+  freeVaultPath,
+  parentPath,
+  vaultHasRotliMarker,
+  vaultIsMemex,
+} from "./vaultDir";
 
 const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
   const line = fm.foreign.find((line) => line.slice(0, line.indexOf(":")).trim() === key);
@@ -31,13 +38,6 @@ function assertSecureRemoval(body: string): void {
     throw new Error("Remove the detected secret from the note before removing secure protection");
 }
 
-/** A Rotli vault carries a valid `mx_` marker (the Rust `is_memex_root`
- * twin). Any other folder was opened in place and is never rearranged. */
-async function hasRotliMarker(dir: VaultDir): Promise<boolean> {
-  if (!(await dir.exists("memex.json"))) return false;
-  return isMemexId(parseMemexInfo(await dir.readText("memex.json"))?.id);
-}
-
 /** Returns the resulting path for relocation bookkeeping. Identity is stable;
  * protect the target BEFORE moving, and leave the old ignore on any failure. */
 export async function setFolderSecure(dir: VaultDir, path: string, secure: boolean): Promise<string> {
@@ -45,7 +45,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
   if (!secure) assertSecureRemoval(body);
-  if (!(await hasRotliMarker(dir))) {
+  if (!(await vaultHasRotliMarker(dir))) {
     // A folder opened in place keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
@@ -126,7 +126,10 @@ export async function setFolderProtection(
     }
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
-  await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
+  // a person's note in a folder opened in place gains only the line asked for
+  const inPlace = !rotliMade(frontmatter) && !(await vaultHasRotliMarker(dir));
+  const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  await writeVersionedFile(dir, path, text, opened.revision);
 }
 
 export async function readFolderRawMetadata(dir: VaultDir, path: string) {
