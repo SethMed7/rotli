@@ -54,3 +54,34 @@ describe("selectionCoversImage", () => {
     expect(selectionCoversImage({ from: 10, to: 25 }, 10, 30)).toBe(false);
   });
 });
+
+describe("imageSourceSpan for Obsidian's ![[file]] form", () => {
+  test("an image or video file is an image, carrying its width the Obsidian way", () => {
+    expect(imageSourceSpan("![[rose.png]]", 4)).toEqual({
+      from: 4,
+      to: 17,
+      alt: "",
+      src: "rose.png",
+      wiki: true,
+    });
+    expect(imageSourceSpan("![[garden/rose.png|420]]", 0)).toEqual({
+      from: 0,
+      to: 24,
+      alt: "|420",
+      src: "garden/rose.png",
+      wiki: true,
+    });
+    expect(imageSourceSpan("![[walk.mp4]]", 0)?.src).toBe("walk.mp4");
+  });
+
+  test("a sheet, document, board, or note is not a picture", () => {
+    for (const line of [
+      "![[ledger.xlsm]]",
+      "![[letter.docx]]",
+      "![[sketch.excalidraw]]",
+      "![[Weekly review]]",
+      "![[a.png#x]]",
+    ])
+      expect(imageSourceSpan(line, 0)).toBeNull();
+  });
+});

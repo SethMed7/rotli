@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Images and embeds from an Obsidian vault show up in Rotli.** An image linked
+  relative to its note, or written Obsidian's way as `![[rose.png]]`, now
+  displays on the Mac and the web, and `![[budget.xlsx]]`, `![[plan.docx]]`,
+  or `![[map.excalidraw]]` on its own line opens the live sheet, document, or
+  board. When an image has moved, Rotli no longer rewrites a link you wrote; it
+  shows the picture from where it found it. (Only Rotli's own `storage:` links
+  are still repaired in place.)
 - **Editing a note in a folder you opened in place no longer renames it or adds
   Rotli's fields.** Saving a note from an Obsidian vault used to rename its file
   after its title (breaking `[[links]]` to it in Obsidian) and add `id`,

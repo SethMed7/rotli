@@ -139,7 +139,8 @@ An adopted folder, and the source of any import, is **protected**:
 | `.canvas` | Byte-for-byte JSON Canvas | Keep |
 | `mermaid` fences | Renders | Keep |
 | `chart` fences | Shows as a code block | Acceptable degrade; documented |
-| Images linked with the `storage:` scheme | **Broken image** (unknown scheme) | Write a root-relative path Obsidian resolves (`storage/…`), keep reading `storage:` |
+| Images linked with the `storage:` scheme | **Broken image** (unknown scheme) | Write a standard Markdown path relative to the note (owner, 2026-10-13); keep reading `storage:` |
+| File embeds as ```` ```sheet ```` / ```` ```document ```` / ```` ```board ```` fences | Code block | Write Obsidian's `![[file]]` (owner, 2026-10-13); Rotli renders it as the live editor and keeps reading fences |
 | Boards as `.excalidraw` | Opens only with the Excalidraw plugin | Document; no change |
 | `secure: true` | Ignored; Obsidian AI plugins can read secure notes | Document clearly: Rotli's protection is Rotli's, not the folder's |
 | `.rotli/`, empty `.obsidian/` | Hidden / filled by Obsidian on first open | Keep |
@@ -176,7 +177,23 @@ An adopted folder, and the source of any import, is **protected**:
 3. The copy flow: choice screen, copy with progress, verification, and
    `import.json`. This wires the existing command.
 4. Organize-the-copy: a Rotli vault from the copy, Librarian at Suggest first.
-5. `storage:` links written as Obsidian-resolvable paths.
+5. Obsidian-readable images and embeds (owner decisions 2026-10-13: images as
+   standard Markdown paths relative to the note; `/sheet`, `/board`,
+   `/document` as `![[file]]`; an opt-in converter for existing links).
+   - **5a, reading (in review):** Rotli shows note-relative images,
+     `![[image]]`, and whole-line `![[file]]` embeds of sheets, documents, and
+     boards, on the Mac and the web. A missing image's link is repaired in
+     place only for Rotli's own `storage:` form; any other link is shown from
+     where the file is found and never rewritten. Deferred to 5b: the link
+     index and graph still count `![[file]]` as a note link, and inline
+     (mid-sentence) `![[x.png]]` stays text.
+   - **5b, writing:** new images and embeds use the new forms, and every reader
+     that knows only `storage:` (chat media, Hand to AI, clipboard, cleanup when
+     a note is deleted) learns them. **Constraint:** deleting a note never
+     deletes an image it links in a protected folder — Obsidian attachments are
+     shared across notes and are the person's files.
+   - **5c, the converter:** a Settings action that previews every change and
+     rewrites only Rotli vaults, never a folder opened in place.
 
 ## Decisions (owner, 2026-10-13)
 
