@@ -1,7 +1,8 @@
 # Bringing an existing vault into Rotli: work on a copy, stay Obsidian-readable
 
-Status: **proposal** for owner review (2026-10-13). Nothing here is built yet
-beyond what "Today" describes.
+Status: **accepted direction, not yet built** (2026-10-13). The owner decided
+A, B, and C below the same day. Nothing here is built yet beyond what "Today"
+describes.
 
 ## The law
 
@@ -90,8 +91,9 @@ from.
 ### 4. Organize the copy
 
 The copy becomes a real Rotli vault (marker + `.rotli/`), so the Librarian can
-work on it. **Open decision A** (below) is where the imported tree lives so the
-Librarian can reach it. The first Librarian pass on an import runs at
+work on it. **The original tree stays at the copy's root** (decision A): notes
+keep their folders, Obsidian settings that name paths keep working, and the
+Librarian learns to organize that layout instead of only `wiki/**`. The first Librarian pass on an import runs at
 **Suggest** (nothing moves without a person) until the person turns it up.
 After that, it follows the vault's normal setting.
 
@@ -106,8 +108,10 @@ An adopted folder, and the source of any import, is **protected**:
   in a protected folder says it will stay in place, and stores the flag in
   `.rotli/`.
 - Ordinary edits the person makes are allowed; that is what "open in place"
-  means. **Open decision B** is whether those edits may stamp `id`, `created`,
-  and `updated`.
+  means. **Rotli adds nothing to the note** (decision B): no `id`, `created`,
+  `updated`, or rename `aliases` in a protected folder's frontmatter. Rotli
+  keeps those facts in `.rotli/` instead. The note's text is exactly what the
+  person wrote.
 - Rust enforces this in `mutation_allowed`-style checks, not only in the UI.
   A protected root refuses `relocate`, `file_note`, and Librarian writes with a
   plain reason.
@@ -153,16 +157,14 @@ An adopted folder, and the source of any import, is **protected**:
 4. Organize-the-copy: a Rotli vault from the copy, Librarian at Suggest first.
 5. `storage:` links written as Obsidian-resolvable paths.
 
-## Open decisions for the owner
+## Decisions (owner, 2026-10-13)
 
-- **A. Where the copy's notes live.** (1) Keep the original tree at the root
-  and widen the Librarian to that layout, or (2) place it under
-  `wiki/<original name>/` so today's Librarian reaches it. Wikilinks resolve
-  either way. (1) keeps Obsidian settings that name paths, such as the
-  attachment folder, working.
-- **B. In-place edits.** May an edit in a protected folder add `id`,
-  `created`, and `updated` to frontmatter, or should protected folders keep
-  Rotli's facts in `.rotli/` only?
-- **C. Existing users.** Folders already adopted in place become protected
-  automatically, so the Librarian and secure moves stop there. Should Rotli
-  also offer them *Work on a copy* once?
+- **A. Where the copy's notes live: keep the original tree at the root.** The
+  Librarian learns the adopted layout; nothing is moved under `wiki/` just to be
+  reachable.
+- **B. In-place edits stamp nothing.** A protected folder's notes never gain
+  Rotli frontmatter. Identity, dates, and rename aliases for them live in
+  `.rotli/`.
+- **C. Existing users get one offer.** Folders already adopted in place become
+  protected automatically, and after the update Rotli offers *Work on a copy*
+  once, dismissibly. Nothing happens unless the person accepts.
