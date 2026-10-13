@@ -21,6 +21,7 @@ import { type EditorState, type Range, StateEffect, StateField } from "@codemirr
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
+import { rootIdOf } from "../lib/corpusWireId";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { isTauri } from "../lib/tauri";
@@ -39,6 +40,9 @@ import {
   scanFences,
   withheldEmbedMessage,
 } from "./fences";
+import { resolveWikiEmbed, scanWikiEmbeds } from "./fileEmbeds";
+import { noteFolderFacet } from "./imageSource";
+import { noteIdFacet } from "./livePreview";
 import { type InlineMermaidCamera, createInlineMermaidCamera } from "./mermaidInlineCamera";
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import { mountMermaidWorkspace } from "./mermaidWorkspace";
@@ -311,17 +315,29 @@ class EmbedBlockWidget extends WidgetType {
     readonly kind: "board" | "sheet" | "document",
     readonly fileId: string,
     readonly themeSig: string,
+    /** Obsidian's `![[name]]`: `fileId` is the name, resolved before mounting. */
+    readonly wiki = false,
   ) {
     super();
   }
 
   eq(o: EmbedBlockWidget): boolean {
-    return o.kind === this.kind && o.fileId === this.fileId && o.themeSig === this.themeSig;
+    return (
+      o.kind === this.kind && o.fileId === this.fileId && o.themeSig === this.themeSig && o.wiki === this.wiki
+    );
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const container = document.createElement("div");
     container.className = "rotli-render-block rotli-render-embed";
+    const named = this.wiki
+      ? resolveWikiEmbed(
+          this.fileId,
+          rootIdOf(view.state.facet(noteIdFacet)),
+          view.state.facet(noteFolderFacet),
+        )
+      : Promise.resolve(this.fileId.trim());
+    let resolved = this.wiki ? "" : this.fileId.trim();
     container.dataset.lang = this.kind;
 
     const body = document.createElement("div");
@@ -336,20 +352,26 @@ class EmbedBlockWidget extends WidgetType {
       // resized heights survive rebuilds + restarts, per embedded file
       persistKey: this.fileId.trim(),
       onOpen: () => {
-        if (this.kind === "board") usePanesStore.getState().openCanvas(this.fileId, { newTab: true });
-        else usePanesStore.getState().openFile(this.fileId, { newTab: true });
+        if (!resolved) return;
+        if (this.kind === "board") usePanesStore.getState().openCanvas(resolved, { newTab: true });
+        else usePanesStore.getState().openFile(resolved, { newTab: true });
       },
     });
 
-    const id = this.fileId.trim();
-    if (id) {
+    if (this.fileId.trim()) {
       let cancelled = false;
-      const mount =
-        this.kind === "board"
+      const mount = named.then((id) => {
+        if (!id) {
+          body.textContent = `No single file named ${this.fileId} in this vault`;
+          return () => {};
+        }
+        resolved = id;
+        return this.kind === "board"
           ? mountBoardEmbed(body, id)
           : this.kind === "sheet"
             ? mountSheetEmbed(body, id)
             : mountDocumentEmbed(body, id);
+      });
       void mount.then((cleanup) => {
         if (cancelled) {
           cleanup();
@@ -786,6 +808,15 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     }
     const widget = new RenderBlockWidget(block.lang as StaticLangKey, code, sig, block.from, block.to);
     decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
+  }
+  // Obsidian's whole-line ![[file]] embeds mount the same live editors
+  for (const embed of scanWikiEmbeds(state.doc, fences)) {
+    if (sel.from <= embed.to && sel.to >= embed.from) continue;
+    const withheld = withheldEmbedMessage(embed.kind, LAUNCH_FEATURES, embed.target);
+    const widget = withheld
+      ? new WithheldEmbedWidget(embed.kind, withheld)
+      : new EmbedBlockWidget(embed.kind, embed.target, sig, true);
+    decos.push(Decoration.replace({ widget, block: true }).range(embed.from, embed.to));
   }
 
   return { deco: Decoration.set(decos, true), fences };

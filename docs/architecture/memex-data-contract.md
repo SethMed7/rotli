@@ -218,7 +218,9 @@ second user-visible product or storage location.
   editable support. Its complete workflow must expose user-owned output such as
   transcript, cuts, annotations, or metadata before Rotli calls it supported.
 - Markdown is the primary knowledge surface. It exclusively owns slash commands,
-  typed embed fences, wikilinks, note frontmatter, and note-native workflows.
+  typed embed fences (and Obsidian's whole-line `![[file]]` embeds, read as the
+  same live editors since 2026-10-13; grammar in `SYNTAX.md`), wikilinks, note
+  frontmatter, and note-native workflows.
   DOCX documents, sheets, and Excalidraw boards are secondary bonus work
   surfaces with conventional file behavior, not parallel note systems. Slash
   commands activate in paragraph or list-item content; list markers remain in
