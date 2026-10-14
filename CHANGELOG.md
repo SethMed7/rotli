@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AI edits in the Aa panel.** A note's Aa panel now has an **AI edits** row
+  beside Secure: **Off** keeps the words yours, **Allowed** lets chat and
+  agents rewrite the note's text. It is the same switch as "Let AI edit the
+  text" in the note's menu, and a locked note says how to unlock it.
+
 - **A copied vault is a Rotli vault, and keeps your folders yours.** Work on a
   copy now makes the copy a Rotli vault (vault format 3.9). Every folder you
   brought shows, and your own `Archive`, `Trash`, `chats`, or `storage` folder

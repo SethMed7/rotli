@@ -6,7 +6,8 @@
 //
 // - `created_by`: stamped once when a chat, an agent, or the Librarian creates
 //   a note. Absent means a person wrote it.
-// - `ai_edit`: the person's per-note grant, set only from the note's menu.
+// - `ai_edit`: the person's per-note grant, set only by them (the note's menu
+//   or the Aa panel's AI edits row).
 // A locked note refuses every AI; otherwise the grant decides, and with no
 // grant only an AI-made note is editable.
 
