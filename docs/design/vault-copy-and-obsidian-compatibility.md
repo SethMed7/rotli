@@ -99,6 +99,71 @@ Librarian learns to organize that layout instead of only `wiki/**`. The first Li
 **Suggest** (nothing moves without a person) until the person turns it up.
 After that, it follows the vault's normal setting.
 
+#### Slice 4 design (proposed 2026-10-14, for owner review)
+
+Owner decisions (2026-10-14):
+
+- **D. New notes land in a top-level `Inbox/`.** The Librarian sorts from
+  there into the person's folders, at Suggest first. A copied `Inbox/` is
+  used as that inbox.
+- **E. `_index.md` folder notes are written** in the folders the Librarian
+  organizes, the same as in a Rotli vault.
+- **F. Name collisions: the person's folders stay theirs.** A copied
+  `Archive/`, `Trash/`, `chats/`, `storage/`, or `wiki/` is an ordinary folder.
+  Rotli keeps its own under names of its own.
+
+What the code needs (sized 2026-10-14):
+
+- **A marker that says "imported", in `memex.json`.** `.rotli/` is
+  rebuildable (rotli-001), so the signal can't live in `import.json`. The
+  marker gains `"layout": "imported"` and a **role map**, written once when the
+  copy is made, for example `"folders": {"inbox": "Inbox", "archive": "Archive
+  (Rotli)", "trash": "Trash (Rotli)", "chats": "chats (Rotli)", "storage":
+  "storage (Rotli)"}`. Rotli's folders in an imported vault are always
+  suffixed, not only on a clash, so there is one code path. This is a
+  **contract bump** (3.8 → 3.9). The supported band is `[3.4, current]`, so
+  existing vaults stay read-write, and an older Rotli opens an imported vault
+  read-only instead of hiding its tree.
+- **A new layout, `Imported`.** In a Rotli vault's layout, every top-level
+  folder Rotli doesn't own is Hidden, so a marker alone would make the
+  person's whole tree vanish. `Imported` surfaces every folder. Its
+  Archive/Trash/chats/storage are the role map's folders, so a copied
+  `Archive/` is never read as Rotli's archive.
+- **The person's file names are kept.** A Rotli vault renames a note's file
+  to its title on save. In an imported vault that would break Obsidian's
+  `[[File name]]` links (law 3), so imported notes keep their file names, as
+  with a folder opened in place. Frontmatter stamps (`id`, dates) are allowed:
+  Obsidian shows them and nothing breaks. The Librarian moving a file between
+  folders keeps its name, so Obsidian's links still resolve.
+- **Size.** About 51 Rust branches on the layout, about 40 Rust name-helper
+  calls (`is_hidden_root`, `lifecycle_disk_folder`, `project_folder`, …),
+  and about 130 TS uses of Rotli's folder constants (`DEST`, `isSink`,
+  `isChats`) and their parity fixture. Rotli-vault and legacy layouts keep
+  today's constants from the same functions, with a test that pins them.
+
+Stages (one PR each, held for review):
+
+1. **4a: the imported vault.** The contract bump, the marker and role map,
+   `Imported` surfacing, names kept, and the copy marked at import with its
+   first Librarian setting at Suggest. A copied Rotli vault (one that already
+   has an `mx_` marker) stays a Rotli vault. A copied foreign `memex.json` is
+   never overwritten: that copy opens protected, and the summary says why.
+2. **4b: Rotli's folders by role.** Rust and TS read Archive, Trash, chats,
+   storage, and Inbox from the role map (the `DEST`/`isSink` sweep plus
+   parity), so decision F holds end to end.
+3. **4c: the Librarian on the imported tree.** Candidates anywhere in the
+   tree. Areas are the person's top-level folders. Classify from `Inbox/`,
+   file into areas, and write `_index.md` (decision E).
+
+Until 4b lands, an imported vault would read a copied `Archive/` as Rotli's,
+so 4a and 4b ship together or 4a stays unmerged.
+
+**Already true today, for the record:** a folder opened in place reads its
+own `Archive/` and `Trash/` as Rotli's (the name checks have no layout).
+Slice 1 stops Rotli *moving* anything there, but notes in a person's
+`Archive/` still show as archived. Decision F could apply to folders opened
+in place too, once 4b exists.
+
 ### 5. Protected originals (open in place)
 
 An adopted folder, and the source of any import, is **protected**:
