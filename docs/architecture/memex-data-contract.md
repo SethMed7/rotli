@@ -16,13 +16,20 @@ second user-visible product or storage location.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
-- **The Vault view shows the disk itself (2026-09-30).** Beside Main and the
-  named views, the view picker offers **Vault — folders as on disk**
-  (`services/vaultTree.ts`): the vault's own folders and files, folders first,
-  by name, as Finder lists them (a memex's `wiki/` is its root; Archive and
-  Trash stay in the System zone). Nothing is stored for it, and it can't be
-  arranged: it moves when the files move. Off by default, and an app setting
-  on this Mac (`vaultView`). Picking Main or a named view turns it off.
+- **Raw data shows the disk itself (2026-09-30; apart from the views since
+  2026-10-10).** The views menu lists Main and the named views, then, set
+  apart below them, **Raw data — the vault as on disk**
+  (`services/vaultTree.ts`); Settings → Appearance → Notes offers the same
+  choice. It shows the vault's own folders and files, folders first, by name,
+  as Finder lists them (a memex's `wiki/` is its root; Archive and Trash stay
+  in the System zone). It is not a view: nothing is stored for it, and it
+  can't be arranged; it moves when the files move. Off by default, and an app
+  setting on this Mac (`vaultView`). Picking a view, by pointer or ⌘⇧W, turns
+  it off. While it is on, the System zone hides its Library row: the sidebar
+  already is the Finder view the Library opens. Four ideas stay apart: the
+  **vault** is the data on disk, **views** are how you see it, **Raw data**
+  shows it as is, and the **Librarian** organizes it (a vault's name never
+  carries the Librarian's state).
 - **Both manifests are revision-gated, and a conflict is recovered quietly.**
   The app presents the revision it read with every `main.json` / `views.json`
   write; the CLI, the Librarian, and a views write that files a new item into
@@ -165,7 +172,7 @@ second user-visible product or storage location.
 - The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
-  While the Vault view is on, a note that is showing in the sidebar is left
+  While Raw data is on, a note that is showing in the sidebar is left
   where it is too, and it moves once it's out of sight. The sidebar sends
   which rows are on screen (`organizer_set_visible`), the daemon requeues
   them like a quiet note (`Skip::Visible`), and Main sends nothing, since a

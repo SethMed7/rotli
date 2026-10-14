@@ -4,7 +4,7 @@ import { isValidElement } from "react";
 
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { DocumentGlyph, FileGlyph, WordGlyph } from "./glyphs";
-import { CanvasGlyph, glyphForNote } from "./noteGlyph";
+import { CanvasGlyph, SheetGlyph, glyphForNote } from "./noteGlyph";
 
 function glyphType(title: string): unknown {
   const glyph = glyphForNote({ kind: "file", title });
@@ -17,6 +17,13 @@ describe("conventional file glyph identity", () => {
     expect(glyphType("report.docx")).toBe(WordGlyph);
     expect(glyphType("template.dotm")).toBe(WordGlyph);
     expect(glyphType("legacy.doc")).toBe(WordGlyph);
+  });
+
+  test("workbooks and delimited text wear the sheet mark, never the plain file", () => {
+    expect(glyphType("Q4 pricing model.xlsx")).toBe(SheetGlyph);
+    expect(glyphType("budget.xlsm")).toBe(SheetGlyph);
+    expect(glyphType("export.csv")).toBe(SheetGlyph);
+    expect(glyphType("export.tsv")).toBe(SheetGlyph);
   });
 
   test("non-Word document formats keep the honest generic document mark", () => {

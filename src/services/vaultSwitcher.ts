@@ -3,17 +3,10 @@
 // and active state; refresh and overflow controls stay presentation concerns.
 
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
-import type { MenuSpec } from "../state/contextMenu";
 
 export interface VaultSwitcherItem {
   instance: MemexInstance;
   active: boolean;
-}
-
-/** A vault row's label: raw vaults carry a quiet suffix; Librarian-on is the
- * default and stays unmarked (calm — only the exception is labeled). */
-export function vaultRowLabel(inst: Pick<MemexInstance, "label" | "brainEnabled">): string {
-  return inst.brainEnabled ? inst.label : `${inst.label} · raw`;
 }
 
 /** The sidebar-header vault name: the corpus instance's label, else the open
@@ -32,39 +25,34 @@ export function connectPlan(kind: "memex" | "markdown" | "empty"): "create" | "l
   return kind === "memex" ? "link" : "open";
 }
 
-/** A vault row's overflow menu. Removal is a drill-in so the destructive step
- * needs a second click, states that the folder stays on disk, and is refused
- * for the active vault (the shell's forget_root rule: switch first). */
-export function vaultOverflowItems(
-  inst: Pick<MemexInstance, "label">,
-  active: boolean,
-  on: { openLocationSettings: () => void; remove: () => void },
-): MenuSpec[] {
-  return [
-    { kind: "action", label: "Location settings…", onClick: on.openLocationSettings },
-    { kind: "sep" },
-    active
-      ? {
-          kind: "action",
-          label: "Remove from Rotli… (switch vaults first)",
-          disabled: true,
-          onClick: () => {},
-        }
-      : {
-          kind: "drill",
-          label: "Remove from Rotli…",
-          danger: true,
-          items: [
-            { kind: "action", label: `Remove ${inst.label}`, danger: true, onClick: on.remove },
-            {
-              kind: "action",
-              label: "The folder and its files stay where they are",
-              disabled: true,
-              onClick: () => {},
-            },
-          ],
-        },
-  ];
+/** What Remove from Rotli does for one row. It only disconnects: Rotli never
+ * deletes a vault's folder or files (the owner, 2026-10-10: "we never delete
+ * people's stuff ever"). Rust unbinds only a vault that is not live, so the
+ * current vault is switched away from first: to the next connected vault, or,
+ * when it is the only one, to a vault the person picks or makes right then
+ * ("it will just prompt me to add new one before I can move forward"). Until
+ * they pick one, nothing is removed. */
+export type VaultRemovePlan =
+  | { kind: "forget" }
+  | { kind: "switch"; to: MemexInstance }
+  | { kind: "replace" };
+
+export function vaultRemovePlan(items: VaultSwitcherItem[], target: VaultSwitcherItem): VaultRemovePlan {
+  if (!target.active) return { kind: "forget" };
+  const next = items.find((item) => !item.active)?.instance;
+  return next ? { kind: "switch", to: next } : { kind: "replace" };
+}
+
+/** The vault a Connect just added: in the list now, not before it. */
+export function addedVault(before: MemexInstance[], after: MemexInstance[]): MemexInstance | null {
+  const known = new Set(before.map((i) => i.id));
+  return after.find((i) => i.id !== CORPUS_INSTANCE_ID && !known.has(i.id)) ?? null;
+}
+
+/** The id the outgoing vault was given when the shell switched away from it:
+ * the switch re-registers it under a fresh route, found again by its folder. */
+export function outgoingVaultId(instances: MemexInstance[], root: string): string | null {
+  return instances.find((i) => i.id !== CORPUS_INSTANCE_ID && i.root === root)?.id ?? null;
 }
 
 /** Current vault first, then every connected switch target in config order.

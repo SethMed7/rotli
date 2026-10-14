@@ -1162,15 +1162,31 @@
    the other), clipped before it can crowd the title */
 .sb-chatmodel,
 .sb-chattime,
+/* A run's status never gives up letters to the title: the title is the one
+   that ellipsizes ("Wor…" and "D…" read as noise, the owner 2026-10-10). */
 .sb-chatstatus {
   margin-left: auto;
-  flex: 0 1 auto;
-  max-width: 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
   font-size: 10.5px;
   color: var(--text-muted);
+}
+.sb-chatstatus.running::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: cmsg-think-pulse 1.1s var(--motion-ease) infinite;
+}
+.sb-chatrow.sel .sb-chatstatus.running::before {
+  background: var(--accent-text);
+}
+.sb-chatrow .fname {
+  min-width: 0;
 }
 .sb-chatmodel ~ .sb-chatpin,
 .sb-chattime ~ .sb-chatpin,
@@ -1518,7 +1534,8 @@
 }
 .vault-menu-target,
 .vault-menu-row-action,
-.vault-menu-connect {
+.vault-menu-connect,
+.vault-panel-item {
   border: 0;
   border-radius: var(--r-inner);
   color: inherit;
@@ -1566,12 +1583,14 @@
   opacity: 0.45;
   cursor: default;
 }
-.vault-menu-separator {
+.vault-menu-separator,
+.vault-panel-sep {
   height: 1px;
   margin: 4px 8px;
   background: color-mix(in srgb, var(--text) 12%, transparent);
 }
-.vault-menu-connect {
+.vault-menu-connect,
+.vault-panel-item {
   width: 100%;
   min-height: 34px;
   display: flex;
@@ -1581,11 +1600,31 @@
   color: var(--text);
   text-align: left;
 }
-.vault-menu-connect:hover {
+.vault-menu-connect:hover,
+.vault-panel-item:hover {
   background: var(--hov);
 }
 .vault-menu-connect svg {
   color: var(--text-muted);
+}
+/* a row's own actions, in place of the rows (VaultRowPanel) */
+.vault-menu-back {
+  font-weight: 600;
+}
+.vault-menu-back > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-menu-danger {
+  color: var(--danger);
+}
+.vault-menu-note {
+  margin: 2px 10px 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 /* — the filter row pinned at the sidebar's top (filter on top, no header) — */
@@ -2711,7 +2750,7 @@
   outline: 2px solid var(--ground);
 }
 /* "update available" on the footer's Settings button — the titlebar dot's twin
-   (.tb-update-dot): a warm clay dot, never a red badge, and static (a hidden
+   (.tb-update-badge): warm clay, never a red badge, and static (a hidden
    window must not composite) */
 .sb-footbtn .sb-update-dot {
   width: 7px;
@@ -2958,25 +2997,15 @@ svg.sb-scene * {
 }
 
 /* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one
-   ink for every mark, the Word badge, the kit's clay, and the provider logos
-   (shown as masks). Color: each kind of file its own semantic color. */
-.model-logo-ink {
-  display: none;
-}
+   ink for every mark, the Word badge, and the kit's clay. Color: each kind of
+   file its own semantic color. Provider logos keep their own colors in both. */
 .sidebar[data-icons="neutral"] {
   --format-word: currentColor;
   --on-format-word: var(--ground);
+  --format-sheet: currentColor;
+  --on-format-sheet: var(--ground);
   --icon-clay: currentColor;
   --icon-olive: currentColor;
-}
-.sidebar[data-icons="neutral"] .model-logo-color {
-  display: none;
-}
-.sidebar[data-icons="neutral"] .model-logo-ink {
-  display: inline-block;
-  background: currentColor;
-  -webkit-mask: var(--logo) center / contain no-repeat;
-  mask: var(--logo) center / contain no-repeat;
 }
 .sidebar[data-icons="color"] .kind-board,
 .sidebar[data-icons="color"] .kind-folder {

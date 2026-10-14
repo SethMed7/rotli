@@ -374,16 +374,18 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     setViewInputError(null);
   };
 
+  // picking a view, by pointer or ⌘⇧W's number, also leaves Raw
+  const showView = (name: string | null) => {
+    setVaultOn(false);
+    setActiveView(name);
+  };
   const viewMenuItems = (numbered: boolean) =>
     viewPickerItems(
       viewsManifest,
       activeView,
       viewsWritable,
       {
-        show: (name) => {
-          setVaultOn(false);
-          setActiveView(name);
-        },
+        show: showView,
         create: () => {
           setEditingView("create");
           setViewInputError(null);
@@ -404,7 +406,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       },
     );
   // the view menu by pointer, and numbered for ⌘⇧W; ⌘⇧S numbers the root notes
-  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, setActiveView);
+  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, showView);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -1097,7 +1099,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
           <ViewSectionHeader
-            current={vaultOn ? "Vault" : (activeView ?? "Main")}
+            current={vaultOn ? "Raw data" : (activeView ?? "Main")}
             viewRef={viewsButtonRef}
             onPickView={openViewMenu}
             tour
@@ -1255,6 +1257,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         rowProps={rowProps}
         zoom={zoom}
         here={hereRow}
+        showLibrary={!vaultOn}
       />
     </>
   );

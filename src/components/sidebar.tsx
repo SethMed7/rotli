@@ -17,8 +17,7 @@ import { dispatch } from "../keys/registry";
 import { isWebVault } from "../lib/browserVault";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
-import { type MemexInstance } from "../memex/config";
-import { initMemexAsCorpus, pickVaultFolder } from "../memex/service";
+import { initMemexAsCorpus, loadConfig as loadMemexConfig, pickVaultFolder } from "../memex/service";
 import {
   useChooseFolder,
   useConnectBrain,
@@ -33,8 +32,10 @@ import { openExistingFolder } from "../services/vaultImport";
 import {
   connectPlan,
   vaultDisplayName,
-  vaultOverflowItems,
-  vaultRowLabel,
+  addedVault,
+  outgoingVaultId,
+  vaultRemovePlan,
+  type VaultSwitcherItem,
   vaultSwitcherItems,
 } from "../services/vaultSwitcher";
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
@@ -56,6 +57,7 @@ import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
+import { VaultRowPanel } from "./sidebar/vaultRowPanel";
 
 /** Collapse-all glyph — two chevrons folding toward the center ("fold the tree
  * up"). Inline like RestoreGlyph; same 1.7 stroke / 24-viewBox family. */
@@ -115,19 +117,28 @@ export function Sidebar() {
   const vaultMenuRef = useRef<HTMLDivElement>(null);
   const [vaultMenuPosition, setVaultMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const [refreshingVaultId, setRefreshingVaultId] = useState<string | null>(null);
-  useTransientPopover([vaultTriggerRef, vaultMenuRef], !!vaultMenuPosition, () => setVaultMenuPosition(null));
+  // the row whose own actions the menu shows in place of the rows (VaultRowPanel)
+  const [vaultRowOpen, setVaultRowOpen] = useState<VaultSwitcherItem | null>(null);
+  const closeVaultMenu = () => {
+    setVaultMenuPosition(null);
+    setVaultRowOpen(null);
+  };
+  useTransientPopover([vaultTriggerRef, vaultMenuRef], !!vaultMenuPosition, closeVaultMenu);
 
   const vaultErr = (verb: string) => (err: unknown) =>
     setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
 
-  const connectVault = async () => {
+  /** True once a folder was picked and connected; false when the picker was
+   * dismissed (or, on Rotli Web, handed to the browser's own dialog). */
+  const connectVault = async (title = "Connect a vault, or make a new folder for one"): Promise<boolean> => {
     if (isWebVault()) {
       // Rotli Web: say what is about to happen, then the browser's own picker
       useWebVaultConnect.getState().show();
-      return;
+      return false;
     }
-    const path = await pickVaultFolder("Connect a vault, or make a new folder for one");
-    if (path) await connectPath(path);
+    const path = await pickVaultFolder(title);
+    if (!path) return false;
+    return connectPath(path);
   };
 
   /** A picked folder (or one a folder window hands over) becomes a vault:
@@ -177,7 +188,7 @@ export function Sidebar() {
 
   const openVaultMenu = (e: MouseEvent<HTMLButtonElement>) => {
     if (vaultMenuPosition) {
-      setVaultMenuPosition(null);
+      closeVaultMenu();
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();
@@ -188,28 +199,26 @@ export function Sidebar() {
     });
   };
 
-  // Per-row overflow: Location settings, and the same "Remove from Rotli"
-  // that lives in Settings → Location. Removal only disconnects — the folder
-  // and its files stay where they are — and the active vault refuses (Rust's
-  // forget_root rule), so switch first.
-  const openVaultOverflow = (
-    event: MouseEvent<HTMLButtonElement>,
-    instance: MemexInstance,
-    active: boolean,
-  ) => {
-    event.stopPropagation();
-    const trigger = event.currentTarget;
-    const rect = trigger.getBoundingClientRect();
-    setVaultMenuPosition(null);
-    openContextMenu(
-      Math.max(8, rect.right - 202),
-      rect.bottom + 4,
-      vaultOverflowItems(instance, active, {
-        openLocationSettings: () => dispatch("app.settings"),
-        remove: () => void forgetBrainMut.mutateAsync(instance.id).catch(vaultErr("remove the vault")),
-      }),
-      { returnFocus: () => vaultTriggerRef.current?.focus() },
-    );
+  // Remove from Rotli only disconnects; the folder and its files stay. The
+  // current vault goes too: switch to the next one first (Rust unbinds only a
+  // vault that is not live), then forget it under the id the switch gave it.
+  const removeVault = async (item: VaultSwitcherItem) => {
+    const plan = vaultRemovePlan(vaultItems, item);
+    if (plan.kind === "forget") {
+      await forgetBrainMut.mutateAsync(item.instance.id);
+      return;
+    }
+    let to = plan.kind === "switch" ? plan.to : null;
+    if (plan.kind === "replace") {
+      // the only vault: pick or make the next one first; dismissed = nothing removed
+      const before = (await loadMemexConfig()).instances;
+      if (!(await connectVault(`Choose a vault to use instead of ${item.instance.label}`))) return;
+      to = addedVault(before, (await loadMemexConfig()).instances);
+    }
+    // a new folder or a plain one opens live on its own; a linked vault is switched to
+    if (to) await switchVaultMut.mutateAsync(to.id);
+    const outgoing = outgoingVaultId((await loadMemexConfig()).instances, item.instance.root);
+    if (outgoing) await forgetBrainMut.mutateAsync(outgoing);
   };
 
   // — the front follows the focused tab (2026-08-01). Every navigation reveal —
@@ -293,81 +302,110 @@ export function Sidebar() {
               aria-label="Vaults"
               style={{ left: vaultMenuPosition.left, top: vaultMenuPosition.top }}
             >
-              <div className="vault-menu-rows">
-                {vaultItems.map(({ instance, active }) => {
-                  const label = vaultRowLabel(instance);
-                  const refreshing = refreshingVaultId === instance.id;
-                  return (
-                    <div key={instance.id} className={active ? "vault-menu-row active" : "vault-menu-row"}>
-                      <button
-                        type="button"
-                        className="vault-menu-target"
-                        role="menuitem"
-                        aria-current={active ? "true" : undefined}
-                        onClick={() => {
-                          setVaultMenuPosition(null);
-                          if (!active)
-                            void switchVaultMut.mutateAsync(instance.id).catch(vaultErr("switch vaults"));
-                        }}
-                      >
-                        <VaultGlyph size={15} />
-                        <span>{label}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="vault-menu-row-action"
-                        role="menuitem"
-                        aria-label={`Refresh ${label}`}
-                        title={`Refresh ${label}`}
-                        disabled={!!refreshingVaultId}
-                        onClick={() =>
-                          void refreshVault(instance.id, active).catch(vaultErr("refresh the vault"))
-                        }
-                      >
-                        <RefreshGlyph size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        className="vault-menu-row-action"
-                        role="menuitem"
-                        aria-label={`More options for ${label}`}
-                        title={`More options for ${label}`}
-                        onClick={(event) => openVaultOverflow(event, instance, active)}
-                      >
-                        <MoreGlyph size={16} />
-                      </button>
-                      {refreshing && <span className="sr-only">Refreshing</span>}
-                    </div>
-                  );
-                })}
-              </div>
-              {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
-              {isWebVault() && (
-                <button
-                  type="button"
-                  className="vault-menu-connect"
-                  role="menuitem"
-                  onClick={() => {
-                    setVaultMenuPosition(null);
-                    useWebVaultConnect.getState().show();
+              {vaultRowOpen ? (
+                <VaultRowPanel
+                  label={vaultRowOpen.instance.label}
+                  plan={vaultRemovePlan(vaultItems, vaultRowOpen)}
+                  onBack={() => setVaultRowOpen(null)}
+                  onLocationSettings={() => {
+                    closeVaultMenu();
+                    dispatch("app.settings");
                   }}
-                >
-                  <NewFolderGlyph size={15} />
-                  <span>Change vault…</span>
-                </button>
+                  onRemove={() => {
+                    const item = vaultRowOpen;
+                    closeVaultMenu();
+                    void removeVault(item).catch(vaultErr("remove the vault"));
+                  }}
+                />
+              ) : (
+                <>
+                  <div className="vault-menu-rows">
+                    {vaultItems.map((item) => {
+                      const { instance, active } = item;
+                      // the folder's name only: whether the Librarian organizes
+                      // a vault is the Librarian's setting, not the vault's name
+                      // (the owner, 2026-10-10)
+                      const label = instance.label;
+                      const refreshing = refreshingVaultId === instance.id;
+                      return (
+                        <div
+                          key={instance.id}
+                          className={active ? "vault-menu-row active" : "vault-menu-row"}
+                        >
+                          <button
+                            type="button"
+                            className="vault-menu-target"
+                            role="menuitem"
+                            aria-current={active ? "true" : undefined}
+                            onClick={() => {
+                              closeVaultMenu();
+                              if (!active)
+                                void switchVaultMut.mutateAsync(instance.id).catch(vaultErr("switch vaults"));
+                            }}
+                          >
+                            <VaultGlyph size={15} />
+                            <span>{label}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="vault-menu-row-action"
+                            role="menuitem"
+                            aria-label={`Refresh ${label}`}
+                            title={`Refresh ${label}`}
+                            disabled={!!refreshingVaultId}
+                            onClick={() =>
+                              void refreshVault(instance.id, active).catch(vaultErr("refresh the vault"))
+                            }
+                          >
+                            <RefreshGlyph size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="vault-menu-row-action"
+                            role="menuitem"
+                            aria-label={`More options for ${label}`}
+                            title={`More options for ${label}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setVaultRowOpen(item);
+                            }}
+                          >
+                            <MoreGlyph size={16} />
+                          </button>
+                          {refreshing && <span className="sr-only">Refreshing</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
+                  {isWebVault() && (
+                    <button
+                      type="button"
+                      className="vault-menu-connect"
+                      role="menuitem"
+                      onClick={() => {
+                        closeVaultMenu();
+                        useWebVaultConnect.getState().show();
+                      }}
+                    >
+                      <NewFolderGlyph size={15} />
+                      <span>Change vault…</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="vault-menu-connect"
+                    role="menuitem"
+                    onClick={() => {
+                      closeVaultMenu();
+                      void connectVault().catch(vaultErr("connect the vault"));
+                    }}
+                  >
+                    <NewFolderGlyph size={15} />
+                    <span>Connect vault</span>
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                className="vault-menu-connect"
-                role="menuitem"
-                onClick={() => {
-                  setVaultMenuPosition(null);
-                  void connectVault().catch(vaultErr("connect the vault"));
-                }}
-              >
-                <NewFolderGlyph size={15} />
-                <span>Connect vault</span>
-              </button>
             </div>,
             document.body,
           )}

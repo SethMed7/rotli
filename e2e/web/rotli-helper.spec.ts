@@ -310,10 +310,18 @@ test("the chat buddy thinks while a reply runs and is happy when it lands", asyn
   await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "thoughtful");
   // one buddy for the thread, never one per message
   await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
+  // and one working indicator: the status rides beside the buddy, never a
+  // second dotted line above it or "thinking…" in the composer (2026-10-10)
+  await expect(edge.locator(".chat-live-status")).toBeVisible();
+  await expect(page.locator(".chat-thread .cmsg-think")).toHaveCount(0);
+  await expect(page.getByPlaceholder("Write your next message…")).toBeVisible();
+  // the chat row's Claude mark keeps its color under the default Neutral icons
+  await expect(page.locator(".sidebar .sb-chatmark img.model-logo").first()).toBeVisible();
 
   release();
   await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
   await expect(edge).toHaveAttribute("data-moment", "done");
+  await expect(edge.locator(".chat-live-status")).toHaveCount(0);
   await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "celebrating");
   await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
 });

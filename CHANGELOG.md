@@ -146,6 +146,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The footer's sign-up works with browser agents (an experiment).** In
   browsers that support WebMCP (Chrome, with a trial or a flag), an AI agent
   can fill in your address for you; you still send it yourself.
+- **Update checks go through rotli.co.** The Mac app asks rotli.co first,
+  with its version in the address, and rotli.co passes it to the signed feed
+  on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
+  traffic count Macs per version, with no identifier or personal data; the
+  privacy page and PRIVACY.md say so.
+- **Model logos are in color in chat.** Claude, Gemini, Gemma, and Qwen
+  chats show their own colored marks in the sidebar, including with Neutral
+  sidebar icons, and the model button under the message box shows the
+  picked model's logo instead of a cloud or laptop (hovering still says
+  whether the chat leaves your Mac).
+- **A reply in progress shows in one place.** The quokka and what it is
+  doing ("reading the shelves…", "searching notes…") now sit together on
+  one line at the end of the chat, instead of a dotted line, a separate
+  quokka, and "thinking…" in the message box. The message box keeps saying
+  "Write your next message…" while you wait. In the sidebar, Working and
+  Done always read in full, with a soft dot beside Working; a long chat
+  title is shortened instead.
+- **Raw data sits apart from your views.** The vault's folders as they are
+  on disk are no longer listed as one more view. The views menu now offers
+  **Raw data — the vault as on disk** below your views, set apart, and
+  Settings → Appearance → Notes switches between Views and Raw data. Picking
+  any view, by pointer or ⌘⇧W, leaves Raw data (⌘⇧W didn't before). In Raw
+  data the System area's Library steps aside, since the sidebar already shows
+  the vault's folders. Vault names no longer carry "· raw" for a vault with
+  the Librarian off: the Librarian organizes a vault, it isn't part of its
+  name.
+- **A vault row's options open inside the vault menu.** "…" on a vault now
+  shows that vault's options in place, with Back, instead of closing the menu
+  and opening a second one over the notes.
+- **You can remove the vault you're in.** Remove from Rotli now works on the
+  current vault: Rotli switches to your next vault first, or, if it's your
+  only vault, asks you to choose or make the one to use instead (close the
+  picker and nothing changes). It only disconnects the vault; the folder and
+  its files stay where they are, and Rotli never deletes them.
+- **Sheets look like sheets.** Workbooks and CSV/TSV files now wear a green
+  grid mark in the sidebar, tabs, and file lists, beside the Word mark for
+  documents, instead of the plain file icon that made them easy to miss.
+- **A new version is hard to miss.** When an update is ready, the Settings
+  button at the top of the window wears a clay badge with an up arrow, and a
+  short note drops down from it: "Rotli 1.9.0 is ready to install", with
+  Update… (opens Settings, where the install is) and Later. Later closes the
+  note for this launch; the badge stays until you update.
 
 ### Added
 

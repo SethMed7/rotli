@@ -136,6 +136,7 @@ export function ModelPicker({
   const flatKey = flatItems.map((m) => `${m.provider}:${m.id}`).join("\u0000");
 
   const pickedKind: ModelKind = picked ? kindOf(picked) : "local";
+  const pickedMark = picked && pickedKind !== "preset" ? chatMark(picked.provider, picked.label) : null;
   const triggerTitle = fallbackFrom
     ? `Saved model “${shortModelLabel(fallbackFrom)}” is unavailable. Using ${picked ? shortModelLabel(picked.label) : "the local default"}.`
     : pickedKind === "connected"
@@ -214,7 +215,11 @@ export function ModelPicker({
           }
         }}
       >
-        <span className="chat-modelrow-ico">{modelKindGlyph(pickedKind)}</span>
+        {/* the picked model's own mark, as in the list and the sidebar; where it
+            runs (on this Mac or not) stays in the title */}
+        <span className="chat-modelrow-ico">
+          {pickedMark?.logo ? <ModelLogo logo={pickedMark.logo} /> : modelKindGlyph(pickedKind)}
+        </span>
         <span className="chat-model-trigger-name">
           {picked ? shortModelLabel(picked.label) : "Pick a model"}
         </span>

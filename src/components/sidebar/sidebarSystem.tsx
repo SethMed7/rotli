@@ -32,6 +32,7 @@ export function SidebarSystem({
   rowProps,
   zoom,
   here = null,
+  showLibrary = true,
 }: {
   open: boolean;
   brainCount: number;
@@ -44,6 +45,9 @@ export function SidebarSystem({
   zoom: number;
   /** The row the open note lives under when Main doesn't hold it. */
   here?: string | null;
+  /** Off in Raw: the sidebar already shows the vault's folders, so the
+   * Library's Finder view would only repeat them (the owner, 2026-10-10). */
+  showLibrary?: boolean;
 }) {
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const contentView = useUiStore((s) => s.contentView);
@@ -67,22 +71,24 @@ export function SidebarSystem({
 
       {open && (
         <>
-          <button
-            type="button"
-            className={`frow${(contentView === "system" && systemRoot === "Brain") || here === "Brain" ? " sel" : ""}`}
-            aria-current={here === "Brain" ? "location" : undefined}
-            onClick={() => openSystemRoot("Brain")}
-            title={
-              brainEnabled
-                ? "The Library — where the Librarian files everything"
-                : "The Library — plain folders in this raw vault"
-            }
-            {...rowProps({ id: "Brain", kind: "folder" })}
-          >
-            <NotesStackGlyph size={14.5} />
-            <span className="fname">Library</span>
-            {brainCount > 0 && <span className="count">{brainCount}</span>}
-          </button>
+          {showLibrary && (
+            <button
+              type="button"
+              className={`frow${(contentView === "system" && systemRoot === "Brain") || here === "Brain" ? " sel" : ""}`}
+              aria-current={here === "Brain" ? "location" : undefined}
+              onClick={() => openSystemRoot("Brain")}
+              title={
+                brainEnabled
+                  ? "The Library — where the Librarian files everything"
+                  : "The Library — your vault's folders, to browse like Finder"
+              }
+              {...rowProps({ id: "Brain", kind: "folder" })}
+            >
+              <NotesStackGlyph size={14.5} />
+              <span className="fname">Library</span>
+              {brainCount > 0 && <span className="count">{brainCount}</span>}
+            </button>
+          )}
           {destRows.map(({ id, label, Glyph }) => {
             const destNotes = notesByDest[id] ?? [];
             const selected = (contentView === "system" && systemRoot === id) || here === id;

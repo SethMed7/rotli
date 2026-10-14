@@ -129,6 +129,7 @@ import {
   type TimeFormat,
   useUiStore,
 } from "../state/ui";
+import { useVaultView } from "../state/vaultView";
 import { AntigravitySetup } from "./antigravitySetup";
 import { type CharacterName, QuokkaMark } from "./character";
 import {
@@ -1072,6 +1073,8 @@ function AppearancePane() {
   const sidebarSide = useUiStore((s) => s.sidebarSide);
   const setSidebarSide = useUiStore((s) => s.setSidebarSide);
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
+  const rawData = useVaultView((s) => s.on);
+  const setRawData = useVaultView((s) => s.setOn);
   const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const boardBackground = useUiStore((s) => s.boardBackground);
@@ -1194,6 +1197,17 @@ function AppearancePane() {
           ["hover", "On hover"],
         ]}
         onPick={setSidebarReveal}
+      />
+      {/* the same choice as Raw data in the views menu: Views shows Main and
+          your views; Raw data, the vault's folders as they are on disk */}
+      <SegField
+        label="Notes"
+        value={rawData ? "raw" : "views"}
+        options={[
+          ["views", "Views"],
+          ["raw", "Raw data"],
+        ]}
+        onPick={(value) => setRawData(value === "raw")}
       />
       <SidebarLookSettings />
 

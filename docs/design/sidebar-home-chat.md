@@ -45,7 +45,11 @@ Now the sidebar has **one top switcher and one body**:
   lane · recency-sorted chat folders · every chat, then the footer.
   Since 2026-08-03 the front carries live signals and organization:
   - **Run signals** — a chat is labeled Working while answering, New when a
-    reply lands elsewhere, and Done once acknowledged. The Activity lane stays
+    reply lands elsewhere, and Done once acknowledged. The label never
+    truncates (the title gives way), and Working carries a soft pulsing dot.
+    In the chat itself the working state is one row at the live edge: the
+    buddy with the run's status beside it (`ChatLiveEdge`), never a second
+    indicator in the composer. The Activity lane stays
     at the top for the session, clearly separated from virtual folders.
     State lives in `src/state/chatRuns.ts`, session-only — the transcript on
     disk is the durable truth. Navigating away no longer cancels a queued
@@ -373,10 +377,12 @@ uses their own color".
   64px). Still, never animated (ROTLI_DESIGN#2), `pointer-events: none`, under
   the rows through `isolation` on `.sidebar`, faded by a linear mask.
 - **Icons** (`data-icons` on `.sidebar`; Icons: Neutral · Color, default
-  Neutral). Neutral gives every mark one ink: the Word badge, the kit's clay,
-  and the color provider logos (drawn as masks, `model-logo-ink`). Color gives
-  each row's kind its semantic color (`iconKind`, `kind-*`): boards and
-  folders the accent, PDFs `--danger`, images `--success`, documents and SVGs
-  `--syntax-blue`; Word and the provider logos keep their own.
+  Neutral). Neutral gives every mark one ink: the Word badge and the kit's
+  clay. Color gives each row's kind its semantic color (`iconKind`, `kind-*`):
+  boards and folders the accent, PDFs `--danger`, images `--success`,
+  documents and SVGs `--syntax-blue`; Word keeps its own. Provider logos keep
+  their own colors under both (the owner, 2026-10-10: in one ink every model
+  looked alike); a vendor's mark only says who answers, so Rotli never
+  recolors it.
 - Both live in the app settings on this Mac (`sidebarLook`, `state/appExtras.ts`).
   Proof: `src/lib/sidebarLook.test.ts`, `e2e/sidebar-look.spec.ts`.

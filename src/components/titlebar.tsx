@@ -9,7 +9,7 @@
 // both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Keybindings —
 // they just no longer have a home in the bar.
 
-import type { MouseEvent } from "react";
+import { type MouseEvent, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
@@ -36,6 +36,7 @@ import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { Palette } from "./palette";
 import { PinButtons } from "./pinnedSites/pinButtons";
+import { UpdateBadge, UpdateNote } from "./settings/updateNote";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (the maintainer, 2026-06-15). */
@@ -65,6 +66,7 @@ export function Titlebar() {
   const navBack = useNavHistory(canBack);
   const navForward = useNavHistory(canForward);
   const updateAvailable = useUiStore((s) => s.updateAvailable);
+  const updateBadgeRef = useRef<HTMLSpanElement>(null);
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const sidebarMode = useUiStore((s) => s.sidebarMode);
   const breveActive = sidebarMode === "breve";
@@ -263,8 +265,9 @@ export function Titlebar() {
           onClick={() => dispatch("app.settings")}
         >
           <Icon name="rotli-settings" size={TB_ICON} />
-          {updateAvailable && <span className="tb-update-dot" aria-hidden="true" />}
+          {updateAvailable && <UpdateBadge badgeRef={updateBadgeRef} />}
         </IconButton>
+        <UpdateNote anchorRef={updateBadgeRef} />
       </div>
     </header>
   );
