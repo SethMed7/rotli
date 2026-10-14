@@ -56,6 +56,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
 export const COMPONENT_ROOT_FILE_OWNERS = {
   "backToNotes.tsx": "shared back-to-panes control for full-content views",
   "surfaceSearch.tsx": "shared search field for full-content views (Tasks, Captures)",
+  "vaultImportDialog.tsx": "vault import: the copy-or-in-place choice, the copy's progress, and its result",
   "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
   "webDialogFrame.tsx":
     "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
@@ -126,6 +127,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
   "vaultRepair.ts": "native vault repair passes (secure intake, leftover note names)",
+  "finderBridge.ts":
+    "native commands for what arrives from outside a vault (folder windows, the Quick Action, vault copies)",
   "useNow.ts": "shared React wall-clock subscription for presentation projections",
 } as const;
 
@@ -173,6 +176,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
+  "vaultImport.ts": "vault import (work on a copy: ask, copy with progress, open the copy)",
   "connectorSetup.ts": "chat",
   "connectedModels.ts": "chat (the connected clients' own model lists)",
   "helperLink.ts": "chat",

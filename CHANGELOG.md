@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Bring a vault in as a copy.** Opening an Obsidian vault or a folder of
+  notes now asks first: **Work on a copy** (recommended) or **Open in place**.
+  A copy goes into a new folder beside your vaults, with progress and a Cancel
+  button. Rotli checks every file against the original before opening it, and
+  the original is only ever read, never changed. Linked items it can't follow
+  are named, never skipped silently.
+
 - **Drop an Excalidraw board onto Rotli and it opens, ready to edit.** A
   `.excalidraw` file dragged onto the window (from Finder, or exported from
   excalidraw.com) is copied into your vault's boards, added to Main, and

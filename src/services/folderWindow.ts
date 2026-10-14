@@ -8,14 +8,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { corpusListRoot, folderWindowAddAsVault } from "../lib/finderBridge";
 import { onAddVault, onNativeCloseTab, onOpenNotice } from "../lib/hostEvents";
-import {
-  type CorpusListPayload,
-  corpusListRoot,
-  folderWindowAddAsVault,
-  startWindowDrag,
-  toggleMaximize,
-} from "../lib/tauri";
+import { type CorpusListPayload, startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { RAW_ROOT_PREFIX } from "../state/paneVaults";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { FsNotesService } from "./fsNotes";

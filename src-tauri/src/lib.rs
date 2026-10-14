@@ -29,6 +29,7 @@ mod deep_link;
 mod open_requests;
 mod folder_window;
 mod finder_quick_action;
+mod vault_import;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
@@ -1264,68 +1265,19 @@ async fn corpus_inspect_folder(app: AppHandle, path: String) -> Result<VaultInsp
     .map_err(|e| format!("vault inspection worker failed ({e})"))?
 }
 
-fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
-    let source = std::fs::canonicalize(source).map_err(|e| format!("open source: {e}"))?;
-    let destination =
-        std::fs::canonicalize(destination).map_err(|e| format!("open destination: {e}"))?;
-    if source == destination || destination.starts_with(&source) || source.starts_with(&destination)
-    {
-        return Err("Choose a separate destination outside the source vault.".into());
-    }
-    let has_entries = std::fs::read_dir(&destination)
-        .map_err(|e| e.to_string())?
-        .filter_map(Result::ok)
-        .any(|entry| entry.file_name().to_str() != Some(".DS_Store"));
-    if has_entries {
-        return Err("Import a copy into an empty folder.".into());
-    }
-    let mut stack = vec![(source.clone(), destination.clone())];
-    while let Some((from, to)) = stack.pop() {
-        std::fs::create_dir_all(&to).map_err(|e| format!("create {}: {e}", to.display()))?;
-        for entry in
-            std::fs::read_dir(&from).map_err(|e| format!("read {}: {e}", from.display()))?
-        {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let name = entry.file_name();
-            if name.to_str() == Some(".rotli") {
-                continue;
-            }
-            let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() || (kind.is_dir() && corpus::is_skipped_dir(&name.to_string_lossy())) {
-                continue;
-            }
-            let target = to.join(&name);
-            if kind.is_dir() {
-                stack.push((entry.path(), target));
-            } else if kind.is_file() {
-                std::fs::copy(entry.path(), &target)
-                    .map_err(|e| format!("copy {}: {e}", entry.path().display()))?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod vault_activation_tests {
-    use super::{copy_vault_tree, inspect_vault_path};
+    use super::inspect_vault_path;
 
     #[test]
-    fn inspection_is_read_only_and_copy_preserves_the_foreign_tree() {
+    fn inspection_is_read_only() {
         let temp = tempfile::TempDir::new().unwrap();
         let source = temp.path().join("obsidian");
-        let destination = temp.path().join("copy");
         std::fs::create_dir_all(source.join("Projects/Nested")).unwrap();
         std::fs::create_dir_all(source.join(".obsidian")).unwrap();
-        std::fs::create_dir_all(source.join(".rotli")).unwrap();
-        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
         std::fs::write(source.join("Projects/Nested/plan.md"), "# Plan\n").unwrap();
         std::fs::write(source.join(".obsidian/app.json"), "{}").unwrap();
-        std::fs::write(source.join(".rotli/main.json"), "old rotli state").unwrap();
-
-        std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
-        std::fs::create_dir_all(source.join(".git/objects")).unwrap();
-        std::fs::write(source.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
         std::fs::write(source.join("Projects/node_modules/dep/README.md"), "# Dep\n").unwrap();
 
         let report = inspect_vault_path(&source).unwrap();
@@ -1336,60 +1288,7 @@ mod vault_activation_tests {
             std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(),
             "# Plan\n"
         );
-
-        copy_vault_tree(&source, &destination).unwrap();
-        assert_eq!(
-            std::fs::read_to_string(destination.join("Projects/Nested/plan.md")).unwrap(),
-            "# Plan\n"
-        );
-        assert!(destination.join(".obsidian/app.json").is_file());
-        assert!(!destination.join("Projects/node_modules").exists(), "dependency folders never copy");
-        assert!(!destination.join(".git").exists(), "history folders never copy");
-        assert!(
-            !destination.join(".rotli").exists(),
-            "source-specific Rotli state must not copy"
-        );
     }
-
-    #[test]
-    fn copy_refuses_a_nonempty_destination_before_writing() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let source = temp.path().join("source");
-        let destination = temp.path().join("destination");
-        std::fs::create_dir_all(&source).unwrap();
-        std::fs::create_dir_all(&destination).unwrap();
-        std::fs::write(source.join("note.md"), "# Note\n").unwrap();
-        std::fs::write(destination.join("keep.md"), "# Keep\n").unwrap();
-
-        assert!(copy_vault_tree(&source, &destination).is_err());
-        assert_eq!(
-            std::fs::read_to_string(destination.join("keep.md")).unwrap(),
-            "# Keep\n"
-        );
-        assert!(!destination.join("note.md").exists());
-    }
-}
-
-#[tauri::command]
-async fn corpus_import_vault_copy(
-    app: AppHandle,
-    source: String,
-    destination: String,
-) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let _lane = vault_lane();
-        let authorizations = app.state::<memex::FolderAuthorizations>();
-        let source = authorizations.require(std::path::Path::new(&source))?;
-        let destination = authorizations.require(std::path::Path::new(&destination))?;
-        reject_privileged_root(&app, &source)?;
-        reject_privileged_root(&app, &destination)?;
-        flush_webviews_before_shutdown(&app)?;
-        let inspection = inspect_vault_path(&source)?;
-        copy_vault_tree(&source, &destination)?;
-        activate_vault_path_live(&app, destination, inspection.kind != "memex").map(|_| ())
-    })
-    .await
-    .map_err(|e| format!("vault import worker failed ({e})"))?
 }
 
 /// Read-only first-run gate. Unlike `corpus_list_config`, this never migrates,
@@ -2236,6 +2135,7 @@ pub fn run() {
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
+        .manage(vault_import::VaultCopyCancel::default())
         .manage(provider::ProviderState::default())
         .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
@@ -2274,7 +2174,8 @@ pub fn run() {
             corpus_list_config,
             corpus_status,
             corpus_inspect_folder,
-            corpus_import_vault_copy,
+            vault_import::corpus_copy_vault,
+            vault_import::corpus_copy_vault_cancel,
             corpus_refresh_active_vault,
             corpus_refresh_vault,
             corpus_choose_folder,

@@ -1,8 +1,9 @@
 # Bringing an existing vault into Rotli: work on a copy, stay Obsidian-readable
 
-Status: **accepted direction, not yet built** (2026-10-13). The owner decided
-A, B, and C below the same day. Nothing here is built yet beyond what "Today"
-describes.
+Status: **accepted direction; slices 1, 1b, 3, and 5 built** (2026-10-13).
+The owner decided A, B, and C below the same day. Slice 4 (a Rotli vault
+from the copy, with the Librarian) is next. Until it lands, a copy opens
+protected, like a folder opened in place.
 
 ## The law
 
@@ -175,7 +176,23 @@ An adopted folder, and the source of any import, is **protected**:
 2. The compatibility audit script, plus a run over the owner's vaults
    (read-only report).
 3. The copy flow: choice screen, copy with progress, verification, and
-   `import.json`. This wires the existing command.
+   `import.json`. **Built** (`src-tauri/src/vault_import.rs`,
+   `src/components/vaultImportDialog.tsx`):
+   - Setup's folder step, the sidebar's Connect, and a folder window's Add as
+     vault ask *Work on a copy (recommended)* or *Open in place* for a
+     Markdown/Obsidian folder. A Rotli vault and an empty folder never ask.
+   - Rotli plans the copy, then copies into `<name> (Rotli)` beside the
+     person's vaults (the folder picker's start; ` 2`, ` 3`… on a clash).
+     Progress shows files and MB.
+   - **Cancel** takes no vault lock and stops between files. A folder Rotli
+     made goes whole; a picked empty folder keeps itself.
+   - **Verify** compares every path and size, and the content of every
+     Markdown file, against the plan. A mismatch opens nothing and leaves
+     both folders.
+   - `.rotli/import.json` records the source, time, counts, and the linked
+     items not followed. It survives opening the copy.
+   - The copy then opens, protected, until slice 4.
+   - The old unused `corpus_import_vault_copy` is replaced.
 4. Organize-the-copy: a Rotli vault from the copy, Librarian at Suggest first.
 5. Obsidian-readable images and embeds (owner decisions 2026-10-13: images as
    standard Markdown paths relative to the note; `/sheet`, `/board`,

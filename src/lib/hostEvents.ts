@@ -49,6 +49,20 @@ export function onAddVault(cb: (path: string) => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** Rust → main window: "Work on a copy" progress (throttled). */
+export interface VaultCopyProgress {
+  files: number;
+  totalFiles: number;
+  bytes: number;
+  totalBytes: number;
+}
+
+export function onVaultCopyProgress(cb: (progress: VaultCopyProgress) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listenHere<VaultCopyProgress>("rotli:vault-copy-progress", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** macOS File → Close Tab. ⌘W intentionally stays in the frontend registry so
  * it closes during the original key event instead of taking a native event
  * round trip; pointer selection of the menu item still forwards here. */

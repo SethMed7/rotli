@@ -148,10 +148,10 @@ folder (`CorpusStore::open_raw_folder`, `src-tauri/src/folder_window.rs`).
   handshake), then closes and unmounts. The sidecar stays in the app cache.
 - **Add as vault** authorizes the folder like a picked one and hands it to
   main's ordinary connect flow: an empty folder becomes a new vault, a Rotli
-  vault is connected, and anything else opens in place. **Work on a copy**
-  arrives with the copy-flow slice of
-  [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md);
-  its Rust side exists, but no screen offers it yet.
+  vault is connected, and a folder of notes asks **Work on a copy
+  (recommended)** or **Open in place**
+  ([`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md),
+  slice 3).
 - Finder registration: a `public.folder` association (rank `Alternate`) is in
   `bundle.fileAssociations`. A debug bundle's Info.plist carries it
   (`LSItemContentTypes = public.folder`, `LSHandlerRank = Alternate`), so a

@@ -3,7 +3,7 @@
 
 import { isTauri } from "../lib/tauri";
 
-export { finderQuickActionSet, finderQuickActionStatus, type QuickActionStatus } from "../lib/tauri";
+export { finderQuickActionSet, finderQuickActionStatus, type QuickActionStatus } from "../lib/finderBridge";
 
 /** Only the Mac app can add a Quick Action (a browser preview has no shell). */
 export function quickActionAvailable(): boolean {

@@ -48,6 +48,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:native-drag` | R→W | A native drag is hovering (physical pointer, item count) or has left; the editor under the pointer draws its drop line. A pathless drag that promises a file or carries image bytes (the macOS screenshot thumbnail, a browser image) counts as one item so the line still draws. |
 | `rotli:native-drop-authorized` | R→W | The host issued one-shot import grants for a native drop and reports the paths plus drop position. A file promise resolves after the drop, so this can arrive a moment later, always with the ORIGINAL drop position. |
 | `rotli:native-drop-refused` | R→W | A native drop delivered nothing that could be granted (folders, files gone mid-drag, a drag with no path, promise, or image bytes); the webview shows a notice instead of doing nothing. |
+| `rotli:vault-copy-progress` | R→W | "Work on a copy": files and bytes copied so far (throttled), for the import dialog's progress. |
 | `rotli:add-vault` | R→W | A folder window's "Add as vault": the folder (authorized by Rust, read from the window's own mount) runs main's ordinary connect flow. |
 | `rotli:open-notice` | R→W | Something Finder handed Rotli couldn't open, or a folder window couldn't save before closing; the window says so instead of doing nothing. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |

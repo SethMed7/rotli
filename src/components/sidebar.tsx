@@ -29,6 +29,7 @@ import {
 import { openNewItemMenu } from "../newItems/menu";
 import { onFolderAddedAsVault } from "../services/folderWindow";
 import { mainFolderIds, mainFoldersOpenByDefault, mainTreeSize } from "../services/mainTree";
+import { openExistingFolder } from "../services/vaultImport";
 import {
   connectPlan,
   vaultDisplayName,
@@ -130,17 +131,22 @@ export function Sidebar() {
   };
 
   /** A picked folder (or one a folder window hands over) becomes a vault:
-   * made fresh when empty, linked when it's a vault, else opened in place. */
+   * made fresh when empty, linked when it's a vault; a folder of someone's
+   * notes asks first — a copy Rotli makes, or the folder in place. */
   const connectPath = async (path: string) => {
-    const plan = connectPlan((await corpusInspectFolder(path)).kind);
+    const inspection = await corpusInspectFolder(path);
+    const plan = connectPlan(inspection.kind);
     if (plan === "create") {
       await initMemexAsCorpus(path);
       await activateCreatedVault();
     } else if (plan === "link") {
       await connectBrainMut.mutateAsync(path);
     } else {
-      await flushSettingsNow();
-      await chooseFolderMut.mutateAsync(path);
+      // a folder of someone's notes: a copy Rotli makes, or the folder in place
+      await openExistingFolder(path, inspection, async () => {
+        await flushSettingsNow();
+        await chooseFolderMut.mutateAsync(path);
+      });
     }
   };
 
