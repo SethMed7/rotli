@@ -68,12 +68,6 @@ fn mount_and_show(app: &AppHandle, path: &Path) -> Result<(), String> {
 /// The close button: save what's typing first, then close. A failed save
 /// keeps the window open and says why in it.
 pub(crate) fn close(app: &AppHandle, label: &str) {
-    close_then(app, label, |_| {});
-}
-
-/// Save the window's typing, close it, then run `after` — off the main thread,
-/// and one save handshake at a time (main's own switch flushes next).
-fn close_then(app: &AppHandle, label: &str, after: impl FnOnce(&AppHandle) + Send + 'static) {
     let app = app.clone();
     let label = label.to_string();
     std::thread::spawn(move || {
@@ -84,7 +78,6 @@ fn close_then(app: &AppHandle, label: &str, after: impl FnOnce(&AppHandle) + Sen
         if let Some(window) = app.get_webview_window(&label) {
             let _ = window.destroy();
         }
-        after(&app);
     });
 }
 
@@ -94,8 +87,8 @@ pub(crate) fn unmount(app: &AppHandle, label: &str) {
 }
 
 /// "Add as vault": the window's own label names the folder, so the webview
-/// never names a path. The folder is authorized like a picked one; once this
-/// window has saved and closed, main runs the ordinary connect flow with it.
+/// never names a path. The folder is authorized like a picked one and handed
+/// to main, which asks how to open it and closes this window once it has.
 #[tauri::command]
 pub(crate) fn folder_window_add_as_vault(window: tauri::WebviewWindow) -> Result<(), String> {
     let app = window.app_handle();
@@ -108,11 +101,22 @@ pub(crate) fn folder_window_add_as_vault(window: tauri::WebviewWindow) -> Result
         }
     })?;
     let path = app.state::<crate::memex::FolderAuthorizations>().authorize(&dir)?;
-    // this window saves and closes FIRST; only then does main start its switch
-    // (which runs its own save handshake), so the two never overlap
-    close_then(app, &label, move |app| {
-        let _ = app.emit_to("main", "rotli:add-vault", path.to_string_lossy().into_owned());
-        crate::show_main(app);
-    });
+    // main asks how to open it (a copy, or in place); this window stays until a
+    // vault actually opens, so "not now" leaves it where it was
+    let payload = serde_json::json!({ "path": path.to_string_lossy(), "window": label });
+    app.emit_to("main", "rotli:add-vault", payload).map_err(|e| e.to_string())?;
+    crate::show_main(app);
+    Ok(())
+}
+
+/// Main closes a folder window once its folder has opened as a vault (after
+/// main's own switch, so the two save handshakes never overlap). Only ever a
+/// folder window; anything else is refused.
+#[tauri::command]
+pub(crate) fn folder_window_close(app: AppHandle, label: String) -> Result<(), String> {
+    if !is_folder_window(&label) {
+        return Err("not a folder window".into());
+    }
+    close(&app, &label);
     Ok(())
 }

@@ -44,11 +44,7 @@ export function FolderShell() {
     () =>
       attachFolderShell({
         closeTab: () => dispatch("tabs.close"),
-        // a save that failed on close keeps the window: Add as vault can retry
-        notice: (message) => {
-          setAdding(false);
-          useUiStore.getState().setRowActionError(message);
-        },
+        notice: (message) => useUiStore.getState().setRowActionError(message),
       }),
     [],
   );
@@ -57,12 +53,15 @@ export function FolderShell() {
     if (adding) return;
     setAdding(true);
     setRowActionError(null);
-    addFolderAsVault().catch((cause: unknown) => {
-      setAdding(false);
-      setRowActionError(
-        `Couldn’t add this folder — ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    });
+    // main asks how to open it, and closes this window once a vault opened
+    addFolderAsVault()
+      .then(() => setAdding(false))
+      .catch((cause: unknown) => {
+        setAdding(false);
+        setRowActionError(
+          `Couldn’t add this folder — ${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      });
   };
 
   return (
