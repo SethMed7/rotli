@@ -2,7 +2,9 @@
 // it thinks). Every lane is offered with what this Mac has for it (the owner,
 // 2026-10-02: "check what is available; if they have nothing they still
 // choose"), and a lane that isn't ready yet is finished later from the
-// sidebar's Librarian.
+// sidebar's Librarian. In a folder connected in place the Librarian is only
+// ever offered on a copy (decision H): choosing it copies the folder, and the
+// copy opens with the Librarian on.
 
 import { useEffect } from "react";
 
@@ -17,14 +19,28 @@ import {
   suggestedLibrarian,
 } from "../../ai/librarianLane";
 import { providerCatalog } from "../../ai/models";
+import { useMemexConfig } from "../../memex/useMemex";
 import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
 import { setLibrarianOn } from "../../services/librarianSwitch";
+import { copyAndOpen } from "../../services/vaultImport";
 import { settleLibrarianChoice, useSetupDetection } from "../../state/setupDetection";
 import { useUiStore } from "../../state/ui";
+import { WhyCopy } from "../whyCopy";
 import { LIBRARIAN_ON_DESCRIPTION, SetupChoiceGroup } from "./setupControls";
 
+/** The "on" choice in a folder connected in place: a copy, never the original. */
+export function librarianCopyChoice(label: string) {
+  return {
+    value: "on" as const,
+    title: "Use the Librarian on a copy",
+    description: `Rotli copies “${label}” beside your vaults, and the Librarian organizes the copy. Your original is never touched.`,
+  };
+}
+
 export function LibrarianScreen() {
-  const brainEnabled = useUiStore((state) => state.brainEnabled);
+  const config = useMemexConfig().data;
+  const inPlace = config?.openedInPlace ? config.currentFolder : null;
+  const librarianOn = useUiStore((state) => state.brainEnabled) && !inPlace;
   const organizerModel = useUiStore((state) => state.organizerModel);
   const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
   // detection began on the first screen; by now the answers are usually in
@@ -50,14 +66,19 @@ export function LibrarianScreen() {
       </p>
       <SetupChoiceGroup
         label="Librarian"
-        value={brainEnabled ? "on" : "off"}
-        onChange={(choice) => setLibrarianOn(choice === "on")}
+        value={librarianOn ? "on" : "off"}
+        onChange={(choice) => {
+          if (choice === "on" && inPlace) void copyAndOpen(inPlace.root, inPlace.label);
+          else setLibrarianOn(choice === "on");
+        }}
         options={[
-          {
-            value: "on",
-            title: "Use the Librarian",
-            description: LIBRARIAN_ON_DESCRIPTION,
-          },
+          inPlace
+            ? librarianCopyChoice(inPlace.label)
+            : {
+                value: "on",
+                title: "Use the Librarian",
+                description: LIBRARIAN_ON_DESCRIPTION,
+              },
           {
             value: "off",
             title: "Not now",
@@ -65,7 +86,8 @@ export function LibrarianScreen() {
           },
         ]}
       />
-      {brainEnabled && <LibrarianModel />}
+      {inPlace && <WhyCopy />}
+      {librarianOn && <LibrarianModel />}
       <p className="setup-local-note">
         Models for chat come the first time you open Chat. Everything else is in Settings → AI Models.
       </p>

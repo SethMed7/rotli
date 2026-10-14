@@ -949,7 +949,37 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   into a folder with any `memex.json`, a Rotli backup, or a marker still in a
   sweep folder, even when the heal before it failed. Folder inspection
   reports a recoverable vault as a vault. Plain Markdown and Obsidian folders
-  never get a marker.
+  never get a marker, except a copy Rotli made of one (below).
+- **An imported vault: contract 3.9** (2026-10-14). *Work on a copy* marks the
+  verified copy with a new `mx_` marker that says `"layout": "imported"` and
+  names Rotli's own folders in a role map, written once:
+  `"folders": {"inbox": "Inbox", "archive": "Archive (Rotli)", "trash":
+  "Trash (Rotli)", "chats": "chats (Rotli)", "storage": "storage (Rotli)"}`
+  (`src-tauri/src/vault_roles.rs`; TS twin `IMPORTED_FOLDER_ROLES` in
+  `src/services/destinations.ts`, pinned by `parity.json`). Rotli's folders
+  are always suffixed, so a copied `Archive/`, `Trash/`, `chats/`, `storage/`,
+  or `wiki/` is the person's ordinary folder; new notes and captures land in a
+  top-level `Inbox/`, and a copied `Inbox/` is used as it. An unusable or
+  colliding role entry falls back to the default, never to the person's
+  folder. The layout (`Layout::Imported`, `src-tauri/src/corpus_layout.rs`)
+  surfaces every top-level folder read-write except the root control files;
+  Rotli's storage folder keeps a Rotli vault's rules (binaries read-only,
+  `excalidraw/` writable). Ids are disk paths, with one projection: a note in
+  the inbox on the capture shelf reads under Captures. Notes keep their file
+  names on save and move, so Obsidian's `[[File name]]` links resolve; a
+  secure flag stays on the note where it is. Empty Trash reaches only Rotli's
+  trash. The copy's Librarian switch is on, at Suggest (the switch is the
+  vault's own, never carried from the previous vault). A folder connected in
+  place is the opposite: its Librarian switch is always off
+  (`CorpusRefView.brainEnabled` false, `adopted` true), and the only way to
+  the Librarian is such a copy. The Librarian, the
+  Library, and the memex note lanes stay off there until they learn the
+  layout, so the webview sees it as a plain vault with a role map
+  (`CorpusRefView.folderRoles`). A copied Rotli vault keeps its own marker and
+  layout; a copied `memex.json` that isn't Rotli's is never overwritten, so
+  that copy opens protected, in place. The band is `[3.4, 3.9]`: every
+  existing vault stays read-write. An older Rotli reads a 3.9 marker as out of
+  band and opens the vault read-only, in its Rotli-vault layout.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
   an empty folder, links an existing vault as a switch target, and opens any
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the

@@ -24,14 +24,19 @@ export function folderWindowAddAsVault(): Promise<void> {
   return invoke<void>("folder_window_add_as_vault");
 }
 
-/** What "Work on a copy" made (src-tauri/src/vault_import.rs). */
+/** What "Connect a copy with the Librarian" made (src-tauri/src/vault_import.rs). */
 export interface VaultCopyReport {
   destination: string;
   files: number;
   bytes: number;
   /** Linked items (symlinks) that were not followed, by path. */
   skipped: string[];
+  /** What the copy became: an imported vault, the Rotli vault it already was,
+   * or — its `memex.json` belongs to another tool — a protected folder. */
+  marked: VaultCopyMarked;
 }
+
+export type VaultCopyMarked = "imported" | "alreadyRotli" | "foreign";
 
 /** Copy a picked vault into a new `<name> (Rotli)` folder beside the person's
  * vaults (or a picked empty `destination`), verify it, and open the copy. The

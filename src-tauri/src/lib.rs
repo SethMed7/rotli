@@ -59,6 +59,7 @@ mod private_browser;
 mod private_browser_media;
 mod quick_window;
 mod vault_marker;
+mod vault_roles;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
@@ -1110,6 +1111,11 @@ struct CorpusView {
     /// The vault's Librarian switch (display fact for the switcher/Location —
     /// read from the root's own settings sidecar, never stored in corpus.json).
     brain_enabled: bool,
+    /// An imported vault's own folders by role (vault_roles.rs); null otherwise.
+    folder_roles: Option<vault_roles::FolderRoles>,
+    /// A folder opened in place (protected): the Librarian never organizes it,
+    /// so Settings offers a copy instead.
+    adopted: bool,
 }
 
 /// A connected brain + per-root display facts the config file never stores.
@@ -1308,14 +1314,19 @@ fn corpus_status(app: AppHandle) -> bool {
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
     let development_read_only = development_read_only(&app);
+    // An imported vault is not a memex to the webview: its notes go through the
+    // corpus store, never the memex note lanes (wiki/_inbox), and its Library
+    // and Librarian stay off until they learn its layout (slice 4c).
+    let folder_roles = vault_roles::read(&cfg.corpus.abs_path);
     let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
-        Some((id, p)) => (true, Some(id), Some(p)),
-        None => (false, None, None),
+        Some((id, p)) if folder_roles.is_none() => (true, Some(id), Some(p)),
+        _ => (false, None, None),
     };
     if development_read_only {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
-    let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
+    // a folder connected in place is never organized: its switch reads off
+    let corpus_brain_enabled = !cfg.corpus.adopted && root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
@@ -1323,6 +1334,8 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             memex_id,
             perms,
             brain_enabled: corpus_brain_enabled,
+            folder_roles,
+            adopted: cfg.corpus.adopted,
         },
         brains: cfg
             .brains

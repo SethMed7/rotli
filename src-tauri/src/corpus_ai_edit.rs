@@ -71,7 +71,7 @@ impl CorpusStore {
         if !rel.to_ascii_lowercase().ends_with(".md") {
             return Err("agents trash Markdown notes only".into());
         }
-        let trash = lifecycle_disk_folder(self.layout, "Trash");
+        let trash = lifecycle_disk_folder(self.layout, self.layout.trash_id());
         self.writable(&rel)?;
         self.writable(&trash)?;
         let path = self.abs(&rel);

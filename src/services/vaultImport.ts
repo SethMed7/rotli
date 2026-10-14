@@ -1,7 +1,10 @@
-// "Work on a copy" (docs/design/vault-copy-and-obsidian-compatibility.md,
-// slice 3). Opening a folder that already holds notes asks first: a copy Rotli
-// makes and opens (recommended; the original is only ever read), or the
-// folder itself, in place and protected. Callers keep their own in-place path.
+// "Connect a copy with the Librarian" (docs/design/vault-copy-and-obsidian-
+// compatibility.md). The copy only matters for the Librarian — the one thing
+// that moves and renames notes, and never in a person's original. So setup
+// just connects a folder in place; adding a vault later confirms: connect the
+// folder in place, or connect a copy Rotli makes with the Librarian on. A
+// folder already open in place can ask for that copy from Settings → Librarian.
+// Callers keep their own in-place path.
 
 import { corpusCopyVault, corpusCopyVaultCancel } from "../lib/finderBridge";
 import { onVaultCopyProgress } from "../lib/hostEvents";
@@ -35,7 +38,8 @@ export async function openExistingFolder(
   return copyAndOpen(path, inspection.label);
 }
 
-async function copyAndOpen(path: string, label: string): Promise<boolean> {
+/** Copy `path` and open the copy with the Librarian on, at Suggest. */
+export async function copyAndOpen(path: string, label: string): Promise<boolean> {
   const { set } = useVaultImport.getState();
   set({ kind: "copying", label, files: 0, totalFiles: 0, bytes: 0, totalBytes: 0 });
   const stop = onVaultCopyProgress((progress) => {

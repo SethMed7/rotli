@@ -27,8 +27,6 @@ export const BOARD_LANE = "storage/excalidraw";
  * (parity.json `emptyBoardScene`). */
 export const EMPTY_BOARD_FILE = JSON.stringify(EMPTY_SCENE);
 
-const RESERVED = new Set<string>(Object.values(DEST));
-
 export function isBoardPath(path: string): boolean {
   return path.endsWith(BOARD_EXT);
 }
@@ -58,7 +56,8 @@ export function boardHome(folderId: string, isMemex: boolean): string {
   const local = normalizeVaultPath(folderId.slice(folderId.indexOf(":") + 1));
   const under = (root: string) => local === root || local.startsWith(`${root}/`);
   if (isMemex) return under("wiki") || under("chats") || under(BOARD_LANE) ? local : BOARD_LANE;
-  return RESERVED.has(folderId) ? "" : local;
+  // read per call: an imported vault's reserved rows are its role folders
+  return Object.values(DEST).includes(folderId) ? "" : local;
 }
 
 /** Boards collide as "name-2.excalidraw" (Rust `free_name`), not "name (2)". */

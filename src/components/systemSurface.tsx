@@ -75,13 +75,15 @@ import { NoteListRow } from "./noteListRow";
 import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
-/** Root id → the browser's title + the prefix its folder labels strip. */
-const ROOTS: Record<string, { title: string; prefix: string }> = {
+/** Root id → the browser's title + the prefix its folder labels strip. The
+ * ids (and so the prefixes) are the active vault's: an imported vault's
+ * sinks are Rotli's own folders, never the person's `Archive/`. */
+const systemRoots = (): Record<string, { title: string; prefix: string }> => ({
   Brain: { title: "Library", prefix: "wiki" },
-  [DEST.storage]: { title: "Assets", prefix: "Storage" },
-  [DEST.archive]: { title: "Archive", prefix: "Archive" },
-  [DEST.trash]: { title: "Trash", prefix: "Trash" },
-};
+  [DEST.storage]: { title: "Assets", prefix: DEST.storage },
+  [DEST.archive]: { title: "Archive", prefix: DEST.archive },
+  [DEST.trash]: { title: "Trash", prefix: DEST.trash },
+});
 
 // per-root session memory — the surface unmounts on every content-view
 // switch, and a Finder that forgets its view or its place feels broken
@@ -153,7 +155,7 @@ function ItemTile({ n, selected, handlers }: { n: NoteSummary; selected: boolean
 }
 
 export function SystemSurface({ rootId }: { rootId: string }) {
-  const root = ROOTS[rootId] ?? { title: rootId, prefix: rootId };
+  const root = systemRoots()[rootId] ?? { title: rootId, prefix: rootId };
   const isLibrary = rootId === "Brain";
   const isTrash = rootId === DEST.trash;
   // Empty Trash (2026-07-31): whole-root count (not just the cwd listing) +

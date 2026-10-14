@@ -1,6 +1,13 @@
 // Rotli-owned DOCX/XLSX creation and pristine-draft cleanup over a connected
 // vault. The registry is session-only: an old file can never become disposable.
-import { baseName, bytesRevision, joinVaultPath, vaultIsMemex, type VaultDir } from "./vaultDir";
+import {
+  baseName,
+  bytesRevision,
+  joinVaultPath,
+  vaultFolderRoles,
+  vaultIsMemex,
+  type VaultDir,
+} from "./vaultDir";
 
 export const MANAGED_MEMEX_LANE = "storage/rotli";
 export const MANAGED_PLAIN_LANE = "Storage";
@@ -20,7 +27,13 @@ function validManagedName(name: string): void {
 /** Create-only at every candidate, including after another tab wins a race. */
 export async function createManagedFile(dir: VaultDir, name: string, bytes: Uint8Array): Promise<string> {
   validManagedName(name);
-  const folder = (await vaultIsMemex(dir)) ? MANAGED_MEMEX_LANE : MANAGED_PLAIN_LANE;
+  // an imported vault keeps Rotli's files in its own storage folder (Rust `create_managed_file`)
+  const roles = await vaultFolderRoles(dir);
+  const folder = roles
+    ? `${roles.storage}/rotli`
+    : (await vaultIsMemex(dir))
+      ? MANAGED_MEMEX_LANE
+      : MANAGED_PLAIN_LANE;
   await dir.mkdir(folder);
   const dot = name.lastIndexOf(".");
   const stem = name.slice(0, dot);

@@ -16,6 +16,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::corpus;
+use crate::vault_roles::Marked;
 
 /// Set by Cancel; read between files. Never takes the vault lane, so it can
 /// always stop the copy holding it.
@@ -232,6 +233,9 @@ pub(crate) struct CopyReport {
     files: usize,
     bytes: u64,
     skipped: Vec<String>,
+    /// What the copy became: an imported vault, the Rotli vault it already
+    /// was, or (a foreign `memex.json`) a protected folder opened in place.
+    marked: Marked,
 }
 
 /// "Work on a copy": copy `source` (a folder picked in Rotli's picker) into
@@ -304,10 +308,8 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
     }
     let record = record(&source, &destination, &plan)?;
     crate::flush_webviews_before_shutdown(app)?;
-    // the person's settings follow them into the copy, as with any switch
-    if corpus::is_configured(app) {
-        corpus::carry_settings(&corpus::resolve_corpus(app), &destination)?;
-    }
+    let previous = corpus::is_configured(app).then(|| corpus::resolve_corpus(app));
+    let marked = make_vault(&destination, previous.as_deref())?;
     let memex = crate::memex::detect_folder(&destination).kind == "memex";
     crate::activate_vault_path_live(app, destination.clone(), !memex)?;
     Ok(CopyReport {
@@ -315,7 +317,25 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
         files: record.files,
         bytes: record.bytes,
         skipped: record.skipped,
+        marked,
     })
+}
+
+/// Turn a verified copy into the vault it opens as (slice 4): mark it
+/// imported, carry the person's settings over as with any switch, then turn
+/// its Librarian on at Suggest — the person made this copy for the Librarian,
+/// and the switch is decided per vault, never inherited. A copied Rotli vault
+/// stays one, and
+/// a foreign `memex.json` is never overwritten — that copy opens protected.
+pub(crate) fn make_vault(destination: &Path, previous: Option<&Path>) -> Result<Marked, String> {
+    let marked = crate::vault_roles::mark_imported(destination)?;
+    if let Some(previous) = previous {
+        corpus::carry_settings(previous, destination)?;
+    }
+    if marked == Marked::Imported {
+        crate::vault_roles::seed_librarian(destination)?;
+    }
+    Ok(marked)
 }
 
 #[cfg(test)]

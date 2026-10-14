@@ -3,13 +3,17 @@
 // document. Heading levels live on the format bar. One row is about the NOTE
 // rather than its look: Secure (the owner, 2026-09-18: "in the Aa area I need a
 // toggle … and a little note of the hotkey"). It is a real frontmatter change
-// through keys/noteProtectionActions, the same path the chord takes.
+// through keys/noteProtectionActions, the same path the chord takes. Beside it,
+// whether AI may edit this note's text (the owner, 2026-10-14): the same
+// `ai_edit` grant as the note menu's "Let AI edit the text"; Rust owns the verdict.
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { formatChord } from "../keys/chords";
 import { TOGGLE_SECURE_ACTION, toggleNoteSecure } from "../keys/noteProtectionActions";
 import { currentChord } from "../keys/registry";
+import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import { corpusSetAiEdit } from "../lib/noteProtection";
 import { useTransientPopover } from "../lib/popover";
 import { corpusFrontmatter, isTauri } from "../lib/tauri";
 import {
@@ -21,6 +25,22 @@ import {
   useNoteStyleStore,
 } from "../state/noteStyle";
 import { useUiStore } from "../state/ui";
+
+/** The AI-edits row's hint for the note's verdict (pure; the tests read it). */
+export function aiEditHint(verdict: AiBodyEdit | null): string {
+  switch (verdict) {
+    case "locked":
+      return "This note is locked, so no AI may edit it. Unlock it from the note’s menu first.";
+    case "allowed":
+      return "Chat and agents may rewrite this note’s text. Turn it off to keep the words yours.";
+    case "person-written":
+      return "You wrote this note, so AI may not rewrite its text unless you allow it.";
+    case "revoked":
+      return "AI may not rewrite this note’s text. It can still read the note.";
+    default:
+      return "Whether chat and agents may rewrite this note’s text.";
+  }
+}
 
 const MEASURES: { id: Measure; label: string }[] = [
   { id: "narrow", label: "Narrow" },
@@ -50,10 +70,16 @@ export function AaPanel({
   // is a Mac-app feature: the web has no frontmatter writer, so no dead switch.
   const [secure, setSecure] = useState<boolean | null>(null);
   const [secureErr, setSecureErr] = useState<string | null>(null);
+  const [aiEdit, setAiEdit] = useState<AiBodyEdit | null>(null);
+  const [aiEditErr, setAiEditErr] = useState<string | null>(null);
   useEffect(() => {
     if (!isTauri()) return;
     let live = true;
-    void corpusFrontmatter(noteId).then((fm) => live && setSecure(!!fm?.secure));
+    void corpusFrontmatter(noteId).then((fm) => {
+      if (!live) return;
+      setSecure(!!fm?.secure);
+      setAiEdit(fm?.aiBodyEdit ?? null);
+    });
     return () => {
       live = false;
     };
@@ -65,6 +91,19 @@ export function AaPanel({
     toggleNoteSecure(noteId).then(setSecure, (error: unknown) =>
       setSecureErr(error instanceof Error ? error.message : String(error)),
     );
+  };
+
+  const aiMayEdit = aiEdit === "allowed";
+  const pickAiEdit = (want: boolean) => {
+    if (aiEdit === null || aiEdit === "locked" || aiMayEdit === want) return;
+    setAiEditErr(null);
+    // re-read after the write: Rust's verdict, not a guess
+    corpusSetAiEdit(noteId, want)
+      .then(() => corpusFrontmatter(noteId))
+      .then(
+        (fm) => setAiEdit(fm?.aiBodyEdit ?? null),
+        (error: unknown) => setAiEditErr(error instanceof Error ? error.message : String(error)),
+      );
   };
 
   return (
@@ -168,6 +207,28 @@ export function AaPanel({
           <div className="aahint">
             {secureErr ?? "A secure note is never sent to remote AI. On-device models can still read it."}
           </div>
+          <div className="aalabel">AI edits · this note</div>
+          <div className="aarow" role="group" aria-label="AI edits">
+            <button
+              type="button"
+              className={aiEdit !== null && !aiMayEdit ? "aaseg sel" : "aaseg"}
+              aria-pressed={aiEdit !== null && !aiMayEdit}
+              disabled={aiEdit === null || aiEdit === "locked"}
+              onClick={() => pickAiEdit(false)}
+            >
+              Off
+            </button>
+            <button
+              type="button"
+              className={aiMayEdit ? "aaseg sel" : "aaseg"}
+              aria-pressed={aiMayEdit}
+              disabled={aiEdit === null || aiEdit === "locked"}
+              onClick={() => pickAiEdit(true)}
+            >
+              Allowed
+            </button>
+          </div>
+          <div className="aahint">{aiEditErr ?? aiEditHint(aiEdit)}</div>
         </>
       )}
       <div className="aanote">

@@ -58,14 +58,38 @@ protected, like a folder opened in place.
 
 ### 1. Detect
 
-When the chosen folder already holds notes (`inspect_vault_path` says Obsidian
-vault, ZenNotes vault, or Markdown folder), setup and the switcher show one
-choice instead of opening it straight away:
+The copy matters only for the Librarian: it is the one thing that moves and
+renames notes, and it never runs on a person's original (decision G). A
+folder connected in place is already safe without it. So the question is
+asked by stage, when the chosen folder already holds notes
+(`inspect_vault_path` says Obsidian vault, ZenNotes vault, or Markdown
+folder):
 
-- **Work on a copy (recommended).** "Rotli makes its own copy and organizes
-  that. Your vault stays exactly as it is."
-- **Open in place, as it is.** "Rotli reads and edits these notes where they
-  are, and never reorganizes them." This is the protected mode (step 5).
+- **Setup** just connects it in place. The Librarian is setup's own later
+  step; there, in a folder connected in place, its only "on" choice is
+  **Use the Librarian on a copy**, which copies the folder and opens the copy
+  with the Librarian on.
+- **Adding a vault** (the switcher's Connect, a folder window's Add as vault)
+  confirms right after the pick, because by now the person knows the
+  Librarian:
+  - **Connect.** "Rotli opens these notes where they are. You read and edit
+    them as usual; nothing is moved or renamed, and the Librarian stays off
+    here." This is the protected mode (step 5).
+  - **Connect a copy with the Librarian.** "Rotli copies the folder beside
+    your vaults, and the Librarian organizes the copy, suggesting each change
+    first. Your original stays exactly as it is."
+- **A folder already connected in place** offers the same copy from
+  Settings → Librarian, in place of the Librarian's controls.
+- **No way around it (decision H).** The Librarian is never on for a folder
+  connected in place: the switch reads off and refuses on in the webview
+  (`services/librarianSwitch.ts`), Rust reports it off
+  (`corpus_list_config`), and the organizer never models such a folder
+  (`organizer_adopted_tests.rs`). An empty folder becomes a fresh Rotli
+  vault, so it needs no copy.
+- Every copy offer carries a closed **Why a copy?** disclosure
+  (`components/whyCopy.tsx`): the Librarian moves and renames notes, so it
+  only ever organizes a copy Rotli made, and the original is never moved,
+  renamed, edited, or deleted by Rotli.
 
 ### 2. Copy
 
@@ -98,6 +122,108 @@ keep their folders, Obsidian settings that name paths keep working, and the
 Librarian learns to organize that layout instead of only `wiki/**`. The first Librarian pass on an import runs at
 **Suggest** (nothing moves without a person) until the person turns it up.
 After that, it follows the vault's normal setting.
+
+#### Slice 4 design (proposed 2026-10-14, for owner review)
+
+Owner decisions (2026-10-14):
+
+- **D. New notes land in a top-level `Inbox/`.** The Librarian sorts from
+  there into the person's folders, at Suggest first. A copied `Inbox/` is
+  used as that inbox.
+- **E. `_index.md` folder notes are written** in the folders the Librarian
+  organizes, the same as in a Rotli vault.
+- **F. Name collisions: the person's folders stay theirs.** A copied
+  `Archive/`, `Trash/`, `chats/`, `storage/`, or `wiki/` is an ordinary folder.
+  Rotli keeps its own under names of its own.
+
+What the code needs (sized 2026-10-14):
+
+- **A marker that says "imported", in `memex.json`.** `.rotli/` is
+  rebuildable (rotli-001), so the signal can't live in `import.json`. The
+  marker gains `"layout": "imported"` and a **role map**, written once when the
+  copy is made, for example `"folders": {"inbox": "Inbox", "archive": "Archive
+  (Rotli)", "trash": "Trash (Rotli)", "chats": "chats (Rotli)", "storage":
+  "storage (Rotli)"}`. Rotli's folders in an imported vault are always
+  suffixed, not only on a clash, so there is one code path. This is a
+  **contract bump** (3.8 → 3.9). The supported band is `[3.4, current]`, so
+  existing vaults stay read-write, and an older Rotli opens an imported vault
+  read-only instead of hiding its tree.
+- **A new layout, `Imported`.** In a Rotli vault's layout, every top-level
+  folder Rotli doesn't own is Hidden, so a marker alone would make the
+  person's whole tree vanish. `Imported` surfaces every folder. Its
+  Archive/Trash/chats/storage are the role map's folders, so a copied
+  `Archive/` is never read as Rotli's archive.
+- **The person's file names are kept.** A Rotli vault renames a note's file
+  to its title on save. In an imported vault that would break Obsidian's
+  `[[File name]]` links (law 3), so imported notes keep their file names, as
+  with a folder opened in place. Frontmatter stamps (`id`, dates) are allowed:
+  Obsidian shows them and nothing breaks. The Librarian moving a file between
+  folders keeps its name, so Obsidian's links still resolve.
+- **Size.** About 51 Rust branches on the layout, about 40 Rust name-helper
+  calls (`is_hidden_root`, `lifecycle_disk_folder`, `project_folder`, …),
+  and about 130 TS uses of Rotli's folder constants (`DEST`, `isSink`,
+  `isChats`) and their parity fixture. Rotli-vault and legacy layouts keep
+  today's constants from the same functions, with a test that pins them.
+
+Stages (one PR each, held for review):
+
+1. **4a: the imported vault.** The contract bump, the marker and role map,
+   `Imported` surfacing, names kept, and the copy marked at import with its
+   first Librarian setting at Suggest. A copied Rotli vault (one that already
+   has an `mx_` marker) stays a Rotli vault. A copied foreign `memex.json` is
+   never overwritten: that copy opens protected, and the summary says why.
+2. **4b: Rotli's folders by role.** Rust and TS read Archive, Trash, chats,
+   storage, and Inbox from the role map (the `DEST`/`isSink` sweep plus
+   parity), so decision F holds end to end.
+3. **4c: the Librarian on the imported tree.** Candidates anywhere in the
+   tree. Areas are the person's top-level folders. Classify from `Inbox/`,
+   file into areas, and write `_index.md` (decision E).
+
+Until 4b lands, an imported vault would read a copied `Archive/` as Rotli's,
+so 4a and 4b ship together or 4a stays unmerged.
+
+**4a + 4b built (2026-10-14, one PR, in review).** As specified, with these
+choices made while building (contract: `docs/architecture/memex-data-contract.md`):
+
+- The role map has five roles (inbox, archive, trash, chats, storage). A
+  secure flag in an imported vault stays on the note where it is, as in a
+  folder opened in place, so no secure folder is needed; a capture lands in
+  `Inbox/` with the capture shelf and reads under Captures.
+- Ids in an imported vault are disk paths, so Rotli's sinks are
+  `Archive (Rotli)` and `Trash (Rotli)` end to end (Rust, the webview's
+  `DEST`, and Rotli Web).
+- Names are kept for every note in an imported vault, the ones Rotli creates
+  there included, on save and on move (a move into Trash too).
+- The webview sees an imported vault as a plain vault with a role map, not a
+  memex: its notes go through the corpus store, never the memex note lane
+  (`wiki/_inbox`), and the Library and Librarian stay off until 4c. Chat
+  transcripts are not saved into an imported vault yet, the same as the
+  protected copy before it; the chat lane (`chats (Rotli)`) is wired in Rust
+  for when they are.
+- Empty Trash in an imported vault reaches only `Trash (Rotli)`, never the
+  person's `Trash/`.
+- **Decision G, built with it (owner, 2026-10-14):** setup connects a folder
+  of notes in place without asking; adding a vault confirms *Connect* or
+  *Connect a copy with the Librarian*; Settings → Librarian in a folder
+  connected in place offers that copy instead of the Librarian's controls.
+  The copy's Librarian is **on, at Suggest**: the switch belongs to each
+  vault and is never carried from the previous one (it was, in the first
+  cut). Until 4c the Librarian still stands down on the imported tree.
+- **Decision H, built with it (owner, 2026-10-14):** setup's Librarian step
+  offers only *Use the Librarian on a copy* in a folder connected in place,
+  and the switch is held off there on every surface (see step 1). Found
+  while building: setup never mounted the copy dialog, so slice 3's setup
+  question could never be answered there; setup now mounts it for the
+  Librarian step's copy.
+- Correction to the earlier sizing note: an older Rotli opens a 3.9 vault
+  read-only *in its Rotli-vault layout*, which hides the person's tree. It
+  cannot lose notes there, but it does not show them.
+
+**Already true today, for the record:** a folder opened in place reads its
+own `Archive/` and `Trash/` as Rotli's (the name checks have no layout).
+Slice 1 stops Rotli *moving* anything there, but notes in a person's
+`Archive/` still show as archived. Decision F could apply to folders opened
+in place too, once 4b exists.
 
 ### 5. Protected originals (open in place)
 
@@ -237,4 +363,18 @@ An adopted folder, and the source of any import, is **protected**:
   `.rotli/`.
 - **C. Existing users get one offer.** Folders already adopted in place become
   protected automatically, and after the update Rotli offers *Work on a copy*
-  once, dismissibly. Nothing happens unless the person accepts.
+  once, dismissibly. Nothing happens unless the person accepts. *Amended by G
+  (2026-10-14): the offer lives in Settings → Librarian instead of a one-time
+  prompt, since only someone who wants the Librarian needs it.*
+- **G. The copy is for the Librarian, asked by stage (2026-10-14).** Without
+  the Librarian nothing is organized, so a folder connected in place needs no
+  copy. Setup connects in place and leaves the Librarian to its own step;
+  adding a vault confirms *Connect* or *Connect a copy with the Librarian*;
+  a folder connected in place offers the copy from Settings → Librarian. The
+  Librarian switch is decided per vault: the copy's starts on, at Suggest.
+- **H. The Librarian on a folder of notes is always a copy (2026-10-14).**
+  No way around it, in setup and when adding a vault: a folder connected in
+  place keeps the Librarian off, and turning it on means a copy Rotli makes.
+  An empty folder needs no copy. A closed *Why a copy?* says why: the
+  original is never touched by Rotli, so nothing that happens in the copy can
+  fall on it.

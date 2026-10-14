@@ -8,7 +8,10 @@ import { describe, expect, test } from "bun:test";
 import {
   DEST,
   destContains,
-  HIDDEN_ROOTS,
+  folderRolesFromMarker,
+  hiddenRoots,
+  IMPORTED_FOLDER_ROLES,
+  isStorageDisk,
   isChats,
   isChatsPath,
   isHidden,
@@ -18,13 +21,15 @@ import {
   isVault,
   isWikiPath,
   memexMarkersOf,
-  SINK_ROOTS,
+  reservedFolders,
+  setFolderRoles,
+  sinkRoots,
   VAULT_MARKER,
 } from "./destinations";
 
 describe("DEST + the root sets", () => {
   test("names the six reserved roots by their own folder ids", () => {
-    expect(DEST).toEqual({
+    expect({ ...DEST }).toEqual({
       inbox: "Inbox",
       secure: "Secure notes",
       vault: "vault:",
@@ -36,11 +41,11 @@ describe("DEST + the root sets", () => {
   });
 
   test("hides Archive, Trash, and Board from listings", () => {
-    expect(HIDDEN_ROOTS).toEqual([DEST.archive, DEST.trash, DEST.board]);
+    expect(hiddenRoots()).toEqual([DEST.archive, DEST.trash, DEST.board]);
   });
 
   test("treats only Archive and Trash as never-delete sinks", () => {
-    expect(SINK_ROOTS).toEqual([DEST.archive, DEST.trash]);
+    expect(sinkRoots()).toEqual([DEST.archive, DEST.trash]);
   });
 });
 
@@ -240,5 +245,75 @@ describe("isRootMarker — a bare non-default root '<rootid>:'", () => {
     expect(isRootMarker("vault:wiki")).toBe(false); // a folder inside the root
     expect(isRootMarker(":")).toBe(false); // empty rootid
     expect(isRootMarker("")).toBe(false);
+  });
+});
+
+// An imported vault (slice 4): Rotli's folders come from the marker's role map,
+// and the person's own Archive/, Trash/, chats/, storage/, and wiki/ are plain.
+describe("an imported vault's role map", () => {
+  const marker = (extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ id: "mx_tsroles", layout: "imported", folders: IMPORTED_FOLDER_ROLES, ...extra });
+
+  test("reads only a Rotli marker that says imported", () => {
+    expect(folderRolesFromMarker(marker())).toEqual(IMPORTED_FOLDER_ROLES);
+    expect(folderRolesFromMarker(JSON.stringify({ id: "mx_plainvault" }))).toBeNull();
+    expect(folderRolesFromMarker(JSON.stringify({ id: "obsidian", layout: "imported" }))).toBeNull();
+    expect(folderRolesFromMarker("not json")).toBeNull();
+  });
+
+  test("never lets a hand edit point a role at another folder or outside the vault", () => {
+    const bad = { archive: "../escape", trash: ".dot", chats: "x/y", storage: " ", inbox: "Not:here" };
+    expect(folderRolesFromMarker(marker({ folders: bad }))).toEqual(IMPORTED_FOLDER_ROLES);
+    expect(folderRolesFromMarker(marker({ folders: { inbox: "Drafts" } }))?.inbox).toBe("Drafts");
+    expect(
+      folderRolesFromMarker(marker({ folders: { archive: "Done (Rotli)", trash: "done (Rotli)" } })),
+    ).toEqual(IMPORTED_FOLDER_ROLES);
+    expect(folderRolesFromMarker(marker({ folders: null }))).toEqual(IMPORTED_FOLDER_ROLES);
+  });
+
+  test("a sink role never names the person's own folder", () => {
+    expect(folderRolesFromMarker(marker({ folders: { trash: "Trash", archive: "Archive" } }))).toEqual(
+      IMPORTED_FOLDER_ROLES,
+    );
+  });
+
+  test("Rotli's sinks are its own and the person's folders are plain", () => {
+    setFolderRoles(IMPORTED_FOLDER_ROLES);
+    try {
+      expect(DEST.archive).toBe(IMPORTED_FOLDER_ROLES.archive);
+      expect(DEST.trash).toBe(IMPORTED_FOLDER_ROLES.trash);
+      expect(DEST.storage).toBe(IMPORTED_FOLDER_ROLES.storage);
+      expect(DEST.inbox).toBe("Inbox");
+      expect(isSink("Archive")).toBe(false);
+      expect(isSink("Trash/2024")).toBe(false);
+      expect(isSink(`${IMPORTED_FOLDER_ROLES.archive}/2024`)).toBe(true);
+      expect(isHidden("Archive")).toBe(false);
+      expect(isHidden(IMPORTED_FOLDER_ROLES.trash)).toBe(true);
+      expect(isTrash("Trash")).toBe(false);
+      expect(isTrash(`${IMPORTED_FOLDER_ROLES.trash}/2024`)).toBe(true);
+      expect(isChatsPath("chats/standup")).toBe(false);
+      expect(isChatsPath(`${IMPORTED_FOLDER_ROLES.chats}/standup`)).toBe(true);
+      expect(isChatsPath("vault:chats/standup")).toBe(true);
+      expect(isStorageDisk("storage/kiln.jpg")).toBe(false);
+      expect(isStorageDisk(`${IMPORTED_FOLDER_ROLES.storage}/kiln.jpg`)).toBe(true);
+      expect(destContains("Brain", "wiki/pottery")).toBe(false);
+      expect(isWikiPath("wiki/pottery")).toBe(false);
+      expect(destContains(DEST.storage, "storage/kiln.jpg")).toBe(false);
+      expect(reservedFolders()).toContain(IMPORTED_FOLDER_ROLES.trash);
+      expect(
+        memexMarkersOf({ corpus: { isMemex: false, folderRoles: IMPORTED_FOLDER_ROLES }, brains: [] }),
+      ).toEqual(new Set([""]));
+    } finally {
+      setFolderRoles(null);
+    }
+  });
+
+  test("a Rotli vault keeps the fixed names once the map is cleared", () => {
+    setFolderRoles(IMPORTED_FOLDER_ROLES);
+    setFolderRoles(null);
+    expect(DEST.archive).toBe("Archive");
+    expect(isSink("Archive")).toBe(true);
+    expect(isChatsPath("chats/standup")).toBe(true);
+    expect(isStorageDisk("storage/kiln.jpg")).toBe(true);
   });
 });

@@ -354,14 +354,15 @@ describe("parseMemexInfo + isMemexId", () => {
 });
 
 describe("contractInRange", () => {
-  test("rotli's default band is [3.4, 3.8] — prior cards and the readable-query brain pass", () => {
+  test("rotli's default band is [3.4, 3.9] — prior cards, the readable-query brain, and imported vaults pass", () => {
     expect(contractInRange("3.4")).toBe(true); // an older memex.json
     expect(contractInRange("3.5")).toBe(true); // the prior engine version
     expect(contractInRange("3.6")).toBe(true); // memex-vault after the identity/personality + org split
     expect(contractInRange("3.7")).toBe(true); // v3.7 — the AI Filer lane
     expect(contractInRange("3.8")).toBe(true); // v3.8 — readable identity + deterministic queries
+    expect(contractInRange("3.9")).toBe(true); // v3.9 — the imported layout
     expect(contractInRange("3.3")).toBe(false); // older than rotli supports
-    expect(contractInRange("3.9")).toBe(false); // newer than rotli was built for
+    expect(contractInRange("3.10")).toBe(false); // newer than rotli was built for
   });
   test("can widen the band", () => {
     expect(contractInRange("3.6", "3.4", "3.6")).toBe(true);

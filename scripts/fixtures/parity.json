@@ -234,6 +234,16 @@
       "sourceOfTruth": "src/services/folderBoards.ts BOARD_LANE ↔ src-tauri/src/corpus.rs BOARD_LANE",
       "value": "storage/excalidraw"
     },
+    "importedFolderRoles": {
+      "sourceOfTruth": "src/services/destinations.ts IMPORTED_FOLDER_ROLES ↔ src-tauri/src/vault_roles.rs FolderRoles::imported",
+      "value": {
+        "inbox": "Inbox",
+        "archive": "Archive (Rotli)",
+        "trash": "Trash (Rotli)",
+        "chats": "chats (Rotli)",
+        "storage": "storage (Rotli)"
+      }
+    },
     "secureNotesFolder": {
       "sourceOfTruth": "src/security/secureNotes.ts SECURE_NOTES_FOLDER + src/services/destinations.ts DEST.secure ↔ src-tauri/src/corpus.rs SECURE_NOTES_FOLDER",
       "value": "Secure notes"

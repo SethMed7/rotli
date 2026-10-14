@@ -1,4 +1,4 @@
-// "Work on a copy" (docs/design/vault-copy-and-obsidian-compatibility.md,
+// "Connect a copy with the Librarian" (docs/design/vault-copy-and-obsidian-compatibility.md,
 // slice 3): the one dialog's state. A caller asks how to open a folder that
 // already holds notes; the person answers in the dialog; a copy then shows its
 // progress, and ends open or with what went wrong. Session-only.
@@ -11,6 +11,8 @@ export interface VaultCopyDone {
   destination: string;
   files: number;
   skipped: string[];
+  /** "foreign": the copy kept another tool's memex.json, so it opened protected. */
+  marked?: "imported" | "alreadyRotli" | "foreign";
 }
 
 export type VaultImportStep =

@@ -10,6 +10,7 @@ import { finishFirstRun } from "../../services/firstRun";
 import { flushSettingsNow } from "../../state/persist";
 import { type OnboardingPhase, useUiStore } from "../../state/ui";
 import { type VaultStatus, useVaultStore } from "../../state/vault";
+import { VaultImportDialog } from "../vaultImportDialog";
 
 const Onboarding = lazy(() => import("./onboarding").then((m) => ({ default: m.Onboarding })));
 const VaultActivation = lazy(() => import("./vaultActivation").then((m) => ({ default: m.VaultActivation })));
@@ -51,6 +52,8 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
   const screen = (node: ReactNode) => (
     <div className="app-window">
       <Suspense fallback={null}>{node}</Suspense>
+      {/* a copy started from setup (the Librarian step) shows its progress here */}
+      <VaultImportDialog />
     </div>
   );
 

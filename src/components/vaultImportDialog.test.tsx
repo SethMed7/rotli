@@ -2,10 +2,10 @@ import { expect, test } from "bun:test";
 
 import { COPYING_LINES, importCopy } from "./vaultImportDialog";
 
-test("the choice names the folder, what it is, and how many notes", () => {
+test("the confirmation names the folder, what it is, and how many notes", () => {
   const copy = importCopy({ kind: "choose", label: "Garden", source: "Obsidian vault", notes: 1204 });
-  expect(copy.title).toBe("Open “Garden”");
-  expect(copy.lines[0]).toBe("It’s an Obsidian vault with 1,204 notes. How should Rotli open it?");
+  expect(copy.title).toBe("Connect “Garden”");
+  expect(copy.lines[0]).toBe("It’s an Obsidian vault with 1,204 notes.");
 });
 
 test("progress counts files and size, and says the original is only read", () => {
@@ -33,6 +33,15 @@ test("done says where the copy is and names linked items that weren't copied", (
     "Copied 1 file to /Users/sam/Garden (Rotli). Your original wasn’t changed.",
     "1 linked item wasn’t copied: Linked.md",
   ]);
+});
+
+test("done says the copy's Librarian is on at Suggest, or why a copy opened protected", () => {
+  const report = { destination: "/Users/sam/Garden (Rotli)", files: 1, skipped: [] };
+  const imported = importCopy({ kind: "done", label: "Garden", report: { ...report, marked: "imported" } });
+  expect(imported.lines[1]).toContain("Librarian is on for the copy, at Suggest");
+  expect(imported.lines).toHaveLength(2);
+  const foreign = importCopy({ kind: "done", label: "Garden", report: { ...report, marked: "foreign" } });
+  expect(foreign.lines[1]).toContain("protected folder");
 });
 
 test("a failure says what went wrong", () => {

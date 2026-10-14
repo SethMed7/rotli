@@ -188,6 +188,12 @@ fn empty_board_scene_matches_fixture() {
 }
 
 #[test]
+fn imported_folder_roles_match_fixture() {
+    let expected = serde_json::to_value(crate::vault_roles::FolderRoles::imported()).unwrap();
+    assert_eq!(entry("importedFolderRoles"), expected);
+}
+
+#[test]
 fn board_lane_matches_fixture() {
     assert_eq!(entry("boardLane").as_str(), Some(crate::corpus::BOARD_LANE));
 }

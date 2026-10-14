@@ -6,7 +6,7 @@
 // (read-only), so a Vault row looks and opens exactly like a Main row.
 
 import type { Folder, NoteSummary } from "../types";
-import { DEST, RESERVED_FOLDERS, isSink, isVault } from "./destinations";
+import { DEST, folderRoles, isSink, isVault, reservedFolders } from "./destinations";
 import type { MainNode } from "./mainTree";
 
 /** A disk path relative to where notes live: a memex's `wiki/` is its root
@@ -27,15 +27,17 @@ const newDir = (): Dir => ({ folders: new Map(), notes: [] });
  * always a projection: Rotli Web lists them first, and the Mac app makes one for a shelf. In a plain
  * folder vault a top-level folder's id is its bare name, so only the six rows Rotli Web's list
  * leads with are left out; a real Inbox folder after them still shows. */
-const DESTINATION_ROWS: ReadonlySet<string> = new Set([DEST.inbox, DEST.secure, DEST.storage, DEST.board]);
 function destinationRows(folders: readonly Folder[]): Set<Folder> {
   const rows = new Set<Folder>();
-  const memex = folders.some((folder) => folder.id === "wiki" && folder.parentId === null);
+  // an imported vault's wiki/ is the person's folder, not a memex spine
+  const memex = !folderRoles() && folders.some((folder) => folder.id === "wiki" && folder.parentId === null);
   if (memex) {
-    for (const folder of folders) if (DESTINATION_ROWS.has(folder.id)) rows.add(folder);
+    const destinationIds = new Set([DEST.inbox, DEST.secure, DEST.storage, DEST.board]);
+    for (const folder of folders) if (destinationIds.has(folder.id)) rows.add(folder);
   }
-  if (RESERVED_FOLDERS.every((id, i) => folders[i]?.id === id && folders[i].parentId === null)) {
-    for (const folder of folders.slice(0, RESERVED_FOLDERS.length)) rows.add(folder);
+  const reserved = reservedFolders();
+  if (reserved.every((id, i) => folders[i]?.id === id && folders[i].parentId === null)) {
+    for (const folder of folders.slice(0, reserved.length)) rows.add(folder);
   }
   return rows;
 }
