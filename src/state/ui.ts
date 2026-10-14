@@ -701,7 +701,11 @@ interface UiState {
 
   /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
   focusMode: boolean;
+  /** Leaving focus mode leaves reading mode too (reading is focus, read-only). */
   setFocusMode: (on: boolean) => void;
+  /** ⌥⌘R reading mode: focus mode, and the note only to read (editor/readingMode.ts). */
+  readingMode: boolean;
+  setReadingMode: (on: boolean) => void;
 
   /** Open transient close-callbacks, top = last. Esc (app.hide, the one
    * registry dispatcher) closes the topmost transient before the window —
@@ -1074,7 +1078,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setUpdateVersion: (version) => set({ updateVersion: version }),
 
   focusMode: false,
-  setFocusMode: (on) => set({ focusMode: on }),
+  setFocusMode: (on) => set(on ? { focusMode: true } : { focusMode: false, readingMode: false }),
+  readingMode: false,
+  setReadingMode: (on) => set({ readingMode: on, focusMode: on }),
 
   transients: [],
   registerTransient: (close) => {

@@ -31,7 +31,7 @@ import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
 function actionIcon(id: string): ReactNode {
   if (id === "notes.new" || id === "tabs.new") return <PlusGlyph size={15} />;
   if (id.startsWith("panes.split")) return <SplitGlyph size={15} />;
-  if (id === "view.focus") return <FocusGlyph size={15} />;
+  if (id === "view.focus" || id === "view.reading") return <FocusGlyph size={15} />;
   if (id === "app.settings") return <Icon name="rotli-settings" size={15} />;
   if (id === "theme.cycle") return <SunGlyph size={15} />;
   if (id.startsWith("capture.")) return <Icon name="rotli-capture" size={15} />;
@@ -166,6 +166,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
       suggest("notes.new", newNoteIn ? `New note in “${newNoteIn}”` : "New note");
       suggest("panes.splitRight");
       suggest("view.focus");
+      suggest("view.reading");
       return [
         ...(recents.length > 0 ? [{ name: "Recent", rows: recents.map(recentRow), score: 100 }] : []),
         { name: "Suggested", rows: suggested, score: 100 },

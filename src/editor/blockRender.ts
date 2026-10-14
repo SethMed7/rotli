@@ -46,6 +46,7 @@ import { noteIdFacet } from "./livePreview";
 import { type InlineMermaidCamera, createInlineMermaidCamera } from "./mermaidInlineCamera";
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import { mountMermaidWorkspace } from "./mermaidWorkspace";
+import { revealRange } from "./readingReveal";
 import { sanitizeSvg } from "./svgSanitizer";
 
 // Heavy fence libs (katex / mermaid / jsxgraph) load on first use — they used to
@@ -777,7 +778,7 @@ interface BlockState {
 
 function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
   const decos: Range<Decoration>[] = [];
-  const sel = state.selection.main;
+  const sel = revealRange(state);
   const sig = themeSignature();
 
   for (const block of fences) {
