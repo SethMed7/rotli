@@ -1,7 +1,8 @@
 # Open in Rotli: a file or folder from Finder
 
-Status: **stages 1–3 built** (a file in a tab, a folder in its own window,
-the opt-in Quick Action; owner decisions 2026-10-13). Stage 4 is not built yet.
+Status: **all four stages built** (a file in a tab, a folder in its own
+window, the opt-in Quick Action, Office files and CSVs; owner decisions
+2026-10-13).
 Roadmap item `open-with-rotli`. Builds on the protected-originals rule in
 [`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md).
 
@@ -192,7 +193,15 @@ Rotli Web keeps its own Open folder flow.
    flow; copy-first comes with the copy-flow slice).
 3. **Built:** the Quick Action with its opt-in Settings install
    (Settings → General → Open in Rotli from Finder).
-4. DOCX, XLSX, and CSV in external tabs.
+4. **Built:** DOCX, XLSX, and CSV. Open With registers `docx`, `xlsx`, and
+   `csv` (Editor, `Alternate`), the formats this build edits. Macro and
+   template variants aren't registered. In a Finder mount they open in their
+   editors as ordinary files (`file_stat` reports them writable) and save in
+   place. Two fixes keep "nothing else changes" true:
+   - The one-time safety copy an Office save makes (`<name>.bak`) goes to the
+     mount's cache sidecar (`.rotli/backups/…`), not beside the file.
+   - CSV → XLSX conversion (a new sibling file) is refused.
+   The sidecar path is canonical, so containment checks under it hold.
 
 ## Proof plan
 

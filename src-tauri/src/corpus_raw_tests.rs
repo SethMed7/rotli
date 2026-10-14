@@ -188,3 +188,33 @@ fn a_folder_opened_from_finder_is_never_added_to() {
     assert!(CorpusStore::open_raw_folder(&folder.join("Trip notes.md"), &cache).is_err(), "a file is not a folder mount");
     assert!(CorpusStore::open_raw_folder(Path::new("/"), &cache).is_err(), "never the whole disk");
 }
+
+/// Stage 4: an Office file or CSV opened from Finder saves in place, and the
+/// one-time safety copy of the original goes to Rotli's cache, never beside it.
+#[test]
+fn an_office_file_opened_from_finder_keeps_its_backup_out_of_the_folder() {
+    let (_temp, folder, cache) = downloads();
+    fs::write(folder.join("budget.xlsx"), b"original workbook").unwrap();
+    fs::create_dir_all(folder.join("q3")).unwrap();
+    fs::write(folder.join("q3/costs.csv"), "item,cost\npaper,4\n").unwrap();
+    let before = snapshot(&folder);
+
+    let mut single = CorpusStore::open_raw_file(&folder.join("budget.xlsx"), &cache).unwrap();
+    single.write_file_bytes("budget.xlsx", b"edited workbook", true).unwrap();
+    let mut whole = CorpusStore::open_raw_folder(&folder, &cache).unwrap();
+    whole.write_file_bytes("q3/costs.csv", b"item,cost\npaper,5\n", true).unwrap();
+    assert!(whole.new_file_bytes("q3", "costs.xlsx", b"converted").is_err(), "no sibling workbook");
+
+    let mut after = snapshot(&folder);
+    assert_eq!(after.remove("budget.xlsx").as_deref(), Some(&b"edited workbook"[..]));
+    assert_eq!(after.remove("q3/costs.csv").as_deref(), Some(&b"item,cost\npaper,5\n"[..]));
+    let mut was = before.clone();
+    was.remove("budget.xlsx");
+    was.remove("q3/costs.csv");
+    assert_eq!(after, was, "no .bak or anything else in the person's folder");
+    let backup = single.guard_rel(".rotli/backups/budget.xlsx.bak").unwrap();
+    assert!(backup.starts_with(fs::canonicalize(&cache).unwrap()), "{}", backup.display());
+    assert_eq!(fs::read(backup).unwrap(), b"original workbook");
+    let csv_backup = whole.guard_rel(".rotli/backups/q3/costs.csv.bak").unwrap();
+    assert_eq!(fs::read_to_string(csv_backup).unwrap(), "item,cost\npaper,4\n");
+}

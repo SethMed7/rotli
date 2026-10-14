@@ -3137,12 +3137,22 @@ impl CorpusStore {
             return Err(format!("not a file: {rel}"));
         }
         if bak {
-            let bak_abs = abs.with_file_name(format!(
-                "{}.bak",
-                abs.file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default()
-            ));
+            // a file opened from Finder keeps its backup in Rotli's cache: its
+            // folder gains nothing but the edit (docs/design/open-in-rotli.md)
+            let bak_abs = if self.raw.is_some() {
+                let bak = self.guard_rel(&format!("{DOT_DIR}/backups/{rel}.bak"))?;
+                if let Some(parent) = bak.parent() {
+                    fs::create_dir_all(parent).map_err(|e| format!("backup {rel}: {e}"))?;
+                }
+                bak
+            } else {
+                abs.with_file_name(format!(
+                    "{}.bak",
+                    abs.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default()
+                ))
+            };
             if !bak_abs.exists() {
                 fs::copy(&abs, &bak_abs).map_err(|e| format!("backup {rel}: {e}"))?;
             }
@@ -3178,6 +3188,7 @@ impl CorpusStore {
         name: &str,
         bytes: &[u8],
     ) -> Result<String, String> {
+        raw::refuse_in_raw(self, "add files to")?;
         if !folder.is_empty() {
             validate_rel(folder)?;
         }

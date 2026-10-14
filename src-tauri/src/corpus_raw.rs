@@ -91,6 +91,8 @@ impl CorpusStore {
         let root = file.parent().ok_or("this file has no folder")?.to_path_buf();
         let sidecar = sidecar_base.join(raw_root_id(&file));
         fs::create_dir_all(&sidecar).map_err(|e| format!("create {}: {e}", sidecar.display()))?;
+        // canonical, so containment checks beneath it compare like with like
+        let sidecar = fs::canonicalize(&sidecar).map_err(|e| format!("open {}: {e}", sidecar.display()))?;
         Ok(Self::raw_mount(root, RawMount { sidecar, only: Some(HashSet::from([name])) }))
     }
 
@@ -107,6 +109,8 @@ impl CorpusStore {
         }
         let sidecar = sidecar_base.join(raw_root_id(&dir));
         fs::create_dir_all(&sidecar).map_err(|e| format!("create {}: {e}", sidecar.display()))?;
+        // canonical, so containment checks beneath it compare like with like
+        let sidecar = fs::canonicalize(&sidecar).map_err(|e| format!("open {}: {e}", sidecar.display()))?;
         Ok(Self::raw_mount(dir, RawMount { sidecar, only: None }))
     }
 

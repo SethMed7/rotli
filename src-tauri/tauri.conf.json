@@ -127,6 +127,23 @@
       },
       {
         "ext": [
+          "docx"
+        ],
+        "name": "Word document",
+        "role": "Editor",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "xlsx",
+          "csv"
+        ],
+        "name": "Spreadsheet",
+        "role": "Editor",
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
           "png",
           "jpg",
           "jpeg",
