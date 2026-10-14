@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { DOCUMENT_EXTS, WORD_EXTS } from "../documents/kinds";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { IMAGE_EXTS, extOf, isCanvasPath } from "../lib/fileKind";
+import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import {
   DocumentGlyph,
   ExcalidrawGlyph,
@@ -19,6 +20,32 @@ import {
   SvgFormatGlyph,
   WordGlyph,
 } from "./glyphs";
+
+/** A spreadsheet (xlsx, csv, tsv): a grid card in the sheet color, so a
+ * workbook reads as one at a glance beside the Word mark (the owner,
+ * 2026-10-10: sheets looked like plain files). */
+export function SheetGlyph({ size = 15, className }: GlyphProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <rect x="7" y="3" width="14" height="18" rx="2" fill="var(--format-sheet)" opacity="0.82" />
+      <path
+        d="M14 3v18M7 9h14M7 15h14"
+        fill="none"
+        stroke="var(--on-format-sheet)"
+        strokeWidth="1.1"
+        opacity="0.6"
+      />
+      <rect x="2" y="6" width="12" height="12" rx="1.5" fill="var(--format-sheet)" />
+      <path
+        d="M4.5 9.5h7v5h-7zM8 9.5v5M4.5 12h7"
+        fill="none"
+        stroke="var(--on-format-sheet)"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /** A JSON Canvas: two cards and the line between them. */
 export function CanvasGlyph(props: GlyphProps) {
@@ -53,6 +80,7 @@ export function glyphForNote(
     if (ext === "svg") return <SvgFormatGlyph {...props} />;
     if (ext === "pdf") return <PdfGlyph {...props} />;
     if (WORD_EXTS.has(ext)) return <WordGlyph {...props} />;
+    if (SHEET_BIN.has(ext) || SHEET_TEXT.has(ext)) return <SheetGlyph {...props} />;
     if (DOCUMENT_EXTS.has(ext)) return <DocumentGlyph {...props} />;
     if (IMAGE_EXTS.has(ext)) return <ImageGlyph {...props} />;
   }

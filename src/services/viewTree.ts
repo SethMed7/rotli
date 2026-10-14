@@ -194,38 +194,41 @@ export function viewPickerItems(
   },
   /** The two-step hotkey opened it: the first nine choices wear ⌘1–⌘9. */
   numbered = false,
-  /** The Vault view (services/vaultTree.ts): the vault's folders as on disk. */
-  vault?: { on: boolean; show: () => void },
+  /** Raw data (services/vaultTree.ts): the vault as on disk. Not a view: it
+   * sits apart, below them, and picking a view leaves it (the owner, 2026-10-10:
+   * "in the views when you click you have an option to view data raw"). */
+  raw?: { on: boolean; show: () => void },
 ): MenuSpec[] {
   const slot = (index: number) => (numbered && SHOW_HOTKEYS && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
       label: "Main — all items",
-      checked: activeView === null && !vault?.on,
+      checked: activeView === null && !raw?.on,
       checkedMark: "highlight",
       onClick: () => on.show(null),
       ...slot(0),
     },
-    ...(vault
-      ? [
-          {
-            kind: "action" as const,
-            label: "Vault — folders as on disk",
-            checked: vault.on,
-            checkedMark: "highlight" as const,
-            onClick: vault.show,
-          },
-        ]
-      : []),
     ...manifest.views.map((view, index) => ({
       kind: "action" as const,
       label: view.name,
-      checked: activeView === view.name && !vault?.on,
+      checked: activeView === view.name && !raw?.on,
       checkedMark: "highlight" as const,
       onClick: () => on.show(view.name),
       ...slot(index + 1),
     })),
+    ...(raw
+      ? [
+          { kind: "sep" as const },
+          {
+            kind: "action" as const,
+            label: "Raw data — the vault as on disk",
+            checked: raw.on,
+            checkedMark: "highlight" as const,
+            onClick: raw.show,
+          },
+        ]
+      : []),
     { kind: "sep" },
     { kind: "action", label: "New view…", disabled: !writable, onClick: on.create },
     {

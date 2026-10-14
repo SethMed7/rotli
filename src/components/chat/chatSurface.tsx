@@ -131,7 +131,7 @@ import {
 import { WebDialogFrame } from "../webDialogFrame";
 import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
-import { ChatBuddy, useJustFinished } from "./chatBuddy";
+import { ChatBuddy, ChatLiveEdge, useJustFinished } from "./chatBuddy";
 import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
@@ -2541,7 +2541,10 @@ export function ChatSurface({
                       <div className="cmsg-bubble">{renderMessage(streamingText, mediaRoot)}</div>
                     </div>
                   )}
-                {working && !streamingText && (
+                {/* the working line rides beside the buddy at the live edge
+                    (ChatLiveEdge); only a queued send, or a run with no edge
+                    buddy, keeps its own bubble here */}
+                {working && !streamingText && (queued || !buddy.edge) && (
                   <div className="cmsg ai">
                     {queued ? (
                       // waiting on measured compute headroom, not thinking — say
@@ -2575,9 +2578,11 @@ export function ChatSurface({
                   </div>
                 )}
                 {buddy.edge && (
-                  <div className="chat-buddy-row" data-moment={buddy.edge}>
-                    <ChatBuddy moment={buddy.edge} hour={welcomeHour} size={72} className="chat-endmark" />
-                  </div>
+                  <ChatLiveEdge
+                    moment={buddy.edge}
+                    hour={welcomeHour}
+                    status={working && !streamingText && !queued ? status : null}
+                  />
                 )}
                 {saveErr && (
                   <p className="file-err chat-save-err" role="alert">
@@ -2698,7 +2703,9 @@ export function ChatSurface({
                         ref={msgRef}
                         className="chat-msg"
                         rows={1}
-                        placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
+                        placeholder={
+                          working ? "Write your next message…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"
+                        }
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
                         onPaste={onComposerPaste}
