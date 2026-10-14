@@ -35,6 +35,14 @@ test("done says where the copy is and names linked items that weren't copied", (
   ]);
 });
 
+test("done says why a copy that kept another app's memex.json opened protected", () => {
+  const report = { destination: "/Users/sam/Garden (Rotli)", files: 1, skipped: [] };
+  const imported = importCopy({ kind: "done", label: "Garden", report: { ...report, marked: "imported" } });
+  expect(imported.lines).toHaveLength(1);
+  const foreign = importCopy({ kind: "done", label: "Garden", report: { ...report, marked: "foreign" } });
+  expect(foreign.lines[1]).toContain("protected folder");
+});
+
 test("a failure says what went wrong", () => {
   expect(importCopy({ kind: "failed", label: "Garden", message: "Copy into an empty folder." })).toEqual({
     title: "Couldn’t copy “Garden”",

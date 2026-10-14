@@ -9,7 +9,6 @@ import { DEST } from "./destinations";
 import { type VaultDir, type VaultStat, freeVaultPath, normalizeVaultPath, vaultIsMemex } from "./vaultDir";
 
 const CANVAS_EXT = ".canvas";
-const RESERVED = new Set<string>(Object.values(DEST));
 
 export function isCanvasFile(path: string): boolean {
   return path.toLowerCase().endsWith(CANVAS_EXT);
@@ -30,7 +29,8 @@ export function canvasHome(folderId: string, isMemex: boolean): string {
   const local = normalizeVaultPath(folderId.slice(folderId.indexOf(":") + 1));
   const under = (root: string) => local === root || local.startsWith(`${root}/`);
   if (isMemex) return under("wiki") ? local : "wiki/_inbox";
-  return RESERVED.has(folderId) ? "" : local;
+  // read per call: an imported vault's reserved rows are its role folders
+  return Object.values(DEST).includes(folderId) ? "" : local;
 }
 
 const revisionOf = (stat: VaultStat) => `${stat.lastModified}:${stat.size}`;

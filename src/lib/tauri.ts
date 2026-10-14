@@ -13,6 +13,7 @@ import type {
   BreveBackfillResult,
   BreveDeliverySettings,
 } from "../routines/breveTypes";
+import type { FolderRoles } from "../services/destinations";
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
@@ -1596,6 +1597,8 @@ export interface CorpusRefView {
   perms: MemexPerms | null;
   /** The active vault's Librarian switch (see ConnectedBrain.brainEnabled). */
   brainEnabled: boolean;
+  /** An imported vault's own folders by role (services/destinations.ts); null otherwise. */
+  folderRoles?: FolderRoles | null;
 }
 
 /** The whole Location config (the one place "where do my notes live" is decided). */

@@ -14,10 +14,8 @@ import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isSkippedDir } from "../lib/fileKind";
 import {
-  type NoteFrontmatter,
   composeNoteDocument,
   parseNoteDocument,
-  shelfOf,
   withShelf,
   isLockedFrontmatter,
   isSecureFrontmatter,
@@ -30,13 +28,14 @@ import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import {
   DEST,
-  RESERVED_FOLDERS,
   isChats,
   isHidden,
   isRootMarker,
   isSink,
   isTrash,
   isVault,
+  reservedFolders,
+  setFolderRoles,
 } from "./destinations";
 import { BOARD_LANE } from "./folderBoards";
 import { isCanvasFile } from "./folderCanvases";
@@ -52,11 +51,11 @@ import {
 } from "./folderMemexNotes";
 import { folderNoteAliases, prepareFolderTitleRename } from "./folderNoteAliases";
 import {
-  SINK_DIRS,
   WIKI,
   WIKI_INBOX,
   WIKI_SECURE,
   diskDirFor,
+  projectVaultFolder,
   relocationTarget,
   under,
   withoutSinkPrefix,
@@ -71,6 +70,7 @@ import {
   freeVaultPath,
   joinVaultPath,
   parentPath,
+  vaultFolderRoles,
   vaultHasRotliMarker,
   vaultIsMemex,
 } from "./vaultDir";
@@ -86,40 +86,13 @@ const MEMEX_NOTE_ROOTS = ["wiki", "chats", "archive", "trash"] as const;
 /** Roots a PLAIN folder never walks, so a vault holding a memex spine without a `wiki/` keeps
  * those files out of the note list (chats/ is indexed; All notes hides it via isChats). */
 const SKIPPED_ROOTS = new Set(["identity", "personality", "history"]);
+/** Root files an imported vault hides (Rust `surfaced_imported`). */
+const ROOT_CONTROL_FILES = new Set(["memex.json", "users.json", "memex.local.json", "identities.local.json"]);
 
 /** Cached bytes for one file, keyed by the revision they were read at. */
 interface CachedFile {
   revision: string;
   text: string;
-}
-
-/** The folder a note is PROJECTED into — the row the sidebar shows, which in a
- * memex differs from the physical directory. A path-based table:
- *
- * • `archive` / `trash` and their subtrees → the reserved Archive / Trash rows.
- * • `wiki/_inbox` → Board (the Captures row).
- * • `wiki/_secure` → Board when the note is shelved to Inbox (a quick capture
- *   is secure at birth but is still a capture), otherwise the Secure spine.
- * • any other `wiki/<path>` → that path; `wiki` itself → "wiki".
- * • a plain vault projects the physical directory, with the root as Inbox.
- *
- * Deliberate divergences from Rust `project_folder`, which the browser build's
- * folder list requires: Rust keeps the suffix (`Archive/wiki/ideas`) where this
- * flattens to `Archive`, and Rust projects a shelved `wiki/**` note onto its
- * primary shelf where this keeps the disk path, because `listFolders` here
- * offers the wiki tree rather than a shelf vocabulary. */
-export function projectVaultFolder(
-  diskFolderId: string,
-  fm: NoteFrontmatter | null,
-  isMemex: boolean,
-): string {
-  if (!isMemex) return diskFolderId === "" ? DEST.inbox : diskFolderId;
-  for (const sink of SINK_DIRS) if (under(diskFolderId, sink.dir)) return sink.dest;
-  if (under(diskFolderId, WIKI_INBOX)) return DEST.board;
-  if (under(diskFolderId, WIKI_SECURE)) {
-    return fm && shelfOf(fm).includes(DEST.inbox) ? DEST.board : WIKI_SECURE;
-  }
-  return diskFolderId;
 }
 
 export class FolderNotesService implements NotesService {
@@ -128,6 +101,9 @@ export class FolderNotesService implements NotesService {
   private isMemex = false;
   /** No Rotli marker: a folder opened in place, whose own notes stay as written. */
   private inPlace = false;
+  /** An imported copy (slice 4): every note keeps its file name, so the
+   * person's Obsidian `[[File name]]` links still resolve. */
+  private imported = false;
 
   constructor(private readonly dir: VaultDir) {}
 
@@ -136,7 +112,7 @@ export class FolderNotesService implements NotesService {
   /** The memex-root marker set used by the All-Notes chats/ exclusion. A memex
    * vault's default root is the bare "" marker; a plain folder has none. */
   private memexMarkers(): ReadonlySet<string> {
-    return new Set(this.isMemex ? [""] : []);
+    return new Set(this.isMemex || this.imported ? [""] : []);
   }
 
   private async ensureIndex(): Promise<Map<string, string>> {
@@ -145,8 +121,17 @@ export class FolderNotesService implements NotesService {
   }
 
   private async rebuildIndex(): Promise<Map<string, string>> {
-    this.isMemex = await vaultIsMemex(this.dir);
-    this.inPlace = !(await vaultHasRotliMarker(this.dir));
+    // an imported vault's tree is the person's: its wiki/ is no memex spine,
+    // its identity/ or history/ no reserved root, its Archive/ no sink
+    const [roles, memexShape, marked] = await Promise.all([
+      vaultFolderRoles(this.dir),
+      vaultIsMemex(this.dir),
+      vaultHasRotliMarker(this.dir),
+    ]);
+    setFolderRoles(roles);
+    this.imported = roles !== null;
+    this.isMemex = !this.imported && memexShape;
+    this.inPlace = !marked;
     const paths: string[] = [];
     if (this.isMemex) {
       for (const root of MEMEX_NOTE_ROOTS) await this.collect(root, paths);
@@ -155,7 +140,7 @@ export class FolderNotesService implements NotesService {
       await this.collect("storage", lane);
       paths.push(...lane.filter((path) => isPathItem(path) || path.startsWith(`${BOARD_LANE}/`)));
     } else {
-      await this.collect("", paths, true);
+      await this.collect("", paths, !this.imported);
     }
     const index = new Map<string, string>();
     for (const path of paths) {
@@ -173,6 +158,8 @@ export class FolderNotesService implements NotesService {
   private async collect(path: string, out: string[], isRoot = false): Promise<void> {
     for (const entry of await this.dir.list(path)) {
       if (entry.name.startsWith(".")) continue;
+      // an imported vault's marker files are Rust-hidden control files
+      if (this.imported && path === "" && ROOT_CONTROL_FILES.has(entry.name)) continue;
       const child = joinVaultPath(path, entry.name);
       if (entry.kind === "directory") {
         if (isSkippedDir(entry.name) || (isRoot && SKIPPED_ROOTS.has(entry.name))) continue;
@@ -265,7 +252,7 @@ export class FolderNotesService implements NotesService {
 
   async listFolders(): Promise<Folder[]> {
     await this.ensureIndex();
-    const folders: Folder[] = RESERVED_FOLDERS.map((id) => ({ id, name: id, parentId: null }));
+    const folders: Folder[] = reservedFolders().map((id) => ({ id, name: id, parentId: null }));
     const root = this.isMemex ? WIKI : "";
     if (this.isMemex && (await this.dir.exists(WIKI))) {
       folders.push({ id: WIKI, name: WIKI, parentId: null });
@@ -402,13 +389,16 @@ export class FolderNotesService implements NotesService {
     await this.ensureIndex();
     const title = titleOf(body);
     const id = ulid();
-    const dir = policy?.secure && this.isMemex ? WIKI_SECURE : this.isMemex ? WIKI_INBOX : "";
+    const plain = this.imported ? DEST.inbox : "";
+    const dir = policy?.secure && this.isMemex ? WIKI_SECURE : this.isMemex ? WIKI_INBOX : plain;
     const path = await this.freePath(dir, `${noteStem(title, id)}.md`);
     const text = composeNote(
       {
         id,
         title,
-        shelf: [DEST.inbox],
+        // an imported vault's capture shelf would read every new note as a
+        // capture on the Mac (Rust project_folder); there it is a plain note
+        shelf: this.imported ? [] : [DEST.inbox],
         reach: [],
         ...(policy?.secure ? { secure: true } : {}),
         ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
@@ -468,9 +458,10 @@ export class FolderNotesService implements NotesService {
     if (frontmatter && modified === undefined) throw new Error(`unknown note: ${path}`);
     const asWritten = this.inPlace && !rotliMade(frontmatter);
     const text = savedNoteText(original, currentBody, frontmatter, body, modified, asWritten);
-    const rename = asWritten
-      ? { text, path }
-      : await prepareFolderTitleRename(this.dir, path, text, titleOf(currentBody), titleOf(body));
+    const rename =
+      asWritten || this.imported
+        ? { text, path }
+        : await prepareFolderTitleRename(this.dir, path, text, titleOf(currentBody), titleOf(body));
     await this.writeFile(path, rename.text, revision);
     // moveFile carries a secure note's .gitignore line to the new name
     if (rename.path !== path) return this.moveFile(id, path, rename.path);
@@ -555,6 +546,15 @@ export class FolderNotesService implements NotesService {
    * lands in the capture staging area instead of recreating a dead tree. */
   async restoreNote(id: string): Promise<Note> {
     const path = await this.pathOf(id);
+    // an imported vault's notes go back to the folder their origin names
+    // (Rust relocate); the inbox when that folder is gone
+    if (this.imported && !isPathItem(path)) {
+      const origin = parseNoteDocument(await this.readFile(path)).frontmatter?.origin;
+      const stripped = withoutSinkPrefix(path);
+      const wanted = typeof origin === "string" ? origin : stripped !== path ? parentPath(stripped) : null;
+      const home = wanted !== null && (await this.dir.exists(wanted)) ? wanted : DEST.inbox;
+      return this.moveNote(id, home);
+    }
     const original = withoutSinkPrefix(path);
     if (original === path) return this.clearOrigin(id, path);
     const home = parentPath(original);

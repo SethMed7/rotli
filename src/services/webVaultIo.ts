@@ -5,6 +5,7 @@ import { isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "../
 import type { FrontmatterView } from "../lib/tauri";
 import { registerWebVaultIo } from "../lib/webAiSeam";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { DEST, folderRoles } from "./destinations";
 import {
   folderAssetUrl,
   folderFileBytes,
@@ -59,7 +60,13 @@ export const webVaultIo = {
     // its files where they are (owner rule 2026-10-13)
     if (!(await vaultHasRotliMarker(directory())))
       throw new Error("this file can't move (a folder opened in place keeps its files where they are)");
-    return (await notesService().moveNote(id, sink)).id;
+    // an imported vault's own files stay where the person keeps them; only
+    // Rotli's storage and canvases move (Rust storage_file_lifecycle_block)
+    const roles = folderRoles();
+    if (roles && !id.startsWith(`${roles.storage}/`) && !id.toLowerCase().endsWith(".canvas"))
+      throw new Error("this file can't move (outside Rotli storage)");
+    // the menu's label, resolved to this vault's own sink (Rust move_file_to_sink)
+    return (await notesService().moveNote(id, sink === "Archive" ? DEST.archive : DEST.trash)).id;
   },
   restoreFile: async (id: string) => (await notesService().restoreNote(id)).id,
   async protection(

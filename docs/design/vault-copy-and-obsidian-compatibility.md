@@ -158,6 +158,30 @@ Stages (one PR each, held for review):
 Until 4b lands, an imported vault would read a copied `Archive/` as Rotli's,
 so 4a and 4b ship together or 4a stays unmerged.
 
+**4a + 4b built (2026-10-14, one PR, in review).** As specified, with these
+choices made while building (contract: `docs/architecture/memex-data-contract.md`):
+
+- The role map has five roles (inbox, archive, trash, chats, storage). A
+  secure flag in an imported vault stays on the note where it is, as in a
+  folder opened in place, so no secure folder is needed; a capture lands in
+  `Inbox/` with the capture shelf and reads under Captures.
+- Ids in an imported vault are disk paths, so Rotli's sinks are
+  `Archive (Rotli)` and `Trash (Rotli)` end to end (Rust, the webview's
+  `DEST`, and Rotli Web).
+- Names are kept for every note in an imported vault, the ones Rotli creates
+  there included, on save and on move (a move into Trash too).
+- The webview sees an imported vault as a plain vault with a role map, not a
+  memex: its notes go through the corpus store, never the memex note lane
+  (`wiki/_inbox`), and the Library and Librarian stay off until 4c. Chat
+  transcripts are not saved into an imported vault yet, the same as the
+  protected copy before it; the chat lane (`chats (Rotli)`) is wired in Rust
+  for when they are.
+- Empty Trash in an imported vault reaches only `Trash (Rotli)`, never the
+  person's `Trash/`.
+- Correction to the earlier sizing note: an older Rotli opens a 3.9 vault
+  read-only *in its Rotli-vault layout*, which hides the person's tree. It
+  cannot lose notes there, but it does not show them.
+
 **Already true today, for the record:** a folder opened in place reads its
 own `Archive/` and `Trash/` as Rotli's (the name checks have no layout).
 Slice 1 stops Rotli *moving* anything there, but notes in a person's

@@ -9,7 +9,7 @@
 import { noteDiskFolder } from "../lib/noteLocation";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
-import { DEST } from "./destinations";
+import { DEST, folderRoles } from "./destinations";
 import { isChatItem, libraryPathOfChat, rerootDiskPath } from "./systemBrowser";
 
 /** Per-root session memory of the browser's folder — the surface unmounts on
@@ -26,6 +26,13 @@ export function openSystemRoot(id: string): void {
 
 /** The System root a note's disk folder sits under, and its browser prefix. */
 function rootOf(folder: string): { id: string; prefix: string } {
+  // an imported vault's sinks are exact folder names; the person's own
+  // `Archive/` or `storage/` is a plain folder
+  if (folderRoles()) {
+    const first = folder.split("/")[0] ?? "";
+    const id = [DEST.storage, DEST.archive, DEST.trash].find((root) => root === first);
+    return id ? { id, prefix: id } : { id: "Brain", prefix: "wiki" };
+  }
   const top = folder.split("/")[0]?.toLowerCase() ?? "";
   if (top === "storage") return { id: DEST.storage, prefix: "Storage" };
   if (top === "archive") return { id: DEST.archive, prefix: "Archive" };

@@ -11,6 +11,8 @@ export interface VaultCopyDone {
   destination: string;
   files: number;
   skipped: string[];
+  /** "foreign": the copy kept another tool's memex.json, so it opened protected. */
+  marked?: "imported" | "alreadyRotli" | "foreign";
 }
 
 export type VaultImportStep =

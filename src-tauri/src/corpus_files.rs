@@ -52,8 +52,8 @@ impl CorpusStore {
             .and_then(|stem| stem.to_str())
             .filter(|stem| !stem.trim().is_empty())
             .unwrap_or("Board");
-        let home = if self.layout == Layout::Memex { BOARD_LANE } else { "Board" };
-        self.create_named_board(home, name, Some(&body))
+        let home = self.layout.board_lane();
+        self.create_named_board(&home, name, Some(&body))
     }
 
     /// Why a surfaced storage asset cannot enter Rotli's in-memex Archive/Trash
@@ -70,10 +70,7 @@ impl CorpusStore {
         if !self.guard_rel(rel).is_ok_and(|path| path.is_file()) {
             return Some("not a file");
         }
-        let in_storage = match self.layout {
-            Layout::Memex => rel.starts_with("storage/"),
-            Layout::LegacyRotli => rel.starts_with("Storage/"),
-        };
+        let in_storage = rel.starts_with(&format!("{}/", self.layout.storage_dir()));
         let ext = Path::new(rel)
             .extension()
             .and_then(|value| value.to_str())
@@ -90,9 +87,13 @@ impl CorpusStore {
     pub fn move_file_to_sink(&mut self, rel: &str, sink: &str) -> Result<String, String> {
         super::raw::refuse_in_raw(self, "move or delete")?;
         validate_rel(rel)?;
-        if sink != "Archive" && sink != "Trash" {
-            return Err(format!("not a file lifecycle destination: {sink}"));
-        }
+        // the menu's labels, resolved to this vault's own sink (an imported
+        // vault's Archive/ and Trash/ are the person's folders)
+        let sink = match sink {
+            "Archive" => self.layout.archive_id(),
+            "Trash" => self.layout.trash_id(),
+            other => return Err(format!("not a file lifecycle destination: {other}")),
+        };
         if let Some(reason) = self.storage_file_lifecycle_block(rel) {
             return Err(format!("this file can't move ({reason}): {rel}"));
         }
@@ -127,16 +128,14 @@ impl CorpusStore {
         validate_rel(rel)?;
         self.mutation_allowed()?;
         self.guard_rel(rel)?;
-        // either layout's sink spelling (Archive/ or a memex's archive/)
-        let original_rel = ["Archive", "Trash"]
+        // either layout's sink spelling (Archive/ or a memex's archive/), or an
+        // imported vault's own sinks
+        let original_rel = [self.layout.archive_id(), self.layout.trash_id()]
             .iter()
             .flat_map(|sink| [Layout::LegacyRotli, Layout::Memex].map(|layout| lifecycle_disk_folder(layout, sink)))
             .find_map(|disk| rel.strip_prefix(disk.as_str())?.strip_prefix('/'))
             .ok_or_else(|| format!("file is not in Archive or Trash: {rel}"))?;
-        let in_storage = match self.layout {
-            Layout::Memex => original_rel.starts_with("storage/"),
-            Layout::LegacyRotli => original_rel.starts_with("Storage/"),
-        };
+        let in_storage = original_rel.starts_with(&format!("{}/", self.layout.storage_dir()));
         // a BOARD restores by this lane too (2026-08-04): it is path-addressed
         // with no frontmatter origin, so the sink-relative path is its only way
         // home — and in LegacyRotli boards live in `Board/`, outside storage.

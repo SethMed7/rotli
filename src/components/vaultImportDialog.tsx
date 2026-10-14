@@ -48,6 +48,11 @@ export function importCopy(step: Exclude<VaultImportStep, { kind: "idle" }>): {
                 `${plural(step.report.skipped.length, "linked item wasn’t", "linked items weren’t")} copied: ${step.report.skipped.slice(0, 5).join(", ")}${step.report.skipped.length > 5 ? "…" : ""}`,
               ]
             : []),
+          ...(step.report.marked === "foreign"
+            ? [
+                "It has a memex.json from another app, which Rotli leaves as it is. So the copy is open as a protected folder: Rotli changes only what you ask for there, and the Librarian stays off.",
+              ]
+            : []),
         ],
       };
     case "failed":

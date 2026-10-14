@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A copied vault is a Rotli vault, and keeps your folders yours.** Work on a
+  copy now makes the copy a Rotli vault (vault format 3.9). Every folder you
+  brought shows, and your own `Archive`, `Trash`, `chats`, or `storage` folder
+  stays an ordinary folder: Rotli keeps its own Archive and Trash under
+  `Archive (Rotli)` and `Trash (Rotli)`, and new notes land in `Inbox`. Notes
+  keep their file names, so Obsidian links still work. The Librarian starts at
+  Suggest there and stays off until it learns the copy's layout.
+
 - **Bring a vault in as a copy.** Opening an Obsidian vault or a folder of
   notes now asks first: **Work on a copy** (recommended) or **Open in place**.
   A copy goes into a new folder beside your vaults, with progress and a Cancel

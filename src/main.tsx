@@ -5,6 +5,7 @@ import ReactDOM from "react-dom/client";
 import App from "./app";
 import { PLATFORM } from "./lib/featurePolicy";
 import { attachIdleMotion } from "./lib/idleMotion";
+import { syncFolderRoles } from "./services/fsNotes";
 import { hydrateWebVault } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
@@ -30,6 +31,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   // window drag); the stylesheet keys off this before the first paint.
   document.documentElement.dataset.platform = PLATFORM;
   await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
+  await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

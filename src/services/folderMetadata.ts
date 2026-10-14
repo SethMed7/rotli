@@ -17,6 +17,7 @@ import {
   baseName,
   freeVaultPath,
   parentPath,
+  vaultFolderRoles,
   vaultHasRotliMarker,
   vaultIsMemex,
 } from "./vaultDir";
@@ -45,8 +46,9 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
   if (!secure) assertSecureRemoval(body);
-  if (!(await vaultHasRotliMarker(dir))) {
-    // A folder opened in place keeps the note where it is (owner rule
+  if (!(await vaultHasRotliMarker(dir)) || (await vaultFolderRoles(dir))) {
+    // A folder opened in place — and an imported copy, whose folders are the
+    // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
     if (secure) await updateGitExclusions(dir, [path]);

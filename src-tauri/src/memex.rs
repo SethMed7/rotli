@@ -84,10 +84,11 @@ impl FolderAuthorizations {
 /// pins it; #24, audit 2026-07: the two sides drifted 3.6 vs 3.7 and Rust's
 /// verdict is the effective one — a 3.7 brain silently opened read-only).
 /// v3.8 adds readable filename projections, aliases, and a read-only query
-/// grammar on top of v3.7's AI Filer lane. rotli still
+/// grammar on top of v3.7's AI Filer lane. v3.9 adds the imported layout
+/// (`"layout": "imported"` + a role map, vault_roles.rs). rotli still
 /// WRITES to a v3.4 brain (the chat/inbox shape is unchanged), so the supported
 /// band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
-const CONTRACT_VERSION: &str = "3.8";
+pub(crate) const CONTRACT_VERSION: &str = "3.9";
 const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
@@ -522,7 +523,7 @@ pub fn memex_read_chat(
 
 fn read_chat_at(root: &Path, slug: &str) -> Result<VersionedChat, String> {
     let safe = safe_slug(slug)?;
-    let rel = format!("chats/{safe}.md");
+    let rel = format!("{}/{safe}.md", crate::vault_roles::chats_dir(root));
     let path = crate::containment::resolve_beneath(root, Path::new(&rel))?;
     let bytes = fs::read(&path).map_err(|error| format!("read {rel}: {error}"))?;
     let revision = crate::fsutil::revision(&bytes);
@@ -632,7 +633,7 @@ fn frontmatter_head(p: &Path) -> String {
 }
 
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
-    let dir = root.join("chats");
+    let dir = root.join(crate::vault_roles::chats_dir(root));
     let mut out = Vec::new();
     if let Ok(rd) = fs::read_dir(&dir) {
         for e in rd.flatten() {
@@ -818,15 +819,25 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
     // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
     atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;
+    write_new_marker(root, serde_json::Map::new())
+}
+
+/// Write a fresh `mx_` root marker stamped with `apps.rotli`, plus any `extra`
+/// fields (an imported vault's layout and role map, vault_roles.rs). Returns
+/// the new vault id. The one place a new marker is made.
+pub(crate) fn write_new_marker(root: &Path, extra: serde_json::Map<String, Value>) -> Result<String, String> {
     let id = format!("mx_{}", Uuid::new_v4());
     let now = now_iso();
-    let info = serde_json::json!({
+    let mut info = serde_json::json!({
         "id": id,
         "contract": CONTRACT_VERSION,
         "createdAt": now,
         "selfHeal": true,
         "apps": { "rotli": { "role": "chat-system", "connectedAt": now } },
     });
+    if let Some(object) = info.as_object_mut() {
+        object.extend(extra);
+    }
     atomic_write(
         &root.join("memex.json"),
         &(serde_json::to_string_pretty(&info).map_err(|e| e.to_string())? + "\n"),
@@ -879,7 +890,7 @@ fn write_chat_at(
     let safe = safe_slug(slug)?;
     let rel = format!("chats/{safe}.md");
     assert_writable(&rel)?;
-    let chats = root.join("chats");
+    let chats = root.join(crate::vault_roles::chats_dir(root));
     fs::create_dir_all(&chats).map_err(|e| e.to_string())?;
     let path = chats.join(format!("{safe}.md"));
     with_file_lock(&path, || {
@@ -1045,7 +1056,7 @@ pub fn memex_rename_chat(
     let new_safe = safe_slug(&new_slug)?;
     assert_writable(&format!("chats/{old_safe}.md"))?;
     assert_writable(&format!("chats/{new_safe}.md"))?;
-    let chats = root.join("chats");
+    let chats = root.join(crate::vault_roles::chats_dir(&root));
     let old_path = chats.join(format!("{old_safe}.md"));
     let new_path = chats.join(format!("{new_safe}.md"));
     if !old_path.exists() {
@@ -1083,7 +1094,7 @@ pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> 
 pub fn memex_reveal_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
     let root = registered_root(&app, &root)?;
     let safe = safe_slug(&slug)?;
-    let path = root.join("chats").join(format!("{safe}.md"));
+    let path = root.join(crate::vault_roles::chats_dir(&root)).join(format!("{safe}.md"));
     if !path.is_file() {
         return Err(format!("chat not found on disk: {safe}"));
     }
@@ -1110,11 +1121,11 @@ fn move_chat_to_bucket(
     let safe = safe_slug(slug)?;
     assert_writable(&format!("chats/{safe}.md"))?;
     assert_writable(&format!("chats/{bucket}/{safe}.md"))?;
-    let src = root.join("chats").join(format!("{safe}.md"));
+    let src = root.join(crate::vault_roles::chats_dir(&root)).join(format!("{safe}.md"));
     if !src.exists() {
         return Err(format!("chat not found: {safe}"));
     }
-    let dir = root.join("chats").join(bucket);
+    let dir = root.join(crate::vault_roles::chats_dir(&root)).join(bucket);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dst = dir.join(format!("{safe}.md"));
     with_file_lock(&src, || fs::rename(&src, &dst).map_err(|e| e.to_string()))
@@ -1505,9 +1516,10 @@ mod tests {
         assert!(contract_ok(Some("3.5"))); // mid-band
         assert!(contract_ok(Some("3.6"))); // mid-band
         assert!(contract_ok(Some("3.7"))); // the Filer-lane contract
-        assert!(contract_ok(Some("3.8"))); // readable identity + query grammar ceiling
+        assert!(contract_ok(Some("3.8"))); // readable identity + query grammar
+        assert!(contract_ok(Some("3.9"))); // the imported layout ceiling
         assert!(!contract_ok(Some("3.3"))); // below the floor
-        assert!(!contract_ok(Some("3.9"))); // above the ceiling
+        assert!(!contract_ok(Some("3.10"))); // above the ceiling
         assert!(!contract_ok(Some("4.0"))); // a future major
         assert!(!contract_ok(None));
     }

@@ -26,7 +26,7 @@
 use serde::Serialize;
 
 use super::{
-    is_archive_folder, is_chats_folder, is_trash_folder, CorpusState, CorpusStore, Layout,
+    is_archive_folder, is_chats_lane, is_trash_folder, CorpusState, CorpusStore,
     NoteKind,
 };
 
@@ -186,9 +186,9 @@ impl CorpusStore {
         let mut out = Vec::new();
         for meta in &cache.list.notes {
             if meta.kind != NoteKind::Note
-                || is_trash_folder(&meta.folder_id)
-                || is_archive_folder(&meta.folder_id)
-                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+                || is_trash_folder(layout, &meta.folder_id)
+                || is_archive_folder(layout, &meta.folder_id)
+                || is_chats_lane(layout, &meta.folder_id)
             {
                 continue;
             }
