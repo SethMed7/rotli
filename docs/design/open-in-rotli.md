@@ -151,7 +151,9 @@ folder (`CorpusStore::open_raw_folder`, `src-tauri/src/folder_window.rs`).
   vault is connected, and a folder of notes asks **Work on a copy
   (recommended)** or **Open in place**
   ([`vault-copy-and-obsidian-compatibility.md`](vault-copy-and-obsidian-compatibility.md),
-  slice 3).
+  slice 3). The folder window stays open while main asks. Main closes it
+  (`folder_window_close`, which accepts only folder-window labels) once a
+  vault opened, so "not now" leaves it where it was.
 - Finder registration: a `public.folder` association (rank `Alternate`) is in
   `bundle.fileAssociations`. A debug bundle's Info.plist carries it
   (`LSItemContentTypes = public.folder`, `LSHandlerRank = Alternate`), so a

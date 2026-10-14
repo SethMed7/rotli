@@ -27,7 +27,7 @@ import {
   useSwitchVault,
 } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
-import { onFolderAddedAsVault } from "../services/folderWindow";
+import { closeFolderWindow, onFolderAddedAsVault } from "../services/folderWindow";
 import { mainFolderIds, mainFoldersOpenByDefault, mainTreeSize } from "../services/mainTree";
 import { openExistingFolder } from "../services/vaultImport";
 import {
@@ -133,26 +133,34 @@ export function Sidebar() {
   /** A picked folder (or one a folder window hands over) becomes a vault:
    * made fresh when empty, linked when it's a vault; a folder of someone's
    * notes asks first — a copy Rotli makes, or the folder in place. */
-  const connectPath = async (path: string) => {
+  /** Resolves whether a vault opened or connected (false: "not now"). */
+  const connectPath = async (path: string): Promise<boolean> => {
     const inspection = await corpusInspectFolder(path);
     const plan = connectPlan(inspection.kind);
     if (plan === "create") {
       await initMemexAsCorpus(path);
       await activateCreatedVault();
-    } else if (plan === "link") {
-      await connectBrainMut.mutateAsync(path);
-    } else {
-      // a folder of someone's notes: a copy Rotli makes, or the folder in place
-      await openExistingFolder(path, inspection, async () => {
-        await flushSettingsNow();
-        await chooseFolderMut.mutateAsync(path);
-      });
+      return true;
     }
+    if (plan === "link") {
+      await connectBrainMut.mutateAsync(path);
+      return true;
+    }
+    // a folder of someone's notes: a copy Rotli makes, or the folder in place
+    return openExistingFolder(path, inspection, async () => {
+      await flushSettingsNow();
+      await chooseFolderMut.mutateAsync(path);
+    });
   };
 
   // a folder window's "Add as vault" lands here, already authorized by Rust
-  const addFolderAsVault = useEffectEvent((path: string) => {
-    void connectPath(path).catch(vaultErr("add that folder as a vault"));
+  // (its window closes only once a vault opened; "not now" leaves it open)
+  const addFolderAsVault = useEffectEvent(({ path, window }: { path: string; window: string }) => {
+    void connectPath(path)
+      .then(async (opened) => {
+        if (opened) await closeFolderWindow(window);
+      })
+      .catch(vaultErr("add that folder as a vault"));
   });
   useEffect(() => onFolderAddedAsVault(addFolderAsVault), []);
 

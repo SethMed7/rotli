@@ -13,6 +13,11 @@ export function corpusListRoot(root: string): Promise<CorpusListPayload> {
   return invoke<CorpusListPayload>("corpus_list_root", { root });
 }
 
+/** Main closes a folder window once its folder opened as a vault. */
+export function folderWindowClose(label: string): Promise<void> {
+  return invoke<void>("folder_window_close", { label });
+}
+
 /** A folder window hands its folder to the main window as a vault. Rust reads
  * the folder from this window's own mount; the page never names a path. */
 export function folderWindowAddAsVault(): Promise<void> {

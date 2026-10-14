@@ -8,7 +8,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { corpusListRoot, folderWindowAddAsVault } from "../lib/finderBridge";
+import { corpusListRoot, folderWindowAddAsVault, folderWindowClose } from "../lib/finderBridge";
 import { onAddVault, onNativeCloseTab, onOpenNotice } from "../lib/hostEvents";
 import { type CorpusListPayload, startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { RAW_ROOT_PREFIX } from "../state/paneVaults";
@@ -113,8 +113,13 @@ export function useFolderWindowListing(root: string) {
 }
 
 /** Main window: a folder window's "Add as vault" handed its folder over. */
-export function onFolderAddedAsVault(cb: (path: string) => void): () => void {
+export function onFolderAddedAsVault(cb: (request: { path: string; window: string }) => void): () => void {
   return onAddVault(cb);
+}
+
+/** The folder opened as a vault: its folder window can go. */
+export function closeFolderWindow(label: string): Promise<void> {
+  return folderWindowClose(label);
 }
 
 /** The shell's listeners; returns the teardown. File → Close Tab closes a

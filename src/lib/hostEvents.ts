@@ -43,9 +43,11 @@ export function onOpenNotice(cb: (message: string) => void): () => void {
 
 /** Rust → main window: a folder window's "Add as vault" — the folder (already
  * authorized like a picked one) runs main's ordinary connect flow. */
-export function onAddVault(cb: (path: string) => void): () => void {
+export function onAddVault(cb: (request: { path: string; window: string }) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listenHere<string>("rotli:add-vault", (event) => cb(event.payload));
+  const unlisten = listenHere<{ path: string; window: string }>("rotli:add-vault", (event) =>
+    cb(event.payload),
+  );
   return () => void unlisten.then((fn) => fn());
 }
 

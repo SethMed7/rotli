@@ -49,7 +49,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:native-drop-authorized` | R→W | The host issued one-shot import grants for a native drop and reports the paths plus drop position. A file promise resolves after the drop, so this can arrive a moment later, always with the ORIGINAL drop position. |
 | `rotli:native-drop-refused` | R→W | A native drop delivered nothing that could be granted (folders, files gone mid-drag, a drag with no path, promise, or image bytes); the webview shows a notice instead of doing nothing. |
 | `rotli:vault-copy-progress` | R→W | "Work on a copy": files and bytes copied so far (throttled), for the import dialog's progress. |
-| `rotli:add-vault` | R→W | A folder window's "Add as vault": the folder (authorized by Rust, read from the window's own mount) runs main's ordinary connect flow. |
+| `rotli:add-vault` | R→W | A folder window's "Add as vault": the folder (authorized by Rust, read from the window's own mount) and the window's label. Main asks copy-or-in-place and closes that window (`folder_window_close`) only once a vault opened. |
 | `rotli:open-notice` | R→W | Something Finder handed Rotli couldn't open, or a folder window couldn't save before closing; the window says so instead of doing nothing. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |
 | `rotli:organizer-progress` | R→W | Librarian run progress for the live Activity lane. |

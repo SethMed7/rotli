@@ -1279,8 +1279,13 @@ mod vault_activation_tests {
         std::fs::write(source.join("Projects/Nested/plan.md"), "# Plan\n").unwrap();
         std::fs::write(source.join(".obsidian/app.json"), "{}").unwrap();
         std::fs::write(source.join("Projects/node_modules/dep/README.md"), "# Dep\n").unwrap();
+        // opened in place before: its sidecar doesn't make it a Rotli vault,
+        // so bringing it in still asks copy-or-in-place
+        std::fs::create_dir_all(source.join(".rotli")).unwrap();
+        std::fs::write(source.join(".rotli/main.json"), "{}").unwrap();
 
         let report = inspect_vault_path(&source).unwrap();
+        assert_eq!(report.kind, "markdown");
         assert_eq!(report.source, "Obsidian vault");
         assert_eq!(report.markdown_files, 1, "node_modules is never part of a vault");
         assert_eq!(report.folders, 2);
@@ -2198,6 +2203,7 @@ pub fn run() {
             corpus::corpus_list,
             corpus::raw::corpus_list_root,
             folder_window::folder_window_add_as_vault,
+            folder_window::folder_window_close,
             finder_quick_action::finder_quick_action_status,
             finder_quick_action::finder_quick_action_set,
             corpus::corpus_search,
