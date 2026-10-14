@@ -53,6 +53,7 @@ import {
   RESULT_EM,
 } from "./listGeometry";
 import { widestOrdinalInRun } from "./listNumbers";
+import { revealRange } from "./readingReveal";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -795,7 +796,7 @@ function build(view: EditorView): {
 } {
   const decos: Range<Decoration>[] = [];
   const atomics: Range<Decoration>[] = [];
-  const sel = view.state.selection.main;
+  const sel = revealRange(view.state);
   const doc = view.state.doc;
   const progress = scanTaskProgress(doc);
   // blockRender owns the rendered fenced languages; livePreview must leave

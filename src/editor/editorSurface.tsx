@@ -241,6 +241,7 @@ export function EditorSurface({
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
   const librarianOpen = useLibrarianBar((s) => s.paneId === paneId);
   const focusMode = useUiStore((s) => s.focusMode);
+  const readingMode = useUiStore((s) => s.readingMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
   const focusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
@@ -532,7 +533,7 @@ export function EditorSurface({
         noteFolder={noteDiskFolder(note)}
         paneId={paneId}
         autoFocus={autoFocus || focusOnMount || pending}
-        focusMode={focusMode}
+        focusMode={focusMode && !readingMode}
         fontSize={fontSize}
         measureWidth={measureWidth}
         initialText={note.body}
@@ -546,7 +547,7 @@ export function EditorSurface({
         onFmCommit={commitFm}
         onFmRead={onFmRead}
       />
-      {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
+      {focusMode && !readingMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
       <LibrarianChat noteId={noteId} paneId={paneId} />
       {librarianOpen ? (
         <BottomSlot>

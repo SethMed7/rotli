@@ -146,6 +146,7 @@ function MainShell() {
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const transientCount = useUiStore((s) => s.transients.length);
   const focusMode = useUiStore((s) => s.focusMode);
+  const readingMode = useUiStore((s) => s.readingMode);
   const onboarded = useUiStore((s) => s.onboarded);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
@@ -176,7 +177,10 @@ function MainShell() {
   useEffect(() => {
     if (focusMode) document.documentElement.dataset.focus = "true";
     else delete document.documentElement.dataset.focus;
-  }, [focusMode]);
+    // reading mode rides on focus mode: the note, read-only, nothing reacts to hover
+    if (readingMode) document.documentElement.dataset.reading = "true";
+    else delete document.documentElement.dataset.reading;
+  }, [focusMode, readingMode]);
 
   // One composition-owned housekeeping trigger. It runs after opt-in/settings
   // changes and whenever the app becomes visible again. No background timer:

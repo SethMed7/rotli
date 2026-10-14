@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reading mode (⌥⌘R).** Everything but the note you're in steps away, as in
+  Focus mode, and the note is only for reading: it is always beautified,
+  takes no typing, shows no spelling marks, and nothing changes when the
+  pointer moves over it. It still scrolls. Esc or ⌥⌘R leaves it; it's also in
+  the command palette.
+
 - **AI edits in the Aa panel.** A note's Aa panel now has an **AI edits** row
   beside Secure: **Off** keeps the words yours, **Allowed** lets chat and
   agents rewrite the note's text. It is the same switch as "Let AI edit the

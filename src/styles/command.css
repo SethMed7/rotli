@@ -3049,6 +3049,17 @@
 [data-focus="true"] .panes.multi .pane.focused::before {
   display: none;
 }
+/* reading mode (keys/viewModeActions.ts) rides on focus mode: the note only to
+   read. Nothing in it reacts to the pointer (no hover states, handles, link
+   cursors, or caret), and the page still scrolls under the wheel. */
+[data-reading="true"] .cm-content,
+[data-reading="true"] .cm-content * {
+  pointer-events: none;
+}
+[data-reading="true"] .cm-gutters,
+[data-reading="true"] .editor-scroll-top {
+  display: none;
+}
 /* word count, bottom-right at 60%, gone while typing */
 .fwc {
   position: absolute;

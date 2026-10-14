@@ -59,6 +59,7 @@ import { registerQuickNoteActions } from "./quickNoteActions";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 import { registerVaultActions } from "./vaultActions";
+import { registerViewModeActions } from "./viewModeActions";
 
 function focusedTabNow() {
   const { root, focusedPaneId } = usePanesStore.getState();
@@ -244,17 +245,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerCaptureActions();
-  registerAction({
-    id: "view.focus",
-    title: "Focus mode",
-    defaultChord: "Alt+Meta+F",
-    run: () => {
-      const ui = useUiStore.getState();
-      if (ui.sidebarMode === "breve") return;
-      ui.setSettingsOpen(false);
-      ui.setFocusMode(!ui.focusMode);
-    },
-  });
+  registerViewModeActions();
   if (LAUNCH_FEATURES.breve)
     registerAction({
       enabled: () => frontOn("breve"),
