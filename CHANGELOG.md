@@ -17,11 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   brought shows, and your own `Archive`, `Trash`, `chats`, or `storage` folder
   stays an ordinary folder: Rotli keeps its own Archive and Trash under
   `Archive (Rotli)` and `Trash (Rotli)`, and new notes land in `Inbox`. Notes
-  keep their file names, so Obsidian links still work. The Librarian starts at
-  Suggest there and stays off until it learns the copy's layout.
+  keep their file names, so Obsidian links still work. The copy's Librarian is
+  on, at Suggest, whatever the vault you came from had; it starts organizing
+  once it learns the copy's layout.
 
-- **Bring a vault in as a copy.** Opening an Obsidian vault or a folder of
-  notes now asks first: **Work on a copy** (recommended) or **Open in place**.
+- **Connect a copy with the Librarian.** Adding an Obsidian vault or a folder
+  of notes now confirms: **Connect** opens it where it is, untouched by the
+  Librarian, or **Connect a copy with the Librarian**. Setup just connects it,
+  and its Librarian step offers the Librarian only on a copy; a folder already
+  connected that way offers the copy in Settings → Librarian. The Librarian is
+  never on for a folder you connected in place, and **Why a copy?** explains:
+  your original is never touched.
   A copy goes into a new folder beside your vaults, with progress and a Cancel
   button. Rotli checks every file against the original before opening it, and
   the original is only ever read, never changed. Linked items it can't follow

@@ -4146,3 +4146,17 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
     gap: 6px;
   }
 }
+/* "Why a copy?" (whyCopy.tsx): a quiet disclosure under the copy offer */
+.why-copy {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.why-copy summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+.why-copy p {
+  margin: 6px 0 0;
+}

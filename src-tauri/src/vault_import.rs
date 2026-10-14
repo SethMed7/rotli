@@ -322,8 +322,10 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
 }
 
 /// Turn a verified copy into the vault it opens as (slice 4): mark it
-/// imported, carry the person's settings over as with any switch, then set
-/// its first Librarian setting to Suggest. A copied Rotli vault stays one, and
+/// imported, carry the person's settings over as with any switch, then turn
+/// its Librarian on at Suggest — the person made this copy for the Librarian,
+/// and the switch is decided per vault, never inherited. A copied Rotli vault
+/// stays one, and
 /// a foreign `memex.json` is never overwritten — that copy opens protected.
 pub(crate) fn make_vault(destination: &Path, previous: Option<&Path>) -> Result<Marked, String> {
     let marked = crate::vault_roles::mark_imported(destination)?;
@@ -331,7 +333,7 @@ pub(crate) fn make_vault(destination: &Path, previous: Option<&Path>) -> Result<
         corpus::carry_settings(previous, destination)?;
     }
     if marked == Marked::Imported {
-        crate::vault_roles::seed_suggest(destination)?;
+        crate::vault_roles::seed_librarian(destination)?;
     }
     Ok(marked)
 }

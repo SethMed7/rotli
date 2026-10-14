@@ -16,7 +16,6 @@ import {
   type CorpusRefView,
 } from "../../lib/tauri";
 import { chooseFolder, initMemexAsCorpus, pickVaultFolder } from "../../memex/service";
-import { openExistingFolder } from "../../services/vaultImport";
 import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
@@ -104,13 +103,9 @@ export function useVaultChoice({
       if (plan === "create") {
         await initMemexAsCorpus(path, librarian());
         await activateCreatedVault();
-      } else if (inspection.kind === "markdown") {
-        // someone's notes: a copy Rotli makes (recommended), or in place
-        if (!(await openExistingFolder(path, inspection, openInPlace))) {
-          await restoreVaultStep();
-          return;
-        }
       } else {
+        // a vault, or someone's notes: used in place. Setup never asks about
+        // a copy; the Librarian is its own step, and only it would need one
         await openInPlace();
       }
       await onDone?.();

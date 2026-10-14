@@ -51,7 +51,7 @@ export function onAddVault(cb: (request: { path: string; window: string }) => vo
   return () => void unlisten.then((fn) => fn());
 }
 
-/** Rust → main window: "Work on a copy" progress (throttled). */
+/** Rust → main window: "Connect a copy with the Librarian" progress (throttled). */
 export interface VaultCopyProgress {
   files: number;
   totalFiles: number;

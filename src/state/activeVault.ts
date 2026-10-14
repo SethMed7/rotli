@@ -1,5 +1,6 @@
 import { corpusRefreshActiveVault, isTauri } from "../lib/tauri";
 import { syncFolderRoles } from "../services/fsNotes";
+import { holdLibrarianOffInPlace } from "../services/librarianSwitch";
 import { queryClient } from "../services/query";
 import { openWelcome, resetWelcome } from "../services/welcome";
 import { resetMainForVaultSwitch } from "./main";
@@ -24,6 +25,7 @@ export function refreshActiveVault(): Promise<void> {
     resetViewsForVaultSwitch();
     useMruStore.setState({ ids: [], itemTouchedAt: {}, chatTouchedAt: {} });
     await hydratePersistedState();
+    holdLibrarianOffInPlace();
     resetUiForVaultSwitch();
   })();
   refreshInFlight = refresh;

@@ -1599,6 +1599,8 @@ export interface CorpusRefView {
   brainEnabled: boolean;
   /** An imported vault's own folders by role (services/destinations.ts); null otherwise. */
   folderRoles?: FolderRoles | null;
+  /** A folder opened in place (protected): the Librarian never organizes it. */
+  adopted?: boolean;
 }
 
 /** The whole Location config (the one place "where do my notes live" is decided). */

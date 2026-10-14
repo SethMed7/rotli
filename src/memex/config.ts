@@ -34,6 +34,10 @@ export interface MemexConfig {
    * folder): display-only, for the vault switcher. Never a write target, so it
    * stays out of `instances`. */
   currentFolder?: MemexInstance | null;
+  /** The open folder was opened in place, so the Librarian never organizes it
+   * (docs/design/vault-copy-and-obsidian-compatibility.md): Settings offers a
+   * copy with the Librarian instead. */
+  openedInPlace?: boolean;
 }
 
 function baseName(p: string): string {
@@ -85,7 +89,13 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
           brainEnabled: v.corpus.brainEnabled ?? true,
         }
       : null;
-  return { activeId, instances, developmentReadOnly: v.developmentReadOnly, currentFolder };
+  return {
+    activeId,
+    instances,
+    developmentReadOnly: v.developmentReadOnly,
+    currentFolder,
+    openedInPlace: v.corpus.adopted === true,
+  };
 }
 
 export const activeInstance = (c: MemexConfig): MemexInstance | null =>

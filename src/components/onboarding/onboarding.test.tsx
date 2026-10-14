@@ -3,6 +3,7 @@
 
 import { expect, test } from "bun:test";
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { registerDefaultActions } from "../../keys/actions";
@@ -13,7 +14,9 @@ registerDefaultActions();
 
 const render = (step: "you" | "librarian" | "shortcuts") =>
   renderToStaticMarkup(
-    <Onboarding step={step} resumed onDone={() => {}} onBack={() => {}} onSkip={() => {}} />,
+    <QueryClientProvider client={new QueryClient()}>
+      <Onboarding step={step} resumed onDone={() => {}} onBack={() => {}} onSkip={() => {}} />
+    </QueryClientProvider>,
   );
 
 test("the first screen is your name and a theme, and nothing dresses the quokka", () => {

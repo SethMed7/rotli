@@ -1113,6 +1113,9 @@ struct CorpusView {
     brain_enabled: bool,
     /// An imported vault's own folders by role (vault_roles.rs); null otherwise.
     folder_roles: Option<vault_roles::FolderRoles>,
+    /// A folder opened in place (protected): the Librarian never organizes it,
+    /// so Settings offers a copy instead.
+    adopted: bool,
 }
 
 /// A connected brain + per-root display facts the config file never stores.
@@ -1322,7 +1325,8 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     if development_read_only {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
-    let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
+    // a folder connected in place is never organized: its switch reads off
+    let corpus_brain_enabled = !cfg.corpus.adopted && root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
@@ -1331,6 +1335,7 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             perms,
             brain_enabled: corpus_brain_enabled,
             folder_roles,
+            adopted: cfg.corpus.adopted,
         },
         brains: cfg
             .brains

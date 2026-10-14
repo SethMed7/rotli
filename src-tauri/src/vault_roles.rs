@@ -208,10 +208,11 @@ pub(crate) fn mark_imported(root: &Path) -> Result<Marked, String> {
     Ok(Marked::Imported)
 }
 
-/// Seed the copy's first Librarian setting at Suggest (nothing moves without
-/// the person) — every other setting carried from the previous vault, the
-/// Librarian switch included, stays as it is.
-pub(crate) fn seed_suggest(root: &Path) -> Result<(), String> {
+/// Turn the copy's Librarian on at Suggest (nothing moves without the person).
+/// The person chose a copy *with the Librarian*, and the switch belongs to
+/// each vault, so it is set here rather than carried from the previous vault;
+/// every other carried setting stays as it is.
+pub(crate) fn seed_librarian(root: &Path) -> Result<(), String> {
     let dir = root.join(".rotli");
     let path = dir.join("settings.json");
     let mut settings = match fs::read_to_string(&path) {
@@ -223,6 +224,7 @@ pub(crate) fn seed_suggest(root: &Path) -> Result<(), String> {
     let Some(object) = settings.as_object_mut() else {
         return Err("the copy's settings are not an object".into());
     };
+    object.insert("brainEnabled".into(), Value::Bool(true));
     object.insert("organizerTrust".into(), Value::String("suggest".into()));
     fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
     let text = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())? + "\n";

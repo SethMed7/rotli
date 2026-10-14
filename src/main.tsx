@@ -6,6 +6,7 @@ import App from "./app";
 import { PLATFORM } from "./lib/featurePolicy";
 import { attachIdleMotion } from "./lib/idleMotion";
 import { syncFolderRoles } from "./services/fsNotes";
+import { holdLibrarianOffInPlace } from "./services/librarianSwitch";
 import { hydrateWebVault } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
@@ -33,6 +34,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
   await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws
+  holdLibrarianOffInPlace(); // a folder connected in place is never organized
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>

@@ -968,7 +968,11 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   the inbox on the capture shelf reads under Captures. Notes keep their file
   names on save and move, so Obsidian's `[[File name]]` links resolve; a
   secure flag stays on the note where it is. Empty Trash reaches only Rotli's
-  trash. The copy's first Librarian setting is Suggest; the Librarian, the
+  trash. The copy's Librarian switch is on, at Suggest (the switch is the
+  vault's own, never carried from the previous vault). A folder connected in
+  place is the opposite: its Librarian switch is always off
+  (`CorpusRefView.brainEnabled` false, `adopted` true), and the only way to
+  the Librarian is such a copy. The Librarian, the
   Library, and the memex note lanes stay off there until they learn the
   layout, so the webview sees it as a plain vault with a role map
   (`CorpusRefView.folderRoles`). A copied Rotli vault keeps its own marker and

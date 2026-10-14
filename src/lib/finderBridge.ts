@@ -24,7 +24,7 @@ export function folderWindowAddAsVault(): Promise<void> {
   return invoke<void>("folder_window_add_as_vault");
 }
 
-/** What "Work on a copy" made (src-tauri/src/vault_import.rs). */
+/** What "Connect a copy with the Librarian" made (src-tauri/src/vault_import.rs). */
 export interface VaultCopyReport {
   destination: string;
   files: number;

@@ -56,7 +56,9 @@ export const COMPONENT_DIRECTORY_OWNERS = {
 export const COMPONENT_ROOT_FILE_OWNERS = {
   "backToNotes.tsx": "shared back-to-panes control for full-content views",
   "surfaceSearch.tsx": "shared search field for full-content views (Tasks, Captures)",
-  "vaultImportDialog.tsx": "vault import: the copy-or-in-place choice, the copy's progress, and its result",
+  "vaultImportDialog.tsx":
+    "vault import: connect or connect a copy with the Librarian, the copy's progress, and its result",
+  "whyCopy.tsx": "vault import: the Why a copy? disclosure every Librarian copy offer carries",
   "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
   "webDialogFrame.tsx":
     "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
@@ -176,7 +178,10 @@ export const SERVICE_FILE_OWNERS = {
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
-  "vaultImport.ts": "vault import (work on a copy: ask, copy with progress, open the copy)",
+  "vaultImport.ts":
+    "vault import (connect a copy with the Librarian: confirm, copy with progress, open the copy)",
+  "vaultInPlace.ts":
+    "vault import: whether the active vault is a folder connected in place (the Librarian stays off)",
   "connectorSetup.ts": "chat",
   "connectedModels.ts": "chat (the connected clients' own model lists)",
   "helperLink.ts": "chat",

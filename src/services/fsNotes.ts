@@ -30,6 +30,7 @@ import {
   setFolderRoles,
 } from "./destinations";
 import type { NotesService } from "./notesPort";
+import { setOpenedInPlace } from "./vaultInPlace";
 
 /** corpus.rs says "note not found: <id>" for a stale/unknown id. */
 function isNotFound(err: unknown): boolean {
@@ -76,13 +77,15 @@ export function memexRootMarkers(): Promise<ReadonlySet<string>> {
   return corpusListConfig().then(memexMarkersOf);
 }
 
-/** Load the active vault's role map (an imported vault's own folders) before
- * anything lists it: at boot and on every vault switch. A failed read keeps
+/** Load the active vault's role map (an imported vault's own folders), and
+ * whether it is a folder connected in place, before anything lists it: at
+ * boot and on every vault switch. A failed read keeps
  * the fixed names — the same answer a Rotli vault gives. */
 export async function syncFolderRoles(): Promise<void> {
   if (!isTauri()) return; // Rotli Web reads the marker itself (folderNotes.ts)
   const cfg = await corpusListConfig().catch(() => null);
   setFolderRoles(cfg?.corpus.folderRoles ?? null);
+  setOpenedInPlace(cfg?.corpus.adopted === true);
 }
 
 export class FsNotesService implements NotesService {

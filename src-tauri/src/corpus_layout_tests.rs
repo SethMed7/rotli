@@ -153,8 +153,8 @@ fn an_imported_capture_reads_as_a_capture_and_the_persons_inbox_notes_do_not() {
 
 /// Guard 2: an Obsidian-shaped folder with its own Archive/, Trash/, and Inbox/
 /// is copied, marked, and opened. Every folder is the person's and visible,
-/// Rotli's trash is its own, the Librarian's first setting is Suggest, and the
-/// person's Librarian switch came with them.
+/// Rotli's trash is its own, and the Librarian is on at Suggest even when the
+/// vault the person came from had it off (the copy was made for it).
 #[test]
 fn a_marked_copy_opens_as_an_imported_vault_with_every_folder_the_persons() {
     let temp = tempfile::TempDir::new().unwrap();
@@ -219,7 +219,7 @@ fn a_marked_copy_opens_as_an_imported_vault_with_every_folder_the_persons() {
 
     let knobs = crate::organizer_knobs::parse_knobs(&store.dot_read("settings").unwrap());
     assert_eq!(knobs.trust, Some(crate::organizer::Trust::Suggest));
-    assert!(!knobs.brain_enabled, "the Librarian switch is inherited");
+    assert!(knobs.brain_enabled, "the copy's switch is its own: on, never carried");
     // the source is untouched
     assert!(!source.join("memex.json").exists());
     assert!(source.join("Projects/Roadmap draft.md").is_file());

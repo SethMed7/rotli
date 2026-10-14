@@ -77,7 +77,7 @@ fn interning_hands_back_one_map_per_shape() {
 }
 
 #[test]
-fn suggest_is_seeded_over_carried_settings_and_nothing_else_changes() {
+fn the_librarian_is_seeded_on_at_suggest_over_carried_settings_and_nothing_else_changes() {
     let dir = TempDir::new().unwrap();
     fs::create_dir_all(dir.path().join(".rotli")).unwrap();
     fs::write(
@@ -85,18 +85,18 @@ fn suggest_is_seeded_over_carried_settings_and_nothing_else_changes() {
         "{\"organizerTrust\":\"organize\",\"brainEnabled\":false,\"theme\":\"grove\"}",
     )
     .unwrap();
-    seed_suggest(dir.path()).unwrap();
+    seed_librarian(dir.path()).unwrap();
     let settings: Value =
         serde_json::from_str(&fs::read_to_string(dir.path().join(".rotli/settings.json")).unwrap()).unwrap();
     assert_eq!(settings["organizerTrust"], "suggest");
-    assert_eq!(settings["brainEnabled"], false);
+    assert_eq!(settings["brainEnabled"], true, "the switch is this vault's, not carried");
     assert_eq!(settings["theme"], "grove");
 
     let fresh = TempDir::new().unwrap();
-    seed_suggest(fresh.path()).unwrap();
+    seed_librarian(fresh.path()).unwrap();
     let settings: Value =
         serde_json::from_str(&fs::read_to_string(fresh.path().join(".rotli/settings.json")).unwrap()).unwrap();
-    assert_eq!(settings, serde_json::json!({"organizerTrust": "suggest"}));
+    assert_eq!(settings, serde_json::json!({"brainEnabled": true, "organizerTrust": "suggest"}));
 }
 
 #[test]

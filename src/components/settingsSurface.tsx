@@ -153,6 +153,7 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FinderQuickActionSettings } from "./settings/finderQuickActionSettings";
 import { FrontsSettings } from "./settings/frontsSettings";
+import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { LINK_PASS } from "./settings/linkFormatSettings";
 import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
@@ -1643,6 +1644,8 @@ function BrainPane() {
 }
 
 function DesktopBrainPane() {
+  const memexCfg = useMemexConfig().data;
+  const inPlace = memexCfg?.openedInPlace ? memexCfg.currentFolder : null;
   const brainOn = useUiStore((s) => s.brainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
@@ -1682,6 +1685,14 @@ function DesktopBrainPane() {
     organizerSetTrust("suggest").catch(() => {});
     setLibrarianOn(true);
   };
+  if (inPlace) {
+    return (
+      <>
+        <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
+        <LibrarianCopyOffer root={inPlace.root} label={inPlace.label} />
+      </>
+    );
+  }
   return (
     <>
       <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
