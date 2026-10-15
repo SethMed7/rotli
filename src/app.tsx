@@ -29,7 +29,8 @@ import { ChatShell } from "./components/chatWindow/chatShell";
 import { FolderShell } from "./components/folderWindow/folderShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
-import { PersonSinksDialog } from "./components/personSinksDialog";
+import { PersonSinksPopout } from "./components/personSinksPopout";
+import { fillStartupTab } from "./state/startupTab";
 import { VaultImportDialog } from "./components/vaultImportDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
@@ -44,7 +45,6 @@ import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/re
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
   emitCaptureAck,
-  hasDurableCorpus,
   isTauri,
   onCaptureSave,
   onOrganizerProgress,
@@ -88,7 +88,7 @@ import { queryClient } from "./services/query";
 import { attachChatWindow } from "./state/chatWindow";
 import { addFragmentToMain, hydrateMain } from "./state/main";
 import { useOrganizerLive } from "./state/organizerLive";
-import { activeTabOf, leaves, usePanesStore } from "./state/panes";
+import { usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
 import { switchVault } from "./memex/service";
 import { invalidateChatFolders } from "./services/chatFolders";
@@ -391,19 +391,9 @@ function MainShell() {
   // this synchronously at module init; the disk corpus answers async — fill
   // the pristine startup tab once, never replacing anything the user opened.
   // A NOTE: a newer board or canvas opened here as a broken note tab.
+  // (state/startupTab.ts; a later vault switch fills it from activeVault.ts)
   useEffect(() => {
-    if (!hasDurableCorpus()) return;
-    void notesService.listNotes().then((notes) => {
-      const freshest = notes.find((note) => (note.kind ?? "note") === "note");
-      if (!freshest) return;
-      const { root, openNote } = usePanesStore.getState();
-      const panes = leaves(root);
-      const only = panes[0];
-      const onlyTab = only && only.tabs.length === 1 ? activeTabOf(only) : null;
-      const pristine =
-        panes.length === 1 && !!onlyTab && onlyTab.surfaceKind === "note" && onlyTab.noteId === "";
-      if (pristine) openNote(freshest.id);
-    });
+    void fillStartupTab();
   }, []);
 
   // While onboarding, the window must NOT vanish on blur (it normally hides) —
@@ -446,7 +436,7 @@ function MainShell() {
       <BoardNameDialog />
       <RenameDialog />
       <VaultImportDialog />
-      <PersonSinksDialog />
+      <PersonSinksPopout />
     </div>
   );
 }

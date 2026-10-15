@@ -105,6 +105,8 @@ export function SidebarSystem({
                   trashFull ? `${destNotes.length} items — open Trash to review and empty it` : undefined
                 }
                 data-system-trash-drop={id === DEST.trash ? "1" : undefined}
+                // where the "move your Archive and Trash?" callout points (personSinksPopout.tsx)
+                data-system-row={id === DEST.archive ? "archive" : id === DEST.trash ? "trash" : undefined}
                 onClick={() => openSystemRoot(id)}
                 {...rowProps({ id, kind: "folder" })}
               >

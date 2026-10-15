@@ -94,6 +94,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No stray "Untitled" tab after choosing a vault.** Opening a vault during
+  setup, or switching vaults later, left an empty "Untitled" tab over a blank
+  pane. The window now opens the vault's newest note, or nothing when it has
+  no notes, after every switch, not only at launch.
 - **A `.canvas` file no longer shows up as raw JSON in the public app.**
   Canvases aren't in this release yet, so Rotli now leaves `.canvas` files out
   of the sidebar and Main instead of listing them as ordinary files, and a tab
@@ -189,7 +193,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inheriting the original's id and the Librarian staying off.
 - **A copy with its own Archive and Trash asks once** whether to move their
   notes into Rotli's Archive and Trash, so the Librarian treats them as
-  archived and trashed. Yes moves every file and keeps its name and folder;
+  archived and trashed. The question pops out of the sidebar beside its
+  Archive and Trash rows, waits until setup's thank-you card is closed, and
+  goes away on its own after ten seconds, or with ×, Esc, or a click
+  elsewhere; then it asks again next time Rotli opens, until you answer. Yes moves every file and keeps its name and folder;
   No moves nothing. Either way Rotli never asks again for that vault.
 - **Chat with no vault offers Connect vault right there**, the same connect
   flow as the vault menu, instead of sending you to Settings.
