@@ -172,7 +172,7 @@ export const SERVICE_FILE_OWNERS = {
   "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
   "librarianPeople.ts": "librarian (statements: rules, People groups, new people notes, journaled)",
   "notePathCopy.ts": "notes",
-  "thanksShare.ts": "onboarding (the thank-you card: links, saving and copying the banner)",
+  "thanksShare.ts": "onboarding (the thank-you card: links and the share sheet)",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",

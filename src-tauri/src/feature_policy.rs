@@ -31,8 +31,9 @@ pub(crate) fn require_agents() -> Result<(), String> {
 }
 
 /// JSON Canvas `.canvas` files (2026-10-06): development builds only. In the
-/// public binary a `.canvas` stays an ordinary file — listed with its full
-/// name, moved like any file — and Rotli never creates one.
+/// public binary a `.canvas` is withheld (2026-10-15): the walk leaves it out
+/// of every listing and Main (`corpus_files.rs` `is_withheld_canvas`), it stays
+/// on disk untouched, and Rotli never creates one.
 fn canvas_enabled_for(channel: &str) -> bool {
     channel == "dev"
 }

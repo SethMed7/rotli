@@ -105,6 +105,7 @@ import type { SidebarChatData } from "./useChatFolders";
 import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
+import { ViewNameEditor } from "./viewNameEditor";
 
 /** The fixed System destinations after Library. Switching vaults changes only
  * their contents and counts and, in an imported vault, the folder ids behind
@@ -1121,46 +1122,17 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             ]}
           />
           {editingView && (
-            <div className="view-editor">
-              <label htmlFor="new-view-name">{editingView === "rename" ? "Rename view" : "New view"}</label>
-              <div className="view-editor-row">
-                <input
-                  id="new-view-name"
-                  autoFocus
-                  type="text"
-                  defaultValue={editingView === "rename" ? (activeView ?? "") : ""}
-                  placeholder="View name"
-                  aria-invalid={!!viewInputError}
-                  aria-describedby={viewInputError ? "view-name-error" : undefined}
-                  onChange={() => viewInputError && setViewInputError(null)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      commitViewName(event.currentTarget.value);
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      setEditingView(null);
-                      setViewInputError(null);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="view-editor-save"
-                  onClick={(event) => {
-                    const input = event.currentTarget.parentElement?.querySelector("input");
-                    if (input) commitViewName(input.value);
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-              {viewInputError && (
-                <p id="view-name-error" className="view-editor-error" role="alert">
-                  {viewInputError}
-                </p>
-              )}
-            </div>
+            <ViewNameEditor
+              mode={editingView}
+              initialName={editingView === "rename" ? (activeView ?? "") : ""}
+              error={viewInputError}
+              onCommit={commitViewName}
+              onEdit={() => viewInputError && setViewInputError(null)}
+              onClose={() => {
+                setEditingView(null);
+                setViewInputError(null);
+              }}
+            />
           )}
           {deletingView && (
             <div className="view-delete" role="alert">

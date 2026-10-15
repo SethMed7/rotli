@@ -949,9 +949,8 @@
   }
 
 }
-/* Thank you (thanksDialog.tsx): the shared dialog frame, wide
-   enough for the 1200×630 banner at a readable size; the quokka it copies
-   from is drawn off screen */
+/* Thank you (thanksDialog.tsx): the shared dialog frame, wide enough for the
+   banner scene at a readable size */
 .rename-card.thanks-card {
   width: min(40rem, calc(100vw - 32px));
   max-width: none;
@@ -970,28 +969,77 @@
   font-size: 13px;
   line-height: 1.5;
 }
-.thanks-quokka-source {
-  position: fixed;
-  top: 0;
-  left: -10000px;
-  pointer-events: none;
-}
+/* the banner (onboarding/thanksBannerScene.tsx, 2026-10-15): a full scene in
+   the theme's own scenery — a breath of its accent for the sky, its sky
+   ornament on the right, its horizon along the bottom, the quokka standing
+   on the ground, and the thank-you in the calm sky on the left. Sized from
+   the banner's own width so a narrow window shrinks it whole. */
 .thanks-banner {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 1200 / 630;
+  position: relative;
+  container-type: inline-size;
+  flex-shrink: 0;
+  margin: 0;
+  aspect-ratio: 2 / 1;
   border: 1px solid var(--border);
   border-radius: var(--r-control);
   overflow: hidden;
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
-.thanks-banner img {
+.thanks-banner-sky {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 52%;
+  height: auto;
+}
+.thanks-banner-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
-  display: block;
+  height: 44%;
 }
-/* two rows (2026-10-02): the shares, then the status and what's next, so
-   Start now and Take the tour never squeeze onto two lines */
+.thanks-banner .thanks-banner-quokka {
+  position: absolute;
+  left: 72%;
+  bottom: 2%;
+  /* the drawing's own size is its ceiling; the banner's width scales it down */
+  max-width: 36cqi;
+  max-height: 36cqi;
+  transform: translateX(-50%);
+}
+.thanks-banner-words {
+  position: absolute;
+  left: 6%;
+  top: 11%;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqi;
+}
+.thanks-banner-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(17px, 6cqi, 38px);
+  line-height: 1.1;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.thanks-banner-subline {
+  font-size: clamp(11.5px, 2.6cqi, 16px);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.thanks-banner-site {
+  margin-top: 1cqi;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(10.5px, 2.1cqi, 13px);
+  color: var(--accent-text);
+}
+/* two rows (2026-10-02): the shares and their status, then what's next, so
+   Take the tour and Start now never squeeze onto two lines */
 .thanks-card .rename-actions {
   flex-direction: column;
   align-items: stretch;
@@ -1000,11 +1048,13 @@
 .thanks-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 .thanks-next {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 .thanks-actions .rename-btn,
@@ -1012,11 +1062,33 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
-/* a brand's mark in place of its name (GitHub, X) */
-.thanks-mark {
+.thanks-share {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+/* GitHub and X (2026-10-15): the brands' logos alone, no chip around them —
+   a quiet 32px target that shows itself only on hover and keyboard focus */
+.thanks-logo {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.thanks-logo:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.thanks-logo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--text);
 }
 .thanks-status {
   flex: 1;

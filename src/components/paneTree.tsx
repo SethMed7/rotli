@@ -19,6 +19,7 @@ import {
 import { EditorSurface } from "../editor/editorSurface";
 import { evictDocument, pendingNoteDocumentId } from "../editor/model";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { canvasFileMode, fileName } from "../lib/fileKind";
 import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
@@ -45,8 +46,16 @@ import { TabStrip } from "./tabStrip";
 const CanvasFileEditor = lazy(() =>
   import("./jsonCanvas/canvasFileEditor").then((m) => ({ default: m.CanvasFileEditor })),
 );
-const opensAsJsonCanvas = (fileId: string): boolean =>
-  LAUNCH_FEATURES.jsonCanvas && fileId.toLowerCase().endsWith(".canvas");
+/** A `.canvas` in a build without canvases (a tab restored from an older
+ * session): its name and a quiet line, never the raw JSON. */
+function WithheldCanvasSurface({ fileId }: { fileId: string }) {
+  return (
+    <div className="canvas-withheld" role="status">
+      <strong>{fileName(fileId)}</strong>
+      <span>Canvases are coming soon. This file stays in your folder as it is.</span>
+    </div>
+  );
+}
 const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
 
 function PendingNoteSurface({ paneId, tabId }: { paneId: string; tabId: string }) {
@@ -161,13 +170,15 @@ function LeafView({ node }: { node: LeafNode }) {
                 />
               )}
               {heavyTab.surfaceKind === "file" &&
-                (opensAsJsonCanvas(heavyTab.fileId) ? (
-                  <Suspense fallback={null}>
-                    <CanvasFileEditor key={heavyTab.fileId} fileId={heavyTab.fileId} />
-                  </Suspense>
-                ) : (
-                  <FileSurface paneId={node.id} fileId={heavyTab.fileId} />
-                ))}
+                {
+                  canvas: (
+                    <Suspense fallback={null}>
+                      <CanvasFileEditor key={heavyTab.fileId} fileId={heavyTab.fileId} />
+                    </Suspense>
+                  ),
+                  withheld: <WithheldCanvasSurface fileId={heavyTab.fileId} />,
+                  file: <FileSurface paneId={node.id} fileId={heavyTab.fileId} />,
+                }[canvasFileMode(heavyTab.fileId, LAUNCH_FEATURES.jsonCanvas)]}
               {heavyTab.surfaceKind === "browser" && (
                 <BrowserSurface paneId={node.id} tabId={heavyTab.id} active={active} />
               )}

@@ -1,7 +1,7 @@
 // Semantic tokens resolved to colors a <canvas> can paint. A canvas can't read
 // `var(--accent)`, and a token's raw text may be color-mix() or another var(),
 // so each token is resolved through a hidden probe's computed color. Shared by
-// the onboarding banner and the Graph view (2026-10-05) — one resolver.
+// the Graph view (2026-10-05); the onboarding banner is a DOM scene now.
 
 function resolveTokenColors<K extends string>(
   tokens: Record<K, string>,
