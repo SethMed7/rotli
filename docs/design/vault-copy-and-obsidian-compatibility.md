@@ -247,7 +247,12 @@ brought-in vaults).
 - **Chat with no vault** offers *Connect vault*, the switcher's own Connect
   flow (`components/sidebar/useConnectVault.ts`).
 - **The Archive and Trash question.** In a copy whose Librarian is on, when
-  its own top-level `Archive/` or `Trash/` holds files, Rotli asks once:
+  its own top-level `Archive/` or `Trash/` holds files, Rotli asks once, in
+  a callout that pops out of the sidebar beside its Archive and Trash rows
+  (owner, 2026-10-15; `components/personSinksPopout.tsx`). It waits for the
+  copy dialog and setup's thank-you card, and closes on its own after ten
+  seconds (paused while pointed at or focused), or with ×, Esc, or a click
+  elsewhere; closing without an answer only hides it for this session:
   "Your vault has its own Archive and Trash folders. Move their notes into
   Rotli's Archive and Trash so the Librarian treats them as archived and
   trashed?" **Yes** moves every file into `Archive (Rotli)/` or

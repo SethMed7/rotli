@@ -7,6 +7,7 @@ import { resetMainForVaultSwitch } from "./main";
 import { useMruStore } from "./mru";
 import { resetPanesForVaultSwitch } from "./panes";
 import { hydratePersistedState } from "./persist";
+import { fillStartupTab } from "./startupTab";
 import { resetUiForVaultSwitch } from "./ui";
 import { resetViewsForVaultSwitch } from "./views";
 
@@ -14,7 +15,7 @@ let refreshInFlight: Promise<void> | null = null;
 
 /** Rebind one webview to the backend's newly active default vault. The native
  * shell stays mounted; only vault-scoped caches and durable projections move. */
-export function refreshActiveVault(): Promise<void> {
+export function refreshActiveVault({ startupTab = true }: { startupTab?: boolean } = {}): Promise<void> {
   if (refreshInFlight) return refreshInFlight;
   const refresh = (async () => {
     await syncFolderRoles();
@@ -27,6 +28,8 @@ export function refreshActiveVault(): Promise<void> {
     await hydratePersistedState();
     holdLibrarianOffInPlace();
     resetUiForVaultSwitch();
+    // the reset left a placeholder tab: open the vault's freshest note in it
+    if (startupTab) void fillStartupTab();
   })();
   refreshInFlight = refresh;
   void refresh.then(
@@ -46,7 +49,8 @@ export function refreshActiveVault(): Promise<void> {
  * a seeding failure is logged and left to Settings → Open welcome folder rather
  * than failing the creation. Opening an existing vault never comes through here. */
 export async function activateCreatedVault(): Promise<void> {
-  await refreshActiveVault();
+  // a new vault opens on its Welcome note instead of the freshest note
+  await refreshActiveVault({ startupTab: false });
   try {
     await openWelcome();
   } catch (cause) {
