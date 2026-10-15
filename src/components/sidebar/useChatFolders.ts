@@ -37,6 +37,8 @@ export interface SidebarChatData {
   activeMemex: MemexInstance | null;
   /** Pinned first, then newest reply (services/chatFolders chatActivityMs). */
   chatList: MemexChatSummary[];
+  /** The vault's chats have been read (an empty list then means "no chats yet"). */
+  chatsLoaded: boolean;
   manifest: ChatFoldersManifest;
   grouped: GroupedChats<MemexChatSummary>;
   /** Every folder's expandedDests key — the collapse-all default-open set. */
@@ -94,5 +96,13 @@ export function useChatFolders(): SidebarChatData {
         ),
       );
   };
-  return { activeMemex, chatList, manifest, grouped, folderKeys, update };
+  return {
+    activeMemex,
+    chatList,
+    chatsLoaded: rawChats !== undefined,
+    manifest,
+    grouped,
+    folderKeys,
+    update,
+  };
 }

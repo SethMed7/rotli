@@ -16,7 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Connect a model…** item that opens the same chooser setup used: models on
   this Mac, installing one, or connecting your own Claude, ChatGPT, Cursor, or
   Gemini. The first time you open Chat in a vault, that chooser comes first,
-  with **Start chatting** to go straight on with the model you already have.
+  on its own without clicking New chat, and on its own: the message box and
+  suggestions wait until you press **Start chatting** or **New chat**.
+- **Settings choices read clearly.** Pointing at an option no longer fills it
+  in like the selected one, so a choice like Naming's "First message" only
+  looks chosen when it is.
 
 - **Chat asks before it edits a note you wrote.** Instead of quietly making a
   copy, the chat shows a card: **Allow once**, **Always for this note**, or

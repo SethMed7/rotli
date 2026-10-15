@@ -2641,7 +2641,7 @@ export function ChatSurface({
               <ChatBlockedBar kind={blocked.kind} onAction={(action) => void onBlocked(action)} />
             )}
 
-            {writable ? (
+            {firstVisit ? null : writable ? (
               <>
                 <div className="chat-composer">
                   <div className="chat-composer-inner">
