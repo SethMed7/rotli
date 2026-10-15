@@ -24,6 +24,12 @@ fn error_text(result: &Value) -> String {
     result["content"][0]["text"].as_str().unwrap_or_default().to_string()
 }
 
+/// The note's current revision, read off disk as the AI write lane checks it.
+fn revision_of(ws: &mut Workspace, id: &str) -> String {
+    let rel = ws.store.resolve_note_rel(id).unwrap();
+    crate::fsutil::revision(&fs::read(ws.store.root().join(rel)).unwrap())
+}
+
 fn add_frontmatter_line(ws: &mut Workspace, id: &str, line: &str) {
     let rel = ws.store.resolve_note_rel(id).unwrap();
     let path = ws.store.root().join(rel);
@@ -235,10 +241,6 @@ fn opening_a_connected_vaults_item_queues_its_wire_id_in_the_default_mailbox() {
 /// wrote, journaled as `inline`, and nowhere the person said no.
 #[test]
 fn an_accepted_insertion_lands_in_a_person_written_note_and_nowhere_it_was_refused() {
-    fn revision_of(ws: &mut Workspace, id: &str) -> String {
-        let rel = ws.store.resolve_note_rel(id).unwrap();
-        crate::fsutil::revision(&fs::read(ws.store.root().join(rel)).unwrap())
-    }
     // the editor body the insertion is measured against, read off disk
     fn body_of(ws: &mut Workspace, id: &str) -> String {
         let rel = ws.store.resolve_note_rel(id).unwrap();
@@ -307,10 +309,6 @@ fn an_accepted_insertion_lands_in_a_person_written_note_and_nowhere_it_was_refus
 
 #[test]
 fn allow_once_rewrites_a_person_written_note_and_never_outranks_a_lock_or_a_no() {
-    fn revision_of(ws: &mut Workspace, id: &str) -> String {
-        let rel = ws.store.resolve_note_rel(id).unwrap();
-        crate::fsutil::revision(&fs::read(ws.store.root().join(rel)).unwrap())
-    }
     fn rewrite(ws: &mut Workspace, id: &str, body: &str, mode: AiWrite<'_>) -> Result<(), String> {
         let revision = revision_of(ws, id);
         ws.store.write_for_ai_as(id, body, true, &revision, mode).map(|_| ())

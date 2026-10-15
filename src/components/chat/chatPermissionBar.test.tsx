@@ -3,7 +3,13 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { BLOCK_NOTICES } from "../../ai/remoteBlock";
-import { ChatBlockedBar, ChatEditPermission, lastBlocked, typedConsent } from "./chatPermissionBar";
+import {
+  ChatBlockedBar,
+  ChatEditPermission,
+  lastBlocked,
+  PERMISSION_LABELS as L,
+  typedConsent,
+} from "./chatPermissionBar";
 
 test("a held-back message at the end of the thread is found with the words the person typed", () => {
   const thread = [
@@ -21,26 +27,25 @@ test("a held-back message at the end of the thread is found with the words the p
 
 test("only typed text can be sent anyway; secure-note text offers no way around", () => {
   const pattern = renderToStaticMarkup(<ChatBlockedBar kind="pattern" onAction={() => {}} />);
-  expect(pattern).toContain(">Send anyway<");
-  expect(pattern).toContain(">Edit message<");
+  expect(pattern).toContain(`>${L.sendAnyway}<`);
+  expect(pattern).toContain(`>${L.edit}<`);
   expect(pattern).toContain('role="alert"');
   const secure = renderToStaticMarkup(<ChatBlockedBar kind="secure" onAction={() => {}} />);
-  expect(secure).not.toContain("Send anyway");
-  expect(secure).toContain(">Edit message<");
+  expect(secure).not.toContain(L.sendAnyway);
+  expect(secure).toContain(`>${L.edit}<`);
   expect(renderToStaticMarkup(<ChatBlockedBar kind="warming" onAction={() => {}} />)).toContain(
-    ">Try again<",
+    `>${L.retry}<`,
   );
 });
 
 test("the edit card asks like a code editor; a turned-off note can't be allowed once", () => {
   const request = { id: "n1", title: "Thought of the day", revoked: false };
   const card = renderToStaticMarkup(<ChatEditPermission request={request} allowOnce onAnswer={() => {}} />);
-  for (const label of ["Allow once", "Always for this note", "No, make a new note"])
-    expect(card).toContain(label);
+  for (const label of [L.once, L.always, L.no]) expect(card).toContain(label);
   expect(card).toContain("Edit “Thought of the day”?");
   const revoked = renderToStaticMarkup(
     <ChatEditPermission request={{ ...request, revoked: true }} allowOnce onAnswer={() => {}} />,
   );
-  expect(revoked).not.toContain("Allow once");
-  expect(revoked).toContain("Turn AI editing back on");
+  expect(revoked).not.toContain(L.once);
+  expect(revoked).toContain(L.backOn);
 });

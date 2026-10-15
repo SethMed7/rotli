@@ -8,6 +8,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditAnswer, EditRequest } from "../../ai/editGate";
 import { BLOCK_NOTICES, blockedNoticeKind, type RemoteBlockKind } from "../../ai/remoteBlock";
 
+/** The words on the chat's ask-first buttons (tests read these, not copies). */
+export const PERMISSION_LABELS = {
+  once: "Allow once",
+  always: "Always for this note",
+  backOn: "Turn AI editing back on",
+  no: "No, make a new note",
+  sendAnyway: "Send anyway",
+  retry: "Try again",
+  edit: "Edit message",
+} as const;
+
 /** One pending "may I edit this note?" at a time; `ask` resolves when the
  * person answers, and anything still waiting answers "no" when the turn ends. */
 export function useEditPermission() {
@@ -53,14 +64,14 @@ export function ChatEditPermission({
         <div>
           {allowOnce && !request.revoked && (
             <button type="button" className="primary" onClick={() => onAnswer("once")}>
-              Allow once
+              {PERMISSION_LABELS.once}
             </button>
           )}
           <button type="button" onClick={() => onAnswer("always")}>
-            {request.revoked ? "Turn AI editing back on" : "Always for this note"}
+            {request.revoked ? PERMISSION_LABELS.backOn : PERMISSION_LABELS.always}
           </button>
           <button type="button" onClick={() => onAnswer("no")}>
-            No, make a new note
+            {PERMISSION_LABELS.no}
           </button>
         </div>
       </section>
@@ -86,16 +97,16 @@ export function ChatBlockedBar({
         <div>
           {kind === "pattern" && (
             <button type="button" className="danger" onClick={() => onAction("send-anyway")}>
-              Send anyway
+              {PERMISSION_LABELS.sendAnyway}
             </button>
           )}
           {kind === "warming" && (
             <button type="button" className="primary" onClick={() => onAction("retry")}>
-              Try again
+              {PERMISSION_LABELS.retry}
             </button>
           )}
           <button type="button" onClick={() => onAction("edit")}>
-            Edit message
+            {PERMISSION_LABELS.edit}
           </button>
         </div>
       </section>
