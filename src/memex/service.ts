@@ -190,6 +190,20 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
   await rewriteChat(instance, slug, (contents) => setAttachedTo(contents, stem));
 }
 
+/** Take a held-back exchange off the end of a chat file (the person's turn and
+ * Rotli's "⚠" notice after it), so "Send anyway" or "Edit message" replaces it
+ * instead of leaving a duplicate. Anything else at the end: unchanged. */
+export function withoutTrailingBlockedExchange(contents: string): string {
+  const reply = contents.lastIndexOf("\n**rotli** · ");
+  if (reply < 0 || !/^\n\*\*rotli\*\* · [^\n]*? — ⚠/.test(contents.slice(reply))) return contents;
+  const ask = contents.lastIndexOf("\n**you** · ", reply - 1);
+  return ask < 0 ? contents : contents.slice(0, ask + 1);
+}
+
+export async function dropBlockedExchange(instance: MemexInstance, slug: string): Promise<void> {
+  await rewriteChat(instance, slug, withoutTrailingBlockedExchange);
+}
+
 /** Rewrite one existing chat file through a pure edit. Another writer may land
  * first (a new chat's model/provider frontmatter is written in the
  * background); a lost revision race re-reads and applies the edit again

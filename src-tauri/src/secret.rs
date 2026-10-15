@@ -21,6 +21,13 @@ use std::sync::{Mutex, OnceLock};
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the text holds secrets.
 pub fn looks_secure(text: &str) -> bool {
+    !secret_spans(text).is_empty()
+}
+
+/// Every secret-shaped span in `text`, as byte ranges: exactly what
+/// `looks_secure` matches. `remote_block` uses the spans to honour a person's
+/// "Send anyway" only for text they typed themselves.
+pub(crate) fn secret_spans(text: &str) -> Vec<std::ops::Range<usize>> {
     static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
     let pats = PATTERNS.get_or_init(|| {
         [
@@ -42,9 +49,8 @@ pub fn looks_secure(text: &str) -> bool {
         .filter_map(|p| regex::Regex::new(p).ok())
         .collect()
     });
-    if pats.iter().any(|re| re.is_match(text)) {
-        return true;
-    }
+    let mut spans: Vec<std::ops::Range<usize>> =
+        pats.iter().flat_map(|re| re.find_iter(text).map(|m| m.range())).collect();
     // UNSEPARATED card numbers (#23, audit 2026-07): "4242424242424242" has no
     // dashes/spaces and skipped every pattern above. A bare 15–16 digit run is
     // too common (ids, phone-ish strings) to flag on shape alone, so each
@@ -57,8 +63,12 @@ pub fn looks_secure(text: &str) -> bool {
     // counts — only the digits after the point are exempt.
     static PAN: OnceLock<regex::Regex> = OnceLock::new();
     let pan = PAN.get_or_init(|| regex::Regex::new(r"\b\d{15,16}\b").expect("valid PAN regex"));
-    pan.find_iter(text)
-        .any(|m| !is_decimal_fraction(text, m.start()) && luhn_ok(m.as_str()))
+    spans.extend(
+        pan.find_iter(text)
+            .filter(|m| !is_decimal_fraction(text, m.start()) && luhn_ok(m.as_str()))
+            .map(|m| m.range()),
+    );
+    spans
 }
 
 /// Whether the digit run starting at `start` follows `<digit>.` — the
@@ -80,7 +90,12 @@ fn is_decimal_fraction(text: &str, start: usize) -> bool {
 /// nothing — is `echoes_secure_text`. Egress seams call `blocked_for_remote`,
 /// which is both.
 pub fn protected_for_remote(text: &str) -> bool {
-    looks_secure(text) || text.lines().any(|line| marks_protected(line.trim()))
+    looks_secure(text) || marked_protected(text)
+}
+
+/// The marker half alone: a line announcing a secure note or a tainted chat.
+pub(crate) fn marked_protected(text: &str) -> bool {
+    text.lines().any(|line| marks_protected(line.trim()))
 }
 
 /// The frontmatter markers that mean "this text came out of a protected
@@ -259,6 +274,11 @@ pub fn blocked_for_remote(text: &str) -> bool {
 /// every caller refuses while the ledger is cold (fail closed). Warm by
 /// default — the CLI, helper, and tests never start cold.
 static LEDGER_WARM: AtomicBool = AtomicBool::new(true);
+
+/// Whether the startup walk has fed the ledger (false: every remote send waits).
+pub(crate) fn ledger_warm() -> bool {
+    LEDGER_WARM.load(Ordering::Acquire)
+}
 
 /// App setup, before the background walk starts.
 pub fn begin_ledger_warmup() {

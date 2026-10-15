@@ -12,11 +12,13 @@ use super::{
 };
 use crate::ai_edit_policy::ai_edit_field;
 
-/// How an AI body write may change a note: rewrite it (chat, under the grant)
-/// or add one accepted passage (`/ai`, under the person's consent).
+/// How an AI body write may change a note: rewrite it (chat, under the grant),
+/// rewrite it once because the person said "Allow once" when the chat asked
+/// (2026-10-15), or add one accepted passage (`/ai`, under their consent).
 #[derive(Clone, Copy)]
 pub(crate) enum AiWrite<'a> {
     Replace,
+    ConsentedReplace,
     Insert(&'a str),
 }
 

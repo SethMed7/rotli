@@ -21,6 +21,7 @@ export function ChatClarificationBar({
             </button>
           ))}
         </div>
+        <small className="chat-question-hint">Or type your own answer below.</small>
       </section>
     </div>
   );

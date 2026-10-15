@@ -75,7 +75,13 @@ import {
   parseChatArtifacts,
   parseChatArtifactTurns,
 } from "../../memex/contract";
-import { readChat, registerChatArtifact, registerChatArtifactTurn, writeNote } from "../../memex/service";
+import {
+  dropBlockedExchange,
+  readChat,
+  registerChatArtifact,
+  registerChatArtifactTurn,
+  writeNote,
+} from "../../memex/service";
 import {
   useInstanceChats,
   useMemexConfig,
@@ -146,6 +152,14 @@ import {
   removeChatDraftImage,
 } from "./chatImageTokens";
 import { ModelPicker } from "./chatModelPicker";
+import {
+  type BlockedAction,
+  ChatBlockedBar,
+  ChatEditPermission,
+  lastBlocked,
+  typedConsent,
+  useEditPermission,
+} from "./chatPermissionBar";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
 import {
@@ -1189,6 +1203,7 @@ export function ChatSurface({
   const images = draft.images;
   const pendingQuestion = draft.questionKey === chatKeyId ? draft.question : null;
   const [messages, setMessages] = useState<Msg[]>([]);
+  const editPermission = useEditPermission();
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0);
   // The draft store clears as soon as the first prompt sends. Keep the title
   // chosen/derived for the brief pre-bind interval so the real input retires
@@ -1488,11 +1503,22 @@ export function ChatSurface({
     el.style.height = `${el.scrollHeight}px`;
   }, [message]);
 
-  const send = async (answer?: string) => {
+  // a held-back message: send it anyway, wait out startup, or take it back to edit
+  const blocked = lastBlocked(messages);
+  const onBlocked = async (action: BlockedAction) => {
+    if (!blocked || !active) return;
+    const base = messages.slice(0, -2);
+    setMessages(base);
+    if (chatSlug) await dropBlockedExchange(active, chatSlug).catch(() => undefined);
+    if (action === "edit") setDraftMessage(tabId, blocked.text);
+    else void send(blocked.text, { base, consent: action === "send-anyway" });
+  };
+  const send = async (answer?: string, retry?: { base: Msg[]; consent: boolean }) => {
+    const prior = retry?.base ?? messages;
     const typed = (answer ?? message).trim();
     const imgs = answer === undefined ? images : [];
     const createdArtifacts: ChatArtifact[] = [];
-    const assistantTurn = messages.filter((item) => item.speaker !== "you").length;
+    const assistantTurn = prior.filter((item) => item.speaker !== "you").length;
     const userAt = new Date().toISOString();
     // an image with no words is a real message ("what is this?") — the guard
     // used to require text, so attaching a picture and pressing send did nothing
@@ -1590,7 +1616,7 @@ export function ChatSurface({
     lastSentRef.current = { text: typed, images: imgs };
     clearDraft(tabId);
     // history = the prior turns; the new user message rides as runAgent's userText
-    const history: ChatTurn[] = messages.map((m) => ({
+    const history: ChatTurn[] = prior.map((m) => ({
       role: m.speaker === "you" ? "user" : "assistant",
       text: m.text,
     }));
@@ -1735,8 +1761,11 @@ export function ChatSurface({
     // same run already sees the secure context (PR #4 P1)
     const isSecureContext = () => secureReadRef.current || attachedSecure;
     const webSearchProvider = useUiStore.getState().webSearchProvider;
+    const consent = retry?.consent ? typedConsent(prior, [userText, providerUserText]) : undefined;
     const baseOpts = {
       requestId,
+      ...(consent ? { consent } : {}),
+      confirmEdit: editPermission.ask,
       ...(turnModel.id === picked.id && reasoningEffort ? { reasoningEffort } : {}),
       ...(turnModel.id === picked.id && serviceTier ? { serviceTier } : {}),
       onSecureNoteRead,
@@ -1776,6 +1805,7 @@ export function ChatSurface({
         ? runNativeAgent(makeTauriHost(turnModel, hostOpts), claudeSession(requestId), runInput, {
             modelId: turnModel.id,
             ...(baseOpts.reasoningEffort ? { reasoningEffort: baseOpts.reasoningEffort } : {}),
+            ...(consent ? { consent } : {}),
             isSecureContext,
           })
         : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
@@ -1815,7 +1845,7 @@ export function ChatSurface({
     const failed = reply.startsWith("⚠");
     const assistantAt = new Date().toISOString();
     const settledThread = recentChatThread([
-      ...messages,
+      ...prior,
       { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.id || image.src) },
       {
         speaker: "rotli",
@@ -1867,7 +1897,7 @@ export function ChatSurface({
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
     // a failed exchange (the ⚠ notice AND the turn it answered) never reaches
     // the notes model — a replayed safeguard error re-trips the safeguard
-    const memoryTurns = withoutFailedExchanges([...messages, ...turn], (m) => m.speaker === "rotli");
+    const memoryTurns = withoutFailedExchanges([...prior, ...turn], (m) => m.speaker === "rotli");
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)
@@ -2053,6 +2083,7 @@ export function ChatSurface({
     runSeq.current++;
     if (requestRef.current) {
       void cliCancel(requestRef.current).catch(() => {});
+      editPermission.answer("no"); // a stopped turn edits nothing
       // take it out of the local-compute line if it was waiting AND flag a
       // running local stream to abort mid-token (drops the socket, frees the slot)
       void localQueueCancel(requestRef.current).catch(() => {});
@@ -2610,6 +2641,16 @@ export function ChatSurface({
 
             {!busy && pendingQuestion && (
               <ChatClarificationBar question={pendingQuestion} onAnswer={(answer) => void send(answer)} />
+            )}
+            {editPermission.pending && (
+              <ChatEditPermission
+                request={editPermission.pending}
+                allowOnce={PLATFORM === "desktop"}
+                onAnswer={editPermission.answer}
+              />
+            )}
+            {!busy && blocked && (
+              <ChatBlockedBar kind={blocked.kind} onAction={(action) => void onBlocked(action)} />
             )}
 
             {writable ? (

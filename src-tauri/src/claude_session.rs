@@ -56,12 +56,15 @@ pub async fn claude_session_run(
     max_turns: u32,
     timeout_ms: Option<u64>,
     reasoning_effort: Option<String>,
+    // the person's own messages they chose to send anyway (remote_block.rs)
+    consent: Option<Vec<String>>,
     on_event: Channel<String>,
 ) -> Result<String, String> {
     provider::connected_provider_execution_allowed("claude")?;
     // the lane is remote by definition — the same egress law as cli_complete
-    if crate::secret::blocked_for_remote(&system_prompt) || crate::secret::blocked_for_remote(&user_text) {
-        return Err(crate::provider_lane::SECRET_MESSAGE.into());
+    let consented = consent.unwrap_or_default();
+    if let Some(block) = crate::remote_block::first_block(&[&system_prompt, &user_text], &consented) {
+        return Err(block.message());
     }
     check_tools(&tools)?;
     let turns = max_turns.clamp(1, 24);

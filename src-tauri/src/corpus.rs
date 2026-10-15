@@ -3851,7 +3851,11 @@ impl CorpusStore {
             }
             let refusal = match mode {
                 AiWrite::Replace => crate::ai_edit_policy::body_edit(&fm.foreign).refusal(),
-                AiWrite::Insert(_) => crate::ai_edit_policy::consented_insert_refusal(&fm.foreign),
+                // the person's "Allow once" covers what an accepted insert does:
+                // never a lock or a deliberate `ai_edit: false`
+                AiWrite::ConsentedReplace | AiWrite::Insert(_) => {
+                    crate::ai_edit_policy::consented_insert_refusal(&fm.foreign)
+                }
             };
             if let Some(refusal) = refusal {
                 return Err(refusal.into());
@@ -3879,7 +3883,7 @@ impl CorpusStore {
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             let editor = match mode {
-                AiWrite::Replace => ai_journal::AiEditor::chat(model_is_local),
+                AiWrite::Replace | AiWrite::ConsentedReplace => ai_journal::AiEditor::chat(model_is_local),
                 AiWrite::Insert(_) => ai_journal::AiEditor::inline(model_is_local),
             };
             self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, remote_visible, &editor);
@@ -8256,12 +8260,18 @@ pub fn corpus_write_ai(
     model_id: String,
     endpoint: String,
     expected_revision: String,
+    // the person said "Allow once" when the chat asked to edit their note
+    consented: Option<bool>,
 ) -> Result<CorpusWriteResult, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state
         .route(&root, |s| {
-            s.write_for_ai_if_revision(&rel, &body, model_is_local, &expected_revision)
+            if consented == Some(true) {
+                s.write_for_ai_as(&rel, &body, model_is_local, &expected_revision, AiWrite::ConsentedReplace)
+            } else {
+                s.write_for_ai_if_revision(&rel, &body, model_is_local, &expected_revision)
+            }
         })
         .map(|result| prefix_write_result(&root, result))
 }

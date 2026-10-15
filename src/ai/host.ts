@@ -8,11 +8,11 @@ import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemor
 import { documentImageFromBase64 } from "../documents/images";
 import type { DocumentImage } from "../documents/model";
 import { extOf, fileName } from "../lib/fileKind";
+import { corpusSetAiEdit } from "../lib/noteProtection";
 import {
   type ChatModelInfo,
   chatMessages,
   chatMessagesStream,
-  cliComplete,
   corpusFileBytesAi,
   corpusFrontmatter,
   corpusCreateManagedFile,
@@ -37,14 +37,16 @@ import {
 } from "../newItems/composition";
 import { inSecureHome } from "../security/secureNotes";
 import { createRoutedNote } from "../services/createNote";
+import { titleOf } from "../services/derive";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
-import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
+import { askToEdit, type EditAnswer, type EditRequest, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
 import { aiFileAccessById, makeFileTools } from "./hostFiles";
 import { aiReadableHits, assertAiNoteLocation, noteLocationIsProtected } from "./hostReadGate";
+import { completeOnCli } from "./hostRemote";
 import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
@@ -56,20 +58,7 @@ import {
   rankNotes,
   stripLeadingFrontmatter,
 } from "./tools";
-import type { CompleteReq, Host } from "./types";
-
-/** Mirror of Rust `flatten_messages`: the loop sends ONE user message (the
- * whole rendered prompt) which passes verbatim; anything else gets labeled
- * turns + a trailing Assistant: cue. */
-function flattenWire(messages: CompleteReq["messages"]): string {
-  const [only] = messages;
-  if (messages.length === 1 && only && only.role === "user") return only.content;
-  const labeled = messages.map((m) => {
-    const label = m.role === "system" ? "System" : m.role === "assistant" ? "Assistant" : "User";
-    return `${label}: ${m.content}`;
-  });
-  return `${labeled.join("\n\n")}\n\nAssistant:`;
-}
+import type { Host } from "./types";
 
 /** Memory search reads only this many newest chats, so the body cache holds no more. */
 export const CHAT_MEMORY_WINDOW = 100;
@@ -109,6 +98,8 @@ export function makeTauriHost(
   model: ChatModelInfo,
   opts?: {
     requestId?: string;
+    consent?: string[]; // the person's own messages sent anyway (ai/remoteBlock.ts)
+    confirmEdit?: (request: EditRequest) => Promise<EditAnswer>; // ai/editGate.ts askToEdit
     reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
     serviceTier?: "standard" | "fast";
     /** Registered root that owns conventional files created by this chat. */
@@ -160,21 +151,8 @@ export function makeTauriHost(
           new Error("This chat carries secure-note content and cannot be sent to a remote model."),
         );
       }
-      // the connected lanes: one tool-less subprocess per step (Rust owns the
-      // allowlist + sandbox flags). Stateless — the prompt carries everything.
-      if (model.api === "cli") {
-        // attachments ride the FIRST message, exactly like the openai lane
-        const attached = messages.flatMap((m) => m.images ?? []);
-        return cliComplete({
-          requestId: opts?.requestId ?? crypto.randomUUID(),
-          provider: model.provider,
-          model: model.id,
-          prompt: flattenWire(messages),
-          ...(opts?.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
-          ...(opts?.serviceTier ? { serviceTier: opts.serviceTier } : {}),
-          ...(attached.length > 0 ? { images: attached } : {}),
-        });
-      }
+      // the connected lanes (ai/hostRemote.ts)
+      if (model.api === "cli") return completeOnCli(model, messages, opts);
       const wireOpts: {
         model: string;
         endpoint: string;
@@ -291,7 +269,9 @@ export function makeTauriHost(
         ...(secure ? { secure: true } : {}),
       });
       await Promise.all([invalidateNotes(), invalidateMemex()]);
-      return `created ${secure ? "SECURE " : ""}note ${id}${title ? ` ("${title}")` : ""} in the intake${
+      // like every new note, it lands in Main too: under this chat's folder
+      await opts?.onArtifactCreated?.({ kind: "note", id, label: title || "Note" });
+      return `created ${secure ? "SECURE " : ""}note ${id}${title ? ` ("${title}")` : ""} in the intake and in Main${
         secure ? " (marked secure because this chat carries secure-note content)" : ""
       } — tell the user it's there, and offer open_note to show it.`;
     },
@@ -345,11 +325,13 @@ export function makeTauriHost(
       // remote models and knob-denied local ones, and its refusal is final here
       // too. The read also marks the chat's secure taint exactly like read_note.
       let readRevision: string;
+      let readTitle = "this note";
       let protectedLocation: boolean;
       try {
         protectedLocation = await assertAiNoteLocation(id, model);
         const read = await corpusReadAiVersioned(id, model);
         readRevision = read.revision;
+        readTitle = titleOf(stripLeadingFrontmatter(read.body)) || readTitle;
       } catch (e) {
         return `blocked: ${e instanceof Error ? e.message : String(e)}`;
       }
@@ -358,9 +340,12 @@ export function makeTauriHost(
       // the IPC hop on exactly the "edit a private note" path). Unknowable =
       // secure AND locked — fail closed on both axes.
       const frontmatter = await corpusFrontmatter(id).catch(() => null);
-      // unreadable, LOCKED, or a person's note without a grant (editGate.ts)
-      const editBlock = aiEditBlock(frontmatter);
-      if (editBlock || !frontmatter) return editBlock ?? UNREADABLE_PROTECTION;
+      // unreadable, LOCKED, or a person's note without a grant: a person's
+      // note asks them first (editGate.ts askToEdit)
+      const gate = await askToEdit(frontmatter, { id, title: readTitle }, opts?.confirmEdit, (note) =>
+        corpusSetAiEdit(note, true),
+      );
+      if (gate.block || !frontmatter) return gate.block ?? UNREADABLE_PROTECTION;
       if (opts?.onSecureNoteRead && (frontmatter.secure === true || protectedLocation)) {
         opts.onSecureNoteRead();
       }
@@ -376,7 +361,7 @@ export function makeTauriHost(
       const content = stripLeadingFrontmatter(body);
       if (!content.trim()) return "error: the new body was only metadata — send the note's full content.";
       try {
-        await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model, readRevision);
+        await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model, readRevision, gate.consented);
       } catch (e) {
         return `blocked: ${e instanceof Error ? e.message : String(e)}`;
       }

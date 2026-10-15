@@ -5,8 +5,10 @@
 //! - `created_by`: stamped once when a chat, an external agent, or the
 //!   Librarian creates a note. Absent — every note a person wrote, and every
 //!   note from before this rule — means a person wrote it.
-//! - `ai_edit`: the person's per-note grant, set only by them (the note's menu
-//!   or the Aa panel's AI edits row).
+//! - `ai_edit`: the person's per-note grant, set only by them (the note's menu,
+//!   the Aa panel's AI edits row, or "Always for this note" when a chat asks).
+//!   "Allow once" grants nothing standing: it is one consented write
+//!   (`AiWrite::ConsentedReplace`), refused by a lock or an explicit no.
 //!
 //! A locked note refuses every AI. Otherwise `ai_edit: true` allows,
 //! `ai_edit: false` refuses, and with no grant only an AI-made note is

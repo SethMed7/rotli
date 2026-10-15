@@ -268,4 +268,56 @@ describe("native prompt and tool definitions", () => {
     const withDocument = toolSpecsFor(new Set<ToolName>(["create_artifact", "create_document"]));
     expect(withDocument[0]?.description).toContain("create_document");
   });
+
+  test("ask_user puts a question with options in the chat, and it is the turn's reply", async () => {
+    const { session, seen } = scripted(
+      [
+        {
+          name: "ask_user",
+          args: { question: "Who is the post for?", options: ["Developers", "Founders", "Developers"] },
+        },
+      ],
+      "I'll wait for your answer.",
+    );
+    const { events } = await run(host().host, session);
+    const question = events.find((e) => e.type === "question");
+    expect(question).toEqual({
+      type: "question",
+      prompt: "Who is the post for?",
+      options: ["Developers", "Founders"],
+    });
+    // the model is told to stop, and its trailing text never replaces the question
+    expect(seen.results[0]).toContain("End your turn");
+    expect(events.some((e) => e.type === "final")).toBe(false);
+    expect(seen.req?.tools.some((t) => t.name === "ask_user")).toBe(true);
+    expect(seen.req?.systemPrompt).toContain("call ask_user once");
+  });
+
+  test("ask_user needs a question and two options, once per turn", async () => {
+    const { session, seen } = scripted(
+      [
+        { name: "ask_user", args: { question: "Which?", options: ["Only one"] } },
+        { name: "ask_user", args: { question: "Which?", options: ["A", "B"] } },
+        { name: "ask_user", args: { question: "Again?", options: ["A", "B"] } },
+      ],
+      "done",
+    );
+    await run(host().host, session);
+    expect(seen.results[0]).toContain("error:");
+    expect(seen.results[1]).toContain("End your turn");
+    expect(seen.results[2]).toContain("error:");
+  });
+
+  test("Send anyway's consent rides the session request", async () => {
+    const { session, seen } = scripted([], "sent");
+    await run(host().host, session, {}, { consent: ["my own words"] });
+    expect(seen.req?.consent).toEqual(["my own words"]);
+  });
+
+  test("a held-back send reads as plain words, not Rust's tag", async () => {
+    const { session } = scripted([], new Error("rotli-blocked:secure This conversation includes text"));
+    const { final } = await run(host().host, session);
+    expect(final.startsWith("⚠ Not sent: this conversation includes text from a secure note")).toBe(true);
+    expect(final).not.toContain("rotli-blocked");
+  });
 });

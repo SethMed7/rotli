@@ -40,10 +40,31 @@ pub(crate) fn complete_blocking(
     service_tier: Option<&str>,
     staged: Option<&ImageFiles>,
 ) -> Result<String, String> {
+    complete_blocking_consented(
+        children, request_id, provider_id, model, prompt, timeout, reasoning_effort, service_tier, staged, &[],
+    )
+}
+
+/// `complete_blocking` with the person's own messages they chose to send
+/// anyway (remote_block.rs); a chat turn's lane. Background lanes (the
+/// Librarian) call `complete_blocking`, which consents to nothing.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn complete_blocking_consented(
+    children: &Arc<Mutex<HashMap<String, Running>>>,
+    request_id: &str,
+    provider_id: &str,
+    model: &str,
+    prompt: &str,
+    timeout: Duration,
+    reasoning_effort: Option<&str>,
+    service_tier: Option<&str>,
+    staged: Option<&ImageFiles>,
+    consented: &[String],
+) -> Result<String, String> {
     provider::connected_provider_execution_allowed(provider_id)?;
     // the CLI lane is remote by definition — same egress law as chat.rs
-    if crate::secret::blocked_for_remote(prompt) {
-        return Err(SECRET_MESSAGE.into());
+    if let Some(block) = crate::remote_block::remote_block(prompt, consented) {
+        return Err(block.message());
     }
     let bin = provider::resolve_bin(provider::spec(provider_id)?)
         .ok_or_else(|| format!("{provider_id} isn't installed (checked its usual homes)"))?;
@@ -107,7 +128,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(secret.unwrap_err(), SECRET_MESSAGE);
+        assert!(secret.unwrap_err().starts_with("rotli-blocked:pattern "));
         assert!(children.lock().unwrap().is_empty(), "a refused prompt never registers a child");
     }
 

@@ -67,7 +67,7 @@ interface Row {
 let rows: Row[] = [];
 /** Set by the test when the batched permission probe should blow up. */
 let probeThrows = false;
-const writes: { id: string; body: string; modelId: string }[] = [];
+const writes: { id: string; body: string; modelId: string; consented?: boolean }[] = [];
 const webRequests: Array<{
   provider: WebSearchProvider;
   query: string;
@@ -178,7 +178,13 @@ void mock.module("../lib/tauri", () => ({
       fields: [],
     };
   },
-  corpusWriteAi: async (id: string, body: string, model: ChatModelInfo) => {
+  corpusWriteAi: async (
+    id: string,
+    body: string,
+    model: ChatModelInfo,
+    _revision: string,
+    consented = false,
+  ) => {
     const row = rows.find((r) => r.id === id);
     if (!row) throw new Error(`unknown note: ${id}`);
     // the Rust lane's own refusals, mirrored: read gate, then LOCKED
@@ -188,7 +194,7 @@ void mock.module("../lib/tauri", () => ({
     if (row.locked) {
       throw new Error("This note is locked — no AI may edit it. Unlock it from the note's menu first.");
     }
-    writes.push({ id, body, modelId: model.id });
+    writes.push({ id, body, modelId: model.id, ...(consented ? { consented } : {}) });
     row.body = body;
     return meta(row);
   },
@@ -420,6 +426,7 @@ test("every registered vault-content tool refuses secure-home content for a remo
     "create_document",
     "create_artifact",
     "draw_board",
+    "ask_user", // a question for the person: reads nothing
   ];
   const contentTools = registered.filter((name) => !nonContentTools.includes(name));
   expect(contentTools).toEqual([
@@ -497,6 +504,14 @@ describe("a person's note is closed to AI edits until they grant it", () => {
     }
     expect(rows.find((r) => r.id === "n-mine")?.body).toBe("my own kelpie diary");
     expect(writes).toEqual([]);
+  });
+
+  test("the chat asks first: no keeps the note, Allow once writes this one edit", async () => {
+    const via = (answer: "once" | "no") => makeTauriHost(LOCAL, { confirmEdit: async () => answer });
+    expect(await updateVia(via("no"), "n-mine", "# Kelpie diary\n\nnew")).toMatch(/chose to keep this note/);
+    expect(writes).toEqual([]);
+    expect(await updateVia(via("once"), "n-mine", "# Kelpie diary\n\nnew")).toMatch(/updated/);
+    expect(writes.map((w) => w.consented)).toEqual([true]);
   });
 });
 

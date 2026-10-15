@@ -42,7 +42,7 @@
         "private_url"
       ],
       "src-tauri/src/provider_lane.rs": [
-        "complete_blocking"
+        "complete_blocking_consented"
       ],
       "src-tauri/src/claude_session.rs": [
         "claude_session_run"

@@ -26,7 +26,9 @@ export type ToolName =
   | "web_fetch"
   | "create_artifact"
   | "generate_image"
-  | "draw_board";
+  | "draw_board"
+  // the person answers in the chat (nativeLoop.ts); nothing leaves the device
+  | "ask_user";
 
 /** A note the model can read, surfaced by search_notes / the index. */
 export interface NoteHit {

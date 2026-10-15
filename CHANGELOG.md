@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Chat asks before it edits a note you wrote.** Instead of quietly making a
+  copy, the chat shows a card: **Allow once**, **Always for this note**, or
+  **No, make a new note**, and waits for your answer. A locked note still
+  can't be edited, and a note you turned AI editing off for can only be turned
+  back on.
+- **Chat asks you questions with options.** Claude can now stop and ask one
+  short question with a few answers to pick from (or type your own) before it
+  writes something long, instead of guessing.
+- **A message held back from a connected model says why, in red.** It names
+  the reason: text shaped like a password, key, or card number; text from a
+  secure note; or Rotli still checking your secure notes after starting. For
+  text you typed yourself, **Send anyway** sends it; you always have the final
+  say over your own words. Text from a secure note still never goes to a
+  connected model. **Edit message** puts your words back in the box, and
+  right after launch the chat waits a moment instead of refusing.
+- **Notes a chat creates show up in Main**, in that chat's folder, like every
+  other new note.
+
 - **Reading mode (⌥⌘R).** Everything but the note you're in steps away, as in
   Focus mode, and the note is only for reading: it is always beautified,
   takes no typing, shows no spelling marks, and nothing changes when the
@@ -76,6 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Try again" after a held-back message no longer answers an older
+  request.** The held-back message used to be dropped from the conversation
+  without a word, so the model never saw it. Now it stays on screen with what
+  you can do next, and sending it anyway or editing it replaces the held-back
+  exchange instead of duplicating it.
 - **A copied vault opens with everything in Main.** A copy made with the
   Librarian opened with an empty Main, so the notes you brought were only
   under All notes. Main now starts with every folder and note that came over,
