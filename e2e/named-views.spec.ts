@@ -218,3 +218,38 @@ test("Chat switches views without leaving Chat, and ⌘T there files into that v
   await context.getByRole("button", { name: "New chat in Main" }).click();
   await expect(page.locator(".pane.focused [data-chat-pane]")).toBeVisible();
 });
+
+test("the New view card closes from its ×, Escape, and a click outside", async ({ page }) => {
+  await gotoApp(page);
+  const viewSwitcher = page.getByRole("button", { name: /Current view: Main/ });
+  const card = page.getByRole("group", { name: "New view" });
+  const openCard = async () => {
+    await viewSwitcher.scrollIntoViewIfNeeded();
+    await viewSwitcher.click();
+    await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
+    await expect(card.getByRole("textbox", { name: "New view" })).toBeFocused();
+  };
+
+  await openCard();
+  await card.getByRole("button", { name: "Close" }).click();
+  await expect(card).toHaveCount(0);
+
+  await openCard();
+  await page.keyboard.press("Escape");
+  await expect(card).toHaveCount(0);
+
+  // Escape from the Save button too, where the input's own key handler can't hear it
+  await openCard();
+  await card.getByRole("button", { name: "Save" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(card).toHaveCount(0);
+
+  await openCard();
+  await page
+    .locator(".pane")
+    .first()
+    .click({ position: { x: 40, y: 120 } });
+  await expect(card).toHaveCount(0);
+  // nothing was created along the way
+  await expect(viewSwitcher).toBeVisible();
+});

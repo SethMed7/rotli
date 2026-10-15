@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { imageBytesMatchExtension, isCanvasPath, managedFileNote } from "./fileKind";
+import { canvasFileMode, imageBytesMatchExtension, isCanvasPath, managedFileNote } from "./fileKind";
 
 describe("managed file details", () => {
   test("only storage/ files carry the not-tracked-by-git fact", () => {
@@ -33,4 +33,15 @@ test("a JSON Canvas is known by its extension, any case", () => {
   expect(isCanvasPath("Board.CANVAS")).toBe(true);
   expect(isCanvasPath("notes/canvas.md")).toBe(false);
   expect(isCanvasPath("canvas")).toBe(false);
+});
+
+test("a canvas opens in the Canvas editor only where canvases are live, never as raw JSON", () => {
+  // dev channel
+  expect(canvasFileMode("wiki/Q3 plan.canvas", true)).toBe("canvas");
+  // public channel: withheld, whatever the case
+  expect(canvasFileMode("wiki/Q3 plan.canvas", false)).toBe("withheld");
+  expect(canvasFileMode("Board.CANVAS", false)).toBe("withheld");
+  // every other file opens as itself in both
+  expect(canvasFileMode("notes/data.json", false)).toBe("file");
+  expect(canvasFileMode("notes/data.json", true)).toBe("file");
 });

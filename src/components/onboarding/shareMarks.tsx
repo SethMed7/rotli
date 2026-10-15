@@ -1,6 +1,7 @@
-// The brands' own marks for the thank-you card's shares (2026-09-30: logos
-// read faster than a brand's name). Filled with the text color, so they sit in
-// any theme; kept beside the banner code the card already uses.
+// The marks for the thank-you card's shares (2026-09-30: logos read faster
+// than a brand's name). Filled with the text color, so they sit in any theme.
+
+import { Glyph, type GlyphProps } from "../glyphs";
 
 interface MarkProps {
   size?: number;
@@ -37,5 +38,16 @@ export function XMarkGlyph({ size = 14, className }: MarkProps) {
     >
       <path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23zm-1.16 17.52h1.83L7.08 4.13H5.12z" />
     </svg>
+  );
+}
+
+/** Share — the macOS share mark, a tray with an arrow leaving it. */
+export function ShareGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M12 3v12" />
+      <path d="m8 7 4-4 4 4" />
+      <path d="M8 11H6.5A1.5 1.5 0 0 0 5 12.5v7A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5H16" />
+    </Glyph>
   );
 }

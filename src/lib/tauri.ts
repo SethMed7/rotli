@@ -825,6 +825,16 @@ export function openUrl(url: string): Promise<void> {
   });
 }
 
+/** The macOS share sheet (share_sheet.rs) beside `anchor`, a rect in this
+ * webview's CSS pixels. Rust takes a short line and one https link only. */
+export function shareText(
+  text: string,
+  url: string,
+  anchor: { x: number; y: number; width: number; height: number },
+): Promise<void> {
+  return corpusInvoke<void>("share_text", { text, url, anchor });
+}
+
 export interface PrivateBrowserBounds {
   x: number;
   y: number;

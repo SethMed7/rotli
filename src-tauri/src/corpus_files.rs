@@ -15,12 +15,26 @@ use super::*;
 /// lives beside notes and moves to Archive/Trash like one (owner decisions
 /// 2026-10-06).
 pub(crate) fn is_canvas_path(rel: &str) -> bool {
-    // in the public binary a .canvas is an ordinary file
-    crate::feature_policy::canvas_enabled()
-        && Path::new(rel)
-            .extension()
-            .and_then(|value| value.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("canvas"))
+    crate::feature_policy::canvas_enabled() && has_canvas_extension(rel)
+}
+
+fn has_canvas_extension(rel: &str) -> bool {
+    let name = rel.rsplit('/').next().unwrap_or(rel);
+    // a dotfile named ".canvas" has no extension, as Path reads it
+    name.rsplit_once('.')
+        .is_some_and(|(stem, ext)| !stem.is_empty() && ext.eq_ignore_ascii_case("canvas"))
+}
+
+/// A `.canvas` in a build whose canvases aren't live (the owner, 2026-10-15:
+/// a public build listed one as an ordinary file and opened it as raw JSON).
+/// The walk leaves it out, so it is in no listing, never seeded into Main,
+/// and never opened; the file itself stays on disk untouched.
+pub(crate) fn is_withheld_canvas(rel: &str) -> bool {
+    withheld_canvas_for(crate::feature_policy::canvas_enabled(), rel)
+}
+
+fn withheld_canvas_for(canvases_enabled: bool, rel: &str) -> bool {
+    !canvases_enabled && has_canvas_extension(rel)
 }
 
 /// What a new canvas file holds: an empty JSON Canvas, written the way
@@ -209,6 +223,41 @@ pub fn corpus_create_canvas(
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn only_a_build_without_canvases_withholds_a_canvas() {
+        // stable: a .canvas is withheld, whatever its case; nothing else is
+        assert!(withheld_canvas_for(false, "Plan.canvas"));
+        assert!(withheld_canvas_for(false, "wiki/projects/Q3.CANVAS"));
+        assert!(!withheld_canvas_for(false, "notes/canvas.md"));
+        assert!(!withheld_canvas_for(false, "photo.png"));
+        assert!(!withheld_canvas_for(false, "canvas"));
+        // dev: nothing is withheld
+        assert!(!withheld_canvas_for(true, "Plan.canvas"));
+    }
+
+    #[test]
+    fn a_canvas_is_listed_and_seeded_into_main_only_when_canvases_are_live() {
+        let (dir, mut store) = super::super::tests::bare();
+        let root = dir.path().join("corpus");
+        let canvas = "{\"nodes\":[],\"edges\":[]}";
+        fs::write(root.join("Ideas.md"), "# Ideas\n").unwrap();
+        fs::write(root.join("Plan.canvas"), canvas).unwrap();
+        fs::write(root.join("photo.png"), b"png").unwrap();
+        let _ = fs::remove_file(root.join(".rotli/main.json"));
+
+        let ids: Vec<String> = store.list().unwrap().notes.into_iter().map(|note| note.id).collect();
+        store.seed_main_from_disk_if_missing().unwrap();
+        let main = fs::read_to_string(root.join(".rotli/main.json")).unwrap();
+
+        let live = crate::feature_policy::canvas_enabled();
+        assert_eq!(ids.iter().any(|id| id == "Plan.canvas"), live, "listed: {ids:?}");
+        assert_eq!(main.contains("Plan.canvas"), live, "main: {main}");
+        // other files list either way, and the canvas stays on disk as written
+        assert!(ids.iter().any(|id| id == "photo.png"), "{ids:?}");
+        assert!(main.contains("photo.png"), "{main}");
+        assert_eq!(fs::read_to_string(root.join("Plan.canvas")).unwrap(), canvas);
+    }
 
     #[test]
     fn a_dropped_excalidraw_file_becomes_an_editable_board_and_the_source_stays() {

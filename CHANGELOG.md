@@ -94,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A `.canvas` file no longer shows up as raw JSON in the public app.**
+  Canvases aren't in this release yet, so Rotli now leaves `.canvas` files out
+  of the sidebar and Main instead of listing them as ordinary files, and a tab
+  left open from before says canvases are coming soon. The file stays in your
+  folder untouched. Development builds still open canvases as before.
+- **The New view card can be closed.** It has a close button now, and Escape
+  or a click anywhere outside it puts it away without making a view.
 - **"Try again" after a held-back message no longer answers an older
   request.** The held-back message used to be dropped from the conversation
   without a word, so the model never saw it. Now it stays on screen with what
@@ -159,6 +166,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The thank-you card after setup is simpler and friendlier.** Its banner is
+  now a whole scene in your theme, with the quokka standing in it. **Share**
+  opens the Mac share sheet (Messages, Mail, AirDrop, Notes and more) with a
+  short note and a link to rotli.co; on Rotli Web it uses the browser's share
+  sheet, or copies the link and says so. The GitHub and X buttons are just
+  their logos. **Take the tour** now comes first and **Start now** is the main
+  button on the right. The banner can no longer be saved or downloaded, and
+  "Tell a friend" is gone in favor of Share.
 - **Chat has room to breathe.** A reply no longer sits right under your
   question: messages are spaced clearly further apart than the lines inside
   them, a new question opens a little wider still, and replies read with a

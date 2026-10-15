@@ -29,6 +29,9 @@
         "web_fetch_blocking",
         "open_url"
       ],
+      "src-tauri/src/share_sheet.rs": [
+        "share_text"
+      ],
       "src-tauri/src/chat.rs": [
         "egress_allowed"
       ],

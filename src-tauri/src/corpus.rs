@@ -6701,7 +6701,7 @@ fn walk(
                 origin: None,
                 kind: NoteKind::Board,
             });
-        } else if kind.is_file() {
+        } else if kind.is_file() && !files::is_withheld_canvas(&rel) {
             // Any OTHER file (image, pdf, txt, …): surfaced read-only so a folder
             // like Storage shows what's actually in it. id == its relative path,
             // title = the filename WITH its extension (so "photo.png" reads true)

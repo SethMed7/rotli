@@ -786,12 +786,39 @@
   text-transform: none;
   letter-spacing: normal;
 }
-.view-editor > label {
-  display: block;
+.view-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   margin-bottom: 5px;
+}
+.view-editor-head > label {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--text-muted);
+}
+/* the card's dismiss (2026-10-15): a quiet 24px target, like the strip's x */
+.view-editor-close {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -6px -6px -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.view-editor-close:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.view-editor-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .view-editor-row {
   display: flex;

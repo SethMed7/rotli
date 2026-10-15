@@ -71,6 +71,7 @@ mod routines;
 mod search_index; mod search_match;
 mod remote_block;
 mod secret;
+mod share_sheet;
 mod spellcheck;
 mod quit_flush;
 mod usage;
@@ -2341,6 +2342,7 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            share_sheet::share_text,
             ai_files::corpus_create_managed_file_ai,
             ai_files::corpus_write_file_ai,
             pinned_site::pinned_sites_supported,
