@@ -590,6 +590,9 @@ pub struct ChatSummary {
     /// most recently touched chat. The listing stays slug-sorted (the sidebar
     /// depends on that order); recency is the CALLER's concern.
     pub modified_ms: u64,
+    /// When the newest reply landed (ms; 0 = none yet) — the sidebar's order,
+    /// so sending leaves a chat in place and the answer lifts it.
+    pub replied_ms: u64,
     /// `pinned: true` frontmatter — the sidebar sorts pinned chats first.
     pub pinned: bool,
     /// `model:` / `provider:` frontmatter — who answers this chat, in the file
@@ -603,33 +606,6 @@ pub struct ChatSummary {
 pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
     let root = registered_root(&app, &root)?;
     list_chats_at(&root)
-}
-
-/// The first 41 lines of a file — exactly the window `fm()` can ever read
-/// (opening `---` + its 40-line backstop). Chat listings need only
-/// title/source/attachedTo/pinned, but transcripts grow unbounded, and
-/// read_to_string dragged the whole body in per chat per listing (perf
-/// audit 2026-07-30, finding 27). A 32 KiB byte cap backstops pathological
-/// single-line files. One deliberate divergence from the old whole-file read:
-/// a chat whose BODY is non-UTF-8 used to lose its frontmatter too
-/// (read_to_string failed → ""); the head read now returns it, so such a chat
-/// gains its real title/pinned instead of the "Untitled" fallback.
-fn frontmatter_head(p: &Path) -> String {
-    use std::io::{BufRead, BufReader, Read};
-    let Ok(f) = fs::File::open(p) else {
-        return String::new();
-    };
-    let mut reader = BufReader::new(f).take(32 * 1024);
-    let mut head = String::new();
-    let mut line = String::new();
-    for _ in 0..41 {
-        line.clear();
-        match reader.read_line(&mut line) {
-            Ok(0) | Err(_) => break,
-            Ok(_) => head.push_str(&line),
-        }
-    }
-    head
 }
 
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
@@ -649,7 +625,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
             if slug.eq_ignore_ascii_case("readme") {
                 continue;
             }
-            let text = frontmatter_head(&p);
+            let text = crate::memex_chat_scan::frontmatter_head(&p);
             let modified_ms = fs::metadata(&p)
                 .and_then(|m| m.modified())
                 .ok()
@@ -663,6 +639,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
                 attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
                 path: p.to_string_lossy().to_string(),
                 modified_ms,
+                replied_ms: crate::memex_chat_scan::last_reply_ms(&p),
                 pinned: fm(&text, "pinned") == "true",
                 model: fm(&text, "model"),
                 provider: fm(&text, "provider"),

@@ -8,6 +8,7 @@ import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
+import { lastReplyMs } from "../memex/chatRecency";
 import { type VaultDir, freeSiblingPath, vaultFolderRoles } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
@@ -34,6 +35,7 @@ export function summarize(slug: string, contents: string, modifiedMs: number): M
     attachedTo: attached,
     path: `chats/${slug}.md`,
     modifiedMs,
+    repliedMs: lastReplyMs(contents),
     pinned: frontmatterField(contents, "pinned") === "true",
     model: frontmatterField(contents, "model"),
     provider: frontmatterField(contents, "provider"),

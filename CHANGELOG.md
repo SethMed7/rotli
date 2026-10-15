@@ -136,6 +136,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat has room to breathe.** A reply no longer sits right under your
+  question: messages are spaced clearly further apart than the lines inside
+  them, a new question opens a little wider still, and replies read with a
+  roomier line and paragraph rhythm.
+
+- **The chat list stays put while you wait.** Sending a message no longer
+  jumps the chat to the top of the sidebar; it moves up when the reply
+  arrives, inside its folder too. The time on each row is the time of the
+  last reply.
+
+- **One row per chat, with a dot for what's new.** The sidebar's Activity
+  group at the top is gone, so a chat no longer shows twice. Instead each row
+  carries a small dot beside its time: a softly pulsing ring while a reply is
+  being written, and a solid dot when a reply is waiting that you haven't
+  opened yet. The "Done" labels that got cut to "D…" are gone.
+
+- **Every model logo is in its maker's colors.** OpenAI's logo is OpenAI's
+  black (white on dark themes) instead of the theme's ink, and Llama, Phi, and
+  Mistral models show Meta's blue, Microsoft's four colors, and Mistral's
+  orange — in the sidebar, the model picker, and setup, in every theme and
+  with Neutral sidebar icons.
+
 - **rotli.co's film is a one-minute tour of the Mac app.** The landing hero
   now plays a real recording of the Mac app on synthetic notes: writing a
   note, the Librarian filing it on your Mac, tasks, search, docs, sheets and

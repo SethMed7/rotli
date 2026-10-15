@@ -1105,34 +1105,10 @@
   height: 14px;
   object-fit: contain;
 }
-/* Full-color provider art remains itself on the selected row. The row already
-   supplies the selection surface; a second backing tile made the logo look
-   boxed and visually heavier than every neighboring mark. */
-/* OpenAI ships black and white artwork. Use the official black Blossom as a
-   mask so its exact silhouette follows semantic ink instead of disappearing
-   in Warm Dark, Charcoal, or a selected row. */
-.model-logo--openai,
-.model-logo--meta,
-.model-logo--microsoft,
-.model-logo--mistral {
-  background: currentColor;
-}
-.model-logo--openai {
-  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
-  mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
-}
-.model-logo--meta {
-  -webkit-mask: url("../brand/providers/meta.svg") center / contain no-repeat;
-  mask: url("../brand/providers/meta.svg") center / contain no-repeat;
-}
-.model-logo--microsoft {
-  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
-  mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
-}
-.model-logo--mistral {
-  -webkit-mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
-  mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
-}
+/* Provider art is the vendor's own full-color file (src/brand/providers):
+   never a mask, never Rotli ink, unchanged on the selected row and under
+   Neutral sidebar icons. OpenAI's black/white Blossom swaps by environment in
+   ModelLogo, not here. */
 .sb-chatmark.preset,
 .sb-chatmark.local {
   background: var(--surface-2);
@@ -1153,54 +1129,65 @@
   color: var(--selected-icon);
   border-color: var(--border);
 }
-.sb-chatrow.sel .sb-chatmark.openai {
-  color: var(--text);
-}
 
-/* the per-chat model chip (the maintainer, 2026-08-03) — a quiet right-aligned label,
-   hidden while a run signal owns the row's right edge (the JSX renders one or
-   the other), clipped before it can crowd the title */
+/* the row's right edge: compact activity that never gives up letters — the
+   title is the one that ellipsizes (the owner, 2026-10-10) */
 .sb-chatmodel,
-.sb-chattime,
-/* A run's status never gives up letters to the title: the title is the one
-   that ellipsizes ("Wor…" and "D…" read as noise, the owner 2026-10-10). */
-.sb-chatstatus {
+.sb-chattime {
   margin-left: auto;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   white-space: nowrap;
   font-size: 10.5px;
   color: var(--text-muted);
-}
-.sb-chatstatus.running::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: cmsg-think-pulse 1.1s var(--motion-ease) infinite;
-}
-.sb-chatrow.sel .sb-chatstatus.running::before {
-  background: var(--accent-text);
 }
 .sb-chatrow .fname {
   min-width: 0;
 }
 .sb-chatmodel ~ .sb-chatpin,
-.sb-chattime ~ .sb-chatpin,
-.sb-chatstatus ~ .sb-chatpin {
+.sb-chattime ~ .sb-chatpin {
   margin-left: 0;
 }
 .sb-chattrail {
   position: relative;
   margin-left: auto;
-  flex: 0 0 42px;
+  flex: 0 0 auto;
+  min-width: 42px;
   height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
+}
+/* The run signal (the owner, 2026-10-15): a dot beside the age, never a word
+   that truncates. Working is an accent ring that breathes; an Unread reply is
+   a solid accent dot that holds still. Ring vs fill keeps the two apart
+   without motion, so reduced motion loses nothing. */
+.sb-chatsignal {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+}
+.sb-chatsignal.working {
+  border: 1.5px solid var(--accent);
+  animation: cmsg-think-pulse 1.1s var(--motion-ease) infinite;
+}
+.sb-chatsignal.unread {
+  background: var(--accent);
+}
+.sb-chatrow.sel .sb-chatsignal.working {
+  border-color: var(--accent-text);
+}
+.sb-chatrow.sel .sb-chatsignal.unread {
+  background: var(--accent-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-chatsignal.working {
+    animation: none;
+  }
 }
 .sb-chattrail .sb-chattime {
   margin-left: 0;
@@ -1247,49 +1234,8 @@
   margin-left: 0;
 }
 .sb-chatrow.sel .sb-chatmodel,
-.sb-chatrow.sel .sb-chattime,
-.sb-chatrow.sel .sb-chatstatus {
+.sb-chatrow.sel .sb-chattime {
   color: var(--selected-muted);
-}
-.sb-chatstatus {
-  font-weight: 600;
-}
-.sb-chatstatus.unread {
-  color: var(--accent-text);
-}
-.sb-chatstatus.done {
-  color: var(--text-muted);
-}
-/* the Unread lane header — reads like a folder row but is a label, not a
-   control */
-.sb-chatunread .unreadhead,
-.sb-chatworking .unreadhead,
-.sb-chatactivity .unreadhead {
-  cursor: default;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-.sb-chatunread .unreadhead .sb-chatrun,
-.sb-chatworking .unreadhead .sb-chatrun,
-.sb-chatactivity .unreadhead .sb-activity-mark {
-  margin-left: 0;
-}
-.sb-chatunread .unreadhead:hover,
-.sb-chatworking .unreadhead:hover,
-.sb-chatactivity .unreadhead:hover {
-  background: none;
-}
-.sb-chatactivity {
-  margin: 4px 0 7px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--border);
-}
-.sb-activity-mark {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-pill);
-  background: var(--accent);
 }
 .sb-chatnew {
   color: var(--accent-text);

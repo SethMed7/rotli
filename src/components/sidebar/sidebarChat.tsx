@@ -18,6 +18,7 @@ import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/servic
 import { invalidateMemex } from "../../memex/useMemex";
 import {
   assignChatToFolder,
+  chatActivityMs,
   createChatFolder,
   deleteChatFolder,
   renameChatFolder,
@@ -39,7 +40,7 @@ import { chatMark } from "./chatMark";
 import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
 import { OverviewCard } from "./overviewCard";
-import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
 /** Where a dragged chat would land: a folder row (positional reordering retired 2026-08-03). */
@@ -106,11 +107,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     setActiveView(null);
     setContentView("allChats");
   };
-
-  // One clearly separated activity lane holds every run seen this session.
-  // Completed work stays discoverable instead of disappearing the instant it
-  // settles; the canonical row still remains inside its recency-sorted folder.
-  const activityChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] !== undefined);
 
   // the header's New-folder button, while Chat is the active front, mints a
   // CHAT folder and opens its rename inline — the nonce is the seam between
@@ -323,12 +319,14 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     ]);
   };
 
-  // one chat row, shared by folder groups and the loose list below them.
-  // `hoisted` marks the COPY the Activity lane lifts to the top: the same chat
-  // still sits in its real folder below, and only that canonical row carries
-  // the selected highlight — two lit rows for one open chat read as a bug.
-  const renderChatRow = (c: MemexChatSummary, folderId: string | null, hoisted = false) =>
-    chatRename.renamingChatSlug === c.slug ? (
+  // one chat row, shared by folder groups and the loose list below them. Each
+  // chat appears exactly once: the session Activity lane that hoisted copies
+  // to the top is retired (the owner, 2026-10-15) — the row's own dot says
+  // Working or Unread reply, and the reply-recency order lifts it.
+  const renderChatRow = (c: MemexChatSummary, folderId: string | null) => {
+    const signal = chatRowSignal(runs[runKeyOf(c.slug)]);
+    const selected = contentView === "panes" && focusedChatSlug === c.slug;
+    return chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
         key={c.slug}
         className="sb-chatrename"
@@ -344,9 +342,9 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         /* a chat row lights only while the PANES actually show it — never
            alongside an active All-chats (or other) view (the maintainer, 2026-07-30:
            two highlights at once read as wrong) */
-        className={`sb-chatrow${folderId ? " in-folder" : ""}${
-          !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
-        }${dragSlug === c.slug ? " dragging" : ""}`}
+        className={`sb-chatrow${folderId ? " in-folder" : ""}${selected ? " sel" : ""}${
+          dragSlug === c.slug ? " dragging" : ""
+        }`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
           if (didDragRef.current) return;
@@ -362,10 +360,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         <button
           type="button"
           className="sb-chatrow-open"
-          aria-label={`Open chat ${c.title || c.slug}`}
-          aria-current={
-            !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? "page" : undefined
-          }
+          aria-label={`Open chat ${c.title || c.slug}${signal ? `, ${signal.label}` : ""}`}
+          aria-current={selected ? "page" : undefined}
           title={c.title || c.slug}
         />
         {(() => {
@@ -390,46 +386,40 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           );
         })()}
         <span className="fname">{c.title || c.slug}</span>
-        {(() => {
-          // A live session status is the newest fact. Otherwise the right edge
-          // carries compact file activity; hovering or focusing swaps that fact
-          // for one stable action slot without moving the title.
-          const run = runs[runKeyOf(c.slug)];
-          return (
-            <>
-              {hoisted && run === "running" && (
-                <span className="sb-chatstatus running" role="status">
-                  Working
-                </span>
-              )}
-              {hoisted && run === "unread" && <span className="sb-chatstatus unread">New</span>}
-              {hoisted && run === "done" && <span className="sb-chatstatus done">Done</span>}
-              {!hoisted && (
-                <span className="sb-chattrail">
-                  <span className="sb-chattime">{relativeChatAge(now, c.modifiedMs)}</span>
-                  <button
-                    type="button"
-                    className="sb-chataction"
-                    aria-label={`More actions for ${c.title || c.slug}`}
-                    title="More actions"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      openChatActions(c, rect.right, rect.bottom);
-                    }}
-                  >
-                    <MoreGlyph size={14} />
-                  </button>
-                </span>
-              )}
-            </>
-          );
-        })()}
+        {/* The right edge carries the live signal dot (Working pulses, an
+            Unread reply holds still in accent) beside the age of the last
+            reply; hovering or focusing swaps the age for one stable action
+            slot without moving the title. Nothing here ever truncates. */}
+        <span className="sb-chattrail">
+          {signal && (
+            <span
+              className={`sb-chatsignal ${signal.kind}`}
+              role="img"
+              aria-label={signal.label}
+              title={signal.label}
+            />
+          )}
+          <span className="sb-chattime">{relativeChatAge(now, chatActivityMs(c))}</span>
+          <button
+            type="button"
+            className="sb-chataction"
+            aria-label={`More actions for ${c.title || c.slug}`}
+            title="More actions"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              openChatActions(c, rect.right, rect.bottom);
+            }}
+          >
+            <MoreGlyph size={14} />
+          </button>
+        </span>
         {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
       </div>
     );
+  };
 
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
@@ -497,16 +487,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           </p>
         ) : (
           <>
-            {activityChats.length > 0 && (
-              <div className="sb-chatfolder sb-chatactivity">
-                <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
-                  <span className="sb-activity-mark" />
-                  <span className="fname">Activity</span>
-                  <span className="sb-chatfolder-n">{activityChats.length}</span>
-                </div>
-                {activityChats.map((c) => renderChatRow(c, null, true))}
-              </div>
-            )}
             {grouped.folders.map(({ folder, chats: allFolderChats }) => {
               // an active view narrows every group to its own chats; a folder
               // with none simply doesn't render while the view is on

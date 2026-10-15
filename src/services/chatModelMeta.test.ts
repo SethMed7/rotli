@@ -10,6 +10,7 @@ const chat = (slug: string, model = "", provider = ""): MemexChatSummary => ({
   attachedTo: "",
   path: `chats/${slug}.md`,
   modifiedMs: 0,
+  repliedMs: 0,
   pinned: false,
   model,
   provider,

@@ -206,8 +206,19 @@ for (const [name, palette] of Object.entries(BREVE_PDF_PRESETS)) {
 // Sidebar model marks share one 14px slot, so their visible artwork must share
 // an optical footprint too. A nominally 14px SVG with a padded viewBox or
 // hairline geometry still reads as a tiny icon beside its peers. Rasterize at
-// the shipped size and guard both the visible bounds and alpha mass.
-for (const name of ["claude-spark-clay", "gemini", "gemma", "qwen", "openai-blossom"]) {
+// the shipped size and guard both the visible bounds and alpha mass. Meta's
+// infinity and Mistral's pixel M are wide by design, so they sit outside the
+// square-footprint rule.
+const squareProviderMarks = [
+  "claude-spark-clay",
+  "gemini",
+  "gemma",
+  "qwen",
+  "openai-blossom",
+  "openai-blossom-white",
+  "microsoft",
+];
+for (const name of squareProviderMarks) {
   const { data } = await sharp(join(root, `src/brand/providers/${name}.svg`))
     .resize(14, 14, { fit: "contain" })
     .ensureAlpha()
@@ -315,5 +326,5 @@ if (violations.length) {
 }
 
 console.log(
-  `check:design-system ok — ${expectedDataThemes.length} app themes + ${Object.keys(BREVE_PDF_PRESETS).length} PDF palettes + 5 provider marks`,
+  `check:design-system ok — ${expectedDataThemes.length} app themes + ${Object.keys(BREVE_PDF_PRESETS).length} PDF palettes + ${squareProviderMarks.length} provider marks`,
 );
