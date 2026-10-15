@@ -69,6 +69,7 @@ mod claude_session;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
+mod remote_block;
 mod secret;
 mod spellcheck;
 mod quit_flush;

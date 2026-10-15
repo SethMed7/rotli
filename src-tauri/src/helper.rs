@@ -387,7 +387,7 @@ impl Helper {
         let tier = arguments.get("serviceTier").and_then(Value::as_str);
         let timeout = arguments.get("timeoutMs").and_then(Value::as_u64);
         crate::provider::complete_connected(
-            &self.children, &request_id, &provider, &model, &prompt, timeout, effort, tier, &[],
+            &self.children, &request_id, &provider, &model, &prompt, timeout, effort, tier, &[], &[],
         )
         .map_err(|error| (400, error))
     }

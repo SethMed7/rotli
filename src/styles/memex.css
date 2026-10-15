@@ -1174,6 +1174,34 @@
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+/* the chat asking before it acts (chatPermissionBar.tsx): may it edit the
+   person's note, and a message held back from a connected model — in red,
+   so a held-back send is never mistaken for a reply */
+.chat-question-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.chat-question p strong {
+  font-weight: 700;
+}
+.chat-question button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent, var(--surface));
+}
+.chat-blocked {
+  border-color: var(--failure);
+  background: color-mix(in srgb, var(--failure) 8%, var(--surface));
+}
+.chat-blocked p {
+  color: var(--failure);
+}
+.chat-question button.danger {
+  border-color: var(--failure);
+  color: var(--failure);
+}
 .chat-composer-inner {
   width: 100%;
   max-width: var(--chat-measure, 740px);

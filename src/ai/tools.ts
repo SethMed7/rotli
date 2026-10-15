@@ -212,6 +212,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
       return "reading a note…";
     case "create_note":
       return "creating a note…";
+    case "ask_user":
+      return "asking you…";
     case "create_document":
       return "creating a Word document…";
     case "edit_document":
@@ -331,6 +333,9 @@ export async function runTool(
   budget: Budget,
 ): Promise<string> {
   switch (tool) {
+    case "ask_user":
+      // answered by the chat itself (nativeLoop.ts), never through the Host
+      return "error: ask_user is answered in the chat, not here.";
     case "search_memory": {
       const q = argText(args.query).trim();
       if (q === "") return 'error: search_memory needs a non-empty "query".';

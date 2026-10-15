@@ -658,6 +658,8 @@ export function cliComplete(args: {
    * passes them on lanes with a native image flag (codex `-i`); other lanes
    * ignore them rather than pretending to see (2026-08-04). */
   images?: string[];
+  /** The person's own messages they chose to send anyway (src-tauri/src/remote_block.rs). */
+  consent?: string[];
 }): Promise<string> {
   return aiInvoke("cli_complete", { ...args });
 }
@@ -1468,6 +1470,8 @@ export function corpusWriteAi(
   body: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
   expectedRevision: string,
+  /** The person said "Allow once" when the chat asked (ai/editGate.ts). Desktop only. */
+  consented = false,
 ): Promise<CorpusWriteResult> {
   // Rotli Web has no Rust gate: its AI corpus runs the same policy itself
   if (!isTauri()) {
@@ -1480,6 +1484,7 @@ export function corpusWriteAi(
     modelId: model.id,
     endpoint: model.endpoint,
     expectedRevision,
+    consented,
   });
 }
 

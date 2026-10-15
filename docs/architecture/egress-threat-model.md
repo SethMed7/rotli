@@ -127,6 +127,7 @@ Everything in the tables below reduces to which question a seam asks.
 | `secret::looks_secure` | credential SHAPES — API keys, PEM, JWT, SSN, Luhn-valid PANs (never the fractional digits after `<digit>.`, so a board's float coordinates are not cards; 2026-10-13, parity fixture `looksSecure`) | ordinary private prose |
 | `secret::protected_for_remote` | the above **+ markers**: `secure: true`, `local_ai_allowed:`, `secureContext: true` | prose whose markers were stripped |
 | `secret::blocked_for_remote` | the above **+ the secure-prose ledger**; **everything** while the ledger is still warming at launch (fail closed) | prose that never entered the vault |
+| `remote_block::remote_block` (chat lanes, 2026-10-15) | exactly `blocked_for_remote`, and it says which part refused (warming, secure-note text, or a secret shape). One exception the owner chose: a secret-**shaped** span the person typed themselves may go when they press **Send anyway**, carried as `consent` (their own messages). Secure-note markers and secure-prose echoes are never overridable | a compromised webview could claim consent for a secret-shaped span; it still can never forward secure-note text |
 
 **The ledger is the new thing, and it is what made most of the fixes possible.**
 Before it, Rust could only refuse text that ANNOUNCED itself. A secure note is

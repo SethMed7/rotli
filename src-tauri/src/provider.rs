@@ -623,11 +623,14 @@ pub async fn cli_complete(
     // `images`: base64 payloads (raw or data: URL) the composer attached. Only
     // lanes with a NATIVE image flag carry them — see `image_args`.
     images: Option<Vec<String>>,
+    // the person's own messages they chose to send anyway (remote_block.rs)
+    consent: Option<Vec<String>>,
 ) -> Result<String, String> {
     // defence in depth: refuse before a task is even scheduled (and
     // `complete_connected` asks again, for every caller that is not this one)
-    if crate::secret::blocked_for_remote(&prompt) {
-        return Err(crate::provider_lane::SECRET_MESSAGE.into());
+    let consented = consent.unwrap_or_default();
+    if let Some(block) = crate::remote_block::remote_block(&prompt, &consented) {
+        return Err(block.message());
     }
     let children = Arc::clone(&state.children);
     tauri::async_runtime::spawn_blocking(move || {
@@ -641,6 +644,7 @@ pub async fn cli_complete(
             reasoning_effort.as_deref(),
             service_tier.as_deref(),
             images.as_deref().unwrap_or(&[]),
+            &consented,
         )
     })
     .await
@@ -662,12 +666,13 @@ pub(crate) fn complete_connected(
     reasoning_effort: Option<&str>,
     service_tier: Option<&str>,
     images: &[String],
+    consented: &[String],
 ) -> Result<String, String> {
     connected_provider_execution_allowed(provider)?;
     // the CLI lane is remote by definition — same egress law as chat.rs; the
     // lane seam checks again, and here it refuses before an image hits disk
-    if crate::secret::blocked_for_remote(prompt) {
-        return Err(crate::provider_lane::SECRET_MESSAGE.into());
+    if let Some(block) = crate::remote_block::remote_block(prompt, consented) {
+        return Err(block.message());
     }
     let millis = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS);
     let timeout = Duration::from_millis(millis);
@@ -679,7 +684,7 @@ pub(crate) fn complete_connected(
         Some(s) if reads_images_from_path(provider) => format!("{}\n{prompt}", image_preamble(&s.paths)),
         _ => prompt.to_string(),
     };
-    crate::provider_lane::complete_blocking(
+    crate::provider_lane::complete_blocking_consented(
         children,
         request_id,
         provider,
@@ -689,6 +694,7 @@ pub(crate) fn complete_connected(
         reasoning_effort,
         service_tier,
         staged.as_ref(),
+        consented,
     )
 }
 
