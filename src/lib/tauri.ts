@@ -1891,6 +1891,9 @@ export interface MemexChatSummary {
   path: string;
   /** fs mtime in ms (0 when unreadable) — ⌥A summon-chat picks the newest. */
   modifiedMs: number;
+  /** When the newest reply landed (ms; 0 = no reply yet, or one longer than
+   * the listing's tail window) — the sidebar's order (chatActivityMs). */
+  repliedMs: number;
   /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
   pinned: boolean;
   /** `model:` / `provider:` frontmatter — who answers this chat, in the file

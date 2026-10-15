@@ -52,12 +52,12 @@ test("chat rows reveal one keyboard-safe action without recoloring the provider 
   expect(hoverRules).toContain(".sb-chatrow:focus-within .sb-chataction");
   expect(hoverRules).toContain("pointer-events: auto");
 
-  const openAiSelected = notesStyles.slice(
-    notesStyles.indexOf(".sb-chatrow.sel .sb-chatmark.openai"),
-    notesStyles.indexOf("/* the per-chat model chip"),
-  );
-  expect(openAiSelected).toContain("color: var(--text)");
-  expect(openAiSelected).not.toContain("var(--selected-icon)");
+  // one row per chat: the hoisting Activity lane is retired (2026-10-15)
+  expect(sidebarChatSource).not.toContain("sb-chatactivity");
+  expect(notesStyles).not.toContain(".sb-chatstatus");
+  // provider art is the vendor's own colored file — no mask, no row ink
+  expect(notesStyles).not.toContain(".sb-chatrow.sel .sb-chatmark.openai");
+  expect(notesStyles).not.toMatch(/\.model-logo--\w+\s*\{[^}]*mask/);
 });
 
 test("file drops wait for Rust to issue native import grants", () => {

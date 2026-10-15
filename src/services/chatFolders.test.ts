@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   EMPTY_CHAT_FOLDERS,
   assignChatToFolder,
+  chatActivityMs,
   createChatFolder,
   deleteChatFolder,
   groupChats,
@@ -11,6 +12,7 @@ import {
   renameChatFolder,
   serializeChatFolders,
   setChatFolderPinned,
+  sortChatsByActivity,
 } from "./chatFolders";
 
 describe("chat folders (virtual grouping over flat chats/)", () => {
@@ -113,6 +115,47 @@ describe("chat folder ordering — response recency rules", () => {
     const reparsed = parseChatFolders(serializeChatFolders(withOrder));
     expect(reparsed.order).toEqual({ [id]: ["c", "a"] }); // survives for old builds
     expect(groupChats(chats, reparsed).folders[0]?.chats.map((c) => c.slug)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  // the owner, 2026-10-15: sending must leave the chat in place; the reply lifts it
+  test("sending (a newer file time) does not reorder; the arriving reply does", () => {
+    const before = [
+      { slug: "older", pinned: false, modifiedMs: 1_000, repliedMs: 1_000 },
+      { slug: "newer", pinned: false, modifiedMs: 2_000, repliedMs: 2_000 },
+    ];
+    expect(sortChatsByActivity(before).map((c) => c.slug)).toEqual(["newer", "older"]);
+    // your turn lands at 3_000: the file is newest, the reply time is not
+    const sent = before.map((c) => (c.slug === "older" ? { ...c, modifiedMs: 3_000 } : c));
+    expect(sortChatsByActivity(sent).map((c) => c.slug)).toEqual(["newer", "older"]);
+    // the answer lands at 4_000: now it leads
+    const replied = sent.map((c) => (c.slug === "older" ? { ...c, modifiedMs: 4_000, repliedMs: 4_000 } : c));
+    expect(sortChatsByActivity(replied).map((c) => c.slug)).toEqual(["older", "newer"]);
+  });
+
+  test("pins still lead, and a chat with no reply yet uses its file time", () => {
+    const list = [
+      { slug: "fresh", pinned: false, modifiedMs: 5_000, repliedMs: 0 },
+      { slug: "answered", pinned: false, modifiedMs: 6_000, repliedMs: 4_000 },
+      { slug: "pinned", pinned: true, modifiedMs: 1, repliedMs: 1 },
+    ];
+    expect(sortChatsByActivity(list).map((c) => c.slug)).toEqual(["pinned", "fresh", "answered"]);
+    expect(chatActivityMs({ modifiedMs: 5_000, repliedMs: 0 })).toBe(5_000);
+    expect(chatActivityMs({ modifiedMs: 6_000, repliedMs: 4_000 })).toBe(4_000);
+  });
+
+  test("a folder floats by its newest reply, not its newest file write", () => {
+    const work = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
+    const home = createChatFolder(work.manifest, "Home");
+    let manifest = assignChatToFolder(home.manifest, "w", work.id);
+    manifest = assignChatToFolder(manifest, "h", home.id);
+    const grouped = groupChats(
+      [
+        { slug: "w", modifiedMs: 9_000, repliedMs: 1_000 },
+        { slug: "h", modifiedMs: 2_000, repliedMs: 2_000 },
+      ],
+      manifest,
+    );
+    expect(grouped.folders.map((f) => f.folder.name)).toEqual(["Home", "Work"]);
   });
 
   test("a legacy manifest without order parses to an empty order map", () => {

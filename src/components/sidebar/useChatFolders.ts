@@ -22,6 +22,7 @@ import {
   invalidateChatFolders,
   loadChatFolders,
   saveChatFolders,
+  sortChatsByActivity,
 } from "../../services/chatFolders";
 import { backfillChatModels } from "../../services/chatModelMeta";
 import { useUiStore } from "../../state/ui";
@@ -34,7 +35,7 @@ export function chatFolderKey(id: string): string {
 export interface SidebarChatData {
   /** The vault whose chats/ these are — null until a vault is configured. */
   activeMemex: MemexInstance | null;
-  /** Pinned first, then most-recent (the maintainer, 2026-07-30). */
+  /** Pinned first, then newest reply (services/chatFolders chatActivityMs). */
   chatList: MemexChatSummary[];
   manifest: ChatFoldersManifest;
   grouped: GroupedChats<MemexChatSummary>;
@@ -50,13 +51,7 @@ export function useChatFolders(): SidebarChatData {
   const memexCfg = useMemexConfig();
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const rawChats = useInstanceChats(activeMemex).data;
-  const chatList = useMemo(
-    () =>
-      [...(rawChats ?? [])].sort(
-        (a, b) => Number(b.pinned) - Number(a.pinned) || b.modifiedMs - a.modifiedMs,
-      ),
-    [rawChats],
-  );
+  const chatList = useMemo(() => sortChatsByActivity(rawChats ?? []), [rawChats]);
   const foldersQuery = useQuery({
     queryKey: [...CHAT_FOLDERS_KEY, activeMemex?.root ?? ""],
     // the vault answers on the desktop and in Rotli Web alike; only the

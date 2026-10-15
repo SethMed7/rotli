@@ -176,7 +176,26 @@ export interface GroupedChats<T> {
  * to the top of the folder / top of the left bar"). The old per-folder MANUAL
  * drag order is retired by that ask — the `order` field stays parsed for
  * manifest compatibility but no longer changes rendering. */
-export function groupChats<T extends { slug: string; modifiedMs?: number }>(
+/** A chat's place in the recency order: when its newest REPLY landed, so a
+ * send (which writes the person's turn at once) leaves it where it is and the
+ * arriving answer lifts it (the owner, 2026-10-15). A chat with no reply yet —
+ * or one written before reply times were read — falls back to its file time. */
+export function chatActivityMs(chat: { modifiedMs?: number; repliedMs?: number }): number {
+  return chat.repliedMs && chat.repliedMs > 0
+    ? chat.repliedMs
+    : (chat.modifiedMs ?? Number.NEGATIVE_INFINITY);
+}
+
+/** Pinned first, then newest activity first; ties keep their incoming order. */
+export function sortChatsByActivity<T extends { pinned: boolean; modifiedMs?: number; repliedMs?: number }>(
+  chats: readonly T[],
+): T[] {
+  return [...chats].sort(
+    (a, b) => Number(b.pinned) - Number(a.pinned) || chatActivityMs(b) - chatActivityMs(a),
+  );
+}
+
+export function groupChats<T extends { slug: string; modifiedMs?: number; repliedMs?: number }>(
   chats: readonly T[],
   manifest: ChatFoldersManifest,
 ): GroupedChats<T> {
@@ -190,10 +209,7 @@ export function groupChats<T extends { slug: string; modifiedMs?: number }>(
   }
   const manifestRank = new Map(manifest.folders.map((folder, index) => [folder.id, index]));
   const newest = (folder: ChatFolder) =>
-    Math.max(
-      ...(byFolder.get(folder.id) ?? []).map((chat) => chat.modifiedMs ?? Number.NEGATIVE_INFINITY),
-      Number.NEGATIVE_INFINITY,
-    );
+    Math.max(...(byFolder.get(folder.id) ?? []).map(chatActivityMs), Number.NEGATIVE_INFINITY);
   const ranked = [...manifest.folders].sort((a, b) => {
     const pinRank = Number(b.pinned === true) - Number(a.pinned === true);
     if (pinRank !== 0) return pinRank;

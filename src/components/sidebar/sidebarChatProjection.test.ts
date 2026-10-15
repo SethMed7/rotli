@@ -1,6 +1,18 @@
 import { describe, expect, test } from "bun:test";
 
-import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+
+describe("chat row signal", () => {
+  test("a live run reads Working and an unseen answer reads Unread reply", () => {
+    expect(chatRowSignal("running")).toEqual({ kind: "working", label: "Working" });
+    expect(chatRowSignal("unread")).toEqual({ kind: "unread", label: "Unread reply" });
+  });
+
+  test("an acknowledged or never-run chat carries no signal", () => {
+    expect(chatRowSignal("done")).toBeNull();
+    expect(chatRowSignal(undefined)).toBeNull();
+  });
+});
 
 const chats = [{ slug: "one" }, { slug: "two" }];
 

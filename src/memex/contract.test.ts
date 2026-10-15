@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { summarize } from "../services/webChats";
 import { setChatModel } from "./chatModelFrontmatter";
+import { lastReplyMs } from "./chatRecency";
 import {
   AI_KEYS,
   USER_KEYS,
@@ -147,6 +148,32 @@ describe("messages", () => {
     );
     expect(slug).toBe("rotli-architecture");
     expect(contents.endsWith("## Messages\n**you** · 2026-06-24 — hi\n")).toBe(true);
+  });
+});
+
+// The TS twin of memex_chat_scan.rs last_reply_ms — same cases as its Rust tests.
+describe("lastReplyMs (the sidebar's reply-recency order)", () => {
+  const head = composeChatFile({ title: "T", source: "rotli" }, DATE);
+
+  test("the newest reply is the last non-you line; a pending send does not count", () => {
+    const file = appendMessages(
+      head,
+      [
+        { speaker: "you", text: "hi", at: "2026-10-15T10:00:00.000Z" },
+        { speaker: "rotli", text: "hello\nsecond line", at: "2026-10-15T10:00:05.000Z" },
+        { speaker: "you", text: "again", at: "2026-10-15T11:00:00.000Z" },
+      ],
+      DATE,
+    );
+    expect(lastReplyMs(file)).toBe(Date.parse("2026-10-15T10:00:05.000Z"));
+    expect(summarize("t", file, 99).repliedMs).toBe(Date.parse("2026-10-15T10:00:05.000Z"));
+  });
+
+  test("no reply yet is zero; a date-only turn reads as that day's UTC midnight", () => {
+    expect(lastReplyMs(appendMessages(head, [{ speaker: "you", text: "hi" }], DATE))).toBe(0);
+    expect(lastReplyMs(appendMessages(head, [{ speaker: "rotli", text: "old" }], DATE))).toBe(
+      Date.parse(`${DATE}T00:00:00Z`),
+    );
   });
 });
 
