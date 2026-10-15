@@ -76,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A copied vault opens with everything in Main.** A copy made with the
+  Librarian opened with an empty Main, so the notes you brought were only
+  under All notes. Main now starts with every folder and note that came over,
+  as a folder connected in place already did. A Main you've arranged is never
+  replaced.
 - **Agents can read and edit boards again when their shapes sit at decimal
   coordinates.** A board Excalidraw saves stores positions like
   `17.140276393692147`, and the digits after the point could look like a card

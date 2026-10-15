@@ -4219,6 +4219,17 @@ impl CorpusStore {
         self.ensure_walked()
     }
 
+    /// A vault the person brought (a folder connected in place, or an imported
+    /// copy) starts with Main showing everything it holds (the owner,
+    /// 2026-10-14: "everything that was copied over should by default all be on
+    /// the main view"). A Rotli vault made fresh seeds its own Welcome instead.
+    pub fn seed_main_if_brought_in(&mut self) -> Result<(), String> {
+        if self.adopted || self.layout.is_imported() {
+            self.seed_main_from_disk_if_missing()?;
+        }
+        Ok(())
+    }
+
     /// First activation of an adopted Markdown folder mirrors its disk tree into
     /// Main as references. Content is never copied and note files are never
     /// rewritten; `.rotli/index.json` supplies the stable local identities.
