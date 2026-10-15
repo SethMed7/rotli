@@ -186,6 +186,16 @@ fn a_marked_copy_opens_as_an_imported_vault_with_every_folder_the_persons() {
     assert!(store.layout.is_imported());
     assert!(!store.is_memex(), "the Librarian stands down until it learns this layout (4c)");
 
+    // Main starts with everything that came over, folder by folder
+    store.seed_main_if_brought_in().unwrap();
+    let main: serde_json::Value = serde_json::from_str(&store.main_read().unwrap()).unwrap();
+    let top: Vec<&str> = main["tree"].as_array().unwrap().iter().filter_map(|n| n["folder"].as_str()).collect();
+    for folder in ["Projects", "Archive", "Trash", "Inbox"] {
+        assert!(top.contains(&folder), "{folder} is in Main: {top:?}");
+    }
+    let projects = main["tree"].as_array().unwrap().iter().find(|n| n["folder"] == "Projects").unwrap();
+    assert_eq!(projects["children"].as_array().unwrap().len(), 1, "its note came with it");
+
     let list = store.list().unwrap();
     let folders: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
     for folder in ["Projects", "Archive", "Trash", "Inbox"] {
@@ -223,4 +233,14 @@ fn a_marked_copy_opens_as_an_imported_vault_with_every_folder_the_persons() {
     // the source is untouched
     assert!(!source.join("memex.json").exists());
     assert!(source.join("Projects/Roadmap draft.md").is_file());
+}
+
+#[test]
+fn a_fresh_rotli_vault_is_not_seeded_from_disk() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let root = fs::canonicalize(temp.path()).unwrap();
+    crate::memex::write_new_marker(&root, serde_json::Map::new()).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    store.seed_main_if_brought_in().unwrap();
+    assert!(!root.join(".rotli/main.json").exists(), "a new vault seeds its own Welcome instead");
 }

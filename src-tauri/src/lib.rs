@@ -1526,9 +1526,7 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
         corpus::CorpusStore::open(root.clone())?
     };
     store.warm_secure_ledger()?;
-    if adopted {
-        store.seed_main_from_disk_if_missing()?;
-    }
+    store.seed_main_if_brought_in()?;
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     if active {
         organizer.with_vault_transition(|| {
@@ -1604,9 +1602,7 @@ fn activate_vault_path_live(
             corpus::CorpusStore::open(root.clone())?
         };
         store.warm_secure_ledger()?;
-        if adopted {
-            store.seed_main_from_disk_if_missing()?;
-        }
+        store.seed_main_if_brought_in()?;
         let suppress = store.suppress_set();
         new_root = Some((store, suppress));
     }
@@ -2529,7 +2525,7 @@ pub fn run() {
             let warm_app = app.handle().clone();
             std::thread::spawn(move || {
                 let state = warm_app.state::<corpus::CorpusState>();
-                let try_warm = |(id, adopted): &(String, bool)| {
+                let try_warm = |(id, _): &(String, bool)| {
                     if !state.contains_root(id).unwrap_or(true) {
                         return secret::Warm::Gone;
                     }
@@ -2540,10 +2536,8 @@ pub fn run() {
                         eprintln!("rotli: secure-note ledger not warm for root {id} ({e}); egress stays closed, retrying");
                         return secret::Warm::Failed;
                     }
-                    if *adopted {
-                        if let Err(e) = state.route(id, |store| store.seed_main_from_disk_if_missing()) {
-                            eprintln!("rotli: could not mirror adopted vault {id} into Main ({e})");
-                        }
+                    if let Err(e) = state.route(id, |store| store.seed_main_if_brought_in()) {
+                        eprintln!("rotli: could not mirror vault {id} into Main ({e})");
                     }
                     secret::Warm::Done
                 };
