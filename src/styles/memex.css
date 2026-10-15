@@ -4337,3 +4337,32 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
 .why-copy p {
   margin: 6px 0 0;
 }
+/* connecting a model from Chat itself (chatConnectModels.tsx): the picker's
+   way to the chooser, and the chooser shown first on a vault's first chat */
+.chat-model-connect {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-model-connect:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.chat-model-connect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.chat-first-visit-go {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}

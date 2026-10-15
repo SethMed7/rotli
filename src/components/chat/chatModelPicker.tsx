@@ -13,6 +13,7 @@ import { refreshShownLanes } from "../../services/connectedModels";
 import { CloudGlyph, EyeGlyph, LaptopGlyph, SearchGlyph } from "../glyphs";
 import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
+import { useConnectModels } from "./chatConnectModels";
 
 /** The list's own height cap: beside the composer chip it must fit the window,
  * and a short list reads as a menu rather than a panel. */
@@ -363,6 +364,17 @@ export function ModelPicker({
                   })
                 )}
               </div>
+              {/* connect another model right here (chatConnectModels.tsx) */}
+              <button
+                type="button"
+                className="chat-model-connect"
+                onClick={() => {
+                  setOpen(false);
+                  useConnectModels.getState().show();
+                }}
+              >
+                Connect a model…
+              </button>
             </div>
           </div>,
           document.body,
