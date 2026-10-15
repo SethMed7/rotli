@@ -30,6 +30,7 @@ import { FolderShell } from "./components/folderWindow/folderShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { PersonSinksPopout } from "./components/personSinksPopout";
+import { ConnectModelsDialog } from "./components/chat/chatConnectModels";
 import { fillStartupTab } from "./state/startupTab";
 import { VaultImportDialog } from "./components/vaultImportDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
@@ -437,6 +438,7 @@ function MainShell() {
       <RenameDialog />
       <VaultImportDialog />
       <PersonSinksPopout />
+      <ConnectModelsDialog />
     </div>
   );
 }

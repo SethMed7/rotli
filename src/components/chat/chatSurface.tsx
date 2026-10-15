@@ -139,6 +139,7 @@ import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatBuddy, ChatLiveEdge, useJustFinished } from "./chatBuddy";
 import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
+import { ChatFirstVisit, firstVisitShows, useChatFirstVisitDone } from "./chatConnectModels";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
@@ -151,7 +152,7 @@ import {
   pastedChatImages,
   removeChatDraftImage,
 } from "./chatImageTokens";
-import { ModelPicker } from "./chatModelPicker";
+import { ModelPicker, shortModelLabel } from "./chatModelPicker";
 import {
   type BlockedAction,
   ChatBlockedBar,
@@ -1093,6 +1094,8 @@ export function ChatSurface({
     : null;
   const mediaRoot = active && active.id !== CORPUS_INSTANCE_ID ? `${active.id}:` : "";
   const chats = useInstanceChats(active);
+  // the first time Chat opens in a vault, connecting comes before a new chat (chatConnectModels.tsx)
+  const firstVisitDone = useChatFirstVisitDone((state) => state.open);
   const write = useWriteChat();
   const updateTitle = useUpdateChatTitle();
   // The stored title is presentation; attachment identity is the note stem.
@@ -2248,6 +2251,11 @@ export function ChatSurface({
   }, [artifactRevealKey, artifacts.length, artifactsCompact]);
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
   const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
+  const firstVisit = firstVisitShows({
+    pristine: pristineChat,
+    chatCount: chats.data?.length,
+    done: firstVisitDone,
+  });
   const welcomeHour = new Date().getHours();
   const lastMessage = messages.at(-1);
   const lastSpeaker = lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null;
@@ -2508,6 +2516,9 @@ export function ChatSurface({
                     </div>
                     {!pristineChat && (
                       <p className="chat-sub">This saved chat is ready for its first message.</p>
+                    )}
+                    {catalogSettled && picked && firstVisit && (
+                      <ChatFirstVisit modelLabel={shortModelLabel(picked.label)} />
                     )}
                     {catalogSettled && !picked && (
                       <ChatSetupGuide secureOnly={secureChat} onOpenSettings={() => setSettingsOpen(true)} />
