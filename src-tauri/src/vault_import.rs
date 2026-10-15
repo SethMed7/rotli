@@ -309,9 +309,18 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
     let record = record(&source, &destination, &plan)?;
     crate::flush_webviews_before_shutdown(app)?;
     let previous = corpus::is_configured(app).then(|| corpus::resolve_corpus(app));
+    // a copy of a folder connected in place replaces it (read before the copy
+    // is marked: the copy gets a fresh, not-in-place marker)
+    let replaces = crate::vault_roles::in_place(&source);
     let marked = make_vault(&destination, previous.as_deref())?;
     let memex = crate::memex::detect_folder(&destination).kind == "memex";
     crate::activate_vault_path_live(app, destination.clone(), !memex)?;
+    if replaces {
+        // only the copy stays connected, and the original gets back the
+        // marker Rotli wrote into it (the owner, 2026-10-15)
+        crate::forget_vault_at(app, &source)?;
+        crate::vault_roles::release_in_place(&source)?;
+    }
     Ok(CopyReport {
         destination: destination.display().to_string(),
         files: record.files,

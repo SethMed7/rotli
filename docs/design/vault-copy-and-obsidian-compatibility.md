@@ -445,3 +445,10 @@ An adopted folder, and the source of any import, is **protected**:
   An empty folder needs no copy. A closed *Why a copy?* says why: the
   original is never touched by Rotli, so nothing that happens in the copy can
   fall on it.
+- **A copy replaces the folder it was made from when that folder was
+  connected in place (owner, 2026-10-15: "it should only connect one not
+  both").** After the copy opens, the original leaves the vault list
+  (`forget_vault_at`) and the marker Rotli wrote into it, plus its backup in
+  `.rotli/`, is taken back (`vault_roles::release_in_place`); the person's
+  files are untouched. A copy of a folder that was never connected changes
+  nothing in the original, as before.

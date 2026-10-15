@@ -1898,16 +1898,35 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
             "Choose or create a development vault before changing linked libraries.".into(),
         );
     }
+    forget_brain_now(&app, &id)
+}
+
+/// Take one connected vault out of Rotli: its route, its saved entry, and its
+/// asset scope. The folder and its files stay exactly where they are.
+fn forget_brain_now(app: &AppHandle, id: &str) -> Result<(), String> {
     let state = app.state::<corpus::CorpusState>();
-    let root = state.remove_registered_root(&id, || corpus::forget_root(&app, &id))?;
+    let root = state.remove_registered_root(id, || corpus::forget_root(app, id))?;
     if let Err(error) = app.asset_protocol_scope().forbid_directory(&root, true) {
         eprintln!(
             "rotli: removed vault route but could not revoke its asset scope {} ({error})",
             root.display()
         );
     }
-    chat_window::emit_corpus_changed(&app);
+    chat_window::emit_corpus_changed(app);
     Ok(())
+}
+
+/// Take the vault at `root` out of the list, if it is a connected one (a copy
+/// now stands in for it: vault_import.rs). Not connected: nothing to do.
+pub(crate) fn forget_vault_at(app: &AppHandle, root: &std::path::Path) -> Result<(), String> {
+    let same = |path: &std::path::Path| {
+        std::fs::canonicalize(path).ok() == std::fs::canonicalize(root).ok() || path == root
+    };
+    let cfg = corpus::ensure_corpus_config(app);
+    match cfg.brains.iter().find(|brain| same(&brain.abs_path)) {
+        Some(brain) => forget_brain_now(app, &brain.id.clone()),
+        None => Ok(()),
+    }
 }
 
 /// Make a connected brain the active write target. No relaunch — the frontend
