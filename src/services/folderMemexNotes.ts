@@ -5,7 +5,7 @@
 
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
-import { contentRevision, type VaultDir } from "./vaultDir";
+import { contentRevision, type VaultDir, vaultFolderRoles } from "./vaultDir";
 
 /** The vault's settings file: its `brainEnabled` is the Librarian switch. */
 const SETTINGS_FILE = ".rotli/settings.json";
@@ -28,9 +28,10 @@ export function assertSafeStem(stem: string): void {
 /** The folder a new memex note is born in: `wiki/_secure` for a secure note,
  * else `wiki/_inbox` while the Librarian is on (missing or malformed settings
  * keep the ON default, as in Rust), else the `wiki/` root. A plain folder has
- * no `wiki/`, so its notes land at its root. */
+ * no `wiki/`, so its notes land at its root; a brought-in vault (copy or in
+ * place) never grows a `wiki/` tree — its notes land in its Inbox. */
 export async function memexNoteFolder(dir: VaultDir, contents: string, isMemex: boolean): Promise<string> {
-  if (!isMemex) return "";
+  if (!isMemex) return (await vaultFolderRoles(dir))?.inbox ?? "";
   if (isSecureNote(contents)) return "wiki/_secure";
   return (await librarianEnabled(dir)) ? "wiki/_inbox" : "wiki";
 }

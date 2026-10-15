@@ -164,3 +164,37 @@ fn the_destination_is_separate_empty_and_named_beside_the_vaults() {
     fs::create_dir_all(parent.join("Garden (Rotli) 2")).unwrap();
     assert_eq!(default_destination(&parent, &source), parent.join("Garden (Rotli) 3"));
 }
+
+/// A copy of a folder connected in place copies its marker too: the copy gets
+/// a fresh id (never the original's), loses `inPlace`, keeps the role map, and
+/// has its Librarian seeded on at Suggest. A copied Rotli vault stays itself.
+#[test]
+fn a_copy_of_a_folder_connected_in_place_is_its_own_vault_with_the_librarian() {
+    let temp = TempDir::new().unwrap();
+    let source = obsidian(&temp);
+    crate::vault_roles::mark_in_place(&source).unwrap();
+    let read_marker = |root: &Path| -> serde_json::Value {
+        serde_json::from_str(&fs::read_to_string(root.join("memex.json")).unwrap()).unwrap()
+    };
+    let original = read_marker(&source);
+    let copy = temp.path().join("Garden (Rotli)");
+    fs::create_dir_all(&copy).unwrap();
+    copy_all(&source, &copy);
+    assert!(crate::vault_roles::in_place(&copy), "the copied marker still says in place");
+
+    assert_eq!(make_vault(&copy, None).unwrap(), Marked::Imported);
+    let marker = read_marker(&copy);
+    assert_ne!(marker["id"], original["id"], "a fresh id");
+    assert!(marker.get("inPlace").is_none());
+    assert_eq!(marker["folders"], original["folders"], "the same role map");
+    assert!(!crate::vault_roles::in_place(&copy));
+    assert_eq!(read_marker(&source), original, "the original is untouched");
+    let settings = fs::read_to_string(copy.join(".rotli/settings.json")).unwrap();
+    assert!(settings.contains("\"brainEnabled\": true") && settings.contains("suggest"), "{settings}");
+
+    // a copied Rotli vault (a copy's copy) keeps its marker byte-for-byte
+    let again = temp.path().join("Garden (Rotli) 2");
+    fs::create_dir_all(&again).unwrap();
+    fs::write(again.join("memex.json"), fs::read(copy.join("memex.json")).unwrap()).unwrap();
+    assert_eq!(make_vault(&again, None).unwrap(), Marked::AlreadyRotli);
+}

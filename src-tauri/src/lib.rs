@@ -1128,6 +1128,11 @@ struct BrainRootView {
     #[serde(flatten)]
     brain: corpus::ConnectedBrain,
     brain_enabled: bool,
+    /// A brought-in vault's own folders by role (copy or in place); null for a
+    /// Rotli vault.
+    folder_roles: Option<vault_roles::FolderRoles>,
+    /// Connected in place (its marker says so): the Librarian never runs there.
+    adopted: bool,
 }
 
 /// A root's Librarian switch, straight off its settings sidecar. Same rules as
@@ -1216,7 +1221,11 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
     }
     // a displaced marker still reads as a vault; opening it heals (vault_marker.rs)
     let is_vault = corpus::is_memex_root(&root) || vault_marker::recoverable(&root);
-    let source = if is_vault {
+    // a folder connected in place links back as one (its marker keeps the
+    // Librarian off whichever way it is reopened)
+    let source = if vault_roles::in_place(&root) {
+        "Folder connected in place"
+    } else if is_vault {
         "Rotli vault"
     } else if root.join(".obsidian").is_dir() {
         "Obsidian vault"
@@ -1320,16 +1329,22 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     // An imported vault is not a memex to the webview: its notes go through the
     // corpus store, never the memex note lanes (wiki/_inbox), and its Library
     // and Librarian stay off until they learn its layout (slice 4c).
+    // Its chats still live in the vault (the role map's chats folder), so its
+    // id and perms are reported like any vault's: the webview writes chats
+    // there and routes new notes to the corpus store's Inbox.
     let folder_roles = vault_roles::read(&cfg.corpus.abs_path);
-    let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
-        Some((id, p)) if folder_roles.is_none() => (true, Some(id), Some(p)),
-        _ => (false, None, None),
+    let (memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+        Some((id, p)) => (Some(id), Some(p)),
+        None => (None, None),
     };
+    let is_memex = memex_id.is_some() && folder_roles.is_none();
     if development_read_only {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
-    // a folder connected in place is never organized: its switch reads off
-    let corpus_brain_enabled = !cfg.corpus.adopted && root_brain_enabled(&cfg.corpus.abs_path);
+    // a folder connected in place is never organized: its switch reads off.
+    // The marker says so too (decision I), whatever corpus.json remembers.
+    let adopted = cfg.corpus.adopted || vault_roles::in_place(&cfg.corpus.abs_path);
+    let corpus_brain_enabled = !adopted && root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
@@ -1338,16 +1353,18 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             perms,
             brain_enabled: corpus_brain_enabled,
             folder_roles,
-            adopted: cfg.corpus.adopted,
+            adopted,
         },
         brains: cfg
             .brains
             .into_iter()
             .map(|b| {
-                let brain_enabled = root_brain_enabled(&b.abs_path);
+                let adopted = vault_roles::in_place(&b.abs_path);
                 BrainRootView {
+                    brain_enabled: !adopted && root_brain_enabled(&b.abs_path),
+                    folder_roles: vault_roles::read(&b.abs_path),
+                    adopted,
                     brain: b,
-                    brain_enabled,
                 }
             })
             .collect(),
@@ -1423,6 +1440,16 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
         _ => {
             if let Some(current) = &current {
                 corpus::carry_settings(current, &abs)?;
+            }
+            // Decision I: the same layout as a copy (marker + role map, Rotli's
+            // folders suffixed), marked "in place" so the Librarian never runs
+            // here and the person's notes are never stamped. Another tool's
+            // memex.json is never replaced: that folder stays protected as it
+            // was. No seed_librarian: the switch stays off in place. The heal
+            // then gives the new marker its backup (and an empty `.obsidian/`
+            // guard, which Obsidian vaults already have) — see vault_marker.rs.
+            if vault_roles::mark_in_place(&abs)? == vault_roles::Marked::Imported {
+                vault_marker::heal_best_effort(&abs);
             }
             true
         }
@@ -2284,6 +2311,8 @@ pub fn run() {
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
             corpus::note_pass::corpus_vault_pass,
+            corpus::person_sinks::corpus_person_sinks,
+            corpus::person_sinks::corpus_adopt_person_sinks,
             corpus::rules_store::corpus_secure_by_keywords,
             breve::breve_snapshot,
             breve::breve_import_legacy,

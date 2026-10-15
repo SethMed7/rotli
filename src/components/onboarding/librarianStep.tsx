@@ -19,6 +19,7 @@ import {
   suggestedLibrarian,
 } from "../../ai/librarianLane";
 import { providerCatalog } from "../../ai/models";
+import { openedInPlaceVault } from "../../memex/config";
 import { useMemexConfig } from "../../memex/useMemex";
 import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
 import { setLibrarianOn } from "../../services/librarianSwitch";
@@ -39,7 +40,7 @@ export function librarianCopyChoice(label: string) {
 
 export function LibrarianScreen() {
   const config = useMemexConfig().data;
-  const inPlace = config?.openedInPlace ? config.currentFolder : null;
+  const inPlace = openedInPlaceVault(config);
   const librarianOn = useUiStore((state) => state.brainEnabled) && !inPlace;
   const organizerModel = useUiStore((state) => state.organizerModel);
   const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);

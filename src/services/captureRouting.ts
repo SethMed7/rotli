@@ -7,19 +7,21 @@ import {
   type MemexConfig,
   type MemexInstance,
   activeInstance,
-  isWritable,
+  noteLaneWritable,
 } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
 
 export function captureDestination(config: MemexConfig, targetId: string | null): MemexInstance | null {
   if (!targetId) {
     const active = activeInstance(config);
-    return isWritable(active) ? active : null;
+    // a brought-in vault keeps captures in its Inbox through the corpus store
+    // (the caller's local fallback), never a wiki/ lane
+    return noteLaneWritable(active) ? active : null;
   }
   const requested = config.instances.find((candidate) => candidate.id === targetId);
   if (!requested)
     throw new Error("The chosen capture vault is no longer available. Choose another in Settings.");
-  if (!isWritable(requested)) {
+  if (!noteLaneWritable(requested)) {
     throw new Error("The chosen capture vault no longer has write access. Update it in Settings → Location.");
   }
   return requested;

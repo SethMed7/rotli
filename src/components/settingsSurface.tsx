@@ -89,7 +89,8 @@ import {
   type MemexInstance,
   type Perms,
   activeInstance,
-  isWritable,
+  noteLaneWritable,
+  openedInPlaceVault,
 } from "../memex/config";
 import { pickVaultFolder } from "../memex/service";
 import {
@@ -551,7 +552,7 @@ function GeneralPane() {
   const setCaptureVaultId = useUiStore((s) => s.setCaptureVaultId);
   const memexConfig = useMemexConfig();
   const currentVault = memexConfig.data ? activeInstance(memexConfig.data) : null;
-  const writableVaults = (memexConfig.data?.instances ?? []).filter(isWritable);
+  const writableVaults = (memexConfig.data?.instances ?? []).filter(noteLaneWritable);
   // Physical folders remain available only for current/local routing. Named
   // memex destinations always use their guarded intake lane.
   const folderOpts = (useFolders().data ?? []).filter(
@@ -1659,7 +1660,7 @@ function BrainPane() {
 
 function DesktopBrainPane() {
   const memexCfg = useMemexConfig().data;
-  const inPlace = memexCfg?.openedInPlace ? memexCfg.currentFolder : null;
+  const inPlace = openedInPlaceVault(memexCfg);
   const brainOn = useUiStore((s) => s.brainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);

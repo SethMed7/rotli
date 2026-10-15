@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { DEST, IMPORTED_FOLDER_ROLES, setFolderRoles } from "./destinations";
 import { setFolderSecure } from "./folderMetadata";
 import { FolderNotesService } from "./folderNotes";
-import { MemoryVaultDir } from "./vaultDir";
+import { MemoryVaultDir, vaultOpenedInPlace } from "./vaultDir";
 import { FolderChatStore } from "./webChats";
 
 // An imported vault (slice 4) on Rotli Web: the copy's tree is the person's.
@@ -99,5 +99,64 @@ describe("an imported vault", () => {
     await chats.write("pancakes", "---\ntitle: Pancakes\n---\n", null);
     expect(await dir.exists(`${IMPORTED_FOLDER_ROLES.chats}/pancakes.md`)).toBe(true);
     expect(await dir.exists("chats/pancakes.md")).toBe(false);
+  });
+
+  test("a memex note write never grows a wiki/ lane: it lands in the Inbox", async () => {
+    const dir = await importedVault();
+    const notes = new FolderNotesService(dir);
+    const path = await notes.writeMemexNote(
+      "chat-note",
+      "---\nid: 01JWEBCHATNOTE000000000000\n---\n# Chat note\n",
+    );
+    expect(path).toBe("Inbox/chat-note.md");
+    expect(await dir.exists("wiki/_inbox")).toBe(false);
+  });
+});
+
+// Decision I (owner, 2026-10-15): a folder connected in place gets the same
+// marker as a copy plus `"inPlace": true`. Rotli Web reads that field — not
+// "no marker" — to keep the person's notes exactly as they wrote them.
+describe("a folder connected in place", () => {
+  async function inPlaceVault(inPlace: boolean): Promise<MemoryVaultDir> {
+    const dir = new MemoryVaultDir();
+    const marker = {
+      id: "mx_webinplace",
+      contract: "3.9",
+      layout: "imported",
+      folders: IMPORTED_FOLDER_ROLES,
+    };
+    await dir.writeText("memex.json", JSON.stringify(inPlace ? { ...marker, inPlace: true } : marker));
+    await dir.writeText("Hikes/Trail notes.md", "# Trail\n\nOld.\n");
+    return dir;
+  }
+
+  afterEach(() => setFolderRoles(null));
+
+  test("is detected from the marker's field, and a copy or a Rotli vault is not", async () => {
+    expect(await vaultOpenedInPlace(await inPlaceVault(true))).toBe(true);
+    expect(await vaultOpenedInPlace(await inPlaceVault(false))).toBe(false);
+    const plain = new MemoryVaultDir();
+    expect(await vaultOpenedInPlace(plain)).toBe(true);
+    await plain.writeText("memex.json", JSON.stringify({ id: "mx_rotli" }));
+    expect(await vaultOpenedInPlace(plain)).toBe(false);
+  });
+
+  test("a save stamps nothing on the person's note", async () => {
+    const dir = await inPlaceVault(true);
+    const notes = new FolderNotesService(dir);
+    const trail = (await notes.listAll()).find((n) => n.title === "Trail");
+    if (!trail) throw new Error("missing fixture note");
+    const note = await notes.getNote(trail.id);
+    await notes.updateNote(trail.id, "# Trail\n\nNew.\n", note?.revision ?? "");
+    expect(await dir.readText("Hikes/Trail notes.md")).toBe("# Trail\n\nNew.\n");
+  });
+
+  test("trash uses Rotli's own trash there too", async () => {
+    const dir = await inPlaceVault(true);
+    const notes = new FolderNotesService(dir);
+    const trail = (await notes.listAll()).find((n) => n.title === "Trail");
+    if (!trail) throw new Error("missing fixture note");
+    await notes.trashNote(trail.id);
+    expect(await dir.exists("Trash (Rotli)/Hikes/Trail notes.md")).toBe(true);
   });
 });

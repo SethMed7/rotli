@@ -332,6 +332,9 @@ interface UiState {
   /** Which quick note the window reopens on — "remember where I am". */
   quickActiveId: string | null;
   setQuickActiveId: (id: string | null) => void;
+  /** The Archive/Trash question's answer, "<vault id>:moved" or ":kept" (once per vault). */
+  personSinksAnswer: string | null;
+  setPersonSinksAnswer: (answer: string) => void;
   /** Folder new quick notes (the "+") are created in. */
   quickFolder: string;
   setQuickFolder: (folder: string) => void;
@@ -794,6 +797,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuickVaultId: (id) => set({ quickVaultId: id }),
   captureVaultId: null,
   setCaptureVaultId: (id) => set({ captureVaultId: id }),
+  personSinksAnswer: null,
+  setPersonSinksAnswer: (answer) => set({ personSinksAnswer: answer }),
 
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),

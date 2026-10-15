@@ -29,6 +29,7 @@ import { ChatShell } from "./components/chatWindow/chatShell";
 import { FolderShell } from "./components/folderWindow/folderShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
+import { PersonSinksDialog } from "./components/personSinksDialog";
 import { VaultImportDialog } from "./components/vaultImportDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
@@ -445,6 +446,7 @@ function MainShell() {
       <BoardNameDialog />
       <RenameDialog />
       <VaultImportDialog />
+      <PersonSinksDialog />
     </div>
   );
 }

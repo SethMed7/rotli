@@ -8,12 +8,12 @@ import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 
 import { modelLabel, modelProvider } from "../../ai/models";
-import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
+import { chatsDirOf } from "../../memex/config";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import {
@@ -42,6 +42,7 @@ import { ModelLogo } from "./modelLogo";
 import { OverviewCard } from "./overviewCard";
 import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
+import { useConnectVault } from "./useConnectVault";
 
 /** Where a dragged chat would land: a folder row (positional reordering retired 2026-08-03). */
 type ChatDrop = { kind: "folder"; id: string };
@@ -57,6 +58,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const expandedDests = useUiStore((s) => s.expandedDests);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
+  // no vault yet: connect one right here (the vault menu's Connect flow)
+  const { connectVault } = useConnectVault();
   const sidebarFolderNonce = useUiStore((s) => s.sidebarFolderNonce);
   const openContextMenu = useContextMenu((s) => s.open);
   const openChat = usePanesStore((s) => s.openChat);
@@ -296,7 +299,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         label: "Copy file path",
         onClick: () => {
           if (activeMemex) {
-            void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
+            void navigator.clipboard.writeText(`${activeMemex.root}/${chatsDirOf(activeMemex)}/${c.slug}.md`);
           }
         },
       },
@@ -476,8 +479,18 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           onNewChat={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
         />
         {!activeMemex ? (
-          <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
-            Choose a vault in Settings → Location
+          <button
+            type="button"
+            className="sb-chat-empty"
+            onClick={() =>
+              void connectVault().catch((err: unknown) =>
+                setRowActionError(
+                  `Couldn't connect that folder — ${err instanceof Error ? err.message : String(err)}`,
+                ),
+              )
+            }
+          >
+            Connect vault
           </button>
         ) : chatList.length === 0 ? (
           <p className="sb-empty">No chats yet.</p>

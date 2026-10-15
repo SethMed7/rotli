@@ -8,7 +8,7 @@
 
 import { bytesRevision } from "../lib/contentRevision";
 import { isMemexId, parseMemexInfo } from "../memex/contract";
-import { type FolderRoles, folderRolesFromMarker } from "./destinations";
+import { type FolderRoles, folderRolesFromMarker, markerInPlace } from "./destinations";
 export { bytesRevision, contentRevision } from "../lib/contentRevision";
 
 export interface VaultDirEntry {
@@ -106,6 +106,20 @@ export async function vaultHasRotliMarker(dir: Pick<VaultDir, "exists" | "readTe
   if (!(await dir.exists("memex.json"))) return false;
   // unreadable reads as "opened in place": the direction that writes less
   return isMemexId(parseMemexInfo(await dir.readText("memex.json").catch(() => ""))?.id);
+}
+
+/** Whether the person's notes here are theirs as written (decision B): a folder
+ * with no Rotli marker (opened in place before decision I), or one whose
+ * marker says `"inPlace": true` (connected in place since). Rotli never stamps
+ * or renames such a folder's own notes. A copy and a Rotli vault are not. */
+export async function vaultOpenedInPlace(dir: Pick<VaultDir, "exists" | "readText">): Promise<boolean> {
+  if (!(await vaultHasRotliMarker(dir))) return true;
+  try {
+    return markerInPlace(JSON.parse(await dir.readText("memex.json")));
+  } catch {
+    // unreadable reads as "opened in place": the direction that writes less
+    return true;
+  }
 }
 
 /** An imported vault's role map, read from its marker (Rust `vault_roles::read`).

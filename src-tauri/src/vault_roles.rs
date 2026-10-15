@@ -12,6 +12,13 @@
 //!
 //! The signal lives in the marker, not in `.rotli/`, because `.rotli/` is
 //! rebuildable.
+//!
+//! A folder connected in place gets the same marker and role map, plus
+//! `"inPlace": true` (decision I, owner 2026-10-15). Everything works there as
+//! in a copy — chat, Inbox, Rotli's own Archive/Trash — except the Librarian,
+//! which never runs on it, and Rotli never stamps the person's notes there
+//! (decision B). The flag lives in the marker so every open path reads one
+//! fact instead of trusting `corpus.json`.
 
 use std::fs;
 use std::path::Path;
@@ -21,6 +28,10 @@ use serde_json::Value;
 
 const MARKER: &str = "memex.json";
 pub(crate) const LAYOUT_IMPORTED: &str = "imported";
+/// The marker field that says "connected in place" — byte-identical to
+/// `IN_PLACE_MARKER_KEY` in src/services/destinations.ts (parity.json
+/// importedMarkerInPlace).
+const IN_PLACE_KEY: &str = "inPlace";
 
 /// Rotli's own folders in an imported vault, by role. Each is one top-level
 /// folder name; ids in an imported vault are disk paths, so these are also
@@ -150,8 +161,28 @@ fn read_marker(root: &Path) -> Option<Value> {
 /// foreign `memex.json`.
 pub(crate) fn read(root: &Path) -> Option<FolderRoles> {
     let marker = read_marker(root)?;
-    (marker.get("layout").and_then(Value::as_str) == Some(LAYOUT_IMPORTED))
-        .then(|| FolderRoles::from_marker(marker.get("folders")))
+    is_imported(&marker).then(|| FolderRoles::from_marker(marker.get("folders")))
+}
+
+fn is_imported(marker: &Value) -> bool {
+    marker.get("layout").and_then(Value::as_str) == Some(LAYOUT_IMPORTED)
+}
+
+/// Whether a parsed marker says "a folder connected in place": a Rotli
+/// imported marker whose `inPlace` is exactly `true`. Anything else (missing,
+/// a string, a Rotli-vault marker) reads as not in place.
+pub(crate) fn marker_in_place(marker: &Value) -> bool {
+    marker.get("id").and_then(Value::as_str).is_some_and(|id| id.starts_with("mx_"))
+        && is_imported(marker)
+        && marker.get(IN_PLACE_KEY).and_then(Value::as_bool) == Some(true)
+}
+
+/// Whether `root` is a folder connected in place (its marker says so). Every
+/// open path derives the store's `adopted` from this, OR'd with the
+/// registry's own flag, so the Librarian stays off and notes stay unstamped
+/// whichever way the folder is reopened.
+pub(crate) fn in_place(root: &Path) -> bool {
+    read_marker(root).is_some_and(|marker| marker_in_place(&marker))
 }
 
 /// The same map, interned so `Layout` can stay `Copy`. Distinct maps are few
@@ -192,18 +223,42 @@ pub(crate) enum Marked {
 /// Make a fresh copy an imported Rotli vault: a new `mx_` marker with
 /// `"layout": "imported"` and the role map, written once. Never replaces a
 /// root `memex.json` — a copied Rotli vault keeps its own marker and layout,
-/// and another tool's file is left exactly as copied.
+/// and another tool's file is left exactly as copied. The one exception is a
+/// copy of a folder connected in place: its copied marker would hand the copy
+/// the original's id and keep the Librarian off, so the copy gets a fresh
+/// marker (a new id, no `inPlace`) with the same role map, and its folders
+/// stay exactly where they are.
 pub(crate) fn mark_imported(root: &Path) -> Result<Marked, String> {
+    mark(root, false)
+}
+
+/// Connect a folder in place with the same layout as a copy: the imported
+/// marker and role map, plus `"inPlace": true` (decision I). A folder that
+/// already has Rotli's marker keeps it, and another tool's `memex.json` is
+/// never replaced (that folder stays protected, the way it always was).
+pub(crate) fn mark_in_place(root: &Path) -> Result<Marked, String> {
+    mark(root, true)
+}
+
+fn mark(root: &Path, in_place: bool) -> Result<Marked, String> {
     let path = root.join(MARKER);
-    match fs::symlink_metadata(&path) {
-        Ok(_) if read_marker(root).is_some() => return Ok(Marked::AlreadyRotli),
-        Ok(_) => return Ok(Marked::Foreign),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+    let roles = match fs::symlink_metadata(&path) {
+        Ok(_) => match read_marker(root) {
+            Some(marker) if !in_place && marker_in_place(&marker) => {
+                FolderRoles::from_marker(marker.get("folders"))
+            }
+            Some(_) => return Ok(Marked::AlreadyRotli),
+            None => return Ok(Marked::Foreign),
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => FolderRoles::free_in(root),
         Err(e) => return Err(format!("read {MARKER}: {e}")),
-    }
+    };
     let mut extra = serde_json::Map::new();
     extra.insert("layout".into(), LAYOUT_IMPORTED.into());
-    extra.insert("folders".into(), FolderRoles::free_in(root).to_json());
+    extra.insert("folders".into(), roles.to_json());
+    if in_place {
+        extra.insert(IN_PLACE_KEY.into(), Value::Bool(true));
+    }
     crate::memex::write_new_marker(root, extra)?;
     Ok(Marked::Imported)
 }

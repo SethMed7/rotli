@@ -955,8 +955,11 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   a manual restore; the plain-folder open never scaffolds its reserved folders
   into a folder with any `memex.json`, a Rotli backup, or a marker still in a
   sweep folder, even when the heal before it failed. Folder inspection
-  reports a recoverable vault as a vault. Plain Markdown and Obsidian folders
-  never get a marker, except a copy Rotli made of one (below).
+  reports a recoverable vault as a vault. A plain Markdown or Obsidian folder
+  gets a marker only when Rotli connects it: a copy (below), or, since
+  decision I, the folder itself when connected in place (the same marker plus
+  `"inPlace": true`). From then on the heal above runs for it like any vault:
+  a backup marker, and an empty `.obsidian/` if it has none.
 - **An imported vault: contract 3.9** (2026-10-14). *Work on a copy* marks the
   verified copy with a new `mx_` marker that says `"layout": "imported"` and
   names Rotli's own folders in a role map, written once:
@@ -976,22 +979,47 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   names on save and move, so Obsidian's `[[File name]]` links resolve; a
   secure flag stays on the note where it is. Empty Trash reaches only Rotli's
   trash. The copy's Librarian switch is on, at Suggest (the switch is the
-  vault's own, never carried from the previous vault). A folder connected in
-  place is the opposite: its Librarian switch is always off
-  (`CorpusRefView.brainEnabled` false, `adopted` true), and the only way to
-  the Librarian is such a copy. The Librarian, the
-  Library, and the memex note lanes stay off there until they learn the
-  layout, so the webview sees it as a plain vault with a role map
-  (`CorpusRefView.folderRoles`). A copied Rotli vault keeps its own marker and
-  layout; a copied `memex.json` that isn't Rotli's is never overwritten, so
-  that copy opens protected, in place. The band is `[3.4, 3.9]`: every
-  existing vault stays read-write. An older Rotli reads a 3.9 marker as out of
-  band and opens the vault read-only, in its Rotli-vault layout.
+  vault's own, never carried from the previous vault). The Librarian and the
+  Library stay off there until they learn the layout (slice 4c).
+- **A folder connected in place: the same layout, `"inPlace": true`**
+  (decision I, owner 2026-10-15). Connecting a folder of notes in place
+  writes the imported marker and role map, plus `"inPlace": true`
+  (`vault_roles::mark_in_place`; TS twin `markerInPlace`, pinned by
+  `parity.json` importedMarkerInPlace). Only a Rotli imported marker whose
+  `inPlace` is exactly `true` counts. Everything then works as in a copy —
+  chats in its chats folder, new notes and captures in its Inbox, Trash and
+  Archive through Rotli's own sinks (a file too) — with two exceptions: its
+  Librarian switch is always off (`brainEnabled` false, `adopted` true; the
+  store's `brain_enabled` and the filer gate refuse independently), and the
+  person's notes are never stamped (decision B: no `id`, dates, rename
+  aliases, or detector writes; their file names stay). The marker is the
+  truth: every open path (startup, switch, refresh, reconnect, a link) derives
+  the store's `adopted` from it, OR'd with `corpus.json`'s flag, and Rotli Web
+  reads the same field (`vaultOpenedInPlace`) instead of "no marker". A
+  folder opened in place before decision I has no marker and keeps its old
+  behavior (its files never move to Trash); none is added behind the person's
+  back. Another tool's `memex.json` is never replaced, so that folder stays
+  protected as before. A copy of a folder connected in place gets a fresh
+  marker (a new `mx_` id, no `inPlace`, the same role map) and its Librarian
+  on, at Suggest; a copy of a Rotli vault keeps its marker.
+- **Chat in a brought-in vault** (copy or in place). Its corpus is the
+  webview's write target (`MemexInstance.layout: "imported"`, `inPlace`), so
+  chats are written into that vault's chats folder, never into another
+  connected vault. Its notes never take the Library lanes: one predicate,
+  `noteLaneWritable` (`src/memex/config.ts`), keeps every note-creating path
+  (new note, capture, a chat's memory note, save chat as note) on the corpus
+  store, which files them in its Inbox. **No `wiki/` tree is ever made in a
+  brought-in vault:** Rust `memex_write_note` refuses one, and Rotli Web's
+  twin lands in the Inbox. Its own `wiki/` is the person's folder.
+- **The band.** It is `[3.4, 3.9]`: every existing vault stays read-write. An
+  older Rotli reads a 3.9 marker as out of band and opens the vault
+  read-only, in its Rotli-vault layout.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
-  an empty folder, links an existing vault as a switch target, and opens any
-  other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
-  same as picking a folder that already holds notes in setup. An open plain folder is still
-  the switcher's current row and names its header.
+  an empty folder, links an existing vault as a switch target, and connects
+  any other folder (Markdown, Obsidian, ZenNotes) in place with the in-place
+  marker above, the same as picking a folder that already holds notes in
+  setup. A folder already connected in place links back as one. Chat's empty
+  state runs the same Connect.
 - **Dependency folders are never part of a vault** (2026-10-12). `.git` and
   `node_modules` (any depth, any letter case) are skipped by the native corpus
   walk, folder inspection, and the file watcher — one rule,

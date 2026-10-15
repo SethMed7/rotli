@@ -31,7 +31,7 @@ import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER, inSecureHome } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
-import { DEST, IMPORTED_FOLDER_ROLES } from "../services/destinations";
+import { DEST, IMPORTED_FOLDER_ROLES, markerInPlace } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
 import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
@@ -181,6 +181,11 @@ describe("parity.json ↔ TS constants", () => {
 
   test("importedFolderRoles", () => {
     expect(IMPORTED_FOLDER_ROLES).toEqual(entries.importedFolderRoles.value);
+  });
+
+  test("importedMarkerInPlace", () => {
+    for (const { marker, inPlace } of entries.importedMarkerInPlace.value)
+      expect(markerInPlace(marker)).toBe(inPlace);
   });
 
   test("boardLane", () => {

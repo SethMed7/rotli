@@ -1142,6 +1142,11 @@ fn write_note_at_with_suppress(
     contents: &str,
     suppress: Option<&crate::corpus::SuppressSet>,
 ) -> Result<String, String> {
+    // a brought-in vault (copy or in place) has no Library lane: its `wiki/`
+    // is the person's folder, so new notes go through the corpus store's Inbox
+    if crate::vault_roles::read(root).is_some() {
+        return Err("This vault keeps new notes in its Inbox, not a Library lane.".into());
+    }
     let safe = safe_slug(stem)?;
     let secure = contents
         .strip_prefix("---\n")
@@ -1616,6 +1621,12 @@ mod tests {
         assert!(write_note_at(root, "../escape", "x").is_err());
         assert!(write_note_at(root, "a/b", "x").is_err());
         assert!(write_note_at(root, "Caps", "x").is_err());
+        // a brought-in vault (copy or in place) never grows a wiki/ tree
+        let imported = dir.path().join("imported");
+        std::fs::create_dir_all(&imported).unwrap();
+        crate::vault_roles::mark_in_place(&imported).unwrap();
+        assert!(write_note_at(&imported, stem, body).is_err());
+        assert!(!imported.join("wiki").exists());
     }
 
     #[test]

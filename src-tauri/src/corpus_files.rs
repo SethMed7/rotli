@@ -76,9 +76,12 @@ impl CorpusStore {
         if self.mutation_allowed().is_err() {
             return Some("read-only vault");
         }
-        // a folder opened in place keeps its files where they are: an image there
-        // may be shared by many of the person's notes (owner rule 2026-10-13)
-        if self.adopted {
+        // a folder opened in place before decision I (no marker) keeps its
+        // files where they are: an image there may be shared by many of the
+        // person's notes (owner rule 2026-10-13), and its own `Trash/` would
+        // read as Rotli's. A folder connected in place since has Rotli's own
+        // sinks (the role map), so Trash and Archive work there as in a copy.
+        if self.adopted && !self.layout.is_imported() {
             return Some("a folder opened in place keeps its files where they are");
         }
         if !self.guard_rel(rel).is_ok_and(|path| path.is_file()) {

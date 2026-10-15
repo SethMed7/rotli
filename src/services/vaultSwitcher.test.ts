@@ -21,6 +21,8 @@ const inst = (over: Partial<MemexInstance>): MemexInstance => ({
   mode: "local",
   perms: "read-only",
   brainEnabled: true,
+  layout: "memex",
+  inPlace: false,
   ...over,
 });
 

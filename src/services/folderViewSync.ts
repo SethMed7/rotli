@@ -6,7 +6,7 @@ import { readVersionedFile, textRevision, writeVersionedFile } from "./folderFil
 import { updateGitExclusions } from "./folderMemexNotes";
 import { FolderNotesService } from "./folderNotes";
 import type { MainNode } from "./mainTree";
-import { contentRevision, type VaultDir, vaultHasRotliMarker } from "./vaultDir";
+import { contentRevision, type VaultDir, vaultOpenedInPlace } from "./vaultDir";
 import { VIEW_FOLDER_FORBIDDEN_CHARS, viewNameError, type ViewsManifest } from "./viewTree";
 
 const broadRotliExclusions = [".rotli", ".rotli/"];
@@ -93,7 +93,7 @@ export async function writeFolderViews(
   let manifestWritten = false;
   let ignoreRollback: { before: string | null; applied: string; safe: boolean } | null = null;
   // a folder opened in place: the person's notes gain only the view_tag line
-  const inPlace = !(await vaultHasRotliMarker(dir));
+  const inPlace = await vaultOpenedInPlace(dir);
   try {
     for (const id of new Set([...before.keys(), ...next.keys()])) {
       if (before.get(id) === next.get(id)) continue;

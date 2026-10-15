@@ -1,6 +1,7 @@
 # Bringing an existing vault into Rotli: work on a copy, stay Obsidian-readable
 
-Status: **accepted direction; slices 1, 1b, 3, and 5 built** (2026-10-13).
+Status: **accepted direction; slices 1, 1b, 3, and 5 built** (2026-10-13);
+**decision I built** (2026-10-15).
 The owner decided A, B, and C below the same day. Slice 4 (a Rotli vault
 from the copy, with the Librarian) is next. Until it lands, a copy opens
 protected, like a folder opened in place.
@@ -219,11 +220,55 @@ choices made while building (contract: `docs/architecture/memex-data-contract.md
   read-only *in its Rotli-vault layout*, which hides the person's tree. It
   cannot lose notes there, but it does not show them.
 
+**Decision I, built (2026-10-15, one PR).** Contract:
+`docs/architecture/memex-data-contract.md` (the `inPlace` field, chat in
+brought-in vaults).
+
+- **The marker.** Connecting a folder in place (setup and the switcher share
+  `corpus_choose_folder`) writes the imported marker with `"inPlace": true`
+  before the folder opens (`vault_roles::mark_in_place`). Every open path
+  reads it (`vault_roles::in_place`), so the store is adopted however the
+  folder is reopened, and Rotli Web reads the same field
+  (`vaultOpenedInPlace`). The marker heal then gives it a backup marker, and
+  an empty `.obsidian/` if it has none (an Obsidian vault already does).
+- **Kept in place:** no stamps on the person's notes (decision B), no
+  detector writes, the secure line only where asked, no link conversion, Main
+  seeded from disk, and the Librarian refused three ways (the switch reads
+  off, the store's `brain_enabled`, the filer gate).
+- **Dropped in place:** the file Trash/Archive block. With Rotli's own sinks
+  there, a file moves like in a copy. A folder opened in place before
+  decision I has no marker, so it keeps the block (its own `Trash/` would
+  read as Rotli's).
+- **Chat** writes into the brought-in vault (its role map's chats folder).
+  Fixed with it: an imported active vault with a connected brain beside it
+  wrote its chats into the brain. New notes, captures, a chat's memory note,
+  and "save chat as note" take the corpus store into its Inbox; no `wiki/`
+  is ever made there.
+- **Chat with no vault** offers *Connect vault*, the switcher's own Connect
+  flow (`components/sidebar/useConnectVault.ts`).
+- **The Archive and Trash question.** In a copy whose Librarian is on, when
+  its own top-level `Archive/` or `Trash/` holds files, Rotli asks once:
+  "Your vault has its own Archive and Trash folders. Move their notes into
+  Rotli's Archive and Trash so the Librarian treats them as archived and
+  trashed?" **Yes** moves every file into `Archive (Rotli)/` or
+  `Trash (Rotli)/`, keeping its name and its place below the folder
+  (`Archive/2024/a.md` → `Archive (Rotli)/2024/a.md`, so a note's relative
+  image links still resolve), and stamps each note's `origin` like a normal
+  archive or trash (Restore sends it back). **The person folder is removed
+  only when it is left empty** — nothing in it but empty folders and Finder's
+  `.DS_Store`; anything that didn't move (a linked item) keeps it. **No**
+  moves nothing. Dismissing the question counts as No. The answer is saved in
+  the vault's `.rotli/settings.json` as `personSinksAnswer`
+  (`"<vault id>:moved"` or `":kept"`), keyed by the vault's id because
+  settings are carried to a new vault: a later copy is asked for itself.
+  Never asked in place (`corpus_person_sinks.rs`, `services/personSinks.ts`).
+
 **Already true today, for the record:** a folder opened in place reads its
 own `Archive/` and `Trash/` as Rotli's (the name checks have no layout).
 Slice 1 stops Rotli *moving* anything there, but notes in a person's
 `Archive/` still show as archived. Decision F could apply to folders opened
-in place too, once 4b exists.
+in place too, once 4b exists. *Done by decision I (2026-10-15) for every
+folder connected in place from then on.*
 
 ### 5. Protected originals (open in place)
 
@@ -248,7 +293,8 @@ An adopted folder, and the source of any import, is **protected**:
   keeps those facts in `.rotli/` instead. The note's text is exactly what the
   person wrote.
 - Enforcement lives in the core, not only in the UI. The Mac marks an adopted
-  store (`CorpusStore.adopted`); Rotli Web decides by the `mx_` marker. The
+  store (`CorpusStore.adopted`, derived from the marker's `inPlace` since
+  decision I); Rotli Web decides by the same marker (`vaultOpenedInPlace`). The
   person's own moves (a sidebar drag) still work. The Librarian already writes
   only in a Rotli vault (`filer_writable`), and now it never sweeps, queues, or
   models any other folder.
@@ -341,7 +387,8 @@ An adopted folder, and the source of any import, is **protected**:
      and chat images keep `storage:` (they don't know the note). **The
      constraint holds:** in a folder opened in place no file is ever moved to
      Trash or Archive (Mac `storage_file_lifecycle_block`, web
-     `moveFileToSink`).
+     `moveFileToSink`). *Amended by decision I:* only for a folder opened in
+     place before it (no marker); one connected since has Rotli's own sinks.
    - **5c, the converter (in review):** Settings → General → Link format
      counts the Rotli-only links on open, shows up to five before → after lines,
      and converts on a click: `](storage:X)` → the standard path from the note
@@ -372,6 +419,21 @@ An adopted folder, and the source of any import, is **protected**:
   adding a vault confirms *Connect* or *Connect a copy with the Librarian*;
   a folder connected in place offers the copy from Settings → Librarian. The
   Librarian switch is decided per vault: the copy's starts on, at Suggest.
+- **I. In place has the same layout as a copy; only the Librarian differs
+  (2026-10-15).** "Nothing in functionality changes. The copy just copies
+  the whole folder into a new one named '(Rotli)' and works as normal. … The
+  only purpose of the copy is to not let the Librarian damage the original
+  vault." So a folder connected in place gets the copy's marker and role map
+  plus `"inPlace": true`: Rotli's own folders are suffixed (`Archive (Rotli)`,
+  `Trash (Rotli)`, `chats (Rotli)`, `storage (Rotli)`), notes keep their file
+  names, chat writes into the vault, captures and new notes land in `Inbox/`
+  (an existing one is used as is, decision D), and Trash and Archive work.
+  The only differences: the Librarian never runs there, and Rotli never
+  stamps the person's notes (decision B stands). "Make a copy" from such a
+  folder gives the copy a fresh marker (new id, no `inPlace`) and its
+  Librarian on, at Suggest. A copy with the person's own top-level `Archive/`
+  or `Trash/` holding files asks once whether to move them into Rotli's
+  (below). Built: see *Decision I, built*.
 - **H. The Librarian on a folder of notes is always a copy (2026-10-14).**
   No way around it, in setup and when adding a vault: a folder connected in
   place keeps the Librarian off, and turning it on means a copy Rotli makes.

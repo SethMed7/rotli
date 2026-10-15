@@ -19,6 +19,7 @@ import {
   parentPath,
   vaultFolderRoles,
   vaultHasRotliMarker,
+  vaultOpenedInPlace,
   vaultIsMemex,
 } from "./vaultDir";
 
@@ -129,7 +130,7 @@ export async function setFolderProtection(
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
   // a person's note in a folder opened in place gains only the line asked for
-  const inPlace = !rotliMade(frontmatter) && !(await vaultHasRotliMarker(dir));
+  const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
   await writeVersionedFile(dir, path, text, opened.revision);
 }

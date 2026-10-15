@@ -77,7 +77,7 @@ fn a_rotli_plain_folder_still_moves_a_secure_note_into_its_secure_folder() {
     assert!(rel.starts_with(&format!("{SECURE_NOTES_FOLDER}/")), "{rel}");
 }
 
-fn adopted_id(store: &mut CorpusStore, rel: &str) -> String {
+pub(super) fn adopted_id(store: &mut CorpusStore, rel: &str) -> String {
     let list = store.list().unwrap();
     list.notes
         .iter()

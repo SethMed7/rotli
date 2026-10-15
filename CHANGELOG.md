@@ -101,6 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder untouched. Development builds still open canvases as before.
 - **The New view card can be closed.** It has a close button now, and Escape
   or a click anywhere outside it puts it away without making a view.
+- **Chat in a copied vault writes into that vault.** With a copy open and
+  another vault connected, chats were written into the other vault.
 - **"Try again" after a held-back message no longer answers an older
   request.** The held-back message used to be dropped from the conversation
   without a word, so the model never saw it. Now it stays on screen with what
@@ -174,6 +176,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their logos. **Take the tour** now comes first and **Start now** is the main
   button on the right. The banner can no longer be saved or downloaded, and
   "Tell a friend" is gone in favor of Share.
+- **A folder you connect in place works like any vault.** Chat keeps its
+  conversations in it, new notes and captures land in its `Inbox`, and Trash
+  and Archive work, using Rotli's own `Archive (Rotli)`, `Trash (Rotli)`,
+  `chats (Rotli)`, and `storage (Rotli)` folders so your own Archive, Trash,
+  chats, and storage stay yours. The one difference from a copy: the
+  Librarian never runs there, and Rotli never adds anything to the notes you
+  wrote. Rotli writes a small `memex.json` at the folder's top to remember
+  this. Folders you connected in place before keep working as they did.
+- **Making a copy of a folder you connected in place gives the copy its own
+  identity** and turns its Librarian on, at Suggest, instead of the copy
+  inheriting the original's id and the Librarian staying off.
+- **A copy with its own Archive and Trash asks once** whether to move their
+  notes into Rotli's Archive and Trash, so the Librarian treats them as
+  archived and trashed. Yes moves every file and keeps its name and folder;
+  No moves nothing. Either way Rotli never asks again for that vault.
+- **Chat with no vault offers Connect vault right there**, the same connect
+  flow as the vault menu, instead of sending you to Settings.
 - **Chat has room to breathe.** A reply no longer sits right under your
   question: messages are spaced clearly further apart than the lines inside
   them, a new question opens a little wider still, and replies read with a
