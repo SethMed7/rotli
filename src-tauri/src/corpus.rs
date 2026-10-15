@@ -959,8 +959,8 @@ fn switch_corpus_config(
         cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
     }
     cfg.corpus = CorpusRef {
+        adopted: adopted || crate::vault_roles::in_place(&path),
         abs_path: path,
-        adopted,
     };
     if let Some(outgoing) = outgoing {
         let _ = upsert_brain_config(&mut cfg, outgoing, false)?;
@@ -2666,6 +2666,13 @@ impl CorpusStore {
     /// rebuildable sidecar; the user's visible hierarchy stays byte-for-byte as
     /// it was (no reserved folders and no welcome note).
     pub fn open_adopted(root: PathBuf) -> Result<Self, String> {
+        // a folder connected in place since decision I carries the imported
+        // marker: it opens in that layout (and its band), still adopted
+        if crate::vault_roles::read(&root).is_some() {
+            let mut store = Self::open_memex(root, false)?;
+            store.adopted = true;
+            return Ok(store);
+        }
         let root =
             fs::canonicalize(&root).map_err(|e| format!("canonicalize {}: {e}", root.display()))?;
         let dot = crate::containment::resolve_beneath(&root, Path::new(DOT_DIR))?;
@@ -2774,6 +2781,7 @@ impl CorpusStore {
         // write refused in Rust, matching the TS read-only verdict (brain_view).
         let band_read_only = !crate::memex::contract_in_band_at(&root);
         let layout = Layout::of_vault(&root);
+        let adopted = crate::vault_roles::in_place(&root);
         let mut store = Self {
             root,
             index: HashMap::new(),
@@ -2782,7 +2790,9 @@ impl CorpusStore {
             layout,
             band_read_only,
             perms_read_only: read_only,
-            adopted: false,
+            // the marker, not the registry, says "connected in place": every
+            // open path (startup, switch, refresh, reconnect) lands here
+            adopted,
             raw: None,
             list_cache: None,
             search_index: None,
@@ -2826,7 +2836,9 @@ impl CorpusStore {
     /// Whether this root IS a memex spine — the one territory the organizer
     /// daemon may run over (the Filer lane only exists there, contract v3.7).
     pub fn is_memex(&self) -> bool {
-        self.layout == Layout::Memex
+        // GUARD (decision I): a folder connected in place is never a memex,
+        // even if a later slice widens this to the imported layout
+        self.layout == Layout::Memex && !self.adopted
     }
 
     /// This root's layout — an imported vault answers its role map from it.
@@ -5266,6 +5278,11 @@ impl CorpusStore {
     /// fails CLOSED (pressure-test 2026-07-26): an unreadable consent boundary
     /// must never silently re-enable the Brain on a raw vault.
     pub(crate) fn brain_enabled(&self) -> bool {
+        // a folder connected in place is never organized, whatever its
+        // settings say (decision H; defense in depth behind corpus_list_config)
+        if self.adopted {
+            return false;
+        }
         let Ok(settings) = self.dot_read("settings") else {
             return false; // NotFound is Ok("{}") — this is a genuine IO fault
         };
@@ -5289,7 +5306,9 @@ impl CorpusStore {
 
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         self.guard_rel(rel)?;
-        if self.layout != Layout::Memex {
+        // GUARD (decision I): never a folder connected in place, even if a
+        // later slice (4c) lets the Librarian write the imported layout
+        if self.layout != Layout::Memex || self.adopted {
             return Err("the Librarian only runs in a Rotli vault".into());
         }
         // #3 (audit 2026-07): the FILER lane honors the same read-only verdicts as
@@ -8708,6 +8727,9 @@ pub mod links;
 pub mod files;
 #[path = "corpus_gitignore.rs"]
 mod gitignore;
+/// The one-time "move your Archive and Trash?" question in a copy.
+#[path = "corpus_person_sinks.rs"]
+pub mod person_sinks;
 #[path = "corpus_raw.rs"]
 pub mod raw;
 pub(crate) use files::is_canvas_path;
@@ -8746,6 +8768,10 @@ mod ai_file_tests;
 #[cfg(test)]
 #[path = "corpus_adopted_tests.rs"]
 mod adopted_tests;
+
+#[cfg(test)]
+#[path = "corpus_in_place_marked_tests.rs"]
+mod in_place_marked_tests;
 
 #[cfg(test)]
 mod tests {

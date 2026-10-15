@@ -7,9 +7,9 @@ import {
   readChatMemoryNoteStem,
   setChatAttachedTo,
   setChatMemoryNoteStem,
-  writeNote,
 } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
+import { createChatNote } from "../services/createNote";
 import { titleOf } from "../services/derive";
 import { isChatsPath } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
@@ -159,11 +159,11 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       // no shelf: a chat's note is a background note, not a capture — it
       // projects to where it lives (staging, then the area the Librarian files
       // it under), never to the Captures board (the owner, 2026-09-17)
-      const created = await writeNote({ instance: input.instance, body, shelf: [], createdBy: "chat" });
-      const id = `${prefix}${created.id}`;
+      // (a brought-in vault's lands in its Inbox: createChatNote)
+      const { id, stem } = await createChatNote(input.instance, body, "chat");
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
-      return { id, stem: created.stem, body, revision: note.revision, aiEditable: true };
+      return { id, stem, body, revision: note.revision, aiEditable: true };
     },
     // one gated write on both platforms: Rust on the Mac, the web AI corpus's
     // twin of it in Rotli Web (webAiCorpus.write)

@@ -13,7 +13,7 @@ import type {
   BreveBackfillResult,
   BreveDeliverySettings,
 } from "../routines/breveTypes";
-import type { FolderRoles } from "../services/destinations";
+import { type FolderRoles, folderRoles } from "../services/destinations";
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
@@ -1601,6 +1601,10 @@ export interface ConnectedBrain {
   /** The vault's Librarian switch — a per-root display fact the view derives
    * from that root's own settings sidecar (never stored in corpus.json). */
   brainEnabled: boolean;
+  /** A brought-in vault's own folders by role; null for a Rotli vault. */
+  folderRoles?: FolderRoles | null;
+  /** Connected in place (its marker says so): the Librarian never runs there. */
+  adopted?: boolean;
 }
 
 /** The active corpus, enriched with whether it IS a memex (derived) + its perms. */
@@ -1608,7 +1612,7 @@ export interface CorpusRefView {
   absPath: string;
   isMemex: boolean;
   memexId: string | null;
-  /** when isMemex: "chats+inbox" | "read-only"; else null */
+  /** a vault's (a Rotli vault's, or a brought-in one's) write perms; null for a plain folder */
   perms: MemexPerms | null;
   /** The active vault's Librarian switch (see ConnectedBrain.brainEnabled). */
   brainEnabled: boolean;
@@ -1680,6 +1684,9 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
         memexId: isWebVault() ? "browser-vault" : null,
         perms: isWebVault() ? "chats+inbox" : null,
         brainEnabled: true,
+        // a brought-in folder's role map (read from its marker at load):
+        // its new notes go to its Inbox, never a wiki/ lane
+        folderRoles: folderRoles(),
       },
       brains: [],
       folders: [],

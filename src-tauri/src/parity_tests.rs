@@ -187,11 +187,6 @@ fn empty_board_scene_matches_fixture() {
     );
 }
 
-#[test]
-fn imported_folder_roles_match_fixture() {
-    let expected = serde_json::to_value(crate::vault_roles::FolderRoles::imported()).unwrap();
-    assert_eq!(entry("importedFolderRoles"), expected);
-}
 
 #[test]
 fn board_lane_matches_fixture() {
@@ -595,3 +590,5 @@ fn note_filename_slugs_match_fixture() {
 
 #[path = "parity_link_secret_tests.rs"]
 mod link_secret;
+#[path = "parity_vault_tests.rs"]
+mod vault;

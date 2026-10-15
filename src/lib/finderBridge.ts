@@ -50,6 +50,23 @@ export function corpusCopyVaultCancel(): Promise<void> {
   return invoke<void>("corpus_copy_vault_cancel");
 }
 
+/** Files in a copy's own top-level Archive and Trash (corpus_person_sinks.rs). */
+export interface PersonSinks {
+  archive: number;
+  trash: number;
+}
+
+/** The one-time Archive/Trash question's facts for the active vault: null
+ * when it doesn't apply (not a copy, connected in place, or nothing there). */
+export function corpusPersonSinks(): Promise<PersonSinks | null> {
+  return invoke<PersonSinks | null>("corpus_person_sinks");
+}
+
+/** Yes: move the copy's own Archive and Trash into Rotli's; returns how many moved. */
+export function corpusAdoptPersonSinks(): Promise<PersonSinks> {
+  return invoke<PersonSinks>("corpus_adopt_person_sinks");
+}
+
 /** Finder's "Open in Rotli" Quick Action: `absent` · `installed` · `theirs`
  * (a same-named workflow Rotli didn't make). src-tauri/src/finder_quick_action.rs */
 export type QuickActionStatus = "absent" | "installed" | "theirs";

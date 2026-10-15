@@ -22,6 +22,8 @@ const INSTANCE: MemexInstance = {
   mode: "secure",
   perms: "chats+inbox",
   brainEnabled: true,
+  layout: "memex",
+  inPlace: false,
 };
 
 const BASE = "---\nid: c1\ntitle: Plan\nattachedTo: [[my-plan]]\n---\n\n## Messages\n";

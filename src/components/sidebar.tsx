@@ -16,21 +16,13 @@ import { createPortal } from "react-dom";
 import { dispatch } from "../keys/registry";
 import { isWebVault } from "../lib/browserVault";
 import { useTransientPopover } from "../lib/popover";
-import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
-import { initMemexAsCorpus, loadConfig as loadMemexConfig, pickVaultFolder } from "../memex/service";
-import {
-  useChooseFolder,
-  useConnectBrain,
-  useForgetBrain,
-  useMemexConfig,
-  useSwitchVault,
-} from "../memex/useMemex";
+import { corpusRefreshVault } from "../lib/tauri";
+import { loadConfig as loadMemexConfig } from "../memex/service";
+import { useForgetBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
 import { closeFolderWindow, onFolderAddedAsVault } from "../services/folderWindow";
 import { mainFolderIds, mainFoldersOpenByDefault, mainTreeSize } from "../services/mainTree";
-import { openExistingFolder } from "../services/vaultImport";
 import {
-  connectPlan,
   vaultDisplayName,
   addedVault,
   outgoingVaultId,
@@ -38,11 +30,10 @@ import {
   type VaultSwitcherItem,
   vaultSwitcherItems,
 } from "../services/vaultSwitcher";
-import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
+import { reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
 import { useFrontCount, useFrontOn } from "../state/fronts";
 import { useFocusedTab } from "../state/panes";
-import { flushSettingsNow } from "../state/persist";
 import { useSidebarLook } from "../state/sidebarLook";
 import { useUiStore } from "../state/ui";
 import { useWebVaultConnect } from "../state/webVaultConnect";
@@ -57,6 +48,7 @@ import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
+import { useConnectVault } from "./sidebar/useConnectVault";
 import { VaultRowPanel } from "./sidebar/vaultRowPanel";
 
 /** Collapse-all glyph — two chevrons folding toward the center ("fold the tree
@@ -108,8 +100,6 @@ export function Sidebar() {
   //   one Connect action handles existing and empty folders. —
   const memexCfg = useMemexConfig();
   const switchVaultMut = useSwitchVault();
-  const connectBrainMut = useConnectBrain();
-  const chooseFolderMut = useChooseFolder();
   const forgetBrainMut = useForgetBrain();
   const vaultName = vaultDisplayName(memexCfg.data?.instances ?? [], memexCfg.data?.currentFolder);
   const vaultItems = vaultSwitcherItems(memexCfg.data?.instances ?? [], memexCfg.data?.currentFolder);
@@ -128,41 +118,8 @@ export function Sidebar() {
   const vaultErr = (verb: string) => (err: unknown) =>
     setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
 
-  /** True once a folder was picked and connected; false when the picker was
-   * dismissed (or, on Rotli Web, handed to the browser's own dialog). */
-  const connectVault = async (title = "Connect a vault, or make a new folder for one"): Promise<boolean> => {
-    if (isWebVault()) {
-      // Rotli Web: say what is about to happen, then the browser's own picker
-      useWebVaultConnect.getState().show();
-      return false;
-    }
-    const path = await pickVaultFolder(title);
-    if (!path) return false;
-    return connectPath(path);
-  };
-
-  /** A picked folder (or one a folder window hands over) becomes a vault:
-   * made fresh when empty, linked when it's a vault; a folder of someone's
-   * notes asks first — a copy Rotli makes, or the folder in place. */
-  /** Resolves whether a vault opened or connected (false: "not now"). */
-  const connectPath = async (path: string): Promise<boolean> => {
-    const inspection = await corpusInspectFolder(path);
-    const plan = connectPlan(inspection.kind);
-    if (plan === "create") {
-      await initMemexAsCorpus(path);
-      await activateCreatedVault();
-      return true;
-    }
-    if (plan === "link") {
-      await connectBrainMut.mutateAsync(path);
-      return true;
-    }
-    // a folder of someone's notes: a copy Rotli makes, or the folder in place
-    return openExistingFolder(path, inspection, async () => {
-      await flushSettingsNow();
-      await chooseFolderMut.mutateAsync(path);
-    });
-  };
+  // the one Connect flow, shared with chat's empty state (useConnectVault)
+  const { connectVault, connectPath } = useConnectVault();
 
   // a folder window's "Add as vault" lands here, already authorized by Rust
   // (its window closes only once a vault opened; "not now" leaves it open)

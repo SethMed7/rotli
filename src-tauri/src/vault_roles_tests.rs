@@ -112,3 +112,30 @@ fn rotlis_folders_never_take_a_name_the_person_already_uses() {
     assert_eq!(roles.archive, "Archive (Rotli)");
     assert_eq!(roles.inbox, "Inbox", "a copied Inbox is used as it");
 }
+
+/// Decision I: a folder connected in place gets the copy's marker and role
+/// map plus `"inPlace": true`, and never replaces another tool's file.
+#[test]
+fn a_folder_connected_in_place_is_marked_like_a_copy_and_says_so() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir_all(dir.path().join("Trash (Rotli)")).unwrap();
+    assert_eq!(mark_in_place(dir.path()).unwrap(), Marked::Imported);
+    let written = marker(dir.path());
+    assert_eq!(written["layout"], "imported");
+    assert_eq!(written["inPlace"], true);
+    assert_eq!(written["folders"]["trash"], "Trash (Rotli) 2", "never a name the person uses");
+    assert!(in_place(dir.path()));
+    assert_eq!(chats_dir(dir.path()), "chats (Rotli)");
+    let before = fs::read(dir.path().join(MARKER)).unwrap();
+    assert_eq!(mark_in_place(dir.path()).unwrap(), Marked::AlreadyRotli);
+    assert_eq!(fs::read(dir.path().join(MARKER)).unwrap(), before);
+
+    let foreign = TempDir::new().unwrap();
+    fs::write(foreign.path().join(MARKER), "{\"name\":\"zen\"}").unwrap();
+    assert_eq!(mark_in_place(foreign.path()).unwrap(), Marked::Foreign);
+    assert!(!in_place(foreign.path()));
+
+    let copy = TempDir::new().unwrap();
+    assert_eq!(mark_imported(copy.path()).unwrap(), Marked::Imported);
+    assert!(!in_place(copy.path()), "a copy is not in place");
+}

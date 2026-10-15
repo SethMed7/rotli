@@ -95,6 +95,17 @@ export function folderRolesFromMarker(markerJson: string): FolderRoles | null {
   return new Set(names).size === names.length ? roles : { ...IMPORTED_FOLDER_ROLES };
 }
 
+/** Whether a parsed root marker says "a folder connected in place" — the
+ * Rust `vault_roles::marker_in_place` twin (parity.json importedMarkerInPlace).
+ * Decision I: such a folder has the imported layout and role map, but Rotli
+ * never stamps the person's notes there and the Librarian never runs. Only a
+ * Rotli imported marker whose `inPlace` is exactly `true` counts. */
+export function markerInPlace(marker: unknown): boolean {
+  if (!marker || typeof marker !== "object") return false;
+  const { id, layout, inPlace } = marker as Record<string, unknown>;
+  return typeof id === "string" && id.startsWith("mx_") && layout === "imported" && inPlace === true;
+}
+
 /** The active vault's role map: null for a Rotli vault or a plain folder,
  * whose reserved names are fixed. Set once per vault load (Location config on
  * the Mac, the marker on Rotli Web) — never per call site. */

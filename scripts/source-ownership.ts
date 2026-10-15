@@ -59,6 +59,8 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "vaultImportDialog.tsx":
     "vault import: connect or connect a copy with the Librarian, the copy's progress, and its result",
   "whyCopy.tsx": "vault import: the Why a copy? disclosure every Librarian copy offer carries",
+  "personSinksDialog.tsx":
+    "vault import: a copy's one-time question whether to move its own Archive and Trash into Rotli's",
   "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
   "webDialogFrame.tsx":
     "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
@@ -180,6 +182,7 @@ export const SERVICE_FILE_OWNERS = {
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
   "vaultImport.ts":
     "vault import (connect a copy with the Librarian: confirm, copy with progress, open the copy)",
+  "personSinks.ts": "vault import (a copy's one-time question: move its own Archive and Trash into Rotli's)",
   "vaultInPlace.ts":
     "vault import: whether the active vault is a folder connected in place (the Librarian stays off)",
   "connectorSetup.ts": "chat",

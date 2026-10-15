@@ -8,6 +8,7 @@
 
 import { corpusCopyVault, corpusCopyVaultCancel } from "../lib/finderBridge";
 import { onVaultCopyProgress } from "../lib/hostEvents";
+import { type VaultInspection, corpusInspectFolder } from "../lib/tauri";
 import { refreshActiveVault } from "../state/activeVault";
 import { useVaultImport } from "../state/vaultImport";
 
@@ -15,6 +16,11 @@ export interface FolderInspection {
   label: string;
   source: string;
   markdownFiles: number;
+}
+
+/** What a picked folder holds (read-only): empty, a vault, or someone's notes. */
+export function inspectVaultFolder(path: string): Promise<VaultInspection> {
+  return corpusInspectFolder(path);
 }
 
 /** Ask how to open `path`, then do it. Resolves true when a vault opened

@@ -68,7 +68,7 @@ import {
   localQueuePrioritize,
   onLocalQueue,
 } from "../../lib/tauri";
-import { CORPUS_INSTANCE_ID, activeInstance } from "../../memex/config";
+import { CORPUS_INSTANCE_ID, activeInstance, storageDirOf } from "../../memex/config";
 import {
   type ChatArtifact,
   hasSecureContext,
@@ -80,7 +80,6 @@ import {
   readChat,
   registerChatArtifact,
   registerChatArtifactTurn,
-  writeNote,
 } from "../../memex/service";
 import {
   useInstanceChats,
@@ -102,12 +101,12 @@ import {
 } from "../../services/chatFolders";
 import { syncChatModelMeta } from "../../services/chatModelMeta";
 import { useConnectedLanes } from "../../services/connectedModels";
+import { createChatNote } from "../../services/createNote";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
-import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
@@ -143,6 +142,7 @@ import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
+import { ChatNoVault, ChatUnavailable } from "./chatEmptyStates";
 import { UserMessageText } from "./chatImageRefs";
 import {
   WEB_IMAGES_NEED_THE_MAC_APP,
@@ -2214,11 +2214,11 @@ export function ChatSurface({
 
   useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
 
-  // this chat's generated assets: everything under storage/chats/<slug>/ in the
+  // this chat's generated assets: everything under <storage>/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
   const assetPrefix =
     active && chatSlug
-      ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}storage/chats/${chatSlug}/`
+      ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}${storageDirOf(active)}/chats/${chatSlug}/`
       : null;
   const artifacts = useMemo(() => {
     const next = [...artifactRefs];
@@ -2297,15 +2297,10 @@ export function ChatSurface({
     setNoteErr(null);
     try {
       const name = storedTitle || chatSlug.replace(/-/g, " ");
-      const { id, stem } = await writeNote({
-        instance: active,
-        body: `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`,
-        shelf: [], // a chat's note is not a capture
-      });
+      // not a capture: a Rotli vault's Library lane, or a brought-in vault's Inbox
+      const { id: noteId, stem } = await createChatNote(active, `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`);
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();
-      const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
-      const noteId = `${prefix}${id}`;
       rememberChatNote(chatSlug, noteId);
       openAttachedNote(noteId);
     } catch (e) {
@@ -2477,27 +2472,9 @@ export function ChatSurface({
       </header>
 
       {!runtimeAvailable ? (
-        <div className="list-empty chat-empty">
-          <ChatBuddy moment="unavailable" hour={welcomeHour} size={120} />
-          {PLATFORM === "web" ? (
-            <>
-              <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
-              <button type="button" className="chat-cta" onClick={() => useChatSetupGuide.getState().show()}>
-                Set up chat on the web
-              </button>
-            </>
-          ) : (
-            <p>Chat uses your vault as context — it runs in the app.</p>
-          )}
-        </div>
+        <ChatUnavailable hour={welcomeHour} />
       ) : !active ? (
-        <div className="list-empty chat-empty">
-          <ChatBuddy moment="no-vault" hour={welcomeHour} size={120} />
-          <p>No vault connected yet.</p>
-          <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
-            Connect one in Settings → Location
-          </button>
-        </div>
+        <ChatNoVault hour={welcomeHour} />
       ) : (
         <main className="chat-main">
           <div className={pristineChat ? "chat-conversation is-new" : "chat-conversation"}>

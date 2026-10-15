@@ -71,7 +71,7 @@ import {
   joinVaultPath,
   parentPath,
   vaultFolderRoles,
-  vaultHasRotliMarker,
+  vaultOpenedInPlace,
   vaultIsMemex,
 } from "./vaultDir";
 
@@ -99,7 +99,7 @@ export class FolderNotesService implements NotesService {
   private index: Map<string, string> | null = null;
   private readonly cache = new Map<string, CachedFile>();
   private isMemex = false;
-  /** No Rotli marker: a folder opened in place, whose own notes stay as written. */
+  /** Opened in place (no marker, or one saying `inPlace`): notes stay as written. */
   private inPlace = false;
   /** An imported copy (slice 4): every note keeps its file name, so the
    * person's Obsidian `[[File name]]` links still resolve. */
@@ -123,15 +123,15 @@ export class FolderNotesService implements NotesService {
   private async rebuildIndex(): Promise<Map<string, string>> {
     // an imported vault's tree is the person's: its wiki/ is no memex spine,
     // its identity/ or history/ no reserved root, its Archive/ no sink
-    const [roles, memexShape, marked] = await Promise.all([
+    const [roles, memexShape, inPlace] = await Promise.all([
       vaultFolderRoles(this.dir),
       vaultIsMemex(this.dir),
-      vaultHasRotliMarker(this.dir),
+      vaultOpenedInPlace(this.dir),
     ]);
     setFolderRoles(roles);
     this.imported = roles !== null;
     this.isMemex = !this.imported && memexShape;
-    this.inPlace = !marked;
+    this.inPlace = inPlace;
     const paths: string[] = [];
     if (this.isMemex) {
       for (const root of MEMEX_NOTE_ROOTS) await this.collect(root, paths);

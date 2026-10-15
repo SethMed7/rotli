@@ -32,6 +32,8 @@ const INSTANCE: MemexInstance = {
   mode: "secure",
   perms: "chats+inbox",
   brainEnabled: true,
+  layout: "memex",
+  inPlace: false,
 };
 
 interface FakeChat {

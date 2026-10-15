@@ -22,6 +22,8 @@ const ROOTS: MemexConfig = {
       mode: null,
       perms: "chats+inbox",
       brainEnabled: true,
+      layout: "memex",
+      inPlace: false,
     },
     {
       id: "other",
@@ -32,6 +34,8 @@ const ROOTS: MemexConfig = {
       mode: "open",
       perms: "chats+inbox",
       brainEnabled: true,
+      layout: "memex",
+      inPlace: false,
     },
   ],
 };

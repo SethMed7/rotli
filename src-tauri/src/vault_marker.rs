@@ -28,8 +28,14 @@
 //! `refuses_scaffolding` keeps the plain-folder path from adding its reserved
 //! folders to it.
 //!
-//! Plain Markdown and Obsidian folders never get a marker: they are adopted in
-//! place without one.
+//! A plain Markdown or Obsidian folder gets a marker only when Rotli connects
+//! it: a copy is marked imported (vault_roles.rs), and since decision I
+//! (owner, 2026-10-15) a folder connected in place gets the same imported
+//! marker plus `"inPlace": true`. From then on this heal treats it like any
+//! vault — its backup `.rotli/memex.json`, and an empty `.obsidian/` guard if it
+//! has none (an Obsidian vault already does) — on purpose: other apps' sweeps
+//! must not carry its marker off. A folder opened in place before decision I
+//! has no marker and none is added behind the person's back.
 
 use std::fs;
 use std::path::{Path, PathBuf};

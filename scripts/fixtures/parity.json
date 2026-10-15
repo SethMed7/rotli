@@ -244,6 +244,16 @@
         "storage": "storage (Rotli)"
       }
     },
+    "importedMarkerInPlace": {
+      "sourceOfTruth": "src/services/destinations.ts markerInPlace ↔ src-tauri/src/vault_roles.rs marker_in_place",
+      "value": [
+        { "marker": { "id": "mx_a", "layout": "imported", "inPlace": true }, "inPlace": true },
+        { "marker": { "id": "mx_a", "layout": "imported" }, "inPlace": false },
+        { "marker": { "id": "mx_a", "layout": "imported", "inPlace": "true" }, "inPlace": false },
+        { "marker": { "id": "mx_a", "inPlace": true }, "inPlace": false },
+        { "marker": { "id": "obsidian", "layout": "imported", "inPlace": true }, "inPlace": false }
+      ]
+    },
     "secureNotesFolder": {
       "sourceOfTruth": "src/security/secureNotes.ts SECURE_NOTES_FOLDER + src/services/destinations.ts DEST.secure ↔ src-tauri/src/corpus.rs SECURE_NOTES_FOLDER",
       "value": "Secure notes"
