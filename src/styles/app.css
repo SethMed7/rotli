@@ -14,7 +14,6 @@
   display: block;
 }
 
-/* — window frame — */
 .app-window {
   height: 100%;
   display: flex;
@@ -28,7 +27,6 @@
   display: flex; /* the surface inside fills the window exactly; panes scroll internally */
 }
 
-/* — titlebar (r4/r5 gate values) — */
 .titlebar {
   display: flex;
   align-items: center;

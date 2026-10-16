@@ -106,7 +106,6 @@ for (const viewport of [
       const share = (await page.locator("[data-share]").boundingBox())!;
       expect(box.y).toBeGreaterThan(share.y + share.height);
     }
-    // Before the footer.
     const footer = (await page.locator(".site-footer-shell").boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(footer.y);
     // Only this site's own files were asked for by the article and its end.
