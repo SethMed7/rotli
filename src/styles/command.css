@@ -2717,7 +2717,7 @@
   font-weight: 600;
 }
 .segrow .aaseg:hover {
-  background: var(--hov);
+  /* text only: a filled pill on hover read as the selection (owner, 2026-10-15) */
   color: var(--text);
 }
 .segrow .aaseg.sel {

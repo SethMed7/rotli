@@ -29,9 +29,10 @@ import { assignChatToView, chatAssignedView, viewChats } from "../../services/vi
 import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
 import { useIsHidden } from "../../state/hidden";
-import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
+import { leaves, useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
+import { useChatFirstVisitDone } from "../chat/chatConnectModels";
 import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
@@ -63,6 +64,27 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const sidebarFolderNonce = useUiStore((s) => s.sidebarFolderNonce);
   const openContextMenu = useContextMenu((s) => s.open);
   const openChat = usePanesStore((s) => s.openChat);
+  // New chat starts a chat, past the first-visit chooser (chatConnectModels.tsx)
+  const newChat = () => {
+    useChatFirstVisitDone.getState().show();
+    openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined);
+  };
+  // the first time Chat opens in a vault with no chats, land on a new chat
+  // (with the model chooser) instead of an empty pane — once per session
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    // the Mac app's first-visit chooser is where this leads; Rotli Web keeps its own guide
+    if (PLATFORM !== "desktop" || autoOpened.current || !chats.activeMemex || !chats.chatsLoaded) return;
+    if (chats.chatList.length !== 0) return;
+    if (
+      leaves(usePanesStore.getState().root).some((leaf) =>
+        leaf.tabs.some((tab) => tab.surfaceKind === "chat"),
+      )
+    )
+      return;
+    autoOpened.current = true;
+    openChat(null, { vaultId: chats.activeMemex.id });
+  }, [chats.activeMemex, chats.chatsLoaded, chats.chatList.length, openChat]);
   const focusedChatSlug = useFocusedChatSlug();
   const chatRename = useChatRename();
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
@@ -455,12 +477,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             ]}
           />
         )}
-        <button
-          type="button"
-          className="sb-chatnew"
-          data-hotkey="chat.new"
-          onClick={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
-        >
+        <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={newChat}>
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
@@ -475,9 +492,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           <SearchGlyph size={14} />
           <span className="fname">All chats</span>
         </button>
-        <ChatViewPicker
-          onNewChat={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
-        />
+        <ChatViewPicker onNewChat={newChat} />
         {!activeMemex ? (
           <button
             type="button"
