@@ -1,4 +1,34 @@
 {
+  "1.9.0": [
+    {
+      "title": "Bring your Obsidian vault",
+      "body": "Connect a folder of notes as it is, or connect a copy for the Librarian to organize. Your own folders stay yours, notes keep their file names, and links still work in Obsidian. Your original folder is never touched by the Librarian.",
+      "platform": "mac"
+    },
+    {
+      "title": "Chat asks before it acts",
+      "body": "Chat asks before it edits a note you wrote, asks you a quick question with options before writing something long, and says plainly why a message was held back, with Send anyway for words you typed yourself.",
+      "platform": "mac"
+    },
+    {
+      "title": "Reading mode",
+      "body": "Press ⌥⌘R and everything but your note steps away: it stays beautified, takes no typing, and nothing reacts to the pointer. Esc brings you back."
+    },
+    {
+      "title": "Open anything from Finder",
+      "body": "Open With → Rotli opens notes, boards, Word documents, spreadsheets, and CSVs, and Open in Rotli opens a whole folder in its own window. Nothing new appears beside your files.",
+      "platform": "mac"
+    },
+    {
+      "title": "Connect a model from Chat",
+      "body": "The model menu has Connect a model…, and your first chat starts by showing every way in: models on this Mac, or your own Claude, ChatGPT, Cursor, or Gemini.",
+      "platform": "mac"
+    },
+    {
+      "title": "A calmer chat list",
+      "body": "One row per chat, a dot for a reply you haven't read, room to breathe between turns, and every model logo in its maker's colors."
+    }
+  ],
   "1.8.1": [
     {
       "title": "Big folders stay light",
