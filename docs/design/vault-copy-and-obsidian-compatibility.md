@@ -408,12 +408,14 @@ run on a synthetic imported copy, since the daemon only runs in the Mac app.
    lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
 3. **4c-3: native acceptance** on a synthetic copy, with evidence.
 
-**Open question for the owner.** Should the Librarian also *re-file* notes
-the person already placed in a folder when they seem to belong elsewhere
-(proposed at Suggest only), or only file what is unfiled (inbox and root)?
-Re-filing is what the Rotli vault's dormant `Verb::Refile` was for. Comment
-cleanup wave 3 plans to remove it as dead code, so the answer decides
-whether it stays.
+**Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
+functionality of the Librarian; it is to add security so a user can't blame
+us for losing a note." Whatever the Librarian does in a Rotli vault, it does
+in a copy, at the same trust setting, and nothing more or less. 4c changes only
+*where* things are (the map), never *what* the Librarian does. So re-filing
+notes a person already placed (`Verb::Refile`, the planned pass whose
+ladder rung is already pinned: review below Organize) comes to copies the day
+it ships for Rotli vaults. It is a planned verb, not dead code, and stays.
 
 ### 5. Protected originals (open in place)
 
