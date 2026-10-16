@@ -275,6 +275,109 @@ Slice 1 stops Rotli *moving* anything there, but notes in a person's
 in place too, once 4b exists. *Done by decision I (2026-10-15) for every
 folder connected in place from then on.*
 
+#### Slice 4c design (proposed 2026-10-16, for owner review)
+
+The Librarian on a copy. Today it stands down in every imported vault: the
+store's `is_memex()` is `Layout::Memex` only (`corpus.rs`), `filer_writable`
+refuses any other layout, and the webview's config keeps the Librarian lane off
+for a vault with a role map (`lib.rs`, "until 4c"). Its whole geometry is
+also hard-wired to `wiki/`:
+
+| Librarian piece | Today (Rotli vault) | Where |
+| --- | --- | --- |
+| Input notes | `wiki/**/*.md`, minus `wiki/README.md`, `_index.md`, dot folders, `wiki/Templates` | `organizer::candidate_rel`, the watcher feed, the reconciliation sweep |
+| Classify (Job A) | only notes in `wiki/_inbox/` | `run_cycle` |
+| Areas | the folders directly under `wiki/`, described by their `_index.md` | `area_vocab`, `area_members` |
+| Filing target | `wiki/{area}` | `run_cycle` (the journal's `after`) |
+| Enrich (Job B) | any input note | `run_cycle` |
+| Folder notes (Job C) | `wiki/{area}/_index.md` | `refresh_indexes`, `corpus::write_index` |
+
+**What 4c does: one geometry, two layouts.** A small layout-owned value, the
+*Librarian's map*, answers the questions above, and the organizer asks it
+instead of naming `wiki/`. A Rotli vault's map returns today's values exactly;
+a test pins them, so a Rotli vault's Librarian cannot change. An imported
+copy's map reads from its role map:
+
+- **Inbox.** The role map's `inbox` (`Inbox/`, decision D). Classify runs only
+  on notes directly in it, as with `wiki/_inbox/` today.
+- **Areas are the person's top-level folders** that hold at least one note,
+  minus: the inbox; Rotli's role folders (`Archive (Rotli)`, `Trash (Rotli)`,
+  `chats (Rotli)`, `storage (Rotli)`); dot folders (`.obsidian`, `.trash`,
+  `.rotli`); and the folders Obsidian's own settings name for templates
+  (`.obsidian/templates.json`), attachments (`.obsidian/app.json`
+  `attachmentFolderPath`), and daily notes (`.obsidian/daily-notes.json`).
+  A copy with no area left has nothing to classify into. As in a Rotli vault,
+  Enrich still runs, and Suggest says so.
+- **Filing goes into an area's top level only, never a subfolder.** Inbox and
+  every area sit one level down, so a note filed from `Inbox/` to `Work/` keeps
+  its depth. Its relative image and file links (`../attachments/x.png`, the
+  form Rotli itself writes) still resolve. The file name is kept (4a), so
+  Obsidian's `[[File name]]` links resolve too. The apply step refuses any
+  move that would change a note's depth. It journals the refusal instead of
+  moving the note.
+- **Enrich runs on every note** in the person's folders and the inbox (decision
+  A: candidates anywhere in the tree), outside the excluded folders above.
+  Enrich proposes tags and links in frontmatter, which a copy allows (4a).
+- **`_index.md` is written in each area** (decision E), at `<Area>/_index.md`,
+  with the same generated-file marker and the same rule that a person's
+  edits above the marker are kept. The first prose line still describes the
+  area to Classify. Obsidian shows it as an ordinary note.
+- **Notes at the vault's root** (outside every folder) are enriched but never
+  filed: moving them would change their depth. See open question 1.
+
+**The gates move from "a Rotli vault" to "a vault the Librarian may write".**
+`librarian_writes()` is true for a Rotli vault not opened in place (today's
+`is_memex()`), and for an imported copy whose marker has no `inPlace`. Every
+present `is_memex()` gate on the Librarian, `filer_writable`, and the
+webview's lane check read it instead. `is_memex()` keeps its meaning for the
+Library note lane (`wiki/_inbox`), which an imported vault never uses: its new
+notes keep going through the corpus store into `Inbox/`.
+
+**Never in a folder connected in place (decisions H and I).** The three
+refusals stay and are tested on an in-place folder that has an `Inbox/` and
+areas: the switch reads off, the store's `brain_enabled` is false, and
+`filer_writable` refuses. A folder opened in place before decision I has no
+marker. Its layout is not `Imported`, so it is refused as today. Legacy layouts
+are refused too.
+
+**Suggest first.** A copy already starts with its Librarian on, at Suggest
+(decision G). 4c adds nothing to that. The first pass proposes and journals,
+and nothing moves until the person accepts or turns the Librarian up.
+
+**Proof.** Rust: the map's Rotli-vault values pinned. An imported fixture with
+`Inbox/`, areas, nested folders, an attachments folder, a templates folder,
+root notes, and a person's `Archive/`. Suggest is write-free on note files.
+An accepted proposal files `Inbox/a.md` → `Work/a.md`, keeping the name and
+relative image links. A depth-changing move is refused. `_index.md` lands
+only in areas. The in-place refusals hold three ways. Webview: the Librarian
+controls show for a copy and stay replaced by the copy offer in place. E2E
+(web lane): a copy's Suggest card proposes the filing. Native: the
+`validate-in-the-native-app` run on a synthetic imported copy, since the
+daemon only runs in the Mac app.
+
+**Stages (one PR each, held for review).**
+
+1. **4c-1: the Librarian's map.** Introduce it and route `candidate_rel`, the
+   watcher feed, the sweep, `area_vocab`, `area_members`, the filing target,
+   and `_index.md` paths through it. The gates stay closed, so no behavior
+   changes anywhere, and the Rotli-vault values are pinned.
+2. **4c-2: the Librarian on a copy.** `librarian_writes()`, the Obsidian
+   folder exclusions, the depth guard, and the webview lane. Tests above,
+   contract (`memex-data-contract.md`), CHANGELOG.
+3. **4c-3: native acceptance** on a synthetic copy, with evidence.
+
+**Open questions for the owner.**
+
+1. **Root notes.** Many Obsidian vaults keep notes at the root. Enrich them but
+   never file them (proposed), or treat the root like an inbox and file them
+   into areas? (Their relative links would then go one level deeper, which the
+   depth guard would have to rewrite rather than refuse.)
+2. **Daily notes folder.** Excluded as an area (proposed: captures shouldn't
+   be filed into a journal), or a normal area?
+3. **Subfolders as targets.** Top level only (proposed, keeps links safe), or
+   let the Librarian file into an existing subfolder like `Work/Clients/`,
+   rewriting relative links on the move?
+
 ### 5. Protected originals (open in place)
 
 An adopted folder, and the source of any import, is **protected**:
