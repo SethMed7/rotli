@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-15
+
 ### Added
 
 - **Connect a model from Chat.** The model menu under the message box has a
