@@ -292,38 +292,72 @@ also hard-wired to `wiki/`:
 | Enrich (Job B) | any input note | `run_cycle` |
 | Folder notes (Job C) | `wiki/{area}/_index.md` | `refresh_indexes`, `corpus::write_index` |
 
-**What 4c does: one geometry, two layouts.** A small layout-owned value, the
-*Librarian's map*, answers the questions above, and the organizer asks it
-instead of naming `wiki/`. A Rotli vault's map returns today's values exactly;
-a test pins them, so a Rotli vault's Librarian cannot change. An imported
-copy's map reads from its role map:
+**Owner answers (2026-10-16).** The vault and its views are two layers. In a
+copy, the Librarian organizes the **vault on disk** properly, in LLM-wiki
+style: notes at the root and in the inbox get filed and enriched, into
+subfolders too, so nothing is left sitting in a random place with only a tag
+saying where it belongs. The **views** stay however the person arranged them.
+A Librarian move never changes where a note sits in Main or a named view.
+Daily notes are an ordinary area. Only a locked note stays where it is.
 
-- **Inbox.** The role map's `inbox` (`Inbox/`, decision D). Classify runs only
-  on notes directly in it, as with `wiki/_inbox/` today.
-- **Areas are the person's top-level folders** that hold at least one note,
-  minus: the inbox; Rotli's role folders (`Archive (Rotli)`, `Trash (Rotli)`,
-  `chats (Rotli)`, `storage (Rotli)`); dot folders (`.obsidian`, `.trash`,
-  `.rotli`); and the folders Obsidian's own settings name for templates
-  (`.obsidian/templates.json`), attachments (`.obsidian/app.json`
-  `attachmentFolderPath`), and daily notes (`.obsidian/daily-notes.json`).
-  A copy with no area left has nothing to classify into. As in a Rotli vault,
+**What 4c does: one geometry, two layouts.** A small layout-owned value, the
+*Librarian's map*, answers the questions in the table above, and the
+organizer asks it instead of naming `wiki/`. A Rotli vault's map returns
+today's values exactly; a test pins them, so a Rotli vault's Librarian cannot
+change. An imported copy's map reads from its role map:
+
+- **Input to file (Classify).** Notes in the role map's `Inbox/` (decision D)
+  and notes at the vault's root. Both are unfiled; the Librarian files them.
+- **Areas are the person's top-level folders**, the daily-notes folder
+  included, minus: the inbox; Rotli's role folders (`Archive (Rotli)`,
+  `Trash (Rotli)`, `chats (Rotli)`, `storage (Rotli)`); dot folders
+  (`.obsidian`, `.trash`, `.rotli`); and the folders Obsidian's settings name
+  for templates (`.obsidian/templates.json`) and attachments
+  (`.obsidian/app.json` `attachmentFolderPath`). Those hold no notes to file
+  into: a template would be filed into, and an attachment folder holds files.
+- **Filing targets are an area or any existing folder inside one**
+  (`Work/Clients/`). Classify sees the area's subfolders, each described by
+  its `_index.md` when it has one, and picks the deepest folder that fits.
+  It never invents a folder. A copy with no area has nothing to file into, so
   Enrich still runs, and Suggest says so.
-- **Filing goes into an area's top level only, never a subfolder.** Inbox and
-  every area sit one level down, so a note filed from `Inbox/` to `Work/` keeps
-  its depth. Its relative image and file links (`../attachments/x.png`, the
-  form Rotli itself writes) still resolve. The file name is kept (4a), so
-  Obsidian's `[[File name]]` links resolve too. The apply step refuses any
-  move that would change a note's depth. It journals the refusal instead of
-  moving the note.
-- **Enrich runs on every note** in the person's folders and the inbox (decision
-  A: candidates anywhere in the tree), outside the excluded folders above.
-  Enrich proposes tags and links in frontmatter, which a copy allows (4a).
+- **Enrich runs on every note** in the vault outside the excluded folders
+  (decision A: candidates anywhere in the tree). Its tags and links go in
+  frontmatter, which a copy allows (4a).
 - **`_index.md` is written in each area** (decision E), at `<Area>/_index.md`,
-  with the same generated-file marker and the same rule that a person's
-  edits above the marker are kept. The first prose line still describes the
-  area to Classify. Obsidian shows it as an ordinary note.
-- **Notes at the vault's root** (outside every folder) are enriched but never
-  filed: moving them would change their depth. See open question 1.
+  with the same generated-file marker and the same rule that keeps a person's
+  edits above it. Its first prose line describes the area to Classify.
+  Obsidian shows it as an ordinary note.
+- **Locked notes never move** and are never rewritten. This is the existing
+  law: no AI edits a locked note.
+
+**A move keeps every link working.** In a copy, a note's id is its disk
+path, and filing can change a note's depth (root → `Work/Clients/`). So every
+Librarian move does three things in the same apply, under the moved note's
+lock:
+
+1. **The note's own relative links are rebased.** Markdown links and embeds
+   (an image path `attachments/x.png` becomes `../../attachments/x.png`) are rebased to
+   its new folder, and so is Rotli's `noteImageLink` form. `[[wikilinks]]` and
+   `![[embeds]]` resolve by name and are left as written. The file name is
+   kept (4a).
+2. **Notes that link to it by relative path are rebased too.** A locked
+   linker is never rewritten, so a move that would break a locked note's
+   link is refused, and the refusal is journaled.
+3. **Every view that references it follows the new path**, the same
+   re-pointing a person's rename already gets in the webview
+   (`viewTree.ts`, `renameMainRef`). The daemon runs without the webview, so
+   this is done in Rust, and the rule is defined once, with a parity fixture
+   for the TS side. The note keeps its place in Main and every named view.
+
+Anything that can't be rebased (a link outside the vault, or a path whose
+target is missing) leaves the link as written. A move whose links can't all
+be kept is refused rather than half-done. Suggest shows the links a move
+would rewrite.
+
+*Found while specifying, a gap today:* a person's own move of a note in an
+imported vault (a sidebar drag) doesn't rebase relative links either
+(`corpus::move_note`). The same rebase helper fixes it, so 4c-1 applies it to
+every note move in an imported vault, not only the Librarian's.
 
 **The gates move from "a Rotli vault" to "a vault the Librarian may write".**
 `librarian_writes()` is true for a Rotli vault not opened in place (today's
@@ -344,39 +378,42 @@ are refused too.
 (decision G). 4c adds nothing to that. The first pass proposes and journals,
 and nothing moves until the person accepts or turns the Librarian up.
 
-**Proof.** Rust: the map's Rotli-vault values pinned. An imported fixture with
-`Inbox/`, areas, nested folders, an attachments folder, a templates folder,
-root notes, and a person's `Archive/`. Suggest is write-free on note files.
-An accepted proposal files `Inbox/a.md` → `Work/a.md`, keeping the name and
-relative image links. A depth-changing move is refused. `_index.md` lands
-only in areas. The in-place refusals hold three ways. Webview: the Librarian
-controls show for a copy and stay replaced by the copy offer in place. E2E
-(web lane): a copy's Suggest card proposes the filing. Native: the
-`validate-in-the-native-app` run on a synthetic imported copy, since the
-daemon only runs in the Mac app.
+**Proof.** Rust:
+- The map's Rotli-vault values are pinned.
+- An imported fixture has `Inbox/`, root notes, areas with nested folders, a
+  daily folder, attachment and template folders, a locked note, and a
+  person's `Archive/`.
+- Suggest is write-free on note files.
+- An accepted proposal files a root note into `Work/Clients/` with its name
+  kept. Its image links and an inbound relative link are rebased, and its
+  Main and named-view slots are re-pointed and unmoved.
+- A move that would break a locked note's link is refused.
+- `_index.md` lands only in areas.
+- The in-place refusals hold three ways.
+
+Webview: the Librarian controls show for a copy and stay replaced by the copy
+offer in place. A person's drag rebases links. E2E (web lane): a copy's
+Suggest card proposes the filing. Native: the `validate-in-the-native-app`
+run on a synthetic imported copy, since the daemon only runs in the Mac app.
 
 **Stages (one PR each, held for review).**
 
-1. **4c-1: the Librarian's map.** Introduce it and route `candidate_rel`, the
-   watcher feed, the sweep, `area_vocab`, `area_members`, the filing target,
-   and `_index.md` paths through it. The gates stay closed, so no behavior
-   changes anywhere, and the Rotli-vault values are pinned.
-2. **4c-2: the Librarian on a copy.** `librarian_writes()`, the Obsidian
-   folder exclusions, the depth guard, and the webview lane. Tests above,
-   contract (`memex-data-contract.md`), CHANGELOG.
+1. **4c-1: the map and safe moves.** Introduce the Librarian's map and route
+   `candidate_rel`, the watcher feed, the sweep, `area_vocab`, `area_members`,
+   the filing target, and `_index.md` paths through it. Add the link-rebasing
+   move and the Rust view re-pointing, and use them for a person's moves in an
+   imported vault. The Librarian's gates stay closed.
+2. **4c-2: the Librarian on a copy.** `librarian_writes()`, root and inbox
+   input, subfolder targets, the Obsidian folder exclusions, and the webview
+   lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
 3. **4c-3: native acceptance** on a synthetic copy, with evidence.
 
-**Open questions for the owner.**
-
-1. **Root notes.** Many Obsidian vaults keep notes at the root. Enrich them but
-   never file them (proposed), or treat the root like an inbox and file them
-   into areas? (Their relative links would then go one level deeper, which the
-   depth guard would have to rewrite rather than refuse.)
-2. **Daily notes folder.** Excluded as an area (proposed: captures shouldn't
-   be filed into a journal), or a normal area?
-3. **Subfolders as targets.** Top level only (proposed, keeps links safe), or
-   let the Librarian file into an existing subfolder like `Work/Clients/`,
-   rewriting relative links on the move?
+**Open question for the owner.** Should the Librarian also *re-file* notes
+the person already placed in a folder when they seem to belong elsewhere
+(proposed at Suggest only), or only file what is unfiled (inbox and root)?
+Re-filing is what the Rotli vault's dormant `Verb::Refile` was for. Comment
+cleanup wave 3 plans to remove it as dead code, so the answer decides
+whether it stays.
 
 ### 5. Protected originals (open in place)
 
