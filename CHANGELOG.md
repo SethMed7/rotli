@@ -104,6 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Making a copy keeps one vault, not two.** Choosing "Use the Librarian on
+  a copy" for a folder you had connected in place left both the original and
+  the copy in your vault list. Now only the copy stays, and Rotli takes back
+  the small `memex.json` it had written into your original, so that folder is
+  as you left it.
 - **No stray "Untitled" tab after choosing a vault.** Opening a vault during
   setup, or switching vaults later, left an empty "Untitled" tab over a blank
   pane. The window now opens the vault's newest note, or nothing when it has

@@ -139,3 +139,28 @@ fn a_folder_connected_in_place_is_marked_like_a_copy_and_says_so() {
     assert_eq!(mark_imported(copy.path()).unwrap(), Marked::Imported);
     assert!(!in_place(copy.path()), "a copy is not in place");
 }
+
+#[test]
+fn a_copy_takes_back_the_marker_rotli_wrote_in_place_and_nothing_else() {
+    // connected in place: Rotli's marker (and its backup) come back out
+    let dir = TempDir::new().unwrap();
+    assert_eq!(mark_in_place(dir.path()).unwrap(), Marked::Imported);
+    assert!(in_place(dir.path()));
+    fs::create_dir_all(dir.path().join(".rotli")).unwrap();
+    fs::copy(dir.path().join(MARKER), dir.path().join(".rotli").join(MARKER)).unwrap();
+    fs::write(dir.path().join("Plan.md"), "# Plan\n").unwrap();
+    assert!(release_in_place(dir.path()).unwrap());
+    assert!(!dir.path().join(MARKER).exists());
+    assert!(!dir.path().join(".rotli").join(MARKER).exists());
+    assert_eq!(fs::read_to_string(dir.path().join("Plan.md")).unwrap(), "# Plan\n", "the person's notes stay");
+
+    // a copy Rotli made (not in place), a Rotli vault, and another tool's file stay
+    let copy = TempDir::new().unwrap();
+    mark_imported(copy.path()).unwrap();
+    assert!(!release_in_place(copy.path()).unwrap());
+    assert!(copy.path().join(MARKER).exists());
+    let foreign = TempDir::new().unwrap();
+    fs::write(foreign.path().join(MARKER), "{\"name\":\"another tool\"}").unwrap();
+    assert!(!release_in_place(foreign.path()).unwrap());
+    assert_eq!(fs::read_to_string(foreign.path().join(MARKER)).unwrap(), "{\"name\":\"another tool\"}");
+}

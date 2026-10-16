@@ -240,6 +240,27 @@ pub(crate) fn mark_in_place(root: &Path) -> Result<Marked, String> {
     mark(root, true)
 }
 
+/// A copy now stands in for this folder connected in place (the owner,
+/// 2026-10-15: "it should only connect one not both"). Take back the marker
+/// Rotli wrote at its root, and its backup in `.rotli/`, so the original is as
+/// the person left it. Anything but Rotli's own in-place marker is left alone.
+/// Returns whether a marker was taken back.
+pub(crate) fn release_in_place(root: &Path) -> Result<bool, String> {
+    if !in_place(root) {
+        return Ok(false);
+    }
+    fs::remove_file(root.join(MARKER)).map_err(|e| format!("remove {MARKER}: {e}"))?;
+    let backup = root.join(".rotli").join(MARKER);
+    let ours = fs::read_to_string(&backup)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .is_some_and(|marker| marker_in_place(&marker));
+    if ours {
+        fs::remove_file(&backup).map_err(|e| format!("remove the marker backup: {e}"))?;
+    }
+    Ok(true)
+}
+
 fn mark(root: &Path, in_place: bool) -> Result<Marked, String> {
     let path = root.join(MARKER);
     let roles = match fs::symlink_metadata(&path) {
