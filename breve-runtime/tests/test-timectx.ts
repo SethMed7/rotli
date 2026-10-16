@@ -21,11 +21,9 @@ const eq = (label: string, got: unknown, want: unknown) => {
 eq(`todayIn(New_York)`, todayIn("America/New_York", FIXED), "2026-01-15");
 eq(`todayIn(Tokyo) rolls to next day`, todayIn("Asia/Tokyo", FIXED), "2026-01-16");
 
-// ── minutesNowIn — minutes since local midnight ──────────────────────────────
 eq(`minutesNowIn(New_York)`, minutesNowIn("America/New_York", FIXED), 13 * 60 + 30);
 eq(`minutesNowIn(Tokyo)`, minutesNowIn("Asia/Tokyo", FIXED), 3 * 60 + 30);
 
-// ── parseHM / hm — string ↔ minutes, with wrap ───────────────────────────────
 eq(`parseHM("07:30")`, parseHM("07:30"), 450);
 eq(`parseHM("00:00")`, parseHM("00:00"), 0);
 eq(`parseHM("23:59")`, parseHM("23:59"), 1439);
@@ -61,7 +59,6 @@ eq(`travelExpired(no travel)`, travelExpired(base), false);
 eq(`travelExpired(active window)`, travelExpired(active), false);
 eq(`travelExpired(past window)`, travelExpired(expired), true);
 
-// ── resolveTz — friendly name → IANA, with reject ────────────────────────────
 eq(`resolveTz("eastern")`, resolveTz("eastern"), "America/New_York");
 eq(`resolveTz("CET")`, resolveTz("CET"), "Europe/Paris");
 eq(`resolveTz("Europe/London")`, resolveTz("Europe/London"), "Europe/London");

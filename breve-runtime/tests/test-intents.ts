@@ -85,7 +85,6 @@ const SCENARIOS: Array<[string, string, string]> = [
     "Give me an audio brief response on whether the chip selloff is overdone, do some research first",
     "audio-topic",
   ],
-  // ── Brief vocabulary ──
   ["briefs", "lunch brief", "brief:lunch:audio"],
   ["briefs", "can you give me the lunch brief", "brief:lunch:audio"],
   ["briefs", "nightcap", "brief:night:audio"],
@@ -96,11 +95,9 @@ const SCENARIOS: Array<[string, string, string]> = [
   ["briefs", "let me listen to tonights brief", "brief:night:audio"],
   ["briefs", "the voice version", "followup:audio"],
   ["briefs", "pdf please", "followup:pdf"],
-  // ── Topic vs daily ──
   ["topics", "give me a brief on SpaceX IPO", "topic:quick"],
   ["topics", "deep research brief on the chip selloff", "topic:deep"],
   ["topics", "email me the lunch brief", "chat"], // email flow owns it upstream of these layers
-  // ── Schedule + travel-adjacent ──
   ["schedule", "Moving forward I want my morning briefs to be sent to me at 7 a.m.", "schedule"],
   [
     "schedule",
@@ -108,10 +105,8 @@ const SCENARIOS: Array<[string, string, string]> = [
     "schedule",
   ],
   ["schedule", "what happened at 5 today?", "chat"],
-  // ── Reminders ──
   ["remind", "remind me in 20m to flip the laundry", "reminder"],
   ["remind", "remind me tomorrow at 9 a.m. to call the bank", "reminder"],
-  // ── Links + watchers ──
   ["links", "https://blog.cloudflare.com/frontier-model-defense/", "url:summary"],
   ["links", "read this to me https://example.com/post", "url:read"],
   ["links", "watch https://huggingface.co/MiniMaxAI and tell me when the M3 weights drop", "watcher"],
@@ -147,7 +142,6 @@ for (const [group, text, want] of SCENARIOS) {
   }
 }
 
-// ── Saved-media capture (image/PDF filing) ───────────────────────────────────
 let capChecks = 0;
 const capFail = (m: string) => {
   fail++;
@@ -169,11 +163,9 @@ eq(`slug("....")`, slugifyTopic("...."), null);
 eq(`slug("")`, slugifyTopic(""), null);
 eq(`slug("   ")`, slugifyTopic("   "), null);
 eq(`slug(80×a)`, slugifyTopic("a".repeat(80)), "a".repeat(40));
-// normal topics
 eq(`slug("coffee art")`, slugifyTopic("coffee art"), "coffee-art");
 eq(`slug("Coffee Art!!")`, slugifyTopic("Coffee Art!!"), "coffee-art");
 eq(`slug("House Ideas 2026")`, slugifyTopic("House Ideas 2026"), "house-ideas-2026");
-// save-intent gate
 eq(`intent(coffee folder)`, saveAttachmentIntent("save this in my coffee art folder"), true);
 eq(
   `intent(verbatim 06-17)`,
@@ -224,7 +216,6 @@ eq(
   "I will list the files. I will view the config.",
 );
 
-// ── Model directive (tightened) ──────────────────────────────────────────────
 // A genuine IMPERATIVE pick honors the named tier; an incidental/hypothetical
 // mention ("write me a sonnet", "go with sonnet later", "should I use opus?")
 // must NOT hijack routing. "gemma"/"local" → local, "claude" → sonnet.

@@ -49,7 +49,6 @@ const { values: args } = parseArgs({
   options: { thumbnail: { type: "string" }, pose: { type: "string" }, out: { type: "string" } },
 });
 
-// ── contrast ──────────────────────────────────────────────────────────────
 function luminance(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
@@ -65,7 +64,6 @@ for (const [name, fg, bg] of TEXT_PAIRS) {
   console.log(`contrast ${name}: ${fg} on ${bg} = ${ratio.toFixed(2)}:1`);
 }
 
-// ── fonts and art ─────────────────────────────────────────────────────────
 const fontFaces = (
   await Promise.all(
     [
@@ -87,7 +85,6 @@ const pose = async (name, size = 900) => {
   return art.get(key);
 };
 
-// ── rendering ─────────────────────────────────────────────────────────────
 // Runs in the page: shrink each title until it fits its block and line limit,
 // then report any text outside the safe area or over the quokka.
 function fitAndCheck() {
@@ -402,7 +399,6 @@ async function buildAll() {
   }
 }
 
-// ── contact sheet ─────────────────────────────────────────────────────────
 async function contactSheet() {
   const groups = Map.groupBy(rendered, (item) => item.group);
   const sections = [];
