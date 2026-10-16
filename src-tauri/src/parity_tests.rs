@@ -167,7 +167,7 @@ fn view_folder_forbidden_chars_match_fixture() {
 fn templates_brain_folder_matches_fixture() {
     assert_eq!(
         entry("templatesBrainFolder").as_str(),
-        Some(crate::organizer::TEMPLATES_BRAIN_FOLDER)
+        Some(crate::librarian_map::TEMPLATES_BRAIN_FOLDER)
     );
 }
 

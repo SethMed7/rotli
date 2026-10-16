@@ -5392,8 +5392,9 @@ impl CorpusStore {
         if area.contains('/') || area.contains("..") || area.trim().is_empty() {
             return Err(format!("invalid area: {area}"));
         }
-        let dir = self.abs(&format!("wiki/{area}"));
-        let rel = format!("wiki/{area}/_index.md");
+        let map = crate::librarian_map::LibrarianMap::at(&self.root);
+        let dir = self.abs(&map.area_dir(area));
+        let rel = map.index_rel(area);
         let path = self.abs(&rel);
         crate::fsutil::with_file_lock(&path, || {
             // Re-check after acquiring the same lock used by every other Rotli
@@ -5407,7 +5408,7 @@ impl CorpusStore {
                 }
                 return Ok(());
             }
-            fs::create_dir_all(&dir).map_err(|e| format!("create wiki/{area}: {e}"))?;
+            fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", map.area_dir(area)))?;
             self.suppress.mark(&path);
             atomic_write(&path, body)
         })
@@ -5443,7 +5444,8 @@ impl CorpusStore {
         if area.contains("..") {
             return Err(format!("invalid area: {area}"));
         }
-        self.filer_move(rel, &format!("wiki/{area}"))
+        let target = crate::librarian_map::LibrarianMap::at(&self.root).area_dir(&area);
+        self.filer_move(rel, &target)
     }
 
     /// The Filer's GENERIC move — powers `file_note` (into `wiki/<area>`), re-filing,

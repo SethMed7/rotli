@@ -40,11 +40,12 @@ pub(crate) fn secure_hints(
     let root_id = corpus_state.default_root_id()?;
     corpus_state.route(&root_id, |s| {
         let root = s.root().to_path_buf();
+        let map = LibrarianMap::at(&root);
         let mut out = Vec::new();
         for rel in &pending {
             // the set only ever holds our own sweep rels, but the IPC boundary
             // re-checks anyway — dot components (../) never touch the fs
-            if !candidate_rel(rel) {
+            if !map.is_candidate(rel) {
                 continue;
             }
             let Ok(snap) = snapshot_note(&root, rel) else {
@@ -74,12 +75,12 @@ pub(crate) fn dismiss_secure(
     handle: &OrganizerHandle,
     rel: &str,
 ) -> Result<(), String> {
-    if !candidate_rel(rel) {
-        return Err(format!("not a reviewable note: {rel}"));
-    }
     let root_id = corpus_state.default_root_id()?;
     corpus_state.route(&root_id, |s| {
         let root = s.root().to_path_buf();
+        if !LibrarianMap::at(&root).is_candidate(rel) {
+            return Err(format!("not a reviewable note: {rel}"));
+        }
         let snap = snapshot_note(&root, rel)?;
         if snap.secure_flagged {
             return Err("This note is marked secure — unmark it from its own menu instead.".into());

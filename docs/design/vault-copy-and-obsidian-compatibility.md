@@ -408,6 +408,21 @@ run on a synthetic imported copy, since the daemon only runs in the Mac app.
    lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
 3. **4c-3: native acceptance** on a synthetic copy, with evidence.
 
+**4c-1a built (2026-10-16, one PR).** 4c-1 is split in two, so the map
+lands before anything that moves files. `src-tauri/src/librarian_map.rs` is the
+Librarian's map: `LibrarianMap::at(root)` reads the vault's marker like
+`Layout::of_vault`. The watcher feed, the sweep and audit, the enrich peer
+list, `area_vocab`, `area_members`, Classify's unfiled check, the journaled
+filing target, `_index.md` paths, the secure review lane, and the corpus's
+`file_note` and `write_index` all ask it. The Templates constant moved with
+it (parity unchanged). The Rotli-vault rules are pinned by the existing
+candidate and templates tests, which now run against the map. A copy's map
+(areas, root and inbox notes as unfiled, Obsidian's templates and attachments
+folders set aside, Rotli's role folders skipped) is tested on a synthetic
+Obsidian copy, but nothing reaches it yet: the gates stay closed until 4c-2.
+`filer_writable` still names `wiki/`; it is the gate, so it moves in 4c-2.
+**4c-1b** (next) adds the link-rebasing move and the Rust view re-pointing.
+
 **Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
 functionality of the Librarian; it is to add security so a user can't blame
 us for losing a note." Whatever the Librarian does in a Rotli vault, it does
