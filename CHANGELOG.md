@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Reading mode gives the note room above it.** With the titlebar, tabs, and
+  header gone, the note no longer starts flush at the top of the window: it
+  opens with space above it, a little less in a short window. Writing and
+  Focus mode are unchanged.
+
 ## [1.9.0] - 2026-10-15
 
 ### Added

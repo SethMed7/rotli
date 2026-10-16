@@ -3051,6 +3051,13 @@
 [data-reading="true"] .cm-content * {
   pointer-events: none;
 }
+/* …and the page gets room above it: focus mode took the titlebar, tabs, and
+   header, so the note would otherwise start flush at the window's top edge
+   (the owner, 2026-10-16). Scales with the window's height so a short window
+   keeps its lines. */
+[data-reading="true"] .rotli-cm-host .cm-content {
+  padding-top: clamp(28px, 9vh, 88px);
+}
 [data-reading="true"] .cm-gutters,
 [data-reading="true"] .editor-scroll-top {
   display: none;
