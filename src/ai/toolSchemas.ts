@@ -32,6 +32,23 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
     description: "Read one note's full text by id.",
     inputSchema: object({ id: text("the note id") }, ["id"]),
   },
+  ask_user: {
+    description:
+      "Ask the person one short question with 2–4 answer options before you write, when the request leaves a choice open that would change the result (audience, length, tone, which note). They pick an option or type their own answer, and it comes back as their next message. After calling this, end your turn: write nothing else.",
+    inputSchema: object(
+      {
+        question: text("the question, one short sentence"),
+        options: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 4,
+          description: "2–4 short answers the person can pick",
+        },
+      },
+      ["question", "options"],
+    ),
+  },
   create_note: {
     description: "Create a NEW Markdown note in the user's vault; it lands in their intake.",
     inputSchema: object({ title: text("the note title"), body: text("the note body, in Markdown") }, [

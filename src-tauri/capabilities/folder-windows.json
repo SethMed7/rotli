@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "folder-windows",
+  "description": "A folder opened from Finder in its own window (label = its finder_<hash> mount, src-tauri/src/folder_window.rs): the core IPC an editing window needs, nothing else",
+  "webviews": [
+    "finder_*"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-write-html"
+  ]
+}

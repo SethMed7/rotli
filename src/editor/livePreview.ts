@@ -35,6 +35,7 @@ import { selectChoiceGroup } from "./choiceState";
 import { choiceGroupAlign, isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
+import { healable, noteFolderFacet, resolveNoteImage } from "./imageSource";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
@@ -52,6 +53,7 @@ import {
   RESULT_EM,
 } from "./listGeometry";
 import { widestOrdinalInRun } from "./listNumbers";
+import { revealRange } from "./readingReveal";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -219,7 +221,7 @@ function listItemImage(
   const selected = selectionCoversImage(sel, contentBase, lineEnd);
   if (lineTouched && !selected) return false;
   const d = Decoration.replace({
-    widget: new ImgWidget(image.alt, image.src, selected),
+    widget: new ImgWidget(image.alt, image.src, selected, image.wiki),
   });
   decos.push(d.range(contentBase, lineEnd));
   atomics.push(d.range(contentBase, lineEnd));
@@ -375,11 +377,12 @@ class ImgWidget extends WidgetType {
     readonly alt: string,
     readonly src: string,
     readonly selected: boolean,
+    readonly wiki = false,
   ) {
     super();
   }
   eq(o: ImgWidget) {
-    return o.alt === this.alt && o.src === this.src && o.selected === this.selected;
+    return o.alt === this.alt && o.src === this.src && o.selected === this.selected && o.wiki === this.wiki;
   }
   toDOM(view: EditorView) {
     const wrap = document.createElement("span");
@@ -437,16 +440,17 @@ class ImgWidget extends WidgetType {
     // trashed → "photo deleted"; only a truly gone file says "not found"
     const rescue = () =>
       locateLostImage(this.src, rootId).then((loc) => {
-        if (loc.kind === "moved") {
-          if (healSrc(loc.rel)) return; // the rebuilt widget renders the new src
-          showState(`image moved — ${loc.rel}`);
-          return;
-        }
-        if (loc.kind === "archived") {
+        // only Rotli's own storage: link is rewritten; the person's own link (an
+        // Obsidian ![[name]], a note-relative path) is shown from where it is
+        if (loc.kind === "moved" && healable(this.src) && healSrc(loc.rel)) return;
+        if (loc.kind === "moved" || loc.kind === "archived") {
           return resolveImageSrc(loc.rel, rootId).then((url) => {
             if (url && wrap.isConnected)
               img.src = url; // render from the Archive, link untouched
-            else showState(`image in the Archive — ${this.src}`);
+            else
+              showState(
+                loc.kind === "moved" ? `image moved — ${loc.rel}` : `image in the Archive — ${this.src}`,
+              );
           });
         }
         if (loc.kind === "trashed") showState(`photo deleted — in the Trash (${this.src})`);
@@ -455,7 +459,7 @@ class ImgWidget extends WidgetType {
     const cached = IMG_SRC_CACHE.get(cacheKey);
     if (cached) img.src = cached;
     else {
-      void resolveImageSrc(this.src, rootId)
+      void resolveNoteImage(this.src, rootId, view.state.facet(noteFolderFacet))
         .then((url) => {
           if (url) {
             IMG_SRC_CACHE.set(cacheKey, url);
@@ -640,7 +644,7 @@ class ImgWidget extends WidgetType {
           changes: {
             from: imgFrom,
             to: lineTo,
-            insert: `![${newAlt}](${this.src})`,
+            insert: this.wiki ? `![[${this.src}|${width}]]` : `![${newAlt}](${this.src})`,
           },
         });
       };
@@ -792,7 +796,7 @@ function build(view: EditorView): {
 } {
   const decos: Range<Decoration>[] = [];
   const atomics: Range<Decoration>[] = [];
-  const sel = view.state.selection.main;
+  const sel = revealRange(view.state);
   const doc = view.state.doc;
   const progress = scanTaskProgress(doc);
   // blockRender owns the rendered fenced languages; livePreview must leave
@@ -840,7 +844,7 @@ function build(view: EditorView): {
         const selected = selectionCoversImage(sel, ls, line.to);
         if (!lineTouched || selected) {
           const d = Decoration.replace({
-            widget: new ImgWidget(image.alt, image.src, selected),
+            widget: new ImgWidget(image.alt, image.src, selected, image.wiki),
           });
           decos.push(d.range(ls, line.to));
           atomics.push(d.range(ls, line.to));

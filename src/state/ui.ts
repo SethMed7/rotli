@@ -332,6 +332,9 @@ interface UiState {
   /** Which quick note the window reopens on — "remember where I am". */
   quickActiveId: string | null;
   setQuickActiveId: (id: string | null) => void;
+  /** The Archive/Trash question's answer, "<vault id>:moved" or ":kept" (once per vault). */
+  personSinksAnswer: string | null;
+  setPersonSinksAnswer: (answer: string) => void;
   /** Folder new quick notes (the "+") are created in. */
   quickFolder: string;
   setQuickFolder: (folder: string) => void;
@@ -701,7 +704,11 @@ interface UiState {
 
   /** ⌥⌘F focus mode (r3 frame E): chrome leaves, one centered column. */
   focusMode: boolean;
+  /** Leaving focus mode leaves reading mode too (reading is focus, read-only). */
   setFocusMode: (on: boolean) => void;
+  /** ⌥⌘R reading mode: focus mode, and the note only to read (editor/readingMode.ts). */
+  readingMode: boolean;
+  setReadingMode: (on: boolean) => void;
 
   /** Open transient close-callbacks, top = last. Esc (app.hide, the one
    * registry dispatcher) closes the topmost transient before the window —
@@ -790,6 +797,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuickVaultId: (id) => set({ quickVaultId: id }),
   captureVaultId: null,
   setCaptureVaultId: (id) => set({ captureVaultId: id }),
+  personSinksAnswer: null,
+  setPersonSinksAnswer: (answer) => set({ personSinksAnswer: answer }),
 
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
@@ -1074,7 +1083,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   setUpdateVersion: (version) => set({ updateVersion: version }),
 
   focusMode: false,
-  setFocusMode: (on) => set({ focusMode: on }),
+  setFocusMode: (on) => set(on ? { focusMode: true } : { focusMode: false, readingMode: false }),
+  readingMode: false,
+  setReadingMode: (on) => set({ readingMode: on, focusMode: on }),
 
   transients: [],
   registerTransient: (close) => {

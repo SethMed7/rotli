@@ -155,6 +155,11 @@ function stripComments(src) {
 {
   const sites = allow.rust.gatedEgressSites ?? {};
   const GATE = "blocked_for_remote";
+  // remote_block.rs is the same bound (cold ledger, secure markers, secure-prose
+  // echo, secret shapes) with one exception the owner chose (2026-10-15): the
+  // person may send a secret-SHAPED span they typed themselves. Secure-note text
+  // stays refused, so a chat lane calling it bounds its content just as well.
+  const GATES = [GATE, "remote_block::remote_block", "remote_block::first_block"];
   for (const [rel, fns] of Object.entries(sites)) {
     if (rel.startsWith("_")) continue;
     const code = stripComments(read(rel));
@@ -170,7 +175,7 @@ function stripComments(src) {
       }
       const end = code.indexOf("\n}", start);
       const body = code.slice(start, end < 0 ? code.length : end);
-      if (!body.includes(GATE)) {
+      if (!GATES.some((gate) => body.includes(gate))) {
         failures.push(
           `${rel}: ${fn} is a declared egress site but does not call crate::secret::${GATE}. ` +
             `An outbound lane must bound its CONTENT, not only its destination (docs/architecture/egress-threat-model.md).`,
@@ -210,6 +215,9 @@ function stripComments(src) {
     "edit_document",
     "update_note",
     "open_note",
+    // ask_user puts a question with options in the chat; the person answers
+    // there and nothing leaves the device (src/ai/nativeLoop.ts)
+    "ask_user",
     "search_memory",
     "read_memory",
     "read_file",

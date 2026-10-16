@@ -8,7 +8,8 @@ import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
-import { type VaultDir, freeSiblingPath } from "./vaultDir";
+import { lastReplyMs } from "../memex/chatRecency";
+import { type VaultDir, freeSiblingPath, vaultFolderRoles } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
@@ -34,6 +35,7 @@ export function summarize(slug: string, contents: string, modifiedMs: number): M
     attachedTo: attached,
     path: `chats/${slug}.md`,
     modifiedMs,
+    repliedMs: lastReplyMs(contents),
     pinned: frontmatterField(contents, "pinned") === "true",
     model: frontmatterField(contents, "model"),
     provider: frontmatterField(contents, "provider"),
@@ -171,8 +173,17 @@ function safeSlug(slug: string): string {
 export class FolderChatStore implements ChatStore {
   constructor(private readonly dir: VaultDir) {}
 
-  private path(slug: string): string {
-    return `${CHATS_DIR}/${safeSlug(slug)}.md`;
+  private chats: Promise<string> | null = null;
+
+  /** `chats/`, or an imported vault's own chats folder: the person's `chats/`
+   * there is theirs (vault_roles.rs). Read once per store. */
+  private chatsDir(): Promise<string> {
+    this.chats ??= vaultFolderRoles(this.dir).then((roles) => roles?.chats ?? CHATS_DIR);
+    return this.chats;
+  }
+
+  private async path(slug: string): Promise<string> {
+    return `${await this.chatsDir()}/${safeSlug(slug)}.md`;
   }
 
   private async revision(path: string): Promise<string> {
@@ -181,13 +192,14 @@ export class FolderChatStore implements ChatStore {
   }
 
   async list(): Promise<MemexChatSummary[]> {
-    const entries = await this.dir.list(CHATS_DIR);
+    const chatsDir = await this.chatsDir();
+    const entries = await this.dir.list(chatsDir);
     const rows = await Promise.all(
       entries
         .filter((e) => e.kind === "file" && e.name.endsWith(".md") && e.name.toLowerCase() !== "readme.md")
         .map(async (e) => {
           const slug = e.name.slice(0, -3);
-          const path = `${CHATS_DIR}/${e.name}`;
+          const path = `${chatsDir}/${e.name}`;
           const [text, stat] = await Promise.all([
             this.dir.readText(path).catch(() => ""),
             this.dir.stat(path),
@@ -206,14 +218,14 @@ export class FolderChatStore implements ChatStore {
   }
 
   async read(slug: string): Promise<{ contents: string; revision: string }> {
-    const path = this.path(slug);
+    const path = await this.path(slug);
     if (!(await this.dir.exists(path))) throw new Error(`unknown chat "${slug}"`);
     const [contents, revision] = await Promise.all([this.dir.readText(path), this.revision(path)]);
     return { contents, revision };
   }
 
   async write(slug: string, contents: string, expectedRevision: string | null): Promise<string> {
-    const path = this.path(slug);
+    const path = await this.path(slug);
     const current = await this.revision(path);
     if (expectedRevision === null) {
       if (current !== "0") throw new Error(`a chat named "${slug}" already exists`);
@@ -225,10 +237,10 @@ export class FolderChatStore implements ChatStore {
   }
 
   async remove(slug: string, bin: "trash" | "archive"): Promise<void> {
-    const path = this.path(slug);
+    const path = await this.path(slug);
     if (!(await this.dir.exists(path))) return;
     // a chat already archived under this name keeps its file: take the next free name
-    const direct = `${CHATS_DIR}/${bin}/${safeSlug(slug)}.md`;
+    const direct = `${await this.chatsDir()}/${bin}/${safeSlug(slug)}.md`;
     const target = (await this.dir.exists(direct))
       ? await freeSiblingPath(this.dir, direct, "another")
       : direct;

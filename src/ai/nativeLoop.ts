@@ -22,6 +22,7 @@ import {
 } from "./loop";
 import { renderNativeSystem, renderNativeUser } from "./nativePrompt";
 import { answeredHistory, trimHistory } from "./prompt";
+import { remoteBlockText, retryWhileWarming, WARMING_STATUS } from "./remoteBlock";
 import { statusFor } from "./tools";
 import { toolSpecsFor } from "./toolSchemas";
 import type { AgentEvent, Host, RunInput, ScratchStep, ToolName } from "./types";
@@ -32,6 +33,8 @@ export interface NativeRunOpts {
   reasoningEffort?: string;
   /** Live secure-note taint (a secure read mid-run), as the Host sees it. */
   isSecureContext?: () => boolean;
+  /** The person's own messages they chose to send anyway (ai/remoteBlock.ts). */
+  consent?: string[];
 }
 
 const TAINTED =
@@ -61,7 +64,10 @@ export async function* runNativeAgent(
   }
   const budget = budgetFor(input.model);
   const maxSteps = input.maxSteps ?? budget.maxSteps;
-  const allowed = allowedTools(input, "primitives");
+  // ask_user is this transport's own: the JSON loop asks with its
+  // {"question"} reply shape instead (parse.ts)
+  const allowed = new Set<ToolName>([...allowedTools(input, "primitives"), "ask_user"]);
+  let asked = false;
   const knowledge = await loadKnowledge(host, budget.maxIndexChars);
   // what the model has seen from the vault: the private-prose guard reads it
   const scratch: ScratchStep[] = [];
@@ -83,6 +89,13 @@ export async function* runNativeAgent(
   const onToolCall = async (call: NativeToolCall): Promise<string> => {
     const tool = call.name as ToolName;
     if (!allowed.has(tool)) return `error: ${call.name} isn't available in this chat.`;
+    if (tool === "ask_user") {
+      const question = askUserQuestion(call.args);
+      if (!question || asked) return "error: ask one question, with 2–4 short options.";
+      asked = true;
+      push({ type: "question", prompt: question.prompt, options: question.options });
+      return "asked — their answer comes back as their next message. End your turn now; write nothing else.";
+    }
     if (opts.isSecureContext?.() === true) return TAINTED;
     const sig = `${tool} ${JSON.stringify(call.args)}`;
     if (scratch.some((s) => s.action === sig)) return DUPLICATE_CALL_RESULT;
@@ -104,29 +117,32 @@ export async function* runNativeAgent(
   yield { type: "status", text: "thinking…" };
   // settled from the session's callbacks — a holder, so the wait loop re-reads it
   const settled: { outcome: { text: string } | { error: string } | null } = { outcome: null };
-  void session(
-    {
-      model: opts.modelId,
-      systemPrompt: renderNativeSystem({
-        offeredTools: allowed,
-        web: input.web,
-        knowledge,
-        maxSteps,
-        ...(input.userName ? { userName: input.userName } : {}),
-      }),
-      userText: renderNativeUser(
-        // a failed (⚠) reply and the turn it answered stay out, as in the
-        // JSON loop: one blocked message must not keep blocking the chat
-        trimHistory(answeredHistory(input.history), budget.maxHistoryChars),
-        input.userText,
-        attached,
-      ),
-      tools: toolSpecsFor(allowed),
-      // one turn per tool call, one to answer, one spare for a blocked call
-      maxTurns: maxSteps + 2,
-      ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
-    },
-    onToolCall,
+  const request = {
+    model: opts.modelId,
+    systemPrompt: renderNativeSystem({
+      offeredTools: allowed,
+      web: input.web,
+      knowledge,
+      maxSteps,
+      ...(input.userName ? { userName: input.userName } : {}),
+    }),
+    userText: renderNativeUser(
+      // a failed (⚠) reply and the turn it answered stay out, as in the
+      // JSON loop: one blocked message must not keep blocking the chat
+      trimHistory(answeredHistory(input.history), budget.maxHistoryChars),
+      input.userText,
+      attached,
+    ),
+    tools: toolSpecsFor(allowed),
+    // one turn per tool call, one to answer, one spare for a blocked call
+    maxTurns: maxSteps + 2,
+    ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {}),
+    ...(opts.consent ? { consent: opts.consent } : {}),
+  };
+  // just after launch Rust waits for the secure-note walk: wait with it
+  void retryWhileWarming(
+    () => session(request, onToolCall),
+    () => push({ type: "status", text: WARMING_STATUS }),
   ).then(
     (text) => {
       settled.outcome = { text };
@@ -144,12 +160,14 @@ export async function* runNativeAgent(
       continue;
     }
     const done = settled.outcome;
+    // a question was asked: it IS this turn's reply (the chat shows its options)
+    if (done && asked && !("error" in done)) return;
     if (done) {
       yield {
         type: "final",
         text:
           "error" in done
-            ? `⚠ ${done.error}`
+            ? `⚠ ${remoteBlockText(done.error)}`
             : done.text.trim() || "I couldn't find enough to answer that confidently.",
       };
       return;
@@ -159,4 +177,14 @@ export async function* runNativeAgent(
     });
     wake = null;
   }
+}
+
+/** ask_user's arguments, checked: one question and 2–4 short, distinct options. */
+export function askUserQuestion(args: Record<string, unknown>): { prompt: string; options: string[] } | null {
+  const prompt = typeof args.question === "string" ? args.question.trim() : "";
+  const raw = Array.isArray(args.options) ? args.options : [];
+  const options = [...new Set(raw.filter((o): o is string => typeof o === "string").map((o) => o.trim()))]
+    .filter((o) => o.length > 0 && o.length <= 120)
+    .slice(0, 4);
+  return prompt && options.length >= 2 ? { prompt, options } : null;
 }

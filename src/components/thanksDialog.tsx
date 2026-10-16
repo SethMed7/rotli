@@ -1,73 +1,26 @@
 // Thank you (2026-09-28): the card after setup, before the guided tour. A
-// short note, a thank-you banner with the person's name and quokka, and ways
-// to pass Rotli on: a GitHub star, a mail draft inviting a friend, a post on
-// X, and the banner to keep. Then the tour, or straight in (the owner,
-// 2026-10-01: "Take tour" or "Start now", so skipping the tour is one click);
-// closing the card is Start now.
+// short note, a thank-you banner — the person's name and quokka in their
+// theme's scenery — and ways to pass Rotli on. Then the tour, or straight in
+// (the owner, 2026-10-01: "Take tour" or "Start now", so skipping the tour is
+// one click); closing the card is Start now.
+//
+// 2026-10-15 (the owner, after a fresh-onboarding pass): the banner is a full
+// scene; Share opens the share sheet (Messages, Mail, AirDrop, Notes…) in
+// place of the mail-draft invite; the GitHub and X logos stand on their own,
+// no chip around them; the banner is no longer saved or downloaded; and Take
+// the tour comes first, with Start now the primary on the right.
 
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { ROTLI_REPO_URL } from "../lib/feedback";
-import { bannerText, FRIEND_INVITE, friendInviteMailto, shareOnXUrl } from "../lib/thanksBanner";
-import {
-  bannerSavesToAssets,
-  copyBannerImage,
-  copyText,
-  openLink,
-  saveBanner,
-} from "../services/thanksShare";
+import { shareOnXUrl, shareStatus } from "../lib/thanksBanner";
+import { openLink, shareRotli } from "../services/thanksShare";
 import { useOnboardingThanks } from "../state/onboardingThanks";
 import { showSettingsHintNow } from "../state/settingsHint";
 import { startTour } from "../state/tour";
-import { useUiStore } from "../state/ui";
-import { Character } from "./character";
-import { composeBanner } from "./onboarding/bannerCanvas";
-import { GitHubMarkGlyph, XMarkGlyph } from "./onboarding/shareMarks";
+import { GitHubMarkGlyph, ShareGlyph, XMarkGlyph } from "./onboarding/shareMarks";
+import { ThanksBannerScene } from "./onboarding/thanksBannerScene";
 import { WebDialogFrame } from "./webDialogFrame";
-
-type Banner = { kind: "drawing" } | { kind: "ready"; blob: Blob; url: string } | { kind: "failed" };
-
-/** Frames to wait for the quokka's art (loaded on demand) to mount. */
-const ART_WAIT_FRAMES = 120;
-
-function waitForArt(host: HTMLElement): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let frames = 0;
-    const tick = () => {
-      if (host.querySelector(".quokka-line, .quokka-ink-layer")) return resolve();
-      if (++frames > ART_WAIT_FRAMES) return reject(new Error("the quokka didn’t load"));
-      requestAnimationFrame(tick);
-    };
-    tick();
-  });
-}
-
-/** Draws the banner once the hidden quokka has its art. */
-function useBanner(quokkaHost: RefObject<HTMLSpanElement | null>): Banner {
-  const [banner, setBanner] = useState<Banner>({ kind: "drawing" });
-  useEffect(() => {
-    let live = true;
-    let url = "";
-    const host = quokkaHost.current?.querySelector<HTMLElement>(".quokka");
-    const drawn = host
-      ? waitForArt(host).then(() => composeBanner(host, bannerText(useUiStore.getState().userName)))
-      : Promise.reject();
-    drawn
-      .then((blob) => {
-        if (!live) return;
-        url = URL.createObjectURL(blob);
-        setBanner({ kind: "ready", blob, url });
-      })
-      .catch(() => {
-        if (live) setBanner({ kind: "failed" });
-      });
-    return () => {
-      live = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [quokkaHost]);
-  return banner;
-}
 
 export function ThanksDialog() {
   const open = useOnboardingThanks((s) => s.open);
@@ -76,9 +29,8 @@ export function ThanksDialog() {
 
 function ThanksCard() {
   const hide = useOnboardingThanks((s) => s.hide);
-  const quokkaHost = useRef<HTMLSpanElement | null>(null);
-  const banner = useBanner(quokkaHost);
   const [status, setStatus] = useState("");
+  const [sharing, setSharing] = useState(false);
 
   const takeTour = () => {
     hide();
@@ -88,47 +40,16 @@ function ThanksCard() {
     hide();
     showSettingsHintNow();
   };
-
-  const shareOnX = async () => {
-    if (banner.kind !== "ready") return;
-    // copy first, inside the click, and open X only once the write settles:
-    // WebKit refuses a clipboard write whose window has lost focus
-    const copied = await copyBannerImage(banner.blob);
-    void openLink(shareOnXUrl());
-    setStatus(
-      copied
-        ? "Your banner is copied. Paste it into the post with ⌘V."
-        : "Opening X. Save the banner to add it to your post.",
-    );
-  };
-
-  // a mail draft with the invite, and the invite on the clipboard for
-  // Messages or anywhere else (copied first, while the click still counts)
-  const tellAFriend = async () => {
-    const copied = await copyText(FRIEND_INVITE);
+  const share = async (button: HTMLElement) => {
+    setSharing(true);
+    setStatus("");
     try {
-      await openLink(friendInviteMailto());
-      setStatus(
-        copied
-          ? "Opening a mail draft with an invite. It’s on your clipboard too."
-          : "Opening a mail draft with an invite.",
-      );
-    } catch {
-      setStatus(copied ? "An invite is copied. Send it to a friend." : "Couldn’t open a mail draft.");
+      setStatus(shareStatus(await shareRotli(button)));
+    } finally {
+      setSharing(false);
     }
   };
 
-  const keepBanner = async () => {
-    if (banner.kind !== "ready") return;
-    try {
-      const where = await saveBanner(banner.blob);
-      setStatus(where === "assets" ? "Saved to your vault’s Assets." : "Banner downloaded.");
-    } catch (error) {
-      setStatus(`Couldn’t save the banner — ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
-
-  const ready = banner.kind === "ready";
   return (
     <WebDialogFrame
       id="thanks"
@@ -140,42 +61,43 @@ function ThanksCard() {
           <div className="thanks-actions" role="group" aria-label="Share Rotli">
             <button
               type="button"
-              className="rename-btn thanks-mark"
-              aria-label="Star on GitHub"
+              className="rename-btn thanks-share"
+              disabled={sharing}
+              onClick={(event) => void share(event.currentTarget)}
+            >
+              <ShareGlyph size={14} />
+              Share
+            </button>
+            {/* the brands' own logos, nothing around them: people know them */}
+            <button
+              type="button"
+              className="thanks-logo"
+              aria-label="Star Rotli on GitHub"
               title="Star Rotli on GitHub"
               onClick={() => void openLink(ROTLI_REPO_URL)}
             >
-              <GitHubMarkGlyph />
-              Star
-            </button>
-            <button type="button" className="rename-btn" onClick={() => void tellAFriend()}>
-              Tell a friend
+              <GitHubMarkGlyph size={18} />
             </button>
             <button
               type="button"
-              className="rename-btn thanks-mark"
+              className="thanks-logo"
               aria-label="Share on X"
               title="Share on X"
-              disabled={!ready}
-              onClick={() => void shareOnX()}
+              onClick={() => void openLink(shareOnXUrl())}
             >
-              <XMarkGlyph />
-              Share
+              <XMarkGlyph size={16} />
             </button>
-            <button type="button" className="rename-btn" disabled={!ready} onClick={() => void keepBanner()}>
-              {bannerSavesToAssets() ? "Save banner" : "Download banner"}
-            </button>
-          </div>
-          {/* then what's next, on its own row so neither button is squeezed */}
-          <div className="thanks-next">
             <span className="thanks-status" role="status">
               {status}
             </span>
-            <button type="button" className="rename-btn" onClick={startNow}>
-              Start now
-            </button>
-            <button type="button" className="rename-btn primary" onClick={takeTour}>
+          </div>
+          {/* then what's next, on its own row so neither button is squeezed */}
+          <div className="thanks-next">
+            <button type="button" className="rename-btn" onClick={takeTour}>
               Take the tour
+            </button>
+            <button type="button" className="rename-btn primary" onClick={startNow}>
+              Start now
             </button>
           </div>
         </>
@@ -183,20 +105,9 @@ function ThanksCard() {
     >
       <p className="thanks-note">
         Rotli is made in the open. If it earns a place on your Mac, a star on GitHub helps other people find
-        it, and telling a friend helps even more.
+        it, and sharing it with a friend helps even more.
       </p>
-      <span ref={quokkaHost} className="thanks-quokka-source" aria-hidden="true">
-        <Character name="celebrating" size={440} />
-      </span>
-      <div className="thanks-banner" aria-busy={banner.kind === "drawing"}>
-        {banner.kind === "ready" && <img src={banner.url} alt="Your Rotli thank-you banner" />}
-        {banner.kind === "drawing" && <p className="thanks-note">Drawing your banner…</p>}
-        {banner.kind === "failed" && (
-          <p role="alert" className="rename-error">
-            Couldn’t draw your banner. Everything else still works.
-          </p>
-        )}
-      </div>
+      <ThanksBannerScene />
     </WebDialogFrame>
   );
 }

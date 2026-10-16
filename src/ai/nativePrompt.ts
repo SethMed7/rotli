@@ -32,7 +32,7 @@ ${rules.scope}
 
 TOOLS: the rotli tools are the only tools you have — call them directly when they add facts. ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${frontierNoteRules(ctx.offeredTools.has("read_file"))} You have ${ctx.maxSteps} tool calls for this turn.
 
-ANSWER: your reply ${FRONTIER_ANSWER_STYLE}. When one missing choice would materially change the result, ask one concise question with 2–3 short options instead of guessing.
+ANSWER: your reply ${FRONTIER_ANSWER_STYLE}. ${ctx.offeredTools.has("ask_user") ? "Before writing something substantial (a post, a long note, a rewrite), if the request leaves a choice open that would change the result (audience, length, tone, which note to change), call ask_user once with 2–4 short options instead of guessing, then stop. Don't ask when the request is already clear." : "When one missing choice would materially change the result, ask one concise question with 2–3 short options instead of guessing."}
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}`;

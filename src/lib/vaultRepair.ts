@@ -31,7 +31,7 @@ export interface AliasCleanupReport {
  * the vault's aliases: counted, or removed with `apply`. A linked one stays. */
 export async function aliasCleanup(apply: boolean): Promise<AliasCleanupReport> {
   if (!isTauri()) return { notes: 0, aliases: 0, keptLinked: 0 };
-  return invoke<AliasCleanupReport>("corpus_alias_cleanup", { apply });
+  return invoke<AliasCleanupReport>("corpus_vault_pass", { kind: "aliases", apply });
 }
 
 /** Protect every note already named with a secure keyword (the Librarian
@@ -40,4 +40,23 @@ export async function aliasCleanup(apply: boolean): Promise<AliasCleanupReport> 
 export async function secureByKeywords(): Promise<number> {
   if (!isTauri()) return 0;
   return invoke<number>("corpus_secure_by_keywords");
+}
+
+/** What the link-format pass found (or rewrote, when applied). */
+export interface LinkConvertReport {
+  notes: number;
+  /** `storage:` links, rewritten as standard paths from the note. */
+  links: number;
+  /** ```board / ```sheet / ```document fences, rewritten as `![[path]]`. */
+  embeds: number;
+  /** A few before → after lines for the preview. */
+  examples: { title: string; before: string; after: string }[];
+}
+
+/** Rotli-only links in the vault's notes — counted, or converted to the forms
+ * Obsidian and any Markdown app read with `apply`. A folder opened in place is
+ * refused (its links stay as the person wrote them). */
+export async function convertLinks(apply: boolean): Promise<LinkConvertReport> {
+  if (!isTauri()) return { notes: 0, links: 0, embeds: 0, examples: [] };
+  return invoke<LinkConvertReport>("corpus_vault_pass", { kind: "links", apply });
 }

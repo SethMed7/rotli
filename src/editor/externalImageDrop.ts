@@ -1,4 +1,5 @@
 import { IMAGE_EXTS, VIDEO_EXTS, extOf } from "../lib/fileKind";
+import { noteFolderFacet, noteImageLink } from "./imageSource";
 import { parseBlock } from "./render";
 
 export interface ImageDropEditor {
@@ -7,6 +8,8 @@ export interface ImageDropEditor {
   state: {
     selection: { main: { head: number } };
     doc: { lineAt(pos: number): { from: number; to: number; text: string } };
+    /** A real editor's state: tells which folder the note lives in. */
+    facet?: (facet: typeof noteFolderFacet) => string;
   };
   dispatch(spec: { changes: { from: number; insert: string }; selection: { anchor: number } }): void;
   focus(): void;
@@ -78,8 +81,9 @@ export function dropEditorHost(element: Element | null): HTMLElement | null {
 }
 
 /** Imports return a corpus wire id (`storage/x.png` for the default root or
- * `vault:storage/x.png` for a named root). Markdown image refs are deliberately
- * root-relative, because the open note already owns the root context. */
+ * `vault:storage/x.png` for a named root). Rotli's `storage:` shorthand stays
+ * for writers that don't know the target note (AI tool output, chat); a note
+ * the editor knows gets `noteImageLink` instead. */
 export function storageImageSource(wire: string): string {
   const relative = wire.replace(/^[^/:]+:(?=storage\/)/i, "").replace(/^storage\//i, "");
   return `storage:${relative}`;
@@ -112,9 +116,12 @@ async function importImagesAtPosition<T>(
       at >= line.from + block.prefixLen);
   const hang = indentOnly ? line.text.length : block.prefixLen;
   const wires = await Promise.all(sources.map((source) => importFile(source)));
+  // a standard Markdown path from the note (owner decision 2026-10-13): it
+  // reads the same in Obsidian, GitHub, and any Markdown app
+  const folder = view.state.facet?.(noteFolderFacet) ?? "";
   let insert = "";
   for (const wire of wires.filter(Boolean)) {
-    const image = `![](${storageImageSource(wire)})`;
+    const image = `![](${noteImageLink(wire, folder)})`;
     if (fillsEmptyListItem) {
       if (insert) insert += `\n${" ".repeat(hang)}`;
       insert += image;

@@ -1,0 +1,36 @@
+# Dependabot: security updates only, through the right package managers.
+#
+# Rotli's three JavaScript roots are Bun projects (bun.lock, no npm/yarn
+# lockfile), so they must be declared as `bun`; under the default
+# `npm_and_yarn` ecosystem every security-update job failed with "Bun is
+# misconfigured" and no fix PR was ever opened (2026-10-13). Version-update PRs
+# stay off (`open-pull-requests-limit: 0`); security updates use their own
+# limit. Every resulting lockfile change is still reviewed against
+# docs/operations/release-and-supply-chain.md (three-day release age,
+# script-free frozen installs) before it merges.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    target-branch: dev
+  - package-ecosystem: bun
+    directory: /site
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    target-branch: dev
+  - package-ecosystem: bun
+    directory: /breve-runtime/defaults
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    target-branch: dev
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    target-branch: dev

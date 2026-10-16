@@ -25,6 +25,8 @@ export interface NativeSessionReq {
   tools: NativeToolSpec[];
   maxTurns: number;
   reasoningEffort?: string;
+  /** The person's own messages they chose to send anyway (src-tauri/src/remote_block.rs). */
+  consent?: string[];
 }
 
 /** Run one turn; `onToolCall` executes a call and resolves with its result
@@ -55,6 +57,7 @@ export function claudeSession(requestId: string): NativeSession {
       tools: req.tools,
       maxTurns: req.maxTurns,
       reasoningEffort: req.reasoningEffort,
+      consent: req.consent,
       onEvent: channel,
     });
   };

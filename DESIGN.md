@@ -398,9 +398,11 @@ documents, both on Univer, are Beta.
   the sidebar's Librarian then wears a dot until it is set up, opening
   Settings → Librarian with the step left. The vault step asks nothing about the
   Librarian; one screen owns that choice, whichever way the vault arrived. Then the thank-you
-  card (a thank-you banner with no badges for the choices made; Start now and
-  Take the tour on their own row), the tour, and a note beside Settings
-  naming what else is there.
+  card (a thank-you banner — the person's name and plain quokka standing in
+  their theme's own scenery — with no badges for the choices made; Share,
+  which opens the share sheet, and the GitHub and X logos with no chip around
+  them; then Take the tour and Start now, the primary, on their own row), the
+  tour, and a note beside Settings naming what else is there.
   Everything else waits where it is used: the window behavior and the quokka's
   look in Settings, music in the sidebar player (shown from the first run,
   quiet until Play), and chat models the first time Chat has none. A vault is

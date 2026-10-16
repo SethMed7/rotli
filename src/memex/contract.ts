@@ -35,7 +35,11 @@
 // v3.8 (2026-07-24) adds readable filename projections, rename aliases, and a
 // deterministic read-only query grammar. Durable identity and write lanes are
 // unchanged; Rotli mirrors the grammar through CLI/MCP and extends the band.
-export const CONTRACT_VERSION = "3.8";
+// v3.9 (2026-10-14) adds the imported layout: a copy of someone's notes folder
+// whose memex.json says `"layout": "imported"` and names Rotli's own folders in
+// a role map (src/services/destinations.ts FolderRoles). Existing vaults are
+// unchanged and stay read-write.
+export const CONTRACT_VERSION = "3.9";
 export const MIN_CONTRACT = "3.4";
 
 /** Sources allowed on the chats surface (conversations.ts SURFACES.chats.sources).

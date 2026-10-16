@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { startWithVault } from "./support";
+import { readOpfsFile, startWithVault } from "./support";
 
 const PORT = 43111;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
@@ -36,7 +36,7 @@ function fakeHelper(
   calls: { cmd: string; args: unknown }[],
   models: ModelList | null = null,
   /** Held until it settles before a reply goes back (a reply in flight). */
-  replyGate: Promise<void> = Promise.resolve(),
+  replyGate: Promise<void> | (() => Promise<void>) = Promise.resolve(),
 ) {
   return page.route(`${HELPER}/**`, async (route) => {
     const request = route.request();
@@ -77,7 +77,7 @@ function fakeHelper(
             headers: CORS,
             body: JSON.stringify({ error: "reload Rotli Web" }),
           });
-        await replyGate;
+        await (typeof replyGate === "function" ? replyGate() : replyGate);
         return reply("Hello from the fake helper.");
       case "cli_cancel":
         return reply(null);
@@ -310,10 +310,18 @@ test("the chat buddy thinks while a reply runs and is happy when it lands", asyn
   await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "thoughtful");
   // one buddy for the thread, never one per message
   await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
+  // and one working indicator: the status rides beside the buddy, never a
+  // second dotted line above it or "thinking…" in the composer (2026-10-10)
+  await expect(edge.locator(".chat-live-status")).toBeVisible();
+  await expect(page.locator(".chat-thread .cmsg-think")).toHaveCount(0);
+  await expect(page.getByPlaceholder("Write your next message…")).toBeVisible();
+  // the chat row's Claude mark keeps its color under the default Neutral icons
+  await expect(page.locator(".sidebar .sb-chatmark img.model-logo").first()).toBeVisible();
 
   release();
   await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
   await expect(edge).toHaveAttribute("data-moment", "done");
+  await expect(edge.locator(".chat-live-status")).toHaveCount(0);
   await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "celebrating");
   await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
 });
@@ -375,4 +383,82 @@ test("a sent image's tag names the file and shows it when the chat is opened aga
   await expect(chip).toContainText("dot.png");
   await expect(chip).toHaveAttribute("aria-label", /Image 1: dot\.png/);
   await expect(chip.locator("img")).toHaveAttribute("src", /^blob:/);
+});
+
+// The chat list (the owner, 2026-10-15): one row per chat, no Activity lane;
+// sending leaves a chat where it is and the arriving reply lifts it; the row's
+// dot says Working while the reply runs and Unread reply until it is opened;
+// and a reply sits a clear gap below the question.
+test("the chat list holds still while a reply runs, lifts the answered chat, and marks it Working then Unread reply", async ({
+  page,
+}) => {
+  // a re-armable gate: each reply waits on whatever `hold` is at that moment
+  let hold = Promise.resolve();
+  let release = () => {};
+  const gate = () => hold;
+  await fakeHelper(page, [], null, gate);
+  await pairAndOpenChat(page);
+
+  const rows = page.locator(".sidebar .sb-chatrow[data-chat-slug]");
+  const send = async (text: string) => {
+    const composer = page.locator("textarea.chat-msg:visible").first();
+    await composer.fill(text);
+    await composer.press("Enter");
+  };
+
+  await send("First question");
+  await expect(
+    page.locator(".chat-thread:visible .cmsg.ai").getByText("Hello from the fake helper."),
+  ).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(rows).toHaveCount(1);
+  const first = (await rows.first().getAttribute("data-chat-slug"))!;
+
+  // a reply sits a clear gap below the question — more than any line gap inside it
+  const question = (await page.locator(".chat-thread:visible .cmsg.you").first().boundingBox())!;
+  const answer = (await page.locator(".chat-thread:visible .cmsg.ai").first().boundingBox())!;
+  expect(answer.y - (question.y + question.height)).toBeGreaterThanOrEqual(20);
+
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  await send("Second question");
+  await expect(rows).toHaveCount(2);
+  await expect(
+    page.locator(".chat-thread:visible .cmsg.ai").getByText("Hello from the fake helper."),
+  ).toBeVisible({
+    timeout: 15_000,
+  });
+  const second = (await rows
+    .filter({ hasNot: page.locator(`[data-chat-slug="${first}"]`) })
+    .first()
+    .getAttribute("data-chat-slug"))!;
+  // the newest reply leads
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", second);
+
+  // back in the first chat, hold the next reply in flight and send
+  const firstRow = page.locator(`.sidebar .sb-chatrow[data-chat-slug="${first}"]`);
+  await firstRow.click();
+  await expect(page.locator(".chat-thread:visible .cmsg.you").getByText("First question")).toBeVisible();
+  hold = new Promise<void>((resolve) => (release = resolve));
+  await send("Follow-up question");
+  await expect(firstRow.getByRole("img", { name: "Working" })).toBeVisible();
+  // the person's turn is on disk at once — and the chat did not jump
+  await expect
+    .poll(() => readOpfsFile(page, `chats/${first}.md`), { timeout: 10_000 })
+    .toContain("Follow-up question");
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", second);
+  await expect(rows).toHaveCount(2); // each chat once: no Activity lane copy
+  await expect(page.locator(".sb-chatactivity")).toHaveCount(0);
+
+  // close the chat while it answers; the reply lands unseen and lifts it
+  await page.getByRole("tab", { selected: true }).getByRole("button", { name: "Close tab" }).click();
+  await expect(page.locator(".chat-thread:visible .cmsg.you").getByText("Follow-up question")).toHaveCount(0);
+  release();
+  await expect(firstRow.getByRole("img", { name: "Unread reply" })).toBeVisible({ timeout: 15_000 });
+  await expect(firstRow.getByRole("img", { name: "Working" })).toHaveCount(0);
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", first);
+
+  // opening it acknowledges the reply: the dot goes
+  await firstRow.click();
+  await expect(firstRow.getByRole("img", { name: "Unread reply" })).toHaveCount(0);
 });

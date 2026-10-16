@@ -17,20 +17,21 @@ import {
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
 import { editableDocumentForAi } from "../ai/artifacts";
-import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
+import { containsPrivateDataOverlap, endpointIsLocal, looksSecret } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { decodeDocx } from "../documents/codec/docx";
 import { namedStyle } from "../documents/codec/paragraphStyles";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { noteImageLink } from "../editor/imageSource";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
 import { stampToMs, today } from "../memex/dates";
 import { SECURE_NOTES_FOLDER, inSecureHome } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
-import { DEST } from "../services/destinations";
+import { DEST, IMPORTED_FOLDER_ROLES, markerInPlace } from "../services/destinations";
 import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { canvasHome } from "../services/folderCanvases";
 import { STORAGE_OFFICE_EXTS } from "../services/folderFileIo";
@@ -44,6 +45,7 @@ import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { workbookForAi } from "../sheets/view";
+import { RAW_ROOT_PREFIX } from "../state/paneVaults";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
@@ -177,6 +179,15 @@ describe("parity.json ↔ TS constants", () => {
     expect(EMPTY_BOARD_FILE).toBe(entries.emptyBoardScene.value);
   });
 
+  test("importedFolderRoles", () => {
+    expect(IMPORTED_FOLDER_ROLES).toEqual(entries.importedFolderRoles.value);
+  });
+
+  test("importedMarkerInPlace", () => {
+    for (const { marker, inPlace } of entries.importedMarkerInPlace.value)
+      expect(markerInPlace(marker)).toBe(inPlace);
+  });
+
   test("boardLane", () => {
     expect(BOARD_LANE).toBe(entries.boardLane.value);
   });
@@ -249,6 +260,22 @@ describe("parity.json ↔ TS constants", () => {
         outbound,
         overlaps: false,
       });
+    }
+  });
+
+  test("looksSecure", () => {
+    for (const { text, secret } of entries.looksSecure.value) {
+      expect({ text, secret: looksSecret(text) }).toEqual({ text, secret });
+    }
+  });
+
+  test("rawRootPrefix", () => {
+    expect(RAW_ROOT_PREFIX).toBe(entries.rawRootPrefix.value);
+  });
+
+  test("noteImageLink", () => {
+    for (const { wire, folder, link } of entries.noteImageLink.value) {
+      expect({ wire, folder, link: noteImageLink(wire, folder) }).toEqual({ wire, folder, link });
     }
   });
 

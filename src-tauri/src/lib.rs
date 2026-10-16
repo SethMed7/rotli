@@ -26,6 +26,10 @@ mod compute;
 mod containment;
 mod corpus;
 mod deep_link;
+mod open_requests;
+mod folder_window;
+mod finder_quick_action;
+mod vault_import;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
@@ -40,6 +44,7 @@ mod loopback_http;
 mod librarian_rules;
 mod localmodel;
 mod memex;
+mod memex_chat_scan;
 mod memex_query; mod native_drag; mod note_dates; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
 /// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
 #[cfg(target_os = "macos")]
@@ -55,6 +60,7 @@ mod private_browser;
 mod private_browser_media;
 mod quick_window;
 mod vault_marker;
+mod vault_roles;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
@@ -63,7 +69,9 @@ mod claude_session;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
+mod remote_block;
 mod secret;
+mod share_sheet;
 mod spellcheck;
 mod quit_flush;
 mod usage;
@@ -103,7 +111,7 @@ enum NativeCloseAction {
 
 fn native_close_action(window_label: &str) -> NativeCloseAction {
     // the two shell windows own tabs; every other window is a visitor
-    if chat_window::SHELL_LABELS.contains(&window_label) {
+    if chat_window::SHELL_LABELS.contains(&window_label) || folder_window::is_folder_window(window_label) {
         NativeCloseAction::CloseMainTab
     } else {
         NativeCloseAction::HideWindow
@@ -375,50 +383,6 @@ mod reopen_tests {
     }
 }
 
-/// One accepted deep link → write the one-shot mailbox at the default root,
-/// surface the window, and let the webview consume it (the exact flow of
-/// `rotli open`, minus the redundant `open -a rotli` — we ARE the app).
-fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
-    let (id, kind) = match deep_link::parse(url) {
-        Some(deep_link::DeepLink::Open { id, kind }) => (id, kind),
-        Some(deep_link::DeepLink::Reveal { rel, vault }) => {
-            reveal_deep_link(app, &rel, vault.as_deref());
-            return;
-        }
-        None => return,
-    };
-    let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() else {
-        return;
-    };
-    let path = root.join(".rotli").join("workspace-open.json");
-    let Some(parent) = path.parent() else { return };
-    if std::fs::create_dir_all(parent).is_err() {
-        return;
-    }
-    let body = serde_json::json!({ "id": id, "kind": kind }).to_string();
-    if fsutil::atomic_write(&path, &body, ".rotli-open-").is_err() {
-        return;
-    }
-    show_main(app);
-    let _ = app.emit_to("main", "rotli:open-request", ());
-}
-
-/// `rotli://reveal`: Finder at a vault file, for Rotli Web (2026-09-17). Only
-/// the default vault answers, and only when the link names it (or names none):
-/// the page is connected to ONE folder by name, and a copy of some other vault
-/// must not reveal this one's files. Same guard as "Show in Finder".
-fn reveal_deep_link(app: &AppHandle, rel: &str, vault: Option<&str>) {
-    let state = app.state::<corpus::CorpusState>();
-    if let Some(name) = vault {
-        let Ok(root) = state.default_root_path() else { return };
-        if root.file_name().and_then(|n| n.to_str()) != Some(name) {
-            return;
-        }
-    }
-    let _ = corpus::corpus_reveal_file(state, rel.to_string());
-}
-
-
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
 struct GlobalChords {
@@ -562,10 +526,20 @@ fn record_quit_flush(app: &AppHandle, label: &str, attempt_id: u64, ok: bool, er
 /// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
 /// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
 fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
-    let labels: Vec<&str> = ["main", "quick", "capture", chat_window::LABEL]
+    let mut labels: Vec<String> = ["main", "quick", "capture", chat_window::LABEL]
         .into_iter()
         .filter(|label| app.get_webview_window(label).is_some())
+        .map(str::to_string)
         .collect();
+    labels.extend(app.webview_windows().into_keys().filter(|label| folder_window::is_folder_window(label)));
+    flush_windows(app, &labels).inspect_err(|detail| {
+        show_main(app);
+        let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
+    })
+}
+
+/// Ask each window in `labels` to save what's typing, and wait (bounded).
+fn flush_windows(app: &AppHandle, labels: &[String]) -> Result<(), String> {
     if labels.is_empty() {
         return Ok(());
     }
@@ -582,6 +556,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
         status.attempt_id
     };
     for label in labels {
+        let label = label.as_str();
         if app
             .emit_to(
                 label,
@@ -630,8 +605,6 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     status.pending.clear();
     drop(status);
     if timed_out || failed {
-        show_main(app);
-        let _ = app.emit_to("main", "rotli:quit-flush-failed", &detail);
         Err(detail)
     } else {
         Ok(())
@@ -1141,6 +1114,11 @@ struct CorpusView {
     /// The vault's Librarian switch (display fact for the switcher/Location —
     /// read from the root's own settings sidecar, never stored in corpus.json).
     brain_enabled: bool,
+    /// An imported vault's own folders by role (vault_roles.rs); null otherwise.
+    folder_roles: Option<vault_roles::FolderRoles>,
+    /// A folder opened in place (protected): the Librarian never organizes it,
+    /// so Settings offers a copy instead.
+    adopted: bool,
 }
 
 /// A connected brain + per-root display facts the config file never stores.
@@ -1150,6 +1128,11 @@ struct BrainRootView {
     #[serde(flatten)]
     brain: corpus::ConnectedBrain,
     brain_enabled: bool,
+    /// A brought-in vault's own folders by role (copy or in place); null for a
+    /// Rotli vault.
+    folder_roles: Option<vault_roles::FolderRoles>,
+    /// Connected in place (its marker says so): the Librarian never runs there.
+    adopted: bool,
 }
 
 /// A root's Librarian switch, straight off its settings sidecar. Same rules as
@@ -1238,7 +1221,11 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
     }
     // a displaced marker still reads as a vault; opening it heals (vault_marker.rs)
     let is_vault = corpus::is_memex_root(&root) || vault_marker::recoverable(&root);
-    let source = if is_vault {
+    // a folder connected in place links back as one (its marker keeps the
+    // Librarian off whichever way it is reopened)
+    let source = if vault_roles::in_place(&root) {
+        "Folder connected in place"
+    } else if is_vault {
         "Rotli vault"
     } else if root.join(".obsidian").is_dir() {
         "Obsidian vault"
@@ -1296,71 +1283,27 @@ async fn corpus_inspect_folder(app: AppHandle, path: String) -> Result<VaultInsp
     .map_err(|e| format!("vault inspection worker failed ({e})"))?
 }
 
-fn copy_vault_tree(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
-    let source = std::fs::canonicalize(source).map_err(|e| format!("open source: {e}"))?;
-    let destination =
-        std::fs::canonicalize(destination).map_err(|e| format!("open destination: {e}"))?;
-    if source == destination || destination.starts_with(&source) || source.starts_with(&destination)
-    {
-        return Err("Choose a separate destination outside the source vault.".into());
-    }
-    let has_entries = std::fs::read_dir(&destination)
-        .map_err(|e| e.to_string())?
-        .filter_map(Result::ok)
-        .any(|entry| entry.file_name().to_str() != Some(".DS_Store"));
-    if has_entries {
-        return Err("Import a copy into an empty folder.".into());
-    }
-    let mut stack = vec![(source.clone(), destination.clone())];
-    while let Some((from, to)) = stack.pop() {
-        std::fs::create_dir_all(&to).map_err(|e| format!("create {}: {e}", to.display()))?;
-        for entry in
-            std::fs::read_dir(&from).map_err(|e| format!("read {}: {e}", from.display()))?
-        {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let name = entry.file_name();
-            if name.to_str() == Some(".rotli") {
-                continue;
-            }
-            let kind = entry.file_type().map_err(|e| e.to_string())?;
-            if kind.is_symlink() || (kind.is_dir() && corpus::is_skipped_dir(&name.to_string_lossy())) {
-                continue;
-            }
-            let target = to.join(&name);
-            if kind.is_dir() {
-                stack.push((entry.path(), target));
-            } else if kind.is_file() {
-                std::fs::copy(entry.path(), &target)
-                    .map_err(|e| format!("copy {}: {e}", entry.path().display()))?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod vault_activation_tests {
-    use super::{copy_vault_tree, inspect_vault_path};
+    use super::inspect_vault_path;
 
     #[test]
-    fn inspection_is_read_only_and_copy_preserves_the_foreign_tree() {
+    fn inspection_is_read_only() {
         let temp = tempfile::TempDir::new().unwrap();
         let source = temp.path().join("obsidian");
-        let destination = temp.path().join("copy");
         std::fs::create_dir_all(source.join("Projects/Nested")).unwrap();
         std::fs::create_dir_all(source.join(".obsidian")).unwrap();
-        std::fs::create_dir_all(source.join(".rotli")).unwrap();
-        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
         std::fs::write(source.join("Projects/Nested/plan.md"), "# Plan\n").unwrap();
         std::fs::write(source.join(".obsidian/app.json"), "{}").unwrap();
-        std::fs::write(source.join(".rotli/main.json"), "old rotli state").unwrap();
-
-        std::fs::create_dir_all(source.join("Projects/node_modules/dep")).unwrap();
-        std::fs::create_dir_all(source.join(".git/objects")).unwrap();
-        std::fs::write(source.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
         std::fs::write(source.join("Projects/node_modules/dep/README.md"), "# Dep\n").unwrap();
+        // opened in place before: its sidecar doesn't make it a Rotli vault,
+        // so bringing it in still asks copy-or-in-place
+        std::fs::create_dir_all(source.join(".rotli")).unwrap();
+        std::fs::write(source.join(".rotli/main.json"), "{}").unwrap();
 
         let report = inspect_vault_path(&source).unwrap();
+        assert_eq!(report.kind, "markdown");
         assert_eq!(report.source, "Obsidian vault");
         assert_eq!(report.markdown_files, 1, "node_modules is never part of a vault");
         assert_eq!(report.folders, 2);
@@ -1368,60 +1311,7 @@ mod vault_activation_tests {
             std::fs::read_to_string(source.join("Projects/Nested/plan.md")).unwrap(),
             "# Plan\n"
         );
-
-        copy_vault_tree(&source, &destination).unwrap();
-        assert_eq!(
-            std::fs::read_to_string(destination.join("Projects/Nested/plan.md")).unwrap(),
-            "# Plan\n"
-        );
-        assert!(destination.join(".obsidian/app.json").is_file());
-        assert!(!destination.join("Projects/node_modules").exists(), "dependency folders never copy");
-        assert!(!destination.join(".git").exists(), "history folders never copy");
-        assert!(
-            !destination.join(".rotli").exists(),
-            "source-specific Rotli state must not copy"
-        );
     }
-
-    #[test]
-    fn copy_refuses_a_nonempty_destination_before_writing() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let source = temp.path().join("source");
-        let destination = temp.path().join("destination");
-        std::fs::create_dir_all(&source).unwrap();
-        std::fs::create_dir_all(&destination).unwrap();
-        std::fs::write(source.join("note.md"), "# Note\n").unwrap();
-        std::fs::write(destination.join("keep.md"), "# Keep\n").unwrap();
-
-        assert!(copy_vault_tree(&source, &destination).is_err());
-        assert_eq!(
-            std::fs::read_to_string(destination.join("keep.md")).unwrap(),
-            "# Keep\n"
-        );
-        assert!(!destination.join("note.md").exists());
-    }
-}
-
-#[tauri::command]
-async fn corpus_import_vault_copy(
-    app: AppHandle,
-    source: String,
-    destination: String,
-) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let _lane = vault_lane();
-        let authorizations = app.state::<memex::FolderAuthorizations>();
-        let source = authorizations.require(std::path::Path::new(&source))?;
-        let destination = authorizations.require(std::path::Path::new(&destination))?;
-        reject_privileged_root(&app, &source)?;
-        reject_privileged_root(&app, &destination)?;
-        flush_webviews_before_shutdown(&app)?;
-        let inspection = inspect_vault_path(&source)?;
-        copy_vault_tree(&source, &destination)?;
-        activate_vault_path_live(&app, destination, inspection.kind != "memex").map(|_| ())
-    })
-    .await
-    .map_err(|e| format!("vault import worker failed ({e})"))?
 }
 
 /// Read-only first-run gate. Unlike `corpus_list_config`, this never migrates,
@@ -1436,14 +1326,25 @@ fn corpus_status(app: AppHandle) -> bool {
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
     let development_read_only = development_read_only(&app);
-    let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
-        Some((id, p)) => (true, Some(id), Some(p)),
-        None => (false, None, None),
+    // An imported vault is not a memex to the webview: its notes go through the
+    // corpus store, never the memex note lanes (wiki/_inbox), and its Library
+    // and Librarian stay off until they learn its layout (slice 4c).
+    // Its chats still live in the vault (the role map's chats folder), so its
+    // id and perms are reported like any vault's: the webview writes chats
+    // there and routes new notes to the corpus store's Inbox.
+    let folder_roles = vault_roles::read(&cfg.corpus.abs_path);
+    let (memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+        Some((id, p)) => (Some(id), Some(p)),
+        None => (None, None),
     };
+    let is_memex = memex_id.is_some() && folder_roles.is_none();
     if development_read_only {
         perms = Some(memex::MemexPerms::ReadOnly);
     }
-    let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
+    // a folder connected in place is never organized: its switch reads off.
+    // The marker says so too (decision I), whatever corpus.json remembers.
+    let adopted = cfg.corpus.adopted || vault_roles::in_place(&cfg.corpus.abs_path);
+    let corpus_brain_enabled = !adopted && root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
             abs_path: cfg.corpus.abs_path,
@@ -1451,15 +1352,19 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             memex_id,
             perms,
             brain_enabled: corpus_brain_enabled,
+            folder_roles,
+            adopted,
         },
         brains: cfg
             .brains
             .into_iter()
             .map(|b| {
-                let brain_enabled = root_brain_enabled(&b.abs_path);
+                let adopted = vault_roles::in_place(&b.abs_path);
                 BrainRootView {
+                    brain_enabled: !adopted && root_brain_enabled(&b.abs_path),
+                    folder_roles: vault_roles::read(&b.abs_path),
+                    adopted,
                     brain: b,
-                    brain_enabled,
                 }
             })
             .collect(),
@@ -1535,6 +1440,16 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
         _ => {
             if let Some(current) = &current {
                 corpus::carry_settings(current, &abs)?;
+            }
+            // Decision I: the same layout as a copy (marker + role map, Rotli's
+            // folders suffixed), marked "in place" so the Librarian never runs
+            // here and the person's notes are never stamped. Another tool's
+            // memex.json is never replaced: that folder stays protected as it
+            // was. No seed_librarian: the switch stays off in place. The heal
+            // then gives the new marker its backup (and an empty `.obsidian/`
+            // guard, which Obsidian vaults already have) — see vault_marker.rs.
+            if vault_roles::mark_in_place(&abs)? == vault_roles::Marked::Imported {
+                vault_marker::heal_best_effort(&abs);
             }
             true
         }
@@ -1641,9 +1556,7 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
         corpus::CorpusStore::open(root.clone())?
     };
     store.warm_secure_ledger()?;
-    if adopted {
-        store.seed_main_from_disk_if_missing()?;
-    }
+    store.seed_main_if_brought_in()?;
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     if active {
         organizer.with_vault_transition(|| {
@@ -1719,9 +1632,7 @@ fn activate_vault_path_live(
             corpus::CorpusStore::open(root.clone())?
         };
         store.warm_secure_ledger()?;
-        if adopted {
-            store.seed_main_from_disk_if_missing()?;
-        }
+        store.seed_main_if_brought_in()?;
         let suppress = store.suppress_set();
         new_root = Some((store, suppress));
     }
@@ -1987,16 +1898,35 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
             "Choose or create a development vault before changing linked libraries.".into(),
         );
     }
+    forget_brain_now(&app, &id)
+}
+
+/// Take one connected vault out of Rotli: its route, its saved entry, and its
+/// asset scope. The folder and its files stay exactly where they are.
+fn forget_brain_now(app: &AppHandle, id: &str) -> Result<(), String> {
     let state = app.state::<corpus::CorpusState>();
-    let root = state.remove_registered_root(&id, || corpus::forget_root(&app, &id))?;
+    let root = state.remove_registered_root(id, || corpus::forget_root(app, id))?;
     if let Err(error) = app.asset_protocol_scope().forbid_directory(&root, true) {
         eprintln!(
             "rotli: removed vault route but could not revoke its asset scope {} ({error})",
             root.display()
         );
     }
-    chat_window::emit_corpus_changed(&app);
+    chat_window::emit_corpus_changed(app);
     Ok(())
+}
+
+/// Take the vault at `root` out of the list, if it is a connected one (a copy
+/// now stands in for it: vault_import.rs). Not connected: nothing to do.
+pub(crate) fn forget_vault_at(app: &AppHandle, root: &std::path::Path) -> Result<(), String> {
+    let same = |path: &std::path::Path| {
+        std::fs::canonicalize(path).ok() == std::fs::canonicalize(root).ok() || path == root
+    };
+    let cfg = corpus::ensure_corpus_config(app);
+    match cfg.brains.iter().find(|brain| same(&brain.abs_path)) {
+        Some(brain) => forget_brain_now(app, &brain.id.clone()),
+        None => Ok(()),
+    }
 }
 
 /// Make a connected brain the active write target. No relaunch — the frontend
@@ -2268,6 +2198,7 @@ pub fn run() {
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
+        .manage(vault_import::VaultCopyCancel::default())
         .manage(provider::ProviderState::default())
         .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
@@ -2306,7 +2237,8 @@ pub fn run() {
             corpus_list_config,
             corpus_status,
             corpus_inspect_folder,
-            corpus_import_vault_copy,
+            vault_import::corpus_copy_vault,
+            vault_import::corpus_copy_vault_cancel,
             corpus_refresh_active_vault,
             corpus_refresh_vault,
             corpus_choose_folder,
@@ -2327,6 +2259,11 @@ pub fn run() {
             app_settings::app_settings_read,
             app_settings::app_settings_write,
             corpus::corpus_list,
+            corpus::raw::corpus_list_root,
+            folder_window::folder_window_add_as_vault,
+            folder_window::folder_window_close,
+            finder_quick_action::finder_quick_action_status,
+            finder_quick_action::finder_quick_action_set,
             corpus::corpus_search,
             corpus::corpus_read,
             corpus::corpus_open_file,
@@ -2348,6 +2285,7 @@ pub fn run() {
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
+            corpus::files::corpus_import_board,
             corpus_pick_images,
             pasteboard::clipboard_has_files,
             pasteboard::clipboard_file_paths,
@@ -2391,7 +2329,9 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
-            corpus::alias_cleanup::corpus_alias_cleanup,
+            corpus::note_pass::corpus_vault_pass,
+            corpus::person_sinks::corpus_person_sinks,
+            corpus::person_sinks::corpus_adopt_person_sinks,
             corpus::rules_store::corpus_secure_by_keywords,
             breve::breve_snapshot,
             breve::breve_import_legacy,
@@ -2450,6 +2390,7 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            share_sheet::share_text,
             ai_files::corpus_create_managed_file_ai,
             ai_files::corpus_write_file_ai,
             pinned_site::pinned_sites_supported,
@@ -2636,7 +2577,7 @@ pub fn run() {
             let warm_app = app.handle().clone();
             std::thread::spawn(move || {
                 let state = warm_app.state::<corpus::CorpusState>();
-                let try_warm = |(id, adopted): &(String, bool)| {
+                let try_warm = |(id, _): &(String, bool)| {
                     if !state.contains_root(id).unwrap_or(true) {
                         return secret::Warm::Gone;
                     }
@@ -2647,10 +2588,8 @@ pub fn run() {
                         eprintln!("rotli: secure-note ledger not warm for root {id} ({e}); egress stays closed, retrying");
                         return secret::Warm::Failed;
                     }
-                    if *adopted {
-                        if let Err(e) = state.route(id, |store| store.seed_main_from_disk_if_missing()) {
-                            eprintln!("rotli: could not mirror adopted vault {id} into Main ({e})");
-                        }
+                    if let Err(e) = state.route(id, |store| store.seed_main_if_brought_in()) {
+                        eprintln!("rotli: could not mirror vault {id} into Main ({e})");
                     }
                     secret::Warm::Done
                 };
@@ -2702,7 +2641,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
                     for url in event.urls() {
-                        handle_deep_link(&handle, &url);
+                        open_requests::handle_deep_link(&handle, &url);
                     }
                 });
                 // cold start: a click LAUNCHED the app — sweep the URLs that
@@ -2710,7 +2649,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 if let Ok(Some(urls)) = app.deep_link().get_current() {
                     for url in urls {
-                        handle_deep_link(&handle, &url);
+                        open_requests::handle_deep_link(&handle, &url);
                     }
                 }
             }
@@ -2904,10 +2843,18 @@ pub fn run() {
                         chat_window::request_regroup(window.app_handle());
                         return;
                     }
+                    if folder_window::is_folder_window(window.label()) {
+                        folder_window::close(window.app_handle(), window.label());
+                        return;
+                    }
                     let _ = window.hide();
                     return;
                 }
                 WindowEvent::Focused(false) => {}
+                WindowEvent::Destroyed if folder_window::is_folder_window(window.label()) => {
+                    folder_window::unmount(window.app_handle(), window.label());
+                    return;
+                }
                 _ => return,
             }
             match window.label() {

@@ -8,16 +8,17 @@ import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 
 import { modelLabel, modelProvider } from "../../ai/models";
-import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
+import { chatsDirOf } from "../../memex/config";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import {
   assignChatToFolder,
+  chatActivityMs,
   createChatFolder,
   deleteChatFolder,
   renameChatFolder,
@@ -28,9 +29,10 @@ import { assignChatToView, chatAssignedView, viewChats } from "../../services/vi
 import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
 import { useIsHidden } from "../../state/hidden";
-import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
+import { leaves, useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
+import { useChatFirstVisitDone } from "../chat/chatConnectModels";
 import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
@@ -39,8 +41,9 @@ import { chatMark } from "./chatMark";
 import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
 import { OverviewCard } from "./overviewCard";
-import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
+import { useConnectVault } from "./useConnectVault";
 
 /** Where a dragged chat would land: a folder row (positional reordering retired 2026-08-03). */
 type ChatDrop = { kind: "folder"; id: string };
@@ -56,9 +59,32 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const expandedDests = useUiStore((s) => s.expandedDests);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
+  // no vault yet: connect one right here (the vault menu's Connect flow)
+  const { connectVault } = useConnectVault();
   const sidebarFolderNonce = useUiStore((s) => s.sidebarFolderNonce);
   const openContextMenu = useContextMenu((s) => s.open);
   const openChat = usePanesStore((s) => s.openChat);
+  // New chat starts a chat, past the first-visit chooser (chatConnectModels.tsx)
+  const newChat = () => {
+    useChatFirstVisitDone.getState().show();
+    openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined);
+  };
+  // the first time Chat opens in a vault with no chats, land on a new chat
+  // (with the model chooser) instead of an empty pane — once per session
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    // the Mac app's first-visit chooser is where this leads; Rotli Web keeps its own guide
+    if (PLATFORM !== "desktop" || autoOpened.current || !chats.activeMemex || !chats.chatsLoaded) return;
+    if (chats.chatList.length !== 0) return;
+    if (
+      leaves(usePanesStore.getState().root).some((leaf) =>
+        leaf.tabs.some((tab) => tab.surfaceKind === "chat"),
+      )
+    )
+      return;
+    autoOpened.current = true;
+    openChat(null, { vaultId: chats.activeMemex.id });
+  }, [chats.activeMemex, chats.chatsLoaded, chats.chatList.length, openChat]);
   const focusedChatSlug = useFocusedChatSlug();
   const chatRename = useChatRename();
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
@@ -106,11 +132,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     setActiveView(null);
     setContentView("allChats");
   };
-
-  // One clearly separated activity lane holds every run seen this session.
-  // Completed work stays discoverable instead of disappearing the instant it
-  // settles; the canonical row still remains inside its recency-sorted folder.
-  const activityChats = chatList.filter((c) => inView(c) && runs[runKeyOf(c.slug)] !== undefined);
 
   // the header's New-folder button, while Chat is the active front, mints a
   // CHAT folder and opens its rename inline — the nonce is the seam between
@@ -300,7 +321,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         label: "Copy file path",
         onClick: () => {
           if (activeMemex) {
-            void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
+            void navigator.clipboard.writeText(`${activeMemex.root}/${chatsDirOf(activeMemex)}/${c.slug}.md`);
           }
         },
       },
@@ -323,12 +344,14 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     ]);
   };
 
-  // one chat row, shared by folder groups and the loose list below them.
-  // `hoisted` marks the COPY the Activity lane lifts to the top: the same chat
-  // still sits in its real folder below, and only that canonical row carries
-  // the selected highlight — two lit rows for one open chat read as a bug.
-  const renderChatRow = (c: MemexChatSummary, folderId: string | null, hoisted = false) =>
-    chatRename.renamingChatSlug === c.slug ? (
+  // one chat row, shared by folder groups and the loose list below them. Each
+  // chat appears exactly once: the session Activity lane that hoisted copies
+  // to the top is retired (the owner, 2026-10-15) — the row's own dot says
+  // Working or Unread reply, and the reply-recency order lifts it.
+  const renderChatRow = (c: MemexChatSummary, folderId: string | null) => {
+    const signal = chatRowSignal(runs[runKeyOf(c.slug)]);
+    const selected = contentView === "panes" && focusedChatSlug === c.slug;
+    return chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
         key={c.slug}
         className="sb-chatrename"
@@ -344,9 +367,9 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         /* a chat row lights only while the PANES actually show it — never
            alongside an active All-chats (or other) view (the maintainer, 2026-07-30:
            two highlights at once read as wrong) */
-        className={`sb-chatrow${folderId ? " in-folder" : ""}${
-          !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
-        }${dragSlug === c.slug ? " dragging" : ""}`}
+        className={`sb-chatrow${folderId ? " in-folder" : ""}${selected ? " sel" : ""}${
+          dragSlug === c.slug ? " dragging" : ""
+        }`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
           if (didDragRef.current) return;
@@ -362,10 +385,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         <button
           type="button"
           className="sb-chatrow-open"
-          aria-label={`Open chat ${c.title || c.slug}`}
-          aria-current={
-            !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? "page" : undefined
-          }
+          aria-label={`Open chat ${c.title || c.slug}${signal ? `, ${signal.label}` : ""}`}
+          aria-current={selected ? "page" : undefined}
           title={c.title || c.slug}
         />
         {(() => {
@@ -390,46 +411,40 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           );
         })()}
         <span className="fname">{c.title || c.slug}</span>
-        {(() => {
-          // A live session status is the newest fact. Otherwise the right edge
-          // carries compact file activity; hovering or focusing swaps that fact
-          // for one stable action slot without moving the title.
-          const run = runs[runKeyOf(c.slug)];
-          return (
-            <>
-              {hoisted && run === "running" && (
-                <span className="sb-chatstatus running" role="status">
-                  Working
-                </span>
-              )}
-              {hoisted && run === "unread" && <span className="sb-chatstatus unread">New</span>}
-              {hoisted && run === "done" && <span className="sb-chatstatus done">Done</span>}
-              {!hoisted && (
-                <span className="sb-chattrail">
-                  <span className="sb-chattime">{relativeChatAge(now, c.modifiedMs)}</span>
-                  <button
-                    type="button"
-                    className="sb-chataction"
-                    aria-label={`More actions for ${c.title || c.slug}`}
-                    title="More actions"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      openChatActions(c, rect.right, rect.bottom);
-                    }}
-                  >
-                    <MoreGlyph size={14} />
-                  </button>
-                </span>
-              )}
-            </>
-          );
-        })()}
+        {/* The right edge carries the live signal dot (Working pulses, an
+            Unread reply holds still in accent) beside the age of the last
+            reply; hovering or focusing swaps the age for one stable action
+            slot without moving the title. Nothing here ever truncates. */}
+        <span className="sb-chattrail">
+          {signal && (
+            <span
+              className={`sb-chatsignal ${signal.kind}`}
+              role="img"
+              aria-label={signal.label}
+              title={signal.label}
+            />
+          )}
+          <span className="sb-chattime">{relativeChatAge(now, chatActivityMs(c))}</span>
+          <button
+            type="button"
+            className="sb-chataction"
+            aria-label={`More actions for ${c.title || c.slug}`}
+            title="More actions"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              openChatActions(c, rect.right, rect.bottom);
+            }}
+          >
+            <MoreGlyph size={14} />
+          </button>
+        </span>
         {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
       </div>
     );
+  };
 
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
@@ -462,12 +477,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             ]}
           />
         )}
-        <button
-          type="button"
-          className="sb-chatnew"
-          data-hotkey="chat.new"
-          onClick={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
-        >
+        <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={newChat}>
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
@@ -482,12 +492,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           <SearchGlyph size={14} />
           <span className="fname">All chats</span>
         </button>
-        <ChatViewPicker
-          onNewChat={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
-        />
+        <ChatViewPicker onNewChat={newChat} />
         {!activeMemex ? (
-          <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
-            Choose a vault in Settings → Location
+          <button
+            type="button"
+            className="sb-chat-empty"
+            onClick={() =>
+              void connectVault().catch((err: unknown) =>
+                setRowActionError(
+                  `Couldn't connect that folder — ${err instanceof Error ? err.message : String(err)}`,
+                ),
+              )
+            }
+          >
+            Connect vault
           </button>
         ) : chatList.length === 0 ? (
           <p className="sb-empty">No chats yet.</p>
@@ -497,16 +515,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           </p>
         ) : (
           <>
-            {activityChats.length > 0 && (
-              <div className="sb-chatfolder sb-chatactivity">
-                <div className="sb-chatrow sb-chatfolder-row unreadhead" aria-hidden="true">
-                  <span className="sb-activity-mark" />
-                  <span className="fname">Activity</span>
-                  <span className="sb-chatfolder-n">{activityChats.length}</span>
-                </div>
-                {activityChats.map((c) => renderChatRow(c, null, true))}
-              </div>
-            )}
             {grouped.folders.map(({ folder, chats: allFolderChats }) => {
               // an active view narrows every group to its own chats; a folder
               // with none simply doesn't render while the view is on

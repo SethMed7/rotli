@@ -187,6 +187,7 @@ fn empty_board_scene_matches_fixture() {
     );
 }
 
+
 #[test]
 fn board_lane_matches_fixture() {
     assert_eq!(entry("boardLane").as_str(), Some(crate::corpus::BOARD_LANE));
@@ -489,6 +490,12 @@ fn note_date_stamps_match_fixture() {
     }
 }
 
+/// A file opened from Finder mounts under the same root prefix on both sides.
+#[test]
+fn raw_root_prefix_matches() {
+    assert_eq!(entry("rawRootPrefix"), crate::corpus::raw::RAW_ROOT_PREFIX);
+}
+
 /// The Graph view's edges: both link readers agree on every fixture body.
 #[test]
 fn wikilink_targets_fixtures_agree() {
@@ -580,3 +587,8 @@ fn note_filename_slugs_match_fixture() {
         assert_eq!(crate::corpus::slugify(title), slug, "{title:?}");
     }
 }
+
+#[path = "parity_link_secret_tests.rs"]
+mod link_secret;
+#[path = "parity_vault_tests.rs"]
+mod vault;

@@ -57,6 +57,27 @@ describe("Hand to AI — the files a note links to", () => {
     expect(result.prompt).toContain("![Overlap](</Synthetic Vault/storage/shot.png>)");
   });
 
+  test("a path written from the note (Rotli's new image link) is found, not refused", async () => {
+    const note = await notesService.createNote(
+      DEST.inbox,
+      "# Login\n\nFix it.\n\n![Overlap](../storage/shot.png)",
+    );
+    const folder = note.diskFolderId ?? note.folderId;
+    expect(attachmentIsSecure("../storage/shot.png", [], folder)).toBe(false);
+    const result = await handToAiFor(note.id, locate);
+    expect(result.kind).toBe("ready");
+    if (result.kind !== "ready") return;
+    expect(result.paths).toEqual(["/Synthetic Vault/storage/shot.png"]);
+  });
+
+  test("a secure file is refused whichever way its link is read", () => {
+    expect(attachmentIsSecure("../Secure notes/w2.png", [], "Inbox")).toBe(true);
+    expect(attachmentIsSecure("Secure notes/w2.png", [], "Inbox")).toBe(true);
+    expect(attachmentIsSecure("img/passwords.png", ["passwords"], "Garden")).toBe(true);
+    expect(attachmentIsSecure("../../../escape.png", [], "Inbox")).toBe(true);
+    expect(attachmentIsSecure("img/rose.png", ["passwords"], "Garden")).toBe(false);
+  });
+
   test("a note linking a file in a secure folder is refused, and nothing is located", async () => {
     let asked = 0;
     const counting: LocateAttachment = (...args) => {

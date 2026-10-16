@@ -259,6 +259,7 @@ interface PersistedSettings {
   /** Null means disabled. These remain vault-scoped because their effects are
    * limited to the active vault's projection and chat lifecycle lane. */
   mainAutoRemoveDays: number | null;
+  personSinksAnswer: string | null;
   chatAutoArchiveDays: number | null;
   /** The model a NEW chat starts on — the last one picked anywhere (id from
    * ~/.memex/ai or a connected lane); null = the model store's default. */
@@ -657,6 +658,7 @@ export function parseSettings(raw: string): PersistedSettings {
     quickFolder,
     quickVaultId,
     captureVaultId,
+    personSinksAnswer: typeof data.personSinksAnswer === "string" ? data.personSinksAnswer : null,
     // missing keys default — old configs predate the single sidebar, never crash
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
@@ -790,6 +792,7 @@ function applySettings(s: PersistedSettings): void {
     quickFolder: s.quickFolder,
     quickVaultId: s.quickVaultId,
     captureVaultId: s.captureVaultId,
+    personSinksAnswer: s.personSinksAnswer,
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
     sidebarZoom: s.sidebarZoom,
@@ -1523,6 +1526,7 @@ function settingsSnapshot(): string {
     quickFolder: ui.quickFolder,
     quickVaultId: ui.quickVaultId,
     captureVaultId: ui.captureVaultId,
+    personSinksAnswer: ui.personSinksAnswer,
     sidebarCollapsed: ui.sidebarCollapsed,
     sidebarWidth: ui.sidebarWidth,
     sidebarZoom: ui.sidebarZoom,

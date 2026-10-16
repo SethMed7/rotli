@@ -276,7 +276,7 @@ previews".
 | Development-only gate | `launchFeatures().jsonCanvas` (desktop and development) |
 
 Theme colors for canvas painters now come from one resolver,
-`src/brand/tokenColors.ts`, which the onboarding banner shares.
+`src/brand/tokenColors.ts`.
 
 **Not built in the spike:**
 
@@ -315,6 +315,13 @@ spike.
     build opens canvases.
   - `services/folderCanvases.ts` reads it, saves it with a revision check,
     and creates it.
+- **Builds without canvases** (the public channel; the owner, 2026-10-15):
+  a `.canvas` is withheld, not shown as an ordinary file. The Mac walk skips
+  it (`corpus_files.rs` `is_withheld_canvas`), so it is in no listing and
+  never seeded into Main; Rotli Web's walk skips it the same way; and a tab
+  restored from an older session shows its name and a "coming soon" line
+  (`fileKind.ts` `canvasFileMode`), never the raw JSON. The file stays on
+  disk untouched.
 
 ### Naming
 

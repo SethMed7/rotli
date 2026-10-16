@@ -68,14 +68,19 @@ import {
   localQueuePrioritize,
   onLocalQueue,
 } from "../../lib/tauri";
-import { CORPUS_INSTANCE_ID, activeInstance } from "../../memex/config";
+import { CORPUS_INSTANCE_ID, activeInstance, storageDirOf } from "../../memex/config";
 import {
   type ChatArtifact,
   hasSecureContext,
   parseChatArtifacts,
   parseChatArtifactTurns,
 } from "../../memex/contract";
-import { readChat, registerChatArtifact, registerChatArtifactTurn, writeNote } from "../../memex/service";
+import {
+  dropBlockedExchange,
+  readChat,
+  registerChatArtifact,
+  registerChatArtifactTurn,
+} from "../../memex/service";
 import {
   useInstanceChats,
   useMemexConfig,
@@ -96,12 +101,12 @@ import {
 } from "../../services/chatFolders";
 import { syncChatModelMeta } from "../../services/chatModelMeta";
 import { useConnectedLanes } from "../../services/connectedModels";
+import { createChatNote } from "../../services/createNote";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
-import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
@@ -131,12 +136,14 @@ import {
 import { WebDialogFrame } from "../webDialogFrame";
 import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
-import { ChatBuddy, useJustFinished } from "./chatBuddy";
+import { ChatBuddy, ChatLiveEdge, useJustFinished } from "./chatBuddy";
 import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
+import { ChatFirstVisit, firstVisitShows, useChatFirstVisitDone } from "./chatConnectModels";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
+import { ChatNoVault, ChatUnavailable } from "./chatEmptyStates";
 import { UserMessageText } from "./chatImageRefs";
 import {
   WEB_IMAGES_NEED_THE_MAC_APP,
@@ -145,7 +152,15 @@ import {
   pastedChatImages,
   removeChatDraftImage,
 } from "./chatImageTokens";
-import { ModelPicker } from "./chatModelPicker";
+import { ModelPicker, shortModelLabel } from "./chatModelPicker";
+import {
+  type BlockedAction,
+  ChatBlockedBar,
+  ChatEditPermission,
+  lastBlocked,
+  typedConsent,
+  useEditPermission,
+} from "./chatPermissionBar";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
 import {
@@ -1079,6 +1094,8 @@ export function ChatSurface({
     : null;
   const mediaRoot = active && active.id !== CORPUS_INSTANCE_ID ? `${active.id}:` : "";
   const chats = useInstanceChats(active);
+  // the first time Chat opens in a vault, connecting comes before a new chat (chatConnectModels.tsx)
+  const firstVisitDone = useChatFirstVisitDone((state) => state.open);
   const write = useWriteChat();
   const updateTitle = useUpdateChatTitle();
   // The stored title is presentation; attachment identity is the note stem.
@@ -1189,6 +1206,7 @@ export function ChatSurface({
   const images = draft.images;
   const pendingQuestion = draft.questionKey === chatKeyId ? draft.question : null;
   const [messages, setMessages] = useState<Msg[]>([]);
+  const editPermission = useEditPermission();
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0);
   // The draft store clears as soon as the first prompt sends. Keep the title
   // chosen/derived for the brief pre-bind interval so the real input retires
@@ -1488,11 +1506,22 @@ export function ChatSurface({
     el.style.height = `${el.scrollHeight}px`;
   }, [message]);
 
-  const send = async (answer?: string) => {
+  // a held-back message: send it anyway, wait out startup, or take it back to edit
+  const blocked = lastBlocked(messages);
+  const onBlocked = async (action: BlockedAction) => {
+    if (!blocked || !active) return;
+    const base = messages.slice(0, -2);
+    setMessages(base);
+    if (chatSlug) await dropBlockedExchange(active, chatSlug).catch(() => undefined);
+    if (action === "edit") setDraftMessage(tabId, blocked.text);
+    else void send(blocked.text, { base, consent: action === "send-anyway" });
+  };
+  const send = async (answer?: string, retry?: { base: Msg[]; consent: boolean }) => {
+    const prior = retry?.base ?? messages;
     const typed = (answer ?? message).trim();
     const imgs = answer === undefined ? images : [];
     const createdArtifacts: ChatArtifact[] = [];
-    const assistantTurn = messages.filter((item) => item.speaker !== "you").length;
+    const assistantTurn = prior.filter((item) => item.speaker !== "you").length;
     const userAt = new Date().toISOString();
     // an image with no words is a real message ("what is this?") — the guard
     // used to require text, so attaching a picture and pressing send did nothing
@@ -1590,7 +1619,7 @@ export function ChatSurface({
     lastSentRef.current = { text: typed, images: imgs };
     clearDraft(tabId);
     // history = the prior turns; the new user message rides as runAgent's userText
-    const history: ChatTurn[] = messages.map((m) => ({
+    const history: ChatTurn[] = prior.map((m) => ({
       role: m.speaker === "you" ? "user" : "assistant",
       text: m.text,
     }));
@@ -1735,8 +1764,11 @@ export function ChatSurface({
     // same run already sees the secure context (PR #4 P1)
     const isSecureContext = () => secureReadRef.current || attachedSecure;
     const webSearchProvider = useUiStore.getState().webSearchProvider;
+    const consent = retry?.consent ? typedConsent(prior, [userText, providerUserText]) : undefined;
     const baseOpts = {
       requestId,
+      ...(consent ? { consent } : {}),
+      confirmEdit: editPermission.ask,
       ...(turnModel.id === picked.id && reasoningEffort ? { reasoningEffort } : {}),
       ...(turnModel.id === picked.id && serviceTier ? { serviceTier } : {}),
       onSecureNoteRead,
@@ -1776,6 +1808,7 @@ export function ChatSurface({
         ? runNativeAgent(makeTauriHost(turnModel, hostOpts), claudeSession(requestId), runInput, {
             modelId: turnModel.id,
             ...(baseOpts.reasoningEffort ? { reasoningEffort: baseOpts.reasoningEffort } : {}),
+            ...(consent ? { consent } : {}),
             isSecureContext,
           })
         : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
@@ -1815,7 +1848,7 @@ export function ChatSurface({
     const failed = reply.startsWith("⚠");
     const assistantAt = new Date().toISOString();
     const settledThread = recentChatThread([
-      ...messages,
+      ...prior,
       { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.id || image.src) },
       {
         speaker: "rotli",
@@ -1867,7 +1900,7 @@ export function ChatSurface({
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
     // a failed exchange (the ⚠ notice AND the turn it answered) never reaches
     // the notes model — a replayed safeguard error re-trips the safeguard
-    const memoryTurns = withoutFailedExchanges([...messages, ...turn], (m) => m.speaker === "rotli");
+    const memoryTurns = withoutFailedExchanges([...prior, ...turn], (m) => m.speaker === "rotli");
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)
@@ -2053,6 +2086,7 @@ export function ChatSurface({
     runSeq.current++;
     if (requestRef.current) {
       void cliCancel(requestRef.current).catch(() => {});
+      editPermission.answer("no"); // a stopped turn edits nothing
       // take it out of the local-compute line if it was waiting AND flag a
       // running local stream to abort mid-token (drops the socket, frees the slot)
       void localQueueCancel(requestRef.current).catch(() => {});
@@ -2183,11 +2217,11 @@ export function ChatSurface({
 
   useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
 
-  // this chat's generated assets: everything under storage/chats/<slug>/ in the
+  // this chat's generated assets: everything under <storage>/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
   const assetPrefix =
     active && chatSlug
-      ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}storage/chats/${chatSlug}/`
+      ? `${active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`}${storageDirOf(active)}/chats/${chatSlug}/`
       : null;
   const artifacts = useMemo(() => {
     const next = [...artifactRefs];
@@ -2217,6 +2251,11 @@ export function ChatSurface({
   }, [artifactRevealKey, artifacts.length, artifactsCompact]);
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
   const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
+  const firstVisit = firstVisitShows({
+    pristine: pristineChat,
+    chatCount: chats.data?.length,
+    done: firstVisitDone,
+  });
   const welcomeHour = new Date().getHours();
   const lastMessage = messages.at(-1);
   const lastSpeaker = lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null;
@@ -2266,15 +2305,10 @@ export function ChatSurface({
     setNoteErr(null);
     try {
       const name = storedTitle || chatSlug.replace(/-/g, " ");
-      const { id, stem } = await writeNote({
-        instance: active,
-        body: `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`,
-        shelf: [], // a chat's note is not a capture
-      });
+      // not a capture: a Rotli vault's Library lane, or a brought-in vault's Inbox
+      const { id: noteId, stem } = await createChatNote(active, `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`);
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();
-      const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
-      const noteId = `${prefix}${id}`;
       rememberChatNote(chatSlug, noteId);
       openAttachedNote(noteId);
     } catch (e) {
@@ -2446,27 +2480,9 @@ export function ChatSurface({
       </header>
 
       {!runtimeAvailable ? (
-        <div className="list-empty chat-empty">
-          <ChatBuddy moment="unavailable" hour={welcomeHour} size={120} />
-          {PLATFORM === "web" ? (
-            <>
-              <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
-              <button type="button" className="chat-cta" onClick={() => useChatSetupGuide.getState().show()}>
-                Set up chat on the web
-              </button>
-            </>
-          ) : (
-            <p>Chat uses your vault as context — it runs in the app.</p>
-          )}
-        </div>
+        <ChatUnavailable hour={welcomeHour} />
       ) : !active ? (
-        <div className="list-empty chat-empty">
-          <ChatBuddy moment="no-vault" hour={welcomeHour} size={120} />
-          <p>No vault connected yet.</p>
-          <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
-            Connect one in Settings → Location
-          </button>
-        </div>
+        <ChatNoVault hour={welcomeHour} />
       ) : (
         <main className="chat-main">
           <div className={pristineChat ? "chat-conversation is-new" : "chat-conversation"}>
@@ -2500,6 +2516,9 @@ export function ChatSurface({
                     </div>
                     {!pristineChat && (
                       <p className="chat-sub">This saved chat is ready for its first message.</p>
+                    )}
+                    {catalogSettled && picked && firstVisit && (
+                      <ChatFirstVisit modelLabel={shortModelLabel(picked.label)} />
                     )}
                     {catalogSettled && !picked && (
                       <ChatSetupGuide secureOnly={secureChat} onOpenSettings={() => setSettingsOpen(true)} />
@@ -2541,7 +2560,10 @@ export function ChatSurface({
                       <div className="cmsg-bubble">{renderMessage(streamingText, mediaRoot)}</div>
                     </div>
                   )}
-                {working && !streamingText && (
+                {/* the working line rides beside the buddy at the live edge
+                    (ChatLiveEdge); only a queued send, or a run with no edge
+                    buddy, keeps its own bubble here */}
+                {working && !streamingText && (queued || !buddy.edge) && (
                   <div className="cmsg ai">
                     {queued ? (
                       // waiting on measured compute headroom, not thinking — say
@@ -2575,9 +2597,11 @@ export function ChatSurface({
                   </div>
                 )}
                 {buddy.edge && (
-                  <div className="chat-buddy-row" data-moment={buddy.edge}>
-                    <ChatBuddy moment={buddy.edge} hour={welcomeHour} size={72} className="chat-endmark" />
-                  </div>
+                  <ChatLiveEdge
+                    moment={buddy.edge}
+                    hour={welcomeHour}
+                    status={working && !streamingText && !queued ? status : null}
+                  />
                 )}
                 {saveErr && (
                   <p className="file-err chat-save-err" role="alert">
@@ -2606,8 +2630,18 @@ export function ChatSurface({
             {!busy && pendingQuestion && (
               <ChatClarificationBar question={pendingQuestion} onAnswer={(answer) => void send(answer)} />
             )}
+            {editPermission.pending && (
+              <ChatEditPermission
+                request={editPermission.pending}
+                allowOnce={PLATFORM === "desktop"}
+                onAnswer={editPermission.answer}
+              />
+            )}
+            {!busy && blocked && (
+              <ChatBlockedBar kind={blocked.kind} onAction={(action) => void onBlocked(action)} />
+            )}
 
-            {writable ? (
+            {firstVisit ? null : writable ? (
               <>
                 <div className="chat-composer">
                   <div className="chat-composer-inner">
@@ -2698,7 +2732,9 @@ export function ChatSurface({
                         ref={msgRef}
                         className="chat-msg"
                         rows={1}
-                        placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
+                        placeholder={
+                          working ? "Write your next message…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"
+                        }
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
                         onPaste={onComposerPaste}

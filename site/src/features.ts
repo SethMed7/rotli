@@ -539,14 +539,14 @@ const FEATURES: Feature[] = [
   {
     id: 'views',
     area: 'organizing',
-    name: 'Main, views, and the Vault view',
+    name: 'Main, views, and Raw data',
     line: 'Arrange the notes you reach for by hand, give a project its own view, or see the folders as they are on disk.',
     status: 'Shipped',
     runs: 'both',
     icon: ICON.views,
     body: [
       'Main is your own shelf: the notes you reach for, in the order you set. A named view gives a project or a client a focused Main of its own, and new notes follow the view you are in. A note in a view is the same file on disk, never a copy.',
-      'The Vault view shows the vault’s real folders and files, the way Finder does. Removing a note from Main only takes it out of view; the file stays.',
+      'Raw data, in the same menu, shows the vault’s real folders and files, the way Finder does. Removing a note from Main only takes it out of view; the file stays.',
     ],
     use: [
       { keys: '⌘⇧W', text: 'Switch views.' },

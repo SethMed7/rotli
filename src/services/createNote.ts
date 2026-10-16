@@ -5,7 +5,14 @@
 // entry point (⌘N, the + menu, …) routes identically.
 
 import type { NoteCreator } from "../lib/aiEditPolicy";
-import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
+import { corpusNotePath, isTauri } from "../lib/tauri";
+import {
+  CORPUS_INSTANCE_ID,
+  type MemexInstance,
+  activeInstance,
+  isWritable,
+  noteLaneWritable,
+} from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
 import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
 import { VAULT_MARKER, isHidden, isStorageLane, isVault, isWikiPath } from "./destinations";
@@ -103,7 +110,8 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
     selectedFolderId,
     opts.secure === undefined ? undefined : { secure: opts.secure },
   );
-  const route = routeDecision(selectedFolderId, isSmart, !!(active && isWritable(active)), localFallback);
+  // a brought-in vault takes the corpus store (its Inbox), never wiki/_inbox
+  const route = routeDecision(selectedFolderId, isSmart, noteLaneWritable(active), localFallback);
 
   if (route.kind === "memex" && active) {
     const { id } = await writeNote({
@@ -118,9 +126,41 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
     const prefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
     return `${prefix}${id}`;
   }
-  const note = await notesService.createNote(route.kind === "local" ? route.folder : localFallback, body, {
+  // pinned to a connected brought-in vault: its own Inbox, never the default root
+  const pinned = opts.rootId && active && active.id !== CORPUS_INSTANCE_ID ? active : null;
+  const folder = pinned
+    ? `${pinned.id}:${pinned.folderRoles?.inbox ?? "Inbox"}`
+    : route.kind === "local"
+      ? route.folder
+      : localFallback;
+  const note = await notesService.createNote(folder, body, {
     secure,
     ...(opts.createdBy ? { createdBy: opts.createdBy } : {}),
   });
   return note.id;
+}
+
+/** A note a chat makes in its vault (its memory note, "save chat as note"):
+ * the Library lane in a Rotli vault; in a brought-in vault (copy or in
+ * place) the corpus store's Inbox, so no `wiki/` tree is ever made there.
+ * Returns the note's wire id and the file stem the chat attaches to. */
+export async function createChatNote(
+  instance: MemexInstance,
+  body: string,
+  createdBy?: NoteCreator,
+): Promise<{ id: string; stem: string }> {
+  const prefix = instance.id === CORPUS_INSTANCE_ID ? "" : `${instance.id}:`;
+  if (noteLaneWritable(instance)) {
+    const created = await writeNote({ instance, body, shelf: [], ...(createdBy ? { createdBy } : {}) });
+    return { id: `${prefix}${created.id}`, stem: created.stem };
+  }
+  const inbox = instance.folderRoles?.inbox ?? "Inbox";
+  const note = await notesService.createNote(
+    `${prefix}${inbox}`,
+    body,
+    createdBy ? { createdBy } : undefined,
+  );
+  const path = isTauri() ? await corpusNotePath(note.id) : note.id;
+  const stem = path.split("/").pop()?.replace(/\.md$/i, "") || note.aliases?.[0] || "note";
+  return { id: note.id, stem };
 }

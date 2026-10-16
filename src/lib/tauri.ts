@@ -13,6 +13,7 @@ import type {
   BreveBackfillResult,
   BreveDeliverySettings,
 } from "../routines/breveTypes";
+import { type FolderRoles, folderRoles } from "../services/destinations";
 import type { SearchHit, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
@@ -657,6 +658,8 @@ export function cliComplete(args: {
    * passes them on lanes with a native image flag (codex `-i`); other lanes
    * ignore them rather than pretending to see (2026-08-04). */
   images?: string[];
+  /** The person's own messages they chose to send anyway (src-tauri/src/remote_block.rs). */
+  consent?: string[];
 }): Promise<string> {
   return aiInvoke("cli_complete", { ...args });
 }
@@ -822,6 +825,16 @@ export function openUrl(url: string): Promise<void> {
   });
 }
 
+/** The macOS share sheet (share_sheet.rs) beside `anchor`, a rect in this
+ * webview's CSS pixels. Rust takes a short line and one https link only. */
+export function shareText(
+  text: string,
+  url: string,
+  anchor: { x: number; y: number; width: number; height: number },
+): Promise<void> {
+  return corpusInvoke<void>("share_text", { text, url, anchor });
+}
+
 export interface PrivateBrowserBounds {
   x: number;
   y: number;
@@ -955,6 +968,13 @@ export async function corpusOpenFile(id: string): Promise<void> {
 export async function corpusImportFile(rootId: string, path: string): Promise<string> {
   if (!isTauri()) return "";
   return invoke<string>("corpus_import_file", { rootId, path });
+}
+
+/** Import a dropped `.excalidraw` file as an editable board (copied into the
+ * vault's board home; the original is untouched). Uses the drop's one-shot
+ * grant, like any dropped file. Mac app only. */
+export function corpusImportBoard(rootId: string, path: string): Promise<CorpusNoteMeta> {
+  return invoke<CorpusNoteMeta>("corpus_import_board", { rootId, path });
 }
 
 /** Open Finder for one or more images. Rust returns only canonical paths with
@@ -1460,6 +1480,8 @@ export function corpusWriteAi(
   body: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
   expectedRevision: string,
+  /** The person said "Allow once" when the chat asked (ai/editGate.ts). Desktop only. */
+  consented = false,
 ): Promise<CorpusWriteResult> {
   // Rotli Web has no Rust gate: its AI corpus runs the same policy itself
   if (!isTauri()) {
@@ -1472,6 +1494,7 @@ export function corpusWriteAi(
     modelId: model.id,
     endpoint: model.endpoint,
     expectedRevision,
+    consented,
   });
 }
 
@@ -1578,6 +1601,10 @@ export interface ConnectedBrain {
   /** The vault's Librarian switch — a per-root display fact the view derives
    * from that root's own settings sidecar (never stored in corpus.json). */
   brainEnabled: boolean;
+  /** A brought-in vault's own folders by role; null for a Rotli vault. */
+  folderRoles?: FolderRoles | null;
+  /** Connected in place (its marker says so): the Librarian never runs there. */
+  adopted?: boolean;
 }
 
 /** The active corpus, enriched with whether it IS a memex (derived) + its perms. */
@@ -1585,10 +1612,14 @@ export interface CorpusRefView {
   absPath: string;
   isMemex: boolean;
   memexId: string | null;
-  /** when isMemex: "chats+inbox" | "read-only"; else null */
+  /** a vault's (a Rotli vault's, or a brought-in one's) write perms; null for a plain folder */
   perms: MemexPerms | null;
   /** The active vault's Librarian switch (see ConnectedBrain.brainEnabled). */
   brainEnabled: boolean;
+  /** An imported vault's own folders by role (services/destinations.ts); null otherwise. */
+  folderRoles?: FolderRoles | null;
+  /** A folder opened in place (protected): the Librarian never organizes it. */
+  adopted?: boolean;
 }
 
 /** The whole Location config (the one place "where do my notes live" is decided). */
@@ -1653,6 +1684,9 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
         memexId: isWebVault() ? "browser-vault" : null,
         perms: isWebVault() ? "chats+inbox" : null,
         brainEnabled: true,
+        // a brought-in folder's role map (read from its marker at load):
+        // its new notes go to its Inbox, never a wiki/ lane
+        folderRoles: folderRoles(),
       },
       brains: [],
       folders: [],
@@ -1879,6 +1913,9 @@ export interface MemexChatSummary {
   path: string;
   /** fs mtime in ms (0 when unreadable) — ⌥A summon-chat picks the newest. */
   modifiedMs: number;
+  /** When the newest reply landed (ms; 0 = no reply yet, or one longer than
+   * the listing's tail window) — the sidebar's order (chatActivityMs). */
+  repliedMs: number;
   /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
   pinned: boolean;
   /** `model:` / `provider:` frontmatter — who answers this chat, in the file

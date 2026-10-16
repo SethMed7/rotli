@@ -2717,7 +2717,7 @@
   font-weight: 600;
 }
 .segrow .aaseg:hover {
-  background: var(--hov);
+  /* text only: a filled pill on hover read as the selection (owner, 2026-10-15) */
   color: var(--text);
 }
 .segrow .aaseg.sel {
@@ -3047,6 +3047,17 @@
    chrome leaves in focus mode, and a frame around the only visible pane is
    chrome. (Outranks the .panes.multi rule that draws it.) */
 [data-focus="true"] .panes.multi .pane.focused::before {
+  display: none;
+}
+/* reading mode (keys/viewModeActions.ts) rides on focus mode: the note only to
+   read. Nothing in it reacts to the pointer (no hover states, handles, link
+   cursors, or caret), and the page still scrolls under the wheel. */
+[data-reading="true"] .cm-content,
+[data-reading="true"] .cm-content * {
+  pointer-events: none;
+}
+[data-reading="true"] .cm-gutters,
+[data-reading="true"] .editor-scroll-top {
   display: none;
 }
 /* word count, bottom-right at 60%, gone while typing */
@@ -3436,6 +3447,52 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* the "move your Archive and Trash?" callout (personSinksPopout.tsx): the
+   tour's card, popping out of the sidebar beside its Archive and Trash rows,
+   with a pointer back at them */
+.person-sinks-popout {
+  z-index: 17;
+  padding-right: 34px;
+}
+.person-sinks-popout::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: calc(var(--arrow-top, 24px) - 6px);
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.person-sinks-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.person-sinks-close:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+  color: var(--text);
+}
+.person-sinks-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tour-card p.person-sinks-note {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 .tour-card h2 {
   margin: 2px 0 6px;
   font-size: 15px;
@@ -3570,6 +3627,11 @@
    with plain paragraphs before the actions */
 .web-connect-card {
   max-width: 34rem;
+}
+/* "Work on a copy": the copy's progress, full width inside the card */
+.vault-import-progress {
+  width: 100%;
+  accent-color: var(--accent);
 }
 .web-connect-line {
   margin: 0 0 10px;

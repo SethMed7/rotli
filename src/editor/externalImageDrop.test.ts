@@ -106,7 +106,7 @@ describe("importImagesAtDrop", () => {
     expect(dispatched).toEqual([
       {
         from: 4,
-        insert: "\n![](storage:photo.png)\n",
+        insert: "\n![](storage/photo.png)\n",
         anchor: 28,
       },
     ]);
@@ -134,7 +134,7 @@ describe("importImagesAtDrop", () => {
       Promise.resolve("research:storage/photo.png"),
     );
 
-    expect(dispatched[0]?.insert).toBe("\n![](storage:photo.png)\n");
+    expect(dispatched[0]?.insert).toBe("\n![](storage/photo.png)\n");
   });
 
   for (const { label, source } of [
@@ -170,8 +170,8 @@ describe("importImagesAtDrop", () => {
       );
 
       expect(dispatched[0]?.from).toBe(at);
-      expect(dispatched[0]?.insert).toBe("![](storage:photo.png)\n");
-      expect(source + (dispatched[0]?.insert ?? "")).toBe(`${source}![](storage:photo.png)\n`);
+      expect(dispatched[0]?.insert).toBe("![](storage/photo.png)\n");
+      expect(source + (dispatched[0]?.insert ?? "")).toBe(`${source}![](storage/photo.png)\n`);
     });
   }
 });
@@ -204,9 +204,29 @@ describe("importImagesAtDrop on a whitespace-only line", () => {
     expect(dispatched).toEqual([
       {
         from: doc.length,
-        insert: "![](storage:a.png)\n         ![](storage:b.png)\n",
-        anchor: doc.length + "![](storage:a.png)\n         ![](storage:b.png)\n".length,
+        insert: "![](storage/a.png)\n         ![](storage/b.png)\n",
+        anchor: doc.length + "![](storage/a.png)\n         ![](storage/b.png)\n".length,
       },
     ]);
+  });
+});
+
+describe("a dropped image in a note the editor knows", () => {
+  test("is linked with a standard Markdown path from the note's folder", async () => {
+    const dispatched: Array<{ from: number; insert: string }> = [];
+    const view = {
+      posAtCoords: () => 4,
+      state: {
+        selection: { main: { head: 4 } },
+        doc: { lineAt: () => ({ from: 0, to: 4, text: "body" }) },
+        facet: () => "wiki/_inbox",
+      },
+      dispatch: ({ changes }: { changes: { from: number; insert: string } }) => dispatched.push(changes),
+      focus: () => {},
+    };
+    await importImagesAtDrop(view, ["/tmp/my photo.png"], { x: 20, y: 40 }, async () =>
+      Promise.resolve("storage/images/my photo.png"),
+    );
+    expect(dispatched[0]?.insert).toBe("\n![](../../storage/images/my%20photo.png)\n");
   });
 });

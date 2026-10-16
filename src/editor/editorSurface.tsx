@@ -43,13 +43,13 @@ import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
+import { CharCount, FocusWordCount } from "./liveCounts";
 import {
   ensureDocument,
   flushNoteAfterPaint,
   reloadDocumentIfClean,
   useDocumentDirty,
   useDocumentSaveError,
-  useDocumentLines,
 } from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
@@ -241,6 +241,7 @@ export function EditorSurface({
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
   const librarianOpen = useLibrarianBar((s) => s.paneId === paneId);
   const focusMode = useUiStore((s) => s.focusMode);
+  const readingMode = useUiStore((s) => s.readingMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
   const focusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
@@ -529,9 +530,10 @@ export function EditorSurface({
       <CmEditor
         key={noteId}
         noteId={noteId}
+        noteFolder={noteDiskFolder(note)}
         paneId={paneId}
         autoFocus={autoFocus || focusOnMount || pending}
-        focusMode={focusMode}
+        focusMode={focusMode && !readingMode}
         fontSize={fontSize}
         measureWidth={measureWidth}
         initialText={note.body}
@@ -545,7 +547,7 @@ export function EditorSurface({
         onFmCommit={commitFm}
         onFmRead={onFmRead}
       />
-      {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
+      {focusMode && !readingMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
       <LibrarianChat noteId={noteId} paneId={paneId} />
       {librarianOpen ? (
         <BottomSlot>
@@ -560,39 +562,4 @@ export function EditorSurface({
       )}
     </div>
   );
-}
-
-/** Focus mode's word count, isolated: it is the ONLY consumer of the live
- * buffer at this level, so per-keystroke recomputes stay inside this leaf
- * instead of re-rendering the whole editor shell (finding 8: the shell did
- * join + split + a word-count regex over the full document per keystroke,
- * with the count displayed only in focus mode). */
-function FocusWordCount({ noteId, fallbackBody }: { noteId: string; fallbackBody: string }) {
-  const lines = useDocumentLines(noteId);
-  const wordCount = useMemo(() => {
-    let words = 0;
-    for (const line of lines ?? fallbackBody.split("\n")) {
-      words += line.split(/\s+/).filter(Boolean).length;
-    }
-    return words;
-  }, [lines, fallbackBody]);
-  return (
-    <div className="fwc" aria-hidden="true">
-      {wordCount.toLocaleString()} words
-    </div>
-  );
-}
-
-/** The header's live char count — the other always-on buffer consumer. Same
- * isolation as FocusWordCount: per-keystroke recomputes re-render this span,
- * not the editor shell. */
-function CharCount({ noteId, fallbackBody }: { noteId: string; fallbackBody: string }) {
-  const lines = useDocumentLines(noteId);
-  const chars = useMemo(() => {
-    if (!lines) return fallbackBody.length;
-    let total = lines.length ? lines.length - 1 : 0; // the joining newlines
-    for (const line of lines) total += line.length;
-    return total;
-  }, [lines, fallbackBody]);
-  return <>{chars.toLocaleString()} chars</>;
 }

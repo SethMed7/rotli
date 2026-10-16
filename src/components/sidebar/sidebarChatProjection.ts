@@ -20,3 +20,14 @@ export function relativeChatAge(nowMs: number, modifiedMs: number): string {
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
 }
+
+/** The one live signal a chat row carries beside its age (the owner,
+ * 2026-10-15: a dot, never a truncating "Done"/"D…" word). `done` is quiet:
+ * an acknowledged answer is just a chat again. */
+export type ChatRowSignal = { kind: "working" | "unread"; label: string } | null;
+
+export function chatRowSignal(run: "running" | "unread" | "done" | undefined): ChatRowSignal {
+  if (run === "running") return { kind: "working", label: "Working" };
+  if (run === "unread") return { kind: "unread", label: "Unread reply" };
+  return null;
+}

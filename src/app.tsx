@@ -26,8 +26,13 @@ import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
 import { ChatShell } from "./components/chatWindow/chatShell";
+import { FolderShell } from "./components/folderWindow/folderShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
+import { PersonSinksPopout } from "./components/personSinksPopout";
+import { ConnectModelsDialog } from "./components/chat/chatConnectModels";
+import { fillStartupTab } from "./state/startupTab";
+import { VaultImportDialog } from "./components/vaultImportDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
@@ -41,7 +46,6 @@ import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/re
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
   emitCaptureAck,
-  hasDurableCorpus,
   isTauri,
   onCaptureSave,
   onOrganizerProgress,
@@ -56,6 +60,7 @@ import {
 import {
   onCorpusChanged,
   onVaultChanged,
+  onOpenNotice,
   onOpenRequest,
   onNativeCloseTab,
   onNativeEditHistory,
@@ -84,7 +89,7 @@ import { queryClient } from "./services/query";
 import { attachChatWindow } from "./state/chatWindow";
 import { addFragmentToMain, hydrateMain } from "./state/main";
 import { useOrganizerLive } from "./state/organizerLive";
-import { activeTabOf, leaves, usePanesStore } from "./state/panes";
+import { usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
 import { switchVault } from "./memex/service";
 import { invalidateChatFolders } from "./services/chatFolders";
@@ -134,6 +139,7 @@ function surfaceFromUrl(): Surface {
   if (param === "capture") return "capture";
   if (param === "quick") return "quick";
   if (param === "chat" && PLATFORM !== "web") return "chat"; // a NATIVE window: nothing on the web
+  if (param === "folder" && PLATFORM !== "web") return "folder"; // a folder opened from Finder
   return "main";
 }
 
@@ -142,6 +148,7 @@ function MainShell() {
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const transientCount = useUiStore((s) => s.transients.length);
   const focusMode = useUiStore((s) => s.focusMode);
+  const readingMode = useUiStore((s) => s.readingMode);
   const onboarded = useUiStore((s) => s.onboarded);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
@@ -172,7 +179,10 @@ function MainShell() {
   useEffect(() => {
     if (focusMode) document.documentElement.dataset.focus = "true";
     else delete document.documentElement.dataset.focus;
-  }, [focusMode]);
+    // reading mode rides on focus mode: the note, read-only, nothing reacts to hover
+    if (readingMode) document.documentElement.dataset.reading = "true";
+    else delete document.documentElement.dataset.reading;
+  }, [focusMode, readingMode]);
 
   // One composition-owned housekeeping trigger. It runs after opt-in/settings
   // changes and whenever the app becomes visible again. No background timer:
@@ -317,6 +327,7 @@ function MainShell() {
       unlisten();
     };
   }, []);
+  useEffect(() => onOpenNotice((message) => useUiStore.getState().setRowActionError(message)), []);
 
   // Agents reach Word documents through this window (ai/agentRequests.ts).
   useEffect(() => (LAUNCH_FEATURES.agents ? attachAgentBridge() : undefined), []);
@@ -381,19 +392,9 @@ function MainShell() {
   // this synchronously at module init; the disk corpus answers async — fill
   // the pristine startup tab once, never replacing anything the user opened.
   // A NOTE: a newer board or canvas opened here as a broken note tab.
+  // (state/startupTab.ts; a later vault switch fills it from activeVault.ts)
   useEffect(() => {
-    if (!hasDurableCorpus()) return;
-    void notesService.listNotes().then((notes) => {
-      const freshest = notes.find((note) => (note.kind ?? "note") === "note");
-      if (!freshest) return;
-      const { root, openNote } = usePanesStore.getState();
-      const panes = leaves(root);
-      const only = panes[0];
-      const onlyTab = only && only.tabs.length === 1 ? activeTabOf(only) : null;
-      const pristine =
-        panes.length === 1 && !!onlyTab && onlyTab.surfaceKind === "note" && onlyTab.noteId === "";
-      if (pristine) openNote(freshest.id);
-    });
+    void fillStartupTab();
   }, []);
 
   // While onboarding, the window must NOT vanish on blur (it normally hides) —
@@ -435,6 +436,9 @@ function MainShell() {
       <ContextMenu />
       <BoardNameDialog />
       <RenameDialog />
+      <VaultImportDialog />
+      <PersonSinksPopout />
+      <ConnectModelsDialog />
     </div>
   );
 }
@@ -483,12 +487,15 @@ export default function App() {
   useEffect(() => attachChatWindow(addFragmentToMain, openNoteChatFromQuickNote), []);
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.
+  // A folder window shows its own folder, never the vault: a switch leaves it be.
   useEffect(
     () =>
-      onVaultChanged(() => {
-        void refreshActiveVault();
-      }),
-    [],
+      surface === "folder"
+        ? undefined
+        : onVaultChanged(() => {
+            void refreshActiveVault();
+          }),
+    [surface],
   );
 
   useMainWindowWork(surface);
@@ -504,6 +511,7 @@ export default function App() {
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;
   if (surface === "chat") return <ChatShell />;
+  if (surface === "folder") return <FolderShell />;
   return (
     <>
       <MainShell />

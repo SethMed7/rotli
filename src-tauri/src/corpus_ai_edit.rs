@@ -7,16 +7,18 @@
 use std::fs;
 
 use super::{
-    atomic_write, compose_document, lifecycle_disk_folder, parse_document, prefix_write_result,
+    atomic_write, lifecycle_disk_folder, parse_document, prefix_write_result,
     split_root_id, CorpusState, CorpusStore, CorpusWriteResult, NoteMeta,
 };
 use crate::ai_edit_policy::ai_edit_field;
 
-/// How an AI body write may change a note: rewrite it (chat, under the grant)
-/// or add one accepted passage (`/ai`, under the person's consent).
+/// How an AI body write may change a note: rewrite it (chat, under the grant),
+/// rewrite it once because the person said "Allow once" when the chat asked
+/// (2026-10-15), or add one accepted passage (`/ai`, under their consent).
 #[derive(Clone, Copy)]
 pub(crate) enum AiWrite<'a> {
     Replace,
+    ConsentedReplace,
     Insert(&'a str),
 }
 
@@ -50,7 +52,7 @@ impl CorpusStore {
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| ai_edit_field(l).is_none());
             fm.foreign.push(format!("ai_edit: {allowed}"));
-            atomic_write(&path, &compose_document(&fm, body))
+            atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -65,12 +67,13 @@ impl CorpusStore {
         id: &str,
         expected_revision: &str,
     ) -> Result<NoteMeta, String> {
+        super::raw::refuse_in_raw(self, "move or delete")?;
         crate::fsutil::require_revision(expected_revision)?;
         let rel = self.resolve_note_rel(id)?;
         if !rel.to_ascii_lowercase().ends_with(".md") {
             return Err("agents trash Markdown notes only".into());
         }
-        let trash = lifecycle_disk_folder(self.layout, "Trash");
+        let trash = lifecycle_disk_folder(self.layout, self.layout.trash_id());
         self.writable(&rel)?;
         self.writable(&trash)?;
         let path = self.abs(&rel);

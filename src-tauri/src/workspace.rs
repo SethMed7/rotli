@@ -28,7 +28,7 @@ use crate::loopback_http::{
 };
 
 #[path = "workspace_attachments.rs"]
-mod attachments;
+pub(crate) mod attachments;
 #[path = "workspace_file_visibility.rs"]
 mod file_visibility;
 #[path = "workspace_note_ops.rs"]
@@ -529,11 +529,7 @@ impl Workspace {
         main_parent: &str,
     ) -> Result<NoteMeta, String> {
         let title = validate_note_title(title)?;
-        let folder = if self.store.is_memex() {
-            "wiki/_inbox"
-        } else {
-            "Inbox"
-        };
+        let folder = self.store.layout().intake_dir();
         let markdown = note_markdown(title, body)?;
         let meta = self.store.create_for_remote_agent(folder, &markdown)?;
         if self.root.is_default {
@@ -561,11 +557,7 @@ impl Workspace {
             .iter()
             .filter(|meta| meta.kind == NoteKind::File)
             .count();
-        let intake_folder = if self.store.is_memex() {
-            "wiki/_inbox"
-        } else {
-            "Inbox"
-        };
+        let intake_folder = self.store.layout().intake_dir();
         let intake_notes = list
             .notes
             .iter()
@@ -944,13 +936,9 @@ impl Workspace {
         tags: &str,
         main_parent: &str,
     ) -> Result<NoteMeta, String> {
-        let folder = if self.store.is_memex() {
-            "storage/excalidraw"
-        } else {
-            "Board"
-        };
+        let folder = self.store.layout().board_lane();
         let scene = empty_board(description, tags);
-        let meta = self.store.create_named_board(folder, name, Some(&scene))?;
+        let meta = self.store.create_named_board(&folder, name, Some(&scene))?;
         if self.root.is_default {
             self.main_add(&meta.id, main_parent)?;
         }

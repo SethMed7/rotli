@@ -1,25 +1,32 @@
-// The Vault view (the owner, 2026-09-30: "add 'vault' as a view, so they can
-// see things just how they are in Finder"). Main stays the default; picking
-// Vault shows the vault's own folders, read-only, and Main comes back.
+// Raw data (the owner, 2026-09-30: "see things just how they are in Finder";
+// 2026-10-10: not one more view, but "in the views when you click you have an
+// option to view data raw … which can also be done in settings"). It sits
+// apart in the views menu, shows the vault's own folders read-only, and any
+// view brings the views back.
 
 import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
-test("the view picker offers Vault: the vault's folders as on disk, then back to Main", async ({ page }) => {
+test("the views menu offers Raw data apart from the views, and a view brings Main back", async ({ page }) => {
   await gotoApp(page);
   const switcher = () => page.getByRole("button", { name: /Current view: / });
   await expect(switcher()).toHaveAccessibleName(/Current view: Main/);
+  // in Views the System zone's Library is the way to browse the vault as on disk
+  const library = page.locator(".sb-system .frow", { hasText: "Library" });
+  await expect(library).toBeVisible();
 
   await switcher().click();
   await page
     .getByRole("menu")
-    .getByRole("menuitemcheckbox", { name: /^Vault/ })
+    .getByRole("menuitemcheckbox", { name: /^Raw data/ })
     .click();
-  await expect(switcher()).toHaveAccessibleName(/Current view: Vault/);
+  await expect(switcher()).toHaveAccessibleName(/Current view: Raw data/);
+  // in Raw data the sidebar already is that, so the Library row steps aside
+  await expect(library).toHaveCount(0);
 
   // the disk's folders, closed until opened (a big vault doesn't unfold at once)
-  const tree = page.locator('.main-tree[data-active-view="Main"], .main-tree');
+  const tree = page.locator(".main-tree");
   const folder = tree.locator(".frow.main-row", { hasText: "Projects" });
   await expect(folder).toBeVisible();
   // it IS the disk: nothing to arrange here
@@ -31,9 +38,20 @@ test("the view picker offers Vault: the vault's folders as on disk, then back to
   await folder.click();
   await expect(tree.locator("[data-note-id]").first()).toBeVisible();
 
-  // back to Main
+  // any view leaves Raw data
   await switcher().click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: /^Main/ }).click();
   await expect(switcher()).toHaveAccessibleName(/Current view: Main/);
   await expect(page.getByRole("button", { name: /^New folder in Main/ })).toBeEnabled();
+  await expect(library).toBeVisible();
+});
+
+test("Settings → Appearance → Notes switches between Views and Raw data", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  const notes = page.locator(".segfield", { hasText: "Notes" });
+  await notes.getByRole("button", { name: "Raw data", exact: true }).click();
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Current view: Raw data/ })).toBeVisible();
 });

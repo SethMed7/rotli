@@ -7,6 +7,8 @@
 // file inside it. Text and binary files share the revision-gated write seam.
 
 import { bytesRevision } from "../lib/contentRevision";
+import { isMemexId, parseMemexInfo } from "../memex/contract";
+import { type FolderRoles, folderRolesFromMarker, markerInPlace } from "./destinations";
 export { bytesRevision, contentRevision } from "../lib/contentRevision";
 
 export interface VaultDirEntry {
@@ -91,9 +93,42 @@ export async function freeSiblingPath(
 }
 
 /** A folder holding `wiki/` is a memex vault (Rust `Layout::Memex`); any other
- * folder is a plain vault of Markdown. */
-export function vaultIsMemex(dir: Pick<VaultDir, "exists">): Promise<boolean> {
-  return dir.exists("wiki");
+ * folder is a plain vault of Markdown. An imported vault never is: its `wiki/`
+ * is the person's folder (Rust `Layout::Imported`). */
+export async function vaultIsMemex(dir: Pick<VaultDir, "exists" | "readText">): Promise<boolean> {
+  return (await dir.exists("wiki")) && !(await vaultFolderRoles(dir));
+}
+
+/** A Rotli vault carries a valid `mx_` marker (the Rust `is_memex_root` twin).
+ * Any other folder was opened in place, and the person's notes there are never
+ * rearranged or stamped (owner rule 2026-10-13). */
+export async function vaultHasRotliMarker(dir: Pick<VaultDir, "exists" | "readText">): Promise<boolean> {
+  if (!(await dir.exists("memex.json"))) return false;
+  // unreadable reads as "opened in place": the direction that writes less
+  return isMemexId(parseMemexInfo(await dir.readText("memex.json").catch(() => ""))?.id);
+}
+
+/** Whether the person's notes here are theirs as written (decision B): a folder
+ * with no Rotli marker (opened in place before decision I), or one whose
+ * marker says `"inPlace": true` (connected in place since). Rotli never stamps
+ * or renames such a folder's own notes. A copy and a Rotli vault are not. */
+export async function vaultOpenedInPlace(dir: Pick<VaultDir, "exists" | "readText">): Promise<boolean> {
+  if (!(await vaultHasRotliMarker(dir))) return true;
+  try {
+    return markerInPlace(JSON.parse(await dir.readText("memex.json")));
+  } catch {
+    // unreadable reads as "opened in place": the direction that writes less
+    return true;
+  }
+}
+
+/** An imported vault's role map, read from its marker (Rust `vault_roles::read`).
+ * Null for a Rotli vault, a plain folder, or an unreadable marker. */
+export async function vaultFolderRoles(
+  dir: Pick<VaultDir, "exists" | "readText">,
+): Promise<FolderRoles | null> {
+  if (!(await dir.exists("memex.json"))) return null;
+  return folderRolesFromMarker(await dir.readText("memex.json").catch(() => ""));
 }
 
 /** The first free path for `desired` inside `folder` — the Rust `free_name_with`

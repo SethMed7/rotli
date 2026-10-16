@@ -1,11 +1,12 @@
 // Named-view transaction twin of corpus.rs views_write_unlocked. Rollback
 // restores only our own bytes; a newer external edit always wins.
 import { composeNoteDocument, emptyFrontmatter, parseNoteDocument } from "../lib/frontmatter";
+import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { readVersionedFile, textRevision, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
 import { FolderNotesService } from "./folderNotes";
 import type { MainNode } from "./mainTree";
-import { contentRevision, type VaultDir } from "./vaultDir";
+import { contentRevision, type VaultDir, vaultOpenedInPlace } from "./vaultDir";
 import { VIEW_FOLDER_FORBIDDEN_CHARS, viewNameError, type ViewsManifest } from "./viewTree";
 
 const broadRotliExclusions = [".rotli", ".rotli/"];
@@ -91,6 +92,8 @@ export async function writeFolderViews(
   const written: { path: string; before: string; applied: string }[] = [];
   let manifestWritten = false;
   let ignoreRollback: { before: string | null; applied: string; safe: boolean } | null = null;
+  // a folder opened in place: the person's notes gain only the view_tag line
+  const inPlace = await vaultOpenedInPlace(dir);
   try {
     for (const id of new Set([...before.keys(), ...next.keys()])) {
       if (before.get(id) === next.get(id)) continue;
@@ -102,7 +105,10 @@ export async function writeFolderViews(
       const tag = next.get(id);
       const foreign = fm.foreign.filter((line) => line.split(":", 1)[0] !== "view_tag");
       if (tag) foreign.push(`view_tag: ${tag}`);
-      const applied = composeNoteDocument({ ...fm, foreign }, parsed.body);
+      const applied =
+        inPlace && !rotliMade(parsed.frontmatter)
+          ? withTopLevelLine(opened.contents, "view_tag", tag ?? null)
+          : composeNoteDocument({ ...fm, foreign }, parsed.body);
       if (applied === opened.contents) continue;
       await writeVersionedFile(dir, notePath, applied, opened.revision);
       written.push({ path: notePath, before: opened.contents, applied });

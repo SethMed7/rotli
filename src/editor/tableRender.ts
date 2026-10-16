@@ -17,6 +17,7 @@ import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemir
 
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
 import { noteIdFacet } from "./livePreview";
+import { revealRange } from "./readingReveal";
 import { cellEditValue, cellSourceValue, inlineCell, plainCellLabel } from "./tableCell";
 import { GRIP_H, GRIP_V, applyOp, openTableMenu } from "./tableMenu";
 import {
@@ -702,7 +703,7 @@ const rawLine = Decoration.line({ class: "rotli-table-rawline" });
 
 function build(state: EditorState, tables: TableBlock[], raw: readonly number[]): DecorationSet {
   const decos: Range<Decoration>[] = [];
-  const sel = state.selection.main;
+  const sel = revealRange(state);
   // width identity: header signature + occurrence among same-header tables,
   // so persisted widths survive the table moving within the note
   const sigCounts = new Map<string, number>();
@@ -767,7 +768,7 @@ const tableField = StateField.define<TableFieldValue>({
         hatch = true;
       }
     }
-    const sel = tr.state.selection.main;
+    const sel = revealRange(tr.state);
     raw = raw.filter((p) => tables.some((t) => t.from === p && sel.from <= t.to && sel.to >= t.from));
     if (tr.docChanged || tr.selection || hatch) {
       return { deco: build(tr.state, tables, raw), tables, raw };

@@ -89,7 +89,8 @@ import {
   type MemexInstance,
   type Perms,
   activeInstance,
-  isWritable,
+  noteLaneWritable,
+  openedInPlaceVault,
 } from "../memex/config";
 import { pickVaultFolder } from "../memex/service";
 import {
@@ -106,6 +107,7 @@ import {
 import { availableNewItems, withBetaLabel } from "../newItems/model";
 import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
+import { quickActionAvailable } from "../services/finderQuickAction";
 import { useFolders } from "../services/hooks";
 import { setLibrarianOn } from "../services/librarianSwitch";
 import { queryClient } from "../services/query";
@@ -128,6 +130,7 @@ import {
   type TimeFormat,
   useUiStore,
 } from "../state/ui";
+import { useVaultView } from "../state/vaultView";
 import { AntigravitySetup } from "./antigravitySetup";
 import { type CharacterName, QuokkaMark } from "./character";
 import {
@@ -144,20 +147,24 @@ import {
   SunGlyph,
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
-import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
+import { ALIAS_PASS } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { FinderQuickActionSettings } from "./settings/finderQuickActionSettings";
 import { FrontsSettings } from "./settings/frontsSettings";
+import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
+import { LINK_PASS } from "./settings/linkFormatSettings";
 import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
+import { VaultPassSettings } from "./settings/vaultPass";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
@@ -545,7 +552,7 @@ function GeneralPane() {
   const setCaptureVaultId = useUiStore((s) => s.setCaptureVaultId);
   const memexConfig = useMemexConfig();
   const currentVault = memexConfig.data ? activeInstance(memexConfig.data) : null;
-  const writableVaults = (memexConfig.data?.instances ?? []).filter(isWritable);
+  const writableVaults = (memexConfig.data?.instances ?? []).filter(noteLaneWritable);
   // Physical folders remain available only for current/local routing. Named
   // memex destinations always use their guarded intake lane.
   const folderOpts = (useFolders().data ?? []).filter(
@@ -874,7 +881,9 @@ function GeneralPane() {
 
       <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
-      <AliasCleanupSettings native={isTauri()} />
+      <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
+      <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
+      <FinderQuickActionSettings native={quickActionAvailable()} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>
@@ -1065,6 +1074,8 @@ function AppearancePane() {
   const sidebarSide = useUiStore((s) => s.sidebarSide);
   const setSidebarSide = useUiStore((s) => s.setSidebarSide);
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
+  const rawData = useVaultView((s) => s.on);
+  const setRawData = useVaultView((s) => s.setOn);
   const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const boardBackground = useUiStore((s) => s.boardBackground);
@@ -1187,6 +1198,17 @@ function AppearancePane() {
           ["hover", "On hover"],
         ]}
         onPick={setSidebarReveal}
+      />
+      {/* the same choice as Raw data in the views menu: Views shows Main and
+          your views; Raw data, the vault's folders as they are on disk */}
+      <SegField
+        label="Notes"
+        value={rawData ? "raw" : "views"}
+        options={[
+          ["views", "Views"],
+          ["raw", "Raw data"],
+        ]}
+        onPick={(value) => setRawData(value === "raw")}
       />
       <SidebarLookSettings />
 
@@ -1637,6 +1659,8 @@ function BrainPane() {
 }
 
 function DesktopBrainPane() {
+  const memexCfg = useMemexConfig().data;
+  const inPlace = openedInPlaceVault(memexCfg);
   const brainOn = useUiStore((s) => s.brainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
@@ -1676,6 +1700,14 @@ function DesktopBrainPane() {
     organizerSetTrust("suggest").catch(() => {});
     setLibrarianOn(true);
   };
+  if (inPlace) {
+    return (
+      <>
+        <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
+        <LibrarianCopyOffer root={inPlace.root} label={inPlace.label} />
+      </>
+    );
+  }
   return (
     <>
       <PaneHead title="The Librarian" char="knowledge" motif="librarian" />

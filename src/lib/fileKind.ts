@@ -26,6 +26,15 @@ export function isCanvasPath(id: string): boolean {
   return id.toLowerCase().endsWith(".canvas");
 }
 
+/** How a file tab opens. A `.canvas` opens in the Canvas editor only where
+ * canvases are live; in a build without them it is withheld — never shown as
+ * raw JSON (the owner, 2026-10-15). The twin of Rust `is_withheld_canvas`,
+ * which keeps it out of every listing and Main in the first place. */
+export function canvasFileMode(id: string, canvasesLive: boolean): "canvas" | "withheld" | "file" {
+  if (!isCanvasPath(id)) return "file";
+  return canvasesLive ? "canvas" : "withheld";
+}
+
 /** The basename of a corpus wire id / path ("a/b/c.png" → "c.png"). */
 export function fileName(id: string): string {
   return id.split("/").pop() ?? id;

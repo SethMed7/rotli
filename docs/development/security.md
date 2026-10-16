@@ -243,6 +243,66 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
 
 ### Supply-chain advisories (tracked; reviewed 2026-09-05)
 
+**2026-10-13 maintenance pass (app root).** `bun run deps audit-plan
+--root=app` found 7 compatible repairs, now applied (`@grpc/grpc-js`, both
+`brace-expansion` lines, DOMPurify 3.4.13 → 3.4.16, `ip-address`, `smol-toml`,
+`source-map-js`). Two reviewed direct changes cleared Dependabot alerts: Sharp
+0.35.4 → 0.35.5 (the exact pin and its override, which also moves the local
+voice stack's copy; libvips CVE) and KaTeX `^0.17.0` → `^0.18.11` (settings
+prototype pollution, fixed in 0.18.2). KaTeX 0.18's only breaking change
+prefixes its internal CSS classes; Rotli styles none of them and loads KaTeX's
+own stylesheet. Cargo moved rustls 0.23.43 → 0.23.45 (TLS 1.3 handshake
+messages across encryption levels) with `rustls-webpki` 0.103.15. All versions
+are older than the three-day release age. The lockfile was resolved with
+`bun audit fix --ignore-scripts` under a temporary copy of `bunfig.toml` that
+differs only in `frozenLockfile = false`, because `deps audit-fix --apply`
+cannot write a lockfile that bunfig freezes.
+
+Still open after this pass, unchanged in kind: Mermaid's own KaTeX 0.16.47
+(Mermaid's `^0.16.45` range), lodash-es, nanoid, and uuid inside Excalidraw,
+Univer, Chevrotain, and exceljs, plus `braces` and `sprintf-js`, which have no
+fixed version. **New: two critical Tinypool 2.1.0 advisories** (prototype
+pollution to code execution in worker options). Tinypool arrives only through
+`oxfmt` 0.62, the development formatter, and never ships in Rotli.app or the
+site. `oxfmt` 0.70 and later depend on a fixed Tinypool, but a formatter jump
+can reformat the tree, so it is a separate reviewed change.
+
+**SC-2026-08-31 expired on 2026-09-30.** It is superseded by SC-2026-10-13
+below, which lists only what is still blocked after the repairs it required.
+
+**Temporary release exception SC-2026-10-13 — proposed 2026-10-13, in effect
+once the owner merges the change that records it; owner: @SethMed7; expires
+2026-11-13.** Before it was written, every compatible repair across the three
+roots was applied: the app pass above, and on 2026-10-13 the site (Astro 7.1.6
+→ 7.2.8, devalue, fast-uri, http-cache-semantics, JS-YAML, Sharp 0.35.2 →
+0.35.5, smol-toml, source-map-js, svgo) and Breve (`ip-address` 10.3.1 →
+10.7.1), all past the three-day release age. `bun run deps audit-plan` then
+reports **zero compatible fixes in every root**; the site graph is clean, and
+RustSec reports no vulnerabilities (its 10 allowed warnings are the
+unmaintained and yanked crates recorded below). This exception covers only
+these exact paths:
+
+| Finding | Path | Shipped and reachable? | Why it is accepted |
+| --- | --- | --- | --- |
+| **tinypool 2.1.0**, 2 critical (prototype pollution to code execution in worker options) | `oxfmt` 0.62 (exact pin) | **No.** The development formatter; never in Rotli.app, the site, or Breve | Fixed by `oxfmt` ≥ 0.70, a separate reviewed formatter upgrade because it can reformat the tree |
+| **sharp 0.34.5**, 3 high (libvips, libheif, librsvg) | Breve: `@huggingface/transformers` 3.8.1 (`^0.34.1`) | Ships in the optional local voice stack, which never decodes user images | Upstream range; the app graph is already on 0.35.5 |
+| **lodash-es 4.17.21**, high and moderate (`_.template` imports, prototype pollution) | Mermaid → Chevrotain 11.0.3 (exact) | Bundled; Rotli never calls `_.template` or merges untrusted objects through it | Upstream exact pin |
+| **nanoid** 3.3.3 / 4.0.2 / 5.1.11, high (negative or zero sizes, integer overflow) | Excalidraw 0.18.1, mermaid-to-excalidraw 2.2.2, Univer 0.25.1 | Bundled; their calls use the default size (inspected 2026-09-05, unchanged) | Upstream exact pins |
+| **uuid 8.3.2**, moderate (buffer bounds with a caller buffer) | exceljs 4.4.0 (`^8.3.0`) | Bundled; exceljs never passes a buffer | Upstream range |
+| **katex 0.16.47**, low (settings prototype pollution) | Mermaid 11.16.1 (`^0.16.45`) | Bundled; Mermaid passes its own fixed settings. Rotli's own KaTeX is 0.18.11 | Upstream range |
+| **braces 3.0.3**, high (stack exhaustion on deeply nested patterns), no fixed release | Excalidraw → Sass 1.51 → chokidar | Not reachable: chokidar's file watching never runs in a webview | No fix exists |
+| **sprintf-js 1.1.3**, moderate (unbounded precision), no fixed release | `onnxruntime-node` → global-agent → roarr (app and Breve) | Local voice stack's internal logging; its format strings are fixed | No fix exists |
+
+The remaining impact is an upstream library being unsafe on a path Rotli does
+not exercise today. Compensating controls are unchanged: frozen script-free
+lockfiles, adapter input and size limits, no direct calls to the vulnerable
+APIs, and the full regression and build proof. Re-run `bun run deps
+audit-plan` before every release candidate and at expiry. Any newly compatible
+fix, upstream range, direct reachability, or exploit evidence ends this
+exception and blocks publication until repaired and reviewed. It does not
+auto-renew.
+
+
 All are outside Rotli's own `src/`. The repository has three independent Bun
 lockfiles, so `bun run deps audit` scans each one instead of treating the root
 as the whole product. After compatible repair and dedupe, the current tool

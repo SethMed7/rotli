@@ -49,7 +49,7 @@ import { newItemDefinition } from "../newItems/model";
 import { tabMediaAction } from "../services/ambient";
 import { useBoardRename } from "../services/boardRename";
 import { useChatRename } from "../services/chatRename";
-import { useNoteIndex } from "../services/hooks";
+import { useNoteIndex, useUnlistedNoteTitles } from "../services/hooks";
 import { renameLane } from "../services/itemRename";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { useTabMedia } from "../state/ambient";
@@ -57,6 +57,7 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useIsHidden } from "../state/hidden";
 import { useMainStore } from "../state/main";
 import { activeTabOf, usePanesStore } from "../state/panes";
+import { isOpenedFileId } from "../state/paneVaults";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
 import {
@@ -146,7 +147,16 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   // Direct O(1) lookups per tab — the old per-render Map copy of EVERY note's
   // title was O(all-notes) × per pane strip × per invalidation (perf audit
   // 2026-07-30, finding 11).
-  const titles = useMemo<TitleLookup>(() => ({ get: (id) => noteIndex.get(id)?.title }), [noteIndex]);
+  // a file opened from Finder is in no listing: its title is the editor's read
+  const unlisted = useUnlistedNoteTitles(
+    pane.tabs.flatMap((tab) =>
+      tab.surfaceKind === "note" && isOpenedFileId(tab.noteId) ? [tab.noteId] : [],
+    ),
+  );
+  const titles = useMemo<TitleLookup>(
+    () => ({ get: (id) => noteIndex.get(id)?.title ?? unlisted.get(id) }),
+    [noteIndex, unlisted],
+  );
   const memexConfig = useMemexConfig();
   const activeMemex = memexConfig.data ? activeInstance(memexConfig.data) : null;
   const chats = useInstanceChats(activeMemex);

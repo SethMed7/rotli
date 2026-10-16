@@ -42,6 +42,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   graph: "the Graph view's canvas renderer composed by graphSurface",
   jsonCanvas: "the Canvas editor for .canvas files and its file host",
   chatWindow: "the Chat window's shell: Chat pulled out of main into a window of its own",
+  folderWindow: "a folder opened from Finder in its own window: its shell and tree",
   onboarding: "first-run, vault activation, and model setup presentation",
   settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
@@ -55,6 +56,11 @@ export const COMPONENT_DIRECTORY_OWNERS = {
 export const COMPONENT_ROOT_FILE_OWNERS = {
   "backToNotes.tsx": "shared back-to-panes control for full-content views",
   "surfaceSearch.tsx": "shared search field for full-content views (Tasks, Captures)",
+  "vaultImportDialog.tsx":
+    "vault import: connect or connect a copy with the Librarian, the copy's progress, and its result",
+  "whyCopy.tsx": "vault import: the Why a copy? disclosure every Librarian copy offer carries",
+  "personSinksPopout.tsx":
+    "vault import: a copy's one-time Archive and Trash question, popping out of the sidebar",
   "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
   "webDialogFrame.tsx":
     "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
@@ -66,6 +72,8 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "character.tsx": "shared character renderer",
   "characterArt.ts": "shared lazy character-art registry",
   "contextMenu.tsx": "shared context-menu primitive",
+  "sideWindowFrame.tsx":
+    "shared frame of the windows beside main (Chat, a folder from Finder): title strip, rail, panes",
   "documentEditor.tsx": "FileSurface document presentation adapter",
   "fileHeaderMarks.tsx": "FileSurface header status marks: Beta, or why editing is off",
   "emptyState.tsx": "shared empty-state primitive",
@@ -123,6 +131,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
   "vaultRepair.ts": "native vault repair passes (secure intake, leftover note names)",
+  "finderBridge.ts":
+    "native commands for what arrives from outside a vault (folder windows, the Quick Action, vault copies)",
   "useNow.ts": "shared React wall-clock subscription for presentation projections",
 } as const;
 
@@ -164,10 +174,17 @@ export const SERVICE_FILE_OWNERS = {
   "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
   "librarianPeople.ts": "librarian (statements: rules, People groups, new people notes, journaled)",
   "notePathCopy.ts": "notes",
-  "thanksShare.ts": "onboarding (the thank-you card: links, saving and copying the banner)",
+  "thanksShare.ts": "onboarding (the thank-you card: links and the share sheet)",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
+  "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
+  "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
+  "vaultImport.ts":
+    "vault import (connect a copy with the Librarian: confirm, copy with progress, open the copy)",
+  "personSinks.ts": "vault import (a copy's one-time question: move its own Archive and Trash into Rotli's)",
+  "vaultInPlace.ts":
+    "vault import: whether the active vault is a folder connected in place (the Librarian stays off)",
   "connectorSetup.ts": "chat",
   "connectedModels.ts": "chat (the connected clients' own model lists)",
   "helperLink.ts": "chat",

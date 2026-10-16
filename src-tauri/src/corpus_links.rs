@@ -26,7 +26,7 @@
 use serde::Serialize;
 
 use super::{
-    is_archive_folder, is_chats_folder, is_trash_folder, CorpusState, CorpusStore, Layout,
+    is_archive_folder, is_chats_lane, is_trash_folder, CorpusState, CorpusStore,
     NoteKind,
 };
 
@@ -120,6 +120,20 @@ fn outside_code(line: &str) -> String {
     prose
 }
 
+/// A `[[…]]` naming a file, not a note — `![[budget.xlsx]]`, `[[rose.png]]`
+/// (2026-10-13: Rotli writes embeds this way): any extension the attachments
+/// lane knows a type for, other than Markdown. A canvas, or a title with a dot
+/// ("v1.2 notes"), stays a link. The TS twin mirrors the list; the parity
+/// fixture pins both.
+fn is_file_target(inner: &str) -> bool {
+    let target = inner.split(['|', '#']).next().unwrap_or_default().trim();
+    target.contains('.')
+        && !matches!(
+            crate::workspace::attachments::mime_of(target),
+            "application/octet-stream" | "text/markdown"
+        )
+}
+
 pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     // the open fence: it closes only on the same character, at least as long
@@ -144,7 +158,7 @@ pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
             let after = &rest[start + 2..];
             let Some(end) = after.find("]]") else { break };
             let inner = after[..end].trim();
-            if !inner.is_empty() && !inner.contains('[') && !out.iter().any(|t| t == inner) {
+            if !inner.is_empty() && !inner.contains('[') && !is_file_target(inner) && !out.iter().any(|t| t == inner) {
                 out.push(inner.to_string());
             }
             rest = &after[end + 2..];
@@ -172,9 +186,9 @@ impl CorpusStore {
         let mut out = Vec::new();
         for meta in &cache.list.notes {
             if meta.kind != NoteKind::Note
-                || is_trash_folder(&meta.folder_id)
-                || is_archive_folder(&meta.folder_id)
-                || (layout == Layout::Memex && is_chats_folder(&meta.folder_id))
+                || is_trash_folder(layout, &meta.folder_id)
+                || is_archive_folder(layout, &meta.folder_id)
+                || is_chats_lane(layout, &meta.folder_id)
             {
                 continue;
             }

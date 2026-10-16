@@ -45,12 +45,14 @@ import { findHighlight, passageHighlight, setFindMarks, setPassageMark } from ".
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
+import { noteFolderFacet } from "./imageSource";
 import { linkOpener } from "./linkOpener";
 import { listNumbering } from "./listNumbers";
 import { livePreview, noteIdFacet } from "./livePreview";
 import { markSelectionSpec } from "./markSelection";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
+import { READING, setReading } from "./readingMode";
 import { opensFlow, pickerFence, slashInsertion } from "./slashActions";
 import { SlashInsertPopover, insertAtSlashPoint } from "./slashInsertPopover";
 import {
@@ -88,6 +90,7 @@ export const CmEditor = memo(CmEditorImpl);
 
 function CmEditorImpl({
   noteId,
+  noteFolder = "",
   paneId,
   autoFocus = false,
   focusMode,
@@ -105,6 +108,8 @@ function CmEditorImpl({
   onFmRead,
 }: {
   noteId: string;
+  /** The note's physical folder, so a note-relative image link resolves. */
+  noteFolder?: string;
   paneId: string;
   autoFocus?: boolean;
   focusMode: boolean;
@@ -139,7 +144,11 @@ function CmEditorImpl({
   const onContextRef = useRef(onContext);
   onContextRef.current = onContext;
 
-  const spellcheck = useUiStore((s) => s.spellcheck);
+  // reading mode (editor/readingMode.ts): no spelling marks, handles, or raw Markdown
+  const reading = useUiStore((s) => s.readingMode);
+  const readingRef = useRef(reading);
+  readingRef.current = reading;
+  const spellcheck = useUiStore((s) => s.spellcheck && !s.readingMode);
   const spellcheckRef = useRef(spellcheck);
   spellcheckRef.current = spellcheck;
 
@@ -151,12 +160,12 @@ function CmEditorImpl({
   formatBarRef.current = formatBarVisible;
 
   // beautified (live WYSIWYG) vs raw markdown source — a view toggle (Aa panel).
-  const rawEditor = useUiStore((s) => s.rawEditor);
+  const rawEditor = useUiStore((s) => s.rawEditor && !s.readingMode);
   const rawEditorRef = useRef(rawEditor);
   rawEditorRef.current = rawEditor;
 
   // block handles (⠿ drag/add/remove) — a toggle (Aa panel); ON by default.
-  const blockHandlesOn = useUiStore((s) => s.blockHandles);
+  const blockHandlesOn = useUiStore((s) => s.blockHandles && !s.readingMode);
   const blockHandlesRef = useRef(blockHandlesOn);
   blockHandlesRef.current = blockHandlesOn;
   // a grip click opens the SHARED context-menu host (remediation Batch 3, F13):
@@ -190,6 +199,7 @@ function CmEditorImpl({
     viewMode: new Compartment(),
     block: new Compartment(),
     fm: new Compartment(),
+    reading: new Compartment(),
   }));
   const { spell: spellComp, focus: focusComp, viewMode: viewModeComp, block: blockComp, fm: fmComp } = comps;
 
@@ -566,6 +576,7 @@ function CmEditorImpl({
         // per-note widget context: image srcs resolve against THIS note's
         // corpus root; table widgets key persisted column widths by the id
         noteIdFacet.of(noteId),
+        noteFolderFacet.of(noteFolder),
         viewModeComp.of(
           rawEditorRef.current
             ? rawMarkdown
@@ -584,6 +595,7 @@ function CmEditorImpl({
         copyHandlers(() => rawEditorRef.current),
         spellComp.of(EditorView.contentAttributes.of({ spellcheck: String(spellcheckRef.current) })),
         focusComp.of(focusModeRef.current ? focusDim : []),
+        comps.reading.of(readingRef.current ? READING : []),
         emptyPlaceholder("Write…"),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !applyingExternal.current) {
@@ -709,6 +721,11 @@ function CmEditorImpl({
   useEffect(() => {
     viewRef.current?.dispatch({ effects: fmComp.reconfigure(fmExt(fmRaw, fmGen, fmErr)) });
   }, [fmRaw, fmGen, fmErr, fmComp, fmExt]);
+
+  // reading on/off (editor/readingMode.ts)
+  useEffect(() => {
+    if (viewRef.current) setReading(viewRef.current, comps.reading, reading);
+  }, [reading, comps]);
 
   // block handles on/off → add/remove the gutter + drop handlers
   useEffect(() => {

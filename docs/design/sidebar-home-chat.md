@@ -41,20 +41,31 @@ Now the sidebar has **one top switcher and one body**:
   saved chat activity. It contains no provider/token telemetry. Rotli does not estimate word authorship: a
   human-vs-AI split requires an edit-provenance contract the corpus does not yet
   record.
-- **Chat** is the chat world: New chat · All chats · one session **Activity**
-  lane · recency-sorted chat folders · every chat, then the footer.
+- **Chat** is the chat world: New chat · All chats · reply-recency-sorted chat
+  folders · every chat, then the footer. Each chat appears exactly once; the
+  session Activity lane that hoisted copies to the top is retired (2026-10-15).
   Since 2026-08-03 the front carries live signals and organization:
-  - **Run signals** — a chat is labeled Working while answering, New when a
-    reply lands elsewhere, and Done once acknowledged. The Activity lane stays
-    at the top for the session, clearly separated from virtual folders.
-    State lives in `src/state/chatRuns.ts`, session-only — the transcript on
-    disk is the durable truth. Navigating away no longer cancels a queued
-    turn; it completes, persists, and flips its row.
-  - **Order is response recency** — pinned chats first, then most-recent
-    activity, inside folders too ("the moment I get a response it moves to the
-    top"). The old per-folder manual drag order is retired (the manifest field
-    still parses for older builds); dragging a chat onto a folder still files
-    it there.
+  - **Run signals** — a dot beside the row's age, never a word: an accent ring
+    that breathes while the chat is Working, and a solid accent dot for an
+    Unread reply that landed while you were elsewhere. Opening the chat clears
+    it; an acknowledged answer carries no mark. Ring vs fill stays legible with
+    reduced motion. The open button's name and the dot's own label say
+    "Working" / "Unread reply". In the chat itself the working state is one
+    row at the live edge: the buddy with the run's status beside it
+    (`ChatLiveEdge`), never a second indicator in the composer. State lives in
+    `src/state/chatRuns.ts`, session-only — the transcript on disk is the
+    durable truth. Navigating away no longer cancels a queued turn; it
+    completes, persists, and flips its row.
+  - **Order is reply recency** — pinned chats first, then the time of each
+    chat's newest REPLY, inside folders too ("the moment I get a response it
+    moves to the top"). Sending writes your turn at once but leaves the chat
+    where it is; the arriving answer lifts it (2026-10-15). The reply time is
+    read from the transcript's last non-`you` message line (Rust
+    `memex_chat_scan.rs`, the TS twin `src/memex/chatRecency.ts` for Rotli Web; a chat with
+    no reply yet uses its file time). The row's age shows the same time. The
+    old per-folder manual drag order is retired (the manifest field still
+    parses for older builds); dragging a chat onto a folder still files it
+    there.
   - **Pinned and recent folders** — an explicit pin wins; otherwise the folder
     containing the newest chat floats first (`pinned` stays on the
     `chat-folders.json` entry, while recency remains derived from chat files).
@@ -63,7 +74,10 @@ Now the sidebar has **one top switcher and one body**:
     repeating the model name. Hovering a saved chat, or focusing it from the
     keyboard, swaps that timestamp for one stable overflow action without
     shifting the title; right-click opens the same menu. Selection changes the
-    row surface and text hierarchy but never recolors the provider mark.
+    row surface and text hierarchy but never recolors the provider mark. Every
+    provider mark is the vendor's own full-color file in `src/brand/providers/`
+    (OpenAI's black Blossom in light environments, white in dark), never a
+    mask in Rotli ink — in every theme family and with Neutral sidebar icons.
   - **Views** — chats join named views (`chats: [slug]` on the view in
     `views.json`, singular membership like notes): the row menu's "Move to
     view", an active view narrows the front to its chats, and a chat born
@@ -373,10 +387,12 @@ uses their own color".
   64px). Still, never animated (ROTLI_DESIGN#2), `pointer-events: none`, under
   the rows through `isolation` on `.sidebar`, faded by a linear mask.
 - **Icons** (`data-icons` on `.sidebar`; Icons: Neutral · Color, default
-  Neutral). Neutral gives every mark one ink: the Word badge, the kit's clay,
-  and the color provider logos (drawn as masks, `model-logo-ink`). Color gives
-  each row's kind its semantic color (`iconKind`, `kind-*`): boards and
-  folders the accent, PDFs `--danger`, images `--success`, documents and SVGs
-  `--syntax-blue`; Word and the provider logos keep their own.
+  Neutral). Neutral gives every mark one ink: the Word badge and the kit's
+  clay. Color gives each row's kind its semantic color (`iconKind`, `kind-*`):
+  boards and folders the accent, PDFs `--danger`, images `--success`,
+  documents and SVGs `--syntax-blue`; Word keeps its own. Provider logos keep
+  their own colors under both (the owner, 2026-10-10: in one ink every model
+  looked alike); a vendor's mark only says who answers, so Rotli never
+  recolors it.
 - Both live in the app settings on this Mac (`sidebarLook`, `state/appExtras.ts`).
   Proof: `src/lib/sidebarLook.test.ts`, `e2e/sidebar-look.spec.ts`.

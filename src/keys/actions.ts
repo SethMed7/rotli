@@ -49,6 +49,7 @@ import { registerChatWindowActions } from "./chatWindowActions";
 import { registerEditHistoryActions } from "./editHistoryActions";
 import { EDITOR_ACTION, EDITOR_ACTION_LABEL as label } from "./editorActionIds";
 import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
+import { registerFolderWindowActions } from "./folderWindowActions";
 import { registerGraphActions } from "./graphActions";
 import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
@@ -58,6 +59,7 @@ import { registerQuickNoteActions } from "./quickNoteActions";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 import { registerVaultActions } from "./vaultActions";
+import { registerViewModeActions } from "./viewModeActions";
 
 function focusedTabNow() {
   const { root, focusedPaneId } = usePanesStore.getState();
@@ -243,17 +245,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerCaptureActions();
-  registerAction({
-    id: "view.focus",
-    title: "Focus mode",
-    defaultChord: "Alt+Meta+F",
-    run: () => {
-      const ui = useUiStore.getState();
-      if (ui.sidebarMode === "breve") return;
-      ui.setSettingsOpen(false);
-      ui.setFocusMode(!ui.focusMode);
-    },
-  });
+  registerViewModeActions();
   if (LAUNCH_FEATURES.breve)
     registerAction({
       enabled: () => frontOn("breve"),
@@ -888,4 +880,5 @@ export function registerDefaultActions(): void {
   registerQuickNoteActions();
   // LAST: it opts already-registered tab/pane/chat actions into the Chat window
   registerChatWindowActions();
+  registerFolderWindowActions();
 }

@@ -48,7 +48,10 @@ impl CorpusStore {
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default();
-        self.in_secure_home(rel)
+        // a file opened from Finder is the person's, never the vault's: no
+        // cloud model reads it (docs/design/open-in-rotli.md)
+        self.raw.is_some()
+            || self.in_secure_home(rel)
             || self.secure_keywords_for_classification().map_or(true, |keywords| {
                 crate::librarian_rules::secure_by_name(title, rel, &keywords)
             })

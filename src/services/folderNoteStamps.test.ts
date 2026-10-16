@@ -8,6 +8,8 @@ import { MemoryVaultDir } from "./vaultDir";
 
 async function memexVault(): Promise<MemoryVaultDir> {
   const dir = new MemoryVaultDir();
+  // a Rotli vault carries its marker; without it the folder was opened in place
+  await dir.writeText("memex.json", `${JSON.stringify({ id: "mx_fixture01", contract: "3.4" })}\n`);
   await dir.mkdir("wiki/_inbox");
   return dir;
 }

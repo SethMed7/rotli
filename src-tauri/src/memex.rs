@@ -84,10 +84,11 @@ impl FolderAuthorizations {
 /// pins it; #24, audit 2026-07: the two sides drifted 3.6 vs 3.7 and Rust's
 /// verdict is the effective one — a 3.7 brain silently opened read-only).
 /// v3.8 adds readable filename projections, aliases, and a read-only query
-/// grammar on top of v3.7's AI Filer lane. rotli still
+/// grammar on top of v3.7's AI Filer lane. v3.9 adds the imported layout
+/// (`"layout": "imported"` + a role map, vault_roles.rs). rotli still
 /// WRITES to a v3.4 brain (the chat/inbox shape is unchanged), so the supported
 /// band is `[MIN_CONTRACT, CONTRACT_VERSION]`.
-const CONTRACT_VERSION: &str = "3.8";
+pub(crate) const CONTRACT_VERSION: &str = "3.9";
 const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
@@ -522,7 +523,7 @@ pub fn memex_read_chat(
 
 fn read_chat_at(root: &Path, slug: &str) -> Result<VersionedChat, String> {
     let safe = safe_slug(slug)?;
-    let rel = format!("chats/{safe}.md");
+    let rel = format!("{}/{safe}.md", crate::vault_roles::chats_dir(root));
     let path = crate::containment::resolve_beneath(root, Path::new(&rel))?;
     let bytes = fs::read(&path).map_err(|error| format!("read {rel}: {error}"))?;
     let revision = crate::fsutil::revision(&bytes);
@@ -589,6 +590,9 @@ pub struct ChatSummary {
     /// most recently touched chat. The listing stays slug-sorted (the sidebar
     /// depends on that order); recency is the CALLER's concern.
     pub modified_ms: u64,
+    /// When the newest reply landed (ms; 0 = none yet) — the sidebar's order,
+    /// so sending leaves a chat in place and the answer lifts it.
+    pub replied_ms: u64,
     /// `pinned: true` frontmatter — the sidebar sorts pinned chats first.
     pub pinned: bool,
     /// `model:` / `provider:` frontmatter — who answers this chat, in the file
@@ -604,35 +608,8 @@ pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatS
     list_chats_at(&root)
 }
 
-/// The first 41 lines of a file — exactly the window `fm()` can ever read
-/// (opening `---` + its 40-line backstop). Chat listings need only
-/// title/source/attachedTo/pinned, but transcripts grow unbounded, and
-/// read_to_string dragged the whole body in per chat per listing (perf
-/// audit 2026-07-30, finding 27). A 32 KiB byte cap backstops pathological
-/// single-line files. One deliberate divergence from the old whole-file read:
-/// a chat whose BODY is non-UTF-8 used to lose its frontmatter too
-/// (read_to_string failed → ""); the head read now returns it, so such a chat
-/// gains its real title/pinned instead of the "Untitled" fallback.
-fn frontmatter_head(p: &Path) -> String {
-    use std::io::{BufRead, BufReader, Read};
-    let Ok(f) = fs::File::open(p) else {
-        return String::new();
-    };
-    let mut reader = BufReader::new(f).take(32 * 1024);
-    let mut head = String::new();
-    let mut line = String::new();
-    for _ in 0..41 {
-        line.clear();
-        match reader.read_line(&mut line) {
-            Ok(0) | Err(_) => break,
-            Ok(_) => head.push_str(&line),
-        }
-    }
-    head
-}
-
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
-    let dir = root.join("chats");
+    let dir = root.join(crate::vault_roles::chats_dir(root));
     let mut out = Vec::new();
     if let Ok(rd) = fs::read_dir(&dir) {
         for e in rd.flatten() {
@@ -648,7 +625,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
             if slug.eq_ignore_ascii_case("readme") {
                 continue;
             }
-            let text = frontmatter_head(&p);
+            let text = crate::memex_chat_scan::frontmatter_head(&p);
             let modified_ms = fs::metadata(&p)
                 .and_then(|m| m.modified())
                 .ok()
@@ -662,6 +639,7 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
                 attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
                 path: p.to_string_lossy().to_string(),
                 modified_ms,
+                replied_ms: crate::memex_chat_scan::last_reply_ms(&p),
                 pinned: fm(&text, "pinned") == "true",
                 model: fm(&text, "model"),
                 provider: fm(&text, "provider"),
@@ -818,15 +796,25 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
     // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
     atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;
+    write_new_marker(root, serde_json::Map::new())
+}
+
+/// Write a fresh `mx_` root marker stamped with `apps.rotli`, plus any `extra`
+/// fields (an imported vault's layout and role map, vault_roles.rs). Returns
+/// the new vault id. The one place a new marker is made.
+pub(crate) fn write_new_marker(root: &Path, extra: serde_json::Map<String, Value>) -> Result<String, String> {
     let id = format!("mx_{}", Uuid::new_v4());
     let now = now_iso();
-    let info = serde_json::json!({
+    let mut info = serde_json::json!({
         "id": id,
         "contract": CONTRACT_VERSION,
         "createdAt": now,
         "selfHeal": true,
         "apps": { "rotli": { "role": "chat-system", "connectedAt": now } },
     });
+    if let Some(object) = info.as_object_mut() {
+        object.extend(extra);
+    }
     atomic_write(
         &root.join("memex.json"),
         &(serde_json::to_string_pretty(&info).map_err(|e| e.to_string())? + "\n"),
@@ -879,7 +867,7 @@ fn write_chat_at(
     let safe = safe_slug(slug)?;
     let rel = format!("chats/{safe}.md");
     assert_writable(&rel)?;
-    let chats = root.join("chats");
+    let chats = root.join(crate::vault_roles::chats_dir(root));
     fs::create_dir_all(&chats).map_err(|e| e.to_string())?;
     let path = chats.join(format!("{safe}.md"));
     with_file_lock(&path, || {
@@ -1045,7 +1033,7 @@ pub fn memex_rename_chat(
     let new_safe = safe_slug(&new_slug)?;
     assert_writable(&format!("chats/{old_safe}.md"))?;
     assert_writable(&format!("chats/{new_safe}.md"))?;
-    let chats = root.join("chats");
+    let chats = root.join(crate::vault_roles::chats_dir(&root));
     let old_path = chats.join(format!("{old_safe}.md"));
     let new_path = chats.join(format!("{new_safe}.md"));
     if !old_path.exists() {
@@ -1083,7 +1071,7 @@ pub fn memex_archive_chat(app: tauri::AppHandle, root: String, slug: String) -> 
 pub fn memex_reveal_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
     let root = registered_root(&app, &root)?;
     let safe = safe_slug(&slug)?;
-    let path = root.join("chats").join(format!("{safe}.md"));
+    let path = root.join(crate::vault_roles::chats_dir(&root)).join(format!("{safe}.md"));
     if !path.is_file() {
         return Err(format!("chat not found on disk: {safe}"));
     }
@@ -1110,11 +1098,11 @@ fn move_chat_to_bucket(
     let safe = safe_slug(slug)?;
     assert_writable(&format!("chats/{safe}.md"))?;
     assert_writable(&format!("chats/{bucket}/{safe}.md"))?;
-    let src = root.join("chats").join(format!("{safe}.md"));
+    let src = root.join(crate::vault_roles::chats_dir(&root)).join(format!("{safe}.md"));
     if !src.exists() {
         return Err(format!("chat not found: {safe}"));
     }
-    let dir = root.join("chats").join(bucket);
+    let dir = root.join(crate::vault_roles::chats_dir(&root)).join(bucket);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dst = dir.join(format!("{safe}.md"));
     with_file_lock(&src, || fs::rename(&src, &dst).map_err(|e| e.to_string()))
@@ -1154,6 +1142,11 @@ fn write_note_at_with_suppress(
     contents: &str,
     suppress: Option<&crate::corpus::SuppressSet>,
 ) -> Result<String, String> {
+    // a brought-in vault (copy or in place) has no Library lane: its `wiki/`
+    // is the person's folder, so new notes go through the corpus store's Inbox
+    if crate::vault_roles::read(root).is_some() {
+        return Err("This vault keeps new notes in its Inbox, not a Library lane.".into());
+    }
     let safe = safe_slug(stem)?;
     let secure = contents
         .strip_prefix("---\n")
@@ -1505,9 +1498,10 @@ mod tests {
         assert!(contract_ok(Some("3.5"))); // mid-band
         assert!(contract_ok(Some("3.6"))); // mid-band
         assert!(contract_ok(Some("3.7"))); // the Filer-lane contract
-        assert!(contract_ok(Some("3.8"))); // readable identity + query grammar ceiling
+        assert!(contract_ok(Some("3.8"))); // readable identity + query grammar
+        assert!(contract_ok(Some("3.9"))); // the imported layout ceiling
         assert!(!contract_ok(Some("3.3"))); // below the floor
-        assert!(!contract_ok(Some("3.9"))); // above the ceiling
+        assert!(!contract_ok(Some("3.10"))); // above the ceiling
         assert!(!contract_ok(Some("4.0"))); // a future major
         assert!(!contract_ok(None));
     }
@@ -1627,6 +1621,12 @@ mod tests {
         assert!(write_note_at(root, "../escape", "x").is_err());
         assert!(write_note_at(root, "a/b", "x").is_err());
         assert!(write_note_at(root, "Caps", "x").is_err());
+        // a brought-in vault (copy or in place) never grows a wiki/ tree
+        let imported = dir.path().join("imported");
+        std::fs::create_dir_all(&imported).unwrap();
+        crate::vault_roles::mark_in_place(&imported).unwrap();
+        assert!(write_note_at(&imported, stem, body).is_err());
+        assert!(!imported.join("wiki").exists());
     }
 
     #[test]

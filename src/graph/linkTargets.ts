@@ -55,6 +55,17 @@ function outsideCode(line: string): string {
   return prose;
 }
 
+/** A `[[…]]` naming a file, not a note — `![[budget.xlsx]]`, `[[rose.png]]`
+ * (2026-10-13: Rotli writes embeds this way): the extensions the Rust
+ * attachments lane (`mime_of`) knows a type for, other than Markdown. A canvas,
+ * or a title with a dot ("v1.2 notes"), stays a link. The parity fixture pins
+ * both sides. */
+const FILE_TARGET =
+  /\.(?:png|jpg|jpeg|gif|webp|bmp|svg|avif|heic|mp4|m4v|mov|webm|mp3|m4a|wav|pdf|docx|xlsx|excalidraw|csv|json|txt|log|yaml|yml|toml|tsv)$/i;
+function isFileTarget(inner: string): boolean {
+  return FILE_TARGET.test(inner.split(/[|#]/, 1)[0]!.trim());
+}
+
 export function bodyLinkTargets(body: string): string[] {
   const out: string[] = [];
   // the open fence's run: it closes only on the same character, at least as long
@@ -76,7 +87,7 @@ export function bodyLinkTargets(body: string): string[] {
       const end = after.indexOf("]]");
       if (end === -1) break;
       const inner = after.slice(0, end).trim();
-      if (inner && !inner.includes("[") && !out.includes(inner)) out.push(inner);
+      if (inner && !inner.includes("[") && !isFileTarget(inner) && !out.includes(inner)) out.push(inner);
       rest = after.slice(end + 2);
     }
   }

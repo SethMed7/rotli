@@ -341,6 +341,49 @@ imports.
   scatter chart. A repeated label stays its own bar or slice, counted on the axis
   (`Mon (2)`). Other Markdown readers show the fence as a code block holding
   the same data.
+- **Images.** A line that is only an image renders it, in any form a Markdown
+  vault uses (2026-10-13). A Markdown image's path may be Rotli's `storage:`
+  shorthand for the vault's `storage/` folder (`storage:images/rose.png`), or
+  a path read from the vault root first (Rotli's reading) and else relative to
+  the note, as CommonMark, Obsidian, and GitHub read it (`img/rose.png`,
+  `../attachments/rose.png`; `%20` and `<…>` work, and a path that climbs out
+  of the vault does not). Obsidian's `![[rose.png]]` names one file anywhere
+  in the vault (or a path), and `![[rose.png|420]]` sets its width.
+
+  `alt|420` sets a width in the Markdown form, and the resize grip writes the
+  width back in the link's own form. A missing image is found by its file
+  name. Rotli repairs the link in place only for its own `storage:` form; any
+  other link is the person's, so a found image is shown and the note is left
+  as written.
+
+  A dropped, pasted, or attached image is **written** as a standard Markdown
+  path from the note's folder (`../../storage/images/rose.png` from a note in
+  `wiki/_inbox`), each segment escaped so a space or a parenthesis can't end
+  the link (`my%20rose.png`). Images an AI tool or a chat writes, which don't
+  know the note, keep `storage:`.
+- **File embeds.** A sheet, document, or board shows its live editor inside a
+  note, written either way:
+  - A fenced block whose language is `sheet` (`.xlsx`, `.xlsm`, `.csv`),
+    `document` (`.docx`), or `board` (`.excalidraw`), with the file's id (its
+    vault path; a connected vault prefixes `root:`) as the only line.
+  - Obsidian's whole-line `![[budget.xlsx]]` (`.xlsx`, `.xlsm`, `.csv`, `.docx`,
+    `.excalidraw`): the file is found by its vault path, then by the path
+    from the note, then as the one file with that name. A name two files share
+    shows a notice instead of guessing.
+
+  Older notes convert on request: Settings → General → **Link format** shows
+  what it would change and rewrites `storage:` links and the three embed
+  fences into these forms (a Rotli vault only, never a folder opened in place).
+
+  `/sheet`, `/document`, and `/board` **write** `![[path]]` with the file's
+  vault path (`![[storage/rotli/budget.xlsx]]`), and so does converting a
+  Mermaid diagram to a board; fences written before keep working. A
+  `[[…]]` that names a file by its extension (`.png`, `.xlsx`, `.excalidraw`,
+  …) is a file reference, not a link to a note, in the link index and graph.
+
+  A caret on the line reveals the source. Other Markdown readers show the
+  fence as a code block; Obsidian shows `![[file]]` as its own embed (a board
+  needs its Excalidraw plugin).
 
 ## CSS and design tokens
 

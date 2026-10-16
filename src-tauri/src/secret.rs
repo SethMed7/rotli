@@ -21,6 +21,13 @@ use std::sync::{Mutex, OnceLock};
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the text holds secrets.
 pub fn looks_secure(text: &str) -> bool {
+    !secret_spans(text).is_empty()
+}
+
+/// Every secret-shaped span in `text`, as byte ranges: exactly what
+/// `looks_secure` matches. `remote_block` uses the spans to honour a person's
+/// "Send anyway" only for text they typed themselves.
+pub(crate) fn secret_spans(text: &str) -> Vec<std::ops::Range<usize>> {
     static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
     let pats = PATTERNS.get_or_init(|| {
         [
@@ -42,17 +49,35 @@ pub fn looks_secure(text: &str) -> bool {
         .filter_map(|p| regex::Regex::new(p).ok())
         .collect()
     });
-    if pats.iter().any(|re| re.is_match(text)) {
-        return true;
-    }
+    let mut spans: Vec<std::ops::Range<usize>> =
+        pats.iter().flat_map(|re| re.find_iter(text).map(|m| m.range())).collect();
     // UNSEPARATED card numbers (#23, audit 2026-07): "4242424242424242" has no
     // dashes/spaces and skipped every pattern above. A bare 15–16 digit run is
     // too common (ids, phone-ish strings) to flag on shape alone, so each
     // candidate must ALSO pass Luhn — the checksum every real PAN carries.
     // (`\b` never splits two word chars, so a digit run inside a ULID is safe.)
+    // A run right after `<digit>.` is the FRACTION of a decimal number, never a
+    // card (2026-10-13: an Excalidraw coordinate `17.140276393692147` passed
+    // Luhn and locked a board away from agents); `\b` alone sits between `.`
+    // and a digit. A full stop after a card ("… 4242424242424242.") still
+    // counts — only the digits after the point are exempt.
     static PAN: OnceLock<regex::Regex> = OnceLock::new();
     let pan = PAN.get_or_init(|| regex::Regex::new(r"\b\d{15,16}\b").expect("valid PAN regex"));
-    pan.find_iter(text).any(|m| luhn_ok(m.as_str()))
+    spans.extend(
+        pan.find_iter(text)
+            .filter(|m| !is_decimal_fraction(text, m.start()) && luhn_ok(m.as_str()))
+            .map(|m| m.range()),
+    );
+    spans
+}
+
+/// Whether the digit run starting at `start` follows `<digit>.` — the
+/// fractional part of a decimal number. The TS twin is `isDecimalFraction` in
+/// src/ai/guard.ts; parity fixture `looksSecure` pins both.
+fn is_decimal_fraction(text: &str, start: usize) -> bool {
+    let before = text.as_bytes()[..start].iter().rev();
+    let mut before = before.copied();
+    before.next() == Some(b'.') && before.next().is_some_and(|c| c.is_ascii_digit())
 }
 
 /// MARKER backstop. A secure note read includes its managed frontmatter marker,
@@ -65,7 +90,12 @@ pub fn looks_secure(text: &str) -> bool {
 /// nothing — is `echoes_secure_text`. Egress seams call `blocked_for_remote`,
 /// which is both.
 pub fn protected_for_remote(text: &str) -> bool {
-    looks_secure(text) || text.lines().any(|line| marks_protected(line.trim()))
+    looks_secure(text) || marked_protected(text)
+}
+
+/// The marker half alone: a line announcing a secure note or a tainted chat.
+pub(crate) fn marked_protected(text: &str) -> bool {
+    text.lines().any(|line| marks_protected(line.trim()))
 }
 
 /// The frontmatter markers that mean "this text came out of a protected
@@ -245,6 +275,11 @@ pub fn blocked_for_remote(text: &str) -> bool {
 /// default — the CLI, helper, and tests never start cold.
 static LEDGER_WARM: AtomicBool = AtomicBool::new(true);
 
+/// Whether the startup walk has fed the ledger (false: every remote send waits).
+pub(crate) fn ledger_warm() -> bool {
+    LEDGER_WARM.load(Ordering::Acquire)
+}
+
 /// App setup, before the background walk starts.
 pub fn begin_ledger_warmup() {
     LEDGER_WARM.store(false, Ordering::Release);
@@ -392,6 +427,32 @@ mod tests {
         // too short / too long runs don't match the PAN shape
         assert!(!looks_secure("n 42424242424242"));
         assert!(!looks_secure("n 42424242424242424242"));
+    }
+
+    #[test]
+    fn the_fractional_digits_of_a_decimal_are_never_a_card_number() {
+        // real Excalidraw coordinates (2026-10-13): each fraction is a 15–16
+        // digit run, and the first passes Luhn on its own
+        assert!(luhn_ok("140276393692147"));
+        for scene in [
+            r#"{"x": 12, "y": 17.140276393692147}"#,
+            r#"{"x": -2045.6097236063079, "width": 3935.2297743867343}"#,
+            r#"{"height": 1436.7200927734375}"#,
+            "points [[0, 0], [-0.140276393692147, 2.5]]",
+        ] {
+            assert!(!looks_secure(scene), "{scene}");
+        }
+        // a real card number is still a card number, wherever it sits
+        for text in [
+            "4242 4242 4242 4242",
+            "4242-4242-4242-4242",
+            "4242424242424242",
+            r#"{"number":"4242424242424242"}"#,
+            r#"{"text": "pay with 4242424242424242."}"#,
+            "card 4242424242424242.",
+        ] {
+            assert!(looks_secure(text), "{text}");
+        }
     }
 
     // The ledger is process-global and every test in this binary shares it, so

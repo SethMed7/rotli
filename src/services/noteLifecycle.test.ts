@@ -19,6 +19,31 @@ describe("image cascade (images follow their note into Archive/Trash)", () => {
     expect(noteImageRels(body).sort()).toEqual(["storage/pic.png", "storage/shot.png"]);
   });
 
+  test("a path from the note resolves against its folder, decoded; ![[name]] never cascades", () => {
+    const body = [
+      "![](../../storage/images/my%20pic.png)",
+      "![](img/rose.png)",
+      "![](storage/images/root.png)",
+      "![[bloom.png]]",
+      "![](../../../outside.png)",
+    ].join("\n");
+    expect(noteImageRels(body, "wiki/_inbox").sort()).toEqual([
+      "storage/images/my pic.png",
+      "storage/images/root.png",
+      "wiki/_inbox/img/rose.png",
+    ]);
+  });
+
+  test("referencedElsewhere looks for the escaped spelling of a name too", async () => {
+    const seen: string[] = [];
+    const escapedOnly = async (query: string) => {
+      seen.push(query);
+      return query === "my%20pic.png" ? [{ id: "01OTHER" }] : [];
+    };
+    expect(await referencedElsewhere("storage/images/my pic.png", "01ME", escapedOnly)).toBe(true);
+    expect(seen).toEqual(["my pic.png", "my%20pic.png"]);
+  });
+
   test("referencedElsewhere: another note's hit blocks the cascade; own note doesn't", async () => {
     const search = async () => [{ id: "01OTHER" }];
     expect(await referencedElsewhere("storage/pic.png", "01ME", search)).toBe(true);

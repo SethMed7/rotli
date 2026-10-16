@@ -16,13 +16,20 @@ second user-visible product or storage location.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
-- **The Vault view shows the disk itself (2026-09-30).** Beside Main and the
-  named views, the view picker offers **Vault — folders as on disk**
-  (`services/vaultTree.ts`): the vault's own folders and files, folders first,
-  by name, as Finder lists them (a memex's `wiki/` is its root; Archive and
-  Trash stay in the System zone). Nothing is stored for it, and it can't be
-  arranged: it moves when the files move. Off by default, and an app setting
-  on this Mac (`vaultView`). Picking Main or a named view turns it off.
+- **Raw data shows the disk itself (2026-09-30; apart from the views since
+  2026-10-10).** The views menu lists Main and the named views, then, set
+  apart below them, **Raw data — the vault as on disk**
+  (`services/vaultTree.ts`); Settings → Appearance → Notes offers the same
+  choice. It shows the vault's own folders and files, folders first, by name,
+  as Finder lists them (a memex's `wiki/` is its root; Archive and Trash stay
+  in the System zone). It is not a view: nothing is stored for it, and it
+  can't be arranged; it moves when the files move. Off by default, and an app
+  setting on this Mac (`vaultView`). Picking a view, by pointer or ⌘⇧W, turns
+  it off. While it is on, the System zone hides its Library row: the sidebar
+  already is the Finder view the Library opens. Four ideas stay apart: the
+  **vault** is the data on disk, **views** are how you see it, **Raw data**
+  shows it as is, and the **Librarian** organizes it (a vault's name never
+  carries the Librarian's state).
 - **Both manifests are revision-gated, and a conflict is recovered quietly.**
   The app presents the revision it read with every `main.json` / `views.json`
   write; the CLI, the Librarian, and a views write that files a new item into
@@ -119,6 +126,17 @@ second user-visible product or storage location.
   `transparent` mean "not chosen", and such a board follows Settings →
   Appearance → Board background: Match theme (transparent over the theme's
   ground) or White (`src/brand/boardBackground.ts`).
+  Boards are plain Excalidraw files, readable on excalidraw.com and written in
+  its shape (`type`, `version`, `source`, `elements`, `appState`, `files`);
+  Obsidian's `.excalidraw.md` wrapper is not a Rotli format (owner,
+  2026-10-13). **A dropped `.excalidraw` file opens as a board** (2026-10-13):
+  its scene passes the same validation as any board save, then it is COPIED
+  into the board home (the Excalidraw lane in a vault, `Board/` in a plain
+  folder) under its own name, collision-safe, filed in Main like any new board,
+  and opened in a tab. The dropped original is never touched. Mac:
+  `CorpusStore::import_board` behind the drop's one-shot grant
+  (`corpus_import_board`); Rotli Web reads the dropped file's text and creates
+  the board in the connected vault (`openDroppedWebBoard`).
 - A populated item adds its one stable id/path to Main after durable creation
   and identity refresh; presentation may precede that structural work. A new
   plain Markdown note is the deliberate exception: its durable corpus file and
@@ -154,7 +172,7 @@ second user-visible product or storage location.
 - The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
-  While the Vault view is on, a note that is showing in the sidebar is left
+  While Raw data is on, a note that is showing in the sidebar is left
   where it is too, and it moves once it's out of sight. The sidebar sends
   which rows are on screen (`organizer_set_visible`), the daemon requeues
   them like a quiet note (`Skip::Visible`), and Main sends nothing, since a
@@ -218,7 +236,9 @@ second user-visible product or storage location.
   editable support. Its complete workflow must expose user-owned output such as
   transcript, cuts, annotations, or metadata before Rotli calls it supported.
 - Markdown is the primary knowledge surface. It exclusively owns slash commands,
-  typed embed fences, wikilinks, note frontmatter, and note-native workflows.
+  typed embed fences (and Obsidian's whole-line `![[file]]` embeds, read as the
+  same live editors since 2026-10-13; grammar in `SYNTAX.md`), wikilinks, note
+  frontmatter, and note-native workflows.
   DOCX documents, sheets, and Excalidraw boards are secondary bonus work
   surfaces with conventional file behavior, not parallel note systems. Slash
   commands activate in paragraph or list-item content; list markers remain in
@@ -512,6 +532,22 @@ The Rust corpus boundary independently validates every write.
   invalid `created` and `updated` from the pre-move file time, but never bumps a
   valid `updated`. An imported note without a fence stays fenceless on a body
   save or move. Unknown frontmatter fields survive these writes.
+- **A folder opened in place stamps nothing (decision B, 2026-10-13).** In a
+  folder without a Rotli marker (Obsidian, ZenNotes, plain Markdown), a note the
+  person wrote — any note whose `id` is not a ULID, since every Rotli create path
+  mints one — changes only by what the person asked for, on the Mac and on the
+  web alike. A body save writes the new words between the note's own
+  frontmatter bytes (or none) and keeps its file name: no title-slug rename,
+  which would break Obsidian's file-name links, and no `aliases` history. Lock,
+  pin, a field, the AI edit grant, local-AI access, a view assignment, and the
+  Trash/Archive `origin` breadcrumb each add, change, or remove only their own
+  line; a move keeps the file name. No `id`, `created`, or `updated` is minted;
+  Rotli keeps those facts in memory and `.rotli/`. A note Rotli itself makes
+  there carries a ULID and behaves as in a vault (its file follows its first
+  title). Mac: `CorpusStore::keeps_as_written`, `compose_for`, and
+  `corpus_in_place.rs`; web: `FolderNotesService.inPlace`,
+  `vaultHasRotliMarker`, and `src/lib/frontmatterInPlace.ts`. Writer policy: the
+  contract version does not move.
 - A full timestamp is taken as written. A day is never read as an hour: Rotli
   shows a note's age from the file's own time when that time falls on the
   stamped day — the reader's local day, widened to the UTC day because Mac
@@ -740,6 +776,21 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   before either path changes. Removing protection moves it back before dropping
   the ignore rule. The organizer's Rust gate refuses this lane independently of
   the remote-model read gate.
+- **A folder opened in place is never rearranged (2026-10-13, owner rule:
+  Rotli is never the cause of note loss).** In a folder the person brought and
+  opened without a marker (Obsidian, ZenNotes, plain Markdown), marking a note
+  secure adds only a `secure: true` line and the note's gitignore line; the
+  note keeps its path, and no `id`, `created`, or `updated` is minted (a fence
+  is added only to hold the flag). Removing protection removes that line (with
+  any `local_ai_allowed` / `secure_origin`) and the ignore line, so the file
+  returns byte-for-byte. The secret detector never writes or moves there:
+  remote-model reads already refuse a detected note from its content alone.
+  The Librarian never sweeps, queues, or models a folder that is not a Rotli
+  vault. Mac: `CorpusStore.adopted` and `with_secure_line_only`
+  (`src-tauri/src/corpus.rs`); web: `setFolderSecure` decides by the `mx_`
+  marker, not the `wiki/` folder, with the `withSecureLineOnly` twin
+  (`src/lib/frontmatterRaw.ts`). Writer policy: the contract version does not
+  move.
 - **Secure keywords (2026-09-28, the Librarian rules).** The vault's rules
   (`librarianRules.secureKeywords` in `.rotli/settings.json`) list words that
   make a note secure when they appear in its **title or file name** as whole
@@ -904,13 +955,71 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   a manual restore; the plain-folder open never scaffolds its reserved folders
   into a folder with any `memex.json`, a Rotli backup, or a marker still in a
   sweep folder, even when the heal before it failed. Folder inspection
-  reports a recoverable vault as a vault. Plain Markdown and Obsidian folders
-  never get a marker.
+  reports a recoverable vault as a vault. A plain Markdown or Obsidian folder
+  gets a marker only when Rotli connects it: a copy (below), or, since
+  decision I, the folder itself when connected in place (the same marker plus
+  `"inPlace": true`). From then on the heal above runs for it like any vault:
+  a backup marker, and an empty `.obsidian/` if it has none.
+- **An imported vault: contract 3.9** (2026-10-14). *Work on a copy* marks the
+  verified copy with a new `mx_` marker that says `"layout": "imported"` and
+  names Rotli's own folders in a role map, written once:
+  `"folders": {"inbox": "Inbox", "archive": "Archive (Rotli)", "trash":
+  "Trash (Rotli)", "chats": "chats (Rotli)", "storage": "storage (Rotli)"}`
+  (`src-tauri/src/vault_roles.rs`; TS twin `IMPORTED_FOLDER_ROLES` in
+  `src/services/destinations.ts`, pinned by `parity.json`). Rotli's folders
+  are always suffixed, so a copied `Archive/`, `Trash/`, `chats/`, `storage/`,
+  or `wiki/` is the person's ordinary folder; new notes and captures land in a
+  top-level `Inbox/`, and a copied `Inbox/` is used as it. An unusable or
+  colliding role entry falls back to the default, never to the person's
+  folder. The layout (`Layout::Imported`, `src-tauri/src/corpus_layout.rs`)
+  surfaces every top-level folder read-write except the root control files;
+  Rotli's storage folder keeps a Rotli vault's rules (binaries read-only,
+  `excalidraw/` writable). Ids are disk paths, with one projection: a note in
+  the inbox on the capture shelf reads under Captures. Notes keep their file
+  names on save and move, so Obsidian's `[[File name]]` links resolve; a
+  secure flag stays on the note where it is. Empty Trash reaches only Rotli's
+  trash. The copy's Librarian switch is on, at Suggest (the switch is the
+  vault's own, never carried from the previous vault). The Librarian and the
+  Library stay off there until they learn the layout (slice 4c).
+- **A folder connected in place: the same layout, `"inPlace": true`**
+  (decision I, owner 2026-10-15). Connecting a folder of notes in place
+  writes the imported marker and role map, plus `"inPlace": true`
+  (`vault_roles::mark_in_place`; TS twin `markerInPlace`, pinned by
+  `parity.json` importedMarkerInPlace). Only a Rotli imported marker whose
+  `inPlace` is exactly `true` counts. Everything then works as in a copy —
+  chats in its chats folder, new notes and captures in its Inbox, Trash and
+  Archive through Rotli's own sinks (a file too) — with two exceptions: its
+  Librarian switch is always off (`brainEnabled` false, `adopted` true; the
+  store's `brain_enabled` and the filer gate refuse independently), and the
+  person's notes are never stamped (decision B: no `id`, dates, rename
+  aliases, or detector writes; their file names stay). The marker is the
+  truth: every open path (startup, switch, refresh, reconnect, a link) derives
+  the store's `adopted` from it, OR'd with `corpus.json`'s flag, and Rotli Web
+  reads the same field (`vaultOpenedInPlace`) instead of "no marker". A
+  folder opened in place before decision I has no marker and keeps its old
+  behavior (its files never move to Trash); none is added behind the person's
+  back. Another tool's `memex.json` is never replaced, so that folder stays
+  protected as before. A copy of a folder connected in place gets a fresh
+  marker (a new `mx_` id, no `inPlace`, the same role map) and its Librarian
+  on, at Suggest; a copy of a Rotli vault keeps its marker.
+- **Chat in a brought-in vault** (copy or in place). Its corpus is the
+  webview's write target (`MemexInstance.layout: "imported"`, `inPlace`), so
+  chats are written into that vault's chats folder, never into another
+  connected vault. Its notes never take the Library lanes: one predicate,
+  `noteLaneWritable` (`src/memex/config.ts`), keeps every note-creating path
+  (new note, capture, a chat's memory note, save chat as note) on the corpus
+  store, which files them in its Inbox. **No `wiki/` tree is ever made in a
+  brought-in vault:** Rust `memex_write_note` refuses one, and Rotli Web's
+  twin lands in the Inbox. Its own `wiki/` is the person's folder.
+- **The band.** It is `[3.4, 3.9]`: every existing vault stays read-write. An
+  older Rotli reads a 3.9 marker as out of band and opens the vault
+  read-only, in its Rotli-vault layout.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
-  an empty folder, links an existing vault as a switch target, and opens any
-  other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
-  same as picking a folder that already holds notes in setup. An open plain folder is still
-  the switcher's current row and names its header.
+  an empty folder, links an existing vault as a switch target, and connects
+  any other folder (Markdown, Obsidian, ZenNotes) in place with the in-place
+  marker above, the same as picking a folder that already holds notes in
+  setup. A folder already connected in place links back as one. Chat's empty
+  state runs the same Connect.
 - **Dependency folders are never part of a vault** (2026-10-12). `.git` and
   `node_modules` (any depth, any letter case) are skipped by the native corpus
   walk, folder inspection, and the file watcher — one rule,

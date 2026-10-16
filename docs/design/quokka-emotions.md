@@ -74,5 +74,6 @@ currently show `celebrating`, the same pose as the chat's end mark.
    `src/components/character.test.ts` (rendering). E2E: `e2e/chat-buddy.spec.ts`,
    and the banner spec if the thank-you card uses it.
 
-The thank-you banner (`components/onboarding/bannerCanvas.ts`) copies whatever
-`Character` renders, so a new pose appears there with no extra work.
+The thank-you banner (`components/onboarding/thanksBannerScene.tsx`) renders
+`Character` in the theme's scenery, so a new pose appears there with no extra
+work.

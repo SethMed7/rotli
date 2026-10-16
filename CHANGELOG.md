@@ -10,8 +10,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-15
+
+### Added
+
+- **Connect a model from Chat.** The model menu under the message box has a
+  **Connect a model…** item that opens the same chooser setup used: models on
+  this Mac, installing one, or connecting your own Claude, ChatGPT, Cursor, or
+  Gemini. The first time you open Chat in a vault, that chooser comes first,
+  on its own without clicking New chat, and on its own: the message box and
+  suggestions wait until you press **Start chatting** or **New chat**.
+- **Settings choices read clearly.** Pointing at an option no longer fills it
+  in like the selected one, so a choice like Naming's "First message" only
+  looks chosen when it is.
+
+- **Chat asks before it edits a note you wrote.** Instead of quietly making a
+  copy, the chat shows a card: **Allow once**, **Always for this note**, or
+  **No, make a new note**, and waits for your answer. A locked note still
+  can't be edited, and a note you turned AI editing off for can only be turned
+  back on.
+- **Chat asks you questions with options.** Claude can now stop and ask one
+  short question with a few answers to pick from (or type your own) before it
+  writes something long, instead of guessing.
+- **A message held back from a connected model says why, in red.** It names
+  the reason: text shaped like a password, key, or card number; text from a
+  secure note; or Rotli still checking your secure notes after starting. For
+  text you typed yourself, **Send anyway** sends it; you always have the final
+  say over your own words. Text from a secure note still never goes to a
+  connected model. **Edit message** puts your words back in the box, and
+  right after launch the chat waits a moment instead of refusing.
+- **Notes a chat creates show up in Main**, in that chat's folder, like every
+  other new note.
+
+- **Reading mode (⌥⌘R).** Everything but the note you're in steps away, as in
+  Focus mode, and the note is only for reading: it is always beautified,
+  takes no typing, shows no spelling marks, and nothing changes when the
+  pointer moves over it. It still scrolls. Esc or ⌥⌘R leaves it; it's also in
+  the command palette.
+
+- **AI edits in the Aa panel.** A note's Aa panel now has an **AI edits** row
+  beside Secure: **Off** keeps the words yours, **Allowed** lets chat and
+  agents rewrite the note's text. It is the same switch as "Let AI edit the
+  text" in the note's menu, and a locked note says how to unlock it.
+
+- **A copied vault is a Rotli vault, and keeps your folders yours.** Work on a
+  copy now makes the copy a Rotli vault (vault format 3.9). Every folder you
+  brought shows, and your own `Archive`, `Trash`, `chats`, or `storage` folder
+  stays an ordinary folder: Rotli keeps its own Archive and Trash under
+  `Archive (Rotli)` and `Trash (Rotli)`, and new notes land in `Inbox`. Notes
+  keep their file names, so Obsidian links still work. The copy's Librarian is
+  on, at Suggest, whatever the vault you came from had; it starts organizing
+  once it learns the copy's layout.
+
+- **Connect a copy with the Librarian.** Adding an Obsidian vault or a folder
+  of notes now confirms: **Connect** opens it where it is, untouched by the
+  Librarian, or **Connect a copy with the Librarian**. Setup just connects it,
+  and its Librarian step offers the Librarian only on a copy; a folder already
+  connected that way offers the copy in Settings → Librarian. The Librarian is
+  never on for a folder you connected in place, and **Why a copy?** explains:
+  your original is never touched.
+  A copy goes into a new folder beside your vaults, with progress and a Cancel
+  button. Rotli checks every file against the original before opening it, and
+  the original is only ever read, never changed. Linked items it can't follow
+  are named, never skipped silently.
+
+- **Drop an Excalidraw board onto Rotli and it opens, ready to edit.** A
+  `.excalidraw` file dragged onto the window (from Finder, or exported from
+  excalidraw.com) is copied into your vault's boards, added to Main, and
+  opened in a tab, on the Mac and on Rotli Web. The file you dropped stays
+  where it was. Before, it was filed as a read-only asset.
+- **Open a file from Finder in Rotli.** Right-click a Markdown file, an
+  Excalidraw board, an image, or a video and choose Open With → Rotli. It opens
+  in a tab and your edits save to that file. Rotli adds nothing beside it, never
+  looks at the other files in its folder, and never sends it to a cloud model.
+- **Word documents, spreadsheets, and CSVs open from Finder too.** Open With →
+  Rotli on a `.docx`, `.xlsx`, or `.csv` opens it in Rotli's editor, and your
+  edits save to that file. The one-time safety copy of the original stays in
+  Rotli's own cache, so nothing new appears next to your file.
+- **"Open in Rotli" in Finder's right-click menu.** Settings → General →
+  Open in Rotli from Finder adds a Quick Action. Right-click any file or
+  folder, choose Quick Actions → Open in Rotli, and a file opens in a tab while
+  a folder opens in its own window. Remove takes it back out. Rotli changes
+  nothing in Finder until you add it.
+- **Open a folder from Finder in its own window.** Drag a folder onto Rotli in
+  the Dock and it opens raw, like an editor looking at that folder: its files
+  on the left, tabs on the right.
+  Edits save to the files, and nothing else in the folder changes. **Add as
+  vault** in the title bar turns it into your vault, using the same choices as
+  connecting one from the sidebar.
+- **Convert older notes' links in one step.** Settings → General → Link format
+  counts the images and embeds still written in Rotli's own format, shows a
+  few before → after examples, and on a click rewrites them so Obsidian and
+  any Markdown app read them too. Nothing changes until you click, and a folder
+  you opened in place is never converted.
+
 ### Fixed
 
+- **Making a copy keeps one vault, not two.** Choosing "Use the Librarian on
+  a copy" for a folder you had connected in place left both the original and
+  the copy in your vault list. Now only the copy stays, and Rotli takes back
+  the small `memex.json` it had written into your original, so that folder is
+  as you left it.
+- **No stray "Untitled" tab after choosing a vault.** Opening a vault during
+  setup, or switching vaults later, left an empty "Untitled" tab over a blank
+  pane. The window now opens the vault's newest note, or nothing when it has
+  no notes, after every switch, not only at launch.
+- **A `.canvas` file no longer shows up as raw JSON in the public app.**
+  Canvases aren't in this release yet, so Rotli now leaves `.canvas` files out
+  of the sidebar and Main instead of listing them as ordinary files, and a tab
+  left open from before says canvases are coming soon. The file stays in your
+  folder untouched. Development builds still open canvases as before.
+- **The New view card can be closed.** It has a close button now, and Escape
+  or a click anywhere outside it puts it away without making a view.
+- **Chat in a copied vault writes into that vault.** With a copy open and
+  another vault connected, chats were written into the other vault.
+- **"Try again" after a held-back message no longer answers an older
+  request.** The held-back message used to be dropped from the conversation
+  without a word, so the model never saw it. Now it stays on screen with what
+  you can do next, and sending it anyway or editing it replaces the held-back
+  exchange instead of duplicating it.
+- **A copied vault opens with everything in Main.** A copy made with the
+  Librarian opened with an empty Main, so the notes you brought were only
+  under All notes. Main now starts with every folder and note that came over,
+  as a folder connected in place already did. A Main you've arranged is never
+  replaced.
+- **Agents can read and edit boards again when their shapes sit at decimal
+  coordinates.** A board Excalidraw saves stores positions like
+  `17.140276393692147`, and the digits after the point could look like a card
+  number, so Rotli refused the whole board to connected agents ("secret-shaped
+  content"). Digits after a decimal point no longer count; a real card number
+  in a board's text is still refused.
+- **rotli.co and Breve take their pending security updates.** The site moved
+  to Astro 7.2.8 and Sharp 0.35.5 (with seven smaller repairs), and Breve to
+  `ip-address` 10.7.1. Every security fix now available within the current
+  version ranges is applied; the rest wait on upstream libraries, recorded in
+  `docs/development/security.md`.
+- **New images and embeds are written so Obsidian shows them too.** A dropped
+  or pasted image is now linked with a normal Markdown path from the note
+  (instead of Rotli's `storage:` shorthand), and `/sheet`, `/document`, and
+  `/board` insert Obsidian's `![[file]]` embed. Older links keep working.
+  Trashing a note in a folder you opened in place never moves an image along
+  with it, and Hand to AI no longer refuses a note just because its image is
+  linked from a subfolder.
+- **Images and embeds from an Obsidian vault show up in Rotli.** An image linked
+  relative to its note, or written Obsidian's way as `![[rose.png]]`, now
+  displays on the Mac and the web, and `![[budget.xlsx]]`, `![[plan.docx]]`,
+  or `![[map.excalidraw]]` on its own line opens the live sheet, document, or
+  board. When an image has moved, Rotli no longer rewrites a link you wrote; it
+  shows the picture from where it found it. (Only Rotli's own `storage:` links
+  are still repaired in place.)
+- **Editing a note in a folder you opened in place no longer renames it or adds
+  Rotli's fields.** Saving a note from an Obsidian vault used to rename its file
+  after its title (breaking `[[links]]` to it in Obsidian) and add `id`,
+  `created`, and `updated` lines. Now the file keeps its name and its own
+  frontmatter; locking, pinning, a field, a view, or Trash adds just that one
+  line, and undoing it puts the file back exactly. Notes Rotli creates there
+  still follow their title.
+- **A notes folder you open in place is never rearranged.** When you open an
+  Obsidian vault or any folder of notes as it is, Rotli no longer moves a note
+  into a "Secure notes" folder, whether you mark it secure or Rotli spots
+  something that looks like a password or key. The note stays where it is and
+  gets one `secure: true` line; removing protection puts the file back exactly
+  as it was. Secure notes there are still never sent to a cloud model, and the
+  Librarian never organizes a folder that isn't a Rotli vault.
 - **Chat works again on Rotli Web for a vault opened through Rotli Helper.**
   Since 1.8.1, Rotli Web asks Rotli Helper to confirm which vault a chat
   belongs to, but the installers still downloaded Helper 1.4.0, which can't,
@@ -28,6 +189,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The thank-you card after setup is simpler and friendlier.** Its banner is
+  now a whole scene in your theme, with the quokka standing in it. **Share**
+  opens the Mac share sheet (Messages, Mail, AirDrop, Notes and more) with a
+  short note and a link to rotli.co; on Rotli Web it uses the browser's share
+  sheet, or copies the link and says so. The GitHub and X buttons are just
+  their logos. **Take the tour** now comes first and **Start now** is the main
+  button on the right. The banner can no longer be saved or downloaded, and
+  "Tell a friend" is gone in favor of Share.
+- **A folder you connect in place works like any vault.** Chat keeps its
+  conversations in it, new notes and captures land in its `Inbox`, and Trash
+  and Archive work, using Rotli's own `Archive (Rotli)`, `Trash (Rotli)`,
+  `chats (Rotli)`, and `storage (Rotli)` folders so your own Archive, Trash,
+  chats, and storage stay yours. The one difference from a copy: the
+  Librarian never runs there, and Rotli never adds anything to the notes you
+  wrote. Rotli writes a small `memex.json` at the folder's top to remember
+  this. Folders you connected in place before keep working as they did.
+- **Making a copy of a folder you connected in place gives the copy its own
+  identity** and turns its Librarian on, at Suggest, instead of the copy
+  inheriting the original's id and the Librarian staying off.
+- **A copy with its own Archive and Trash asks once** whether to move their
+  notes into Rotli's Archive and Trash, so the Librarian treats them as
+  archived and trashed. The question pops out of the sidebar beside its
+  Archive and Trash rows, waits until setup's thank-you card is closed, and
+  goes away on its own after ten seconds, or with ×, Esc, or a click
+  elsewhere; then it asks again next time Rotli opens, until you answer. Yes moves every file and keeps its name and folder;
+  No moves nothing. Either way Rotli never asks again for that vault.
+- **Chat with no vault offers Connect vault right there**, the same connect
+  flow as the vault menu, instead of sending you to Settings.
+- **Chat has room to breathe.** A reply no longer sits right under your
+  question: messages are spaced clearly further apart than the lines inside
+  them, a new question opens a little wider still, and replies read with a
+  roomier line and paragraph rhythm.
+
+- **The chat list stays put while you wait.** Sending a message no longer
+  jumps the chat to the top of the sidebar; it moves up when the reply
+  arrives, inside its folder too. The time on each row is the time of the
+  last reply.
+
+- **One row per chat, with a dot for what's new.** The sidebar's Activity
+  group at the top is gone, so a chat no longer shows twice. Instead each row
+  carries a small dot beside its time: a softly pulsing ring while a reply is
+  being written, and a solid dot when a reply is waiting that you haven't
+  opened yet. The "Done" labels that got cut to "D…" are gone.
+
+- **Every model logo is in its maker's colors.** OpenAI's logo is OpenAI's
+  black (white on dark themes) instead of the theme's ink, and Llama, Phi, and
+  Mistral models show Meta's blue, Microsoft's four colors, and Mistral's
+  orange — in the sidebar, the model picker, and setup, in every theme and
+  with Neutral sidebar icons.
+
 - **rotli.co's film is a one-minute tour of the Mac app.** The landing hero
   now plays a real recording of the Mac app on synthetic notes: writing a
   note, the Librarian filing it on your Mac, tasks, search, docs, sheets and
@@ -43,6 +254,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The footer's sign-up works with browser agents (an experiment).** In
   browsers that support WebMCP (Chrome, with a trial or a flag), an AI agent
   can fill in your address for you; you still send it yourself.
+- **Update checks go through rotli.co.** The Mac app asks rotli.co first,
+  with its version in the address, and rotli.co passes it to the signed feed
+  on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
+  traffic count Macs per version, with no identifier or personal data; the
+  privacy page and PRIVACY.md say so.
+- **Model logos are in color in chat.** Claude, Gemini, Gemma, and Qwen
+  chats show their own colored marks in the sidebar, including with Neutral
+  sidebar icons, and the model button under the message box shows the
+  picked model's logo instead of a cloud or laptop (hovering still says
+  whether the chat leaves your Mac).
+- **A reply in progress shows in one place.** The quokka and what it is
+  doing ("reading the shelves…", "searching notes…") now sit together on
+  one line at the end of the chat, instead of a dotted line, a separate
+  quokka, and "thinking…" in the message box. The message box keeps saying
+  "Write your next message…" while you wait. In the sidebar, Working and
+  Done always read in full, with a soft dot beside Working; a long chat
+  title is shortened instead.
+- **Raw data sits apart from your views.** The vault's folders as they are
+  on disk are no longer listed as one more view. The views menu now offers
+  **Raw data — the vault as on disk** below your views, set apart, and
+  Settings → Appearance → Notes switches between Views and Raw data. Picking
+  any view, by pointer or ⌘⇧W, leaves Raw data (⌘⇧W didn't before). In Raw
+  data the System area's Library steps aside, since the sidebar already shows
+  the vault's folders. Vault names no longer carry "· raw" for a vault with
+  the Librarian off: the Librarian organizes a vault, it isn't part of its
+  name.
+- **A vault row's options open inside the vault menu.** "…" on a vault now
+  shows that vault's options in place, with Back, instead of closing the menu
+  and opening a second one over the notes.
+- **You can remove the vault you're in.** Remove from Rotli now works on the
+  current vault: Rotli switches to your next vault first, or, if it's your
+  only vault, asks you to choose or make the one to use instead (close the
+  picker and nothing changes). It only disconnects the vault; the folder and
+  its files stay where they are, and Rotli never deletes them.
+- **Sheets look like sheets.** Workbooks and CSV/TSV files now wear a green
+  grid mark in the sidebar, tabs, and file lists, beside the Word mark for
+  documents, instead of the plain file icon that made them easy to miss.
+- **A new version is hard to miss.** When an update is ready, the Settings
+  button at the top of the window wears a clay badge with an up arrow, and a
+  short note drops down from it: "Rotli 1.9.0 is ready to install", with
+  Update… (opens Settings, where the install is) and Later. Later closes the
+  note for this launch; the badge stays until you update.
 
 ### Added
 

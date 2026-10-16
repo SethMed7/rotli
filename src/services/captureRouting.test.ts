@@ -12,6 +12,8 @@ const instance = (id: string, perms: MemexInstance["perms"] = "chats+inbox"): Me
   mode: "local",
   perms,
   brainEnabled: true,
+  layout: "memex",
+  inPlace: false,
 });
 
 const config: MemexConfig = {
@@ -34,5 +36,12 @@ describe("capture vault routing", () => {
   test("an explicit missing or read-only vault never silently falls back", () => {
     expect(() => captureDestination(config, "missing")).toThrow("no longer available");
     expect(() => captureDestination(config, "readonly")).toThrow("write access");
+  });
+
+  test("a brought-in vault keeps captures in its Inbox, never a wiki/ lane", () => {
+    const imported: MemexInstance = { ...instance("corpus"), layout: "imported" };
+    // the default route hands back null: the caller's corpus-store fallback
+    expect(captureDestination({ ...config, instances: [imported] }, null)).toBeNull();
+    expect(() => captureDestination({ ...config, instances: [imported] }, "corpus")).toThrow("write access");
   });
 });

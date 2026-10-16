@@ -32,7 +32,7 @@ import { rangeBetween } from "../../lib/rangeSelect";
 import { iconKind } from "../../lib/sidebarLook";
 import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
-import { DEST, isRootMarker } from "../../services/destinations";
+import { DEST, folderRoles, isRootMarker, isStorageDisk } from "../../services/destinations";
 import {
   useFolders,
   useMainGcIds,
@@ -105,10 +105,12 @@ import type { SidebarChatData } from "./useChatFolders";
 import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
+import { ViewNameEditor } from "./viewNameEditor";
 
 /** The fixed System destinations after Library. Switching vaults changes only
- * their contents and counts; it never adds, removes, or renames these rows. */
-const DEST_ROWS: SystemDestRow[] = [
+ * their contents and counts and, in an imported vault, the folder ids behind
+ * them; it never adds, removes, or renames these rows. */
+const destRows = (): SystemDestRow[] => [
   { id: DEST.storage, label: "Assets", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
@@ -171,10 +173,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     () => [
       ...(foldersData ?? []).filter(
         (f) =>
-          f.id !== "storage" &&
-          !f.id.startsWith("storage/") &&
+          !isStorageDisk(f.id) &&
           // hide internal memex scaffolding from the Brain (_inbox / _templates)
-          !f.id.startsWith("wiki/_"),
+          (folderRoles() !== null || !f.id.startsWith("wiki/_")),
       ),
       ...storageTree.folders,
     ],
@@ -374,16 +375,18 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     setViewInputError(null);
   };
 
+  // picking a view, by pointer or ⌘⇧W's number, also leaves Raw
+  const showView = (name: string | null) => {
+    setVaultOn(false);
+    setActiveView(name);
+  };
   const viewMenuItems = (numbered: boolean) =>
     viewPickerItems(
       viewsManifest,
       activeView,
       viewsWritable,
       {
-        show: (name) => {
-          setVaultOn(false);
-          setActiveView(name);
-        },
+        show: showView,
         create: () => {
           setEditingView("create");
           setViewInputError(null);
@@ -404,7 +407,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       },
     );
   // the view menu by pointer, and numbered for ⌘⇧W; ⌘⇧S numbers the root notes
-  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, setActiveView);
+  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, showView);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -867,7 +870,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     ...(systemOpen
       ? [
           { id: "Brain", kind: "folder" } as RovingRow,
-          ...DEST_ROWS.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
+          ...destRows().map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
         ]
       : []),
   ];
@@ -913,7 +916,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         setContentView("allNotes");
       } else if (row.id === TASKS) {
         setContentView("tasks");
-      } else if (row.id === "Brain" || DEST_ROWS.some((d) => d.id === row.id)) {
+      } else if (row.id === "Brain" || destRows().some((d) => d.id === row.id)) {
         // System rows open the browser surface (2026-07-26), never a dropdown
         openSystemRoot(row.id);
       } else {
@@ -1005,11 +1008,11 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     if (mode !== "brain") return;
     if (fid === "wiki" || fid.startsWith("wiki/")) {
       openSystemRoot("Brain");
-    } else if (fid.startsWith("Storage")) {
+    } else if (fid.startsWith(DEST.storage)) {
       openSystemRoot(DEST.storage);
-    } else if (fid.startsWith("Archive")) {
+    } else if (fid.startsWith(DEST.archive)) {
       openSystemRoot(DEST.archive);
-    } else if (fid.startsWith("Trash")) {
+    } else if (fid.startsWith(DEST.trash)) {
       openSystemRoot(DEST.trash);
     }
   };
@@ -1097,7 +1100,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
           <ViewSectionHeader
-            current={vaultOn ? "Vault" : (activeView ?? "Main")}
+            current={vaultOn ? "Raw data" : (activeView ?? "Main")}
             viewRef={viewsButtonRef}
             onPickView={openViewMenu}
             tour
@@ -1119,46 +1122,17 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             ]}
           />
           {editingView && (
-            <div className="view-editor">
-              <label htmlFor="new-view-name">{editingView === "rename" ? "Rename view" : "New view"}</label>
-              <div className="view-editor-row">
-                <input
-                  id="new-view-name"
-                  autoFocus
-                  type="text"
-                  defaultValue={editingView === "rename" ? (activeView ?? "") : ""}
-                  placeholder="View name"
-                  aria-invalid={!!viewInputError}
-                  aria-describedby={viewInputError ? "view-name-error" : undefined}
-                  onChange={() => viewInputError && setViewInputError(null)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      commitViewName(event.currentTarget.value);
-                    } else if (event.key === "Escape") {
-                      event.preventDefault();
-                      setEditingView(null);
-                      setViewInputError(null);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="view-editor-save"
-                  onClick={(event) => {
-                    const input = event.currentTarget.parentElement?.querySelector("input");
-                    if (input) commitViewName(input.value);
-                  }}
-                >
-                  Save
-                </button>
-              </div>
-              {viewInputError && (
-                <p id="view-name-error" className="view-editor-error" role="alert">
-                  {viewInputError}
-                </p>
-              )}
-            </div>
+            <ViewNameEditor
+              mode={editingView}
+              initialName={editingView === "rename" ? (activeView ?? "") : ""}
+              error={viewInputError}
+              onCommit={commitViewName}
+              onEdit={() => viewInputError && setViewInputError(null)}
+              onClose={() => {
+                setEditingView(null);
+                setViewInputError(null);
+              }}
+            />
           )}
           {deletingView && (
             <div className="view-delete" role="alert">
@@ -1249,12 +1223,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       <SidebarSystem
         open={systemOpen}
         brainCount={brainNotes.length + secureNotes.length}
-        destRows={DEST_ROWS}
+        destRows={destRows()}
         notesByDest={notesByDest}
         brainEnabled={brainEnabledUi}
         rowProps={rowProps}
         zoom={zoom}
         here={hereRow}
+        showLibrary={!vaultOn}
       />
     </>
   );

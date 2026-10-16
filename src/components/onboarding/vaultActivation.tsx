@@ -1,9 +1,10 @@
 // Where notes live, as one decision (the owner, 2026-10-01: "you either start
 // fresh or connect a folder, that's it"; 2026-10-05: "always open native …
 // they can do it from there"). One button opens the macOS folder panel; an
-// empty folder (New Folder in the panel) becomes a fresh vault, a folder that
-// already holds notes is used in place with only a hidden .rotli sidecar.
-// Picking the folder is the confirmation.
+// empty folder (New Folder in the panel) becomes a fresh vault, and a folder
+// that already holds notes asks once: a copy Rotli makes and opens
+// (recommended), or the folder in place with only a hidden .rotli sidecar
+// (services/vaultImport.ts). A Rotli vault opens as it is.
 
 import { useEffect, useState } from "react";
 
@@ -87,17 +88,25 @@ export function useVaultChoice({
       const path = await pickVaultFolder("Choose a folder for your notes");
       if (!path) return;
       // a read-only look first decides what the folder becomes
-      const plan = vaultPlan((await corpusInspectFolder(path)).kind);
+      const inspection = await corpusInspectFolder(path);
+      const plan = vaultPlan(inspection.kind);
+      const openInPlace = async () => {
+        if (await chooseFolder(path)) {
+          await refreshActiveVault();
+        } else {
+          const why = openedOrWhy(false, await corpusStatus());
+          if (why) throw new Error(why);
+        }
+      };
       await onBeforeSwitch?.();
       await flushSettingsNow();
       if (plan === "create") {
         await initMemexAsCorpus(path, librarian());
         await activateCreatedVault();
-      } else if (await chooseFolder(path)) {
-        await refreshActiveVault();
       } else {
-        const why = openedOrWhy(false, await corpusStatus());
-        if (why) throw new Error(why);
+        // a vault, or someone's notes: used in place. Setup never asks about
+        // a copy; the Librarian is its own step, and only it would need one
+        await openInPlace();
       }
       await onDone?.();
     } catch (cause) {

@@ -5,6 +5,7 @@ import { isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "../
 import type { FrontmatterView } from "../lib/tauri";
 import { registerWebVaultIo } from "../lib/webAiSeam";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { DEST, folderRoles } from "./destinations";
 import {
   folderAssetUrl,
   folderFileBytes,
@@ -15,7 +16,7 @@ import {
 import { createManagedFile, discardPristineManagedFile } from "./folderManagedFiles";
 import { readFolderRawMetadata, writeFolderRawMetadata, setFolderProtection } from "./folderMetadata";
 import type { FolderNotesService } from "./folderNotes";
-import type { VaultDir } from "./vaultDir";
+import { type VaultDir, vaultHasRotliMarker } from "./vaultDir";
 
 let connectedDir: VaultDir | null = null;
 let connectedNotes: (() => FolderNotesService | null) | null = null;
@@ -54,8 +55,19 @@ export const webVaultIo = {
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
     ),
   discardPristineManagedFile: (id: string) => discardPristineManagedFile(directory(), id),
-  moveFileToSink: async (id: string, sink: "Archive" | "Trash") =>
-    (await notesService().moveNote(id, sink)).id,
+  moveFileToSink: async (id: string, sink: "Archive" | "Trash") => {
+    // the Rust storage_file_lifecycle_block twin: a folder opened in place keeps
+    // its files where they are (owner rule 2026-10-13)
+    if (!(await vaultHasRotliMarker(directory())))
+      throw new Error("this file can't move (a folder opened in place keeps its files where they are)");
+    // an imported vault's own files stay where the person keeps them; only
+    // Rotli's storage and canvases move (Rust storage_file_lifecycle_block)
+    const roles = folderRoles();
+    if (roles && !id.startsWith(`${roles.storage}/`) && !id.toLowerCase().endsWith(".canvas"))
+      throw new Error("this file can't move (outside Rotli storage)");
+    // the menu's label, resolved to this vault's own sink (Rust move_file_to_sink)
+    return (await notesService().moveNote(id, sink === "Archive" ? DEST.archive : DEST.trash)).id;
+  },
   restoreFile: async (id: string) => (await notesService().restoreNote(id)).id,
   async protection(
     id: string,

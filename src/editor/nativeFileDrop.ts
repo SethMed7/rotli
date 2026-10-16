@@ -40,6 +40,7 @@ import {
 } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { loadConfig } from "../memex/service";
+import { createManagedBoardWithBody } from "../newItems/composition";
 import { invalidateNotes } from "../services/hooks";
 import { showFileNotice } from "../state/fileNotice";
 import { usePanesStore } from "../state/panes";
@@ -53,7 +54,7 @@ import {
   nativeDropPoints,
   nativeDropSpace,
 } from "./externalImageDrop";
-import { deliverFiles } from "./fileDelivery";
+import { deliverFiles, isBoardPath } from "./fileDelivery";
 import { noteIdFacet } from "./livePreview";
 import { useNativeFilePaste } from "./nativeFilePaste";
 import { awaitEditorFor } from "./openedEditor";
@@ -151,6 +152,19 @@ class DropLine {
   hide(): void {
     this.el?.remove();
     this.el = null;
+  }
+}
+
+/** Rotli Web's half of board drop-in: the browser hands the file's text over
+ * directly, so the board is created from it in the connected vault. */
+async function openDroppedWebBoard(file: File): Promise<void> {
+  const name = file.name.replace(/\.excalidraw$/i, "") || "Board";
+  try {
+    await createManagedBoardWithBody(await file.text(), name, { open: true, newTab: true });
+  } catch (error) {
+    showFileNotice(
+      `Couldn’t open ${file.name} as a board — ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -304,7 +318,16 @@ export function useNativeFileDrop(): void {
     };
     const onDrop = (event: DragEvent) => {
       settle();
-      const dropped = [...(event.dataTransfer?.files ?? [])];
+      const all = [...(event.dataTransfer?.files ?? [])];
+      // Rotli Web: a dropped Excalidraw board opens as a board, filed like any
+      // new board (the Mac app does the same through its native drop lane)
+      const boards = isTauri() ? [] : all.filter((file) => isBoardPath(file.name));
+      if (boards.length > 0) {
+        event.preventDefault();
+        for (const file of boards) void openDroppedWebBoard(file);
+      }
+      const dropped = all.filter((file) => !boards.includes(file));
+      if (boards.length > 0 && dropped.length === 0) return;
       const row = webRow(event);
       if (row && dropped.length > 0) {
         event.preventDefault();
@@ -339,10 +362,10 @@ export function useNativeFileDrop(): void {
       }
       const host = dropEditorHost(event.target as Element | null);
       if (!host || !event.dataTransfer) return;
-      const files = [...event.dataTransfer.files].filter((file) => isImagePath(file.name));
+      const files = dropped.filter((file) => isImagePath(file.name));
       if (files.length === 0) {
         // Rotli Web: an unhandled file drop would open the file over the app
-        if (!isTauri() && event.dataTransfer.files.length > 0) {
+        if (!isTauri() && dropped.length > 0) {
           event.preventDefault();
           showFileNotice("Rotli Web takes images only — other files stay where they are.");
         }

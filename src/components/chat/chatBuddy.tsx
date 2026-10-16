@@ -33,6 +33,30 @@ export function ChatBuddy({
   );
 }
 
+/** The thread's live edge: the one buddy, and while a reply is in the works
+ * the status of that work beside it (searching, reading, a thinking word), so
+ * the working state reads as one thing in one place. */
+export function ChatLiveEdge({
+  moment,
+  hour,
+  status,
+}: {
+  moment: ChatBuddyMoment;
+  hour: number;
+  status: string | null;
+}) {
+  return (
+    <div className="chat-buddy-row" data-moment={moment}>
+      <ChatBuddy moment={moment} hour={hour} size={52} className="chat-endmark" />
+      {status && (
+        <p className="chat-live-status" role="status">
+          {status}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** True once a reply lands while this chat is on screen, until the next run
  * starts or another chat opens: the buddy is happy about the answer it just
  * watched land, and calm on a thread reopened later or a run stopped before it
