@@ -275,6 +275,148 @@ Slice 1 stops Rotli *moving* anything there, but notes in a person's
 in place too, once 4b exists. *Done by decision I (2026-10-15) for every
 folder connected in place from then on.*
 
+#### Slice 4c design (proposed 2026-10-16, for owner review)
+
+The Librarian on a copy. Today it stands down in every imported vault: the
+store's `is_memex()` is `Layout::Memex` only (`corpus.rs`), `filer_writable`
+refuses any other layout, and the webview's config keeps the Librarian lane off
+for a vault with a role map (`lib.rs`, "until 4c"). Its whole geometry is
+also hard-wired to `wiki/`:
+
+| Librarian piece | Today (Rotli vault) | Where |
+| --- | --- | --- |
+| Input notes | `wiki/**/*.md`, minus `wiki/README.md`, `_index.md`, dot folders, `wiki/Templates` | `organizer::candidate_rel`, the watcher feed, the reconciliation sweep |
+| Classify (Job A) | only notes in `wiki/_inbox/` | `run_cycle` |
+| Areas | the folders directly under `wiki/`, described by their `_index.md` | `area_vocab`, `area_members` |
+| Filing target | `wiki/{area}` | `run_cycle` (the journal's `after`) |
+| Enrich (Job B) | any input note | `run_cycle` |
+| Folder notes (Job C) | `wiki/{area}/_index.md` | `refresh_indexes`, `corpus::write_index` |
+
+**Owner answers (2026-10-16).** The vault and its views are two layers. In a
+copy, the Librarian organizes the **vault on disk** properly, in LLM-wiki
+style: notes at the root and in the inbox get filed and enriched, into
+subfolders too, so nothing is left sitting in a random place with only a tag
+saying where it belongs. The **views** stay however the person arranged them.
+A Librarian move never changes where a note sits in Main or a named view.
+Daily notes are an ordinary area. Only a locked note stays where it is.
+
+**What 4c does: one geometry, two layouts.** A small layout-owned value, the
+*Librarian's map*, answers the questions in the table above, and the
+organizer asks it instead of naming `wiki/`. A Rotli vault's map returns
+today's values exactly; a test pins them, so a Rotli vault's Librarian cannot
+change. An imported copy's map reads from its role map:
+
+- **Input to file (Classify).** Notes in the role map's `Inbox/` (decision D)
+  and notes at the vault's root. Both are unfiled; the Librarian files them.
+- **Areas are the person's top-level folders**, the daily-notes folder
+  included, minus: the inbox; Rotli's role folders (`Archive (Rotli)`,
+  `Trash (Rotli)`, `chats (Rotli)`, `storage (Rotli)`); dot folders
+  (`.obsidian`, `.trash`, `.rotli`); and the folders Obsidian's settings name
+  for templates (`.obsidian/templates.json`) and attachments
+  (`.obsidian/app.json` `attachmentFolderPath`). Those hold no notes to file
+  into: a template would be filed into, and an attachment folder holds files.
+- **Filing targets are an area or any existing folder inside one**
+  (`Work/Clients/`). Classify sees the area's subfolders, each described by
+  its `_index.md` when it has one, and picks the deepest folder that fits.
+  It never invents a folder. A copy with no area has nothing to file into, so
+  Enrich still runs, and Suggest says so.
+- **Enrich runs on every note** in the vault outside the excluded folders
+  (decision A: candidates anywhere in the tree). Its tags and links go in
+  frontmatter, which a copy allows (4a).
+- **`_index.md` is written in each area** (decision E), at `<Area>/_index.md`,
+  with the same generated-file marker and the same rule that keeps a person's
+  edits above it. Its first prose line describes the area to Classify.
+  Obsidian shows it as an ordinary note.
+- **Locked notes never move** and are never rewritten. This is the existing
+  law: no AI edits a locked note.
+
+**A move keeps every link working.** In a copy, a note's id is its disk
+path, and filing can change a note's depth (root → `Work/Clients/`). So every
+Librarian move does three things in the same apply, under the moved note's
+lock:
+
+1. **The note's own relative links are rebased.** Markdown links and embeds
+   (an image path `attachments/x.png` becomes `../../attachments/x.png`) are rebased to
+   its new folder, and so is Rotli's `noteImageLink` form. `[[wikilinks]]` and
+   `![[embeds]]` resolve by name and are left as written. The file name is
+   kept (4a).
+2. **Notes that link to it by relative path are rebased too.** A locked
+   linker is never rewritten, so a move that would break a locked note's
+   link is refused, and the refusal is journaled.
+3. **Every view that references it follows the new path**, the same
+   re-pointing a person's rename already gets in the webview
+   (`viewTree.ts`, `renameMainRef`). The daemon runs without the webview, so
+   this is done in Rust, and the rule is defined once, with a parity fixture
+   for the TS side. The note keeps its place in Main and every named view.
+
+Anything that can't be rebased (a link outside the vault, or a path whose
+target is missing) leaves the link as written. A move whose links can't all
+be kept is refused rather than half-done. Suggest shows the links a move
+would rewrite.
+
+*Found while specifying, a gap today:* a person's own move of a note in an
+imported vault (a sidebar drag) doesn't rebase relative links either
+(`corpus::move_note`). The same rebase helper fixes it, so 4c-1 applies it to
+every note move in an imported vault, not only the Librarian's.
+
+**The gates move from "a Rotli vault" to "a vault the Librarian may write".**
+`librarian_writes()` is true for a Rotli vault not opened in place (today's
+`is_memex()`), and for an imported copy whose marker has no `inPlace`. Every
+present `is_memex()` gate on the Librarian, `filer_writable`, and the
+webview's lane check read it instead. `is_memex()` keeps its meaning for the
+Library note lane (`wiki/_inbox`), which an imported vault never uses: its new
+notes keep going through the corpus store into `Inbox/`.
+
+**Never in a folder connected in place (decisions H and I).** The three
+refusals stay and are tested on an in-place folder that has an `Inbox/` and
+areas: the switch reads off, the store's `brain_enabled` is false, and
+`filer_writable` refuses. A folder opened in place before decision I has no
+marker. Its layout is not `Imported`, so it is refused as today. Legacy layouts
+are refused too.
+
+**Suggest first.** A copy already starts with its Librarian on, at Suggest
+(decision G). 4c adds nothing to that. The first pass proposes and journals,
+and nothing moves until the person accepts or turns the Librarian up.
+
+**Proof.** Rust:
+- The map's Rotli-vault values are pinned.
+- An imported fixture has `Inbox/`, root notes, areas with nested folders, a
+  daily folder, attachment and template folders, a locked note, and a
+  person's `Archive/`.
+- Suggest is write-free on note files.
+- An accepted proposal files a root note into `Work/Clients/` with its name
+  kept. Its image links and an inbound relative link are rebased, and its
+  Main and named-view slots are re-pointed and unmoved.
+- A move that would break a locked note's link is refused.
+- `_index.md` lands only in areas.
+- The in-place refusals hold three ways.
+
+Webview: the Librarian controls show for a copy and stay replaced by the copy
+offer in place. A person's drag rebases links. E2E (web lane): a copy's
+Suggest card proposes the filing. Native: the `validate-in-the-native-app`
+run on a synthetic imported copy, since the daemon only runs in the Mac app.
+
+**Stages (one PR each, held for review).**
+
+1. **4c-1: the map and safe moves.** Introduce the Librarian's map and route
+   `candidate_rel`, the watcher feed, the sweep, `area_vocab`, `area_members`,
+   the filing target, and `_index.md` paths through it. Add the link-rebasing
+   move and the Rust view re-pointing, and use them for a person's moves in an
+   imported vault. The Librarian's gates stay closed.
+2. **4c-2: the Librarian on a copy.** `librarian_writes()`, root and inbox
+   input, subfolder targets, the Obsidian folder exclusions, and the webview
+   lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
+3. **4c-3: native acceptance** on a synthetic copy, with evidence.
+
+**Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
+functionality of the Librarian; it is to add security so a user can't blame
+us for losing a note." Whatever the Librarian does in a Rotli vault, it does
+in a copy, at the same trust setting, and nothing more or less. 4c changes only
+*where* things are (the map), never *what* the Librarian does. So re-filing
+notes a person already placed (`Verb::Refile`, the planned pass whose
+ladder rung is already pinned: review below Organize) comes to copies the day
+it ships for Rotli vaults. It is a planned verb, not dead code, and stays.
+
 ### 5. Protected originals (open in place)
 
 An adopted folder, and the source of any import, is **protected**:
