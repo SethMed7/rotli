@@ -343,7 +343,7 @@ lock:
 2. **Notes that link to it by relative path are rebased too.** A locked
    linker is never rewritten, so a move that would break a locked note's
    link is refused, and the refusal is journaled.
-3. **Every view that references it follows the new path**, the same
+3. *(Not needed; see 4c-1b built: note ids are stable.)* **Every view that references it follows the new path**, the same
    re-pointing a person's rename already gets in the webview
    (`viewTree.ts`, `renameMainRef`). The daemon runs without the webview, so
    this is done in Rust, and the rule is defined once, with a parity fixture
@@ -401,8 +401,7 @@ run on a synthetic imported copy, since the daemon only runs in the Mac app.
 1. **4c-1: the map and safe moves.** Introduce the Librarian's map and route
    `candidate_rel`, the watcher feed, the sweep, `area_vocab`, `area_members`,
    the filing target, and `_index.md` paths through it. Add the link-rebasing
-   move and the Rust view re-pointing, and use them for a person's moves in an
-   imported vault. The Librarian's gates stay closed.
+   move for every move. The Librarian's gates stay closed.
 2. **4c-2: the Librarian on a copy.** `librarian_writes()`, root and inbox
    input, subfolder targets, the Obsidian folder exclusions, and the webview
    lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
@@ -421,7 +420,29 @@ candidate and templates tests, which now run against the map. A copy's map
 folders set aside, Rotli's role folders skipped) is tested on a synthetic
 Obsidian copy, but nothing reaches it yet: the gates stay closed until 4c-2.
 `filer_writable` still names `wiki/`; it is the gate, so it moves in 4c-2.
-**4c-1b** (next) adds the link-rebasing move and the Rust view re-pointing.
+**4c-1b** (next) adds the link-rebasing move.
+
+**4c-1b built (2026-10-16, one PR).** Moves keep links working, in every
+vault, not only copies. `CorpusStore::follow_moves` takes a batch of
+`(old, new)` paths after any move (a person's Archive/Trash and Restore, an
+agent's move, the Librarian's filing and undo, the person-sinks fold, files
+as well as notes). In one walk it re-points every relative Markdown link
+the batch would break: a moved note's own links, and links in other notes
+to a moved file. Order inside a batch doesn't matter, so a note moving with
+the image beside it keeps its link to `kiln.png` as written. Only the path inside `(…)`
+changes, in any unlocked note whatever its AI-edits grant (owner,
+2026-10-16: path fixes are upkeep, not writing). A locked note is never
+written, and the Librarian or an agent refuses a move that would break a
+locked note's link. Two corrections to the design above, found while
+building:
+
+- **No view re-pointing is needed.** A note in a copy has a stable id in
+  `.rotli/index.json` (a ULID), not its path, so Main and named views keep
+  their slots across any move. Only files are path-addressed, and the
+  Librarian never moves files.
+- **A person's drag in the sidebar never moved a file.** It rearranges the
+  view. The disk moves a person makes are Archive, Trash, and Restore, and
+  those now keep links working too.
 
 **Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
 functionality of the Librarian; it is to add security so a user can't blame

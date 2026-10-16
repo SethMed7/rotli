@@ -35,6 +35,11 @@ pub(crate) fn note_image_link(wire: &str, folder: &str) -> String {
         Some((root, rest)) if !root.is_empty() && !root.contains('/') && !rest.starts_with('/') => rest,
         _ => wire,
     };
+    link_from(folder, rel)
+}
+
+/// The encoded Markdown path from `folder` to the vault file `rel`.
+pub(crate) fn link_from(folder: &str, rel: &str) -> String {
     let target: Vec<&str> = rel.split('/').filter(|part| !part.is_empty()).collect();
     let from: Vec<&str> = folder.split('/').filter(|part| !part.is_empty()).collect();
     let mut shared = 0;

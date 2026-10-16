@@ -198,4 +198,4 @@ pub(crate) fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
 
 #[cfg(test)]
 #[path = "librarian_map_tests.rs"]
-mod tests;
+pub(crate) mod tests;

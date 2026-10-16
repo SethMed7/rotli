@@ -4025,6 +4025,7 @@ impl CorpusStore {
         {
             return Err("note is locked — an external agent may not move it".into());
         }
+        self.refuse_breaking_locked_links(&rel)?;
         if self.layout == Layout::Memex
             && (rel == "wiki" || rel.starts_with("wiki/"))
             && (target_folder == "wiki" || target_folder.starts_with("wiki/"))
@@ -5052,10 +5053,15 @@ impl CorpusStore {
                 target_folder.clone()
             };
             let path = self.abs(&rel);
-            return crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &dest));
+            let meta = crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &dest))?;
+            self.follow_moves(&[(rel, meta.id.clone())])?;
+            return Ok(meta);
         }
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || self.relocate(id, &rel, &target_folder))
+        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(id, &rel, &target_folder))?;
+        let new_rel = self.resolve_note_rel(&meta.id)?;
+        self.follow_moves(&[(rel, new_rel)])?;
+        Ok(meta)
     }
 
     /// Move a NON-markdown item (a board, a surfaced file) between folders
@@ -5211,7 +5217,9 @@ impl CorpusStore {
         };
         // A move is metadata-only: everything after the frontmatter fence lands
         // byte-for-byte as it was (2026-09-29). Only a note that had no
-        // frontmatter gains the one separator line the new block needs.
+        // frontmatter gains the one separator line the new block needs. The
+        // caller's `follow_moves` then re-points the relative link paths the
+        // move would break (2026-10-16), and nothing else.
         let out = if as_written {
             compose_in_place(&text, &fm)
         } else if had_frontmatter {
@@ -5460,8 +5468,9 @@ impl CorpusStore {
         if folder_of(rel) == target_folder {
             return Err(format!("already in {target_folder}"));
         }
+        self.refuse_breaking_locked_links(rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        let meta = crate::fsutil::with_file_lock(&path, || {
             let text = fs::read_to_string(&path).map_err(|e| format!("read {rel}: {e}"))?;
             let id = parse_document(&text)
                 .0
@@ -5469,7 +5478,10 @@ impl CorpusStore {
                 .id
                 .ok_or("note has no id")?;
             self.relocate(&id, rel, target_folder)
-        })
+        })?;
+        let new_rel = self.resolve_note_rel(&meta.id)?;
+        self.follow_moves(&[(rel.clone(), new_rel)])?;
+        Ok(meta)
     }
 
     /// Append one line to the brain change JOURNAL (`.rotli/brain-journal.jsonl`) —
@@ -8719,6 +8731,8 @@ pub mod alias_cleanup;
 pub mod link_convert;
 #[path = "corpus_note_pass.rs"]
 pub mod note_pass;
+#[path = "corpus_link_rebase.rs"]
+pub mod link_rebase;
 /// The Graph view's Links projection — a child module.
 #[path = "corpus_links.rs"]
 pub mod links;
