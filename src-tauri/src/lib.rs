@@ -41,6 +41,7 @@ mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
+mod librarian_map;
 mod librarian_rules;
 mod localmodel;
 mod memex;

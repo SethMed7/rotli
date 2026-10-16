@@ -33,6 +33,7 @@ use ulid::Ulid;
 
 use crate::chat::{self, WireMsg};
 use crate::corpus::{self, CorpusState};
+use crate::librarian_map::LibrarianMap;
 use crate::organizer_knobs::{connected_lane, parse_knobs, Knobs, DEFAULT_QUIET};
 
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
@@ -290,10 +291,11 @@ impl OrganizerHandle {
         }))
     }
 
-    /// Watcher feed: keep `wiki/**/*.md`, drop `_index.md` / `wiki/README.md` /
-    /// dot components (the candidate filter). Paths arrive absolute.
+    /// Watcher feed: keep the vault's Librarian input notes (the map's
+    /// candidate filter). Paths arrive absolute.
     pub fn enqueue(&self, root: &Path, paths: &[PathBuf]) {
         let mut added = false;
+        let map = LibrarianMap::at(root);
         {
             let mut q = self.0.queue.lock().unwrap();
             for p in paths {
@@ -301,7 +303,7 @@ impl OrganizerHandle {
                     continue;
                 };
                 let rel = rel.to_string_lossy().replace('\\', "/");
-                if !candidate_rel(&rel) {
+                if !map.is_candidate(&rel) {
                     continue;
                 }
                 q.insert(rel, Instant::now());
@@ -459,32 +461,6 @@ fn parse_state(json: &str) -> OrganizerFile {
     serde_json::from_str(json).unwrap_or_default()
 }
 
-/// The Templates folder (1.3.0) — byte-identical to TEMPLATES_BRAIN_FOLDER in
-/// src/services/templates.ts (parity.json templatesBrainFolder). The notes in it
-/// are the user's saved layouts for `/template`: placeholders, not knowledge. So
-/// the daemon never files a capture INTO it (it is no area), never enriches what
-/// is in it, and writes no `_index.md` there. It stays an ordinary, visible
-/// folder to everything else.
-pub(crate) const TEMPLATES_BRAIN_FOLDER: &str = "wiki/Templates";
-
-fn in_templates(rel: &str) -> bool {
-    rel.strip_prefix(TEMPLATES_BRAIN_FOLDER)
-        .is_some_and(|rest| rest.starts_with('/'))
-}
-
-/// The enqueue/sweep filter: only `wiki/**/*.md` notes are the daemon's input.
-/// `_index.md` is the daemon's own OUTPUT (never an input candidate),
-/// `wiki/README.md` is the pinned human trust artifact (§3.4 — never touched),
-/// and dot components are sidecar/temp plumbing the watcher filters anyway.
-fn candidate_rel(rel: &str) -> bool {
-    rel.ends_with(".md")
-        && rel.starts_with("wiki/")
-        && rel != "wiki/README.md"
-        && rel.rsplit('/').next() != Some("_index.md")
-        && !rel.split('/').any(|c| c.starts_with('.'))
-        && !in_templates(rel)
-}
-
 /// In-memory snapshot of one note read straight off disk. NEVER
 /// `read_frontmatter` — that path WRITES on read (the auto-secure flag), and a
 /// Suggest run must be provably write-free on corpus files.
@@ -625,26 +601,15 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
 
 // ─── pure core: classify ─────────────────────────────────────────────────────
 
-/// The Brain's area vocabulary: `wiki/<area>` directories (never `_inbox`,
-/// never underscore/dot names), each with the first content line of its
-/// `_index.md` as a one-line description ("" when none). Lock-free reads.
+/// The Brain's area vocabulary: the Librarian map's areas, each with the first
+/// content line of its `_index.md` as a one-line description ("" when none).
+/// Lock-free reads.
 fn area_vocab(root: &Path) -> Vec<(String, String)> {
-    let Ok(entries) = std::fs::read_dir(root.join("wiki")) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter_map(|e| e.file_name().to_str().map(str::to_string))
-        .filter(|n| !n.starts_with('_') && !n.starts_with('.'))
-        // saved layouts are not an area to file captures under
-        .filter(|n| format!("wiki/{n}") != TEMPLATES_BRAIN_FOLDER)
-        .collect();
-    names.sort();
-    names
+    let map = LibrarianMap::at(root);
+    map.areas(root)
         .into_iter()
         .map(|name| {
-            let desc = std::fs::read_to_string(root.join("wiki").join(&name).join("_index.md"))
+            let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
                 .ok()
                 .and_then(|t| {
                     let (_, body) = corpus::parse_document(&t);
@@ -745,11 +710,9 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
 /// model echo it into `links:` of committed notes (§4.2.2). The check costs one
 /// read per wiki note, once per cycle — the price of the absolute rule.
 fn list_peers(root: &Path) -> Vec<(String, String)> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    let mut peers: Vec<(String, String)> = rels
+    let mut peers: Vec<(String, String)> = LibrarianMap::at(root)
+        .candidates(root)
         .into_iter()
-        .filter(|rel| candidate_rel(rel))
         .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked))
         .map(|rel| {
             let stem = rel
@@ -955,11 +918,9 @@ struct IndexRow {
 /// README are never members; secure/locked never listed) in canonical
 /// title-then-id order.
 fn area_members(root: &Path, area: &str) -> Vec<IndexRow> {
-    let mut rels = Vec::new();
-    collect_md(root, &format!("wiki/{area}"), &mut rels);
-    let mut rows: Vec<IndexRow> = rels
+    let mut rows: Vec<IndexRow> = LibrarianMap::at(root)
+        .area_candidates(root, area)
         .iter()
-        .filter(|rel| candidate_rel(rel))
         .filter_map(|rel| snapshot_note(root, rel).ok())
         .filter(|s| !s.secure && !s.locked)
         .map(|s| IndexRow {
@@ -1324,6 +1285,7 @@ pub(crate) fn run_cycle(
     rels.sort();
     inner.emit_progress(serde_json::json!({ "phase": "start", "total": rels.len() }));
 
+    let map = LibrarianMap::at(root);
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
     // the Vault view's visible notes, read once per pass (empty in Main)
@@ -1411,8 +1373,8 @@ pub(crate) fn run_cycle(
         inner
             .emit_progress(serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }));
 
-        // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
-        if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
+        // ── Job A — Classify (unfiled notes only) ─────────────────────────────
+        if map.is_unfiled(&rel) && !classify_covered(&snap, &state) {
             let vocab = vocab.get_or_insert_with(|| {
                 crate::librarian_rules::with_people_groups(area_vocab(root), &knobs.rules)
             });
@@ -1506,7 +1468,7 @@ pub(crate) fn run_cycle(
                                         .unwrap_or_default(),
                                 },
                                 after: match verb {
-                                    Verb::FileStaged => format!("wiki/{area}"),
+                                    Verb::FileStaged => map.area_dir(&area),
                                     _ => area.clone(),
                                 },
                                 confidence: Some(conf),
@@ -1869,6 +1831,7 @@ fn refresh_indexes(
     state: &mut OrganizerFile,
     report: &mut CycleReport,
 ) -> Result<(), String> {
+    let map = LibrarianMap::at(root);
     for (area, _) in area_vocab(root) {
         let members = area_members(root, &area);
         if members.is_empty() {
@@ -1879,7 +1842,7 @@ fn refresh_indexes(
             continue; // membership (incl. summaries) unchanged since last build
         }
         let body = render_index(&area, &members);
-        let rel = format!("wiki/{area}/_index.md");
+        let rel = map.index_rel(&area);
         let disk = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
         if body == disk {
             // fixed point — record it (this is also how a FRONTEND approval
@@ -1970,14 +1933,13 @@ fn state_pretty(state: &OrganizerFile) -> String {
     serde_json::to_string_pretty(state).unwrap_or_else(|_| "{}".into())
 }
 
-/// The reconciliation sweep (doc §2 gate 3): walk `wiki/**/*.md` lock-free and
+/// The reconciliation sweep (doc §2 gate 3): walk the Librarian's notes lock-free and
 /// return every candidate some job still has work on (body hash differs from
 /// the recorded classify AND enrich markers) — a DIFF sweep, not a re-process.
 fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => !(classify_covered(&s, state) && enrich_covered(&s, state)),
             Err(_) => false,
@@ -1995,10 +1957,9 @@ fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
 /// the cycle itself would exclude them. The never-clobber baseline
 /// (`last_fields`) is untouched — user-owned values stay theirs.
 fn audit_gaps(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => {
                 if s.locked || s.secure {
@@ -2027,24 +1988,6 @@ fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
         if let Some(ns) = state.notes.get_mut(&state_key(&snap)) {
             ns.hash.clear();
             ns.proposed.enrich.clear();
-        }
-    }
-}
-
-fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(root.join(prefix)) else {
-        return;
-    };
-    for entry in entries.filter_map(|e| e.ok()) {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        let rel = format!("{prefix}/{name}");
-        match entry.file_type() {
-            Ok(t) if t.is_dir() => collect_md(root, &rel, out),
-            Ok(t) if t.is_file() && name.ends_with(".md") => out.push(rel),
-            _ => {}
         }
     }
 }
@@ -2746,6 +2689,8 @@ mod tests {
 
     #[test]
     fn candidate_filter_drops_index_readme_dots_nonwiki() {
+        // a Rotli vault's Librarian map, pinned: these are its rules exactly
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(candidate_rel("wiki/_inbox/foo-a1b2c3.md"));
         assert!(candidate_rel("wiki/Projects/alazan-84-x1y2z3.md"));
         assert!(
@@ -2768,6 +2713,7 @@ mod tests {
 
     #[test]
     fn the_templates_folder_is_neither_input_nor_a_filing_area() {
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(!candidate_rel("wiki/Templates/meeting-notes.md"));
         assert!(!candidate_rel("wiki/Templates/Work/weekly.md"));
         // only that folder: a lookalike name and a nested namesake stay ordinary
