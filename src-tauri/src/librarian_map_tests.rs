@@ -2,7 +2,8 @@ use super::*;
 use std::fs;
 use tempfile::TempDir;
 
-fn write(root: &Path, rel: &str, text: &str) {
+/// Write a vault file, making its folders (shared by the move tests).
+pub(crate) fn write(root: &Path, rel: &str, text: &str) {
     let path = root.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(path, text).unwrap();

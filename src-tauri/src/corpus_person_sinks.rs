@@ -86,6 +86,7 @@ impl CorpusStore {
             return Err("Only a copy Rotli made has its own Archive and Trash to move into.".into());
         };
         let mut moved = PersonSinks::default();
+        let mut moves = Vec::new();
         for (role, sink) in [("archive", roles.archive.as_str()), ("trash", roles.trash.as_str())] {
             let Some(folder) = self.person_sink(role) else { continue };
             let mut count = 0;
@@ -96,12 +97,14 @@ impl CorpusStore {
                 self.writable(&rel)?;
                 self.writable(&target)?;
                 let path = self.abs(&rel);
-                if rel.to_ascii_lowercase().ends_with(".md") {
+                let new_rel = if rel.to_ascii_lowercase().ends_with(".md") {
                     let id = self.wire_id_of(&rel)?;
-                    crate::fsutil::with_file_lock(&path, || self.relocate(&id, &rel, &target))?;
+                    let meta = crate::fsutil::with_file_lock(&path, || self.relocate(&id, &rel, &target))?;
+                    self.resolve_note_rel(&meta.id)?
                 } else {
-                    crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &target))?;
-                }
+                    crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &target))?.id
+                };
+                moves.push((rel, new_rel));
                 count += 1;
             }
             remove_if_emptied(&self.root.join(&folder));
@@ -111,6 +114,7 @@ impl CorpusStore {
                 moved.trash = count;
             }
         }
+        self.follow_moves(&moves)?;
         Ok(moved)
     }
 }

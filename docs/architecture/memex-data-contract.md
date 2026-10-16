@@ -631,7 +631,18 @@ The Rust corpus boundary independently validates every write.
   an AI. Rust enforces it at every AI body-write seam; `ai_edit_policy.rs` and
   `src/lib/aiEditPolicy.ts` are twins pinned by the parity fixture. Metadata
   and filing are not body edits: filing moves the file and writes every byte
-  after the frontmatter fence unchanged.
+  after the frontmatter fence unchanged, except relative link paths. **Moves
+  keep links working (owner, 2026-10-16):** after any move (filing, an
+  agent's, Archive/Trash and Restore, files included), the relative Markdown
+  links it would break are re-pointed: the moved note's own, and links in
+  other notes to the moved file. Only the path inside `(…)` changes, never a
+  word, in any unlocked note whatever its `ai_edit` grant; a locked note is
+  never written, and an AI move (the Librarian's, an agent's) that would
+  break a locked note's link is refused. `[[wikilinks]]` resolve by name and
+  are left alone; a link outside the vault or to a missing file stays as
+  written. One pass per batch (`CorpusStore::follow_moves`,
+  `src-tauri/src/corpus_link_rebase.rs`). A note's id is stable across a move
+  (`.rotli/index.json`), so Main and views need nothing.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance
   (including `created_by`) and the `ai_edit` grant cannot be forged through
   the raw metadata editor.
