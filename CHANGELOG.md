@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A smaller app.** Rotli's own code is built for size now, about 4.5 MB
+  smaller. Search and reading PDFs keep full speed.
+
 - **The Librarian organizes a copy of your folder.** When Rotli makes a copy
   of an existing folder of notes (an Obsidian vault, say), its Librarian now
   works there exactly as it does in a Rotli vault, at the trust setting you
