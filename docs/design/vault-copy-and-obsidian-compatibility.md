@@ -444,6 +444,37 @@ building:
   view. The disk moves a person makes are Archive, Trash, and Restore, and
   those now keep links working too.
 
+**4c-2 built (2026-10-19, one PR).** The Librarian runs on a copy.
+`CorpusStore::librarian_writes()` (a Rotli vault or an imported copy, never
+in place, never legacy) replaces `is_memex()` as the daemon's gate and
+`filer_writable`'s, and the filer asks the map where it may write
+(`LibrarianMap::writes`: a copy's whole tree except Rotli's role folders, dot
+folders, and Obsidian's set-aside folders). Classify's filing targets are
+`LibrarianMap::filing_targets`: the areas and the folders already inside
+them, in both layouts (parity: a Rotli vault files into `wiki/Work/Clients`
+too); People's folders stay the rules' alone. Three things found while
+building:
+
+- **A copy's notes have no frontmatter `id`.** Their stable ids live in
+  `.rotli/index.json`, so `filer_move` and the daemon take the store's id
+  (`wire_id_of`) instead of refusing ("note has no id").
+- **Approving a root note's filing compared folders by the last `/`**, which
+  a root note doesn't have, so the webview always said it had moved.
+  `brainJournal` and `brainFiling` now use `parentPath`.
+- **The Librarian chat refused every note outside `wiki/`.**
+  `librarianReaches` and `libraryAreas` read the role map, so the chat takes
+  a copy's notes and offers its top-level folders.
+
+`is_memex()` keeps meaning the Library note lanes, and the Breve importer
+(which writes `wiki/reference`) now checks it explicitly, since the filer
+gate alone would let it write into a copy. Proof:
+`src-tauri/src/organizer_copy_tests.rs` (Suggest write-free, Organize files a
+root note into `Work/Clients` with its links kept and its id unchanged, a
+locked linker keeps it in place, `_index.md` only in areas, the in-place
+refusals three ways, and nested filing in a Rotli vault); TS:
+`librarianBar.test.ts`, `librarianSession.test.ts`, `brainJournal.test.ts`.
+**4c-3** (native acceptance on a synthetic copy) is next.
+
 **Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
 functionality of the Librarian; it is to add security so a user can't blame
 us for losing a note." Whatever the Librarian does in a Rotli vault, it does

@@ -604,13 +604,15 @@ The Rust corpus boundary independently validates every write.
   `prefix + exact + suffix`, then by `exact` alone, and reports "moved" rather
   than guessing when those words appear more than once
   (`src/lib/librarianActions.ts`).
-- `area` names a top-level Library area, with one exception (2026-09-28, the
-  Librarian rules): `People/<group>` for a group the vault's rules name, so
-  a person can be filed into People/Friends. Nothing else may nest, and Rust
-  (`file_note`) refuses an unconfigured group, a deeper path, and `..`. The
-  group's folder is made when its first note is filed. The contract version
-  does not move: an older Rotli refuses to file a nested area rather than
-  misfiling it.
+- `area` names a top-level Library area, `People/<group>` for a group the
+  vault's rules name (2026-09-28, the Librarian rules), or a folder that
+  already exists inside an area, such as `Work/Clients` (slice 4c-2,
+  2026-10-19). Classify is offered those folders and picks the most specific
+  one that fits; it never invents a folder. The rules alone govern People's
+  folders. Rust (`file_note`) refuses an unconfigured group, a folder that
+  isn't there, and `..`. A group's folder is made when its first note is
+  filed. The contract version does not move: an older Rotli refuses to file
+  a nested area rather than misfiling it.
 - The Librarian may create a note about a person (2026-09-28, the owner's
   Round Three rule: it "can create a new note and fill it in"), only when the
   person tells it about someone through `/librarian` and the vault has no
@@ -797,7 +799,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   returns byte-for-byte. The secret detector never writes or moves there:
   remote-model reads already refuse a detected note from its content alone.
   The Librarian never sweeps, queues, or models a folder that is not a Rotli
-  vault. Mac: `CorpusStore.adopted` and `with_secure_line_only`
+  vault or a copy Rotli made. Mac: `CorpusStore.adopted` and `with_secure_line_only`
   (`src-tauri/src/corpus.rs`); web: `setFolderSecure` decides by the `mx_`
   marker, not the `wiki/` folder, with the `withSecureLineOnly` twin
   (`src/lib/frontmatterRaw.ts`). Writer policy: the contract version does not
@@ -990,8 +992,20 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   names on save and move, so Obsidian's `[[File name]]` links resolve; a
   secure flag stays on the note where it is. Empty Trash reaches only Rotli's
   trash. The copy's Librarian switch is on, at Suggest (the switch is the
-  vault's own, never carried from the previous vault). The Librarian and the
-  Library stay off there until they learn the layout (slice 4c).
+  vault's own, never carried from the previous vault). **Its Librarian works
+  as in a Rotli vault** (slice 4c-2, owner 2026-10-16: "copy is not to change
+  the functionality of the Librarian"), at the same trust setting, in the
+  person's own tree (`src-tauri/src/librarian_map.rs`): notes at the root and
+  in the inbox are filed, into an area or a folder inside one; every note is
+  enriched; `_index.md` is written in each area. Its areas are the person's
+  top-level folders that hold a note, minus the inbox, Rotli's role folders,
+  dot folders, and the folders Obsidian's settings name for templates and
+  attachments, which the Librarian never writes. One gate,
+  `CorpusStore::librarian_writes` (a Rotli vault or a copy, never in place),
+  opens the daemon and the filer lane; `is_memex` still means the Library note
+  lanes (`wiki/_inbox`), which a copy never uses, and Breve writes only a
+  Rotli vault. A copy's notes keep their stable id in `.rotli/index.json`,
+  which the filer uses when a note has no `id` in frontmatter.
 - **A folder connected in place: the same layout, `"inPlace": true`**
   (decision I, owner 2026-10-15). Connecting a folder of notes in place
   writes the imported marker and role map, plus `"inPlace": true`

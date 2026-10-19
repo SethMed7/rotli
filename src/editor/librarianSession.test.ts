@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import type { CompleteReq } from "../ai/types";
 import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import type { ChatModelInfo } from "../lib/tauri";
+import { IMPORTED_FOLDER_ROLES } from "../services/destinations";
 import { LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
 import { closeLibrarianChat, startLibrarianChat, useLibrarianBar } from "../state/librarianBar";
 import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
-import { applyProposal, chatDraft, sendToLibrarian, takeToChat } from "./librarianSession";
+import { applyProposal, chatDraft, libraryAreas, sendToLibrarian, takeToChat } from "./librarianSession";
 
 const MODEL: ChatModelInfo = {
   id: "claude-opus",
@@ -298,5 +299,19 @@ describe("taking a request to Chat", () => {
 
   test("a note that is gone opens nothing", async () => {
     expect(await takeToChat("gone", { text: "x", highlight: null }, async () => false)).toBe(false);
+  });
+});
+
+describe("the Librarian's areas", () => {
+  test("a Rotli vault's are the folders under wiki/, minus its lanes", () => {
+    expect(libraryAreas(["wiki", "wiki/Work", "wiki/_inbox", "wiki/Work/Clients", "chats"], null)).toEqual([
+      "Work",
+    ]);
+  });
+
+  test("a copy's are the person's own top-level folders, never the inbox or Rotli's", () => {
+    const roles = IMPORTED_FOLDER_ROLES;
+    const ids = ["Work", "Work/Clients", "Daily", roles.inbox, roles.trash, roles.chats, ".obsidian"];
+    expect(libraryAreas(ids, roles)).toEqual(["Work", "Daily"]);
   });
 });

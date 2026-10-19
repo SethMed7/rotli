@@ -11,6 +11,7 @@ import { corpusFileNote, corpusNotePath, corpusSetAiField } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { logAction } from "./brainJournalStore";
 import { invalidateJournal, invalidateNotes } from "./hooks";
+import { parentPath } from "./vaultDir";
 
 /** File a note (by wire id or rel path) into `wiki/<area>`: set the AI area
  * field, move through the Filer gate, retarget open panes, journal it, refresh.
@@ -24,7 +25,7 @@ export async function fileNoteToArea(
   opts?: { journal?: boolean },
 ): Promise<string> {
   const rel = await corpusNotePath(noteId);
-  const before = rel.slice(0, rel.lastIndexOf("/"));
+  const before = parentPath(rel);
   const title = (rel.split("/").pop() ?? rel).replace(/-[a-z0-9]{6}\.md$/i, "").replace(/\.md$/, "");
   await corpusSetAiField(rel, "area", area);
   const newRel = await corpusFileNote(rel);
@@ -39,7 +40,7 @@ export async function fileNoteToArea(
       noteTitle: title,
       area,
       before,
-      after: newRel.slice(0, newRel.lastIndexOf("/")),
+      after: parentPath(newRel),
     });
     // queries never go stale on their own (staleTime ∞) — a fresh journal row
     // must push itself into Activity + the sidebar badge
