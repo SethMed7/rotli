@@ -6,6 +6,8 @@
 // works off `before`/`after` (no git dependency) — see and reverse every AI write
 // before anything becomes automatic.
 
+import { parentPath } from "./vaultDir";
+
 export interface BrainAction {
   id: string;
   ts: number;
@@ -149,13 +151,13 @@ export async function approveProposal(p: BrainAction, deps: JournalDeps): Promis
   if (p.action === "file") {
     if (!p.area) throw new Error("file proposal without an area");
     const rel = await deps.notePath(handleOf(p));
-    if (rel.slice(0, rel.lastIndexOf("/")) !== p.before) {
+    if (parentPath(rel) !== p.before) {
       throw new Error("The note moved since this was proposed — dismiss it; the AI will re-evaluate.");
     }
     // journal:false — this proposal row IS the journal entry; it transitions.
     const newRel = await deps.fileNote(handleOf(p), p.area, { journal: false });
     marker.noteId = newRel;
-    marker.after = newRel.slice(0, newRel.lastIndexOf("/"));
+    marker.after = parentPath(newRel);
     // filed_by/filed_at ride the approve exactly like a daemon auto-apply
     // (#90, audit 2026-07) — the audit trail must not depend on WHO clicked.
     // The decider is the row's model; a model-less row records the approval.

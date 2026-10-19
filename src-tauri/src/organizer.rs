@@ -541,6 +541,15 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
 
 /// The state-file key for a note — its ULID when it has one (survives the
 /// filing rename), else its rel path (a frontmatter-less external drop).
+/// A copy's notes keep their stable id in `.rotli/index.json`, not in
+/// frontmatter (slice 4c): the store answers it, so a copy files like a Rotli vault.
+fn store_id(corpus_state: &CorpusState, root_id: &str, map: &LibrarianMap, snap: &mut NoteSnapshot) {
+    if snap.id.is_none() && matches!(map, LibrarianMap::Copy { .. }) {
+        let rel = snap.rel.clone();
+        snap.id = corpus_state.route(root_id, |s| s.wire_id_of(&rel)).ok();
+    }
+}
+
 fn state_key(s: &NoteSnapshot) -> String {
     s.id.clone().unwrap_or_else(|| s.rel.clone())
 }
@@ -601,12 +610,14 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
 
 // ─── pure core: classify ─────────────────────────────────────────────────────
 
-/// The Brain's area vocabulary: the Librarian map's areas, each with the first
-/// content line of its `_index.md` as a one-line description ("" when none).
-/// Lock-free reads.
-fn area_vocab(root: &Path) -> Vec<(String, String)> {
+/// The Brain's area vocabulary: the Librarian map's areas (with `nested`, the
+/// folders already inside them too, Classify's filing targets), each with the
+/// first content line of its `_index.md` as a one-line description ("" when
+/// none). Lock-free reads.
+fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
     let map = LibrarianMap::at(root);
-    map.areas(root)
+    let names = if nested { map.filing_targets(root) } else { map.areas(root) };
+    names
         .into_iter()
         .map(|name| {
             let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
@@ -636,7 +647,8 @@ fn area_vocab(root: &Path) -> Vec<(String, String)> {
 /// `filing` is the person's own rules (plain sentences), followed when they apply.
 fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)], filing: &[String]) -> String {
     let mut p = String::from(
-        "You file notes in a personal knowledge base. Pick the ONE best area for this note.\n\nAreas:\n",
+        "You file notes in a personal knowledge base. Pick the ONE best area for this note. \
+         An `Area/Folder` entry is a folder inside that area: pick the most specific one that fits.\n\nAreas:\n",
     );
     for (name, desc) in vocab {
         if desc.is_empty() {
@@ -1265,7 +1277,7 @@ pub(crate) fn run_cycle(
     let mut report = CycleReport::default();
     let model_label = inner.model_label.lock().unwrap().clone();
     let knobs = read_knobs(corpus_state, root_id, inner);
-    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.is_memex())).unwrap_or(false) {
+    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.librarian_writes())).unwrap_or(false) {
         // a RAW vault (vault-vs-brain, 2026-07-26) or a folder opened in place (2026-10-13)
         // has no Brain — harder off than Trust::Off: the queue and review hints drain so
         // nothing accumulates, is modeled, or nags while the folder stays untouched.
@@ -1319,11 +1331,12 @@ pub(crate) fn run_cycle(
             continue; // stays queued — the gate closed mid-cycle
         }
         inner.queue.lock().unwrap().remove(&rel);
-        let Ok(snap) = snapshot_note(root, &rel) else {
+        let Ok(mut snap) = snapshot_note(root, &rel) else {
             // deleted/unreadable: drop — and it can't be a pending secret anymore
             inner.status.lock().unwrap().secure_pending.remove(&rel);
             continue;
         };
+        store_id(corpus_state, root_id, &map, &mut snap);
         match skip_reason(&snap, &state, knobs.quiet, &visible) {
             Some(Skip::Secure) => {
                 // counted + remembered for the §4.2.3 "review them yourself"
@@ -1367,7 +1380,6 @@ pub(crate) fn run_cycle(
         }
 
         let mut rel = rel;
-        let mut snap = snap;
         // the live feed's "what it's looking at right now" line — titles only,
         // never body content (the same boundary every surface keeps)
         inner
@@ -1376,7 +1388,7 @@ pub(crate) fn run_cycle(
         // ── Job A — Classify (unfiled notes only) ─────────────────────────────
         if map.is_unfiled(&rel) && !classify_covered(&snap, &state) {
             let vocab = vocab.get_or_insert_with(|| {
-                crate::librarian_rules::with_people_groups(area_vocab(root), &knobs.rules)
+                crate::librarian_rules::with_people_groups(area_vocab(root, true), &knobs.rules)
             });
             // no areas yet ⇒ nothing to classify into — Enrich still runs below
             if !vocab.is_empty() {
@@ -1576,6 +1588,7 @@ pub(crate) fn run_cycle(
                                         Ok(s) => s,
                                         Err(_) => continue 'candidates,
                                     };
+                                    store_id(corpus_state, root_id, &map, &mut snap);
                                 }
                             }
                             Err(e) => {
@@ -1832,7 +1845,7 @@ fn refresh_indexes(
     report: &mut CycleReport,
 ) -> Result<(), String> {
     let map = LibrarianMap::at(root);
-    for (area, _) in area_vocab(root) {
+    for (area, _) in area_vocab(root, false) {
         let members = area_members(root, &area);
         if members.is_empty() {
             continue; // nothing to overview — never propose an empty table
@@ -2210,7 +2223,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             };
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
-            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_is_memex().unwrap_or(false) {
+            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_librarian_writes().unwrap_or(false) {
                 // RAW vault or a folder opened in place (2026-10-13): consume every wake
                 // signal and park — no sweep, no cycle, and nothing left queued to act on if
                 // the Brain later returns (re-enabling starts fresh from its own sweep).
@@ -2432,7 +2445,7 @@ pub fn organizer_status(
     let st = inner.status.lock().unwrap().clone();
     OrganizerStatus {
         running: inner.running.load(Ordering::SeqCst)
-            && corpus_state.default_is_memex().unwrap_or(false),
+            && corpus_state.default_librarian_writes().unwrap_or(false),
         trust: inner.trust.lock().unwrap().as_str().to_string(),
         queued: inner.queue.lock().unwrap().len(),
         last_run_at: st.last_run_at,
@@ -2570,6 +2583,9 @@ pub mod secure;
 #[cfg(test)]
 #[path = "organizer_adopted_tests.rs"]
 mod adopted_tests;
+#[cfg(test)]
+#[path = "organizer_copy_tests.rs"]
+mod copy_tests;
 #[cfg(test)]
 use secure::{dismiss_secure, secure_hints};
 
@@ -2724,7 +2740,7 @@ mod tests {
         for area in ["Projects", "Templates", "_inbox"] {
             std::fs::create_dir_all(dir.path().join("wiki").join(area)).unwrap();
         }
-        let areas: Vec<String> = area_vocab(dir.path()).into_iter().map(|(name, _)| name).collect();
+        let areas: Vec<String> = area_vocab(dir.path(), true).into_iter().map(|(name, _)| name).collect();
         assert_eq!(areas, ["Projects"]);
     }
 

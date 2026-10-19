@@ -2841,6 +2841,14 @@ impl CorpusStore {
         self.layout == Layout::Memex && !self.adopted
     }
 
+    /// Whether the Librarian may organize this root (slice 4c): a Rotli vault,
+    /// or a copy Rotli made of someone's folder. Never a folder connected in
+    /// place (decision I), and never a legacy layout. It works the same in
+    /// both; only where things are differs (`LibrarianMap`).
+    pub(crate) fn librarian_writes(&self) -> bool {
+        matches!(self.layout, Layout::Memex | Layout::Imported(_)) && !self.adopted
+    }
+
     /// This root's layout — an imported vault answers its role map from it.
     pub(crate) fn layout(&self) -> Layout {
         self.layout
@@ -5314,10 +5322,8 @@ impl CorpusStore {
 
     fn filer_writable(&self, rel: &str) -> Result<(), String> {
         self.guard_rel(rel)?;
-        // GUARD (decision I): never a folder connected in place, even if a
-        // later slice (4c) lets the Librarian write the imported layout
-        if self.layout != Layout::Memex || self.adopted {
-            return Err("the Librarian only runs in a Rotli vault".into());
+        if !self.librarian_writes() {
+            return Err("the Librarian only runs in a Rotli vault or a copy Rotli made".into());
         }
         // #3 (audit 2026-07): the FILER lane honors the same read-only verdicts as
         // the user lane — an out-of-band contract or read-only perms close BOTH.
@@ -5332,7 +5338,7 @@ impl CorpusStore {
             );
         }
         let rel = rel.trim_start_matches('/');
-        if !(rel == "wiki" || rel.starts_with("wiki/")) {
+        if !crate::librarian_map::LibrarianMap::at(&self.root).writes(rel) {
             return Err(format!(
                 "the Librarian may only write the vault's Library (refused: {rel})"
             ));
@@ -5442,9 +5448,19 @@ impl CorpusStore {
             })
             .filter(|a| !a.is_empty())
             .ok_or("note has no `area` to file into")?;
-        // one nesting only: People/<group>, for a group the Librarian rules name
+        // a nested target is People/<group> for a group the Librarian rules
+        // name (the rules alone govern People), or a folder already inside
+        // another area (never one it invents)
+        let map = crate::librarian_map::LibrarianMap::at(&self.root);
+        let people = crate::librarian_rules::PEOPLE_AREA;
         let area = if area.contains('/') {
             crate::librarian_rules::people_group_area(&area, &self.librarian_rules())
+                .or_else(|| {
+                    let top = area.split('/').next().unwrap_or_default();
+                    (!top.eq_ignore_ascii_case(people))
+                        .then(|| map.filing_targets(&self.root).into_iter().find(|t| *t == area))
+                        .flatten()
+                })
                 .ok_or_else(|| format!("invalid area: {area}"))?
         } else {
             area
@@ -5452,8 +5468,7 @@ impl CorpusStore {
         if area.contains("..") {
             return Err(format!("invalid area: {area}"));
         }
-        let target = crate::librarian_map::LibrarianMap::at(&self.root).area_dir(&area);
-        self.filer_move(rel, &target)
+        self.filer_move(rel, &map.area_dir(&area))
     }
 
     /// The Filer's GENERIC move — powers `file_note` (into `wiki/<area>`), re-filing,
@@ -5469,16 +5484,11 @@ impl CorpusStore {
             return Err(format!("already in {target_folder}"));
         }
         self.refuse_breaking_locked_links(rel)?;
+        // the store's stable id: a Rotli note's frontmatter ULID, and in a
+        // copy the id `.rotli/index.json` keeps for a note with none
+        let id = self.wire_id_of(rel)?;
         let path = self.abs(rel);
-        let meta = crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| format!("read {rel}: {e}"))?;
-            let id = parse_document(&text)
-                .0
-                .unwrap_or_default()
-                .id
-                .ok_or("note has no id")?;
-            self.relocate(&id, rel, target_folder)
-        })?;
+        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(&id, rel, target_folder))?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel.clone(), new_rel)])?;
         Ok(meta)
@@ -7120,7 +7130,7 @@ impl CorpusState {
         Ok(store.root().to_path_buf())
     }
 
-    pub(crate) fn default_is_memex(&self) -> Result<bool, String> {
+    pub(crate) fn default_librarian_writes(&self) -> Result<bool, String> {
         let reg = self
             .0
             .lock()
@@ -7129,7 +7139,7 @@ impl CorpusState {
             .stores
             .get(&reg.default_id)
             .ok_or_else(|| format!("corpus root unavailable: {}", reg.default_id))?;
-        Ok(store.is_memex())
+        Ok(store.librarian_writes())
     }
 
     /// Share one registered store's cache generation/suppression set with a
@@ -7168,6 +7178,9 @@ impl CorpusState {
             .stores
             .get_mut(&default_id)
             .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?;
+        if !store.is_memex() {
+            return Err("Breve's notes go only to a Rotli vault's Library".into());
+        }
         store.filer_writable("wiki/reference")?;
         Ok(store.root().to_path_buf())
     }

@@ -119,6 +119,51 @@ impl LibrarianMap {
         names
     }
 
+    /// Where Classify may file a note: every area and every folder already
+    /// inside one (`Work/Clients`), as area-relative paths, sorted. It never
+    /// invents a folder, and a folder set aside or Rotli's own is no target.
+    pub(crate) fn filing_targets(&self, root: &Path) -> Vec<String> {
+        let mut targets = Vec::new();
+        for area in self.areas(root) {
+            self.collect_folders(root, &area, &mut targets);
+        }
+        targets.sort();
+        targets
+    }
+
+    fn collect_folders(&self, root: &Path, target: &str, out: &mut Vec<String>) {
+        out.push(target.to_string());
+        let Ok(entries) = std::fs::read_dir(root.join(self.area_dir(target))) else {
+            return;
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let inner = format!("{target}/{name}");
+            if entry.file_type().is_ok_and(|t| t.is_dir())
+                && !name.starts_with('_')
+                && self.is_candidate(&format!("{}/x.md", self.area_dir(&inner)))
+            {
+                self.collect_folders(root, &inner, out);
+            }
+        }
+    }
+
+    /// Whether the Librarian may write `rel` (a note or a folder). A Rotli
+    /// vault: only the Library (`wiki/**`). A copy: anywhere in the person's
+    /// tree, the root included, but never Rotli's own folders, dot folders, or
+    /// the folders Obsidian's settings set aside.
+    pub(crate) fn writes(&self, rel: &str) -> bool {
+        match self {
+            Self::RotliVault => rel == "wiki" || rel.starts_with("wiki/"),
+            Self::Copy { roles, set_aside } => {
+                let inside = format!("{rel}/");
+                !rel.split('/').any(|c| c.starts_with('.'))
+                    && !rotli_owned(roles, &inside)
+                    && !set_aside.iter().any(|folder| under(&inside, folder))
+            }
+        }
+    }
+
     /// Every Librarian input note in the vault, lock-free.
     pub(crate) fn candidates(&self, root: &Path) -> Vec<String> {
         self.candidates_in(root, self.walk_root())
