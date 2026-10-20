@@ -249,8 +249,6 @@ fn smoke_list_the_real_clients_on_this_machine() {
     }
 }
 
-// ── the argv allowlist with discovery in the loop ─────────────────────────────
-
 use crate::provider::build_args_for;
 
 fn reported(id: &str, efforts: &[&str], fast_tier: bool) -> DiscoveredModel {

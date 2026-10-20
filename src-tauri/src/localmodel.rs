@@ -221,8 +221,6 @@ pub fn local_model_default() -> Option<String> {
     plist_get_model(&plist)
 }
 
-// ── commands ──────────────────────────────────────────────────────────────────
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallProgress {
@@ -622,8 +620,6 @@ pub fn local_model_uninstall(id: String) -> Result<(), String> {
     }
     Ok(())
 }
-
-// ─── tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
