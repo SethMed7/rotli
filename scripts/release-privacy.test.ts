@@ -1,5 +1,13 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,4 +50,27 @@ test("the bundle admits declared resources but refuses arbitrary ignored persona
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// `env!("CARGO_MANIFEST_DIR")` bakes the builder's checkout path into the
+// binary. A runtime `if cfg!(debug_assertions)` does not keep that literal out
+// of a release build; only compile-time `#[cfg(...)]` gating does. 1.9.1's
+// first release run was refused for exactly this (routines.rs, 2026-10-20).
+test("Rust source never compiles the checkout path into a release binary", () => {
+  const sourceRoot = join(import.meta.dir, "..", "src-tauri", "src");
+  const offenders: string[] = [];
+  for (const file of readdirSync(sourceRoot, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".rs") || file.endsWith("tests.rs")) continue;
+    const lines = readFileSync(join(sourceRoot, file), "utf8").split("\n");
+    const testModule = lines.findIndex((line) => line.trim() === "#[cfg(test)]");
+    lines.forEach((line, index) => {
+      if (!line.includes("CARGO_MANIFEST_DIR")) return;
+      if (testModule !== -1 && index > testModule) return;
+      const gated = lines
+        .slice(Math.max(0, index - 3), index)
+        .some((l) => l.includes("#[cfg(debug_assertions)]"));
+      if (!gated) offenders.push(`${file}:${index + 1}`);
+    });
+  }
+  expect(offenders).toEqual([]);
 });

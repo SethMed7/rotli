@@ -45,9 +45,9 @@ struct SupervisorInner {
 }
 
 pub(crate) fn source_root(app: &AppHandle) -> Result<PathBuf, String> {
-    let dev = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../breve-runtime"));
-    if cfg!(debug_assertions) && dev.join("scripts/rotli-scheduler.ts").is_file() {
-        return Ok(dev);
+    #[cfg(debug_assertions)] // compile-time gate: the checkout path never reaches a release binary
+    if Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../breve-runtime/scripts/rotli-scheduler.ts")).is_file() {
+        return Ok(PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../breve-runtime")));
     }
     let bundled = app
         .path()
