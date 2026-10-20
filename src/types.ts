@@ -119,8 +119,6 @@ export interface CanvasTab {
  * unsent chat (the file is created on the first send, then the tab is bound to it). */
 export interface ChatTab {
   id: string;
-  /** Never set for this kind — present so the union reads uniformly. */
-  preview?: boolean;
   surfaceKind: "chat";
   chatSlug: string | null;
   /** Stable owner of the chat file. Optional only for legacy viewstate and a
@@ -144,8 +142,6 @@ export interface FileTab {
  * singleton view (no per-note binding). */
 export interface ActivityTab {
   id: string;
-  /** Never set for this kind — present so the union reads uniformly. */
-  preview?: boolean;
   surfaceKind: "activity";
 }
 
@@ -154,8 +150,6 @@ export interface ActivityTab {
  * with the created item's real surface. */
 export interface NewItemTab {
   id: string;
-  /** Never set for this kind — present so the union reads uniformly. */
-  preview?: boolean;
   surfaceKind: "newItem";
   /** Present only while ⌘T's durable creator runs. The tab itself is opened in
    * the key event, then retargeted in place once the file exists. */
@@ -169,11 +163,13 @@ export interface NewItemTab {
  * non-persistent native webview and are intentionally absent from viewstate. */
 export interface BrowserTab {
   id: string;
-  preview?: boolean;
   surfaceKind: "browser";
 }
 
 export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab | NewItemTab | BrowserTab;
+
+/** The kinds a single-click browse may open as a preview tab. */
+export type PreviewableTab = NoteTab | CanvasTab | FileTab;
 
 export type SplitDir = "row" | "col";
 

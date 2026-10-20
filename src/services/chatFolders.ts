@@ -229,8 +229,6 @@ export function groupChats<T extends { slug: string; modifiedMs?: number; replie
   };
 }
 
-// ── I/O (memex bridge) ────────────────────────────────────────────────────────
-
 export interface VersionedChatFolders {
   manifest: ChatFoldersManifest;
   revision: string;

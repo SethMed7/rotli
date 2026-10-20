@@ -243,7 +243,6 @@ export function CanvasEditor({
     setEditing({ id: added.id, field: "text" });
   };
 
-  // ——— pointer on the plane
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement;
@@ -372,7 +371,6 @@ export function CanvasEditor({
     if (!node || node.type === "group") writeCardAt(event.clientX, event.clientY, node?.id);
   };
 
-  // ——— keyboard
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (target.closest("input")) return; // the name field keeps its own keys

@@ -206,8 +206,6 @@ export function parseBlock(line: string): Block {
   return { kind: "para", prefixLen: 0, text: line };
 }
 
-// ——— inline marks ———
-
 interface InlineRule {
   re: RegExp;
   render: (m: RegExpExecArray, key: number) => ReactNode;

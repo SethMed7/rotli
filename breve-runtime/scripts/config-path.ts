@@ -1,9 +1,6 @@
-/** Where Rotli's routine config lives, resolved without side effects.
- *
- * `paths.ts` re-exports this, but it also creates the storage lanes on import;
- * renderers that may run in a vault Breve was never set up in (the chat's
- * PDF artifact, 2026-09-02) import this module instead so reading the theme
- * never scaffolds `storage/breve*` folders as a side effect. */
+/** Where Rotli's routine config lives, resolved without reading any config.
+ * Renderers that may run in a vault Breve was never set up in (the chat's PDF
+ * artifact, 2026-09-02) import this module rather than `paths.ts`. */
 import { join } from "node:path";
 
 export const BREVE_HOME = process.env.ROTLI_BREVE_HOME ?? join(import.meta.dir, "..");

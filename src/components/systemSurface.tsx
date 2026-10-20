@@ -472,7 +472,6 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     // a plain/⇧ item click clears the folder band; ⌘ keeps a mixed selection
     if (!e.metaKey) setFolderSel([]);
     if (e.metaKey) {
-      // ⌘-click toggles
       const has = selectedIds.has(n.id);
       setSelection(has ? selection.filter((x) => x.id !== n.id) : [...selection, n]);
       anchorRef.current = n.id;

@@ -94,8 +94,6 @@ export async function leaveVault(): Promise<void> {
   await disconnectFolderVault();
 }
 
-// ── deciding ──────────────────────────────────────────────────────────────────
-
 /** What asking the helper found. */
 export type HelperProbe =
   | { kind: "offline" }
@@ -199,8 +197,6 @@ export async function resolveVault(link: HelperLink | null): Promise<ResolvedVau
   return { connection: { status: "unbound" }, dir: null };
 }
 
-// ── the helper vault ──────────────────────────────────────────────────────────
-
 /** The one call deadline per verb: a walk or a batch read of a big vault gets
  * longer; the picker none (a person is choosing). */
 function deadlineFor(cmd: string): number | undefined {
@@ -265,8 +261,6 @@ export async function chooseHelperVault(link: HelperLink): Promise<HelperVaultIn
   await saveHelperBinding(info);
   return info;
 }
-
-// ── writes that outlive the tab ───────────────────────────────────────────────
 
 interface PendingRecord {
   vaultId: string;
