@@ -2,7 +2,6 @@
 // between views while in chat too"). The same named views Home switches between
 // — Main is every chat, a view is the chats assigned to it — picked here without
 // leaving Chat. Creating, renaming and deleting views stays in Home's picker.
-// Split out of sidebarChat.tsx, which sits at its size budget.
 
 import type { MouseEvent, ReactNode, RefObject } from "react";
 

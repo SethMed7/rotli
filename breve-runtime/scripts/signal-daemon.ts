@@ -9,7 +9,7 @@
 import { join, resolve, sep } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, readdirSync } from "node:fs";
-import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES } from "./paths";
+import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES, ensureBreveStorage } from "./paths";
 import { knowledgePath, knowledgePathFor, inboxPathFor, assetsPathFor, readMemexRegistry, accessMode, memexInfo, DEFAULT_USER, type MemexRegistry } from "./config";
 import { LLM, localGenerate, warmup } from "./llm";
 import { rootsForPartition, type SandboxRoots } from "./sandbox";
@@ -45,7 +45,7 @@ async function refreshCfg() {
 setInterval(() => { refreshCfg().catch((e) => logFail("cfg-refresh", String(e))); }, 5 * 60_000);
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const TRANSCRIPTS = join(BREVE, "signal", "transcripts");
-mkdirSync(TRANSCRIPTS, { recursive: true });
+ensureBreveStorage(TRANSCRIPTS);
 
 // Each inbound message is handled inside als.run(ctx); send()/sandbox/knowledge/transcripts read the
 // CURRENT ctx, so concurrent turns (MAX_INFLIGHT) never cross. Un-prompted code (scheduled briefs,

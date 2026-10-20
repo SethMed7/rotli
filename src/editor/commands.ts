@@ -58,8 +58,6 @@ export function activeEditor(): EditorHandle | null {
   return handles.get(usePanesStore.getState().focusedPaneId) ?? null;
 }
 
-// ——— inline marks ———
-
 /** Marks whose delimiters can't be confused with another mark's. */
 const RUN_MARKS = new Set<InlineMark>(["bold", "strike", "highlight", "underline"]);
 
@@ -214,8 +212,6 @@ function countBefore(text: string, token: string, pos: number): number {
   return count;
 }
 
-// ——— headings ———
-
 const ANY_HEADING_RE = /^#{1,6} /;
 
 export function headingLevelOf(line: string): number {
@@ -237,8 +233,6 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
   const next = `${"#".repeat(level)} ${stripped}`;
   return { line: next, delta: next.length - line.length };
 }
-
-// ——— block prefixes ———
 
 const RESULT_PAIR = `\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] `;
 const CHOICE_PREFIX = `\\(${CHOICE_MARK}\\) `;
@@ -294,8 +288,6 @@ export function applyBlockToggleAll(lines: string[], kind: BlockToggle): (string
     return applyBlockToggle(t, kind).line;
   });
 }
-
-// ——— inline marks over a selection that spans lines ———
 
 /** Where a line's text starts: after its indent and any heading or block
  * marker, so a mark never lands in front of `- ` or `# ` and breaks it. */

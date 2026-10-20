@@ -102,7 +102,6 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   const [meta, setMeta] = useState<BoardMeta>(EMPTY_BOARD_META);
   const [metaOpen, setMetaOpen] = useState(false);
 
-  // load the board once per boardId
   useEffect(() => {
     if (!boardsAvailable()) return;
     let cancelled = false;

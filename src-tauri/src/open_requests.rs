@@ -5,7 +5,7 @@
 
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{corpus, deep_link, fsutil, show_main};
+use crate::{corpus, deep_link, fsutil, SummonIntent};
 
 /// One accepted deep link → write the one-shot mailbox at the default root,
 /// surface the window, and let the webview consume it (the exact flow of
@@ -71,7 +71,7 @@ fn queue_open_request(app: &AppHandle, id: &str, kind: &str) {
     if fsutil::atomic_write(&path, &body, ".rotli-open-").is_err() {
         return;
     }
-    show_main(app);
+    SummonIntent::ShowMain.perform(app);
     let _ = app.emit_to("main", "rotli:open-request", ());
 }
 

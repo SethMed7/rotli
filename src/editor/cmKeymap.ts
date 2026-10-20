@@ -354,8 +354,6 @@ const taskMarkerArrowLeft: Command = (view) => {
   return true;
 };
 
-// ─── table cell navigation ───────────────────────────────────────────────────
-
 interface TableCtx {
   t: TableBlock;
   /** The caret's cell (row -1 = header) — null when the caret sits on the

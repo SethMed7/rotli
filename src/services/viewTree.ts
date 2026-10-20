@@ -271,8 +271,6 @@ export function deleteNamedView(manifest: ViewsManifest, name: string): ViewsMan
   return { ...manifest, views: manifest.views.filter((view) => view.name !== name) };
 }
 
-// ── chats in views (2026-08-03) ──────────────────────────────────────────────
-
 /** The view a chat belongs to, or null for Main-only. A chat lives in at most
  * one view — the same singular-membership law notes follow. */
 export function chatAssignedView(manifest: ViewsManifest, slug: string): string | null {

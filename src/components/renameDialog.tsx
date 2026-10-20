@@ -42,7 +42,6 @@ export function RenameDialog() {
   useEffect(() => {
     if (target) {
       setDraft({ value: target.current, error: "", busy: false });
-      // focus + select on open
       queueMicrotask(() => {
         inputRef.current?.focus();
         inputRef.current?.select();

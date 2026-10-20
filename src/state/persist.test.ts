@@ -302,14 +302,14 @@ describe("parseSettings — fileMetadata (Show file metadata)", () => {
 describe("parseSettings — chatWeb (#7: no session keys in the durable map)", () => {
   test("keeps real per-slug toggles, drops the legacy '' and unsaved: keys", () => {
     const raw = '{"chatWeb":{"":true,"unsaved:pane-1":true,"my-chat":true,"other":false}}';
-    expect(parseSettings(raw).chatWeb).toEqual({
+    expect<Record<string, unknown>>(parseSettings(raw).chatWeb).toEqual({
       "my-chat": true,
       other: false,
     });
   });
 
   test("drops non-boolean entries entirely", () => {
-    expect(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({
+    expect<Record<string, unknown>>(parseSettings('{"chatWeb":{"a":"yes","b":true}}').chatWeb).toEqual({
       b: true,
     });
   });
@@ -320,8 +320,11 @@ describe("parseSettings — frontier controls", () => {
     const parsed = parseSettings(
       '{"chatReasoning":{"corpus:a":"xhigh","corpus:b":"ultra","unsaved:p":"high"},"chatServiceTier":{"corpus:a":"fast","corpus:b":"priority"}}',
     );
-    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh", "corpus:b": "ultra" });
-    expect(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
+    expect<Record<string, unknown>>(parsed.chatReasoning).toEqual({
+      "corpus:a": "xhigh",
+      "corpus:b": "ultra",
+    });
+    expect<Record<string, unknown>>(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
   });
 });
 
@@ -358,7 +361,7 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
 
   test("chatMeasure keeps valid measures only and drops session keys", () => {
     const raw = '{"chatMeasure":{"my-chat":"wide","other":"huge","unsaved:p1":"narrow"}}';
-    expect(parseSettings(raw).chatMeasure).toEqual({ "my-chat": "wide" });
+    expect<Record<string, unknown>>(parseSettings(raw).chatMeasure).toEqual({ "my-chat": "wide" });
   });
 
   test("provider defaults validate against their own catalog", () => {
