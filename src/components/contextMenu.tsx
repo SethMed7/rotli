@@ -27,11 +27,15 @@ export function ContextMenu() {
   useTransientPopover([ref], !!menu, close);
 
   // reset the drill stack + provisional position whenever a new menu opens
-  const key = menu ? `${menu.x},${menu.y},${menu.items.length}` : null;
+  // (keyed on the menu's primitives, not its object, which a store write may rebuild)
+  const open = !!menu;
+  const menuX = menu?.x ?? 0;
+  const menuY = menu?.y ?? 0;
+  const itemCount = menu?.items.length ?? 0;
   useLayoutEffect(() => {
     setStack([]);
-    setPos(menu ? { left: menu.x, top: menu.y } : null);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+    setPos(open ? { left: menuX, top: menuY } : null);
+  }, [open, menuX, menuY, itemCount]);
 
   // place it once we know the menu's size (flipping to the pointer's other
   // side when a side has no room — lib/menuPlacement), then focus the

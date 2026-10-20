@@ -185,16 +185,15 @@ export function Sidebar() {
   //   persisted front survives launch and a by-hand switch is never undone. —
   const focusedTab = useFocusedTab();
   const focusedTabKey = focusedTab ? `${focusedTab.surfaceKind}:${focusedTab.id}` : null;
+  const focusedSurfaceKind = focusedTab?.surfaceKind ?? null;
   const lastTabKey = useRef(focusedTabKey);
   useEffect(() => {
     if (focusedTabKey === lastTabKey.current) return;
     lastTabKey.current = focusedTabKey;
-    if (!focusedTab) return;
-    if (focusedTab.surfaceKind === "chat") setSidebarView("chat");
-    else if (focusedTab.surfaceKind !== "activity") setSidebarView("home");
-    // `focusedTab` is a fresh object each render — the string key is the dep
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusedTabKey, setSidebarView]);
+    if (!focusedSurfaceKind) return;
+    if (focusedSurfaceKind === "chat") setSidebarView("chat");
+    else if (focusedSurfaceKind !== "activity") setSidebarView("home");
+  }, [focusedTabKey, focusedSurfaceKind, setSidebarView]);
   const visibleSidebarView = sidebarFrontBody(sidebarView, contentView, dashboardSection);
   const pickSidebarView = (view: typeof sidebarView) => {
     // Home/Chat are the way BACK from Breve too (2026-09-02): leave the mode

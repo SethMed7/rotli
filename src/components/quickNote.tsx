@@ -356,7 +356,6 @@ export function QuickNote() {
   // subscribe once — the handler reads everything imperatively (getState, stable
   // refs/setters), so a per-render re-subscribe would only churn the async
   // listen/unlisten pair with no benefit.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: stable handler, subscribe once
   useEffect(
     () =>
       onQuickShow(() => {

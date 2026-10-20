@@ -10,8 +10,8 @@ import {
 } from "@univerjs/preset-sheets-core";
 import UniverPresetSheetsCoreEnUS from "@univerjs/preset-sheets-core/locales/en-US";
 import "@univerjs/preset-sheets-core/lib/index.css";
-import { isRedoChord, isUndoChord } from "../../lib/historyChords";
 import { pauseRenderWhileHidden } from "../../lib/pauseWhileHidden";
+import { installUniverEditMenu, menuDedupe } from "../../lib/univerEditMenu";
 import type { SheetModel, SheetThemeMode } from "./types";
 import { rotliUniverTheme, univerNeutralForTheme } from "./theme";
 
@@ -89,8 +89,6 @@ function liveTheme(): ReturnType<typeof rotliUniverTheme> {
 
 const UNDO_ID = "univer.command.undo";
 const REDO_ID = "univer.command.redo";
-/** An undo Univer just ran from its own ⌘Z keydown must not run again here. */
-const MENU_DEDUPE_MS = 300;
 
 /** Keys and menu commands act on the WORKBOOK only while its grid has focus:
  * not in a native field (a toolbar box), not while a cell is being typed in,
@@ -104,46 +102,28 @@ function workbookFocused(host: HTMLElement, api: FUniverApiLike): boolean {
   return !api.getActiveWorkbook()?.isCellEditing?.();
 }
 
-/** ⌘Z / ⇧⌘Z in a sheet (the owner, 2026-10-09: "we need the hotkeys for undo
- * and redo to work"). Since the Mac Edit menu's Undo/Redo carry no keys
- * (src-tauri lib.rs), ⌘Z / ⇧⌘Z reach the page as key presses. Univer answers
- * ⌘Z only while its editor context says so (not while a cell is merely
- * selected) and binds redo to ⌘Y, so what it leaves is answered here. The beforeinput bridge stays
- * for any other undo:/redo: sender (WebKit turns those into historyUndo /
- * historyRedo on Univer's hidden cell input, which has no history), as the
- * DOCX adapter does (documents/engine/keys.ts). Both act on the WORKBOOK, so
- * both stand down while a cell is being typed in — a workbook step there
- * would change cells you aren't looking at — and for native text fields. */
+/** ⌘Z / ⇧⌘Z and the Edit menu's Undo / Redo in a sheet (the owner,
+ * 2026-10-09: "we need the hotkeys for undo and redo to work"), routed by
+ * lib/univerEditMenu.ts. Both act on the WORKBOOK, so both stand down while a
+ * cell is being typed in — a workbook step there would change cells you
+ * aren't looking at — and for native text fields. */
 function installMenuHistory(host: HTMLElement, api: FUniverApiLike): () => void {
-  const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
-  const workbookHasFocus = () => workbookFocused(host, api);
-  const lastRun = new Map<string, number>();
+  const dedupe = menuDedupe();
   const watch = api.onCommandExecuted?.((c) => {
-    if (c.id === UNDO_ID || c.id === REDO_ID) lastRun.set(c.id, performance.now());
+    if (c.id === UNDO_ID || c.id === REDO_ID) dedupe.ran(c.id);
   });
-  const onBeforeInput = (event: Event) => {
-    const type = (event as InputEvent).inputType;
-    if ((type !== "historyUndo" && type !== "historyRedo") || !workbookHasFocus()) return;
-    event.preventDefault();
-    const id = type === "historyUndo" ? UNDO_ID : REDO_ID;
-    if (performance.now() - (lastRun.get(id) ?? -Infinity) < MENU_DEDUPE_MS) return;
-    void (type === "historyUndo" ? api.undo() : api.redo());
-  };
-  // Univer's own shortcuts run first (a window capture listener); what they
-  // leave unhandled — ⌘Z while a cell is only selected, ⇧⌘Z always — is
-  // answered here, before the browser's default undo can act on the hidden input
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || !workbookHasFocus()) return;
-    const undo = isUndoChord(event, isMac);
-    if (!undo && !isRedoChord(event, isMac)) return;
-    event.preventDefault();
-    void (undo ? api.undo() : api.redo());
-  };
-  host.ownerDocument.addEventListener("beforeinput", onBeforeInput, true);
-  host.ownerDocument.addEventListener("keydown", onKeyDown, true);
+  const run = (step: "undo" | "redo") => void (step === "undo" ? api.undo() : api.redo());
+  const releaseEditMenu = installUniverEditMenu({
+    view: host.ownerDocument,
+    keyTarget: host.ownerDocument,
+    owns: () => workbookFocused(host, api),
+    fromMenu: (step) => {
+      if (dedupe.due(step === "undo" ? UNDO_ID : REDO_ID)) run(step);
+    },
+    fromKey: run,
+  });
   return () => {
-    host.ownerDocument.removeEventListener("beforeinput", onBeforeInput, true);
-    host.ownerDocument.removeEventListener("keydown", onKeyDown, true);
+    releaseEditMenu();
     if (watch && typeof watch === "object") watch.dispose?.();
   };
 }

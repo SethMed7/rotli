@@ -6,6 +6,7 @@ import {
   documentTableRanges,
   isDocumentContentMutation,
   isSelectAllChord,
+  remeasureEngine,
 } from "./policy";
 
 describe("DOCX Univer adapter policy", () => {
@@ -64,5 +65,37 @@ describe("DOCX Univer adapter policy", () => {
     expect(isSelectAllChord({ ...chord, ctrlKey: true }, false)).toBe(true);
     expect(isSelectAllChord({ ...chord, metaKey: true, shiftKey: true }, true)).toBe(false);
     expect(isSelectAllChord({ ...chord, code: "KeyS", metaKey: true }, true)).toBe(false);
+  });
+});
+
+describe("remeasureEngine", () => {
+  test("jolts the canvas one pixel smaller, then restores the host's settled size", () => {
+    const sizes: [number, number][] = [];
+    const engine = { resizeBySize: (width: number, height: number) => sizes.push([width, height]) };
+    const host = { clientWidth: 800, clientHeight: 600 };
+    let restore = () => {};
+    remeasureEngine(engine, host, (later) => {
+      restore = later;
+    });
+    expect(sizes).toEqual([[799, 599]]);
+    host.clientWidth = 820; // the flex layout settled before the next frame
+    restore();
+    expect(sizes).toEqual([
+      [799, 599],
+      [820, 600],
+    ]);
+  });
+
+  test("never sizes a collapsed host below one pixel, and tolerates no engine", () => {
+    const sizes: [number, number][] = [];
+    const engine = { resizeBySize: (width: number, height: number) => sizes.push([width, height]) };
+    remeasureEngine(engine, { clientWidth: 0, clientHeight: 0 }, (later) => later());
+    expect(sizes).toEqual([
+      [1, 1],
+      [1, 1],
+    ]);
+    expect(() =>
+      remeasureEngine(undefined, { clientWidth: 5, clientHeight: 5 }, (later) => later()),
+    ).not.toThrow();
   });
 });
