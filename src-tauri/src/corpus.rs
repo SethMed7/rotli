@@ -167,8 +167,6 @@ pub fn relocate(old_root: &Path, new_root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// ─── multi-root: CorpusRoot + the root registry (Track 2, Build Step 1) ───────
-//
 // THE ID SCHEME (the one law the TS side must mirror): the corpus is becoming
 // MULTI-ROOT. A `folderId` (and every note/board id on the wire) is routed by a
 // root prefix:
@@ -292,8 +290,6 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     out
 }
 
-// ─── the unified corpus model (`corpus.json`) ───────────────────────────────
-//
 // ONE file replaces corpus-root.txt + corpus-memex-root.txt + corpus-roots.json
 // + memex-instances.json. The corpus is THE one folder = your notes = your brain;
 // whether it is a memex is DERIVED (`is_memex_root`), never stored, so it can't
@@ -482,7 +478,6 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
     atomic_write(&f, &json)
 }
 
-// ─── demo mode ──────────────────────────────────────────────────────────────
 // A fully-isolated SEEDED MEMEX for screenshots/demos, named `memex-demo` and
 // living next to the user's real memex (same parent dir). A marker file
 // (`demo.on` in app_config_dir) flips it; when set, the app opens memex-demo
@@ -1167,8 +1162,6 @@ pub fn compose_root_id(root_id: &str, rel: &str) -> String {
     }
 }
 
-// ─── time ────────────────────────────────────────────────────────────────────
-
 fn now_stamp() -> String {
     let now = OffsetDateTime::now_utc();
     now.replace_nanosecond(0)
@@ -1197,8 +1190,6 @@ fn file_stamps(abs: &Path) -> (i64, i64) {
         modified.map(to_ms).unwrap_or_else(now_ms),
     )
 }
-
-// ─── frontmatter codec ───────────────────────────────────────────────────────
 
 /// The four facts rotli owns, plus every line it does not (preserved verbatim,
 /// in order — never destroyed, never reformatted).
@@ -1747,8 +1738,6 @@ fn ensure_backing_folders(folders: &mut Vec<FolderMeta>, notes: &[NoteMeta]) {
         }
     }
 }
-
-// ─── title · snippet · slug · filename ───────────────────────────────────────
 
 fn h1_title(line: &str) -> Option<String> {
     let trimmed = line.trim_start();
@@ -2404,11 +2393,7 @@ struct IndexFile {
     notes: HashMap<String, String>,
 }
 
-// ─── the store ───────────────────────────────────────────────────────────────
-
 const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus — every note is a plain markdown file, right here\non your Mac. Open them in any editor, back them up however you like, keep them\nforever. rotli is just a warm window onto them.\n\nTwo keys to remember:\n\n- **⌥Space** opens rotli from anywhere.\n- **⌥C** catches a thought without breaking stride — it lands here in **Inbox**,\n  ready when you are.\n\nDrop a folder of `.md` files next to this one and it appears in the sidebar.\nThe hidden `.rotli` folder is only an index — delete it any time and rotli\nquietly rebuilds it.\n\nMake yourself at home.\n";
-
-// ─── layout + scope: corpus_layout.rs ────────────────────────────────────────
 
 #[path = "corpus_layout.rs"]
 mod layout;
@@ -5930,7 +5915,6 @@ impl CorpusStore {
         })
     }
 
-    // ─── boards (Excalidraw) ────────────────────────────────────────────────
     // Boards are a parallel surface: raw `*.excalidraw` JSON files, NO
     // frontmatter, id == the relative path, and they bypass the `.rotli` ulid
     // index entirely. The same writable() gate + validate_rel keep them inside
@@ -6806,13 +6790,9 @@ fn ms_to_stamp(ms: i64) -> String {
         .unwrap_or_default()
 }
 
-// ─── watcher (corpus_watch.rs) ───────────────────────────────────────────────
-
 #[path = "corpus_watch.rs"]
 mod watch;
 pub use watch::spawn_watcher;
-
-// ─── tauri state + commands ──────────────────────────────────────────────────
 
 /// The multi-root registry behind the Tauri state (Track 2, Build Step 1). A
 /// map of `root id → CorpusStore` plus the default-root id. The DEFAULT root is
@@ -8766,8 +8746,6 @@ pub(crate) use files::is_canvas_path;
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
 
-// ─── tests ───────────────────────────────────────────────────────────────────
-
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
@@ -9362,7 +9340,6 @@ mod tests {
         assert_eq!(b, "Storage/sheet-2.xlsx");
         assert_eq!(fs::read(store.root().join(&a)).unwrap(), b"one");
         assert_eq!(fs::read(store.root().join(&b)).unwrap(), b"two");
-        // stat sees a legacy corpus as writable
         assert!(store.file_stat(&a).unwrap().writable);
     }
 
@@ -9433,8 +9410,6 @@ mod tests {
             b"\x89PNG\r\n\x1a\nminimal-test-payload"
         );
     }
-
-    // ── frontmatter codec ──
 
     #[test]
     fn frontmatter_round_trip() {
@@ -9558,8 +9533,6 @@ mod tests {
         assert!(on_disk.contains("pinned: true"));
         assert!(on_disk.ends_with("# Kept\n\nEdited.\n"));
     }
-
-    // ── raw frontmatter (the "Show file metadata" editor) ──
 
     #[test]
     fn raw_frontmatter_round_trips_verbatim() {
@@ -9800,8 +9773,6 @@ mod tests {
         assert!(names[0].ends_with(".md"));
     }
 
-    // ── index ──
-
     #[test]
     fn index_rebuilds_from_disk_scan() {
         let (_dir, mut store) = bare();
@@ -9870,8 +9841,6 @@ mod tests {
         assert_eq!(deep.parent_id.as_deref(), Some("Imported"));
         assert!(list.notes.iter().any(|n| n.folder_id == "Imported/Deep"));
     }
-
-    // ── slugs, filenames, renames ──
 
     #[test]
     fn slugging_and_collisions() {
@@ -9985,8 +9954,6 @@ mod tests {
         assert_eq!(title_of("[not a link] (gap)"), "[not a link] (gap)");
         assert_eq!(title_of("![dangling](no close"), "![dangling](no close");
     }
-
-    // ── full-text search (corpus_search) — the pure grammar + the store pass ──
 
     #[test]
     fn store_search_covers_bodies_ranks_titles_first_and_skips_trash() {
@@ -10358,8 +10325,6 @@ mod tests {
         assert!(store.read(&meta.id).unwrap().pinned);
     }
 
-    // ── full cycle ──
-
     #[test]
     fn create_read_write_delete_cycle() {
         let (_dir, mut store) = bare();
@@ -10427,8 +10392,6 @@ mod tests {
         );
         assert!(store.root().join(rel).is_file());
     }
-
-    // ── boards (Excalidraw): a parallel, path-as-id, frontmatter-free surface ──
 
     #[test]
     fn board_create_list_read_write_cycle() {
@@ -10559,7 +10522,6 @@ mod tests {
             store.rename_board(&flat.id, "   ").is_err(),
             "empty name refused"
         );
-        // a non-board id is refused
         assert!(store.rename_board("Inbox/note", "x").is_err());
     }
 
@@ -10884,8 +10846,6 @@ mod tests {
         assert!(store.root().join("Work/Northstar").is_dir());
     }
 
-    // ── watcher ──
-
     #[test]
     fn suppress_set_marks_and_expires_scope() {
         let s = SuppressSet::default();
@@ -10895,8 +10855,6 @@ mod tests {
         assert!(s.contains(&p));
         assert!(!s.contains(Path::new("/tmp/other.md")));
     }
-
-    // ── Increment 3: the corpus can BE a memex instance ──
 
     /// Write a minimal-but-valid memex.json (a real `mx_` id) at `root`, plus the
     /// spine dirs + control files the scope tests probe.
@@ -12368,7 +12326,6 @@ mod tests {
             updated_day == day_before || updated_day == day_after,
             "updated {updated_day} is not the local day {day_before}"
         );
-        // the body changed
         assert!(on_disk.contains("edited body"));
         assert!(!on_disk.contains("original body"));
     }
@@ -12852,8 +12809,6 @@ mod tests {
             "Brain must no longer be scaffolded as a reserved row"
         );
     }
-
-    // ── Track 2: multi-root foundation (Build Step 1) ──
 
     #[test]
     fn split_and_compose_round_trip_the_id_scheme() {
