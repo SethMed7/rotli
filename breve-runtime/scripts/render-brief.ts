@@ -11,8 +11,10 @@ import { join } from "node:path";
 import { renderPdf } from "./chrome-pdf";
 import { errText } from "./err-text";
 import { inlineHtml as inline } from "./markdown-text";
-import { BRIEFS, PDFS } from "./paths";
+import { BRIEFS, PDFS, ensureBreveStorage } from "./paths";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
+
+ensureBreveStorage();
 
 const stem = process.argv[2]
   ?? readdirSync(BRIEFS).filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort().at(-1)?.replace(".md", "");
