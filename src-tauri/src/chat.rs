@@ -95,8 +95,6 @@ pub fn chat_models() -> Vec<ChatModel> {
     crate::chat_registry::models()
 }
 
-// ── multi-turn bridge (the agentic client) ────────────────────────────────────
-
 /// One conversation message from the agent loop. `images` are base64 (raw or a
 /// full `data:` URL); only the openai/vision path consumes them today.
 #[derive(serde::Deserialize)]
@@ -577,8 +575,6 @@ fn ensure_llamacpp_up(endpoint: &str) {
         .args(["kickstart", &format!("gui/{uid}/com.rotli.memex-llamacpp")])
         .output();
 }
-
-// ─── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {

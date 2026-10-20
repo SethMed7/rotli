@@ -52,8 +52,6 @@ import { sanitizeSvg } from "./svgSanitizer";
 // Heavy fence libs (katex / mermaid / jsxgraph) load on first use — they used to
 // ride every note-editor open via a static import. CSS follows the same gate.
 
-// ——— theme resolution ———————————————————————————————————————————————
-
 /** Root-theme "is dark?" — for the Expand overlay, which lives on document.body. */
 function isDarkRoot(): boolean {
   return isDarkDataTheme(document.documentElement.dataset.theme);
@@ -400,8 +398,6 @@ class EmbedBlockWidget extends WidgetType {
     this.interactionCleanup = null;
   }
 }
-
-// ——— the block widget ————————————————————————————————————————————————
 
 class RenderBlockWidget extends WidgetType {
   private destroyed = false;
@@ -756,8 +752,6 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
   document.addEventListener("mousedown", onDown, true);
   document.addEventListener("keydown", onKey, true);
 }
-
-// ——— theme signature ——————————————————————————————————————————————————
 
 const bumpTheme = StateEffect.define<number>();
 let themeVersion = 0;

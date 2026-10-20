@@ -8,8 +8,6 @@
 // so multiple chats open at once and a pane can hold a chat OR a note side by side.
 // This component is driven by props { paneId, chatSlug } — chatSlug null = a fresh
 // unsent chat; the first send creates the file and BINDS the tab to its slug.
-//
-// Still Increment 1: one-shot (no streaming), no @-context yet.
 
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -1360,7 +1358,6 @@ export function ChatSurface({
   const webOn = webForTurn({ secure: secureChat, onDevice: pickedOnDevice, globe: globeOn });
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
-  // image attach is gated on the picked model's vision capability
   const canVision = picked?.vision ?? false;
   const visionModels = modelList.filter((m) => m.vision);
 

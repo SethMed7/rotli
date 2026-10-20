@@ -58,6 +58,19 @@ export function shouldWithholdVoice(source: unknown, voiceInBuild: boolean): boo
   return !voiceInBuild && source === "kokoro-js";
 }
 
+/** KaTeX's stylesheet offers each math font as woff2, woff, and ttf. Every
+ * shell Rotli runs in (WKWebView, current browsers) takes woff2, so the woff
+ * and ttf copies only add ~0.6 MB to the build. Returns the stylesheet with
+ * just the woff2 source, or null for any other file. */
+export function katexWoff2Only(id: string, css: string): string | null {
+  if (!id.replaceAll("\\", "/").includes("/katex/dist/katex") || !id.split("?")[0]?.endsWith(".css"))
+    return null;
+  return css.replace(
+    /(url\([^)]+\.woff2\) format\("woff2"\)),url\([^)]+\.woff\) format\("woff"\),url\([^)]+\.ttf\) format\("truetype"\)/g,
+    "$1",
+  );
+}
+
 export const LAZY_LOCALE_STUB_ID = "\0rotli-lazy-locale-stub";
 export const LAZY_LOCALE_STUB_SOURCE = "export default {};\n";
 

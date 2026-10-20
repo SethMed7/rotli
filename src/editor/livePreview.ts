@@ -239,8 +239,6 @@ export const noteIdFacet = Facet.define<string, string>({
   combine: (values) => values[0] ?? "",
 });
 
-// ——— widgets ———
-
 const BULLET_GLYPHS = ["•", "◦", "▪"];
 
 class BulletWidget extends WidgetType {
@@ -677,8 +675,6 @@ class HrWidget extends WidgetType {
     return false; // let CM place the caret on click → the dashes reveal
   }
 }
-
-// ——— builder ———
 
 function scanInline(
   content: string,

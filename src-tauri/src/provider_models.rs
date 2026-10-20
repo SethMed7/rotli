@@ -374,8 +374,6 @@ pub(crate) fn parse_acp_session_models(session: &serde_json::Value) -> Result<Ve
     finish(models)
 }
 
-// ── the cache ─────────────────────────────────────────────────────────────────
-
 #[derive(Default)]
 struct Lane {
     /// The last list the client reported. A failed refresh keeps it.
@@ -524,8 +522,6 @@ mod fetch;
 use fetch::fetch_models;
 #[cfg(test)]
 pub(crate) use fetch::{read_codex_cache, CLAUDE_DISCOVERY_ARGS};
-
-// ── the command ───────────────────────────────────────────────────────────────
 
 /// Chat picker / Settings: the models this client offers right now. Blocking
 /// discovery rides `spawn_blocking`; `rotli-helper` serves the same function.

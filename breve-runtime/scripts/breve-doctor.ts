@@ -10,13 +10,15 @@
  */
 import { join } from "node:path";
 import { appendFileSync } from "node:fs";
-import { BREVE, BRIEFS, AUDIOS, PDFS } from "./paths";
+import { BREVE, BRIEFS, AUDIOS, PDFS, ensureBreveStorage } from "./paths";
 import { knowledgePath, launchdOrg } from "./config";
 import { loadSettings, effectiveTz, todayIn, minutesNowIn, parseHM } from "./timectx";
 import { bunBin, sendSignal } from "./bin";
 import { LLM } from "./llm";
 import { findingFingerprints, newFindings } from "./doctor-findings";
 import { errText } from "./err-text";
+
+ensureBreveStorage();
 
 // DRY: run every check but skip all healing side-effects (no kickstart/open/Signal/state write).
 const DRY = process.env.BREVE_DOCTOR_DRY === "1";
