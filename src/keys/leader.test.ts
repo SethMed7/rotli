@@ -62,6 +62,31 @@ describe("two-step hotkeys", () => {
     expect(useLeaderStore.getState().mode).toBeNull();
   });
 
+  test("the first leader's timeout never ends the leader that replaced it", async () => {
+    const first: number[] = [];
+    enterLeader({ id: "views", pick: (n) => first.push(n) }, 5);
+    const b = mode("sidebar");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(useLeaderStore.getState().mode).toBe("sidebar");
+    expect(b.ended()).toBe(0);
+    expect(leaderConsumes("4")).toBe(true);
+    expect(b.picked).toEqual([4]);
+    expect(first).toEqual([]);
+  });
+
+  test("a leader entered from onEnd is held, not lost", () => {
+    const picked: number[] = [];
+    enterLeader({
+      id: "views",
+      pick: () => {},
+      onEnd: () => enterLeader({ id: "sidebar", pick: (n) => picked.push(n) }),
+    });
+    expect(leaderConsumes("Meta+K")).toBe(false);
+    expect(useLeaderStore.getState().mode).toBe("sidebar");
+    expect(leaderConsumes("Meta+5")).toBe(true);
+    expect(picked).toEqual([5]);
+  });
+
   test("entering a second leader ends the first", () => {
     const a = mode("views");
     const b = mode("sidebar");

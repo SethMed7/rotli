@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { pathId } from "../lib/corpusWireId";
 import { fileNameStem, userFileName as renamedFileName } from "../lib/fileKind";
 import { renameFileItem, renameLane, type FileRenamePorts } from "./itemRename";
 
@@ -62,6 +63,22 @@ describe("renaming a document", () => {
       "refs storage/rotli/untitled-1.docx → storage/rotli/Plan.docx",
       "refresh",
     ]);
+  });
+
+  test("the reference ports take path ids, never a bare id", () => {
+    const ports = fakePorts([]);
+    // @ts-expect-error a bare string (a note's ULID, say) is not a PathId
+    ports.renameReferences("01JTESTULID0000000000000000", "storage/rotli/Plan.docx");
+    // a path id is still the same string at runtime: nothing serialized changes
+    const wire: string = pathId("storage/rotli/Plan.docx");
+    expect(wire).toBe("storage/rotli/Plan.docx");
+  });
+
+  test("a rename that keeps the same path touches no references", async () => {
+    const calls: string[] = [];
+    const ports = fakePorts(calls, { rename: async (id) => id });
+    expect(await renameFileItem(ports, "storage/rotli/Plan.docx", "Other")).toBe("storage/rotli/Plan.docx");
+    expect(calls).toEqual(["flush", "refresh"]);
   });
 
   test("a blank or unchanged name does nothing", async () => {
