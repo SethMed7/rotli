@@ -44,7 +44,6 @@ const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
 /// A connected client thinks longer than the on-device model; the child
 /// registry's watchdog is the backstop.
 const CONNECTED_TIMEOUT: Duration = Duration::from_secs(120);
-/// The request id every organizer completion registers under.
 const ORGANIZER_REQUEST_ID: &str = "organizer";
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
@@ -74,8 +73,6 @@ const LINK_CANDIDATES: usize = 8;
 const ENRICH_FIELDS: [&str; 3] = ["summary", "tags", "links"];
 /// A `summary:` is ONE frontmatter line — clamp a rogue model's paragraph.
 const SUMMARY_BUDGET: usize = 240;
-
-// ─── the trust ladder ────────────────────────────────────────────────────────
 
 /// The §4.3 trust ladder. Governs only auto-APPLY — the daemon always
 /// classifies in the background (Off is fully dormant). Monotonic in risk.
@@ -147,8 +144,6 @@ fn auto_applies(trust: Trust, verb: Verb, secure: bool) -> bool {
         Trust::Organize => true,
     }
 }
-
-// ─── the managed handle ──────────────────────────────────────────────────────
 
 /// Live daemon status for the UI (Settings → Brain / the Activity pane).
 #[derive(Default, Clone)]
@@ -371,8 +366,6 @@ impl OrganizerHandle {
         self.0.cv.notify_all();
     }
 }
-
-// ─── pure core: hashing, state, candidates, snapshots ────────────────────────
 
 /// FNV-1a 64 as lowercase hex — a tiny local content hash, deterministic across
 /// runs and platforms (std's DefaultHasher explicitly is not), which the
@@ -609,8 +602,6 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
         .is_some_and(|n| n.proposed.enrich == s.body_hash)
 }
 
-// ─── pure core: classify ─────────────────────────────────────────────────────
-
 /// The Brain's area vocabulary: the Librarian map's areas (with `nested`, the
 /// folders already inside them too, Classify's filing targets), each with the
 /// first content line of its `_index.md` as a one-line description ("" when
@@ -710,8 +701,6 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
         confidence,
     })
 }
-
-// ─── pure core: enrich (Job B) ───────────────────────────────────────────────
 
 /// Every OTHER note in the brain as a `(rel, stem)` pair — the link-candidate
 /// haystack, off a lock-free walk. Stems (filename minus `.md`, which carry the
@@ -978,8 +967,6 @@ fn render_index(area: &str, members: &[IndexRow]) -> String {
     out
 }
 
-// ─── pure core: the journal shape ────────────────────────────────────────────
-
 /// One journal row — the ONE shape both writers (the TS Phase-3 commands and
 /// this daemon) speak. Same-id re-append is a status transition; last line wins.
 struct JournalRow {
@@ -1062,8 +1049,6 @@ fn supersede(s: &corpus::CorpusStore, old_id: &str) -> Result<bool, String> {
     s.journal_append(&row.to_string())?;
     Ok(true)
 }
-
-// ─── pure core: gates ────────────────────────────────────────────────────────
 
 /// The §2 gates, sampled cheapest-first. `run_now` (the manual nudge) bypasses
 /// power/thermal/idle — but never barges in on an interactive chat. The probes
@@ -1215,8 +1200,6 @@ fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner)
     }
     knobs
 }
-
-// ─── the cycle ───────────────────────────────────────────────────────────────
 
 #[derive(Default, Debug)]
 pub(crate) struct CycleReport {
@@ -1896,8 +1879,6 @@ fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
     }
 }
 
-// ─── the worker thread ───────────────────────────────────────────────────────
-
 /// One cached system probe — the `pmset` shell-outs aren't free, so each result
 /// lives for the caller's staleness budget, and is sampled only when the lazy
 /// gate chain reaches it. Fail-open: an unreadable probe never bricks the
@@ -2300,8 +2281,6 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
     });
 }
 
-// ─── commands ────────────────────────────────────────────────────────────────
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrganizerStatus {
@@ -2455,8 +2434,6 @@ pub fn organizer_learn_field(
     learn_field(&state, &note, &key, &value)
 }
 
-// ─── the secure review lane (feature B, 2026-07-22): organizer_secure.rs ─────
-
 #[path = "organizer_secure.rs"]
 pub mod secure;
 #[path = "organizer_coverage.rs"]
@@ -2474,8 +2451,6 @@ mod adopted_tests;
 mod copy_tests;
 #[cfg(test)]
 use secure::{dismiss_secure, secure_hints};
-
-// ─── tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -2577,8 +2552,6 @@ mod tests {
     fn no_gates() -> impl Fn() -> bool {
         || true
     }
-
-    // ── pure core ──
 
     #[test]
     fn fnv_hash_is_stable_and_distinct() {
@@ -3403,8 +3376,6 @@ mod tests {
             "the command rejects junk"
         );
     }
-
-    // ── the cycle ──
 
     #[test]
     fn secure_and_locked_never_reach_the_transport() {
@@ -4673,8 +4644,6 @@ mod tests {
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
     }
 
-    // ── enrich (Job B) ──
-
     /// File a staged capture into an area through the Filer lane (the daemon's
     /// own primitives) and return the placed rel — a note with a real ULID.
     fn place_note(state: &CorpusState, body: &str, area: &str) -> String {
@@ -4922,8 +4891,6 @@ mod tests {
         );
         assert_eq!(fs::read_to_string(root.join(&rel)).unwrap(), first);
     }
-
-    // ── refresh-index (Job C) ──
 
     #[test]
     fn render_index_is_deterministic_fixed_point() {

@@ -70,8 +70,6 @@ pub struct ProviderState {
 /// watchdog can never shoot a successor that reused its request id.
 pub(crate) static NEXT_TOKEN: AtomicU64 = AtomicU64::new(1);
 
-// ── the allowlist ─────────────────────────────────────────────────────────────
-
 pub(crate) struct CliSpec {
     pub(crate) id: &'static str,
     /// Absolute candidate paths; "~/" expands to $HOME. First hit wins.
@@ -514,8 +512,6 @@ pub(crate) fn with_stderr_tail(message: &str, stderr: &str, open: &str, close: &
     }
 }
 
-// ── the runner ────────────────────────────────────────────────────────────────
-
 /// Spawn + register + read to EOF + reap. The watchdog thread kills the child
 /// at the deadline (matching token only — a finished step's watchdog must not
 /// shoot a successor reusing the request id); `cli_cancel` kills it early.
@@ -602,8 +598,6 @@ pub(crate) fn organizer_egress_allowed(prompt: &str) -> Result<(), String> {
     }
     Ok(())
 }
-
-// ── commands ──────────────────────────────────────────────────────────────────
 
 /// One constrained completion step on a connected client. Blocking work rides
 /// `spawn_blocking` so `cli_cancel` can interleave on the IPC lane.
@@ -831,8 +825,6 @@ fn version_of(bin: &PathBuf, args: &[&str]) -> Option<String> {
         .to_string();
     (!line.is_empty()).then_some(line)
 }
-
-// ─── tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {

@@ -107,8 +107,6 @@ export class FolderNotesService implements NotesService {
 
   constructor(private readonly dir: VaultDir) {}
 
-  // ─── layout, walking, and the id index ─────────────────────────────────────
-
   /** The memex-root marker set used by the All-Notes chats/ exclusion. A memex
    * vault's default root is the bare "" marker; a plain folder has none. */
   private memexMarkers(): ReadonlySet<string> {
@@ -248,8 +246,6 @@ export class FolderNotesService implements NotesService {
     index.set(newId, path);
   }
 
-  // ─── folders ───────────────────────────────────────────────────────────────
-
   async listFolders(): Promise<Folder[]> {
     await this.ensureIndex();
     const folders: Folder[] = reservedFolders().map((id) => ({ id, name: id, parentId: null }));
@@ -308,8 +304,6 @@ export class FolderNotesService implements NotesService {
     if (children.length > 0) throw new Error(`“${baseName(id)}” isn't empty`);
     await this.dir.remove(id);
   }
-
-  // ─── listing and search ────────────────────────────────────────────────────
 
   async listAll(): Promise<NoteSummary[]> {
     const index = await this.rebuildIndex();
@@ -379,8 +373,6 @@ export class FolderNotesService implements NotesService {
     if (!path || isPathItem(path) || !(await this.dir.exists(path))) return null;
     return this.noteAt(path);
   }
-
-  // ─── writes ────────────────────────────────────────────────────────────────
 
   /** A brand-new note always lands in the capture staging area — `wiki/_inbox`
    * in a memex, the folder root in a plain vault — exactly like the Mac app,
@@ -479,8 +471,6 @@ export class FolderNotesService implements NotesService {
     this.cache.delete(path);
     index.delete(id);
   }
-
-  // ─── lifecycle ─────────────────────────────────────────────────────────────
 
   /** Moving into Archive or Trash keeps the note's ORIGINAL path beneath the
    * sink (`trash/wiki/_inbox/a.md`), so restore is a prefix strip, and stamps

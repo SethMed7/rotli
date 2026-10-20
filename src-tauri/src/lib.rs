@@ -1099,8 +1099,6 @@ fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
     relaunch_app(&app)
 }
 
-// ─── the unified Location surface (corpus.json) ─────────────────────────────
-
 /// The corpus, enriched with whether it IS a memex (derived, never stored) + its
 /// write perms — so the UI/service can treat a memex corpus as the active write
 /// target.

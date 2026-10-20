@@ -130,8 +130,6 @@ export const fmPage = {
   close: () => privateBrowserClose(FM_PAGE),
 };
 
-// ── Claude FM ──────────────────────────────────────────────────────────────
-
 let fmOpen = false;
 let fmUrl: string | null = null;
 let fmState: TabMediaState = "none";
@@ -180,8 +178,6 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
   else fmAskedPause = now;
   void fmPage.media(wantsPlay ? "play" : "pause").catch(() => {});
 }
-
-// ── the rules, applied ─────────────────────────────────────────────────────
 
 /** What ambient does right now. Nothing sounds during setup; the player
  * waits in the sidebar for the person to press Play. */
@@ -394,8 +390,6 @@ export function startAmbient(): () => void {
     closeFm();
   };
 }
-
-// ── the player's buttons ────────────────────────────────────────────────────
 
 /** What a tab's page will be doing once an action lands. */
 function expected(action: TabMediaAction): TabMediaState | null {

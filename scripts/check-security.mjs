@@ -36,11 +36,10 @@ function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 }
 
-// ── (a) egress allowlist ──────────────────────────────────────────────────────
-//
-// Rust: every src-tauri/src file that uses the ureq HTTP client must be a
-// declared egress site; no OTHER HTTP-client crate may enter Cargo.toml.
-{
+/** (a) Egress allowlist.
+ * Rust: every src-tauri/src file that uses the ureq HTTP client must be a
+ * declared egress site; no OTHER HTTP-client crate may enter Cargo.toml. */
+function checkRustEgressSites() {
   const ureqFiles = allow.rust.ureqFiles;
   for (const rel of listFiles("src-tauri/src", /\.rs$/)) {
     const base = rel.split("/").pop();
@@ -65,11 +64,11 @@ function stripComments(src) {
   }
 }
 
-// src/: the webview's CSP is connect-src ipc-only, so a raw fetch( in app code
-// can never reach the asset protocol or the network — it fails at runtime with
-// "Load failed" (the 2026-09-01 chat-drop regression). Every call site must be
-// declared with its reason; file reads go through the IPC byte lane instead.
-{
+/** (a) src/: the webview's CSP is connect-src ipc-only, so a raw fetch( in app code
+ * can never reach the asset protocol or the network — it fails at runtime with
+ * "Load failed" (the 2026-09-01 chat-drop regression). Every call site must be
+ * declared with its reason; file reads go through the IPC byte lane instead. */
+function checkWebviewRawFetch() {
   const fetchFiles = allow.src?.rawFetchFiles ?? {};
   const walk = (dir) =>
     readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
@@ -88,9 +87,9 @@ function stripComments(src) {
   }
 }
 
-// breve-runtime: every raw fetch( site must be a declared egress file; node net
-// modules restricted to the allowlist.
-{
+/** (a) breve-runtime: every raw fetch( site must be a declared egress file; node net
+ * modules restricted to the allowlist. */
+function checkBreveRuntimeEgress() {
   const fetchFiles = allow.breveRuntime.rawFetchFiles;
   const imapFiles = allow.breveRuntime.imapFlowFiles;
   const netModules = allow.breveRuntime.nodeNetModules;
@@ -142,17 +141,16 @@ function stripComments(src) {
   }
 }
 
-// ── (a″) every declared egress SITE still calls the egress gate ───────────────
-//
-// The 2026-08-01 audit found this class three times over: an outbound lane that
-// bounded its DESTINATION (a scheme allowlist, a fixed search host, a provider
-// allowlist) while bounding its CONTENT not at all. `open_url` handed the OS any
-// URL a compromised webview named; the organizer's remote lane sent any prompt
-// the daemon built. Both were one function away from correct and neither was
-// caught by anything mechanical. So: each function named in the fixture must
-// reference `blocked_for_remote`, and the file's other outbound functions are
-// caught by the ureq allowlist above.
-{
+/** (a″) Every declared egress SITE still calls the egress gate.
+ * The 2026-08-01 audit found this class three times over: an outbound lane that
+ * bounded its DESTINATION (a scheme allowlist, a fixed search host, a provider
+ * allowlist) while bounding its CONTENT not at all. `open_url` handed the OS any
+ * URL a compromised webview named; the organizer's remote lane sent any prompt
+ * the daemon built. Both were one function away from correct and neither was
+ * caught by anything mechanical. So: each function named in the fixture must
+ * reference `blocked_for_remote`, and the file's other outbound functions are
+ * caught by the ureq allowlist above. */
+function checkGatedEgressSites() {
   const sites = allow.rust.gatedEgressSites ?? {};
   const GATE = "blocked_for_remote";
   // remote_block.rs is the same bound (cold ledger, secure markers, secure-prose
@@ -185,12 +183,11 @@ function stripComments(src) {
   }
 }
 
-// ── (a′) the TS agent-loop egress-tool set is complete ────────────────────────
-//
-// Every ToolName that isn't a known LOCAL tool must be in EGRESS_TOOLS, so a
-// future off-device tool can't be added past the secret guard (audit info
-// finding). Asserted here rather than as a runtime test so it rides the lint.
-{
+/** (a′) The TS agent-loop egress-tool set is complete.
+ * Every ToolName that isn't a known LOCAL tool must be in EGRESS_TOOLS, so a
+ * future off-device tool can't be added past the secret guard (audit info
+ * finding). Asserted here rather than as a runtime test so it rides the lint. */
+function checkAgentEgressTools() {
   const types = read("src/ai/types.ts");
   const loop = read("src/ai/loop.ts");
   const toolBlock = types.match(/export type ToolName\s*=([\s\S]*?);/);
@@ -244,8 +241,8 @@ function stripComments(src) {
   }
 }
 
-// ── (b) keychain literals only via the named constants ────────────────────────
-{
+/** (b) Keychain literals only via the named constants. */
+function checkKeychainLiterals() {
   const sites = new Set(allow.keychain.constantSites);
   const scanDirs = ["src-tauri/src", "src/lib", "src/ai", "breve-runtime/scripts", "src/components"];
   for (const dir of scanDirs) {
@@ -263,8 +260,8 @@ function stripComments(src) {
   }
 }
 
-// ── (c) tauri.conf.json + capabilities security snapshot ──────────────────────
-{
+/** (c) tauri.conf.json + capabilities security snapshot. */
+function checkPlatformSnapshot() {
   const conf = JSON.parse(read("src-tauri/tauri.conf.json"));
   const sec = conf.app?.security ?? {};
   const snap = allow.tauriConf;
@@ -307,22 +304,20 @@ function stripComments(src) {
   }
 }
 
-// ── (c′) public-site remote images match the deployed CSP ────────────────────
-//
-// Astro's local preview does not apply Caddy's production headers. A remote
-// image can therefore look correct locally and ship blank unless every literal
-// remote <img> origin is present in the one deployed img-src directive.
-{
+/** (c′) Public-site remote images match the deployed CSP.
+ * Astro's local preview does not apply Caddy's production headers. A remote
+ * image can therefore look correct locally and ship blank unless every literal
+ * remote <img> origin is present in the one deployed img-src directive. */
+function checkSiteImageCsp() {
   const sources = walkTree("site/src", /\.astro$/).map((path) => ({ path, contents: read(path) }));
   failures.push(...siteRemoteImageCspFindings(read("site/Caddyfile"), sources));
 }
 
-// ── (c″) public remote-relay deployment boundary ─────────────────────────────
-//
-// The relay is internet-facing and intentionally state-free. Keep the cheap
-// defenses that make arbitrary public traffic an availability problem rather
-// than an unbounded-memory or cross-role authority bug.
-{
+/** (c″) Public remote-relay deployment boundary.
+ * The relay is internet-facing and intentionally state-free. Keep the cheap
+ * defenses that make arbitrary public traffic an availability problem rather
+ * than an unbounded-memory or cross-role authority bug. */
+function checkRemoteRelayBoundary() {
   const relay = allow.remoteRelay;
   const code = stripComments(read(relay.source));
   const dockerfile = read(relay.dockerfile);
@@ -362,13 +357,12 @@ function stripComments(src) {
   }
 }
 
-// ── (d) sensitive-content logging tripwire (heuristic) ────────────────────────
-//
-// Flags a print/log statement in an egress-adjacent file whose argument names a
-// body/secret/prompt-shaped variable. DOCUMENTED LIMIT: a renamed variable or an
-// interpolated helper slips it — this catches the obvious regression, not a
-// determined leak. See docs/development/security.md.
-{
+/** (d) Sensitive-content logging tripwire (heuristic).
+ * Flags a print/log statement in an egress-adjacent file whose argument names a
+ * body/secret/prompt-shaped variable. DOCUMENTED LIMIT: a renamed variable or an
+ * interpolated helper slips it — this catches the obvious regression, not a
+ * determined leak. See docs/development/security.md. */
+function checkSensitiveLogging() {
   const argRe = new RegExp(allow.sensitiveLogging.forbiddenLogArgPattern, "i");
   for (const rel of allow.sensitiveLogging.egressAdjacentFiles) {
     const code = stripComments(read(rel));
@@ -383,14 +377,13 @@ function stripComments(src) {
   }
 }
 
-// ── (d2) a secure note's name never reaches a log ───────────────────────────
-//
-// A note becomes secure by its name (a keyword in its title), so its path or
-// title is private too. CodeQL flagged a log line writing the path of a note
-// being made secure (PR 125, 2026-09-28); this keeps the whole class out: a
-// Rust log statement that talks about secure notes may not interpolate a
-// path or title.
-{
+/** (d2) A secure note's name never reaches a log.
+ * A note becomes secure by its name (a keyword in its title), so its path or
+ * title is private too. CodeQL flagged a log line writing the path of a note
+ * being made secure (PR 125, 2026-09-28); this keeps the whole class out: a
+ * Rust log statement that talks about secure notes may not interpolate a
+ * path or title. */
+function checkSecureNoteNamesInLogs() {
   const logRe = /\b(?:println!|eprintln!)\s*\(([^;\n]*)/g;
   const nameRe = /\{(?:rel|target_rel|abs|target_abs|path|title|name)\b/;
   for (const rel of listFiles("src-tauri/src", /\.rs$/)) {
@@ -404,16 +397,15 @@ function stripComments(src) {
   }
 }
 
-// ── (e) update checks have exactly two owners ────────────────────────────────
-//
-// Local-first also describes network behavior. The updater feed may be queried
-// from the explicit Settings control, and from the ONE routine check
-// (services/updateCheck.ts, owner's decision 2026-09-21) — which must stay
-// behind the `autoUpdateCheck` Settings switch and out of development builds.
-// Any other caller is phoning home. This catches a recurrence without
-// pretending that a grep proves the wider absence of network activity (the
-// egress inventory above owns that).
-{
+/** (e) Update checks have exactly two owners.
+ * Local-first also describes network behavior. The updater feed may be queried
+ * from the explicit Settings control, and from the ONE routine check
+ * (services/updateCheck.ts, owner's decision 2026-09-21) — which must stay
+ * behind the `autoUpdateCheck` Settings switch and out of development builds.
+ * Any other caller is phoning home. This catches a recurrence without
+ * pretending that a grep proves the wider absence of network activity (the
+ * egress inventory above owns that). */
+function checkUpdateCheckOwners() {
   const routine = "src/services/updateCheck.ts";
   const allowedCallers = new Set(["src/components/settingsSurface.tsx"]);
   for (const rel of walkTree("src", /\.(ts|tsx)$/)) {
@@ -450,6 +442,19 @@ function walkTree(dir, re) {
   }
   return out;
 }
+
+checkRustEgressSites();
+checkWebviewRawFetch();
+checkBreveRuntimeEgress();
+checkGatedEgressSites();
+checkAgentEgressTools();
+checkKeychainLiterals();
+checkPlatformSnapshot();
+checkSiteImageCsp();
+checkRemoteRelayBoundary();
+checkSensitiveLogging();
+checkSecureNoteNamesInLogs();
+checkUpdateCheckOwners();
 
 if (failures.length) {
   console.error(`check:security failed:\n${failures.map((l) => `  - ${l}`).join("\n")}`);

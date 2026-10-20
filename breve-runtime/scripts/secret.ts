@@ -46,30 +46,40 @@ async function unlockPw(): Promise<string> {
   return (await $`security find-generic-password -s breve-keychain-pw -w`.text()).trim();
 }
 
-/** Read a generic-password secret by service name from Breve's isolated keychain. */
+const RESEND_SERVICE = "resend-breve";
+
+/** The Resend key from Rotli's own login-keychain entry, or "" when unset. */
+async function readRotliResendKey(): Promise<string> {
+  try {
+    return (await $`security find-generic-password -s ${ROTLI_KEYCHAIN_SERVICE} -a ${ROTLI_RESEND_ACCOUNT} -w`.text()).trim();
+  } catch {
+    return "";
+  }
+}
+
+/** A secret from Breve's isolated keychain, or "" when it can't be read. */
+async function readIsolatedSecret(service: string): Promise<string> {
+  try {
+    const pw = await unlockPw();
+    if (pw) await unlockKeychain(pw);
+    try {
+      return (await $`security find-generic-password -s ${service} -w ${KEYCHAIN}`.text()).trim();
+    } finally {
+      // Best-effort re-lock; never throw if it fails.
+      try { await $`security lock-keychain ${KEYCHAIN}`.quiet(); } catch {}
+    }
+  } catch {
+    return "";
+  }
+}
+
+/** Read a generic-password secret by service name ("" when unreadable). An
+ *  install upgraded from standalone Breve may still hold the Resend key only
+ *  in the isolated keychain. */
 export async function readSecret(service: string): Promise<string> {
   const run = mutex.then(async () => {
-    // Resend is a Rotli-owned delivery credential now. Prefer Rotli's native
-    // login-keychain entry; the isolated Breve keychain remains a one-time
-    // migration fallback for installs upgraded from the standalone project.
-    if (service === "resend-breve") {
-      try {
-        const value = (await $`security find-generic-password -s ${ROTLI_KEYCHAIN_SERVICE} -a ${ROTLI_RESEND_ACCOUNT} -w`.text()).trim();
-        if (value) return value;
-      } catch {}
-    }
-    try {
-      const pw = await unlockPw();
-      if (pw) await unlockKeychain(pw);
-      try {
-        return (await $`security find-generic-password -s ${service} -w ${KEYCHAIN}`.text()).trim();
-      } finally {
-        // Best-effort re-lock; never throw if it fails.
-        try { await $`security lock-keychain ${KEYCHAIN}`.quiet(); } catch {}
-      }
-    } catch {
-      return "";
-    }
+    const rotliOwned = service === RESEND_SERVICE ? await readRotliResendKey() : "";
+    return rotliOwned || readIsolatedSecret(service);
   });
   mutex = run.catch(() => {});
   return run;
