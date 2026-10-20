@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A smaller app.** Rotli's own code is built for size now, about 4.5 MB
+  smaller. Search and reading PDFs keep full speed.
+
+- **The Librarian organizes a copy of your folder.** When Rotli makes a copy
+  of an existing folder of notes (an Obsidian vault, say), its Librarian now
+  works there exactly as it does in a Rotli vault, at the trust setting you
+  chose: notes left at the top of the folder or in the Inbox get filed into
+  your own folders, including folders inside them (`Work/Clients`); notes get
+  summaries and tags; each top-level folder gets an overview note. Your views
+  stay as you arranged them, locked notes never move, and Obsidian's
+  templates and attachments folders are left alone. A folder connected in
+  place is still never organized. In a Rotli vault, the Librarian can now
+  file into an existing folder inside an area too.
+- **Moving a note keeps its links working.** Images and links written as
+  paths (`![](../attachments/photo.png)`, `[plan](Work/Plan.md)`) used to
+  break when a note moved to another folder. Now Rotli adjusts those paths
+  wherever a note or file moves: Archive, Trash, Restore, an AI agent's
+  move, and the Librarian's filing. That covers the moved note's own links
+  and links in other notes that point to it. Only the path changes, never
+  your words. A locked note is never changed, and an AI won't move
+  something a locked note links to. `[[Wikilinks]]` already followed
+  names and are unchanged.
 - **Reading mode gives the note room above it.** With the titlebar, tabs, and
   header gone, the note no longer starts flush at the top of the window: it
   opens with space above it, a little less in a short window. Writing and

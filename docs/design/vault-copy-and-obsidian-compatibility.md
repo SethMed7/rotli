@@ -343,7 +343,7 @@ lock:
 2. **Notes that link to it by relative path are rebased too.** A locked
    linker is never rewritten, so a move that would break a locked note's
    link is refused, and the refusal is journaled.
-3. **Every view that references it follows the new path**, the same
+3. *(Not needed; see 4c-1b built: note ids are stable.)* **Every view that references it follows the new path**, the same
    re-pointing a person's rename already gets in the webview
    (`viewTree.ts`, `renameMainRef`). The daemon runs without the webview, so
    this is done in Rust, and the rule is defined once, with a parity fixture
@@ -401,12 +401,79 @@ run on a synthetic imported copy, since the daemon only runs in the Mac app.
 1. **4c-1: the map and safe moves.** Introduce the Librarian's map and route
    `candidate_rel`, the watcher feed, the sweep, `area_vocab`, `area_members`,
    the filing target, and `_index.md` paths through it. Add the link-rebasing
-   move and the Rust view re-pointing, and use them for a person's moves in an
-   imported vault. The Librarian's gates stay closed.
+   move for every move. The Librarian's gates stay closed.
 2. **4c-2: the Librarian on a copy.** `librarian_writes()`, root and inbox
    input, subfolder targets, the Obsidian folder exclusions, and the webview
    lane. Tests above, contract (`memex-data-contract.md`), CHANGELOG.
 3. **4c-3: native acceptance** on a synthetic copy, with evidence.
+
+**4c-1a built (2026-10-16, one PR).** 4c-1 is split in two, so the map
+lands before anything that moves files. `src-tauri/src/librarian_map.rs` is the
+Librarian's map: `LibrarianMap::at(root)` reads the vault's marker like
+`Layout::of_vault`. The watcher feed, the sweep and audit, the enrich peer
+list, `area_vocab`, `area_members`, Classify's unfiled check, the journaled
+filing target, `_index.md` paths, the secure review lane, and the corpus's
+`file_note` and `write_index` all ask it. The Templates constant moved with
+it (parity unchanged). The Rotli-vault rules are pinned by the existing
+candidate and templates tests, which now run against the map. A copy's map
+(areas, root and inbox notes as unfiled, Obsidian's templates and attachments
+folders set aside, Rotli's role folders skipped) is tested on a synthetic
+Obsidian copy, but nothing reaches it yet: the gates stay closed until 4c-2.
+`filer_writable` still names `wiki/`; it is the gate, so it moves in 4c-2.
+**4c-1b** (next) adds the link-rebasing move.
+
+**4c-1b built (2026-10-16, one PR).** Moves keep links working, in every
+vault, not only copies. `CorpusStore::follow_moves` takes a batch of
+`(old, new)` paths after any move (a person's Archive/Trash and Restore, an
+agent's move, the Librarian's filing and undo, the person-sinks fold, files
+as well as notes). In one walk it re-points every relative Markdown link
+the batch would break: a moved note's own links, and links in other notes
+to a moved file. Order inside a batch doesn't matter, so a note moving with
+the image beside it keeps its link to `kiln.png` as written. Only the path inside `(…)`
+changes, in any unlocked note whatever its AI-edits grant (owner,
+2026-10-16: path fixes are upkeep, not writing). A locked note is never
+written, and the Librarian or an agent refuses a move that would break a
+locked note's link. Two corrections to the design above, found while
+building:
+
+- **No view re-pointing is needed.** A note in a copy has a stable id in
+  `.rotli/index.json` (a ULID), not its path, so Main and named views keep
+  their slots across any move. Only files are path-addressed, and the
+  Librarian never moves files.
+- **A person's drag in the sidebar never moved a file.** It rearranges the
+  view. The disk moves a person makes are Archive, Trash, and Restore, and
+  those now keep links working too.
+
+**4c-2 built (2026-10-19, one PR).** The Librarian runs on a copy.
+`CorpusStore::librarian_writes()` (a Rotli vault or an imported copy, never
+in place, never legacy) replaces `is_memex()` as the daemon's gate and
+`filer_writable`'s, and the filer asks the map where it may write
+(`LibrarianMap::writes`: a copy's whole tree except Rotli's role folders, dot
+folders, and Obsidian's set-aside folders). Classify's filing targets are
+`LibrarianMap::filing_targets`: the areas and the folders already inside
+them, in both layouts (parity: a Rotli vault files into `wiki/Work/Clients`
+too); People's folders stay the rules' alone. Three things found while
+building:
+
+- **A copy's notes have no frontmatter `id`.** Their stable ids live in
+  `.rotli/index.json`, so `filer_move` and the daemon take the store's id
+  (`wire_id_of`) instead of refusing ("note has no id").
+- **Approving a root note's filing compared folders by the last `/`**, which
+  a root note doesn't have, so the webview always said it had moved.
+  `brainJournal` and `brainFiling` now use `parentPath`.
+- **The Librarian chat refused every note outside `wiki/`.**
+  `librarianReaches` and `libraryAreas` read the role map, so the chat takes
+  a copy's notes and offers its top-level folders.
+
+`is_memex()` keeps meaning the Library note lanes, and the Breve importer
+(which writes `wiki/reference`) now checks it explicitly, since the filer
+gate alone would let it write into a copy. Proof:
+`src-tauri/src/organizer_copy_tests.rs` (Suggest write-free, Organize files a
+root note into `Work/Clients` with its links kept and its id unchanged, a
+locked linker keeps it in place, `_index.md` only in areas, the in-place
+refusals three ways, and nested filing in a Rotli vault); TS:
+`librarianBar.test.ts`, `librarianSession.test.ts`, `brainJournal.test.ts`.
+**4c-3** (native acceptance on a synthetic copy) is next.
 
 **Parity is the rule (owner, 2026-10-16).** "The copy is not to change the
 functionality of the Librarian; it is to add security so a user can't blame

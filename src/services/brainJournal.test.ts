@@ -197,6 +197,25 @@ describe("approveProposal — the same-id transition", () => {
     expect(v.history.map((a) => a.id)).toEqual(["01JPROP"]);
   });
 
+  test("in a copy, a note at the vault's root files into a nested folder", async () => {
+    const p = row({
+      id: "01JPROP",
+      noteUlid: "01ULID",
+      area: "Work/Clients",
+      before: "",
+      after: "Work/Clients",
+    });
+    const { deps, calls } = fakeDeps("Call back.md", [], {
+      fileNote: async (id, area, opts) => {
+        calls.fileNote.push([id, area, opts]);
+        return "Work/Clients/Call back.md";
+      },
+    });
+    await approveProposal(p, deps);
+    expect(calls.fileNote).toEqual([["01ULID", "Work/Clients", { journal: false }]]);
+    expect(calls.appended[0]?.after).toBe("Work/Clients");
+  });
+
   test("refuses a file proposal whose note has MOVED since (stale decision, §4.8)", async () => {
     const p = row({ id: "01JPROP", noteUlid: "01ULID" });
     const { deps, calls } = fakeDeps("wiki/Research/foo-a1b2c3.md"); // already elsewhere

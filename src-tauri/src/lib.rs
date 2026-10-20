@@ -41,6 +41,7 @@ mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
+mod librarian_map;
 mod librarian_rules;
 mod localmodel;
 mod memex;
@@ -1327,8 +1328,8 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
     let development_read_only = development_read_only(&app);
     // An imported vault is not a memex to the webview: its notes go through the
-    // corpus store, never the memex note lanes (wiki/_inbox), and its Library
-    // and Librarian stay off until they learn its layout (slice 4c).
+    // corpus store, never the memex note lanes (wiki/_inbox). Its Librarian
+    // runs like a Rotli vault's (slice 4c) unless it was connected in place.
     // Its chats still live in the vault (the role map's chats folder), so its
     // id and perms are reported like any vault's: the webview writes chats
     // there and routes new notes to the corpus store's Inbox.

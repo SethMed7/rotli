@@ -212,6 +212,12 @@ pub(crate) fn with_people_groups(
     mut vocab: Vec<(String, String)>,
     rules: &LibrarianRules,
 ) -> Vec<(String, String)> {
+    // the rules alone govern People's folders, whatever is on disk
+    vocab.retain(|(name, _)| {
+        !name
+            .split_once('/')
+            .is_some_and(|(top, _)| top.eq_ignore_ascii_case(PEOPLE_AREA))
+    });
     if !rules.people_groups.is_empty() {
         vocab.retain(|(name, _)| !name.eq_ignore_ascii_case(PEOPLE_AREA));
         for group in &rules.people_groups {

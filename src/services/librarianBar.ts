@@ -27,6 +27,7 @@ import {
 import { fileNoteToArea } from "./brainFiling";
 import type { BrainAction } from "./brainJournal";
 import { logAction } from "./brainJournalStore";
+import { type FolderRoles, folderRoles } from "./destinations";
 import { invalidateJournal, invalidateNotes } from "./hooks";
 
 export const LIBRARIAN_REFUSALS = {
@@ -77,6 +78,7 @@ export async function librarianRefusal(
   noteId: string,
   where: { native: boolean; librarianOn: boolean; secureKeywords?: readonly string[]; title?: string },
   deps: Pick<LibrarianDeps, "frontmatter" | "notePath"> = liveLibrarianDeps,
+  roles: FolderRoles | null = folderRoles(),
 ): Promise<string | null> {
   if (!where.native) return LIBRARIAN_REFUSALS.web;
   if (!where.librarianOn) return LIBRARIAN_REFUSALS.off;
@@ -87,8 +89,18 @@ export async function librarianRefusal(
   // a secure keyword in its name makes it secure too (the Librarian rules);
   // Rust protects it independently — this refuses before any prompt exists
   if (secureByName(where.title ?? "", rel, where.secureKeywords ?? [])) return LIBRARIAN_REFUSALS.secure;
-  const inLibrary = rel.startsWith("wiki/") && !rel.startsWith("wiki/_secure");
-  return inLibrary ? null : LIBRARIAN_REFUSALS.library;
+  return librarianReaches(rel, roles) ? null : LIBRARIAN_REFUSALS.library;
+}
+
+/** Whether a note is the Librarian's to work: in a Rotli vault, the Library
+ * (`wiki/`, never its secure lane); in a copy, anywhere in the person's tree
+ * but Rotli's own folders and dot folders (librarian_map.rs, enforced there). */
+export function librarianReaches(rel: string, roles: FolderRoles | null): boolean {
+  if (!roles) return rel.startsWith("wiki/") && !rel.startsWith("wiki/_secure");
+  if (!rel || rel.split("/").some((part) => part.startsWith("."))) return false;
+  return ![roles.archive, roles.trash, roles.chats, roles.storage].some((folder) =>
+    rel.startsWith(`${folder}/`),
+  );
 }
 
 /** The note's current tags, for the prompt. */

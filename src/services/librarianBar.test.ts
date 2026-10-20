@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import type { FrontmatterView } from "../lib/tauri";
+import { IMPORTED_FOLDER_ROLES } from "./destinations";
 import {
   applyLibrarian,
   LIBRARIAN_REFUSALS,
   type LibrarianDeps,
   converseLibrarian,
+  librarianReaches,
   librarianRefusal,
 } from "./librarianBar";
 
@@ -73,6 +75,31 @@ describe("who may ask", () => {
       LIBRARIAN_REFUSALS.library,
     );
     expect(await librarianRefusal("n", on, deps)).toBeNull();
+  });
+
+  test("in a copy, it works the person's own tree but never Rotli's folders", async () => {
+    const roles = IMPORTED_FOLDER_ROLES;
+    for (const rel of [
+      "Loose idea.md",
+      "Inbox/Call back.md",
+      "Work/Clients/Acme.md",
+      "Daily/2026-10-16.md",
+    ]) {
+      expect(librarianReaches(rel, roles)).toBe(true);
+    }
+    for (const rel of [
+      `${roles.trash}/x.md`,
+      `${roles.chats}/x.md`,
+      `${roles.archive}/x.md`,
+      ".obsidian/x.md",
+    ]) {
+      expect(librarianReaches(rel, roles)).toBe(false);
+    }
+    // a Rotli vault's rule is unchanged
+    expect(librarianReaches("Work/Plan.md", null)).toBe(false);
+    expect(librarianReaches("wiki/Work/Plan.md", null)).toBe(true);
+    const { deps } = fakeDeps(view([]), "Loose idea.md");
+    expect(await librarianRefusal("n", on, deps, roles)).toBeNull();
   });
 
   test("a note named with a secure keyword is refused before anything is sent", async () => {

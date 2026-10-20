@@ -184,7 +184,8 @@ fn a_marked_copy_opens_as_an_imported_vault_with_every_folder_the_persons() {
     let mut store = CorpusStore::open(copy.clone()).unwrap();
     assert!(!store.adopted, "a copy is Rotli's to keep, not a folder opened in place");
     assert!(store.layout.is_imported());
-    assert!(!store.is_memex(), "the Librarian stands down until it learns this layout (4c)");
+    assert!(!store.is_memex(), "its new notes take the corpus store's Inbox, not wiki/_inbox");
+    assert!(store.librarian_writes(), "the Librarian works a copy like a Rotli vault (4c)");
 
     // Main starts with everything that came over, folder by folder
     store.seed_main_if_brought_in().unwrap();

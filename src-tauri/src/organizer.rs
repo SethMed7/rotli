@@ -33,6 +33,7 @@ use ulid::Ulid;
 
 use crate::chat::{self, WireMsg};
 use crate::corpus::{self, CorpusState};
+use crate::librarian_map::LibrarianMap;
 use crate::organizer_knobs::{connected_lane, parse_knobs, Knobs, DEFAULT_QUIET};
 
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
@@ -290,10 +291,11 @@ impl OrganizerHandle {
         }))
     }
 
-    /// Watcher feed: keep `wiki/**/*.md`, drop `_index.md` / `wiki/README.md` /
-    /// dot components (the candidate filter). Paths arrive absolute.
+    /// Watcher feed: keep the vault's Librarian input notes (the map's
+    /// candidate filter). Paths arrive absolute.
     pub fn enqueue(&self, root: &Path, paths: &[PathBuf]) {
         let mut added = false;
+        let map = LibrarianMap::at(root);
         {
             let mut q = self.0.queue.lock().unwrap();
             for p in paths {
@@ -301,7 +303,7 @@ impl OrganizerHandle {
                     continue;
                 };
                 let rel = rel.to_string_lossy().replace('\\', "/");
-                if !candidate_rel(&rel) {
+                if !map.is_candidate(&rel) {
                     continue;
                 }
                 q.insert(rel, Instant::now());
@@ -459,32 +461,6 @@ fn parse_state(json: &str) -> OrganizerFile {
     serde_json::from_str(json).unwrap_or_default()
 }
 
-/// The Templates folder (1.3.0) — byte-identical to TEMPLATES_BRAIN_FOLDER in
-/// src/services/templates.ts (parity.json templatesBrainFolder). The notes in it
-/// are the user's saved layouts for `/template`: placeholders, not knowledge. So
-/// the daemon never files a capture INTO it (it is no area), never enriches what
-/// is in it, and writes no `_index.md` there. It stays an ordinary, visible
-/// folder to everything else.
-pub(crate) const TEMPLATES_BRAIN_FOLDER: &str = "wiki/Templates";
-
-fn in_templates(rel: &str) -> bool {
-    rel.strip_prefix(TEMPLATES_BRAIN_FOLDER)
-        .is_some_and(|rest| rest.starts_with('/'))
-}
-
-/// The enqueue/sweep filter: only `wiki/**/*.md` notes are the daemon's input.
-/// `_index.md` is the daemon's own OUTPUT (never an input candidate),
-/// `wiki/README.md` is the pinned human trust artifact (§3.4 — never touched),
-/// and dot components are sidecar/temp plumbing the watcher filters anyway.
-fn candidate_rel(rel: &str) -> bool {
-    rel.ends_with(".md")
-        && rel.starts_with("wiki/")
-        && rel != "wiki/README.md"
-        && rel.rsplit('/').next() != Some("_index.md")
-        && !rel.split('/').any(|c| c.starts_with('.'))
-        && !in_templates(rel)
-}
-
 /// In-memory snapshot of one note read straight off disk. NEVER
 /// `read_frontmatter` — that path WRITES on read (the auto-secure flag), and a
 /// Suggest run must be provably write-free on corpus files.
@@ -565,6 +541,15 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
 
 /// The state-file key for a note — its ULID when it has one (survives the
 /// filing rename), else its rel path (a frontmatter-less external drop).
+/// A copy's notes keep their stable id in `.rotli/index.json`, not in
+/// frontmatter (slice 4c): the store answers it, so a copy files like a Rotli vault.
+fn store_id(corpus_state: &CorpusState, root_id: &str, map: &LibrarianMap, snap: &mut NoteSnapshot) {
+    if snap.id.is_none() && matches!(map, LibrarianMap::Copy { .. }) {
+        let rel = snap.rel.clone();
+        snap.id = corpus_state.route(root_id, |s| s.wire_id_of(&rel)).ok();
+    }
+}
+
 fn state_key(s: &NoteSnapshot) -> String {
     s.id.clone().unwrap_or_else(|| s.rel.clone())
 }
@@ -625,26 +610,17 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
 
 // ─── pure core: classify ─────────────────────────────────────────────────────
 
-/// The Brain's area vocabulary: `wiki/<area>` directories (never `_inbox`,
-/// never underscore/dot names), each with the first content line of its
-/// `_index.md` as a one-line description ("" when none). Lock-free reads.
-fn area_vocab(root: &Path) -> Vec<(String, String)> {
-    let Ok(entries) = std::fs::read_dir(root.join("wiki")) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter_map(|e| e.file_name().to_str().map(str::to_string))
-        .filter(|n| !n.starts_with('_') && !n.starts_with('.'))
-        // saved layouts are not an area to file captures under
-        .filter(|n| format!("wiki/{n}") != TEMPLATES_BRAIN_FOLDER)
-        .collect();
-    names.sort();
+/// The Brain's area vocabulary: the Librarian map's areas (with `nested`, the
+/// folders already inside them too, Classify's filing targets), each with the
+/// first content line of its `_index.md` as a one-line description ("" when
+/// none). Lock-free reads.
+fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
+    let map = LibrarianMap::at(root);
+    let names = if nested { map.filing_targets(root) } else { map.areas(root) };
     names
         .into_iter()
         .map(|name| {
-            let desc = std::fs::read_to_string(root.join("wiki").join(&name).join("_index.md"))
+            let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
                 .ok()
                 .and_then(|t| {
                     let (_, body) = corpus::parse_document(&t);
@@ -671,7 +647,8 @@ fn area_vocab(root: &Path) -> Vec<(String, String)> {
 /// `filing` is the person's own rules (plain sentences), followed when they apply.
 fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)], filing: &[String]) -> String {
     let mut p = String::from(
-        "You file notes in a personal knowledge base. Pick the ONE best area for this note.\n\nAreas:\n",
+        "You file notes in a personal knowledge base. Pick the ONE best area for this note. \
+         An `Area/Folder` entry is a folder inside that area: pick the most specific one that fits.\n\nAreas:\n",
     );
     for (name, desc) in vocab {
         if desc.is_empty() {
@@ -745,11 +722,9 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
 /// model echo it into `links:` of committed notes (§4.2.2). The check costs one
 /// read per wiki note, once per cycle — the price of the absolute rule.
 fn list_peers(root: &Path) -> Vec<(String, String)> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    let mut peers: Vec<(String, String)> = rels
+    let mut peers: Vec<(String, String)> = LibrarianMap::at(root)
+        .candidates(root)
         .into_iter()
-        .filter(|rel| candidate_rel(rel))
         .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked))
         .map(|rel| {
             let stem = rel
@@ -955,11 +930,9 @@ struct IndexRow {
 /// README are never members; secure/locked never listed) in canonical
 /// title-then-id order.
 fn area_members(root: &Path, area: &str) -> Vec<IndexRow> {
-    let mut rels = Vec::new();
-    collect_md(root, &format!("wiki/{area}"), &mut rels);
-    let mut rows: Vec<IndexRow> = rels
+    let mut rows: Vec<IndexRow> = LibrarianMap::at(root)
+        .area_candidates(root, area)
         .iter()
-        .filter(|rel| candidate_rel(rel))
         .filter_map(|rel| snapshot_note(root, rel).ok())
         .filter(|s| !s.secure && !s.locked)
         .map(|s| IndexRow {
@@ -1304,7 +1277,7 @@ pub(crate) fn run_cycle(
     let mut report = CycleReport::default();
     let model_label = inner.model_label.lock().unwrap().clone();
     let knobs = read_knobs(corpus_state, root_id, inner);
-    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.is_memex())).unwrap_or(false) {
+    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.librarian_writes())).unwrap_or(false) {
         // a RAW vault (vault-vs-brain, 2026-07-26) or a folder opened in place (2026-10-13)
         // has no Brain — harder off than Trust::Off: the queue and review hints drain so
         // nothing accumulates, is modeled, or nags while the folder stays untouched.
@@ -1324,6 +1297,7 @@ pub(crate) fn run_cycle(
     rels.sort();
     inner.emit_progress(serde_json::json!({ "phase": "start", "total": rels.len() }));
 
+    let map = LibrarianMap::at(root);
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
     // the Vault view's visible notes, read once per pass (empty in Main)
@@ -1357,11 +1331,12 @@ pub(crate) fn run_cycle(
             continue; // stays queued — the gate closed mid-cycle
         }
         inner.queue.lock().unwrap().remove(&rel);
-        let Ok(snap) = snapshot_note(root, &rel) else {
+        let Ok(mut snap) = snapshot_note(root, &rel) else {
             // deleted/unreadable: drop — and it can't be a pending secret anymore
             inner.status.lock().unwrap().secure_pending.remove(&rel);
             continue;
         };
+        store_id(corpus_state, root_id, &map, &mut snap);
         match skip_reason(&snap, &state, knobs.quiet, &visible) {
             Some(Skip::Secure) => {
                 // counted + remembered for the §4.2.3 "review them yourself"
@@ -1405,16 +1380,15 @@ pub(crate) fn run_cycle(
         }
 
         let mut rel = rel;
-        let mut snap = snap;
         // the live feed's "what it's looking at right now" line — titles only,
         // never body content (the same boundary every surface keeps)
         inner
             .emit_progress(serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }));
 
-        // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
-        if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
+        // ── Job A — Classify (unfiled notes only) ─────────────────────────────
+        if map.is_unfiled(&rel) && !classify_covered(&snap, &state) {
             let vocab = vocab.get_or_insert_with(|| {
-                crate::librarian_rules::with_people_groups(area_vocab(root), &knobs.rules)
+                crate::librarian_rules::with_people_groups(area_vocab(root, true), &knobs.rules)
             });
             // no areas yet ⇒ nothing to classify into — Enrich still runs below
             if !vocab.is_empty() {
@@ -1506,7 +1480,7 @@ pub(crate) fn run_cycle(
                                         .unwrap_or_default(),
                                 },
                                 after: match verb {
-                                    Verb::FileStaged => format!("wiki/{area}"),
+                                    Verb::FileStaged => map.area_dir(&area),
                                     _ => area.clone(),
                                 },
                                 confidence: Some(conf),
@@ -1614,6 +1588,7 @@ pub(crate) fn run_cycle(
                                         Ok(s) => s,
                                         Err(_) => continue 'candidates,
                                     };
+                                    store_id(corpus_state, root_id, &map, &mut snap);
                                 }
                             }
                             Err(e) => {
@@ -1869,7 +1844,8 @@ fn refresh_indexes(
     state: &mut OrganizerFile,
     report: &mut CycleReport,
 ) -> Result<(), String> {
-    for (area, _) in area_vocab(root) {
+    let map = LibrarianMap::at(root);
+    for (area, _) in area_vocab(root, false) {
         let members = area_members(root, &area);
         if members.is_empty() {
             continue; // nothing to overview — never propose an empty table
@@ -1879,7 +1855,7 @@ fn refresh_indexes(
             continue; // membership (incl. summaries) unchanged since last build
         }
         let body = render_index(&area, &members);
-        let rel = format!("wiki/{area}/_index.md");
+        let rel = map.index_rel(&area);
         let disk = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
         if body == disk {
             // fixed point — record it (this is also how a FRONTEND approval
@@ -1970,14 +1946,13 @@ fn state_pretty(state: &OrganizerFile) -> String {
     serde_json::to_string_pretty(state).unwrap_or_else(|_| "{}".into())
 }
 
-/// The reconciliation sweep (doc §2 gate 3): walk `wiki/**/*.md` lock-free and
+/// The reconciliation sweep (doc §2 gate 3): walk the Librarian's notes lock-free and
 /// return every candidate some job still has work on (body hash differs from
 /// the recorded classify AND enrich markers) — a DIFF sweep, not a re-process.
 fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => !(classify_covered(&s, state) && enrich_covered(&s, state)),
             Err(_) => false,
@@ -1995,10 +1970,9 @@ fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
 /// the cycle itself would exclude them. The never-clobber baseline
 /// (`last_fields`) is untouched — user-owned values stay theirs.
 fn audit_gaps(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => {
                 if s.locked || s.secure {
@@ -2027,24 +2001,6 @@ fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
         if let Some(ns) = state.notes.get_mut(&state_key(&snap)) {
             ns.hash.clear();
             ns.proposed.enrich.clear();
-        }
-    }
-}
-
-fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(root.join(prefix)) else {
-        return;
-    };
-    for entry in entries.filter_map(|e| e.ok()) {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        let rel = format!("{prefix}/{name}");
-        match entry.file_type() {
-            Ok(t) if t.is_dir() => collect_md(root, &rel, out),
-            Ok(t) if t.is_file() && name.ends_with(".md") => out.push(rel),
-            _ => {}
         }
     }
 }
@@ -2267,7 +2223,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             };
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
-            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_is_memex().unwrap_or(false) {
+            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_librarian_writes().unwrap_or(false) {
                 // RAW vault or a folder opened in place (2026-10-13): consume every wake
                 // signal and park — no sweep, no cycle, and nothing left queued to act on if
                 // the Brain later returns (re-enabling starts fresh from its own sweep).
@@ -2489,7 +2445,7 @@ pub fn organizer_status(
     let st = inner.status.lock().unwrap().clone();
     OrganizerStatus {
         running: inner.running.load(Ordering::SeqCst)
-            && corpus_state.default_is_memex().unwrap_or(false),
+            && corpus_state.default_librarian_writes().unwrap_or(false),
         trust: inner.trust.lock().unwrap().as_str().to_string(),
         queued: inner.queue.lock().unwrap().len(),
         last_run_at: st.last_run_at,
@@ -2628,6 +2584,9 @@ pub mod secure;
 #[path = "organizer_adopted_tests.rs"]
 mod adopted_tests;
 #[cfg(test)]
+#[path = "organizer_copy_tests.rs"]
+mod copy_tests;
+#[cfg(test)]
 use secure::{dismiss_secure, secure_hints};
 
 // ─── tests ───────────────────────────────────────────────────────────────────
@@ -2746,6 +2705,8 @@ mod tests {
 
     #[test]
     fn candidate_filter_drops_index_readme_dots_nonwiki() {
+        // a Rotli vault's Librarian map, pinned: these are its rules exactly
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(candidate_rel("wiki/_inbox/foo-a1b2c3.md"));
         assert!(candidate_rel("wiki/Projects/alazan-84-x1y2z3.md"));
         assert!(
@@ -2768,6 +2729,7 @@ mod tests {
 
     #[test]
     fn the_templates_folder_is_neither_input_nor_a_filing_area() {
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(!candidate_rel("wiki/Templates/meeting-notes.md"));
         assert!(!candidate_rel("wiki/Templates/Work/weekly.md"));
         // only that folder: a lookalike name and a nested namesake stay ordinary
@@ -2778,7 +2740,7 @@ mod tests {
         for area in ["Projects", "Templates", "_inbox"] {
             std::fs::create_dir_all(dir.path().join("wiki").join(area)).unwrap();
         }
-        let areas: Vec<String> = area_vocab(dir.path()).into_iter().map(|(name, _)| name).collect();
+        let areas: Vec<String> = area_vocab(dir.path(), true).into_iter().map(|(name, _)| name).collect();
         assert_eq!(areas, ["Projects"]);
     }
 

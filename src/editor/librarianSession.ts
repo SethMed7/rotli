@@ -18,6 +18,7 @@ import { peopleAreas } from "../lib/librarianRules";
 import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
+import { type FolderRoles, folderRoles } from "../services/destinations";
 import { useNoteIndex } from "../services/hooks";
 import {
   applyLibrarian,
@@ -71,8 +72,17 @@ export function noteTitle(doc: string): string {
   return first.replace(/^#+\s+/, "").trim() || "Untitled";
 }
 
-/** The Library's areas: the top-level folders under wiki/, minus its lanes. */
-export function libraryAreas(folderIds: readonly string[]): string[] {
+/** The Library's areas: the top-level folders under wiki/, minus its lanes.
+ * In a copy (a role map), the person's own top-level folders, minus the inbox
+ * and Rotli's folders (librarian_map.rs owns the full rule; Rust enforces it). */
+export function libraryAreas(
+  folderIds: readonly string[],
+  roles: FolderRoles | null = folderRoles(),
+): string[] {
+  if (roles) {
+    const rotli = [roles.inbox, roles.archive, roles.trash, roles.chats, roles.storage];
+    return folderIds.filter((id) => !id.includes("/") && !id.startsWith(".") && !rotli.includes(id));
+  }
   return folderIds
     .map((id) => /^wiki\/([^/]+)$/.exec(id)?.[1])
     .filter((name): name is string => !!name && !name.startsWith("_"));
