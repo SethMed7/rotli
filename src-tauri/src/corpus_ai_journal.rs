@@ -227,7 +227,6 @@ impl CorpusStore {
         }
     }
 
-    /// Append one row, keeping the newest `MAX_ROWS`.
     fn ai_journal_append(&self, row: &AiEditRow) -> Result<(), String> {
         self.mutation_allowed()?;
         let dir = self.guard_rel(DOT_DIR)?;

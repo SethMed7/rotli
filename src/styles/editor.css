@@ -229,7 +229,6 @@
   margin: 0 0 7px;
 }
 
-/* — rendered blocks (r1 frame A) — */
 .md-h1 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -312,7 +311,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* — inline marks — */
 .md-code {
   font-family: var(--font-mono);
   font-size: 0.92em;
@@ -2125,8 +2123,6 @@
 .cm-block-dragging .cm-content {
   cursor: grabbing;
 }
-
-/* the block-action menu is the SHARED .ctxmenu host now (remediation Batch 3) */
 
 /* the drop line shown while a block is dragged (pointer-drag; position:fixed so it
    needs no scroll math) — a 2px accent rule at the target block's top. */

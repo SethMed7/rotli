@@ -217,10 +217,6 @@ function PaneHead({ title, char, motif }: { title: string; char: CharacterName; 
   return <SettingsBanner title={title} pose={char} motif={motif} />;
 }
 
-// ——— shared settings controls (the maintainer, 2026-06-15) ———
-
-// ——— Hotkeys: every registry action, grouped by area + searchable ———
-
 /** Sections derive from the action id prefix ("tabs.new" → Tabs) — no
  * per-action bookkeeping, new actions land in the right group automatically. */
 const HK_SECTIONS: { prefix: string; label: string }[] = [
@@ -390,8 +386,6 @@ function HotkeysPane() {
     </>
   );
 }
-
-// ——— General: visitor vs resident, dock visibility (the maintainer, 2026-06-12) ———
 
 // ——— Updates: the current version + an explicit manual check, plus the
 // one-click "Install & relaunch" when the signed feed offers a newer build.
@@ -920,8 +914,6 @@ function GeneralPane() {
     </>
   );
 }
-
-// ——— Appearance: four intentional working environments. ———
 
 type PreviewEnvironment =
   | "warm-light"
@@ -1841,8 +1833,6 @@ function DesktopBrainPane() {
     </>
   );
 }
-
-// ——— AI Models (the maintainer, 2026-07-02): connected subscription lanes + hybrid presets ———
 
 /** MB → a human size (the catalog's approx, and the live download total). */
 function formatSize(mb: number): string {

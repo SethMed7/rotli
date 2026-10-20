@@ -145,7 +145,6 @@ for (const path of POSTS) {
       // Nothing over the picture: the words, all of them, under it.
       const copy = await box(page, "[data-article-cover] .head-copy");
       expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
-      // The title is in the first window.
       expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
 
       // "Blog /" is part of the head: straight above the title, on its edge, nothing beside it.

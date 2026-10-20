@@ -82,7 +82,6 @@ function boardLabel(boardId: string): string {
 type TitleLookup = { get: (id: string) => string | undefined };
 
 function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string, string>): string {
-  // surfaceKind dispatch — grows with the union ('chat' …)
   switch (tab.surfaceKind) {
     case "note":
       return titles.get(tab.noteId) ?? "Untitled";

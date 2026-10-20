@@ -383,8 +383,6 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
   return best?.id ?? null;
 }
 
-// ——— the store ———
-
 /** The tab currently under an HTML5 drag — set on dragstart, cleared on
  * dragend/drop. Panes read it to arm their split-detach dropzones (the maintainer,
  * 2026-06-13). */

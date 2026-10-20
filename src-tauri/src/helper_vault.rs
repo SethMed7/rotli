@@ -220,8 +220,6 @@ impl ServedVault {
     }
 }
 
-// ── config ────────────────────────────────────────────────────────────────────
-
 fn read_config(path: &Path) -> Option<VaultConfig> {
     let raw: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     let root = PathBuf::from(raw.get("root")?.as_str()?);
@@ -289,8 +287,6 @@ fn folder_is_empty(root: &Path) -> bool {
         entries.flatten().all(|e| matches!(e.file_name().to_str(), Some(".DS_Store" | ".rotli")))
     })
 }
-
-// ── paths ─────────────────────────────────────────────────────────────────────
 
 /// A vault-relative POSIX path from the page, as components. "" is the root.
 /// Refused before any filesystem call: `..`, a drive or root prefix, a
@@ -387,8 +383,6 @@ fn revision_of(path: &Path) -> String {
 fn joined(rel: &[String]) -> String {
     rel.join("/")
 }
-
-// ── verbs ─────────────────────────────────────────────────────────────────────
 
 fn write(root: &Path, args: &Value) -> Result<Value, Refusal> {
     let rel = path_arg(args, "path")?;

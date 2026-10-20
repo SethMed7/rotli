@@ -697,8 +697,6 @@ class TableWidget extends WidgetType {
   }
 }
 
-// ─── build + field ───────────────────────────────────────────────────────────
-
 const rawLine = Decoration.line({ class: "rotli-table-rawline" });
 
 function build(state: EditorState, tables: TableBlock[], raw: readonly number[]): DecorationSet {

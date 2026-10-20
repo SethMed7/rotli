@@ -139,9 +139,6 @@ pub(crate) fn dropped_image_name(now: OffsetDateTime) -> String {
     )
 }
 
-// ─── AppKit: reading the drag pasteboard ─────────────────────────────────────
-
-/// The pasteboard the live drag session is using.
 fn drag_pasteboard() -> Retained<NSPasteboard> {
     // SAFETY: an AppKit-provided immutable NSString constant.
     let name = unsafe { NSPasteboardNameDrag };
@@ -199,8 +196,6 @@ fn pasteboard_png(pasteboard: &NSPasteboard) -> Option<Vec<u8>> {
     Some(png.to_vec())
 }
 
-// ─── the two lanes ───────────────────────────────────────────────────────────
-
 /// One drop's promised files as they arrive. The reader block runs on the MAIN
 /// queue, so every touch of this is on the same thread and `Rc<RefCell<_>>` is
 /// the honest type.
@@ -209,7 +204,6 @@ struct PromiseTally {
     pending: usize,
     /// How many files the drop offered (the refused event reports this).
     offered: usize,
-    /// Files that actually landed.
     arrived: Vec<PathBuf>,
     /// Set once so a late extra reader call cannot deliver a second time.
     delivered: bool,
@@ -316,8 +310,6 @@ fn write_image_bytes(pasteboard: &NSPasteboard, destination: &Path) -> Option<Pa
     Some(path)
 }
 
-// ─── entry points ────────────────────────────────────────────────────────────
-
 /// Whether a hovering drag with no Finder paths still carries something this
 /// module can serve — the page needs a non-zero count to draw its drop line.
 pub(crate) fn drag_offers_content() -> bool {
@@ -385,8 +377,6 @@ pub(crate) fn claim(window: &Window, position: DropPosition) -> bool {
         }
     }
 }
-
-// ─── Debug: who is the drop target? ──────────────────────────────────────────
 
 /// With `ROTLI_DEBUG_DROPS=1`: after the window is up, write the native view
 /// tree under the window's content view, with each view's registered dragged

@@ -24,8 +24,6 @@
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-// ── the honest copy the chat surface shows ───────────────────────────────────
-
 pub(crate) const REASON_QUEUED: &str = "queued — checking this Mac's compute headroom";
 pub(crate) const REASON_AHEAD: &str = "queued — another local message is ahead of this one";
 pub(crate) const REASON_OTHER_MODEL: &str = "queued — another local model is still generating";
@@ -163,8 +161,6 @@ pub(crate) fn knobs_from(app: &tauri::AppHandle) -> Knobs {
     parse_knobs(&raw)
 }
 
-// ── what this Mac reports ────────────────────────────────────────────────────
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Pressure {
     Normal,
@@ -272,8 +268,6 @@ pub(crate) fn decide(
         Decision::Wait(REASON_HEADROOM)
     }
 }
-
-// ── the queue ────────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug)]
 struct Waiting {
@@ -621,8 +615,6 @@ pub(crate) fn with_slot<T>(
     run()
 }
 
-// ── commands ─────────────────────────────────────────────────────────────────
-
 /// The live queue — the chat surface hydrates from this on mount, then follows
 /// `rotli:local-queue`.
 #[tauri::command]
@@ -650,8 +642,6 @@ pub fn local_queue_cancel(
     state.0.cancel(&request_id)
 }
 
-// ─── tests ───────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -669,8 +659,6 @@ mod tests {
             model: model.to_string(),
         }
     }
-
-    // ── the admission rule ───────────────────────────────────────────────────
 
     #[test]
     fn an_idle_mac_with_room_admits() {
@@ -792,8 +780,6 @@ mod tests {
         );
     }
 
-    // ── knobs ────────────────────────────────────────────────────────────────
-
     #[test]
     fn knobs_default_when_absent_and_when_nonsense() {
         assert_eq!(parse_knobs("{}"), Knobs::default());
@@ -819,8 +805,6 @@ mod tests {
         assert_eq!(k.wait, Duration::from_secs(30));
         assert_eq!(k.poll, Duration::from_millis(200));
     }
-
-    // ── queue ordering ───────────────────────────────────────────────────────
 
     fn seed(ids: &[&str]) -> Inner {
         Inner {
@@ -896,8 +880,6 @@ mod tests {
         assert!(!inner.cancel("nope"));
         assert_eq!(inner.running.len(), 1);
     }
-
-    // ── acquire / release / cancel end to end ────────────────────────────────
 
     fn fast_knobs() -> Knobs {
         Knobs {

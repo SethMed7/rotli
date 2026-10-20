@@ -35,7 +35,6 @@ export function hydrateAppExtras(appSettings: string): void {
   useSidebarLook.setState({ look: parseSidebarLook(data.sidebarLook) });
   useHandToAiMode.setState({ mode: parseHandToAiMode(data.handToAiMode) });
   useAppearanceLook.setState(parseAppearanceLook(data));
-  // on unless someone switched it off
   useGraphStore.setState({ librarianLinks: data.graphLibrarianLinks !== false });
 }
 

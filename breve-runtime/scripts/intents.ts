@@ -215,7 +215,6 @@ export function modelDirective(text: string): ModelTier | null {
   return k as ModelTier;
 }
 
-// ── Saved-media (image/PDF) capture ──────────────────────────────────────────
 /** Does this caption ask Breve to KEEP the attachment (save/file/store it), vs just share it?
  *  Needs a save verb AND an object it plausibly refers to — so "save this to coffee art" fires
  *  but "what is this?" does not. Used as a fast gate + as the fallback when local Gemma is down. */

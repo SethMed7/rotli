@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
 import { parseSettings } from "./persist";
 
-// 2026-09-27: Settings → Appearance → Board background.
 describe("board background setting", () => {
   test("defaults to Match theme, keeps White, and rejects anything else", () => {
     expect(parseSettings("{}").boardBackground).toBe("theme");
