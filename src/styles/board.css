@@ -767,7 +767,6 @@ span.fdr-col {
   border-color: var(--border-strong);
   transform: rotate(0deg);
 }
-/* the card being dragged to reorder */
 .board-card.dragging {
   opacity: 0.5;
   cursor: grabbing;
@@ -1033,8 +1032,6 @@ span.fdr-col {
   margin-left: 8px;
 }
 
-/* Full-text search: the matched span inside a snippet (All notes rows + the
-   ⌘K palette hint). Quiet tint, never the browser-default yellow — low pulse. */
 /* a matched word in search results (palette, note lists, board search): a
    light accent tint plus medium weight — one notch past an email client's
    bold, never a highlighter stripe (Seth, 2026-09-03) */

@@ -250,8 +250,6 @@ fn fetch_text(url: &str) -> Result<(String, Option<String>), String> {
     Ok((text, notice))
 }
 
-// ── HTML → text ───────────────────────────────────────────────────────────────
-
 pub(crate) fn html_to_text(html: &str) -> String {
     static SCRIPT: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static STYLE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();

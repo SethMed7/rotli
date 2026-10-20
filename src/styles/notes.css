@@ -24,7 +24,6 @@
   padding: 0;
 }
 
-/* — three-pane chassis — */
 .threepane {
   flex: 1;
   display: flex;
@@ -1684,7 +1683,6 @@
   outline: none; /* the field itself is the affordance; no ring inside a well */
 }
 
-/* — panes — */
 .panes {
   flex: 1;
   display: flex;

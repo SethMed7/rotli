@@ -47,7 +47,6 @@ const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const TRANSCRIPTS = join(BREVE, "signal", "transcripts");
 mkdirSync(TRANSCRIPTS, { recursive: true });
 
-// ── Multi-user context (per-turn, via AsyncLocalStorage) ────────────────────────────────────────
 // Each inbound message is handled inside als.run(ctx); send()/sandbox/knowledge/transcripts read the
 // CURRENT ctx, so concurrent turns (MAX_INFLIGHT) never cross. Un-prompted code (scheduled briefs,
 // cfg-refresh, startup) runs with no store → the admin/owner default. Single-user (no access.json /
@@ -508,7 +507,6 @@ async function handleCommand(text: string): Promise<boolean> {
   }
   if (ADMIN_POWERS.has(lc) && !c.isAdmin) { await send("That's not available on your account."); return true; }
   switch (lc) {
-    // ── multi-user ──────────────────────────────────────────────────────────
     case "/use": {
       const avail = c.principal.allowedUsers.filter((u) => u !== DEFAULT_USER);
       if (!arg) { await send(avail.length ? `You're in "${c.activeUser}". Switch with /use <name>. Available: ${avail.join(", ")}.` : `You're in "${c.activeUser}".`); return true; }
@@ -738,7 +736,6 @@ function startTyping(): () => void {
   };
 }
 
-// ── Brief retrieval (PDF / audio over Signal) ────────────────────────────────
 // Durable record → the memex history/ (distilled digest). briefs/ is an ephemeral cache (today's
 // issues only); binaries live in the storage root (AUDIOS/PDFS/VIEWS). Q&A reads today's brief from the cache.
 const HOME_OF: Record<string, string> = { mp3: AUDIOS, pdf: PDFS, png: VIEWS };
@@ -847,7 +844,6 @@ async function sendBrief(kind: "view" | "pdf" | "audio", dateArg?: string) {
   await send(`🎧 Audio brief — ${date}`, mp3, true);
 }
 
-// ── Daily-brief retrieval: meal-aware (morning / lunch / night), voice or text ─
 // "Today" always means the owner's day (home tz, or travel tz when travel mode is on) —
 // NEVER UTC and never the bare system clock.
 const todayLocal = () => todayIn(effectiveTz(CFG));
@@ -1013,12 +1009,10 @@ async function handleBareFollowup(text: string, _opts: { asVoice?: boolean } = {
   return true;
 }
 
-// ── Proposed setup actions (model proposes → owner CONFIRMs → daemon runs) ────
 // The deep tier can't run installs, but it can write pending-action.json. The daemon
 // validates against a tight breve-only allowlist, asks the owner, and only runs on CONFIRM.
 const PENDING_ACTION = join(BREVE, "signal", "pending-action.json");
 const AWAITING_ACTION = join(BREVE, "signal", "awaiting-action.json");
-// plainName / validateAction / describeAction moved to ./actions (pure, testable); see import.
 
 // For run/chmod actions, show the ACTUAL script content (size + mtime + first lines + a fresh-edit
 // warning) so a confirm approves substance, not just a path — the model could write+stage in one turn.
@@ -1088,7 +1082,6 @@ async function handleActionConfirm(text: string): Promise<boolean> {
   return true;
 }
 
-// ── Schedule + travel control by chat ("moving forward, morning briefs at 7am") ─
 async function applySchedule(): Promise<string> {
   // Rotli polls settings.json and atomically adopts changes; there are no
   // per-job plists to regenerate anymore.
@@ -1160,7 +1153,6 @@ async function handleTravel(text: string, opts: { asVoice?: boolean } = {}): Pro
   }
 }
 
-// ── Reminders ("remind me in 20m to flip the laundry") ───────────────────────
 const REMINDERS = join(BREVE, "signal", "reminders.json");
 type Reminder = { id: number; due: number; text: string };
 async function readReminders(): Promise<Reminder[]> {
@@ -1223,7 +1215,6 @@ async function handleWatchIntent(text: string, opts: { asVoice?: boolean } = {})
   return true;
 }
 
-// ── "Read this to me" / "summarize this" for links (articles + YouTube) ──────
 async function handleUrlRequest(text: string, opts: { asVoice?: boolean } = {}): Promise<boolean> {
   const req = urlRequest(text);
   if (!req) return false;
@@ -1355,7 +1346,6 @@ Write a spoken-style triage, max 130 words: "${data.unread} unread — ${perAcco
   return true;
 }
 
-// ── Radar suggestions ────────────────────────────────────────────────────────
 // The morning brief ends with one company/project worth watching; the Signal send
 // writes pending-suggestion.json. A plain yes/no here accepts or dismisses it.
 const PENDING_SUG = join(BREVE, "signal", "pending-suggestion.json");
@@ -1381,7 +1371,6 @@ async function handleSuggestionFlow(text: string, opts: { asVoice?: boolean } = 
   return true;
 }
 
-// ── Voice messages in (owner speaks → whisper.cpp transcribes → normal flow) ──
 const WHISPER_MODEL = join(process.env.HOME!, ".cache", "whisper", "ggml-small.en.bin");
 const ATTACH_DIR = join(process.env.HOME!, ".local", "share", "signal-cli", "attachments");
 
@@ -1752,7 +1741,6 @@ async function runAudioTopic(request: string) {
   }
 }
 
-// ── Email-me flow ─────────────────────────────────────────────────────────────
 const PENDING = join(BREVE, "signal", "pending-email.json");
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
 const emailIntent = (t: string) =>
@@ -2063,7 +2051,6 @@ log(`Breve Signal daemon up — bot ${bot}, owner ${owner}`);
 }
 log(`voice STT: ${PARAKEET ? "Parakeet (sherpa) → whisper fallback" : "whisper.cpp"}`);
 
-// ── Durability + backpressure ────────────────────────────────────────────────
 // signal-cli's `receive` removes a message from the server BEFORE we handle it, so a crash
 // mid-handle would drop it. Journal each accepted owner envelope to signal/queue/ before
 // dispatching; delete on success; replay leftovers at startup. (#durability)
@@ -2135,7 +2122,6 @@ function dispatchEnv(env: SignalEnvelope, replayFile?: string) {
   }
 }
 
-// ── Log rotation ─────────────────────────────────────────────────────────────
 // Rotate logs/*.log + the failures log and prune old transcripts/queue files. Once at startup,
 // then every 6h. Guarded so a rotation hiccup never touches the receive loop. (#log-rotation)
 async function rotateGuarded() { try { await rotate(); } catch (e) { logFail("logrotate", String(e)); } }
