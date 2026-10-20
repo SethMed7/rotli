@@ -20,7 +20,6 @@ import { BRIEFS, AUDIOS } from "./paths";
 import { renderMp3, parseSegments } from "./tts";
 import type { GenerateResponse } from "./wire-types";
 
-// 1. Resolve issue
 const stemArg = process.argv[2];
 const mornings = readdirSync(BRIEFS)
   .filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f))

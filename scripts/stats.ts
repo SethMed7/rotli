@@ -98,8 +98,6 @@ export function macsFromChecks(checks: number): number {
   return checks === 0 ? 0 : Math.max(1, Math.round(checks / CHECKS_PER_MAC_PER_DAY));
 }
 
-// ── the effectful half ──────────────────────────────────────────────────────
-
 function gh<T>(path: string): T | null {
   const result = spawnSync("gh", ["api", path], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (result.status !== 0) return null;

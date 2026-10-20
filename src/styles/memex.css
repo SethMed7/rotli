@@ -328,8 +328,6 @@
   color: var(--text-muted);
   font-size: 11px;
 }
-/* the model selecter — what we have in the memex ai (~/.memex/ai). Pinned to the
-   right of the chat header so it reads as "this conversation runs on <model>". */
 /* the per-chat model picker — a quiet popover (same grammar as .chat-measure-pop).
    The trigger is a pill in the composer foot; the popover opens UPWARD (the
    composer sits at the pane bottom), grouped On this Mac · Connected · Presets,
@@ -1401,7 +1399,6 @@
   color: var(--text-muted);
 }
 
-/* attached-image thumbnails above the input */
 .chat-attachments {
   display: flex;
   flex-wrap: wrap;
@@ -1512,7 +1509,6 @@
   content: "Images can’t reach Rotli Helper yet — drop into a note";
 }
 
-/* image-attach vision-capability hint */
 .chat-vision-hint {
   display: flex;
   flex-wrap: wrap;
@@ -2900,8 +2896,6 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   outline-offset: 2px;
 }
 
-/* — Chat front bubbles (Increment 1, 2026-06-26): you right + tinted, the model
-   left + neutral. Plain text for now; markdown rendering rides the editor later. — */
 /* Turn rhythm (the owner, 2026-10-15: the reply sat right under the question
    and the column felt squeezed). The gap between messages is always clearly
    larger than any gap inside one, and a new exchange (reply → your next
@@ -3575,7 +3569,6 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
 .chat-title-h.is-placeholder {
   color: var(--text-muted);
 }
-/* empty state: centered character + hint */
 .chat-newhint {
   display: flex;
   flex-direction: column;

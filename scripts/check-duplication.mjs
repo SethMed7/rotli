@@ -239,7 +239,6 @@ const LIFECYCLE_EVENTS = new Set([
   "clearTimeout",
 ]);
 
-// ---------------------------------------------------------------------------
 // Tokenizer — one scanner for both languages; language only changes string and
 // comment forms (nested block comments, raw strings, lifetimes in Rust).
 
@@ -381,9 +380,6 @@ function lifecycleSequence(toks) {
   return seq;
 }
 
-// ---------------------------------------------------------------------------
-// File walking + unit extraction
-
 function walk(dir, exts, out) {
   const abs = join(root, dir);
   if (!existsSync(abs)) return;
@@ -506,9 +502,6 @@ function balanceBraces(text, open) {
   return -1;
 }
 
-// ---------------------------------------------------------------------------
-// Signals
-
 function fnv(s) {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
@@ -561,9 +554,6 @@ class UnionFind {
 function sha256(s) {
   return createHash("sha256").update(s).digest("hex");
 }
-
-// ---------------------------------------------------------------------------
-// Mining
 
 function mine() {
   const files = [];
@@ -788,9 +778,6 @@ function buildCluster(signal, sites, baseScore, sharedLiterals) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Allowlist + report
-
 function loadAllowlist() {
   const path = join(root, "scripts/dup-allowlist.json");
   if (!existsSync(path)) return [];
@@ -819,7 +806,6 @@ function changedFiles() {
   return new Set(res.stdout.split("\n").filter(Boolean));
 }
 
-// ---------------------------------------------------------------------------
 // Judge (Batch 6b) — opt-in, cached, isolated. Never a gate.
 
 function runJudge(clusters, limit) {
@@ -918,9 +904,6 @@ function parseJudgment(stdout) {
   if (!CLASSIFICATIONS.has(parsed.classification) || !ACTIONS.has(parsed.action)) return null;
   return parsed;
 }
-
-// ---------------------------------------------------------------------------
-// Main
 
 const { files, units, clusters } = mine();
 const entries = loadAllowlist();
