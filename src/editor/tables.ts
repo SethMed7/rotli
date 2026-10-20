@@ -90,7 +90,6 @@ export function scanTables(doc: Text): TableBlock[] {
       // no table at all — otherwise "Alpha | Beta" over a --- divider would be
       // swallowed into a bogus widget and the first op would rewrite the ---.
       if (align && header.length > 0 && align.length === header.length) {
-        // gather data rows until a blank / non-row line
         const rows: string[][] = [];
         let last = n + 1;
         let r = n + 2;

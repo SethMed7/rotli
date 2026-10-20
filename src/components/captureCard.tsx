@@ -83,7 +83,6 @@ export function CaptureCard() {
     return () => setCaptureHandle(null);
   });
 
-  // re-summoned: put the caret back in the field
   useEffect(() => onCaptureShow(() => taRef.current?.focus()), []);
 
   const rows = Math.min(MAX_ROWS, text.split("\n").length);

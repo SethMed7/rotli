@@ -122,7 +122,6 @@ function decodeJsonStringBody(raw: string): string {
 export function makeFinalExtractor(proseIsFinal: boolean): FinalExtractor {
   let buf = "";
   let pos = 0;
-  // scanner state
   type St =
     | "seek"
     | "inObj"

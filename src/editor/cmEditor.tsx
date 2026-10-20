@@ -722,12 +722,10 @@ function CmEditorImpl({
     viewRef.current?.dispatch({ effects: fmComp.reconfigure(fmExt(fmRaw, fmGen, fmErr)) });
   }, [fmRaw, fmGen, fmErr, fmComp, fmExt]);
 
-  // reading on/off (editor/readingMode.ts)
   useEffect(() => {
     if (viewRef.current) setReading(viewRef.current, comps.reading, reading);
   }, [reading, comps]);
 
-  // block handles on/off → add/remove the gutter + drop handlers
   useEffect(() => {
     blockHandlesRef.current = blockHandlesOn;
     viewRef.current?.dispatch({

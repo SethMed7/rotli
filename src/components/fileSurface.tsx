@@ -51,7 +51,6 @@ const DESKTOP = PLATFORM === "desktop";
 
 export { kindOf } from "../lib/fileSurfaceKinds";
 
-// ── image zoom (fit / 100% / steps) — pure math, exported for tests ──────────
 // Scale 1 = "actual size" in POINTS (natural px ÷ devicePixelRatio), matching
 // Preview — a retina screenshot at 100% shows at its on-screen point size.
 
