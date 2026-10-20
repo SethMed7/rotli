@@ -6,6 +6,7 @@
 import { create } from "zustand";
 
 import { sendChatWindow } from "../lib/chatWindowBridge";
+import type { PathId } from "../lib/corpusWireId";
 import { corpusMainRead, corpusMainWrite, hasDurableCorpus } from "../lib/tauri";
 import {
   createRevisionedTrackedWrite,
@@ -159,7 +160,7 @@ export function addFragmentToMain(fragment: readonly MainNode[]): void {
  * id) — the manifest slot follows the note instead of being GC'd on the next
  * setTree (#33, audit 2026-07). No liveIds on purpose: a rename must never
  * double as a prune. No-op when the old id isn't in Main. */
-export function renameMainRef(oldId: string, newId: string): void {
+export function renameMainRef(oldId: PathId, newId: PathId): void {
   const { manifest, setTree } = useMainStore.getState();
   if (mainHasNote(manifest.tree, oldId)) setTree(renameNoteRef(manifest.tree, oldId, newId));
 }

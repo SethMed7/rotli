@@ -17,6 +17,7 @@
 import { create } from "zustand";
 
 import { clamp } from "../lib/clamp";
+import type { PathId } from "../lib/corpusWireId";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { chatWindowTakes } from "./chatWindowStore";
@@ -428,13 +429,14 @@ interface PanesState {
    * open a new one; `newTab` forces a fresh canvas tab. */
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
-  retargetBoard: (oldId: string, newId: string) => void;
+  retargetBoard: (oldId: PathId, newId: PathId) => void;
   /** Retarget every open file tab pointing at `oldId` to `newId` (document rename). */
-  retargetFile: (oldId: string, newId: string) => void;
+  retargetFile: (oldId: PathId, newId: PathId) => void;
   /** Re-point open chat tabs from `oldSlug` to `newSlug` after a rename. */
   retargetChat: (oldSlug: string, newSlug: string, vaultId?: string) => void;
-  /** Point open note tabs at a note's new id after it moved (e.g. the Filer filed it). */
-  retargetNote: (oldId: string, newId: string) => void;
+  /** Point note tabs opened BY PATH at a note's new path after it moved (e.g.
+   * the Filer filed it); a tab opened by ULID never needs this. */
+  retargetNote: (oldId: PathId, newId: PathId) => void;
   /** Open a chat in the focused pane: reuse its open tab or open a new one
    * (`newTab` forces fresh). `chatSlug` null = a fresh unsent chat, always a new tab. */
   openChat: (chatSlug: string | null, opts?: { newTab?: boolean; vaultId?: string }) => void;

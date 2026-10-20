@@ -1,6 +1,7 @@
 // Which items a person can rename, and the ordering that makes a file rename
 // safe. Pure: the composition (itemRenameComposition.ts) supplies the effects.
 
+import { type PathId, pathId } from "../lib/corpusWireId";
 import { extOf, fileName, fileNameStem } from "../lib/fileKind";
 import type { NoteSummary } from "../types";
 
@@ -37,8 +38,8 @@ export interface FileRenamePorts {
   flushDocuments(): Promise<void>;
   /** Rename on disk; resolves the new id or rejects with a person-readable reason. */
   rename(id: string, name: string): Promise<string>;
-  retarget(oldId: string, newId: string): void;
-  renameReferences(oldId: string, newId: string): void;
+  retarget(oldId: PathId, newId: PathId): void;
+  renameReferences(oldId: PathId, newId: PathId): void;
   refresh(): Promise<void>;
 }
 
@@ -52,10 +53,12 @@ export async function renameFileItem(
   const name = raw.trim();
   if (!name || name === fileNameStem(id)) return null;
   await ports.flushDocuments();
-  const newId = await ports.rename(id, name);
-  if (newId !== id) {
-    ports.retarget(id, newId);
-    ports.renameReferences(id, newId);
+  // a document's/sheet's id is its file path, so a rename mints a new one
+  const oldId = pathId(id);
+  const newId = pathId(await ports.rename(id, name));
+  if (newId !== oldId) {
+    ports.retarget(oldId, newId);
+    ports.renameReferences(oldId, newId);
   }
   await ports.refresh();
   return newId;

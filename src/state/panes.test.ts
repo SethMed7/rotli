@@ -1,10 +1,10 @@
-// moveTab regression locks (audit CMP-1): the hit-test hands moveTab a VISUAL
-// strip slot — an index that counts the dragged tab itself. The same-pane
-// reorder must land the tab exactly where the preview line showed, in both
-// directions. (Cross-pane moves are exercised via the same clamped-splice path.)
+// moveTab regression locks (audit CMP-1): the hit-test hands moveTab a VISUAL strip slot — an index that
+// counts the dragged tab itself. The same-pane reorder must land the tab exactly where the preview line
+// showed, in both directions. (Cross-pane moves are exercised via the same clamped-splice path.)
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
+import { pathId } from "../lib/corpusWireId";
 import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
 import {
@@ -303,9 +303,9 @@ describe("the nav trail records every content surface", () => {
       index: 2,
       suppress: false,
     });
-    usePanesStore.getState().retargetNote("wiki/_inbox/foo.md", "wiki/projects/foo.md");
+    usePanesStore.getState().retargetNote(pathId("wiki/_inbox/foo.md"), pathId("wiki/projects/foo.md"));
     usePanesStore.getState().retargetChat("old-slug", "new-slug");
-    usePanesStore.getState().retargetBoard("old.excalidraw", "new.excalidraw");
+    usePanesStore.getState().retargetBoard(pathId("old.excalidraw"), pathId("new.excalidraw"));
     expect(useNavHistory.getState().stack).toEqual([
       "wiki/projects/foo.md",
       "chat:new-slug",
