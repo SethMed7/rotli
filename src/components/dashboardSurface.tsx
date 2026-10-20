@@ -5,6 +5,7 @@ import { relativeLabel } from "../lib/dateLabels";
 import { type ModelUsageRange, type ModelUsageSummary, isTauri, modelUsage } from "../lib/tauri";
 import { useNow } from "../lib/useNow";
 import { useSearchableNotes } from "../services/hooks";
+import { chatModelsBySlug } from "../state/chatMapKeys";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import {
@@ -63,14 +64,7 @@ function RotliActivity() {
   const openSummary = usePanesStore((state) => state.openSummary);
   const openChat = usePanesStore((state) => state.openChat);
   const dashboardModels = useMemo(
-    () =>
-      Object.fromEntries(
-        chats.chatList.flatMap((chat) => {
-          const scoped = chats.activeMemex ? `${chats.activeMemex.id}:${chat.slug}` : chat.slug;
-          const id = chatModelMap[scoped] ?? chatModelMap[chat.slug];
-          return id ? [[chat.slug, id]] : [];
-        }),
-      ),
+    () => chatModelsBySlug(chats.chatList, chats.activeMemex?.id ?? null, chatModelMap),
     [chatModelMap, chats.activeMemex, chats.chatList],
   );
   const nowMs = useNow();

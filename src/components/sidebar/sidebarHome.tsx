@@ -71,6 +71,7 @@ import {
   viewNameError,
   viewPickerItems,
 } from "../../services/viewTree";
+import { chatModelsBySlug } from "../../state/chatMapKeys";
 import { useContextMenu } from "../../state/contextMenu";
 import { useHidden } from "../../state/hidden";
 import { useMainStore } from "../../state/main";
@@ -136,14 +137,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const searchableCount = searchableNotes.length;
   const chatModelMap = useUiStore((s) => s.chatModel);
   const dashboardModels = useMemo(
-    () =>
-      Object.fromEntries(
-        chats.chatList.flatMap((chat) => {
-          const scoped = chats.activeMemex ? `${chats.activeMemex.id}:${chat.slug}` : chat.slug;
-          const id = chatModelMap[scoped] ?? chatModelMap[chat.slug];
-          return id ? [[chat.slug, id]] : [];
-        }),
-      ),
+    () => chatModelsBySlug(chats.chatList, chats.activeMemex?.id ?? null, chatModelMap),
     [chatModelMap, chats.activeMemex, chats.chatList],
   );
   const now = useNow();
