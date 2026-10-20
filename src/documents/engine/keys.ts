@@ -11,19 +11,14 @@
 // here selects the whole document as a single range, so typing replaces all
 // of it; a document with tables keeps Univer's table-aware ranges instead.
 //
-// The macOS Edit menu owns ⌘A before the web view sees a keydown (native
-// check, 2026-09-15). WebKit turns its selectAll:, undo:, and redo: into
-// selectstart and beforeinput (historyUndo/historyRedo) on the focused input,
-// which acted on that hidden element's DOM text. Both routes — Univer's
-// keydown shortcut and the menu — are answered with Univer's own commands.
-// ⌘Z / ⇧⌘Z reach the page as key presses since 2026-10-09 (the Edit menu's
-// Undo/Redo carry no keys; src-tauri lib.rs): what Univer's own shortcuts leave
-// — ⇧⌘Z, which it binds only as ⌘Y, and any ⌘Z it stands down for — is
-// answered here.
+// The macOS Edit menu owns ⌘A before the web view sees a keydown, and WebKit
+// turns its selectAll: into a selectstart on the hidden input. Both routes —
+// Univer's keydown shortcut and the menu — run Univer's own select-all. Undo
+// and redo go through the shared Edit-menu routing (lib/univerEditMenu.ts).
 
 import type { IInsertCommandParams } from "@univerjs/preset-docs-core";
 
-import { isRedoChord, isUndoChord } from "../../lib/historyChords";
+import { installUniverEditMenu, isMacPlatform, menuDedupe } from "../../lib/univerEditMenu";
 import { documentTableRanges, isSelectAllChord } from "./policy";
 
 type DocumentBodyLike = {
@@ -65,9 +60,6 @@ export interface DocumentKeyServices {
   body: () => DocumentBodyLike | null | undefined;
   ids: { tab: string; insertText: string; selectAll: string; undo: string; redo: string };
 }
-
-/** A command Univer already ran from its keydown must not run again via the menu. */
-const MENU_DEDUPE_MS = 300;
 
 /** Tab in an ordinary paragraph inserts a tab character. Univer's list nesting
  * (priority 100) and table-cell move (99) still match first. */
@@ -122,7 +114,7 @@ export function installDocumentKeys(
   unitId: string,
 ): { dispose(): void } {
   const view = host.ownerDocument;
-  const isMac = /Mac/.test(navigator.platform || navigator.userAgent);
+  const isMac = isMacPlatform();
   const plainTab = autoFormat.registerAutoFormat(plainTabRule(ids, unitId));
 
   // Univer's hidden text input for the page. The toolbar (font size, color
@@ -133,10 +125,10 @@ export function installDocumentKeys(
     return !!input && host.contains(input);
   };
 
-  const lastRun = new Map<string, number>();
+  const dedupe = menuDedupe();
   let widening = false;
   const watchCommands = commands.onCommandExecuted((command) => {
-    lastRun.set(command.id, performance.now());
+    dedupe.ran(command.id);
     if (command.id !== ids.selectAll || widening) return;
     widening = true;
     queueMicrotask(() => {
@@ -155,7 +147,7 @@ export function installDocumentKeys(
     });
   });
   const runFromMenu = (id: string) => {
-    if (performance.now() - (lastRun.get(id) ?? -Infinity) < MENU_DEDUPE_MS) return;
+    if (!dedupe.due(id)) return;
     void commands.executeCommand(id);
   };
 
@@ -163,16 +155,9 @@ export function installDocumentKeys(
   // arrives here already defaultPrevented.
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.defaultPrevented || !inDocumentInput(view.activeElement)) return;
-    if (isSelectAllChord(event, isMac)) {
-      event.preventDefault();
-      runFromMenu(ids.selectAll);
-    } else if (isUndoChord(event, isMac) || isRedoChord(event, isMac)) {
-      // what Univer's own shortcuts left (they run first): ⇧⌘Z, which it
-      // binds only as ⌘Y, and ⌘Z wherever its editor context stood down —
-      // answered before the browser's default undo touches the hidden input
-      event.preventDefault();
-      runFromMenu(isUndoChord(event, isMac) ? ids.undo : ids.redo);
-    }
+    if (!isSelectAllChord(event, isMac)) return;
+    event.preventDefault();
+    runFromMenu(ids.selectAll);
   };
 
   // A mouse drag also starts a selection; only a keyboard/menu Select All counts.
@@ -191,20 +176,19 @@ export function installDocumentKeys(
     runFromMenu(ids.selectAll);
   };
 
-  const onBeforeInput = (event: Event) => {
-    const inputType = (event as InputEvent).inputType;
-    if (inputType !== "historyUndo" && inputType !== "historyRedo") return;
-    if (!inDocumentInput(view.activeElement)) return;
-    event.preventDefault();
-    runFromMenu(inputType === "historyUndo" ? ids.undo : ids.redo);
-  };
-
   view.defaultView?.addEventListener("keydown", onKeyDown, true);
   view.addEventListener("pointerdown", onPointerDown, true);
   view.addEventListener("pointerup", onPointerUp, true);
   view.addEventListener("pointercancel", onPointerUp, true);
   view.addEventListener("selectstart", onSelectStart, true);
-  view.addEventListener("beforeinput", onBeforeInput, true);
+  const runHistory = (step: "undo" | "redo") => runFromMenu(ids[step]);
+  const releaseEditMenu = installUniverEditMenu({
+    view,
+    keyTarget: view.defaultView,
+    owns: () => inDocumentInput(view.activeElement),
+    fromMenu: runHistory,
+    fromKey: runHistory,
+  });
 
   return {
     dispose: () => {
@@ -215,7 +199,7 @@ export function installDocumentKeys(
       view.removeEventListener("pointerup", onPointerUp, true);
       view.removeEventListener("pointercancel", onPointerUp, true);
       view.removeEventListener("selectstart", onSelectStart, true);
-      view.removeEventListener("beforeinput", onBeforeInput, true);
+      releaseEditMenu();
     },
   };
 }
