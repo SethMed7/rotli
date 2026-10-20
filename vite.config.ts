@@ -27,8 +27,12 @@ import {
   LAZY_LOCALE_STUB_SOURCE,
   MAX_LAZY_CHUNK_KIB,
   shouldStubLazyLocale,
+  shouldWithholdVoice,
+  WITHHELD_VOICE_STUB_ID,
+  WITHHELD_VOICE_STUB_SOURCE,
 } from "./scripts/build-policy.ts";
 import { devHelperServer } from "./scripts/dev-helper-server";
+import { launchFeatures } from "./src/lib/featurePolicy.ts";
 
 const host = process.env.TAURI_DEV_HOST;
 // The web build (served from the site under a sub-path) sets ROTLI_WEB_BASE,
@@ -47,6 +51,7 @@ const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as s
 export default defineConfig(({ command }) => {
   const channel = process.env.ROTLI_BUILD_CHANNEL ?? (command === "serve" ? "dev" : "stable");
   if (channel !== "dev" && channel !== "stable") throw new Error("Invalid ROTLI_BUILD_CHANNEL");
+  const voiceInBuild = launchFeatures(channel === "dev", platform).voice;
   return {
     base,
     plugins: [
@@ -72,6 +77,20 @@ export default defineConfig(({ command }) => {
         },
         load(id: string) {
           return id === LAZY_LOCALE_STUB_ID ? LAZY_LOCALE_STUB_SOURCE : null;
+        },
+      },
+      // A build without read-aloud leaves out Kokoro and its ONNX runtime —
+      // see shouldWithholdVoice in scripts/build-policy.ts.
+      {
+        name: "rotli-withhold-voice",
+        resolveDynamicImport(source: unknown) {
+          return shouldWithholdVoice(source, voiceInBuild) ? WITHHELD_VOICE_STUB_ID : null;
+        },
+        resolveId(source: string) {
+          return shouldWithholdVoice(source, voiceInBuild) ? WITHHELD_VOICE_STUB_ID : null;
+        },
+        load(id: string) {
+          return id === WITHHELD_VOICE_STUB_ID ? WITHHELD_VOICE_STUB_SOURCE : null;
         },
       },
     ],
