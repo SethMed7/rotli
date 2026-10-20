@@ -21,7 +21,6 @@ export interface NavState {
 
 export const EMPTY_NAV: NavState = { stack: [], index: -1 };
 
-// ─── trail entries ───────────────────────────────────────────────────────────
 // The trail records every CONTENT surface (#6, sweep 2026-07-27): notes stay
 // bare ids (drop/retarget callers speak note ids), boards/chats/files carry a
 // kind prefix so replay can dispatch to the right opener. Activity and other

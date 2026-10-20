@@ -16,8 +16,6 @@ import { highlightTree, tagHighlighter, tags } from "@lezer/highlight";
 import { normalizeFenceLang } from "./codeLangs";
 import { scanFences } from "./fences";
 
-// ── language registry (lazy) ──────────────────────────────────────────────────
-
 type ParserLoader = () => Promise<Parser>;
 
 /** Stream-mode helper: wrap a legacy mode in a Lezer-compatible parser. */
@@ -84,8 +82,6 @@ const rotliHighlighter = tagHighlighter([
   { tag: [tags.propertyName, tags.attributeName, tags.labelName], class: "rotli-tok-attr" },
   { tag: [tags.meta, tags.processingInstruction, tags.annotation], class: "rotli-tok-cmt" },
 ]);
-
-// ── the field + async rebuild plugin ─────────────────────────────────────────
 
 const setHighlights = StateEffect.define<DecorationSet>();
 
