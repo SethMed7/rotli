@@ -5,7 +5,7 @@
 // (docs/design/sidebar-home-chat.md). Lifted wholesale out of sidebar.tsx.
 
 import { useQuery } from "@tanstack/react-query";
-import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { modelLabel, modelProvider } from "../../ai/models";
 import { createDragGhost } from "../../lib/dragGhost";
@@ -137,9 +137,10 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   // CHAT folder and opens its rename inline — the nonce is the seam between
   // the shell's toolbar and the front that answers it (ui.requestSidebarFolder)
   const lastFolderNonce = useRef(sidebarFolderNonce);
-  useEffect(() => {
-    if (sidebarFolderNonce === lastFolderNonce.current) return;
-    lastFolderNonce.current = sidebarFolderNonce;
+  // `update` closes over the live manifest: an effect event, the nonce the trigger
+  const createFolderFromToolbar = useEffectEvent((nonce: number) => {
+    if (nonce === lastFolderNonce.current) return;
+    lastFolderNonce.current = nonce;
     let createdId: string | null = null;
     update(
       (m) => {
@@ -151,10 +152,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         if (createdId) setRenamingFolderId(createdId);
       },
     );
-    // `update` is rebuilt every render (it closes over the live manifest) —
-    // depending on it would fire the effect forever; the nonce is the trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sidebarFolderNonce]);
+  });
+  useEffect(() => createFolderFromToolbar(sidebarFolderNonce), [sidebarFolderNonce]);
 
   // — drag a chat INTO a folder (the maintainer, 2026-07-30: "drag chat into the folder
   //   properly"): the Main tree's pointer-drag grammar (HTML5 DnD stays dead in
