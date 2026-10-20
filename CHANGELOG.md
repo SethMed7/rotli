@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A Black app icon:** a pure black tile with a white quokka, in Settings →
+  Appearance → App icon.
+
 ### Changed
 
 - **A smaller app.** Rotli's own code is built for size now, about 4.5 MB
@@ -41,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   header gone, the note no longer starts flush at the top of the window: it
   opens with space above it, a little less in a short window. Writing and
   Focus mode are unchanged.
+
+### Fixed
+
+- **Rotli is the right size in the Dock.** The app icon now leaves the same
+  margin as every other Mac app instead of filling its whole square, so it no
+  longer looks larger than its neighbors.
+- **App icon choices in Settings match the Dock.** Each choice shows the real
+  icon, so Charcoal's quokka is no longer invisible and Default shows its
+  actual black lines.
 
 ## [1.9.0] - 2026-10-15
 

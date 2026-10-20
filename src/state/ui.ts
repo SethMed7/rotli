@@ -59,7 +59,7 @@ export { SOLID_THEMES, THEME_FAMILY_PRESENTATIONS } from "./themeChoices";
  * brand-new captures · Organize (default) = applies everything, journaled. */
 export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
 /** The macOS Dock/app icon variants (Settings → Appearance → App icon). */
-export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
+export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay" | "black";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 

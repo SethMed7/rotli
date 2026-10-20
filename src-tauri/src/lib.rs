@@ -1953,6 +1953,7 @@ fn app_icon_bytes(variant: &str) -> Option<&'static [u8]> {
         "paper" => Some(include_bytes!("../icons/variants/paper.png")),
         "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png")),
         "clay" => Some(include_bytes!("../icons/variants/clay.png")),
+        "black" => Some(include_bytes!("../icons/variants/black.png")),
         _ => None, // "default" → the bundle icon (nil clears the override)
     }
 }

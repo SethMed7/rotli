@@ -2557,11 +2557,10 @@
   padding: 4px;
 }
 .appicon-tile {
+  display: block;
   width: 56px;
   height: 56px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
+  border-radius: 12.6px; /* the artwork's own corner (185 / 824 of the tile) */
   border: 1px solid var(--border);
   transition: transform var(--motion-exit) var(--motion-ease);
 }
@@ -2579,22 +2578,6 @@
 .appicon.sel .appicon-label {
   color: var(--text);
   font-weight: 600;
-}
-.appicon-tile--default {
-  background: var(--appicon-default-tile);
-  color: var(--appicon-default-ink);
-}
-.appicon-tile--paper {
-  background: var(--appicon-paper-tile);
-  color: var(--appicon-paper-ink);
-}
-.appicon-tile--charcoal {
-  background: var(--appicon-charcoal-tile);
-  color: var(--appicon-charcoal-ink);
-}
-.appicon-tile--clay {
-  background: var(--appicon-clay-tile);
-  color: var(--appicon-clay-ink);
 }
 
 .swtext {
