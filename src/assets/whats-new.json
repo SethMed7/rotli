@@ -1,4 +1,26 @@
 {
+  "1.9.1": [
+    {
+      "title": "Rotli fits in the Dock",
+      "body": "The app icon is now the same size as your other apps, and Settings → App icon shows each choice as it really looks, including a new Black icon.",
+      "platform": "mac"
+    },
+    {
+      "title": "The Librarian organizes your copy",
+      "body": "When Rotli makes a copy of an Obsidian vault or another folder of notes, the Librarian files loose notes into your own folders and adds summaries and tags. Your views, locked notes, and Obsidian's templates and attachments stay as they are.",
+      "platform": "mac"
+    },
+    {
+      "title": "Links follow your notes",
+      "body": "Move, archive, or restore a note and Rotli updates the image and link paths inside it and the ones pointing to it. Only the path changes, never your words.",
+      "platform": "mac"
+    },
+    {
+      "title": "A smaller app",
+      "body": "Rotli is about 8 MB smaller, and search and PDFs stay at full speed.",
+      "platform": "mac"
+    }
+  ],
   "1.9.0": [
     {
       "title": "Bring your Obsidian vault",
