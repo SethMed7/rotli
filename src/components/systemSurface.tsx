@@ -14,6 +14,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -1090,16 +1091,19 @@ function GalleryView({
   // the stage read entries[0] while the path bar read the empty selection —
   // out of sync until the first explicit click. Promote it once on entry.
   const hasExplicit = folderSel !== null || entries.some((e) => e.kind === "item" && selectedIds.has(e.n.id));
-  useEffect(() => {
-    if (hasExplicit) return;
+  // entries' identity churns per render; length + the explicit flag are the
+  // real triggers, so the entries and select callbacks are read as an event
+  const promoteFirstEntry = useEffectEvent(() => {
     const first = entries[0];
     if (!first) return;
     if (first.kind === "folder") onSelectFolder(first.f.path);
     else onSelectItem(first.n);
-    // entries' identity churns per render; length + the explicit flag are the
-    // real triggers, and the select callbacks are stable in behavior
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasExplicit, entries.length]);
+  });
+  const entryCount = entries.length;
+  useEffect(() => {
+    if (hasExplicit || entryCount === 0) return;
+    promoteFirstEntry();
+  }, [hasExplicit, entryCount]);
   const select = (entry: GalleryEntry | undefined) => {
     if (!entry) return;
     if (entry.kind === "folder") onSelectFolder(entry.f.path);

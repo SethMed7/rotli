@@ -15,6 +15,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -969,21 +970,18 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // #25 — reveal the current item: when the focused note, board, or file changes,
   // auto-expand the folder that holds it so its row is on screen and highlighted.
   // Main's copy wins; an item not in Main is revealed at its physical home.
-  // Keyed ONLY on focusedItemId (the latest projections ride in a ref) so it
-  // fires on navigation, never re-opening a folder the user just collapsed.
-  const revealRef = useRef({ mainProjection, noteIndex });
-  revealRef.current = { mainProjection, noteIndex };
+  // Keyed ONLY on focusedItemId (the latest projections are read as an effect
+  // event) so it fires on navigation, never re-opening a folder the user just
+  // collapsed.
   const revealNonce = useUiStore((s) => s.revealNonce);
 
   // Expand the folder chain that holds the focused item (Main copy wins).
-  // Reads the latest projections via the ref so it never re-opens a folder the
-  // user just collapsed by hand.
-  const expandToFocusedItem = (
-    mode: "auto" | "brain" = "auto",
-    targetItemId: string | null = focusedItemId,
-  ) => {
+  // An effect event: it reads the latest projections without making them
+  // triggers, so it never re-opens a folder the user just collapsed by hand.
+  const expandToFocusedItem = useEffectEvent((mode: "auto" | "brain", targetItemId: string | null) => {
     if (!targetItemId) return;
-    const { mainProjection: proj, noteIndex: idx } = revealRef.current;
+    const proj = mainProjection;
+    const idx = noteIndex;
     // "brain" mode skips the Main-wins short-circuit so "Open in Brain" reveals the
     // note's REAL home in the Library even when it's also pinned in Main (the maintainer #3,
     // 2026-07-08). "auto" keeps Main's copy winning on ordinary navigation.
@@ -1015,21 +1013,19 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     } else if (fid.startsWith(DEST.trash)) {
       openSystemRoot(DEST.trash);
     }
-  };
+  });
 
   // #25 — auto-reveal on navigation: expand the holder, never scroll (a yanked
   // scroll on every click is jarring). Keyed on the item id, not the closure.
   useEffect(() => {
     expandToFocusedItem("auto", focusedItemId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedItemId, setDestExpanded]);
 
   // Explicit reveal (the editor's location chip): expand AND scroll the row into
   // view. Fires ONLY on the nonce bump, so normal navigation never scroll-yanks.
   // The nonce bump also puts the sidebar on THIS front (ui.revealFocusedNote),
   // so this component is always mounted by the time the effect runs.
-  useEffect(() => {
-    if (!revealNonce) return;
+  const revealFocusedRow = useEffectEvent(() => {
     const { revealMode: mode, revealNoteId } = useUiStore.getState();
     const targetItemId = revealNoteId ?? focusedItemId;
     expandToFocusedItem(mode, targetItemId);
@@ -1053,7 +1049,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => {
+    if (!revealNonce) return;
+    return revealFocusedRow();
   }, [revealNonce]);
 
   const commitNewFolder = (raw: string) => {
