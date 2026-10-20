@@ -87,8 +87,24 @@ export async function resolveChatNoteId(
   return pickChatNote(ranked);
 }
 
+/** Which notes listing a chat's note lookup reads. The corpus instance reads
+ * the unscoped "All notes" listing; a connected brain reads only its own root,
+ * because the unscoped listing drops every note in a connected brain (ids are
+ * "<brain>:…") — a chat attached to a vault note resolved to nothing, and every
+ * turn minted one more duplicate memory note (2026-08-01). */
+export type ChatNoteScope = { kind: "corpus" } | { kind: "brain"; root: string };
+
+export function chatNoteScope(instance: Pick<MemexInstance, "id">): ChatNoteScope {
+  return instance.id === CORPUS_INSTANCE_ID ? { kind: "corpus" } : { kind: "brain", root: `${instance.id}:` };
+}
+
+/** The notes listing's folder argument for a scope. */
+export function chatNoteListingFolder(scope: ChatNoteScope): string | undefined {
+  return scope.kind === "brain" ? scope.root : undefined;
+}
+
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote | null> {
-  const prefix = input.instance.id === CORPUS_INSTANCE_ID ? "" : `${input.instance.id}:`;
+  const listingFolder = chatNoteListingFolder(chatNoteScope(input.instance));
   const attachedStem =
     input.attachedStem ||
     (await listChats(input.instance))
@@ -100,12 +116,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
     (await corpusFrontmatter(id).catch(() => null))?.aiBodyEdit === "allowed";
   const repository = {
     async findByStem(stem: string): Promise<ChatMemoryNote | null> {
-      // Scope the lookup to THIS brain's root. The unscoped "All notes" listing
-      // drops every note in a connected brain (isVault: ids are "<brain>:…"),
-      // so a chat attached to a vault note resolved to nothing — and every turn
-      // minted one more duplicate memory note (2026-08-01). The corpus instance
-      // has no prefix and keeps the unscoped listing.
-      const summaries = await notesService.listNotes(prefix || undefined);
+      const summaries = await notesService.listNotes(listingFolder);
       const id = await resolveChatNoteId(
         stem,
         input.chatSlug,
@@ -122,7 +133,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       if (!stem) return null;
       // the stem can also match an older note titled the same: resolve by
       // what the chat may write, never by recency alone (pickMemoryNote)
-      const summaries = await notesService.listNotes(prefix || undefined);
+      const summaries = await notesService.listNotes(listingFolder);
       const matches = await Promise.all(
         attachedNoteMatches(
           stem,

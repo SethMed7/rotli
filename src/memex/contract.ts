@@ -48,14 +48,14 @@ export const CHAT_SOURCES = ["rotli", "app", "claude", "manual", "signal"] as co
 export const ROTLI_SOURCE = "rotli";
 
 export type AccessMode = "local" | "open" | "secure";
-// v3.7: "chats+inbox+file" NAMES the Filer lane in the contract mirror — no TS code
-// runs with it (#95, audit 2026-07). The Filer executes entirely in Rust (organizer.rs
-// through corpus.rs's filer gates); the app-facing Perms (memex/config.ts / tauri.ts
-// MemexPerms) deliberately exclude the tier, so no user or linked library can ever be
-// granted it. The interactive editor is always "chats+inbox". The tier stays in this
-// union only so the contract can name both lanes; canFile/mayFile below are likewise
-// mirror-by-value pins of the Rust gate (contract.test.ts), not a live TS write path.
-export type Perms = "chats+inbox" | "chats+inbox+file" | "read-only";
+/** The tiers a user or linked library can hold — the wire strings of Rust's
+ * `memex::MemexPerms` (tauri.ts MemexPerms is this type; parity.json pins it). */
+export type UserPerms = "chats+inbox" | "read-only";
+/** The AI Filer lane (v3.7). It runs only in Rust (organizer.rs through
+ * corpus.rs's filer gates); canFile/mayFile below pin that gate by value. It is
+ * not a UserPerms member, so no user or linked library can be granted it. */
+export type FilerPerms = "chats+inbox+file";
+export type Perms = UserPerms | FilerPerms;
 
 export interface MemexInfo {
   id: string;

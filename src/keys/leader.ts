@@ -30,26 +30,29 @@ export const LEADER_TIMEOUT_MS = 4000;
 /** What is pending, for the surfaces that paint number hints. */
 export const useLeaderStore = create<{ mode: LeaderId | null }>(() => ({ mode: null }));
 
-let active: LeaderMode | null = null;
-let timer: ReturnType<typeof setTimeout> | null = null;
+/** Who holds the next chord: nobody, or one pending leader together with the
+ * timeout that ends it — a pending leader can never exist without its timer. */
+type LeaderHold =
+  | { kind: "idle" }
+  | { kind: "pending"; mode: LeaderMode; timer: ReturnType<typeof setTimeout> };
+
+const IDLE: LeaderHold = { kind: "idle" };
+let hold: LeaderHold = IDLE;
 
 function end(): LeaderMode | null {
-  const mode = active;
-  active = null;
-  if (timer) clearTimeout(timer);
-  timer = null;
-  if (mode) {
-    useLeaderStore.setState({ mode: null });
-    mode.onEnd?.();
-  }
-  return mode;
+  const was = hold;
+  if (was.kind === "idle") return null;
+  hold = IDLE;
+  clearTimeout(was.timer);
+  useLeaderStore.setState({ mode: null });
+  was.mode.onEnd?.();
+  return was.mode;
 }
 
 export function enterLeader(mode: LeaderMode, timeoutMs = LEADER_TIMEOUT_MS): void {
   end();
-  active = mode;
+  hold = { kind: "pending", mode, timer: setTimeout(end, timeoutMs) };
   useLeaderStore.setState({ mode: mode.id });
-  timer = setTimeout(end, timeoutMs);
 }
 
 export function cancelLeader(): void {
@@ -60,11 +63,11 @@ export function cancelLeader(): void {
  * used it and the dispatcher must stop; false = dispatch as usual (after any
  * other chord the leader has already stood down). */
 export function leaderConsumes(pressed: string): boolean {
-  if (!active) return false;
-  const slot = /^(?:Meta\+)?([1-9])$/.exec(pressed);
   const mode = end();
+  if (!mode) return false;
+  const slot = /^(?:Meta\+)?([1-9])$/.exec(pressed);
   if (slot) {
-    mode?.pick(Number(slot[1]));
+    mode.pick(Number(slot[1]));
     return true;
   }
   return pressed === "Esc";
