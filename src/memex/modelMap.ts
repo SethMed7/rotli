@@ -1,3 +1,5 @@
+import { isBidiControl, isC0OrC1Control } from "../lib/controlChars";
+
 export interface ModelMapNote {
   id: string;
   title: string;
@@ -42,14 +44,7 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
 /** C0/C1 controls, line/paragraph separators, and bidi embeddings/overrides/
  * isolates: none of them may reach model-facing text. */
 export function isModelUnsafeCodeUnit(code: number): boolean {
-  return (
-    code <= 0x1f ||
-    (code >= 0x7f && code <= 0x9f) ||
-    code === 0x2028 ||
-    code === 0x2029 ||
-    (code >= 0x202a && code <= 0x202e) ||
-    (code >= 0x2066 && code <= 0x2069)
-  );
+  return isC0OrC1Control(code) || code === 0x2028 || code === 0x2029 || isBidiControl(code);
 }
 
 /** Each model-unsafe UTF-16 code unit becomes U+FFFD; everything else is kept. */

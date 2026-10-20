@@ -1,3 +1,5 @@
+import { isBidiControl, isC0OrC1Control } from "./controlChars";
+
 /** The private browser is deliberately session-only. A tab carries no URL so
  * viewstate.json can never become browser history; this in-memory map exists
  * only long enough to hand an initial destination to its mounted surface. */
@@ -18,9 +20,7 @@ export function privateBrowserDisplayTitle(value: unknown): string {
   const clean = [...value]
     .map((character) => {
       const point = character.codePointAt(0) ?? 0;
-      const control = point <= 0x1f || (point >= 0x7f && point <= 0x9f);
-      const bidiOverride = (point >= 0x202a && point <= 0x202e) || (point >= 0x2066 && point <= 0x2069);
-      return control || bidiOverride ? " " : character;
+      return isC0OrC1Control(point) || isBidiControl(point) ? " " : character;
     })
     .join("")
     .replace(/\s+/g, " ")

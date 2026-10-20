@@ -1,23 +1,21 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { LeafNode, Tab } from "../types";
 import { findLeaf, isPreviewTab, keepTabsFor, usePanesStore } from "./panes";
-
-const tab = (id: string): Tab => ({ id, surfaceKind: "note", noteId: `n-${id}` });
-
-const leaf = (id: string, tabIds: string[]): LeafNode => ({
-  kind: "leaf",
-  id,
-  tabs: tabIds.map(tab),
-  activeTabId: tabIds[0] ?? "",
-});
 
 // preview tabs (the maintainer, 2026-07-28: "every click shouldn't open a new tab") —
 // browsing reuses ONE preview tab; re-clicking the same item keeps it; edits
 // keep it; ⌘T still appends a permanent tab.
 describe("preview tabs", () => {
   beforeEach(() => {
-    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+    usePanesStore.setState({
+      root: {
+        kind: "leaf",
+        id: "p1",
+        tabs: [{ id: "A", surfaceKind: "note", noteId: "n-A" }],
+        activeTabId: "A",
+      },
+      focusedPaneId: "p1",
+    });
   });
 
   test("clicking through notes reuses the one preview tab", () => {

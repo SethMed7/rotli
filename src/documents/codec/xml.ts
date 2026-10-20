@@ -1,5 +1,7 @@
 // Minimal WordprocessingML string helpers shared by the DOCX codec modules.
 
+import { isNonWhitespaceC0 } from "../../lib/controlChars";
+
 export function decodeXml(value: string): string {
   return value
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
@@ -15,9 +17,7 @@ export function decodeXml(value: string): string {
  * and carriage return; U+FFFE; U+FFFF). One such character written verbatim
  * makes Word reject the whole document, so they are dropped, never escaped. */
 function isXmlForbidden(code: number): boolean {
-  return (
-    (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0xfffe || code === 0xffff
-  );
+  return isNonWhitespaceC0(code) || code === 0xfffe || code === 0xffff;
 }
 
 function stripXmlForbidden(value: string): string {

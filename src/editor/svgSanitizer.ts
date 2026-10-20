@@ -1,3 +1,5 @@
+import { isNonWhitespaceC0 } from "../lib/controlChars";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const MAX_SVG_SOURCE_CHARS = 500_000;
 const MAX_SVG_NODES = 10_000;
@@ -110,10 +112,7 @@ export function svgAttributeAllowed(name: string, value: string, namespace: stri
 /** True when an untrusted attribute value carries a C0 control other than tab,
  * line feed, or carriage return — such a value is rejected outright. */
 export function hasForbiddenControlChar(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) return true;
-  }
+  for (let i = 0; i < value.length; i++) if (isNonWhitespaceC0(value.charCodeAt(i))) return true;
   return false;
 }
 
