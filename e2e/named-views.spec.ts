@@ -187,7 +187,6 @@ test("Chat switches views without leaving Chat, and ⌘T there files into that v
   await context.getByRole("button", { name: /Current view: Main/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Research" }).click();
   await expect(context.getByRole("button", { name: /Current view: Research/ })).toBeVisible();
-  // still in Chat
   await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
