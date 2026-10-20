@@ -23,6 +23,7 @@ import { defineConfig } from "vite";
 import {
   bundleBudgetViolations,
   buildWarningViolation,
+  katexWoff2Only,
   LAZY_LOCALE_STUB_ID,
   LAZY_LOCALE_STUB_SOURCE,
   MAX_LAZY_CHUNK_KIB,
@@ -91,6 +92,14 @@ export default defineConfig(({ command }) => {
         },
         load(id: string) {
           return id === WITHHELD_VOICE_STUB_ID ? WITHHELD_VOICE_STUB_SOURCE : null;
+        },
+      },
+      // KaTeX math fonts ship as woff2 only — see katexWoff2Only.
+      {
+        name: "rotli-katex-woff2-only",
+        enforce: "pre" as const,
+        transform(code: string, id: string) {
+          return katexWoff2Only(id, code);
         },
       },
     ],
