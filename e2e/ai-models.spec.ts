@@ -34,7 +34,6 @@ test("the connected lanes are listed in order with Antigravity last and off", as
   await expect(page.getByRole("button", { name: /Install Google/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toHaveCount(0);
 
-  // nothing in the pane overflows the window
   const pane = page.locator(".ailane").last();
   expect(await pane.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 });
@@ -61,6 +60,5 @@ test("a lane that isn't ready shows the walkthrough with copyable commands inste
   const codex = page.locator(".ailane", { hasText: "Codex" }).first();
   await expect(codex.getByText(/^(brew install codex|npm install -g @openai\/codex)$/)).toBeVisible();
   await expect(codex.getByText("codex login")).toBeVisible();
-  // nothing in the walkthrough overflows the window
   expect(await claude.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 });

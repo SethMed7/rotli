@@ -261,8 +261,6 @@ export function llmsFullText(content: { posts: Writing[]; roadmap: RoadmapSectio
   return parts.join("\n\n---\n\n") + "\n";
 }
 
-// ─── JSON-LD (schema.org) ────────────────────────────────────────────────
-
 type Ld = Record<string, unknown>;
 
 const organization: Ld = {

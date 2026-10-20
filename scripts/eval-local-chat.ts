@@ -231,7 +231,6 @@ const WEB_FIXTURES: Record<WebFixtureName, FrozenWebFixture> = {
   },
 };
 
-// ── the fixture vault ─────────────────────────────────────────────────────────
 // Synthetic reproduction of the large people-lane failure: the note that
 // best matches "people" is a README whose BODY holds no names at all — only
 // folder prose — while its frontmatter `links:` line mixes people with a
@@ -465,8 +464,6 @@ const FIXTURE_NOTES: FixtureNote[] = [
   },
 ];
 
-// ── the fixture Host ──────────────────────────────────────────────────────────
-
 function snippetOf(body: string): string {
   const noFm = body.replace(/^---\n[\s\S]*?\n---\n/, "");
   return noFm.replace(/\s+/g, " ").trim().slice(0, 140);
@@ -594,8 +591,6 @@ const webCalls: string[] = [];
 // Successfully read evidence sources in the active frozen fixture. Citation
 // scoring compares the model's ids to this set, not merely to a regex shape.
 const availableWebSourceIds = new Set<string>();
-
-// ── cases + scoring ───────────────────────────────────────────────────────────
 
 interface EvalCase {
   name: string;
@@ -990,8 +985,6 @@ const CASES: EvalCase[] = [
     },
   },
 ];
-
-// ── runner ────────────────────────────────────────────────────────────────────
 
 async function runCase(c: EvalCase, modelId: string, logDir: string): Promise<boolean> {
   const log: StepLog[] = [];
