@@ -29,15 +29,17 @@ describe("breve storage lanes", () => {
     expect(existsSync(store)).toBe(false);
   });
 
-  test("ensureBreveStorage creates every lane", () => {
+  test("ensureBreveStorage creates every lane and the caller's extra folders", () => {
     const store = join(TMP, "ensured");
-    run(store, `(await import(${JSON.stringify(PATHS)})).ensureBreveStorage();`);
+    const extra = JSON.stringify(join(store, "extra"));
+    run(store, `(await import(${JSON.stringify(PATHS)})).ensureBreveStorage(${extra});`);
     expect(readdirSync(store).sort()).toEqual([
       "breveAudios",
       "breveCaptures",
       "brevePDFs",
       "breveTopics",
       "breveViews",
+      "extra",
     ]);
   });
 });

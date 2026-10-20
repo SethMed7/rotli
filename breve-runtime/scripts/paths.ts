@@ -29,8 +29,9 @@ export const TOPICS = join(STORE, "breveTopics"); // audio/HTML topic deep-dives
 // boundary; every destination is verified to resolve under here before any byte is written.
 export const CAPTURES = join(STORE, "breveCaptures");
 
-/** Create the storage lanes. Each script that reads or writes one calls this
- * before its first use, so importing a path never scaffolds a vault. */
-export function ensureBreveStorage(): void {
-  for (const d of [TOPICS, AUDIOS, PDFS, VIEWS, CAPTURES]) mkdirSync(d, { recursive: true });
+/** Create the storage lanes, plus any caller-owned `extraDirs`. Each script
+ * that reads or writes a lane calls this before its first use, so importing a
+ * path never scaffolds a vault. */
+export function ensureBreveStorage(...extraDirs: string[]): void {
+  for (const d of [TOPICS, AUDIOS, PDFS, VIEWS, CAPTURES, ...extraDirs]) mkdirSync(d, { recursive: true });
 }

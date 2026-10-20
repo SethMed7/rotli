@@ -31,8 +31,6 @@ import type {
   UnreadReport, MailSearchReport,
 } from "./wire-types";
 
-ensureBreveStorage();
-
 // The owner's time context (home tz + travel mode) — cached, refreshed every 5 min.
 let CFG: Settings = await loadSettings();
 async function refreshCfg() {
@@ -47,7 +45,7 @@ async function refreshCfg() {
 setInterval(() => { refreshCfg().catch((e) => logFail("cfg-refresh", String(e))); }, 5 * 60_000);
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 const TRANSCRIPTS = join(BREVE, "signal", "transcripts");
-mkdirSync(TRANSCRIPTS, { recursive: true });
+ensureBreveStorage(TRANSCRIPTS);
 
 // ── Multi-user context (per-turn, via AsyncLocalStorage) ────────────────────────────────────────
 // Each inbound message is handled inside als.run(ctx); send()/sandbox/knowledge/transcripts read the
