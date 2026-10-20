@@ -16,7 +16,6 @@ test("the player is there from the start, above the footer; hidden, Settings bri
   // shown by default, quiet (the owner, 2026-10-01)
   await expect(player).toBeVisible();
   await expect(player.getByRole("button", { name: "Play", exact: true })).toBeVisible();
-  // right above the footer
   const [playerBox, footerBox] = await Promise.all([
     player.boundingBox(),
     page.locator(".sb-foot").boundingBox(),

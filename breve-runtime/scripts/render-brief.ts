@@ -28,7 +28,6 @@ const longDate = d.toLocaleDateString("en-US", { month: "long", day: "numeric", 
 const slot = kind === "morning" ? "Morning" : kind === "lunch" ? "Midday" : "Evening";
 const pdfTheme = readPdfTheme();
 
-// ── Markdown → readable HTML (inline voice lives in markdown-text.ts) ─────────
 function mdToBody(src: string): string {
   const out: string[] = [];
   let para: string[] = [];
@@ -125,7 +124,6 @@ const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 
 await Bun.write(join(BRIEFS, `${stem}.html`), html);
 
-// ── Render to PDF via headless Chrome ────────────────────────────────────────
 const pdfPath = join(PDFS, `${stem}.pdf`);
 try {
   await renderPdf(join(BRIEFS, `${stem}.html`), pdfPath);

@@ -320,8 +320,6 @@ function animate(scenery: HTMLElement) {
   };
   const pileCentre = (): Point => ({ x: foodRect.left + foodRect.width / 2, y: foodRect.top + foodRect.height * 0.45 });
 
-  // ——— Leaves: carried, handed over, or dropped ———
-
   function receive(q: Quokka, now: number) {
     deliveredUntil = now + HAPPY_MS;
     calmUntil = Math.max(calmUntil, now + HAPPY_MS + 400);
@@ -418,8 +416,6 @@ function animate(scenery: HTMLElement) {
     const w = el.getBoundingClientRect().width || 48;
     el.style.transform = `translate(${(p.x - sceneRect.left - w / 2).toFixed(1)}px, ${(p.y - sceneRect.top - w / 3).toFixed(1)}px) rotate(${angle.toFixed(1)}deg)`;
   }
-
-  // ——— Pointer ———
 
   function onMove(event: PointerEvent) {
     const now = performance.now();
@@ -540,8 +536,6 @@ function animate(scenery: HTMLElement) {
   function onUp(event: PointerEvent) {
     if (carry && event.pointerId === carry.id) release(performance.now());
   }
-
-  // ——— The ball: two quokkas in the corner playing catch, and the person if it joins ———
 
   // The base rig holds the ball at its belly and catches it overhead; the layered poses (the
   // sitter and the nibbler) catch and hold it where they hold a leaf.
@@ -681,8 +675,6 @@ function animate(scenery: HTMLElement) {
     return null;
   }
 
-  // ——— One quokka, one frame ———
-
   function frame(q: Quokka, now: number, dt: number, look: Point | null, opts: { bob?: number; chew?: boolean } = {}) {
     if (!visible(q)) return;
     const layered = q.layered !== null;
@@ -761,8 +753,6 @@ function animate(scenery: HTMLElement) {
     for (const g of q.looks) write(g, 'transform', `translate(${q.eyeX.toFixed(1)} ${q.eyeY.toFixed(1)})`);
   }
 
-  // ——— The eaters: a leaf in their paws, a bite now and then, and hope for another ———
-
   function eat(q: Quokka, now: number, dt: number, look: Point | null, chew: boolean) {
     const watching = pointer?.mouse && near(pointer, q.box, 120);
     if (watching || carry) q.nextBite = Math.max(q.nextBite, now + 600); // they stop to look at you
@@ -794,8 +784,6 @@ function animate(scenery: HTMLElement) {
     frame(q, now, dt, target, { chew });
   }
 
-  // ——— The guard ———
-
   function guard(q: Quokka, now: number, dt: number, look: Point | null) {
     const onPile = !!pointer && !carry && near(pointer, foodRect, 8) && (pointer.mouse || now - pointer.at < TAP_MS);
     const nearPile =
@@ -820,8 +808,6 @@ function animate(scenery: HTMLElement) {
     if (now < q.holdUntil && now > q.biteAt + BITE_MS + 500) q.biteAt = now;
     frame(q, now, dt, look);
   }
-
-  // ——— The stroller on the dunes ———
 
   function stepWalker(q: Quokka, now: number, dt: number) {
     const width = scenery.clientWidth;
@@ -870,8 +856,6 @@ function animate(scenery: HTMLElement) {
     const look = walk.phase === 'pausing' && pointer ? pointer : null;
     frame(q, now, dt, look, { bob });
   }
-
-  // ——— The visitor's person ———
 
   const bodyWidth = () => person.view.box.width || sceneRect.height * 0.5;
   const personLeaf = (): Point | null => (person.here && person.holding ? person.view.hand() : null);
@@ -1057,8 +1041,6 @@ function animate(scenery: HTMLElement) {
     if (!raf) measure();
     sendPerson(sceneRect.left + (person.here ? person.walk.x : sceneRect.width * 0.42), now);
   }
-
-  // ——— The loop ———
 
   /** Where everything is on screen now: every frame, and on input while the loop rests. */
   function measure() {
