@@ -470,8 +470,6 @@ export async function invalidateJournal(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.secureHints });
 }
 
-// ——— lifecycle (Phase 2c): a note's home changes (archive/trash/restore).
-
 export function useArchiveNote() {
   return useMutation({
     mutationFn: (id: string) => archiveNoteWithImages(id),

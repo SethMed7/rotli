@@ -97,7 +97,6 @@ export function SidebarSwitcher({
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
   const helperVerifying = useHelperLink((s) => s.verifying);
-  // Pull Chat out into its own window: the Mac app only
   const chatWindow = chatWindowSupported();
   const chatDetached = useChatWindowStore((s) => s.detached);
   const pullChatOut = () => {

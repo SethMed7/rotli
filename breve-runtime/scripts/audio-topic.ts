@@ -10,9 +10,11 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderMp3, parseSegments } from "./tts";
-import { AUDIOS, TOPICS } from "./paths";
+import { AUDIOS, TOPICS, ensureBreveStorage } from "./paths";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
 import { localGenerate } from "./llm";
+
+ensureBreveStorage();
 
 const request = process.argv.slice(2).join(" ").trim();
 if (!request) { console.error("ERR usage: bun audio-topic.ts \"<request>\""); process.exit(1); }

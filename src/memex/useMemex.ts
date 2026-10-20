@@ -12,7 +12,7 @@ import * as svc from "./service";
 export const memexKeys = {
   config: ["memex", "config"] as const,
   detect: ["memex", "detect"] as const,
-  chats: (instanceId: string) => ["memex", "chats", instanceId] as const,
+  chats: (instanceId: string | null) => ["memex", "chats", instanceId] as const,
 };
 
 export async function invalidateMemex(): Promise<void> {
@@ -30,7 +30,7 @@ export function useDetectMemex(enabled = true) {
 
 export function useInstanceChats(instance: MemexInstance | null) {
   return useQuery({
-    queryKey: memexKeys.chats(instance?.id ?? "none"),
+    queryKey: memexKeys.chats(instance?.id ?? null),
     queryFn: () => (instance ? svc.listChats(instance) : Promise.resolve([])),
     enabled: !!instance,
   });

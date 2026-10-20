@@ -158,8 +158,6 @@ function isMainSurface(): boolean {
   return (new URLSearchParams(window.location.search).get("window") ?? "main") === "main";
 }
 
-// ─── defensive parsing helpers ───────────────────────────────────────────────
-
 function record(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 }
@@ -1286,8 +1284,6 @@ async function gcPersistedMaps(): Promise<void> {
     // unreadable folders — keep everything
   }
 }
-
-// ─── first paint ─────────────────────────────────────────────────────────────
 
 /** Apply the restored theme before React's first paint. */
 function prePaint(): void {

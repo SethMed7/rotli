@@ -36,7 +36,6 @@ describe("sidebarDropTargetAt", () => {
   test("only SIDEBAR rows count: an All-notes row or a Library tile with data-note-id does not", () => {
     expect(sidebarDropTargetAt(el({ class: "note-row", "data-note-id": "01NOTE" }))).toBeNull();
     expect(sidebarDropTargetAt(el({ class: "fdr-tile", "data-note-id": "01NOTE" }))).toBeNull();
-    // the "All chats" row has the class but no slug
     expect(sidebarDropTargetAt(el({ class: "sb-chatrow all" }))).toBeNull();
   });
 

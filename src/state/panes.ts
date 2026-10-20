@@ -18,7 +18,7 @@ import { create } from "zustand";
 
 import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
-import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
+import type { LeafNode, PaneNode, PreviewableTab, SplitDir, Tab } from "../types";
 import { chatWindowTakes } from "./chatWindowStore";
 import { touchItemActivity, touchMru } from "./mru";
 import {
@@ -129,15 +129,22 @@ export function fileTabOpen(root: PaneNode, fileId: string): boolean {
   return leaves(root).some((l) => l.tabs.some((t) => t.surfaceKind === "file" && t.fileId === fileId));
 }
 
+/** True for a tab a browse opened in the pane's preview slot. */
+export function isPreviewTab(tab: Tab): tab is PreviewableTab {
+  return "preview" in tab && tab.preview === true;
+}
+
 /** An EDIT promotes the item's preview tab(s) to permanent, wherever open —
  * "if I click and edit it should stay open" (the maintainer, 2026-07-28). Cheap no-op
  * when nothing matches. */
 export function keepTabsFor(itemId: string): void {
   const { root } = usePanesStore.getState();
-  const dirty = leaves(root).some((l) => l.tabs.some((t) => t.preview && sidebarItemId(t) === itemId));
+  const dirty = leaves(root).some((l) => l.tabs.some((t) => isPreviewTab(t) && sidebarItemId(t) === itemId));
   if (!dirty) return;
   usePanesStore.setState({
-    root: mapAllTabs(root, (t) => (t.preview && sidebarItemId(t) === itemId ? { ...t, preview: false } : t)),
+    root: mapAllTabs(root, (t) =>
+      isPreviewTab(t) && sidebarItemId(t) === itemId ? { ...t, preview: false } : t,
+    ),
   });
 }
 
@@ -193,7 +200,7 @@ function placeTab(
     const existing = l.tabs.find(matches);
     if (existing) {
       // clicking the item ALREADY showing in the preview tab = keep it
-      if (existing.preview && l.activeTabId === existing.id) {
+      if (isPreviewTab(existing) && l.activeTabId === existing.id) {
         return {
           ...l,
           tabs: l.tabs.map((t) => (t.id === existing.id ? { ...t, preview: false } : t)),
@@ -214,7 +221,7 @@ function placeTab(
     }
     // browsing reuses the pane's preview slot in place
     if (previewable) {
-      const slot = l.tabs.find((t) => "preview" in t && t.preview);
+      const slot = l.tabs.find(isPreviewTab);
       const fresh = { ...make(), preview: true };
       if (slot) {
         return { ...l, tabs: l.tabs.map((t) => (t.id === slot.id ? fresh : t)), activeTabId: fresh.id };
@@ -375,8 +382,6 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
   }
   return best?.id ?? null;
 }
-
-// ——— the store ———
 
 /** The tab currently under an HTML5 drag — set on dragstart, cleared on
  * dragend/drop. Panes read it to arm their split-detach dropzones (the maintainer,

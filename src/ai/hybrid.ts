@@ -152,8 +152,6 @@ export async function* runHybrid(
   yield { type: "final", text: final || "(the model returned nothing)" };
 }
 
-// ── "Generate templates" (Settings → AI Models) ───────────────────────────────
-
 /** Ask a model to design 3 presets for the user's described usage, restricted
  * to the models actually available. Defensive parse — garbage returns []. */
 export async function suggestPresets(
