@@ -7,12 +7,14 @@
 import { join } from "node:path";
 import { renderPdf } from "./chrome-pdf";
 import { errText } from "./err-text";
-import { TOPICS, PDFS } from "./paths";
+import { TOPICS, PDFS, ensureBreveStorage } from "./paths";
 import { readSecret } from "./secret";
 import { localGenerate } from "./llm";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
 import type { ResendResponse } from "./wire-types";
+
+ensureBreveStorage();
 
 const [format, recipient, ...topicParts] = process.argv.slice(2);
 const topic = topicParts.join(" ").trim();

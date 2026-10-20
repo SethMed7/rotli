@@ -223,8 +223,6 @@ fn open_in_browser(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-// ── install ───────────────────────────────────────────────────────────────────
-
 fn read_hex_sha256(path: &Path) -> Result<String, String> {
     let out = Command::new("/usr/bin/shasum")
         .args(["-a", "256"])
@@ -344,8 +342,6 @@ fn install() -> Result<AntigravityStatus, String> {
     result?;
     Ok(status())
 }
-
-// ── sign in / out ─────────────────────────────────────────────────────────────
 
 fn sign_in(children: &Arc<Mutex<HashMap<String, Running>>>) -> Result<AntigravityStatus, String> {
     let bin = current_dir()?.join(EXECUTABLE_NAME);

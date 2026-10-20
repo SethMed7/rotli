@@ -55,6 +55,7 @@ import {
   documentStructureSignature,
   documentTableRanges,
   isDocumentContentMutation,
+  remeasureEngine,
 } from "./policy";
 import { documentImageDrawing } from "./imageDrawing";
 import { fromHorizontalAlign, fromNamedStyle, horizontalAlign, namedStyle, textStyle } from "./textStyle";
@@ -609,13 +610,13 @@ export function mountDocumentEditor(
       const next = documentStructureSignature(editor.getSnapshot());
       if (next === structure) return;
       structure = next;
-      const engine = renderManager.getRenderById(model.id)?.engine;
-      engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
-      cancelAnimationFrame(mutationFrame);
-      mutationFrame = requestAnimationFrame(() => {
-        if (disposed) return;
-        engine?.resizeBySize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
-        styleCanvas();
+      remeasureEngine(renderManager.getRenderById(model.id)?.engine, host, (restore) => {
+        cancelAnimationFrame(mutationFrame);
+        mutationFrame = requestAnimationFrame(() => {
+          if (disposed) return;
+          restore();
+          styleCanvas();
+        });
       });
     });
   });
@@ -633,6 +634,14 @@ export function mountDocumentEditor(
   const resetViewport = () => {
     const viewport = renderManager.getRenderById(model.id)?.scene.getViewport(VIEWPORT_KEY.VIEW_MAIN);
     viewport?.scrollToViewportPos({ viewportScrollX: 0, viewportScrollY: 0 });
+  };
+  // Univer can create its canvas before its document skeleton has a page.
+  // Forcing the zoom after skeleton layout reruns the page-position service
+  // even when the desired ratio matches an earlier, pre-layout attempt.
+  const refreshPage = () => {
+    fitPage(true);
+    styleCanvas();
+    resetViewport();
   };
   const resizeObserver = new ResizeObserver(() => fitPage());
   resizeObserver.observe(host);
@@ -652,45 +661,27 @@ export function mountDocumentEditor(
       cancelAnimationFrame(secondFrame);
       cancelAnimationFrame(mutationFrame);
       firstFrame = requestAnimationFrame(() => {
-        // Univer's engine can mount while its host reports the pre-flex size and
-        // then cache that first measurement. A same-size resize is a no-op, so
-        // jolt its private canvas by one pixel before restoring the settled host
-        // dimensions. This reproduces the real window-resize path that recovers
-        // a page from the off-canvas sentinel without visibly moving the UI.
-        const engine = renderManager.getRenderById(model.id)?.engine;
-        engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
-        secondFrame = requestAnimationFrame(() => {
-          if (readySettled || disposed) return;
-          engine?.resizeBySize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
-          // Univer can create its canvas before its document skeleton has a page.
-          // Force the zoom operation after skeleton layout so the page-position
-          // service reruns even when the desired ratio matches an earlier,
-          // pre-layout attempt. A real window resize used to be the only thing
-          // that recovered the page from its off-canvas sentinel position.
-          fitPage(true);
-          styleCanvas();
-          resetViewport();
-          readySettled = true;
-          resolve();
-          // Tauri can finish its tab/chrome flex transition after Univer's
-          // skeleton reports ready. Repeat the same harmless size jolt once
-          // after that transition so rapid New → Document flows never retain
-          // the off-canvas first measurement until a human resizes the window.
-          lateLayoutTimer = window.setTimeout(() => {
-            if (disposed) return;
-            const settledEngine = renderManager.getRenderById(model.id)?.engine;
-            settledEngine?.resizeBySize(
-              Math.max(1, host.clientWidth - 1),
-              Math.max(1, host.clientHeight - 1),
-            );
-            requestAnimationFrame(() => {
+        remeasureEngine(renderManager.getRenderById(model.id)?.engine, host, (restore) => {
+          secondFrame = requestAnimationFrame(() => {
+            if (readySettled || disposed) return;
+            restore();
+            refreshPage();
+            readySettled = true;
+            resolve();
+            // Tauri can finish its tab/chrome flex transition after Univer's
+            // skeleton reports ready, so re-measure once more after it: rapid
+            // New → Document flows never keep the off-canvas first measurement.
+            lateLayoutTimer = window.setTimeout(() => {
               if (disposed) return;
-              settledEngine?.resizeBySize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
-              fitPage(true);
-              styleCanvas();
-              resetViewport();
-            });
-          }, 500);
+              remeasureEngine(renderManager.getRenderById(model.id)?.engine, host, (restoreSettled) => {
+                requestAnimationFrame(() => {
+                  if (disposed) return;
+                  restoreSettled();
+                  refreshPage();
+                });
+              });
+            }, 500);
+          });
         });
       });
     };

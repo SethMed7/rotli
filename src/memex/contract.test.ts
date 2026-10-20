@@ -37,6 +37,8 @@ import {
   setChatSecureContext,
   hasSecureContext,
   slugify,
+  type FilerPerms,
+  type UserPerms,
 } from "./contract";
 
 const DATE = "2026-06-24";
@@ -419,6 +421,17 @@ describe("the AI Filer lane (v3.7) — mirror of Rust filer_writable/AI_KEYS", (
     expect(mayFile({ locked: true, area: "Projects" }, vocab)).toBe(false);
     expect(mayFile({ area: "Nonsense" }, vocab)).toBe(false);
     expect(mayFile({}, vocab)).toBe(true);
+  });
+  test("the Filer tier is a Perms member but never a user tier", () => {
+    // compile-time half: a FilerPerms member leaking into UserPerms breaks this
+    const userTiers: Record<UserPerms, true> = { "chats+inbox": true, "read-only": true };
+    const filer: FilerPerms = "chats+inbox+file";
+    const leaked: Extract<UserPerms, FilerPerms> extends never ? false : true = false;
+    expect(leaked).toBe(false);
+    expect(Object.keys(userTiers)).not.toContain(filer);
+    // the Filer tier writes what the interactive tier writes (canWrite is per path)
+    expect(canWrite("wiki/x.md", filer)).toBe(true);
+    expect(canWrite("identity/x.md", filer)).toBe(false);
   });
   test("AI_KEYS and USER_KEYS are disjoint", () => {
     for (const k of USER_KEYS) expect(AI_KEYS as readonly string[]).not.toContain(k);

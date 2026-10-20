@@ -72,7 +72,6 @@ for (const viewport of [
     );
     for (const img of await page.locator("[data-secondary] img").all()) await expectThumbnail(img);
 
-    // The section order on the page.
     const order = await page.evaluate(() =>
       ["[data-featured]", "[data-secondary]", "[data-archive]", "[data-upcoming]"].map(
         (selector) => document.querySelector(selector)!.getBoundingClientRect().top + window.scrollY,

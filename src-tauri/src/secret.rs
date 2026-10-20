@@ -496,7 +496,6 @@ mod tests {
         ));
         // and short function words don't pad a phrase into existence
         assert!(!echoes_secure_text("it is on us to go"));
-        // the full run does trip
         assert!(echoes_secure_text(
             "quokkanaut brambleworth ferrocline dispatch overwintered"
         ));

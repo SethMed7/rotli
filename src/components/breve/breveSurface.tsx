@@ -1032,7 +1032,6 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
     }
   };
 
-  // ── custom routines (the maintainer, 2026-07-31): add/remove + per-routine prompts ──
   const [promptOpen, setPromptOpen] = useState<string | null>(null);
   /** Which routine's workflow graph is expanded (2026-08-04). */
   const [flowOpen, setFlowOpen] = useState<string | null>(null);

@@ -505,8 +505,7 @@ export default function App() {
   // main-thread NSApp icon call at boot for nothing
   useEffect(() => {
     if (isTauri() && surface === "main") void setAppIcon(useUiStore.getState().appIcon);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [surface]);
 
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;

@@ -1,7 +1,6 @@
 // `/template` → picker → this: read the chosen template's body and insert it
 // where the slash was typed. The read is async, so the picker closes first and
 // the text lands when it arrives (the attach-image shape in cmEditor.tsx).
-// Split out of cmEditor.tsx, which sits at its size ceiling.
 
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";

@@ -72,7 +72,7 @@ import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { appExtrasSnapshot, hydrateAppExtras, subscribeAppExtras } from "./appExtras";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
-import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
+import { type ChatMap, isUnsavedChatKey, persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
 import { foldStateKeeper } from "./foldState";
@@ -157,8 +157,6 @@ const SAVE_DEBOUNCE_MS = 500;
 function isMainSurface(): boolean {
   return (new URLSearchParams(window.location.search).get("window") ?? "main") === "main";
 }
-
-// ─── defensive parsing helpers ───────────────────────────────────────────────
 
 function record(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
@@ -268,16 +266,14 @@ interface PersistedSettings {
    * ADDITIVE (2026-08-01): an older build ignores this key and falls back to
    * chatModelId, which newer builds keep writing — so a downgrade lands on the
    * last model picked, exactly the pre-per-chat behavior. */
-  chatModel: Record<string, string>;
-  chatReasoning: Record<string, ChatReasoningEffort>;
-  chatServiceTier: Record<string, ChatServiceTier>;
-  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. The
-   * session-scoped unsaved-chat keys ("unsaved:<tabId>", and the legacy "" key)
-   * never persist — a stored one flipped the silent-egress default for every
-   * future fresh chat (#7, audit 2026-07). */
-  chatWeb: Record<string, boolean>;
+  chatModel: ChatMap<string>;
+  chatReasoning: ChatMap<ChatReasoningEffort>;
+  chatServiceTier: ChatMap<ChatServiceTier>;
+  /** Per-chat web-search toggle (the composer globe); `persistableChatMap`
+   * keeps session keys off disk (#7). */
+  chatWeb: ChatMap<boolean>;
   /** Per-chat measure (Narrow/Comfort/Wide), same keying + unsaved-key rule. */
-  chatMeasure: Record<string, Measure>;
+  chatMeasure: ChatMap<Measure>;
   /** Where a chat's attached note opens: a new tab (default) or a right split. */
   chatNoteOpen: "tab" | "split";
   /** Fresh-chat personality: quiet, or time-aware with restrained color. */
@@ -308,7 +304,7 @@ interface PersistedSettings {
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
   /** The macOS Dock/app icon variant. */
-  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay";
+  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay" | "black";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
   fileMetadata: "hide" | "show";
   /** The vault's Brain master switch (vault-vs-brain, 2026-07-26). The Rust
@@ -615,7 +611,8 @@ export function parseSettings(raw: string): PersistedSettings {
       data.appIcon === "warm" ||
       data.appIcon === "paper" ||
       data.appIcon === "charcoal" ||
-      data.appIcon === "clay"
+      data.appIcon === "clay" ||
+      data.appIcon === "black"
         ? data.appIcon
         : "default",
     // hide is the safe default — metadata never surprises a fresh (or old) config
@@ -1259,7 +1256,7 @@ async function gcPersistedMaps(): Promise<void> {
         }
       });
       const ui = useUiStore.getState();
-      const liveKey = (k: string) => composite.has(k) || k.startsWith("unsaved:");
+      const liveKey = (k: string) => composite.has(k) || isUnsavedChatKey(k);
       const kept = pruneMap(rescopeChatMapKeys(ui.chatWeb, owners), liveKey);
       if (kept !== ui.chatWeb) useUiStore.setState({ chatWeb: kept });
       const keptMeasure = pruneMap(rescopeChatMapKeys(ui.chatMeasure, owners), liveKey);
@@ -1288,8 +1285,6 @@ async function gcPersistedMaps(): Promise<void> {
     // unreadable folders — keep everything
   }
 }
-
-// ─── first paint ─────────────────────────────────────────────────────────────
 
 /** Apply the restored theme before React's first paint. */
 function prePaint(): void {

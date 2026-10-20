@@ -93,8 +93,6 @@ const MIN_CONTRACT: &str = "3.4";
 /// The inbox sentinel new captures are inserted after (matches memex-vault's inbox.md).
 const INBOX_MARK: &str = "<!-- entries below this line -->";
 
-// ─── time ─────────────────────────────────────────────────────────────────────
-
 fn now_iso() -> String {
     let now = OffsetDateTime::now_utc();
     now.replace_nanosecond(0)
@@ -160,8 +158,6 @@ pub(crate) fn safe_slug(slug: &str) -> Result<String, String> {
         Err(format!("unsafe chat slug: {slug:?}"))
     }
 }
-
-// ─── instance detection (the memex.json marker) ────────────────────────────────
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -422,8 +418,6 @@ fn memex_write_allowed(cfg: &crate::corpus::CorpusConfig, want: &Path) -> bool {
             && brain_view(&want).is_some()
     })
 }
-
-// ─── commands ──────────────────────────────────────────────────────────────────
 
 /// Scan the likely places for an existing memex (so first-run can offer "merge"):
 /// `~/memex-vault`, `$MEMEX_KNOWLEDGE`, and any already-registered instance. Only
@@ -1323,8 +1317,6 @@ pub async fn memex_pick_folder(app: tauri::AppHandle, title: Option<String>) -> 
     .await
     .map_err(|e| format!("picker worker failed ({e})"))?
 }
-
-// ─── tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {

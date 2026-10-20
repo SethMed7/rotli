@@ -6,6 +6,7 @@
 
 import { useCallback } from "react";
 
+import { pathId } from "../lib/corpusWireId";
 import { renameMainRef } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -18,8 +19,11 @@ export async function renameBoardItem(boardId: string, raw: string): Promise<voi
   const name = raw.trim();
   if (!name) return;
   const meta = await boardStore().rename(boardId, name);
-  usePanesStore.getState().retargetBoard(boardId, meta.id);
-  renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
+  // a board's id is its .excalidraw path, so the rename mints a new one
+  const oldId = pathId(boardId);
+  const newId = pathId(meta.id);
+  usePanesStore.getState().retargetBoard(oldId, newId);
+  renameMainRef(oldId, newId); // the Main slot follows the new path id (#33)
   await invalidateNotes();
 }
 

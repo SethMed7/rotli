@@ -46,6 +46,31 @@ export function buildWarningViolation(warning: BuildWarning): string | null {
   return `${code}${id}${message}`;
 }
 
+export const WITHHELD_VOICE_STUB_ID = "\0rotli-withheld-voice";
+export const WITHHELD_VOICE_STUB_SOURCE =
+  'export const KokoroTTS = { from_pretrained() { throw new Error("Read aloud is not in this build"); } };\n';
+
+/** Read-aloud is a development-build capability (featurePolicy `voice`), and
+ * a build without it never loads a voice. So `kokoro-js`, and the ONNX
+ * runtime it brings (~4 MB in the Mac app, 2026-10-19), is left out of it: a
+ * stub stands in, and throws if anything ever calls it. */
+export function shouldWithholdVoice(source: unknown, voiceInBuild: boolean): boolean {
+  return !voiceInBuild && source === "kokoro-js";
+}
+
+/** KaTeX's stylesheet offers each math font as woff2, woff, and ttf. Every
+ * shell Rotli runs in (WKWebView, current browsers) takes woff2, so the woff
+ * and ttf copies only add ~0.6 MB to the build. Returns the stylesheet with
+ * just the woff2 source, or null for any other file. */
+export function katexWoff2Only(id: string, css: string): string | null {
+  if (!id.replaceAll("\\", "/").includes("/katex/dist/katex") || !id.split("?")[0]?.endsWith(".css"))
+    return null;
+  return css.replace(
+    /(url\([^)]+\.woff2\) format\("woff2"\)),url\([^)]+\.woff\) format\("woff"\),url\([^)]+\.ttf\) format\("truetype"\)/g,
+    "$1",
+  );
+}
+
 export const LAZY_LOCALE_STUB_ID = "\0rotli-lazy-locale-stub";
 export const LAZY_LOCALE_STUB_SOURCE = "export default {};\n";
 

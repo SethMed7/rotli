@@ -24,7 +24,7 @@ pub(crate) fn open(app: &AppHandle, path: &Path) {
     std::thread::spawn(move || {
         if let Err(message) = mount_and_show(&app, &path) {
             let _ = app.emit_to("main", "rotli:open-notice", format!("Couldn’t open that folder — {message}"));
-            crate::show_main(&app);
+            crate::SummonIntent::ShowMain.perform(&app);
         }
     });
 }
@@ -105,7 +105,7 @@ pub(crate) fn folder_window_add_as_vault(window: tauri::WebviewWindow) -> Result
     // vault actually opens, so "not now" leaves it where it was
     let payload = serde_json::json!({ "path": path.to_string_lossy(), "window": label });
     app.emit_to("main", "rotli:add-vault", payload).map_err(|e| e.to_string())?;
-    crate::show_main(app);
+    crate::SummonIntent::ShowMain.perform(app);
     Ok(())
 }
 

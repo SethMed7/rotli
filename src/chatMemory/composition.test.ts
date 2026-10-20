@@ -2,7 +2,8 @@
 // back-link to the chat, reading only the ambiguous bodies (2026-09-17).
 import { describe, expect, test } from "bun:test";
 
-import { resolveChatNoteId } from "./composition";
+import { CORPUS_INSTANCE_ID } from "../memex/config";
+import { chatNoteListingFolder, chatNoteScope, resolveChatNoteId } from "./composition";
 
 describe("resolveChatNoteId", () => {
   const notes = [
@@ -38,5 +39,19 @@ describe("resolveChatNoteId", () => {
 
   test("no match is null", async () => {
     expect(await resolveChatNoteId("nope", "chat", notes, async () => null)).toBeNull();
+  });
+});
+
+describe("chatNoteScope", () => {
+  test("the corpus reads the unscoped listing", () => {
+    const scope = chatNoteScope({ id: CORPUS_INSTANCE_ID });
+    expect(scope).toEqual({ kind: "corpus" });
+    expect(chatNoteListingFolder(scope)).toBeUndefined();
+  });
+
+  test("a connected brain reads only its own root", () => {
+    const scope = chatNoteScope({ id: "work" });
+    expect(scope).toEqual({ kind: "brain", root: "work:" });
+    expect(chatNoteListingFolder(scope)).toBe("work:");
   });
 });

@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import type { NoteLinks } from "../graph/model";
+import type { UserPerms } from "../memex/contract";
 import type {
   BrevePdfPalette,
   BreveConfig,
@@ -19,7 +20,7 @@ import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import type { FrontmatterView } from "./corpusFrontmatter";
 export type { FrontmatterView } from "./corpusFrontmatter";
-import { splitRootId } from "./corpusWireId";
+import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
 import { PLATFORM } from "./featurePolicy";
 import { sameTaskRequest } from "./sameTaskRequest";
@@ -1260,14 +1261,14 @@ export async function corpusSetAiField(id: string, key: string, value: string): 
 /** File a note into the brain per its `area` field. Returns the note's NEW rel
  * path (a .md note's WIRE id is its ULID and survives the move — the rel path is
  * for the journal + retargeting a pane opened by path). */
-export async function corpusFileNote(id: string): Promise<string> {
-  return invoke<string>("corpus_file_note", { id });
+export async function corpusFileNote(id: string): Promise<PathId> {
+  return invoke<PathId>("corpus_file_note", { id });
 }
 
 /** Resolve a note's wire id to its current REL PATH — the ULID→rel bridge (a rel
  * path passes through). Staged-detection and the filing journal use this. */
-export async function corpusNotePath(id: string): Promise<string> {
-  return invoke<string>("corpus_note_path", { id });
+export async function corpusNotePath(id: string): Promise<PathId> {
+  return invoke<PathId>("corpus_note_path", { id });
 }
 
 /** Resolve a note's stable wire id all the way to its current ABSOLUTE file
@@ -1897,7 +1898,8 @@ export interface DetectedMemex {
   usersJson: string | null;
 }
 
-export type MemexPerms = "chats+inbox" | "read-only";
+/** The wire perms a brain carries — the contract's user tiers, never the Filer lane. */
+export type MemexPerms = UserPerms;
 
 export interface MemexContractRaw {
   memexJson: string;

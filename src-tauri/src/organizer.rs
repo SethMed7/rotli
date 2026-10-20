@@ -33,6 +33,9 @@ use ulid::Ulid;
 
 use crate::chat::{self, WireMsg};
 use crate::corpus::{self, CorpusState};
+use coverage::{commit_pass, ClassifyPass, EnrichPass};
+use wake::{RetryAt, RunNow, Wake};
+use crate::librarian_map::LibrarianMap;
 use crate::organizer_knobs::{connected_lane, parse_knobs, Knobs, DEFAULT_QUIET};
 
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
@@ -41,7 +44,6 @@ const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
 /// A connected client thinks longer than the on-device model; the child
 /// registry's watchdog is the backstop.
 const CONNECTED_TIMEOUT: Duration = Duration::from_secs(120);
-/// The request id every organizer completion registers under.
 const ORGANIZER_REQUEST_ID: &str = "organizer";
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
@@ -71,8 +73,6 @@ const LINK_CANDIDATES: usize = 8;
 const ENRICH_FIELDS: [&str; 3] = ["summary", "tags", "links"];
 /// A `summary:` is ONE frontmatter line — clamp a rogue model's paragraph.
 const SUMMARY_BUDGET: usize = 240;
-
-// ─── the trust ladder ────────────────────────────────────────────────────────
 
 /// The §4.3 trust ladder. Governs only auto-APPLY — the daemon always
 /// classifies in the background (Off is fully dormant). Monotonic in risk.
@@ -145,8 +145,6 @@ fn auto_applies(trust: Trust, verb: Verb, secure: bool) -> bool {
     }
 }
 
-// ─── the managed handle ──────────────────────────────────────────────────────
-
 /// Live daemon status for the UI (Settings → Brain / the Activity pane).
 #[derive(Default, Clone)]
 struct StatusSnapshot {
@@ -196,8 +194,7 @@ pub(crate) struct OrganizerInner {
     visible: Mutex<HashSet<String>>,
     /// Whether the worker thread was spawned (false = no memex corpus).
     running: AtomicBool,
-    /// The Settings "Run now" nudge — bypasses quiet/idle/AC/thermal, never chat.
-    run_now: AtomicBool,
+    run_now: RunNow,
     /// The Activity Stop button (2026-07-31): finish the current note, requeue
     /// the rest. Cleared when the next cycle starts; it cannot abort an
     /// in-flight model call, only the next boundary.
@@ -278,7 +275,7 @@ impl OrganizerHandle {
             status: Mutex::new(StatusSnapshot::default()),
             visible: Mutex::new(HashSet::new()),
             running: AtomicBool::new(false),
-            run_now: AtomicBool::new(false),
+            run_now: RunNow::default(),
             stop_now: AtomicBool::new(false),
             cycle_busy: AtomicBool::new(false),
             transition: Mutex::new(()),
@@ -290,10 +287,11 @@ impl OrganizerHandle {
         }))
     }
 
-    /// Watcher feed: keep `wiki/**/*.md`, drop `_index.md` / `wiki/README.md` /
-    /// dot components (the candidate filter). Paths arrive absolute.
+    /// Watcher feed: keep the vault's Librarian input notes (the map's
+    /// candidate filter). Paths arrive absolute.
     pub fn enqueue(&self, root: &Path, paths: &[PathBuf]) {
         let mut added = false;
+        let map = LibrarianMap::at(root);
         {
             let mut q = self.0.queue.lock().unwrap();
             for p in paths {
@@ -301,7 +299,7 @@ impl OrganizerHandle {
                     continue;
                 };
                 let rel = rel.to_string_lossy().replace('\\', "/");
-                if !candidate_rel(&rel) {
+                if !map.is_candidate(&rel) {
                     continue;
                 }
                 q.insert(rel, Instant::now());
@@ -360,7 +358,7 @@ impl OrganizerHandle {
         *self.0.settings_trust.lock().unwrap() = None;
         *self.0.settings_brain.lock().unwrap() = None;
         self.0.brain_off.store(false, Ordering::SeqCst);
-        self.0.run_now.store(false, Ordering::SeqCst);
+        self.0.run_now.cancel();
         self.0.stop_now.store(false, Ordering::SeqCst);
         *self.0.sweep_at.lock().unwrap() = Some(Instant::now());
         *self.0.sweep_hold.lock().unwrap() = Some(Instant::now() + STARTUP_SWEEP_HOLD);
@@ -368,8 +366,6 @@ impl OrganizerHandle {
         self.0.cv.notify_all();
     }
 }
-
-// ─── pure core: hashing, state, candidates, snapshots ────────────────────────
 
 /// FNV-1a 64 as lowercase hex — a tiny local content hash, deterministic across
 /// runs and platforms (std's DefaultHasher explicitly is not), which the
@@ -459,32 +455,6 @@ fn parse_state(json: &str) -> OrganizerFile {
     serde_json::from_str(json).unwrap_or_default()
 }
 
-/// The Templates folder (1.3.0) — byte-identical to TEMPLATES_BRAIN_FOLDER in
-/// src/services/templates.ts (parity.json templatesBrainFolder). The notes in it
-/// are the user's saved layouts for `/template`: placeholders, not knowledge. So
-/// the daemon never files a capture INTO it (it is no area), never enriches what
-/// is in it, and writes no `_index.md` there. It stays an ordinary, visible
-/// folder to everything else.
-pub(crate) const TEMPLATES_BRAIN_FOLDER: &str = "wiki/Templates";
-
-fn in_templates(rel: &str) -> bool {
-    rel.strip_prefix(TEMPLATES_BRAIN_FOLDER)
-        .is_some_and(|rest| rest.starts_with('/'))
-}
-
-/// The enqueue/sweep filter: only `wiki/**/*.md` notes are the daemon's input.
-/// `_index.md` is the daemon's own OUTPUT (never an input candidate),
-/// `wiki/README.md` is the pinned human trust artifact (§3.4 — never touched),
-/// and dot components are sidecar/temp plumbing the watcher filters anyway.
-fn candidate_rel(rel: &str) -> bool {
-    rel.ends_with(".md")
-        && rel.starts_with("wiki/")
-        && rel != "wiki/README.md"
-        && rel.rsplit('/').next() != Some("_index.md")
-        && !rel.split('/').any(|c| c.starts_with('.'))
-        && !in_templates(rel)
-}
-
 /// In-memory snapshot of one note read straight off disk. NEVER
 /// `read_frontmatter` — that path WRITES on read (the auto-secure flag), and a
 /// Suggest run must be provably write-free on corpus files.
@@ -565,6 +535,15 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
 
 /// The state-file key for a note — its ULID when it has one (survives the
 /// filing rename), else its rel path (a frontmatter-less external drop).
+/// A copy's notes keep their stable id in `.rotli/index.json`, not in
+/// frontmatter (slice 4c): the store answers it, so a copy files like a Rotli vault.
+fn store_id(corpus_state: &CorpusState, root_id: &str, map: &LibrarianMap, snap: &mut NoteSnapshot) {
+    if snap.id.is_none() && matches!(map, LibrarianMap::Copy { .. }) {
+        let rel = snap.rel.clone();
+        snap.id = corpus_state.route(root_id, |s| s.wire_id_of(&rel)).ok();
+    }
+}
+
 fn state_key(s: &NoteSnapshot) -> String {
     s.id.clone().unwrap_or_else(|| s.rel.clone())
 }
@@ -623,28 +602,17 @@ fn enrich_covered(s: &NoteSnapshot, st: &OrganizerFile) -> bool {
         .is_some_and(|n| n.proposed.enrich == s.body_hash)
 }
 
-// ─── pure core: classify ─────────────────────────────────────────────────────
-
-/// The Brain's area vocabulary: `wiki/<area>` directories (never `_inbox`,
-/// never underscore/dot names), each with the first content line of its
-/// `_index.md` as a one-line description ("" when none). Lock-free reads.
-fn area_vocab(root: &Path) -> Vec<(String, String)> {
-    let Ok(entries) = std::fs::read_dir(root.join("wiki")) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .filter_map(|e| e.file_name().to_str().map(str::to_string))
-        .filter(|n| !n.starts_with('_') && !n.starts_with('.'))
-        // saved layouts are not an area to file captures under
-        .filter(|n| format!("wiki/{n}") != TEMPLATES_BRAIN_FOLDER)
-        .collect();
-    names.sort();
+/// The Brain's area vocabulary: the Librarian map's areas (with `nested`, the
+/// folders already inside them too, Classify's filing targets), each with the
+/// first content line of its `_index.md` as a one-line description ("" when
+/// none). Lock-free reads.
+fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
+    let map = LibrarianMap::at(root);
+    let names = if nested { map.filing_targets(root) } else { map.areas(root) };
     names
         .into_iter()
         .map(|name| {
-            let desc = std::fs::read_to_string(root.join("wiki").join(&name).join("_index.md"))
+            let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
                 .ok()
                 .and_then(|t| {
                     let (_, body) = corpus::parse_document(&t);
@@ -671,7 +639,8 @@ fn area_vocab(root: &Path) -> Vec<(String, String)> {
 /// `filing` is the person's own rules (plain sentences), followed when they apply.
 fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)], filing: &[String]) -> String {
     let mut p = String::from(
-        "You file notes in a personal knowledge base. Pick the ONE best area for this note.\n\nAreas:\n",
+        "You file notes in a personal knowledge base. Pick the ONE best area for this note. \
+         An `Area/Folder` entry is a folder inside that area: pick the most specific one that fits.\n\nAreas:\n",
     );
     for (name, desc) in vocab {
         if desc.is_empty() {
@@ -733,8 +702,6 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
     })
 }
 
-// ─── pure core: enrich (Job B) ───────────────────────────────────────────────
-
 /// Every OTHER note in the brain as a `(rel, stem)` pair — the link-candidate
 /// haystack, off a lock-free walk. Stems (filename minus `.md`, which carry the
 /// readable filename stem (including a duplicate suffix when present) stands
@@ -745,11 +712,9 @@ fn parse_classify(raw: &str, vocab: &[(String, String)]) -> Option<ClassifyOut> 
 /// model echo it into `links:` of committed notes (§4.2.2). The check costs one
 /// read per wiki note, once per cycle — the price of the absolute rule.
 fn list_peers(root: &Path) -> Vec<(String, String)> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    let mut peers: Vec<(String, String)> = rels
+    let mut peers: Vec<(String, String)> = LibrarianMap::at(root)
+        .candidates(root)
         .into_iter()
-        .filter(|rel| candidate_rel(rel))
         .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked))
         .map(|rel| {
             let stem = rel
@@ -955,11 +920,9 @@ struct IndexRow {
 /// README are never members; secure/locked never listed) in canonical
 /// title-then-id order.
 fn area_members(root: &Path, area: &str) -> Vec<IndexRow> {
-    let mut rels = Vec::new();
-    collect_md(root, &format!("wiki/{area}"), &mut rels);
-    let mut rows: Vec<IndexRow> = rels
+    let mut rows: Vec<IndexRow> = LibrarianMap::at(root)
+        .area_candidates(root, area)
         .iter()
-        .filter(|rel| candidate_rel(rel))
         .filter_map(|rel| snapshot_note(root, rel).ok())
         .filter(|s| !s.secure && !s.locked)
         .map(|s| IndexRow {
@@ -1003,8 +966,6 @@ fn render_index(area: &str, members: &[IndexRow]) -> String {
     }
     out
 }
-
-// ─── pure core: the journal shape ────────────────────────────────────────────
 
 /// One journal row — the ONE shape both writers (the TS Phase-3 commands and
 /// this daemon) speak. Same-id re-append is a status transition; last line wins.
@@ -1088,8 +1049,6 @@ fn supersede(s: &corpus::CorpusStore, old_id: &str) -> Result<bool, String> {
     s.journal_append(&row.to_string())?;
     Ok(true)
 }
-
-// ─── pure core: gates ────────────────────────────────────────────────────────
 
 /// The §2 gates, sampled cheapest-first. `run_now` (the manual nudge) bypasses
 /// power/thermal/idle — but never barges in on an interactive chat. The probes
@@ -1242,8 +1201,6 @@ fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner)
     knobs
 }
 
-// ─── the cycle ───────────────────────────────────────────────────────────────
-
 #[derive(Default, Debug)]
 pub(crate) struct CycleReport {
     pub proposals: usize,
@@ -1304,7 +1261,7 @@ pub(crate) fn run_cycle(
     let mut report = CycleReport::default();
     let model_label = inner.model_label.lock().unwrap().clone();
     let knobs = read_knobs(corpus_state, root_id, inner);
-    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.is_memex())).unwrap_or(false) {
+    if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.librarian_writes())).unwrap_or(false) {
         // a RAW vault (vault-vs-brain, 2026-07-26) or a folder opened in place (2026-10-13)
         // has no Brain — harder off than Trust::Off: the queue and review hints drain so
         // nothing accumulates, is modeled, or nags while the folder stays untouched.
@@ -1324,6 +1281,7 @@ pub(crate) fn run_cycle(
     rels.sort();
     inner.emit_progress(serde_json::json!({ "phase": "start", "total": rels.len() }));
 
+    let map = LibrarianMap::at(root);
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
     // the Vault view's visible notes, read once per pass (empty in Main)
@@ -1357,11 +1315,12 @@ pub(crate) fn run_cycle(
             continue; // stays queued — the gate closed mid-cycle
         }
         inner.queue.lock().unwrap().remove(&rel);
-        let Ok(snap) = snapshot_note(root, &rel) else {
+        let Ok(mut snap) = snapshot_note(root, &rel) else {
             // deleted/unreadable: drop — and it can't be a pending secret anymore
             inner.status.lock().unwrap().secure_pending.remove(&rel);
             continue;
         };
+        store_id(corpus_state, root_id, &map, &mut snap);
         match skip_reason(&snap, &state, knobs.quiet, &visible) {
             Some(Skip::Secure) => {
                 // counted + remembered for the §4.2.3 "review them yourself"
@@ -1405,16 +1364,15 @@ pub(crate) fn run_cycle(
         }
 
         let mut rel = rel;
-        let mut snap = snap;
         // the live feed's "what it's looking at right now" line — titles only,
         // never body content (the same boundary every surface keeps)
         inner
             .emit_progress(serde_json::json!({ "phase": "note", "title": snap.title, "rel": rel }));
 
-        // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
-        if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
+        // ── Job A — Classify (unfiled notes only) ─────────────────────────────
+        if map.is_unfiled(&rel) && !classify_covered(&snap, &state) {
             let vocab = vocab.get_or_insert_with(|| {
-                crate::librarian_rules::with_people_groups(area_vocab(root), &knobs.rules)
+                crate::librarian_rules::with_people_groups(area_vocab(root, true), &knobs.rules)
             });
             // no areas yet ⇒ nothing to classify into — Enrich still runs below
             if !vocab.is_empty() {
@@ -1442,16 +1400,15 @@ pub(crate) fn run_cycle(
                     // hot-loop us — then fall through to Enrich. An outstanding
                     // proposal from an OLDER body is stale now — retire it.
                     None => {
-                        let old_row = {
-                            let ns = state.notes.entry(key).or_default();
-                            ns.hash = snap.body_hash.clone();
-                            ns.processed_at = now_rfc3339();
-                            ns.proposed.file.clear();
-                            std::mem::take(&mut ns.proposed.file_row)
-                        };
+                        let old_row = state.notes.get(&key).map(|n| n.proposed.file_row.clone()).unwrap_or_default();
                         let dismissed = corpus_state.route(root_id, |s| {
                             let d = supersede(s, &old_row)?;
-                            s.dot_write("organizer", &state_pretty(&state))?;
+                            commit_pass(s, &mut state, &key, |ns| {
+                                ns.hash = snap.body_hash.clone();
+                                ns.processed_at = now_rfc3339();
+                                ns.proposed.file.clear();
+                                ns.proposed.file_row.clear();
+                            })?;
                             Ok(d)
                         })?;
                         if dismissed {
@@ -1476,6 +1433,19 @@ pub(crate) fn run_cycle(
                         let row_ulid = Ulid::new().to_string();
                         let ts = now_ms();
                         let stamp = now_rfc3339();
+                        let pass = ClassifyPass {
+                            rel: &rel,
+                            body_hash: &snap.body_hash,
+                            verb,
+                            area: &area,
+                            conf,
+                            apply,
+                            stamp: &stamp,
+                            model_label: &model_label,
+                            row_ulid: &row_ulid,
+                            ts,
+                            old_row: state.notes.get(&key).map(|n| n.proposed.file_row.clone()).unwrap_or_default(),
+                        };
 
                         // the write window — one short route(); re-check the note first
                         let outcome = corpus_state.route(root_id, |s| {
@@ -1506,87 +1476,14 @@ pub(crate) fn run_cycle(
                                         .unwrap_or_default(),
                                 },
                                 after: match verb {
-                                    Verb::FileStaged => format!("wiki/{area}"),
+                                    Verb::FileStaged => map.area_dir(&area),
                                     _ => area.clone(),
                                 },
                                 confidence: Some(conf),
                                 status: "proposed",
                             };
-                            // The FALLIBLE writes run FIRST; NoteState learns this
-                            // pass only after every one of them lands (#25, audit
-                            // 2026-07). Mutating state up front poisoned it on a
-                            // failed apply (a note locked between read and write),
-                            // and any LATER dot_write in the same cycle persisted
-                            // the note as "classify-covered" with no journal row —
-                            // stranded until its body changed.
-                            let mut moved: Option<String> = None;
-                            if apply {
-                                match verb {
-                                    Verb::FileStaged => {
-                                        // the Filer gates re-read `locked` FRESH inside these
-                                        s.set_ai_field(&rel, "area", &area)?;
-                                        s.set_ai_field(&rel, "filed_by", &model_label)?;
-                                        s.set_ai_field(&rel, "filed_at", &stamp)?;
-                                        let meta = s.file_note(&rel)?;
-                                        let new_rel = s.resolve_note_rel(&meta.id)?;
-                                        row.note_id = new_rel.clone();
-                                        moved = Some(new_rel);
-                                    }
-                                    Verb::Annotate => {
-                                        s.set_ai_field(&rel, "suggested_area", &area)?;
-                                        s.set_ai_field(
-                                            &rel,
-                                            "area_confidence",
-                                            &format!("{conf:.2}"),
-                                        )?;
-                                    }
-                                    Verb::Refile | Verb::Index => {
-                                        unreachable!("classify never emits these")
-                                    }
-                                }
-                                row.status = "applied";
-                            }
-                            // a proposal from an OLDER body is stale — retire it
-                            // (only if still pending; a user-resolved row stays).
-                            // PEEK, never take: supersede is fallible too, and a
-                            // failure must leave the pending handle tracked.
-                            let old_row = state
-                                .notes
-                                .get(&key)
-                                .map(|n| n.proposed.file_row.clone())
-                                .unwrap_or_default();
-                            supersede(s, &old_row)?;
-                            s.journal_append(&journal_line(&row, &row_ulid, ts, &model_label))?;
-                            {
-                                // every fallible write landed — NOW record the pass.
-                                // Entry-mutate (never insert-clobber) so a prior
-                                // Enrich's `lastFields` baseline survives.
-                                let ns = state.notes.entry(key.clone()).or_default();
-                                ns.hash = snap.body_hash.clone();
-                                ns.processed_at = stamp.clone();
-                                ns.proposed.file_row.clear();
-                                if apply {
-                                    match verb {
-                                        Verb::FileStaged => ns.area = area.clone(),
-                                        Verb::Annotate => {
-                                            ns.last_fields
-                                                .insert("suggested_area".into(), area.clone());
-                                            ns.last_fields.insert(
-                                                "area_confidence".into(),
-                                                format!("{conf:.2}"),
-                                            );
-                                        }
-                                        Verb::Refile | Verb::Index => {
-                                            unreachable!("classify never emits these")
-                                        }
-                                    }
-                                    ns.proposed.file.clear();
-                                } else {
-                                    ns.proposed.file = snap.body_hash.clone();
-                                    ns.proposed.file_row = row_ulid.clone();
-                                }
-                            }
-                            s.dot_write("organizer", &state_pretty(&state))?;
+                            let moved = pass.write(s, &mut row)?;
+                            commit_pass(s, &mut state, &key, |ns| pass.record(ns))?;
                             Ok(if row.status == "applied" {
                                 Outcome::Applied(moved)
                             } else {
@@ -1614,6 +1511,7 @@ pub(crate) fn run_cycle(
                                         Ok(s) => s,
                                         Err(_) => continue 'candidates,
                                     };
+                                    store_id(corpus_state, root_id, &map, &mut snap);
                                 }
                             }
                             Err(e) => {
@@ -1646,19 +1544,18 @@ pub(crate) fn run_cycle(
             // so the sweep stops re-offering it (a body edit re-evaluates).
             // Outstanding field proposals from an older body would clobber the
             // user's values on Approve — retire them.
+            let old_rows = state.notes.get(&key).map(|n| n.proposed.enrich_rows.clone()).unwrap_or_default();
             let dismissed = corpus_state.route(root_id, |s| {
-                let old_rows = {
-                    let ns = state.notes.entry(key.clone()).or_default();
-                    ns.hash = snap.body_hash.clone();
-                    ns.proposed.enrich = snap.body_hash.clone();
-                    ns.processed_at = stamp.clone();
-                    std::mem::take(&mut ns.proposed.enrich_rows)
-                };
                 let mut d = false;
                 for old in &old_rows {
                     d |= supersede(s, old)?;
                 }
-                s.dot_write("organizer", &state_pretty(&state))?;
+                commit_pass(s, &mut state, &key, |ns| {
+                    ns.hash = snap.body_hash.clone();
+                    ns.proposed.enrich = snap.body_hash.clone();
+                    ns.processed_at = stamp.clone();
+                    ns.proposed.enrich_rows.clear();
+                })?;
                 Ok(d)
             })?;
             if dismissed {
@@ -1711,7 +1608,17 @@ pub(crate) fn run_cycle(
         // an unparseable reply still records coverage below — temp-0 junk
         // must not hot-loop, same rule as classify
         let out = parse_enrich(&raw, &candidates);
-        let apply = auto_applies(trust, Verb::Annotate, false);
+        let pass = EnrichPass {
+            rel: &rel,
+            snap: &snap,
+            eligible: &eligible,
+            apply: auto_applies(trust, Verb::Annotate, false),
+            model_label: &model_label,
+            // §4.8 supersede — this pass only runs for a CHANGED body, so any
+            // still-pending field rows describe an older note
+            old_rows: state.notes.get(&key).map(|n| n.proposed.enrich_rows.clone()).unwrap_or_default(),
+            baseline: state.notes.get(&key).map(|n| n.last_fields.clone()).unwrap_or_default(),
+        };
 
         // the write window — one short route(); re-check the note first
         let outcome = corpus_state.route(root_id, |s| {
@@ -1734,80 +1641,22 @@ pub(crate) fn run_cycle(
                         .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
                 })
                 .collect();
-            // §4.8 supersede — this pass only runs for a CHANGED body, so any
-            // still-pending field rows describe an older note. Retire them.
-            // PEEK, never take (#25's rule): the closing block below re-writes
-            // `enrich_rows` on success; a mid-closure failure must leave the
-            // pending handles tracked in memory.
-            let old_rows: Vec<String> = state
-                .notes
-                .get(&key)
-                .map(|n| n.proposed.enrich_rows.clone())
-                .unwrap_or_default();
-            let mut superseded = false;
-            for old in &old_rows {
-                superseded |= supersede(s, old)?;
+            let mut landed = Vec::new();
+            let wrote = pass.write(s, &fresh_fields, out.as_ref(), &mut landed);
+            for (fkey, value) in landed {
+                state.notes.entry(key.clone()).or_default().last_fields.insert(fkey, value);
             }
-            let mut proposed = 0usize;
-            let mut applied = 0usize;
-            let mut new_rows: Vec<String> = Vec::new();
-            for (fkey, value) in out.iter().flat_map(EnrichOut::fields) {
-                if !eligible.contains(&fkey) {
-                    continue; // user-owned — never clobbered, never even proposed
-                }
-                let current = fresh_fields.get(fkey).cloned().unwrap_or_default();
-                // never-clobber, re-checked FRESH: `eligible` was sampled before
-                // the model call — an edit inside that window makes the field the
-                // user's (empty or daemon-authored stays fair game).
-                let still_ours = field_value_is_empty(&current)
-                    || state.notes.get(&key).is_some_and(|n| {
-                        n.last_fields.get(fkey).map(String::as_str) == Some(current.as_str())
-                    });
-                if !still_ours {
-                    continue;
-                }
-                if current == value {
-                    continue; // compare-before-write: already on disk ⇒ no-op
-                }
-                let row = JournalRow {
-                    action: "field",
-                    note_id: rel.clone(),
-                    note_title: snap.title.clone(),
-                    note_ulid: snap.id.clone(),
-                    area: None,
-                    field: Some(fkey.to_string()),
-                    before: current,
-                    after: value.clone(),
-                    confidence: None,
-                    status: if apply { "applied" } else { "proposed" },
-                };
-                let row_ulid = Ulid::new().to_string();
-                if apply {
-                    // the Filer gate re-reads `locked` FRESH inside this
-                    s.set_ai_field(&rel, fkey, &value)?;
-                    state
-                        .notes
-                        .entry(key.clone())
-                        .or_default()
-                        .last_fields
-                        .insert(fkey.to_string(), value);
-                    applied += 1;
-                } else {
-                    proposed += 1;
-                    new_rows.push(row_ulid.clone());
-                }
-                s.journal_append(&journal_line(&row, &row_ulid, now_ms(), &model_label))?;
-            }
-            let ns = state.notes.entry(key.clone()).or_default();
-            ns.hash = snap.body_hash.clone();
-            ns.proposed.enrich = snap.body_hash.clone();
-            ns.proposed.enrich_rows = new_rows;
-            ns.processed_at = stamp.clone();
-            s.dot_write("organizer", &state_pretty(&state))?;
+            let wrote = wrote?;
+            commit_pass(s, &mut state, &key, |ns| {
+                ns.hash = snap.body_hash.clone();
+                ns.proposed.enrich = snap.body_hash.clone();
+                ns.proposed.enrich_rows = wrote.new_rows;
+                ns.processed_at = stamp.clone();
+            })?;
             Ok(EnrichOutcome::Rows {
-                proposed,
-                applied,
-                superseded,
+                proposed: wrote.proposed,
+                applied: wrote.applied,
+                superseded: wrote.superseded,
             })
         });
         match outcome {
@@ -1869,7 +1718,8 @@ fn refresh_indexes(
     state: &mut OrganizerFile,
     report: &mut CycleReport,
 ) -> Result<(), String> {
-    for (area, _) in area_vocab(root) {
+    let map = LibrarianMap::at(root);
+    for (area, _) in area_vocab(root, false) {
         let members = area_members(root, &area);
         if members.is_empty() {
             continue; // nothing to overview — never propose an empty table
@@ -1879,7 +1729,7 @@ fn refresh_indexes(
             continue; // membership (incl. summaries) unchanged since last build
         }
         let body = render_index(&area, &members);
-        let rel = format!("wiki/{area}/_index.md");
+        let rel = map.index_rel(&area);
         let disk = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
         if body == disk {
             // fixed point — record it (this is also how a FRONTEND approval
@@ -1970,14 +1820,13 @@ fn state_pretty(state: &OrganizerFile) -> String {
     serde_json::to_string_pretty(state).unwrap_or_else(|_| "{}".into())
 }
 
-/// The reconciliation sweep (doc §2 gate 3): walk `wiki/**/*.md` lock-free and
+/// The reconciliation sweep (doc §2 gate 3): walk the Librarian's notes lock-free and
 /// return every candidate some job still has work on (body hash differs from
 /// the recorded classify AND enrich markers) — a DIFF sweep, not a re-process.
 fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => !(classify_covered(&s, state) && enrich_covered(&s, state)),
             Err(_) => false,
@@ -1995,10 +1844,9 @@ fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
 /// the cycle itself would exclude them. The never-clobber baseline
 /// (`last_fields`) is untouched — user-owned values stay theirs.
 fn audit_gaps(root: &Path, state: &OrganizerFile) -> Vec<String> {
-    let mut rels = Vec::new();
-    collect_md(root, "wiki", &mut rels);
-    rels.into_iter()
-        .filter(|rel| candidate_rel(rel))
+    LibrarianMap::at(root)
+        .candidates(root)
+        .into_iter()
         .filter(|rel| match snapshot_note(root, rel) {
             Ok(s) => {
                 if s.locked || s.secure {
@@ -2030,26 +1878,6 @@ fn reopen_coverage(root: &Path, state: &mut OrganizerFile, gaps: &[String]) {
         }
     }
 }
-
-fn collect_md(root: &Path, prefix: &str, out: &mut Vec<String>) {
-    let Ok(entries) = std::fs::read_dir(root.join(prefix)) else {
-        return;
-    };
-    for entry in entries.filter_map(|e| e.ok()) {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        let rel = format!("{prefix}/{name}");
-        match entry.file_type() {
-            Ok(t) if t.is_dir() => collect_md(root, &rel, out),
-            Ok(t) if t.is_file() && name.ends_with(".md") => out.push(rel),
-            _ => {}
-        }
-    }
-}
-
-// ─── the worker thread ───────────────────────────────────────────────────────
 
 /// One cached system probe — the `pmset` shell-outs aren't free, so each result
 /// lives for the caller's staleness budget, and is sampled only when the lazy
@@ -2188,17 +2016,13 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
         // across cycles. Single worker thread — no contention.
         let probes = std::cell::RefCell::new((CachedProbe::new(), CachedProbe::new()));
         let mut backoff = BACKOFF_MIN;
-        let mut next_model_try: Option<Instant> = None;
+        let mut next_model_try = RetryAt::default();
         // a sweep ran but its follow-up cycle hasn't: the index membership diff
         // must still see changes made by FRONTEND approvals, whose writes are
         // suppress-marked — no watcher event ever arrives for them.
         let mut cycle_owed = false;
-        // the last attempt was blocked by the idle/AC/thermal gates — retry on
-        // the GATE_RECHECK leash (only while work is pending; see plan_wait).
-        // An INSTANT, not a flag: the planner gets the leash REMAINDER, which
-        // decays to zero so the blocked attempt is actually retried (gates
-        // re-probed) instead of re-waiting the full leash forever.
-        let mut gate_closed_at: Option<Instant> = None;
+        // the last attempt was blocked by the idle/AC/thermal gates
+        let mut gate_retry = RetryAt::default();
         // last-known quiet knob — refreshed from settings on every RUN (never
         // read while parked; an idle daemon touches no disk)
         let mut quiet = DEFAULT_QUIET;
@@ -2210,11 +2034,11 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
         loop {
             // ── plan: park, sleep a bounded remainder, or run ────────────────
             if *inner.trust.lock().unwrap() == Trust::Off {
-                inner.run_now.store(false, Ordering::SeqCst); // Off parks a stored nudge
+                inner.run_now.cancel();
             }
             let wait = plan_wait(
                 *inner.trust.lock().unwrap() == Trust::Off,
-                inner.run_now.load(Ordering::SeqCst),
+                inner.run_now.pending(),
                 inner.sweep_at.lock().unwrap().map(|t| t.elapsed()),
                 inner
                     .sweep_hold
@@ -2230,8 +2054,8 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     .min(),
                 cycle_owed,
                 quiet,
-                next_model_try.map(|t| t.saturating_duration_since(Instant::now())),
-                gate_closed_at.map(|t| GATE_RECHECK.saturating_sub(t.elapsed())),
+                next_model_try.left(),
+                gate_retry.left(),
             );
             match wait {
                 Wait::Park => {
@@ -2240,7 +2064,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     // between planning and locking must not be lost to a
                     // missed notify (the nudgers notify under this same lock)
                     if !q.is_empty()
-                        || inner.run_now.load(Ordering::SeqCst)
+                        || inner.run_now.pending()
                         || inner.sweep_at.lock().unwrap().is_some()
                     {
                         continue;
@@ -2267,50 +2091,45 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
             };
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
-            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_is_memex().unwrap_or(false) {
+            if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_librarian_writes().unwrap_or(false) {
                 // RAW vault or a folder opened in place (2026-10-13): consume every wake
                 // signal and park — no sweep, no cycle, and nothing left queued to act on if
                 // the Brain later returns (re-enabling starts fresh from its own sweep).
-                inner.run_now.store(false, Ordering::SeqCst);
+                inner.run_now.cancel();
                 inner.sweep_at.lock().unwrap().take();
                 inner.queue.lock().unwrap().clear();
                 inner.status.lock().unwrap().secure_pending.clear();
                 continue;
             }
             if *inner.trust.lock().unwrap() == Trust::Off {
-                inner.run_now.store(false, Ordering::SeqCst);
+                inner.run_now.cancel();
                 continue; // dormant — don't even sweep (the planner parks next)
             }
 
-            // LOAD, don't swap (#29): the nudge is consumed only once its cycle
-            // actually starts — a closed gate below leaves it queued for the
-            // leash retry instead of silently eating the user's explicit click.
-            let run_now = inner.run_now.load(Ordering::SeqCst);
+            let wake = Wake::sample(&inner.run_now);
             // the owed reconciliation sweep (diff-only, disk-local, no model) —
             // startup / Run-now / an approval nudge / trust turned back on.
             // The one-shot startup hold gates the take: while held, a queue
-            // run proceeds WITHOUT dragging the boot sweep along; an explicit
-            // Run-now bypasses (the user's own timing).
+            // run proceeds WITHOUT dragging the boot sweep along.
             let hold_over = {
                 let mut hold = inner.sweep_hold.lock().unwrap();
                 match *hold {
-                    Some(t) if !run_now && Instant::now() < t => false,
+                    Some(t) if !wake.is_nudge() && Instant::now() < t => false,
                     _ => {
                         *hold = None;
                         true
                     }
                 }
             };
-            if (hold_over && inner.sweep_at.lock().unwrap().take().is_some()) || run_now {
+            if (hold_over && inner.sweep_at.lock().unwrap().take().is_some()) || wake.is_nudge() {
                 let state_json = corpus_state
                     .route(&root_id, |s| s.dot_read("organizer"))
                     .unwrap_or_else(|_| "{}".into());
                 let mut state = parse_state(&state_json);
                 let mut targets = sweep(&root, &state);
-                if run_now {
-                    // the explicit nudge is an AUDIT (the maintainer, 2026-07-31): also
-                    // re-open coverage for covered notes whose metadata is
-                    // missing, so "processed once" can never hide a gap
+                if wake.is_nudge() {
+                    // re-open coverage for covered notes whose metadata is missing,
+                    // so "processed once" can never hide a gap (the maintainer, 2026-07-31)
                     let gaps = audit_gaps(&root, &state);
                     if !gaps.is_empty() {
                         reopen_coverage(&root, &mut state, &gaps);
@@ -2335,25 +2154,24 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 }
             }
 
-            if inner.queue.lock().unwrap().is_empty() && !cycle_owed && !run_now {
-                gate_closed_at = None;
+            if inner.queue.lock().unwrap().is_empty() && !cycle_owed && !wake.is_nudge() {
+                gate_retry.clear();
                 continue; // nothing staged — the planner parks
             }
-            // model-offline backoff — run-now retries immediately
-            if !run_now && next_model_try.is_some_and(|t| Instant::now() < t) {
+            if !wake.is_nudge() && next_model_try.waiting() {
                 continue; // the planner sleeps out the remainder
             }
             let gates = || {
                 // the LIVE re-check per candidate: a chat can start, the user
                 // can return / unplug / heat the machine mid-cycle — so idle,
                 // power, thermal, and focus are all re-sampled here (short
-                // probe leash), not just interactive_busy. Only run_now stays
-                // a cycle-start value (the user's explicit nudge).
+                // probe leash), not just interactive_busy. Only the wake stays
+                // a cycle-start value.
                 let (ac, therm) = &mut *probes.borrow_mut();
                 let leash = Duration::from_secs(10);
                 gates_pass_lazy(
                     inner.interactive.load(Ordering::SeqCst) > 0,
-                    run_now,
+                    wake.is_nudge(),
                     || user_idle_from(hid_idle_seconds()),
                     || app_backgrounded(&app),
                     || ac.get(leash, probe_on_ac),
@@ -2361,13 +2179,12 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 )
             };
             if !gates() {
-                gate_closed_at = Some(Instant::now()); // retry on the GATE_RECHECK leash
+                gate_retry = RetryAt::after(GATE_RECHECK);
                 continue; // leave the queue (and a pending run-now) intact for the next wake
             }
-            gate_closed_at = None;
-            if run_now {
-                // the gates passed — the nudge's cycle is really starting (#29)
-                inner.run_now.store(false, Ordering::SeqCst);
+            gate_retry.clear();
+            if wake.is_nudge() {
+                inner.run_now.start();
             }
             // The lane is re-read every cycle: on this Mac, or the connected
             // client the user chose in Settings → Librarian AND turned on in
@@ -2426,7 +2243,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                                         // enqueue stamps (quiet already elapsed) — without the flag
                                         // the planner would spin Run/park-nothing back-to-back
                     if report.requeued > 0 {
-                        gate_closed_at = Some(Instant::now());
+                        gate_retry = RetryAt::after(GATE_RECHECK);
                     }
                     let sig = {
                         let st = inner.status.lock().unwrap();
@@ -2444,11 +2261,11 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                         crate::chat_window::emit_corpus_changed(&app);
                     }
                     if report.model_offline {
-                        next_model_try = Some(Instant::now() + backoff);
+                        next_model_try = RetryAt::after(backoff);
                         backoff = (backoff * 2).min(BACKOFF_MAX);
                     } else {
                         backoff = BACKOFF_MIN;
-                        next_model_try = None;
+                        next_model_try.clear();
                     }
                 }
                 Err(e) => {
@@ -2463,8 +2280,6 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
         }
     });
 }
-
-// ─── commands ────────────────────────────────────────────────────────────────
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -2489,7 +2304,7 @@ pub fn organizer_status(
     let st = inner.status.lock().unwrap().clone();
     OrganizerStatus {
         running: inner.running.load(Ordering::SeqCst)
-            && corpus_state.default_is_memex().unwrap_or(false),
+            && corpus_state.default_librarian_writes().unwrap_or(false),
         trust: inner.trust.lock().unwrap().as_str().to_string(),
         queued: inner.queue.lock().unwrap().len(),
         last_run_at: st.last_run_at,
@@ -2512,8 +2327,7 @@ pub fn organizer_stop(state: tauri::State<OrganizerState>) -> Result<(), String>
         return Err("the Librarian isn't running for this vault".into());
     }
     inner.stop_now.store(true, Ordering::SeqCst);
-    // an unstarted queued nudge dies with the stop — the user said hands off
-    inner.run_now.store(false, Ordering::SeqCst);
+    inner.run_now.cancel();
     Ok(())
 }
 
@@ -2524,7 +2338,7 @@ pub fn organizer_run_once(state: tauri::State<OrganizerState>) -> Result<(), Str
     if !inner.running.load(Ordering::SeqCst) {
         return Err("the Librarian isn't running for this vault".into());
     }
-    inner.run_now.store(true, Ordering::SeqCst);
+    inner.run_now.request();
     // notify UNDER the queue mutex (same reason as nudge_sweep: the parked
     // worker re-checks run_now while holding it — no lost wakeup)
     let _q = inner.queue.lock().unwrap();
@@ -2620,17 +2434,23 @@ pub fn organizer_learn_field(
     learn_field(&state, &note, &key, &value)
 }
 
-// ─── the secure review lane (feature B, 2026-07-22): organizer_secure.rs ─────
-
 #[path = "organizer_secure.rs"]
 pub mod secure;
+#[path = "organizer_coverage.rs"]
+mod coverage;
+#[path = "organizer_wake.rs"]
+mod wake;
+#[cfg(test)]
+#[path = "organizer_coverage_tests.rs"]
+mod coverage_tests;
 #[cfg(test)]
 #[path = "organizer_adopted_tests.rs"]
 mod adopted_tests;
 #[cfg(test)]
+#[path = "organizer_copy_tests.rs"]
+mod copy_tests;
+#[cfg(test)]
 use secure::{dismiss_secure, secure_hints};
-
-// ─── tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -2733,8 +2553,6 @@ mod tests {
         || true
     }
 
-    // ── pure core ──
-
     #[test]
     fn fnv_hash_is_stable_and_distinct() {
         assert_eq!(fnv1a64(b"hello"), fnv1a64(b"hello"));
@@ -2746,6 +2564,8 @@ mod tests {
 
     #[test]
     fn candidate_filter_drops_index_readme_dots_nonwiki() {
+        // a Rotli vault's Librarian map, pinned: these are its rules exactly
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(candidate_rel("wiki/_inbox/foo-a1b2c3.md"));
         assert!(candidate_rel("wiki/Projects/alazan-84-x1y2z3.md"));
         assert!(
@@ -2768,6 +2588,7 @@ mod tests {
 
     #[test]
     fn the_templates_folder_is_neither_input_nor_a_filing_area() {
+        let candidate_rel = |rel: &str| LibrarianMap::RotliVault.is_candidate(rel);
         assert!(!candidate_rel("wiki/Templates/meeting-notes.md"));
         assert!(!candidate_rel("wiki/Templates/Work/weekly.md"));
         // only that folder: a lookalike name and a nested namesake stay ordinary
@@ -2778,7 +2599,7 @@ mod tests {
         for area in ["Projects", "Templates", "_inbox"] {
             std::fs::create_dir_all(dir.path().join("wiki").join(area)).unwrap();
         }
-        let areas: Vec<String> = area_vocab(dir.path()).into_iter().map(|(name, _)| name).collect();
+        let areas: Vec<String> = area_vocab(dir.path(), true).into_iter().map(|(name, _)| name).collect();
         assert_eq!(areas, ["Projects"]);
     }
 
@@ -3555,8 +3376,6 @@ mod tests {
             "the command rejects junk"
         );
     }
-
-    // ── the cycle ──
 
     #[test]
     fn secure_and_locked_never_reach_the_transport() {
@@ -4825,8 +4644,6 @@ mod tests {
         run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
     }
 
-    // ── enrich (Job B) ──
-
     /// File a staged capture into an area through the Filer lane (the daemon's
     /// own primitives) and return the placed rel — a note with a real ULID.
     fn place_note(state: &CorpusState, body: &str, area: &str) -> String {
@@ -5074,8 +4891,6 @@ mod tests {
         );
         assert_eq!(fs::read_to_string(root.join(&rel)).unwrap(), first);
     }
-
-    // ── refresh-index (Job C) ──
 
     #[test]
     fn render_index_is_deterministic_fixed_point() {

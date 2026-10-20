@@ -5,6 +5,8 @@ import {
   buildWarningViolation,
   shouldIgnoreBuildWarning,
   shouldStubLazyLocale,
+  shouldWithholdVoice,
+  katexWoff2Only,
 } from "./build-policy";
 
 function chunk(fileName: string, sizeKib: number, options: { entry?: boolean; imports?: string[] } = {}) {
@@ -102,5 +104,28 @@ describe("lazy locale stubbing (perf audit finding 17)", () => {
     expect(shouldStubLazyLocale("./hu-DVk7Y_ka.js", "/repo/src/main.tsx")).toBe(false);
     expect(shouldStubLazyLocale("./locales/ar-SA-G6X2FPQ2.js", undefined)).toBe(false);
     expect(shouldStubLazyLocale("./chunk-SRAX5OIU.js", excalidraw)).toBe(false);
+  });
+});
+
+describe("read-aloud in the build", () => {
+  test("a build without voice leaves out kokoro-js, and only that", () => {
+    expect(shouldWithholdVoice("kokoro-js", false)).toBe(true);
+    expect(shouldWithholdVoice("kokoro-js", true)).toBe(false);
+    expect(shouldWithholdVoice("@huggingface/transformers", false)).toBe(false);
+    expect(shouldWithholdVoice(undefined, false)).toBe(false);
+  });
+});
+
+describe("KaTeX fonts", () => {
+  const face =
+    '@font-face{src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2"),url(fonts/KaTeX_AMS-Regular.woff) format("woff"),url(fonts/KaTeX_AMS-Regular.ttf) format("truetype")}';
+  test("keeps only the woff2 source in KaTeX's stylesheet", () => {
+    expect(katexWoff2Only("/x/node_modules/katex/dist/katex.min.css", face)).toBe(
+      '@font-face{src:url(fonts/KaTeX_AMS-Regular.woff2) format("woff2")}',
+    );
+  });
+  test("leaves every other file alone", () => {
+    expect(katexWoff2Only("/x/src/styles/app.css", face)).toBeNull();
+    expect(katexWoff2Only("/x/node_modules/katex/dist/katex.mjs", face)).toBeNull();
   });
 });

@@ -11,8 +11,10 @@ import { join } from "node:path";
 import { renderPdf } from "./chrome-pdf";
 import { errText } from "./err-text";
 import { inlineHtml as inline } from "./markdown-text";
-import { BRIEFS, PDFS } from "./paths";
+import { BRIEFS, PDFS, ensureBreveStorage } from "./paths";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
+
+ensureBreveStorage();
 
 const stem = process.argv[2]
   ?? readdirSync(BRIEFS).filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort().at(-1)?.replace(".md", "");
@@ -28,7 +30,6 @@ const longDate = d.toLocaleDateString("en-US", { month: "long", day: "numeric", 
 const slot = kind === "morning" ? "Morning" : kind === "lunch" ? "Midday" : "Evening";
 const pdfTheme = readPdfTheme();
 
-// ── Markdown → readable HTML (inline voice lives in markdown-text.ts) ─────────
 function mdToBody(src: string): string {
   const out: string[] = [];
   let para: string[] = [];
@@ -125,7 +126,6 @@ const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 
 await Bun.write(join(BRIEFS, `${stem}.html`), html);
 
-// ── Render to PDF via headless Chrome ────────────────────────────────────────
 const pdfPath = join(PDFS, `${stem}.pdf`);
 try {
   await renderPdf(join(BRIEFS, `${stem}.html`), pdfPath);

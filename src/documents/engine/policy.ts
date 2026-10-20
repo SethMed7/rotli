@@ -104,3 +104,29 @@ export function isSelectAllChord(event: ChordLike, isMac: boolean): boolean {
   if (event.code !== "KeyA" || event.shiftKey || event.altKey) return false;
   return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
+
+interface ResizableEngine {
+  resizeBySize(width: number, height: number): void;
+}
+
+interface MeasuredBox {
+  clientWidth: number;
+  clientHeight: number;
+}
+
+/** Make Univer re-measure its page against the host's current size. Its engine
+ * can mount while the host still reports the pre-flex size and caches that
+ * first measurement, and a same-size resize is a no-op — so the canvas is
+ * jolted one pixel smaller now and restored to the host's settled size when
+ * `later` calls back (the next frame). That reproduces the real window-resize
+ * path that recovers a page from Univer's off-canvas sentinel without visibly
+ * moving the UI; a structural edit (a table, inline block, drawing) needs the
+ * same re-measure. */
+export function remeasureEngine(
+  engine: ResizableEngine | undefined,
+  host: MeasuredBox,
+  later: (restore: () => void) => void,
+): void {
+  engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
+  later(() => engine?.resizeBySize(Math.max(1, host.clientWidth), Math.max(1, host.clientHeight)));
+}

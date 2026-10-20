@@ -170,7 +170,6 @@ export function figureId(title: string, taken: Set<string>): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  // At most 48 characters, cut at a word.
   const short = words.length > 48 ? words.slice(0, 49).replace(/-[^-]*$/, '') : words;
   const base = `figure-${short || 'chart'}`;
   let id = base;

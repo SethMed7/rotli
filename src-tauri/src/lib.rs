@@ -1,16 +1,7 @@
 // off macOS, code behind macOS-gated entry points is unwired, not dead (Linux cargo-check lane)
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
-// rotli — the shell. The window is a visitor, not a resident: it lives in the
-// menu bar (no dock icon, no Cmd-Tab), is summoned by a global shortcut, and
-// hides on blur or Esc. Summon reveals existing windows without recreating them.
-//
-// THE SUMMON LAW (revised by the maintainer, 2026-06-12): ⌥Space toggles the MAIN
-// window — "Option+Space is the way we open the app." The quick-capture card
-// has its own chord (default ⌥C), and ⌥A ("ask") summons the main window
-// straight into a chat. ⌘⏎ in the card (save & open) reveals the main window.
-// Tray left-click toggles the MAIN window. All chords are rebindable through
-// set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
-// so heavy use can keep the window resident.
+// rotli — the shell. How windows are summoned (the summon law) lives on
+// `summon::SummonIntent`.
 
 mod agent_bridge;
 mod agent_bridge_socket;
@@ -41,6 +32,7 @@ mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
+mod librarian_map;
 mod librarian_rules;
 mod localmodel;
 mod memex;
@@ -73,6 +65,7 @@ mod remote_block;
 mod secret;
 mod share_sheet;
 mod spellcheck;
+mod summon;
 mod quit_flush;
 mod usage;
 mod usage_lines;
@@ -88,6 +81,7 @@ use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use quit_flush::{QuitFlush, QuitFlushStatus};
+use summon::{LastBlurHide, SummonIntent};
 
 use tauri::image::Image;
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
@@ -288,12 +282,6 @@ fn relaunch_app(app: &AppHandle) -> Result<(), String> {
     app.restart()
 }
 
-/// Clicking the tray icon steals focus from the window, so blur fires (and
-/// hides it) *before* the tray click arrives. Within this grace window the
-/// tray toggle treats "just hidden by blur" as the intended hide and does not
-/// immediately re-show.
-const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
-
 /// Summoning a floating panel (Quick Note / capture card) calls set_focus, which
 /// activates the app and makes macOS fire a Reopen. Within this grace after a
 /// summon, that Reopen is the spurious one — never reopen main (the maintainer, 2026-06-30).
@@ -397,9 +385,6 @@ struct GlobalChords {
     /// `palette.summon` — surface the main window with ⌘K search open ("find").
     search: Mutex<Option<String>>,
 }
-
-/// When the main window was last hidden because it lost focus.
-struct LastBlurHide(Mutex<Option<Instant>>);
 
 /// App-owned native panels temporarily take focus from the webview. That is not
 /// click-away intent, so the visitor-law blur handler must leave the parent
@@ -533,7 +518,7 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
         .collect();
     labels.extend(app.webview_windows().into_keys().filter(|label| folder_window::is_folder_window(label)));
     flush_windows(app, &labels).inspect_err(|detail| {
-        show_main(app);
+        SummonIntent::ShowMain.perform(app);
         let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
     })
 }
@@ -617,7 +602,7 @@ fn graceful_shutdown(app: &AppHandle, restart: bool) {
         if flush_webviews_before_shutdown(&handle).is_ok() {
             if restart {
                 if let Err(error) = relaunch_app(&handle) {
-                    show_main(&handle);
+                    SummonIntent::ShowMain.perform(&handle);
                     let _ = handle.emit_to("main", "rotli:quit-flush-failed", error);
                 }
             } else {
@@ -638,13 +623,6 @@ fn graceful_restart(app: &AppHandle) {
 #[tauri::command]
 fn restart_after_flush(app: AppHandle) {
     graceful_restart(&app);
-}
-
-fn show_main(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
 }
 
 fn hide_main(app: &AppHandle) {
@@ -749,49 +727,9 @@ fn is_visible(app: &AppHandle, label: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The capture chord: toggle the one-breath card.
-fn do_summon(app: &AppHandle) {
-    if is_visible(app, "capture") {
-        hide_capture(app);
-        return;
-    }
-    show_capture(app);
-}
-
-fn toggle_main(app: &AppHandle, respect_blur_grace: bool) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
-    };
-    if window.is_visible().unwrap_or(false) {
-        // visible AND focused → hide. Visible but BEHIND other apps (the
-        // Stay-open setting) → the summon chord brings it forward instead
-        // of hiding a window the user can't even see properly.
-        if window.is_focused().unwrap_or(true) {
-            let _ = window.hide();
-            return;
-        }
-        let _ = window.show();
-        let _ = window.set_focus();
-        return;
-    }
-    if respect_blur_grace {
-        let recently_hidden = app
-            .state::<LastBlurHide>()
-            .0
-            .lock()
-            .unwrap()
-            .is_some_and(|at| at.elapsed() < BLUR_TOGGLE_GRACE);
-        if recently_hidden {
-            return;
-        }
-    }
-    let _ = window.show();
-    let _ = window.set_focus();
-}
-
 #[tauri::command]
 fn toggle_main_window(app: AppHandle) {
-    toggle_main(&app, false);
+    SummonIntent::ToggleMain.perform(&app);
 }
 
 #[tauri::command]
@@ -801,7 +739,7 @@ fn hide_main_window(app: AppHandle) {
 
 #[tauri::command]
 fn show_main_window(app: AppHandle) {
-    show_main(&app);
+    SummonIntent::ShowMain.perform(&app);
 }
 
 #[tauri::command]
@@ -1098,8 +1036,6 @@ fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
     relaunch_app(&app)
 }
 
-// ─── the unified Location surface (corpus.json) ─────────────────────────────
-
 /// The corpus, enriched with whether it IS a memex (derived, never stored) + its
 /// write perms — so the UI/service can treat a memex corpus as the active write
 /// target.
@@ -1327,8 +1263,8 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
     let development_read_only = development_read_only(&app);
     // An imported vault is not a memex to the webview: its notes go through the
-    // corpus store, never the memex note lanes (wiki/_inbox), and its Library
-    // and Librarian stay off until they learn its layout (slice 4c).
+    // corpus store, never the memex note lanes (wiki/_inbox). Its Librarian
+    // runs like a Rotli vault's (slice 4c) unless it was connected in place.
     // Its chats still live in the vault (the role map's chats folder), so its
     // id and perms are reported like any vault's: the webview writes chats
     // there and routes new notes to the corpus store's Inbox.
@@ -1972,7 +1908,7 @@ fn corpus_set_brain_perms(
 
 #[tauri::command]
 fn summon(app: AppHandle) {
-    do_summon(&app);
+    SummonIntent::ToggleCapture.perform(&app);
 }
 
 /// Settings → General → "Stay open": disable click-away hiding for the main
@@ -2017,6 +1953,7 @@ fn app_icon_bytes(variant: &str) -> Option<&'static [u8]> {
         "paper" => Some(include_bytes!("../icons/variants/paper.png")),
         "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png")),
         "clay" => Some(include_bytes!("../icons/variants/clay.png")),
+        "black" => Some(include_bytes!("../icons/variants/black.png")),
         _ => None, // "default" → the bundle icon (nil clears the override)
     }
 }
@@ -2141,41 +2078,20 @@ pub fn run() {
                     let matches = |stored: &str| {
                         stored.parse::<Shortcut>().is_ok_and(|s| s == *shortcut)
                     };
-                    let capture = chords.capture.lock().unwrap().clone();
-                    if capture.as_deref().is_some_and(matches) {
-                        do_summon(app);
-                        return;
-                    }
-                    let main_toggle = chords.main_toggle.lock().unwrap().clone();
-                    if main_toggle.as_deref().is_some_and(matches) {
-                        toggle_main(app, false);
-                        return;
-                    }
-                    let quick = chords.quick.lock().unwrap().clone();
-                    if quick.as_deref().is_some_and(matches) {
-                        quick_window::toggle(app);
-                        return;
-                    }
-                    let chat = chords.chat.lock().unwrap().clone();
-                    if chat.as_deref().is_some_and(matches) {
-                        // ⌥A: SHOW (never toggle — "ask" must always land you in a
-                        // chat, not hide the app); the webview picks/creates the chat
-                        // …in whichever window Chat lives right now
-                        if chat_window::is_open(app) {
-                            chat_window::show(app);
-                            let _ = app.emit_to(chat_window::LABEL, "rotli:summon-chat", ());
-                        } else {
-                            show_main(app);
-                            let _ = app.emit_to("main", "rotli:summon-chat", ());
+                    // first match wins, in this order
+                    let routes = [
+                        (&chords.capture, SummonIntent::ToggleCapture),
+                        (&chords.main_toggle, SummonIntent::ToggleMain),
+                        (&chords.quick, SummonIntent::ToggleQuick),
+                        (&chords.chat, SummonIntent::Chat),
+                        (&chords.search, SummonIntent::Search),
+                    ];
+                    for (chord, intent) in routes {
+                        let stored = chord.lock().unwrap().clone();
+                        if stored.as_deref().is_some_and(matches) {
+                            intent.perform(app);
+                            return;
                         }
-                        return;
-                    }
-                    let search = chords.search.lock().unwrap().clone();
-                    if search.as_deref().is_some_and(matches) {
-                        // ⌥F: same SHOW-never-toggle law — "find" must always land
-                        // you in the palette; the webview opens ⌘K
-                        show_main(app);
-                        let _ = app.emit_to("main", "rotli:summon-search", ());
                     }
                 })
                 .build(),
@@ -2687,7 +2603,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "open" => show_main(app),
+                    "open" => SummonIntent::ShowMain.perform(app),
                     // let the webview flush dirty sheets/settings first (#4)
                     "quit" => graceful_quit(app),
                     _ => {}
@@ -2699,8 +2615,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        // tray left-click toggles the MAIN window
-                        toggle_main(tray.app_handle(), true);
+                        SummonIntent::ToggleMainFromTray.perform(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -2912,7 +2827,7 @@ pub fn run() {
                     // Reopen, so a later genuine Dock click always gets through.
                     let summoned = app.state::<LastPanelSummon>().0.lock().unwrap().take();
                     if reopen_should_show_main(has_visible_windows, ours_up, summoned) {
-                        show_main(app);
+                        SummonIntent::ShowMain.perform(app);
                     }
                     // `rotli open <id>` writes its mailbox file then runs
                     // `open -a rotli` — which lands here as a Reopen. Nudge the

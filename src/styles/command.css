@@ -381,7 +381,6 @@
   overflow: hidden;
   padding: 18px;
   background: var(--surface);
-  /* themed hairline (was a hardcoded warm cocoa line) */
   border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
 }
@@ -411,7 +410,6 @@
   max-width: 100%;
   background: var(--surface);
   border-radius: var(--r-window);
-  /* themed hairline (was a hardcoded warm cocoa line) */
   border: 1px solid var(--border-strong);
   overflow: hidden;
 }
@@ -566,7 +564,6 @@
   margin-top: 14px;
 }
 
-/* ——— settings (r1 frame F window grammar) ——— */
 .settings {
   flex: 1;
   display: flex;
@@ -789,7 +786,6 @@
   padding: 2.5px 7px;
 }
 
-/* the corpus story (r1 frame F) */
 .corpus {
   display: flex;
   gap: 18px;
@@ -2561,11 +2557,10 @@
   padding: 4px;
 }
 .appicon-tile {
+  display: block;
   width: 56px;
   height: 56px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
+  border-radius: 12.6px; /* the artwork's own corner (185 / 824 of the tile) */
   border: 1px solid var(--border);
   transition: transform var(--motion-exit) var(--motion-ease);
 }
@@ -2583,22 +2578,6 @@
 .appicon.sel .appicon-label {
   color: var(--text);
   font-weight: 600;
-}
-.appicon-tile--default {
-  background: var(--appicon-default-tile);
-  color: var(--appicon-default-ink);
-}
-.appicon-tile--paper {
-  background: var(--appicon-paper-tile);
-  color: var(--appicon-paper-ink);
-}
-.appicon-tile--charcoal {
-  background: var(--appicon-charcoal-tile);
-  color: var(--appicon-charcoal-ink);
-}
-.appicon-tile--clay {
-  background: var(--appicon-clay-tile);
-  color: var(--appicon-clay-ink);
 }
 
 .swtext {
@@ -2681,7 +2660,6 @@
   width: auto;
   margin: 18px 0 6px;
 }
-/* buttons side by side keep a gap */
 .ghostbtn + .ghostbtn {
   margin-left: 8px;
 }
@@ -3055,6 +3033,13 @@
 [data-reading="true"] .cm-content,
 [data-reading="true"] .cm-content * {
   pointer-events: none;
+}
+/* …and the page gets room above it: focus mode took the titlebar, tabs, and
+   header, so the note would otherwise start flush at the window's top edge
+   (the owner, 2026-10-16). Scales with the window's height so a short window
+   keeps its lines. */
+[data-reading="true"] .rotli-cm-host .cm-content {
+  padding-top: clamp(28px, 9vh, 88px);
 }
 [data-reading="true"] .cm-gutters,
 [data-reading="true"] .editor-scroll-top {

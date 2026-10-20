@@ -25,6 +25,7 @@ import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { nextThemeNow } from "./appearanceLook";
+import type { ChatKey, ChatMap } from "./chatMapKeys";
 import type { Measure } from "./noteStyle";
 import type { OnboardingPhase } from "./onboardingPhase";
 import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
@@ -58,7 +59,7 @@ export { SOLID_THEMES, THEME_FAMILY_PRESENTATIONS } from "./themeChoices";
  * brand-new captures · Organize (default) = applies everything, journaled. */
 export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
 /** The macOS Dock/app icon variants (Settings → Appearance → App icon). */
-export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
+export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay" | "black";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
@@ -121,24 +122,15 @@ export const CHAT_ARTIFACT_OPENS: readonly ChatArtifactOpen[] = ["sidecar", "spl
 export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ChatServiceTier = "standard" | "fast";
 
-/** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
- * saved chat, or a TAB-scoped session key while the chat is still unsaved
- * (never a shared "" key — that leaked one chat's choice into every future
- * fresh chat, #7). VAULT-scoped since 2026-08-03: a bare slug collided across
- * brains sharing one corpus settings.json, so two vaults' same-named chats
- * shared one model pick / globe / measure. */
-export function chatKey(instanceId: string | null, slug: string | null, tabId: string): string {
-  if (!slug) return `unsaved:${tabId}`;
-  return instanceId ? `${instanceId}:${slug}` : slug;
-}
+export { chatKey, type ChatKey } from "./chatMapKeys";
 
 /** Move a renamed chat's entries in every per-chat map to its new key — a
  * rename used to orphan the model pick, globe, and measure under the old slug
  * until the GC deleted them (audit 2026-08-03). */
-export function retargetChatMapKeys(oldKey: string, newKey: string): void {
+export function retargetChatMapKeys(oldKey: ChatKey, newKey: ChatKey): void {
   if (oldKey === newKey) return;
   const s = useUiStore.getState();
-  const move = <T>(m: Record<string, T>): Record<string, T> | null => {
+  const move = <T>(m: ChatMap<T>): ChatMap<T> | null => {
     if (!(oldKey in m)) return null;
     const next = { ...m };
     if (!(newKey in next)) next[newKey] = next[oldKey] as T;
@@ -162,7 +154,7 @@ export function retargetChatMapKeys(oldKey: string, newKey: string): void {
 /** Which model a chat runs on: its own pick, else the new-chat seed. Pure
  * (exported for tests) — a chat that has never been pinned inherits, a chat
  * that has been pinned is immune to picks made in other panes. */
-export function chatModelFor(map: Record<string, string>, key: string, seed: string | null): string | null {
+export function chatModelFor(map: ChatMap<string>, key: ChatKey, seed: string | null): string | null {
   return map[key] ?? seed;
 }
 
@@ -552,30 +544,28 @@ interface UiState {
    * `chatModelId` seed; the chat surface pins its own entry as soon as the
    * model catalog settles, so a pick in one pane can never move another pane's
    * chat. Persisted (unsaved keys excluded, like every per-chat map). */
-  chatModel: Record<string, string>;
-  setChatModel: (key: string, id: string) => void;
-  clearChatModel: (key: string) => void;
+  chatModel: ChatMap<string>;
+  setChatModel: (key: ChatKey, id: string) => void;
+  clearChatModel: (key: ChatKey) => void;
   /** Optional provider-native quality controls. Rust independently validates
    * these values before constructing process argv. */
-  chatReasoning: Record<string, ChatReasoningEffort>;
-  setChatReasoning: (key: string, value: ChatReasoningEffort | null) => void;
-  chatServiceTier: Record<string, ChatServiceTier>;
-  setChatServiceTier: (key: string, value: ChatServiceTier | null) => void;
-  /** Per-chat web-search toggle (the composer globe), keyed by chat slug. Off by
-   * default; only an enabled chat may use the web_search/web_fetch tools. Persisted —
-   * except the session-scoped "unsaved:<tabId>" keys: a not-yet-saved chat's choice
-   * lives under its TAB (never a shared "" key that would leak web-ON into every
-   * future fresh chat — #7, audit 2026-07) and is carried to the slug on bind. */
-  chatWeb: Record<string, boolean>;
-  setChatWeb: (slug: string, on: boolean) => void;
+  chatReasoning: ChatMap<ChatReasoningEffort>;
+  setChatReasoning: (key: ChatKey, value: ChatReasoningEffort | null) => void;
+  chatServiceTier: ChatMap<ChatServiceTier>;
+  setChatServiceTier: (key: ChatKey, value: ChatServiceTier | null) => void;
+  /** Per-chat web-search toggle (the composer globe), keyed by ChatKey. Off by
+   * default; only an enabled chat may use the web_search/web_fetch tools. Persisted
+   * except unsaved keys; an unsaved chat's choice is carried to the slug on bind. */
+  chatWeb: ChatMap<boolean>;
+  setChatWeb: (key: ChatKey, on: boolean) => void;
   /** Drop one chatWeb key — the unsaved-tab key after bind carries it to the slug. */
-  clearChatWeb: (key: string) => void;
+  clearChatWeb: (key: ChatKey) => void;
   /** Per-chat measure (Narrow/Comfort/Wide — the notes Aa vocabulary), keyed
    * exactly like chatWeb (slug, or "unsaved:<tabId>" until the first send
    * binds it). Missing key = comfort. Persisted (unsaved keys excluded). */
-  chatMeasure: Record<string, Measure>;
-  setChatMeasure: (key: string, m: Measure) => void;
-  clearChatMeasure: (key: string) => void;
+  chatMeasure: ChatMap<Measure>;
+  setChatMeasure: (key: ChatKey, m: Measure) => void;
+  clearChatMeasure: (key: ChatKey) => void;
   /** Where a chat's attached note opens from the header toggle: a new tab in
    * this pane, or a right split beside the chat. Persisted. */
   chatNoteOpen: "tab" | "split";
@@ -993,7 +983,7 @@ export const useUiStore = create<UiState>((set, get) => ({
       return { chatServiceTier: next };
     }),
   chatWeb: {},
-  setChatWeb: (slug, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [slug]: on } })),
+  setChatWeb: (key, on) => set((s) => ({ chatWeb: { ...s.chatWeb, [key]: on } })),
   clearChatWeb: (key) =>
     set((s) => {
       if (!(key in s.chatWeb)) return s;

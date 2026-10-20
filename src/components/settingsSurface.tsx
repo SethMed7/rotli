@@ -38,6 +38,11 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
+import appIconBlack from "../assets/appIcons/black.png";
+import appIconCharcoal from "../assets/appIcons/charcoal.png";
+import appIconClay from "../assets/appIcons/clay.png";
+import appIconDefault from "../assets/appIcons/default.png";
+import appIconPaper from "../assets/appIcons/paper.png";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -217,10 +222,6 @@ function PaneHead({ title, char, motif }: { title: string; char: CharacterName; 
   return <SettingsBanner title={title} pose={char} motif={motif} />;
 }
 
-// ——— shared settings controls (the maintainer, 2026-06-15) ———
-
-// ——— Hotkeys: every registry action, grouped by area + searchable ———
-
 /** Sections derive from the action id prefix ("tabs.new" → Tabs) — no
  * per-action bookkeeping, new actions land in the right group automatically. */
 const HK_SECTIONS: { prefix: string; label: string }[] = [
@@ -390,8 +391,6 @@ function HotkeysPane() {
     </>
   );
 }
-
-// ——— General: visitor vs resident, dock visibility (the maintainer, 2026-06-12) ———
 
 // ——— Updates: the current version + an explicit manual check, plus the
 // one-click "Install & relaunch" when the signed feed offers a newer build.
@@ -921,8 +920,6 @@ function GeneralPane() {
   );
 }
 
-// ——— Appearance: four intentional working environments. ———
-
 type PreviewEnvironment =
   | "warm-light"
   | "warm-dark"
@@ -998,13 +995,14 @@ function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
   );
 }
 
-/** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
- * the shipped icon; colors live in themes.css (the appicon-tile-- classes). */
-const APP_ICONS: { id: AppIcon; label: string }[] = [
-  { id: "default", label: "Default" },
-  { id: "paper", label: "Paper" },
-  { id: "charcoal", label: "Charcoal" },
-  { id: "clay", label: "Clay" },
+/** Dock/app icon options. Each thumbnail is the real Dock artwork, cut by
+ * scripts/build-app-icons.mjs from the same render as the native variant. */
+const APP_ICONS: { id: AppIcon; label: string; src: string }[] = [
+  { id: "default", label: "Default", src: appIconDefault },
+  { id: "paper", label: "Paper", src: appIconPaper },
+  { id: "charcoal", label: "Charcoal", src: appIconCharcoal },
+  { id: "clay", label: "Clay", src: appIconClay },
+  { id: "black", label: "Black", src: appIconBlack },
 ];
 
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
@@ -1263,7 +1261,7 @@ function AppearancePane() {
         Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
       </p>
       <div className="appicon-row" role="radiogroup" aria-label="App icon">
-        {APP_ICONS.map(({ id, label }) => (
+        {APP_ICONS.map(({ id, label, src }) => (
           <button
             type="button"
             key={id}
@@ -1274,9 +1272,7 @@ function AppearancePane() {
               void setAppIcon(id);
             }}
           >
-            <span className={`appicon-tile appicon-tile--${id}`}>
-              <QuokkaMark size={26} />
-            </span>
+            <img className="appicon-tile" src={src} alt="" draggable={false} />
             <span className="appicon-label">{label}</span>
           </button>
         ))}
@@ -1841,8 +1837,6 @@ function DesktopBrainPane() {
     </>
   );
 }
-
-// ——— AI Models (the maintainer, 2026-07-02): connected subscription lanes + hybrid presets ———
 
 /** MB → a human size (the catalog's approx, and the live download total). */
 function formatSize(mb: number): string {

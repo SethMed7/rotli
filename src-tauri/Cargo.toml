@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "1.9.0"
+version = "1.9.1"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
@@ -104,5 +104,21 @@ opt-level = 1
 
 [profile.release]
 codegen-units = 1
-lto = "thin"
+# Size first (2026-10-19, measured on 1.9.0): "s" + full LTO makes the Rust
+# code 4.9 MB smaller (20.6 → 15.7 MB) than 3 + thin LTO. The hot paths below
+# keep full speed: search (tantivy) and PDF text extraction.
+opt-level = "s"
+lto = "fat"
 strip = "symbols"
+
+[profile.release.package]
+tantivy = { opt-level = 3 }
+tantivy-bitpacker = { opt-level = 3 }
+tantivy-columnar = { opt-level = 3 }
+tantivy-common = { opt-level = 3 }
+tantivy-fst = { opt-level = 3 }
+tantivy-sstable = { opt-level = 3 }
+tantivy-stacker = { opt-level = 3 }
+pdf-extract = { opt-level = 3 }
+lopdf = { opt-level = 3 }
+regex-automata = { opt-level = 3 }

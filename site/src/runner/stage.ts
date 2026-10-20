@@ -131,8 +131,6 @@ export function mountRunner(stage: HTMLElement) {
     draw(performance.now());
   }
 
-  // ——— Drawing ———
-
   // The sand line, in world units from the top; the sea and the dunes sit just above it, and
   // the rest of the stage is sky (room for a jump and for what flies over).
   const groundY = () => WORLD.height - 48;
@@ -471,8 +469,6 @@ export function mountRunner(stage: HTMLElement) {
       ctx.globalAlpha = 1;
     }
   }
-
-  // ——— The run ———
 
   function showScore() {
     const score = metres(game.distance);

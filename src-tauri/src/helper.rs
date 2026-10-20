@@ -168,8 +168,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
     serve(listener, Arc::new(Helper { port, origins, token, children, in_flight, vault }))
 }
 
-// ── the service ───────────────────────────────────────────────────────────────
-
 fn serve(listener: TcpListener, helper: Arc<Helper>) -> Result<(), String> {
     let live = Arc::new(AtomicUsize::new(0));
     for stream in listener.incoming() {

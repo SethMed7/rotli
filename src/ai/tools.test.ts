@@ -44,7 +44,6 @@ describe("statusFor — enriched, safe live labels", () => {
     const label = statusFor("search_notes", { query: nasty });
     expect(label).not.toContain("\n");
     expect(label).not.toContain("\t");
-    // clipped well under the raw length, and ellipsised
     expect(label.length).toBeLessThan(80);
     expect(label).toContain("…");
   });

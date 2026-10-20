@@ -135,6 +135,7 @@ impl CorpusStore {
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
         fs::rename(&abs, &target_abs).map_err(|e| format!("move {rel} to {sink}: {e}"))?;
+        self.follow_moves(&[(rel.to_string(), target_rel.clone())])?;
         Ok(target_rel)
     }
 
@@ -174,6 +175,7 @@ impl CorpusStore {
         self.suppress.mark(&source_abs);
         self.suppress.mark(&target_abs);
         fs::rename(&source_abs, &target_abs).map_err(|e| format!("restore {rel}: {e}"))?;
+        self.follow_moves(&[(rel.to_string(), target_rel.clone())])?;
         Ok(target_rel)
     }
 
