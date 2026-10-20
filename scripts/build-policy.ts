@@ -46,6 +46,18 @@ export function buildWarningViolation(warning: BuildWarning): string | null {
   return `${code}${id}${message}`;
 }
 
+export const WITHHELD_VOICE_STUB_ID = "\0rotli-withheld-voice";
+export const WITHHELD_VOICE_STUB_SOURCE =
+  'export const KokoroTTS = { from_pretrained() { throw new Error("Read aloud is not in this build"); } };\n';
+
+/** Read-aloud is a development-build capability (featurePolicy `voice`), and
+ * a build without it never loads a voice. So `kokoro-js`, and the ONNX
+ * runtime it brings (~4 MB in the Mac app, 2026-10-19), is left out of it: a
+ * stub stands in, and throws if anything ever calls it. */
+export function shouldWithholdVoice(source: unknown, voiceInBuild: boolean): boolean {
+  return !voiceInBuild && source === "kokoro-js";
+}
+
 export const LAZY_LOCALE_STUB_ID = "\0rotli-lazy-locale-stub";
 export const LAZY_LOCALE_STUB_SOURCE = "export default {};\n";
 

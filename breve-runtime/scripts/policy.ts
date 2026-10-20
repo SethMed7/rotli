@@ -35,7 +35,6 @@ export function policyFor(model: string): Verdict {
 /** Image generation is always allowed direct (incl. Codex) — the maintainer's rule (policy.json). */
 export const imageAlwaysDirect: boolean = POLICY.imageAlwaysDirect ?? true;
 
-// CLI check
 if (import.meta.main) {
   for (const m of [LLM.model, "haiku", "gemini", "sonnet", "opus", "claude-fable-5", "codex", "qwen"]) {
     const v = policyFor(m);

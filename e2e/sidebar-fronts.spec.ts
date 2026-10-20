@@ -37,7 +37,6 @@ test("the switcher hands the whole sidebar body to one front at a time", async (
   // …but the utility footer is app-level and stays under both fronts
   await expect(page.locator(".sb-foot")).toBeVisible();
 
-  // and back
   await homeSeg(page).click();
   await expect(page.locator(".sb-notes-tree")).toBeVisible();
   await expect(page.locator(".sb-system")).toBeVisible();

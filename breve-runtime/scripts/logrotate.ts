@@ -32,7 +32,6 @@ export async function rotate(opts?: { maxLogMB?: number; keepDays?: number }): P
     } catch (e) { did.push(`skip ${f}: ${(e as Error).message}`); }
   }
 
-  // Prune stale transcripts + queued items by mtime.
   for (const sub of ["transcripts", "queue"]) {
     const dir = join(BREVE, "signal", sub);
     let files: string[] = [];

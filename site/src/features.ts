@@ -194,7 +194,6 @@ const ICON = {
 } as const;
 
 const FEATURES: Feature[] = [
-  // ─── Writing ──────────────────────────────────────────────────────────
   {
     id: 'markdown',
     area: 'writing',
@@ -491,7 +490,6 @@ const FEATURES: Feature[] = [
     roadmap: 'read-aloud',
   },
 
-  // ─── Organizing ───────────────────────────────────────────────────────
   {
     id: 'librarian',
     area: 'organizing',
@@ -591,7 +589,6 @@ const FEATURES: Feature[] = [
     keywords: 'graph links map network canvas json canvas obsidian cards',
   },
 
-  // ─── AI and chat ──────────────────────────────────────────────────────
   {
     id: 'chat',
     area: 'ai',
@@ -730,7 +727,6 @@ const FEATURES: Feature[] = [
     roadmap: 'breve-public',
   },
 
-  // ─── Files ────────────────────────────────────────────────────────────
   {
     id: 'docs',
     area: 'files',
@@ -797,7 +793,6 @@ const FEATURES: Feature[] = [
     keywords: 'excalidraw whiteboard canvas sketch drawing images assets attachments screenshot',
   },
 
-  // ─── Privacy and control ──────────────────────────────────────────────
   {
     id: 'your-folder',
     area: 'privacy',
@@ -880,7 +875,6 @@ const FEATURES: Feature[] = [
     keywords: 'private secret remote ai lock permission edit protect',
   },
 
-  // ─── Rotli Web and agents ─────────────────────────────────────────────
   {
     id: 'rotli-web',
     area: 'web',
