@@ -111,8 +111,6 @@ describe("deriveJournal — last line per id wins", () => {
   });
 });
 
-// ─── the transition grammar (approve / dismiss / undo) ──────────────────────
-
 interface Calls {
   appended: BrainAction[];
   fileNote: [string, string, { journal?: boolean } | undefined][];

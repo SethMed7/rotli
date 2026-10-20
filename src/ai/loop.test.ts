@@ -24,8 +24,6 @@ import {
 } from "./tools";
 import type { AgentEvent, ChatTurn, CompleteReq, Host, RunInput, ToolName } from "./types";
 
-// ── fixtures ──────────────────────────────────────────────────────────────────
-
 function note(p: Partial<CorpusNoteMeta> & { id: string; title: string }): CorpusNoteMeta {
   return { snippet: "", folderId: "", createdAt: 0, updatedAt: 0, pinned: false, ...p };
 }
@@ -119,8 +117,6 @@ const ALL: ReadonlySet<ToolName> = new Set<ToolName>([
   "web_fetch",
 ]);
 
-// ── parser ────────────────────────────────────────────────────────────────────
-
 describe("parse", () => {
   test("extracts a balanced object from prose + fences", () => {
     expect(extractJsonObject('```json\n{"final":"hi"}\n```')).toBe('{"final":"hi"}');
@@ -175,8 +171,6 @@ describe("parse", () => {
     expect(parseAction('{"tool":"web_search","args":{"query":"x"}}', notesOnly).kind).toBe("invalid");
   });
 });
-
-// ── retrieval ─────────────────────────────────────────────────────────────────
 
 describe("retrieval", () => {
   test("rankNotes scores title > folder > snippet and skips boards/files", () => {
@@ -371,7 +365,6 @@ describe("budget", () => {
     // the latest turn ALWAYS survives, even oversized
     const tiny = trimHistory(history, 10);
     expect(tiny[tiny.length - 1]?.text[0]).toBe("C");
-    // under the cap → untouched, no marker
     expect(trimHistory(history, 50_000)).toEqual(history);
     expect(trimHistory([], 1000)).toEqual([]);
   });
@@ -489,8 +482,6 @@ describe("web evidence packaging", () => {
   });
 });
 
-// ── guard ─────────────────────────────────────────────────────────────────────
-
 describe("guard", () => {
   test("flags secrets, ignores ordinary text", () => {
     expect(looksSecret("my key sk-ant-api03-EXAMPLE0EXAMPLE0EXAM")).toBe(true);
@@ -539,8 +530,6 @@ describe("guard", () => {
     expect(containsPrivateDataOverlap("research team", [source])).toBe(false);
   });
 });
-
-// ── the loop ──────────────────────────────────────────────────────────────────
 
 describe("runAgent", () => {
   test("emits Rotli's structured format question before calling a model", async () => {

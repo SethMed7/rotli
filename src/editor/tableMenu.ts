@@ -1,7 +1,6 @@
 // The table widget's row/column mini menu and its edit dispatch: a
 // module-level singleton (like the drop line) hosted as imperative DOM — the
 // widget lives inside CodeMirror, so there is no React root to mount into.
-// Split out of tableRender.ts on 2026-09-03 (the widget's size is a ratchet).
 
 import type { EditorView } from "@codemirror/view";
 
@@ -123,14 +122,11 @@ export function openTableMenu(
   document.body.appendChild(menu);
   backdropEl = backdrop;
   menuEl = menu;
-  // place beside the chip, clamped to the viewport
   const mw = menu.offsetWidth;
   const mh = menu.offsetHeight;
   menu.style.left = `${Math.min(anchor.right + 4, window.innerWidth - mw - 8)}px`;
   menu.style.top = `${Math.max(8, Math.min(anchor.top, window.innerHeight - mh - 8))}px`;
 }
-
-// ─── the widget ──────────────────────────────────────────────────────────────
 
 // menu glyphs (2026-07-31, the maintainer: "use standard icons — instantly understood").
 // The Docs-style horizontal-lines family for alignment, arrow+lines for the

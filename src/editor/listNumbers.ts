@@ -63,7 +63,6 @@ export function renumberRunAt(doc: Text, lineNumber: number): NumberChange[] {
   const line = doc.line(lineNumber);
   const here = orderedLineOf(line.text, line.from);
   if (!here) return [];
-  // walk up to the run's first item
   let first = lineNumber;
   for (let n = lineNumber - 1; n >= 1; n--) {
     const l = doc.line(n);
@@ -136,7 +135,6 @@ export function renumberLines(doc: Text, fromLine: number, toLine: number): Numb
     if (seen.has(key * 1_000_000 + n)) continue;
     const run = renumberRunAt(doc, n);
     for (const c of run) changes.push(c);
-    // mark every same-indent line of this run as visited
     for (let m = n; m <= hi; m++) {
       const t = doc.line(m);
       const it = orderedLineOf(t.text, t.from);
