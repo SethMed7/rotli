@@ -9,7 +9,7 @@
 import { join, resolve, sep } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, readdirSync } from "node:fs";
-import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES } from "./paths";
+import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES, ensureBreveStorage } from "./paths";
 import { knowledgePath, knowledgePathFor, inboxPathFor, assetsPathFor, readMemexRegistry, accessMode, memexInfo, DEFAULT_USER, type MemexRegistry } from "./config";
 import { LLM, localGenerate, warmup } from "./llm";
 import { rootsForPartition, type SandboxRoots } from "./sandbox";
@@ -30,6 +30,8 @@ import type {
   PendingAction, PendingVoice, PendingEmail, PendingSuggestion, TravelClassification,
   UnreadReport, MailSearchReport,
 } from "./wire-types";
+
+ensureBreveStorage();
 
 // The owner's time context (home tz + travel mode) — cached, refreshed every 5 min.
 let CFG: Settings = await loadSettings();

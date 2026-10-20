@@ -17,7 +17,6 @@ import { BREVE_HOME, CONFIG_PATH } from "./config-path";
  * fallback keeps direct developer/test runs working. */
 export const BREVE = BREVE_HOME;
 export const BRIEFS = join(BREVE, "briefs");
-/** Rotli's routine config — see config-path.ts (side-effect-free home). */
 export { CONFIG_PATH };
 
 const STORE = storagePath();
@@ -30,4 +29,8 @@ export const TOPICS = join(STORE, "breveTopics"); // audio/HTML topic deep-dives
 // boundary; every destination is verified to resolve under here before any byte is written.
 export const CAPTURES = join(STORE, "breveCaptures");
 
-for (const d of [TOPICS, AUDIOS, PDFS, VIEWS, CAPTURES]) mkdirSync(d, { recursive: true });
+/** Create the storage lanes. Each script that reads or writes one calls this
+ * before its first use, so importing a path never scaffolds a vault. */
+export function ensureBreveStorage(): void {
+  for (const d of [TOPICS, AUDIOS, PDFS, VIEWS, CAPTURES]) mkdirSync(d, { recursive: true });
+}

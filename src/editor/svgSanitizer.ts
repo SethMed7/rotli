@@ -104,10 +104,17 @@ export function svgAttributeAllowed(name: string, value: string, namespace: stri
   if (/^on/i.test(name) || name === "style" || name === "href" || name === "src") return false;
   if (name === "fill" || name === "stroke") return SAFE_PAINT.test(value.trim());
   if (LOCAL_REFERENCE_ATTRIBUTES.has(name)) return LOCAL_REFERENCE.test(value.trim());
-  // The control characters ARE the subject here: an untrusted SVG attribute
-  // carrying them is rejected outright.
-  // oxlint-disable-next-line no-control-regex
-  return PLAIN_ATTRIBUTES.has(name) && !/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value);
+  return PLAIN_ATTRIBUTES.has(name) && !hasForbiddenControlChar(value);
+}
+
+/** True when an untrusted attribute value carries a C0 control other than tab,
+ * line feed, or carriage return — such a value is rejected outright. */
+export function hasForbiddenControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) return true;
+  }
+  return false;
 }
 
 /** Parse untrusted XML and rebuild a fresh SVG tree from a strict element and

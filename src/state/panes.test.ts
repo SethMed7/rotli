@@ -13,6 +13,7 @@ import {
   clampSplitSizes,
   fileTabOpen,
   findLeaf,
+  isPreviewTab,
   leaves,
   openNavTarget,
   sidebarItemId,
@@ -764,7 +765,7 @@ describe("preview tabs", () => {
     usePanesStore.getState().openNote("n-C"); // replaces it in place
     const pane = findLeaf(usePanesStore.getState().root, "p1");
     expect(pane?.tabs).toHaveLength(2);
-    const previews = pane?.tabs.filter((t) => t.preview) ?? [];
+    const previews = pane?.tabs.filter(isPreviewTab) ?? [];
     expect(previews).toHaveLength(1);
     expect(previews[0]?.surfaceKind === "note" && previews[0].noteId).toBe("n-C");
   });
@@ -773,7 +774,7 @@ describe("preview tabs", () => {
     usePanesStore.getState().openNote("n-B");
     usePanesStore.getState().openNote("n-B"); // click it again → permanent
     const pane = findLeaf(usePanesStore.getState().root, "p1");
-    expect(pane?.tabs.some((t) => t.preview)).toBe(false);
+    expect(pane?.tabs.some(isPreviewTab)).toBe(false);
     usePanesStore.getState().openNote("n-C"); // next browse gets a NEW preview
     expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs).toHaveLength(3);
   });
@@ -782,7 +783,7 @@ describe("preview tabs", () => {
     usePanesStore.getState().openNote("n-B");
     keepTabsFor("n-B");
     const pane = findLeaf(usePanesStore.getState().root, "p1");
-    expect(pane?.tabs.some((t) => t.preview)).toBe(false);
+    expect(pane?.tabs.some(isPreviewTab)).toBe(false);
   });
 
   test("⌘T / ⌘-click appends a permanent tab and leaves the preview alone", () => {
@@ -790,7 +791,7 @@ describe("preview tabs", () => {
     usePanesStore.getState().openNote("n-C", { newTab: true });
     const pane = findLeaf(usePanesStore.getState().root, "p1");
     expect(pane?.tabs).toHaveLength(3);
-    expect(pane?.tabs.filter((t) => t.preview)).toHaveLength(1); // n-B stays preview
+    expect(pane?.tabs.filter(isPreviewTab)).toHaveLength(1); // n-B stays preview
   });
 
   test("boards and files browse through the same preview slot as notes", () => {
@@ -799,8 +800,16 @@ describe("preview tabs", () => {
     usePanesStore.getState().openFile("storage/ref.pdf");
     const pane = findLeaf(usePanesStore.getState().root, "p1");
     expect(pane?.tabs).toHaveLength(2); // A + the one preview slot
-    const preview = pane?.tabs.find((t) => t.preview);
+    const preview = pane?.tabs.find(isPreviewTab);
     expect(preview?.surfaceKind).toBe("file");
+  });
+
+  test("chat and activity always open as kept tabs", () => {
+    usePanesStore.getState().openChat("c-1");
+    usePanesStore.getState().openActivity();
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.map((t) => t.surfaceKind)).toEqual(["note", "chat", "activity"]);
+    expect(pane?.tabs.some(isPreviewTab)).toBe(false);
   });
 });
 

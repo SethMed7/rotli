@@ -56,7 +56,7 @@ import { useTabMedia } from "../state/ambient";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useIsHidden } from "../state/hidden";
 import { useMainStore } from "../state/main";
-import { activeTabOf, usePanesStore } from "../state/panes";
+import { activeTabOf, isPreviewTab, usePanesStore } from "../state/panes";
 import { isOpenedFileId } from "../state/paneVaults";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
@@ -312,7 +312,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   title={label}
                   aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
-                    tab.preview ? " preview" : ""
+                    isPreviewTab(tab) ? " preview" : ""
                   }${dragging ? " dragging" : ""}`}
                   onClick={() => activateTab(pane.id, tab.id)}
                   onContextMenu={(event) => openTabMenu(event, tab)}

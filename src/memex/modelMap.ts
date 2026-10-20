@@ -39,16 +39,33 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
   return a.title.localeCompare(b.title);
 }
 
-function dataField(value: string, cap = MAX_MAP_FIELD_CHARS): string {
+/** C0/C1 controls, line/paragraph separators, and bidi embeddings/overrides/
+ * isolates: none of them may reach model-facing text. */
+export function isModelUnsafeCodeUnit(code: number): boolean {
   return (
-    value
-      .normalize("NFKC")
-      // The control characters ARE the subject here: C0/C1 and bidi overrides
-      // are scrubbed out of model-facing text.
-      // oxlint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g, "�")
-      .slice(0, cap)
+    code <= 0x1f ||
+    (code >= 0x7f && code <= 0x9f) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069)
   );
+}
+
+/** Each model-unsafe UTF-16 code unit becomes U+FFFD; everything else is kept. */
+export function scrubModelUnsafe(text: string): string {
+  let out = "";
+  let kept = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (!isModelUnsafeCodeUnit(text.charCodeAt(i))) continue;
+    out += `${text.slice(kept, i)}\ufffd`;
+    kept = i + 1;
+  }
+  return kept === 0 ? text : out + text.slice(kept);
+}
+
+function dataField(value: string, cap = MAX_MAP_FIELD_CHARS): string {
+  return scrubModelUnsafe(value.normalize("NFKC")).slice(0, cap);
 }
 
 function structuredJson(value: unknown): string {

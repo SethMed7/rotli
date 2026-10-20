@@ -16,9 +16,11 @@ import { join } from "node:path";
 
 import { LLM } from "./llm";
 import { stripMarkdown } from "./markdown-text";
-import { BRIEFS, AUDIOS } from "./paths";
+import { BRIEFS, AUDIOS, ensureBreveStorage } from "./paths";
 import { renderMp3, parseSegments } from "./tts";
 import type { GenerateResponse } from "./wire-types";
+
+ensureBreveStorage();
 
 // 1. Resolve issue
 const stemArg = process.argv[2];
