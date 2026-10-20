@@ -59,8 +59,6 @@ function loadCases(path: string): SweepCase[] {
   return raw as SweepCase[];
 }
 
-// ── the CLI-backed read-only Host ─────────────────────────────────────────────
-
 async function cliJson(cli: string, args: string[]): Promise<unknown> {
   const proc = Bun.spawn([cli, ...args], { stdout: "pipe", stderr: "pipe" });
   const [out, err, code] = await Promise.all([
@@ -198,8 +196,6 @@ function makeCliHost(
   };
 }
 
-// ── scoring ───────────────────────────────────────────────────────────────────
-
 type Verdict = "correct" | "partial" | "wrong" | "leak";
 
 function scoreCase(c: SweepCase, final: string): { verdict: Verdict; detail: string } {
@@ -216,8 +212,6 @@ function scoreCase(c: SweepCase, final: string): { verdict: Verdict; detail: str
     detail: `${matched.length}/${c.expect.length} groups (need ${required}): [${matched.map((g) => g[0]).join(", ")}]`,
   };
 }
-
-// ── runner ────────────────────────────────────────────────────────────────────
 
 interface CaseResult {
   name: string;
