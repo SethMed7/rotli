@@ -24,7 +24,8 @@
     "ffmpeg",
     "ffprobe",
     "osascript",
-    "cwebp"
+    "cwebp",
+    "iconutil"
   ],
   "ignoreExportsUsedInFile": true
 }

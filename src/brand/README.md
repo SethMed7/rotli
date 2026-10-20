@@ -17,6 +17,12 @@ wordmark/tile family are intentionally absent from this live kit.
   fills are inset under their selected black-or-white ink so original raster
   color cannot fringe the character.
 
+The macOS app icon family (the bundle `icon.icns`, the Dock variants in
+`src-tauri/icons/variants/`, and the Settings thumbnails in
+`../assets/appIcons/`) is generated from `_logo.svg` by
+`bun scripts/build-app-icons.mjs`, which owns the tile palettes and Apple's
+824-on-1024 grid. Regenerate; never edit those PNGs by hand.
+
 The chat buddy may use Line, Cocoa, Fern, Ocean, Iris, Berry, Amber, or a custom
 hue for its body, plus black or white ink. Glasses, a bucket hat, and goggles
 are optional and carry their own custom hue. The buddy is always part of Chat
