@@ -611,6 +611,8 @@ documents, both on Univer, are Beta.
   a partial source selection remains an escape hatch for editing the Markdown
   link. Click, double-click, and arrow-key navigation into a rendered standalone
   or list image select and outline it as an object instead of exposing source.
+  Double-clicking a missing-file label follows the same object-selection rule;
+  native word selection on its label must not reveal the Markdown source.
 - Beautified tables stay visually tabular during ordinary editing. Clicking or
   keyboard-entering a cell opens one inline cell editor; surrounding cells keep
   rendering, the current column widths and row height remain stable, long cell

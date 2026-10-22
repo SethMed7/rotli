@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Missing images stay selected.** Double-clicking a missing-image label
+  selects its image object without intermittently revealing Markdown source.
+
 - **Cleaner office and pane resizing.** Opening a document after a workbook
   no longer triggers a cross-engine service error. Resizing split panes
   applies their size limits outside observer delivery, avoiding a browser
