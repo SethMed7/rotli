@@ -144,7 +144,7 @@ Timing measurements are descriptive, not wall-clock assertions in CI.
 whole-document axe scans with synthetic vaults. They cover the note shell,
 Main, system views, search, the item chooser, settings, all fourteen theme
 environments, the development Graph, the Canvas creation refusal, and Web's
-live Excalidraw board. Serious and critical violations fail the lane; full
+live Excalidraw board. Moderate, serious and critical violations fail the lane; full
 JSON results are attached for review. Checks wait for fonts and finite
 animations to settle, without disabling rules or excluding components.
 Keyboard regressions cover tab navigation and modal focus containment.

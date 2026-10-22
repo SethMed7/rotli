@@ -415,6 +415,7 @@ function MainShell() {
       <PinPanel />
       <Titlebar />
       <main className="app-content">
+        <h1 className="sr-only">Rotli workspace</h1>
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·
             Recent all render inside NotesSurface's content area (contentView), so
             the three left-menu sections stay visible (the maintainer, 2026-06-26). Memory is

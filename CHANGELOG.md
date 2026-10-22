@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   work when opening and searching your folder. Switching between notes also
   keeps large Main lists more responsive on both platforms.
 
+- **A complete workspace outline for screen readers.** The workspace and
+  Settings have a top-level heading, and board controls no longer masquerade
+  as the page footer. Their visual layout stays the same.
+
 - **Clearer keyboard and screen-reader navigation.** Notes have a named editor;
   sidebar rows and tab controls expose valid roles and independent pin/close
   actions. Tabs support arrow, Home and End navigation. Naming and Web dialogs

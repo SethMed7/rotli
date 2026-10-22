@@ -6,7 +6,7 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 import { SOLID_THEMES } from "../src/state/themeChoices";
 
 /** Whole-document scans: never hide a component or disable a rule to get green.
- * Retain all results; the required gate covers serious and critical findings. */
+ * Retain all results; the required gate covers moderate, serious and critical findings. */
 export async function auditAccessibility(page: Page, info: TestInfo, surface: string): Promise<void> {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -21,7 +21,9 @@ export async function auditAccessibility(page: Page, info: TestInfo, surface: st
   const path = info.outputPath(`axe-${surface}.json`);
   await writeFile(path, JSON.stringify(results, null, 2));
   await info.attach(`axe-${surface}`, { path, contentType: "application/json" });
-  const actionable = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  const actionable = results.violations.filter(
+    (v) => v.impact === "moderate" || v.impact === "serious" || v.impact === "critical",
+  );
   expect
     .soft(
       actionable.map((v) => ({
@@ -29,7 +31,7 @@ export async function auditAccessibility(page: Page, info: TestInfo, surface: st
         impact: v.impact,
         nodes: v.nodes.map((node) => ({ target: node.target, summary: node.failureSummary })),
       })),
-      `axe serious/critical violations on ${surface}`,
+      `axe moderate/serious/critical violations on ${surface}`,
     )
     .toEqual([]);
 }

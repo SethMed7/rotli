@@ -3,13 +3,13 @@ import { expect, test } from "@playwright/test";
 import { auditAccessibility, auditSettings, auditThemes, auditWorkspace } from "../accessibility";
 import { startWithVault } from "./support";
 
-test("web primary workspace surfaces have no serious or critical axe violations", async ({ page }, info) => {
+test("web primary workspace surfaces have no moderate or higher axe violations", async ({ page }, info) => {
   test.slow();
   await startWithVault(page);
   await auditWorkspace(page, info);
 });
 
-test("web settings panes have no serious or critical axe violations", async ({ page }, info) => {
+test("web settings panes have no moderate or higher axe violations", async ({ page }, info) => {
   test.slow();
   await startWithVault(page);
   await auditSettings(page, info, "web");
@@ -21,7 +21,7 @@ test("web note shell is accessible in all fourteen environments", async ({ page 
   await auditThemes(page, info);
 });
 
-test("web Excalidraw creation dialog and board have no serious or critical axe violations", async ({
+test("web Excalidraw creation dialog and board have no moderate or higher axe violations", async ({
   page,
 }, info) => {
   test.slow();

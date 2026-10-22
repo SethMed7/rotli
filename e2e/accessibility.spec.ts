@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { auditAccessibility, auditSettings, auditThemes, auditWorkspace } from "./accessibility";
 import { gotoApp } from "./support";
 
-test("desktop primary workspace surfaces have no serious or critical axe violations", async ({
+test("desktop primary workspace surfaces have no moderate or higher axe violations", async ({
   page,
 }, info) => {
   test.slow();
@@ -11,13 +11,13 @@ test("desktop primary workspace surfaces have no serious or critical axe violati
   await auditWorkspace(page, info);
 });
 
-test("desktop settings panes have no serious or critical axe violations", async ({ page }, info) => {
+test("desktop settings panes have no moderate or higher axe violations", async ({ page }, info) => {
   test.slow();
   await gotoApp(page);
   await auditSettings(page, info, "desktop");
 });
 
-test("development Graph and canvas refusal have no serious or critical axe violations", async ({
+test("development Graph and canvas refusal have no moderate or higher axe violations", async ({
   page,
 }, info) => {
   test.slow();

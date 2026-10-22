@@ -3071,6 +3071,7 @@ export function SettingsSurface() {
 
   return (
     <div className="settings">
+      <h2 className="sr-only">Settings</h2>
       <nav className="set-nav" aria-label="Settings sections">
         <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
           <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">

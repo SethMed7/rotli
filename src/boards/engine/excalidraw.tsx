@@ -28,8 +28,8 @@ export type BoardChangeElements = Parameters<NonNullable<ExcalidrawProps["onChan
 export type BoardChangeAppState = Parameters<NonNullable<ExcalidrawProps["onChange"]>>[1];
 export type BoardChangeFiles = Parameters<NonNullable<ExcalidrawProps["onChange"]>>[2];
 
-/** Vendor controls omit the menu name and the visible zoom percentage from
- * their accessible names. Keep that repair at the engine boundary, including
+/** Vendor controls omit names and mark their footer as a page landmark.
+ * Keep those semantic repairs at the engine boundary, including
  * rerenders and zoom changes; no canvas interaction or vendor styling changes. */
 export function BoardCanvas(props: ExcalidrawProps) {
   const host = useRef<HTMLDivElement>(null);
@@ -40,6 +40,10 @@ export function BoardCanvas(props: ExcalidrawProps) {
       root.querySelectorAll<HTMLElement>(".main-menu-trigger").forEach((button) => {
         if (button.getAttribute("aria-label") !== "Board menu")
           button.setAttribute("aria-label", "Board menu");
+      });
+      root.querySelectorAll<HTMLElement>(".layer-ui__wrapper__footer").forEach((footer) => {
+        footer.setAttribute("role", "group");
+        footer.setAttribute("aria-label", "Board controls");
       });
       root.querySelectorAll<HTMLElement>(".reset-zoom-button").forEach((button) => {
         const label = `Reset zoom — ${button.textContent?.trim() ?? ""}`;
