@@ -54,8 +54,8 @@ test("every variant is wired into the native shell and the Settings picker", asy
   for (const id of VARIANTS.filter((v) => v !== "default")) {
     expect(native).toContain(`"${id}" => Some(include_bytes!("../icons/variants/${id}.png"))`);
   }
-  const settings = readFileSync(join(root, "src/components/settingsSurface.tsx"), "utf8");
+  const settings = readFileSync(join(root, "src/components/settings/appIconSettings.tsx"), "utf8");
   for (const id of ["default", "paper", "charcoal", "clay", "black"]) {
-    expect(settings).toContain(`../assets/appIcons/${id}.png`);
+    expect(settings).toContain(`../../assets/appIcons/${id}.png`);
   }
 });

@@ -208,6 +208,11 @@ capabilities as one-line Mac availability states on web, without Run now,
 hardware scanning, or model install/default/uninstall controls. Helper-supported
 connected CLI configuration stays available.
 
+Appearance keeps the **App icon** heading with **In the Mac app.** on web,
+without the Dock-only choice buttons or their images. The installed Mac app
+keeps all released icon choices and its saved selection; changing a browser
+preference cannot change the Mac's Dock icon.
+
 `/attach` uses a browser `image/*` file picker on web and the existing
 `importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
 land in the bound vault and Markdown receives only a portable `storage:` link;

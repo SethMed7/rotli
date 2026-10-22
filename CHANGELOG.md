@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pin to top works on Rotli Web.** Pinning a note now saves to your connected
   folder and survives a reload. Unpinning works too, without changing the
   note's words or dates.
+- **App icon choices explain where they work.** Rotli Web's Appearance settings
+  now say "In the Mac app" for the Dock icon, instead of offering choices that
+  do nothing there.
 
 ## [1.9.1] - 2026-10-20
 

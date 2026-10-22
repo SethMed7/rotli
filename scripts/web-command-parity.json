@@ -389,7 +389,6 @@
         "hide_quick_window",
         "quit_flush_done",
         "restart_after_flush",
-        "set_app_icon",
         "set_demo_mode",
         "set_dock_visible",
         "set_hide_on_blur",
@@ -579,6 +578,23 @@
         "breve_write_delivery_settings",
         "breve_write_pdf_palette",
         "breve_write_watchlist"
+      ]
+    },
+    {
+      "id": "dock-icon",
+      "status": "notice",
+      "reason": "Appearance labels App icon In the Mac app on web and omits the native Dock choices; desktop keeps every released choice and its saved selection.",
+      "sources": [
+        "src/components/settings/appIconSettings.tsx"
+      ],
+      "tests": [
+        "src/components/settings/appIconSettings.test.tsx",
+        "src/components/settingsSurface.test.tsx",
+        "e2e/appearance-look.spec.ts",
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "set_app_icon"
       ]
     }
   ]

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const policy = { ...(await import("../lib/featurePolicy")) };
 const react = { ...(await import("react")) };
-let selectedPane: "brain" | "models" | "location" = "brain";
+let selectedPane: "brain" | "models" | "location" | "appearance" = "brain";
 await mock.module("../lib/featurePolicy", () => ({
   ...policy,
   PLATFORM: "web",
@@ -52,4 +52,13 @@ test("web Location describes the connected browser folder", () => {
   const html = render();
   expect(html).toContain("folder you connected");
   expect(html).not.toContain("browser preview");
+});
+
+test("web Appearance explains Dock icon availability without offering inert choices", () => {
+  selectedPane = "appearance";
+  const html = render();
+  expect(html).toContain("App icon");
+  expect(html).toContain("In the Mac app.");
+  expect(html).not.toContain('aria-label="App icon"');
+  expect(html).not.toContain("Pick the Dock icon");
 });
