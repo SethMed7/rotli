@@ -316,7 +316,7 @@ function HotkeysPane() {
         <button
           type="button"
           className={recording ? "hkchord recording" : "hkchord"}
-          aria-label={`Rebind ${action.title}`}
+          aria-label={`Rebind ${action.title} — ${recording ? "press keys…" : chord ? formatChord(chord) : "—"}`}
           onClick={(event) => {
             // WebKit does not focus buttons on click — without this the
             // recorder never hears a key and the row sticks on "press keys…"

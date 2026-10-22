@@ -11,7 +11,7 @@ const welcomeFolder = (page: Page) =>
   page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
 const LESSON_ROW = /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/;
 const lessonRows = (page: Page) =>
-  page.locator(".main-tree button[data-main-id][data-note-id]", { hasText: LESSON_ROW });
+  page.locator(".main-tree [data-main-id][data-note-id]", { hasText: LESSON_ROW });
 const rawToggle = async (page: Page, mode: "Raw markdown" | "Beautified") => {
   await page.getByRole("button", { name: "Aa", exact: true }).click();
   await page.getByRole("dialog", { name: "Typography" }).getByRole("button", { name: mode }).click();

@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { DOCX_EDITABLE } from "../documents/kinds";
 import { PLATFORM } from "../lib/featurePolicy";
 import { isBetaFileExt } from "../newItems/model";
@@ -51,4 +53,45 @@ export function FileHeaderMarks({
     );
   }
   return null;
+}
+
+/** HTML view controls change rendering mode; they do not own tabpanels. */
+export function HtmlViewModes({
+  mode,
+  onChange,
+}: {
+  mode: "preview" | "code";
+  onChange: (mode: "preview" | "code") => void;
+}) {
+  return (
+    <div className="file-mode-tabs" role="group" aria-label="View mode">
+      {(["preview", "code"] as const).map((value) => (
+        <FileViewButton key={value} active={mode === value} onClick={() => onChange(value)}>
+          {value === "preview" ? "Preview" : "Code"}
+        </FileViewButton>
+      ))}
+    </div>
+  );
+}
+
+/** HTML modes and sheet pages share the same pressed-state button grammar. */
+export function FileViewButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={active ? "fsh-tab on" : "fsh-tab"}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
 }

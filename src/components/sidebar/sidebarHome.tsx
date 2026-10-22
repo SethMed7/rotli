@@ -609,9 +609,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             );
           }
           return (
-            <button
+            <div
               key={`main:${n.id}`}
-              type="button"
               data-main-id={n.id}
               data-note-id={n.id}
               data-main-slot={slot}
@@ -691,18 +690,24 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   },
                 });
               }}
-              {...rp({ id: `main>${n.id}`, kind: "note" })}
             >
-              {glyphForNote(n, { size: 14, className: `snicon kind-${iconKind(n)}` })}
-              <span className="snt">{displayTitle}</span>
-              <MainSlotHint slot={slot} />
-              {/* the floated pin's marker — same quiet glyph as pinned chats */}
-              {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+              <button
+                type="button"
+                className="main-note-open"
+                aria-current={n.id === focusedItemId ? "page" : undefined}
+                {...rp({ id: `main>${n.id}`, kind: "note" })}
+              >
+                {glyphForNote(n, { size: 14, className: `snicon kind-${iconKind(n)}` })}
+                <span className="snt">{displayTitle}</span>
+                <MainSlotHint slot={slot} />
+                {/* the floated pin's marker — same quiet glyph as pinned chats */}
+                {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+              </button>
               {starBtn(n.id)}
               {/* the hover-× is GONE (the maintainer, 2026-07-09: its reserved slot read as
                   a broken gap next to the star) — the context menu owns
                   "Remove from Main"; folder rows keep their × below */}
-            </button>
+            </div>
           );
         })}
         {childFolders.map((f) => {
@@ -1076,9 +1081,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           positioned popovers (RowMenu, the New… menu) sit OUTSIDE this node, so
           their pixel coordinates stay unscaled. */}
       <div className="sb-rows" aria-label="Home" style={{ zoom }}>
-        {/* This wrapper is the roving listbox: Tab enters at the one tabIndex=0
+        {/* This wrapper owns roving button focus: Tab enters at the one tabIndex=0
             row, j/k walk it; the keyboard highlight is :focus-visible. */}
-        <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
+        <div className="sb-notes-tree" role="group" aria-label="Notes tree">
           <HomeShortcuts
             dashboard={dashboard}
             counts={{ allNotes: searchableCount, captures: captureCount, tasks: openTaskCount }}

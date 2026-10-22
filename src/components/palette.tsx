@@ -1,11 +1,10 @@
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 // ⌘K — titlebar search with an anchored results popover. Empty query = Recent
 // (in-memory MRU) + Suggested
 // actions; typing filters Open tabs · Notes · Actions. Every registry action
 // is listable with its current chord as an inline kbd hint. ⏎ opens replacing
 // the focused pane's active tab; ⌘⏎ opens in a new tab. Esc closes through
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
-
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
@@ -26,6 +25,7 @@ import { ChatGlyph, FocusGlyph, KeyboardGlyph, PlusGlyph, SplitGlyph, SunGlyph }
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
 import { glyphForNote } from "./noteGlyph";
+import { searchActionLabel } from "./paletteModel";
 import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
 
 function actionIcon(id: string): ReactNode {
@@ -364,7 +364,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           placeholder={
             breveActive ? "Search Rotli, files, chats, actions…" : "Search notes, files, chats, actions…"
           }
-          aria-label={breveActive ? "Search Rotli and actions" : "Search notes and actions"}
+          aria-label={searchActionLabel(breveActive)}
           onChange={(e) => {
             setQuery(e.target.value);
             setIndex(0);

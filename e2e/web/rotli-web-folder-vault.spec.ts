@@ -254,7 +254,7 @@ test("a view with no chats of its own shows none in Chat, and Main shows every c
   await homeSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Demos");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await pairAndOpenChat(page);
   const rows = page.locator(".sidebar .sb-chatrow:not(.all)");

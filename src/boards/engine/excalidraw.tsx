@@ -10,6 +10,7 @@
 import "@excalidraw/excalidraw/index.css";
 import "../../styles/canvas.css";
 import { Excalidraw } from "@excalidraw/excalidraw";
+import { useEffect, useRef } from "react";
 
 // Paint the canvas at most once per frame (2026-10-08). Without it Excalidraw
 // redraws the whole scene synchronously for every wheel event, and a trackpad
@@ -27,4 +28,32 @@ export type BoardChangeElements = Parameters<NonNullable<ExcalidrawProps["onChan
 export type BoardChangeAppState = Parameters<NonNullable<ExcalidrawProps["onChange"]>>[1];
 export type BoardChangeFiles = Parameters<NonNullable<ExcalidrawProps["onChange"]>>[2];
 
-export const BoardCanvas = Excalidraw;
+/** Vendor controls omit the menu name and the visible zoom percentage from
+ * their accessible names. Keep that repair at the engine boundary, including
+ * rerenders and zoom changes; no canvas interaction or vendor styling changes. */
+export function BoardCanvas(props: ExcalidrawProps) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = host.current;
+    if (!root) return;
+    const labelControls = () => {
+      root.querySelectorAll<HTMLElement>(".main-menu-trigger").forEach((button) => {
+        if (button.getAttribute("aria-label") !== "Board menu")
+          button.setAttribute("aria-label", "Board menu");
+      });
+      root.querySelectorAll<HTMLElement>(".reset-zoom-button").forEach((button) => {
+        const label = `Reset zoom — ${button.textContent?.trim() ?? ""}`;
+        if (button.getAttribute("aria-label") !== label) button.setAttribute("aria-label", label);
+      });
+    };
+    labelControls();
+    const observer = new MutationObserver(labelControls);
+    observer.observe(root, { subtree: true, childList: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={host} className="board-engine">
+      <Excalidraw {...props} />
+    </div>
+  );
+}

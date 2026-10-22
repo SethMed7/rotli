@@ -28,14 +28,11 @@ export interface RovingRow {
   kind: "note" | "folder" | "smart";
 }
 
-/** The per-row props the Sidebar spreads onto each row element. role="option"
- * pairs with the container's role="listbox"; aria-selected mirrors the roving
- * active row (the keyboard cursor), distinct from the visually-open note's
- * .sel. */
+/** Roving button focus is separate from the note currently open. Mixed
+ * navigation, disclosure, and row actions are not a listbox. */
 export interface RovingRowProps {
   tabIndex: number;
-  role: "option";
-  "aria-selected": boolean;
+  role: "button";
   ref: (el: HTMLElement | null) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onFocus: () => void;
@@ -109,8 +106,7 @@ export function useRovingList(rows: RovingRow[], opts: UseRovingListOpts): UseRo
     (row: RovingRow): RovingRowProps => ({
       // exactly one tabIndex=0 (the active row) — one Tab stop for the list
       tabIndex: row.id === activeId ? 0 : -1,
-      role: "option",
-      "aria-selected": row.id === activeId,
+      role: "button",
       ref: (el: HTMLElement | null) => {
         if (el) refs.current.set(row.id, el);
         else refs.current.delete(row.id);

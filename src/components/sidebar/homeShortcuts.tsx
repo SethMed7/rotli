@@ -79,15 +79,13 @@ export function HomeShortcuts({
           head={["This week", "Rotli activity"]}
           rows={[
             <>
-              <strong>Notes</strong>
-              <span>{dashboard.notes.newInRange} new</span>
+              <strong>Notes</strong> <span>{dashboard.notes.newInRange} new</span>{" "}
               <span>{dashboard.notes.updatedInRange} updated</span>
             </>,
             // Chat turned off (Settings → Sidebar): no Chats row
             chatOn ? (
               <>
-                <strong>Chats</strong>
-                <span>{dashboard.chat.activeInRange} active</span>
+                <strong>Chats</strong> <span>{dashboard.chat.activeInRange} active</span>{" "}
                 <span>{dashboard.chat.total} saved</span>
               </>
             ) : undefined,

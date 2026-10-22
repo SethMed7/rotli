@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Clearer keyboard and screen-reader navigation.** Notes have a named editor;
+  sidebar rows and tab controls expose valid roles and independent pin/close
+  actions. Tabs support arrow, Home and End navigation. Naming and Web dialogs
+  keep keyboard focus inside, and board menu/zoom controls have complete names.
+  Small labels remain readable over selected backgrounds and accent fills.
+
 - **Pin to top works on Rotli Web.** Pinning a note now saves to your connected
   folder and survives a reload. Unpinning works too, without changing the
   note's words or dates.

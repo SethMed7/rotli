@@ -18,7 +18,7 @@ test("Settings → Open welcome folder seeds one Welcome folder in Main and open
 }) => {
   await gotoApp(page);
   const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
-  const rows = page.locator(".main-tree button[data-main-id][data-note-id]", { hasText: ROW });
+  const rows = page.locator(".main-tree [data-main-id][data-note-id]", { hasText: ROW });
   await expect(folder).toHaveCount(0);
 
   await page.getByRole("button", { name: "Settings", exact: true }).click();
