@@ -162,3 +162,54 @@ test("a long transcript without a reply retains the no-reply fallback", async ()
   expect(listed?.repliedMs).toBe(0);
   expect(listed?.modifiedMs).toBeGreaterThan(0);
 });
+test("a CRLF chat keeps its saved title, pin, model and provider in the folder listing", async () => {
+  const dir = new MemoryVaultDir();
+  const contents = [
+    "---",
+    "title: Week plan",
+    "source: rotli",
+    "pinned: true",
+    "model: fixture-model",
+    "provider: fixture-provider",
+    "attachedTo: [[weekly-note]]",
+    "---",
+    "",
+    "# Week plan",
+    "",
+  ].join("\r\n");
+  await dir.writeText("chats/week-plan.md", contents);
+  const [listed] = await new FolderChatStore(dir).list();
+  expect(listed).toMatchObject({
+    title: "Week plan",
+    source: "rotli",
+    pinned: true,
+    model: "fixture-model",
+    provider: "fixture-provider",
+    attachedTo: "weekly-note",
+  });
+  expect(await dir.readText("chats/week-plan.md")).toBe(contents);
+});
+
+test("a CRLF header closing on line 41 still exposes its final pin field", async () => {
+  const dir = new MemoryVaultDir();
+  const contents = [
+    "---",
+    "title: Boundary plan",
+    ...Array.from({ length: 37 }, (_, i) => `custom_${i}: kept`),
+    "pinned: true",
+    "---",
+    "",
+    "# Boundary plan",
+  ].join("\r\n");
+  await dir.writeText("chats/boundary-plan.md", contents);
+  const [listed] = await new FolderChatStore(dir).list();
+  expect(listed).toMatchObject({ title: "Boundary plan", pinned: true });
+  expect(await dir.readText("chats/boundary-plan.md")).toBe(contents);
+});
+
+test("frontmatter-shaped text in a chat body remains body text", async () => {
+  const dir = new MemoryVaultDir();
+  await dir.writeText("chats/body-only.md", "# Body\r\n\r\ntitle: Not metadata\r\npinned: true\r\n");
+  const [listed] = await new FolderChatStore(dir).list();
+  expect(listed).toMatchObject({ title: "body-only", pinned: false });
+});

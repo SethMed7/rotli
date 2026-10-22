@@ -405,3 +405,28 @@ test("a long folder chat is ordered by its newest reply after reload", async ({ 
   await expect(rows.first()).toHaveAttribute("data-chat-slug", "long-plan");
   await expect(rows.nth(1)).toHaveAttribute("data-chat-slug", "other-plan");
 });
+
+test("a CRLF folder chat keeps its title and pin after reload", async ({ page }) => {
+  await fakeHelper(page);
+  const contents = chatFile("Windows plan", "2026-09-01")
+    .replace("source: rotli", "source: rotli\npinned: true\nmodel: sonnet\nprovider: claude")
+    .replaceAll("\n", "\r\n");
+  await plantFolder(page, { "chats/windows-plan.md": contents });
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await pairAndOpenChat(page);
+  const rows = page.locator(".sidebar .sb-chatrow[data-chat-slug]");
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "windows-plan");
+  await expect(rows.first()).toContainText("Windows plan");
+  // Pinning outranks the four newer LF chats already in the folder fixture.
+  await expect(rows).toHaveCount(5);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("A note.");
+  await expect(page.getByRole("button", { name: "Home", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "windows-plan");
+  await expect(rows.first()).toContainText("Windows plan");
+});

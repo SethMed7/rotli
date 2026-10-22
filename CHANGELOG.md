@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Web chats keep metadata from CRLF files.** Chats saved with Windows-style
+  line endings retain their title, pin, attached-note label, and model details.
+
 - **Long Web chats keep their place.** The chat list uses the newest reply even
   when it is past the first 41 lines of a conversation. Sending a message still
   leaves a chat in place until its reply arrives.

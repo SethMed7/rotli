@@ -80,6 +80,9 @@ Now the sidebar has **one top switcher and one body**:
     provider mark is the vendor's own full-color file in `src/brand/providers/`
     (OpenAI's black Blossom in light environments, white in dark), never a
     mask in Rotli ink — in every theme family and with Neutral sidebar icons.
+    Web chat headers accept LF and CRLF line endings equally, keeping saved
+    titles, pins, attached-note labels, and provider metadata without rewriting
+    the file.
   - **Views** — chats join named views (`chats: [slug]` on the view in
     `views.json`, singular membership like notes): the row menu's "Move to
     view", an active view narrows the front to its chats, and a chat born
