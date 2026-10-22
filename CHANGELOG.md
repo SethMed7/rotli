@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cleaner office and pane resizing.** Opening a document after a workbook
+  no longer triggers a cross-engine service error. Resizing split panes
+  applies their size limits outside observer delivery, avoiding a browser
+  resize-loop error. Closing a note with a Mermaid workspace also disposes
+  its separate editor root after the note finishes closing.
+
 - **Faster Web folders and large Main lists.** Rotli Web does less repeated
   work when opening and searching your folder. Switching between notes also
   keeps large Main lists more responsive on both platforms.
