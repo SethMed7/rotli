@@ -93,6 +93,7 @@ export function titleOf(body: string): string {
  * is the first line that isn't blank; everything before it is skipped too. */
 export function snippetOf(body: string): string {
   const parts: string[] = [];
+  let chars = 0;
   let pastTitle = false;
   for (const line of lines(body)) {
     if (!pastTitle) {
@@ -100,7 +101,12 @@ export function snippetOf(body: string): string {
       continue;
     }
     const stripped = stripMarkdown(line);
-    if (stripped) parts.push(stripped);
+    if (stripped) {
+      chars += [...stripped].length + (parts.length > 0 ? 1 : 0);
+      parts.push(stripped);
+      // Later lines cannot change the bounded, code-point-based prefix.
+      if (chars >= 140) break;
+    }
   }
   return [...parts.join(" ")].slice(0, 140).join("");
 }

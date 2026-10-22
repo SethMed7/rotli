@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Faster Web folders and large Main lists.** Rotli Web does less repeated
+  work when opening and searching your folder. Switching between notes also
+  keeps large Main lists more responsive on both platforms.
+
 - **Clearer keyboard and screen-reader navigation.** Notes have a named editor;
   sidebar rows and tab controls expose valid roles and independent pin/close
   actions. Tabs support arrow, Home and End navigation. Naming and Web dialogs

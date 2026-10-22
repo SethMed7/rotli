@@ -30,7 +30,6 @@ import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { rangeBetween } from "../../lib/rangeSelect";
-import { iconKind } from "../../lib/sidebarLook";
 import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
 import { DEST, folderRoles, isRootMarker, isStorageDisk } from "../../services/destinations";
@@ -77,7 +76,7 @@ import { useContextMenu } from "../../state/contextMenu";
 import { useHidden } from "../../state/hidden";
 import { useMainStore } from "../../state/main";
 import { type DropPreview, sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
-import { QUICK_MAX, togglePinQuick } from "../../state/quick";
+import { QUICK_MAX } from "../../state/quick";
 import { ALL_NOTES, SEC_SYSTEM, TASKS, useUiStore } from "../../state/ui";
 import { useVaultView } from "../../state/vaultView";
 import { useViewsStore } from "../../state/views";
@@ -88,23 +87,21 @@ import {
   FolderGlyph,
   NewFileGlyph,
   NewFolderGlyph,
-  PinGlyph,
-  StarGlyph,
   StorageGlyph,
   TrashGlyph,
 } from "../glyphs";
-import { glyphForNote } from "../noteGlyph";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
 import { mainFolderMenuItems } from "./mainFolderMenu";
+import { MainNoteLabel, QuickAccessStar } from "./mainNoteLabel";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { FolderRenameRow, NoteRenameRow } from "./sidebarRenameRows";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
-import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
+import { useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
 import { ViewNameEditor } from "./viewNameEditor";
@@ -545,50 +542,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       // with mainRovingRows so j/k always mirrors the rendered order
       .sort(mainRowSort);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
-    // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
-    // window cycles (the maintainer, 2026-07-01 — "anything starred opens with my hotkey").
-    const starBtn = (id: string) => {
-      const starred = quickNoteIds.includes(id);
-      const full = !starred && quickNoteIds.length >= QUICK_MAX;
-      const label = starred
-        ? "Unstar — remove from Quick access"
-        : full
-          ? `Quick access is full (${QUICK_MAX}) — unstar one first`
-          : SHOW_HOTKEYS
-            ? "Star for Quick access (the ⌥ Quick window)"
-            : "Star for Quick access";
-      return (
-        <span
-          role="button"
-          tabIndex={0}
-          className={`snactbtn mstar${starred ? " on" : ""}${full ? " full" : ""}`}
-          aria-label={label}
-          aria-pressed={starred}
-          title={label}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            if (full) {
-              // the disabled star must explain itself — a silent no-op read as
-              // broken (slice 5, 2026-07-28); the inline error lane is right here
-              setRowActionError(`Quick access is full (${QUICK_MAX}) — unstar one first.`);
-              return;
-            }
-            togglePinQuick(id);
-          }}
-          // a span with role="button" gets no synthetic click from the
-          // keyboard — wire Enter/Space by hand (slice 5, 2026-07-28)
-          onKeyDown={(ev) => {
-            if (ev.key === "Enter" || ev.key === " ") {
-              ev.preventDefault();
-              ev.stopPropagation();
-              ev.currentTarget.click();
-            }
-          }}
-        >
-          <StarGlyph size={13} filled={starred} />
-        </span>
-      );
-    };
     return (
       <>
         {childNotes.map((n, noteIndex) => {
@@ -697,13 +650,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                 aria-current={n.id === focusedItemId ? "page" : undefined}
                 {...rp({ id: `main>${n.id}`, kind: "note" })}
               >
-                {glyphForNote(n, { size: 14, className: `snicon kind-${iconKind(n)}` })}
-                <span className="snt">{displayTitle}</span>
-                <MainSlotHint slot={slot} />
-                {/* the floated pin's marker — same quiet glyph as pinned chats */}
-                {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
+                <MainNoteLabel note={n} title={displayTitle} slot={slot} />
               </button>
-              {starBtn(n.id)}
+              <QuickAccessStar
+                id={n.id}
+                starred={quickNoteIds.includes(n.id)}
+                full={!quickNoteIds.includes(n.id) && quickNoteIds.length >= QUICK_MAX}
+              />
               {/* the hover-× is GONE (the maintainer, 2026-07-09: its reserved slot read as
                   a broken gap next to the star) — the context menu owns
                   "Remove from Main"; folder rows keep their × below */}

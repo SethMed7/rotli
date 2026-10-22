@@ -130,6 +130,14 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
   exclusion, short-lived authorization, and macOS bookmark recovery after a
   move. Never point that native check at a live vault.
 
+### Performance regressions
+
+`src/services/folderNotesCache.test.ts` counts document parses across indexing,
+listing, search and reads, and checks invalidation after external and app edits.
+The derivation and search suites retain Unicode snippet boundaries and the
+Rust-compatible per-code-point case-folding rules while their fast paths change.
+Timing measurements are descriptive, not wall-clock assertions in CI.
+
 ### Automated accessibility
 
 `e2e/accessibility.spec.ts` and `e2e/web/rotli-web-accessibility.spec.ts` run
