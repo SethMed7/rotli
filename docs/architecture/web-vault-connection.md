@@ -196,6 +196,14 @@ silently restoring those lines. Lock, AI-edit permission, and local-AI access
 use their explicit commands. Local-AI access remains portable metadata even
 though the web's AI corpus has no on-device exception.
 
+**Pin to top** writes the note's `pinned` metadata through the same connected
+folder seam and survives reload. It changes only that top-level line, leaving
+the body, dates, nested metadata, and line endings intact, including in a
+folder opened in place. Unpinning removes the line. Locked notes may still be
+pinned by the person; non-Markdown files are refused. A concurrent edit wins
+through the complete-file revision gate, and write failures reach the menu's
+existing error state.
+
 Marking secure requires a stable frontmatter id, records `secure_origin`,
 protects both paths in `.gitignore` before relocation, and moves the note into
 `wiki/_secure` (a plain vault uses `Secure notes`). Clearing protection restores

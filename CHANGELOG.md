@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pin to top works on Rotli Web.** Pinning a note now saves to your connected
+  folder and survives a reload. Unpinning works too, without changing the
+  note's words or dates.
+
 ## [1.9.1] - 2026-10-20
 
 ### Added
