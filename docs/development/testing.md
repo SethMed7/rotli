@@ -42,6 +42,13 @@ direction, runtime wiring, and owning documentation must agree.
 With no lane arguments, `verify` runs all four lanes. Unknown lane names fail
 before any checks or installs; a misspelling cannot produce a passing run.
 
+Both Playwright lanes start their own server and refuse an occupied port, so
+verification cannot silently exercise another checkout. The desktop twin uses
+1420 (`ROTLI_E2E_PORT` overrides it); Rotli Web uses 1435
+(`ROTLI_WEB_E2E_PORT` overrides it). In a worktree, select free ports for both:
+`ROTLI_E2E_PORT=1458 ROTLI_WEB_E2E_PORT=1459 bun run verify`. Do not stop a
+server owned by another checkout.
+
 Development, formatting, and release commands (`check:docs` verifies this map
 stays complete — every `package.json` script must appear in this document):
 

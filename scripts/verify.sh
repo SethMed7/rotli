@@ -108,10 +108,8 @@ if wants e2e; then
     echo "  run: bunx playwright install chromium"
     exit 1
   fi
-  # a stale `vite dev` on 1420 would make Playwright prove the wrong build
-  if lsof -nP -iTCP:1420 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "  ⚠ something already listens on :1420 — Playwright will reuse it (reuseExistingServer); stop it to prove THIS tree"
-  fi
+  # Both Playwright configs refuse existing servers. Select free ports with
+  # ROTLI_E2E_PORT / ROTLI_WEB_E2E_PORT when testing beside another checkout.
   bun run test:e2e
 
   step "e2e — Rotli Web (build:web + vite preview under /app/)"

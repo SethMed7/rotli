@@ -11,10 +11,10 @@ function runVerify(lanes: readonly string[]) {
     copyFileSync(new URL("./verify.sh", import.meta.url), join(root, "scripts/verify.sh"));
     const log = join(root, "commands.log");
     writeFileSync(log, "");
-    for (const name of ["bun", "bunx", "cargo", "git", "lsof"]) {
+    for (const name of ["bun", "bunx", "cargo", "git"]) {
       writeFileSync(
         join(root, "bin", name),
-        `#!/bin/bash\nprintf '%s\\n' "${name} $*" >> "$VERIFY_TEST_LOG"\n${name === "git" || name === "lsof" ? "exit 1" : "exit 0"}\n`,
+        `#!/bin/bash\nprintf '%s\\n' "${name} $*" >> "$VERIFY_TEST_LOG"\n${name === "git" ? "exit 1" : "exit 0"}\n`,
         { mode: 0o755 },
       );
     }
