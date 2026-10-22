@@ -186,6 +186,7 @@
       ],
       "tests": [
         "src/services/webChats.test.ts",
+        "src/services/webChatPaths.test.ts",
         "e2e/web/rotli-web-folder-vault.spec.ts"
       ],
       "commands": [
