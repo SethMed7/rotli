@@ -27,6 +27,19 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
 LANES=("$@")
 [ ${#LANES[@]} -eq 0 ] && LANES=(secrets quality e2e rust)
 
+# Validate the whole request before installs or checks: a typo must never
+# produce a green result for an empty (or only partially requested) run.
+for requested in "${LANES[@]}"; do
+  case "$requested" in
+    secrets|quality|e2e|rust) ;;
+    *)
+      printf '✗ unknown verify lane: %s\n' "$requested" >&2
+      echo 'Usage: bun run verify [secrets|quality|e2e|rust ...]' >&2
+      exit 1
+      ;;
+  esac
+done
+
 wants() {
   local lane="$1"
   for requested in "${LANES[@]}"; do [ "$requested" = "$lane" ] && return 0; done

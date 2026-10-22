@@ -39,6 +39,9 @@ direction, runtime wiring, and owning documentation must agree.
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
 
+With no lane arguments, `verify` runs all four lanes. Unknown lane names fail
+before any checks or installs; a misspelling cannot produce a passing run.
+
 Development, formatting, and release commands (`check:docs` verifies this map
 stays complete — every `package.json` script must appear in this document):
 
