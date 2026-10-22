@@ -19,7 +19,7 @@
 // trashed), activeId is clamped to a still-present row so the list never points
 // at a vanished element.
 
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
 /** One navigable row in the flat, in-render-order list the Sidebar feeds us.
  * kind lets a caller branch (a note opens vs a folder/dest toggles). */
@@ -33,9 +33,10 @@ export interface RovingRow {
 export interface RovingRowProps {
   tabIndex: number;
   role: "button";
-  ref: (el: HTMLElement | null) => void;
+  "data-roving-id": string;
+  ref: (el: HTMLElement | null) => void | (() => void);
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
-  onFocus: () => void;
+  onFocus: (event: FocusEvent<HTMLElement>) => void;
 }
 
 export interface UseRovingListOpts {
@@ -90,81 +91,94 @@ export function useRovingList(rows: RovingRow[], opts: UseRovingListOpts): UseRo
   }, [rows]);
 
   /** Move the cursor by ±1 within the current order and focus the new row. */
-  const move = useCallback(
-    (delta: 1 | -1, fromId: string) => {
-      const index = rows.findIndex((r) => r.id === fromId);
-      if (index === -1) return;
-      const next = rows[index + delta];
-      if (!next) return; // clamp at the ends — no wrap
-      setActiveId(next.id);
-      refs.current.get(next.id)?.focus();
+  const move = useCallback((delta: 1 | -1, fromId: string) => {
+    const currentRows = rowsRef.current;
+    const index = currentRows.findIndex((r) => r.id === fromId);
+    if (index === -1) return;
+    const next = currentRows[index + delta];
+    if (!next) return; // clamp at the ends — no wrap
+    setActiveId(next.id);
+    refs.current.get(next.id)?.focus();
+  }, []);
+
+  // React 19's ref cleanup lets every row share one callback: no per-row
+  // closure cache, detached-element retention, or ref detach on a tab switch.
+  const rowRef = useCallback((el: HTMLElement | null) => {
+    const id = el?.dataset.rovingId;
+    if (!el || !id) return;
+    refs.current.set(id, el);
+    return () => {
+      if (refs.current.get(id) === el) refs.current.delete(id);
+    };
+  }, []);
+  const onFocus = useCallback((event: FocusEvent<HTMLElement>) => {
+    setActiveId(event.currentTarget.dataset.rovingId ?? null);
+  }, []);
+  const onKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLElement>) => {
+      const row = rowsRef.current.find((candidate) => candidate.id === event.currentTarget.dataset.rovingId);
+      if (!row) return;
+      // let real chords (⌘K, ⌃…, ⌥…) fall through to the global dispatcher —
+      // we only own bare keys here
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const o = optsRef.current;
+      // every key we OWN beats the global bare-key rule: preventDefault +
+      // stopPropagation so the registry's window listener never sees it
+      const consume = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      switch (event.key) {
+        case "j":
+        case "ArrowDown":
+          consume();
+          move(1, row.id);
+          return;
+        case "k":
+        case "ArrowUp":
+          consume();
+          move(-1, row.id);
+          return;
+        case "l":
+        case "Enter":
+          consume();
+          o.onOpen(row, false);
+          return;
+        case "/":
+          consume();
+          o.onFocusFilter();
+          return;
+        case "m":
+          consume();
+          o.onOpenMenu(row, event.currentTarget);
+          return;
+        case "h":
+        case "Escape":
+          // collapse if there's anything to collapse; if so, consume. At the
+          // root (nothing nested under the cursor) DO NOT stop — let Escape
+          // bubble to the registry's app.hide so the quokka rule still hides
+          // the window. (h at the root simply does nothing.)
+          if (o.onCollapseOrOut(row)) {
+            consume();
+          }
+          return;
+        default:
+          return; // every other key types/bubbles untouched
+      }
     },
-    [rows],
+    [move],
   );
 
   const rowProps = useCallback(
     (row: RovingRow): RovingRowProps => ({
-      // exactly one tabIndex=0 (the active row) — one Tab stop for the list
+      "data-roving-id": row.id,
       tabIndex: row.id === activeId ? 0 : -1,
       role: "button",
-      ref: (el: HTMLElement | null) => {
-        if (el) refs.current.set(row.id, el);
-        else refs.current.delete(row.id);
-      },
-      // clicking/focusing a row makes it the cursor too — mouse and keyboard
-      // share one active row
-      onFocus: () => setActiveId(row.id),
-      onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-        // let real chords (⌘K, ⌃…, ⌥…) fall through to the global dispatcher —
-        // we only own bare keys here
-        if (event.metaKey || event.ctrlKey || event.altKey) return;
-        const o = optsRef.current;
-        // every key we OWN beats the global bare-key rule: preventDefault +
-        // stopPropagation so the registry's window listener never sees it
-        const consume = () => {
-          event.preventDefault();
-          event.stopPropagation();
-        };
-        switch (event.key) {
-          case "j":
-          case "ArrowDown":
-            consume();
-            move(1, row.id);
-            return;
-          case "k":
-          case "ArrowUp":
-            consume();
-            move(-1, row.id);
-            return;
-          case "l":
-          case "Enter":
-            consume();
-            o.onOpen(row, false);
-            return;
-          case "/":
-            consume();
-            o.onFocusFilter();
-            return;
-          case "m":
-            consume();
-            o.onOpenMenu(row, event.currentTarget);
-            return;
-          case "h":
-          case "Escape":
-            // collapse if there's anything to collapse; if so, consume. At the
-            // root (nothing nested under the cursor) DO NOT stop — let Escape
-            // bubble to the registry's app.hide so the quokka rule still hides
-            // the window. (h at the root simply does nothing.)
-            if (o.onCollapseOrOut(row)) {
-              consume();
-            }
-            return;
-          default:
-            return; // every other key types/bubbles untouched
-        }
-      },
+      ref: rowRef,
+      onFocus,
+      onKeyDown,
     }),
-    [activeId, move],
+    [activeId, rowRef, onFocus, onKeyDown],
   );
 
   const focusActive = useCallback(() => {

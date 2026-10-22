@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Faster Web folders and large Main lists.** Rotli Web does less repeated
   work when opening and searching your folder. Switching between notes also
-  keeps large Main lists more responsive on both platforms.
+  keeps large Main lists more responsive on both platforms. In a very large
+  flat Main, focusing and opening a note now updates only the affected rows.
 
 - **A complete workspace outline for screen readers.** The workspace and
   Settings have a top-level heading, and board controls no longer masquerade

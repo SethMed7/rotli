@@ -136,6 +136,9 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
 listing, search and reads, and checks invalidation after external and app edits.
 The derivation and search suites retain Unicode snippet boundaries and the
 Rust-compatible per-code-point case-folding rules while their fast paths change.
+`e2e/main-row-rendering.spec.ts` uses the dev React profiler's host-row fields
+through its DevTools hook to limit Main note-switch commits to the changed
+rows, while keeping every synthetic row mounted and checking keyboard navigation.
 Timing measurements are descriptive, not wall-clock assertions in CI.
 
 ### Automated accessibility
