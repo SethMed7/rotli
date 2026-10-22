@@ -2,7 +2,7 @@
 // `vite dev` with the in-memory demo corpus; this lane builds the WEB bundle
 // (ROTLI_PLATFORM=web, served under /app/ like the site does) and proves what
 // only that build can: the browser vault persists across a reload, a first
-// visit seeds and opens Welcome, and the platform withholds chat. `vite
+// visit seeds and opens Welcome, and a paired Helper enables chat. `vite
 // preview` sends no Content-Security-Policy — the site's Docker image is the
 // prod twin for headers (site/README.md).
 
