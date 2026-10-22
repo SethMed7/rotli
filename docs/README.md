@@ -73,6 +73,7 @@ fix both in the same change.
 | Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 | Opt-in cloud MCP relay boundary | [`architecture/remote-agent-relay.md`](architecture/remote-agent-relay.md) |
 | Rotli Web: the required vault, Rotli Helper's vault lane, staying connected, and the no-egress rule | [`architecture/web-vault-connection.md`](architecture/web-vault-connection.md) |
+| Native command availability on web and its exhaustive inventory gate | [`architecture/web-vault-connection.md#native-command-availability`](architecture/web-vault-connection.md#native-command-availability) |
 
 ## Source-of-truth boundaries
 

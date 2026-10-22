@@ -253,13 +253,13 @@ hotkeys, and Send feedback) shipped in 1.3.
 
 ## 6. Keeping the web version in sync
 
-- **Parity list** <!-- id: web-parity-list --> · L — every native command is marked "has a web version",
-  "refused on web with a notice", or "Mac only on purpose". A check fails when
-  a new command has no decision.
 - **No silent gaps on web** <!-- id: web-no-silent-gaps --> · M — about 40 features quietly do nothing on web
   today. They should say "In the Mac app".
-- **A real web contract doc** <!-- id: web-contract-doc --> · M — the only one today is an old plan that
-  still says web has no chat.
+
+The [web contract](docs/architecture/web-vault-connection.md) covers the current
+folder and Helper roads, chat, office editing, recovery, and privacy. Its
+[command inventory](docs/architecture/web-vault-connection.md#native-command-availability)
+classifies every native command; lint rejects a new command with no web decision.
 
 **Rule:** every user-facing change is proven on the web build too, and adds
 or extends a web test.

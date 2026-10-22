@@ -5,6 +5,36 @@ what it may reach, and what happens when the connection is interrupted.
 Decided by the owner on 2026-09-22; the history is in
 [`../design/web-version-and-shell-batch-2026-09-16.md`](../design/web-version-and-shell-batch-2026-09-16.md) §1.
 
+## Native command availability
+
+[`../../scripts/web-command-parity.json`](../../scripts/web-command-parity.json)
+is the exhaustive inventory of the native `generate_handler!` registry. Each
+command appears exactly once in a capability group with an explanation,
+implementation paths, and test references:
+
+| Status | Meaning |
+| --- | --- |
+| `web` | A web equivalent exists through the connected folder, browser APIs, or paired Helper. The group's explanation names limits and prerequisites. |
+| `notice` | The web surface explains Mac availability and withholds the native operation. |
+| `mac-only` | The native integration is outside the web capability set; its operation is not offered there. Some groups also describe a web fallback or an availability caption. |
+
+These are user-facing capability equivalents, not a promise that the native
+wrapper itself can be called on web. For example, `FolderNotesService` replaces
+corpus IPC, the browser file picker supplies bytes instead of native paths,
+and web sharing uses browser APIs. Development-only capabilities remain gated
+by the build policy on both shells. Helper chat does not enable local models,
+the Librarian, native windows, or arbitrary native commands.
+
+`bun run check:web-parity` compares every registered native command with those
+literal decisions. Missing, stale, duplicate, malformed, or unexplained entries
+fail, as do missing source/test files. Both lint runners include it, so a new
+native handler requires an explicit web decision in the same change. Update
+the owning implementation and focused tests when changing a disposition.
+The checker proves inventory coverage and reference existence; behavior still
+needs the named tests, and native behavior still needs native evidence. It does
+not certify that every path through a capability behaves identically on both
+shells. The development browser twin's in-memory fallbacks are not web support.
+
 ## The rules
 
 1. **A vault is required.** The editor never runs without a connected vault

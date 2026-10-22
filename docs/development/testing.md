@@ -26,6 +26,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
+| `bun run check:web-parity` | Every registered native command has one explicit web/notice/Mac-only decision in `scripts/web-command-parity.json`, with an explanation and existing implementation/test references; included in both lint chains. Fixture tests prove an added native handler fails until classified. Behavior still requires the referenced tests |
 | `bun run check:ratchets` | Numbers that only move one way (`scripts/ratchet-baseline.json`): per-file line ceilings for every source file at or above 600 lines, the count of source-string test assertions, dated provenance comments, and per-directory test-coverage floors (the recorded ratio is the floor once it sits above the 0.40 constant — coverage may only rise). The source-shape number counts `toContain`/`toMatch` assertions inside files that read source text, not the reads. Lower a ceiling with `--update`; never raise one. The checker has its own fixture tests (`scripts/check-ratchets.test.ts`, as do `check:window-events` and `check:code-shape`) |
 | `bun run check:window-events` | Every `rotli:*` / `private-browser-*` event literal in `src/` and `src-tauri/src/` has a row in `docs/architecture/window-events.md` and is wired on a sending and a receiving side |
 | `bun run check:web-privacy` | Rotli Web's no-egress rule: the `/app/` Content-Security-Policy in `site/Caddyfile` may reach only `http://127.0.0.1` (`connect-src`) and names no other host in any directive; `form-action` and `frame-ancestors` stay `'none'`. Fixture tests in `scripts/check-web-privacy.test.ts`; the E2E twin is `e2e/web/rotli-web-privacy.spec.ts` |
@@ -224,6 +225,9 @@ regressions.
   implement.
 - `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
   and requires multi-segment snake_case command names.
+- `check:web-parity` keeps the native registry and explicit web availability
+  inventory exhaustive in both directions; it rejects missing, stale, duplicate,
+  invalid, or unexplained decisions and missing implementation/test references.
 - `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)
   everywhere under `src/` outside the token-definition layer (`src/brand/`,
   `src/styles/themes.css`; `base.css` may hold functional state tokens).
