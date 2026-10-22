@@ -211,7 +211,9 @@ export class FolderChatStore implements ChatStore {
           const fileTime = stat?.lastModified ?? 0;
           const modified =
             fileTime > EPOCH_MS_FLOOR ? fileTime : Date.parse(frontmatterField(head, "updated")) || fileTime;
-          return summarize(slug, head, modified);
+          // Metadata has a bounded header; the newest reply can be anywhere
+          // in the transcript we already read, beyond that header window.
+          return { ...summarize(slug, head, modified), repliedMs: lastReplyMs(text) };
         }),
     );
     return rows;

@@ -130,3 +130,35 @@ test("trashing a second chat with the same name keeps the first one's file", asy
   expect(await dir.readText("chats/trash/plan.md")).toContain("first");
   expect(await dir.readText("chats/trash/plan (another).md")).toContain("second");
 });
+
+test("folder listings find a reply beyond the metadata head, ignoring a later pending send", async () => {
+  const dir = new MemoryVaultDir();
+  const born = composeNewChat(
+    { title: "Long planning chat", source: "rotli", slug: "long-plan" },
+    [
+      { speaker: "you", at: "2026-10-20T10:00:00Z", text: "Question" },
+      { speaker: "rotli", at: "2026-10-20T10:01:00Z", text: "Earlier reply\n" + "More detail\n".repeat(60) },
+      { speaker: "rotli", at: "2026-10-21T10:01:00Z", text: "Newest reply" },
+      { speaker: "you", at: "2026-10-22T10:00:00Z", text: "Still waiting" },
+    ],
+    "2026-10-22",
+  );
+  await dir.writeText("chats/long-plan.md", born.contents);
+  const [listed] = await new FolderChatStore(dir).list();
+  expect(listed?.title).toBe("Long planning chat");
+  expect(listed?.repliedMs).toBe(Date.parse("2026-10-21T10:01:00Z"));
+  expect(await dir.readText("chats/long-plan.md")).toBe(born.contents);
+});
+
+test("a long transcript without a reply retains the no-reply fallback", async () => {
+  const dir = new MemoryVaultDir();
+  const born = composeNewChat(
+    { title: "Pending plan", source: "rotli", slug: "pending-plan" },
+    [{ speaker: "you", at: "2026-10-22T10:00:00Z", text: "Question\n" + "More detail\n".repeat(60) }],
+    DATE,
+  );
+  await dir.writeText("chats/pending-plan.md", born.contents);
+  const [listed] = await new FolderChatStore(dir).list();
+  expect(listed?.repliedMs).toBe(0);
+  expect(listed?.modifiedMs).toBeGreaterThan(0);
+});

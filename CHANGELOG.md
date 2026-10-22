@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Long Web chats keep their place.** The chat list uses the newest reply even
+  when it is past the first 41 lines of a conversation. Sending a message still
+  leaves a chat in place until its reply arrives.
+
 - **Missing images stay selected.** Double-clicking a missing-image label
   selects its image object without intermittently revealing Markdown source.
 
