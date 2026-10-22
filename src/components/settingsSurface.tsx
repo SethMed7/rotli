@@ -537,7 +537,7 @@ function GeneralPane() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [demo, setDemo] = useState(false);
   useEffect(() => {
-    void demoMode().then(setDemo);
+    if (PLATFORM === "desktop") void demoMode().then(setDemo);
   }, []);
   const quickFolder = useUiStore((s) => s.quickFolder);
   const quickVaultId = useUiStore((s) => s.quickVaultId);
@@ -877,19 +877,32 @@ function GeneralPane() {
       <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
       <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
       <FinderQuickActionSettings native={quickActionAvailable()} />
-      <UpdatesSection />
+      {PLATFORM === "desktop" ? (
+        <UpdatesSection />
+      ) : (
+        <>
+          <h4 className="sethead">Updates</h4>
+          <p className="setnote">In the Mac app.</p>
+        </>
+      )}
 
       <h4 className="sethead">Demo mode</h4>
-      <p className="lead">
-        Switch to a separate demo library with sample content — for screenshots or trying things out. Your
-        real notes are never touched; toggling relaunches Rotli.
-      </p>
-      <Toggle
-        on={demo}
-        title="Demo mode"
-        desc="Read and write a throwaway demo library instead of your real notes."
-        onChange={() => void setDemoMode(!demo)}
-      />
+      {PLATFORM === "desktop" ? (
+        <>
+          <p className="lead">
+            Switch to a separate demo library with sample content — for screenshots or trying things out. Your
+            real notes are never touched; toggling relaunches Rotli.
+          </p>
+          <Toggle
+            on={demo}
+            title="Demo mode"
+            desc="Read and write a throwaway demo library instead of your real notes."
+            onChange={() => void setDemoMode(!demo)}
+          />
+        </>
+      ) : (
+        <p className="setnote">In the Mac app.</p>
+      )}
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">

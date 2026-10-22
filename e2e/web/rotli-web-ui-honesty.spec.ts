@@ -61,6 +61,26 @@ test("search never offers native window or vault-refresh actions", async ({ page
   }
 });
 
+test("General names native update and demo limits without fake controls or version claims", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 760, height: 720 });
+  await startWithVault(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  for (const name of ["Updates", "Demo mode"]) {
+    const heading = page.getByRole("heading", { name, exact: true });
+    await heading.scrollIntoViewIfNeeded();
+    await expect(heading.locator("+ p")).toHaveText("In the Mac app.");
+  }
+  await expect(page.getByRole("button", { name: "Check for updates", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Install & relaunch", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: /^Check for updates automatically / })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: /^Demo mode / })).toHaveCount(0);
+  await expect(page.getByText(/Rotli 0\.1\.0|up to date|toggling relaunches Rotli/)).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("general-native-availability.png") });
+});
+
 test("note chat actions open the web setup guide when no helper is connected", async ({ page }) => {
   await startWithVault(page);
   await page

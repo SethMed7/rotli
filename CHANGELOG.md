@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **App icon choices explain where they work.** Rotli Web's Appearance settings
   now say "In the Mac app" for the Dock icon, instead of offering choices that
   do nothing there.
+- **Web settings no longer pretend to update or switch to Demo mode.** These
+  Mac-only actions now say where they work, without a placeholder app version,
+  a false "up to date" result, or a switch that does nothing.
 
 ## [1.9.1] - 2026-10-20
 

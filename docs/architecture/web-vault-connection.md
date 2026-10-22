@@ -213,6 +213,11 @@ without the Dock-only choice buttons or their images. The installed Mac app
 keeps all released icon choices and its saved selection; changing a browser
 preference cannot change the Mac's Dock icon.
 
+General likewise labels **Updates** and **Demo mode** as **In the Mac app.**
+on web. It does not mount the native updater controls, claim an installed app
+version or an update result, or offer the native demo-vault switch. Native
+update and demo behavior remains owned by the installed shell.
+
 `/attach` uses a browser `image/*` file picker on web and the existing
 `importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
 land in the bound vault and Markdown receives only a portable `storage:` link;

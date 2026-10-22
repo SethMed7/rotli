@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const policy = { ...(await import("../lib/featurePolicy")) };
 const react = { ...(await import("react")) };
-let selectedPane: "brain" | "models" | "location" | "appearance" = "brain";
+let selectedPane: "brain" | "models" | "location" | "appearance" | "general" = "brain";
 await mock.module("../lib/featurePolicy", () => ({
   ...policy,
   PLATFORM: "web",
@@ -61,4 +61,15 @@ test("web Appearance explains Dock icon availability without offering inert choi
   expect(html).toContain("In the Mac app.");
   expect(html).not.toContain('aria-label="App icon"');
   expect(html).not.toContain("Pick the Dock icon");
+});
+
+test("web General withholds native updater and demo controls instead of claiming they work", () => {
+  selectedPane = "general";
+  const html = render();
+  expect(html).toContain("Updates");
+  expect(html).toContain("Demo mode");
+  expect(html).not.toContain("Check for updates");
+  expect(html).not.toContain("Install &amp; relaunch");
+  expect(html).not.toContain("Read and write a throwaway demo library");
+  expect(html).not.toContain("toggling relaunches Rotli");
 });

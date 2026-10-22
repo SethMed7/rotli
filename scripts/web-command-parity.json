@@ -370,7 +370,7 @@
     {
       "id": "native-shell",
       "status": "mac-only",
-      "reason": "Native windows, global shortcuts, Dock icons, demo switching, quit/restart handshakes, and workspace mailboxes belong to the installed Mac shell; web does not expose their actions.",
+      "reason": "Native windows, global shortcuts, Dock icons, quit/restart handshakes, and workspace mailboxes belong to the installed Mac shell; web does not expose their actions.",
       "sources": [
         "src/lib/tauri.ts",
         "src/lib/featurePolicy.ts",
@@ -381,7 +381,6 @@
         "e2e/web/rotli-web-hotkeys.spec.ts"
       ],
       "commands": [
-        "demo_mode",
         "finish_capture_window",
         "hide_capture_window",
         "hide_chat_window",
@@ -389,7 +388,6 @@
         "hide_quick_window",
         "quit_flush_done",
         "restart_after_flush",
-        "set_demo_mode",
         "set_dock_visible",
         "set_hide_on_blur",
         "set_summon_shortcut",
@@ -595,6 +593,23 @@
       ],
       "commands": [
         "set_app_icon"
+      ]
+    },
+    {
+      "id": "demo-vault",
+      "status": "notice",
+      "reason": "General labels Demo mode In the Mac app on web and omits its native vault switch. The installed shell owns the isolated demo corpus and relaunch.",
+      "sources": [
+        "src/components/settingsSurface.tsx",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "src/components/settingsSurface.test.tsx",
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "demo_mode",
+        "set_demo_mode"
       ]
     }
   ]
