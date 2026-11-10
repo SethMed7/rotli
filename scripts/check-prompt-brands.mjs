@@ -176,6 +176,30 @@ function usesItsParameter(checker, fn) {
   return used;
 }
 
+/** Does `type` hold an `any` anywhere a JSON value could carry it? */
+function holdsAny(checker, type, depth = 0) {
+  if (!type || depth > 3) return false;
+  if (type.flags & ts.TypeFlags.Any) return true;
+  if (type.isUnion() || type.isIntersection())
+    return type.types.some((part) => holdsAny(checker, part, depth));
+  if (checker.isArrayType(type) || checker.isTupleType(type))
+    return checker.getTypeArguments(type).some((arg) => holdsAny(checker, arg, depth + 1));
+  if (type.flags & ts.TypeFlags.Object && type.getCallSignatures().length === 0) {
+    return checker
+      .getPropertiesOfType(type)
+      .slice(0, 64)
+      .some((prop) => {
+        const declaration = prop.valueDeclaration ?? prop.declarations?.[0];
+        return (
+          !!declaration && holdsAny(checker, checker.getTypeOfSymbolAtLocation(prop, declaration), depth + 1)
+        );
+      });
+  }
+  return false;
+}
+
+const SUPPRESSION = /@ts-(?:ignore|expect-error|nocheck)\b/;
+
 /** Every failure in `program`'s files under src/ (paths relative to `root`). */
 export function programFailures(program, root, only) {
   const checker = program.getTypeChecker();
@@ -183,11 +207,33 @@ export function programFailures(program, root, only) {
   const usage = new Map();
   for (const file of program.getSourceFiles()) {
     const path = relative(root, file.fileName);
-    if (!path.startsWith("src/") || file.isDeclarationFile || isTestSide(path)) continue;
+    if (!path.startsWith("src/") || isTestSide(path)) continue;
     if (only && !only.has(path)) continue;
     const owned = OWNERS[path] ?? new Set();
     const at = (node) => `${path}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`;
     const fail = (node, message) => failures.push(`${at(node)}: ${message}`);
+    // fifth review: a declaration file may not name a brand (it would claim a
+    // branded value no code made), and nothing outside tests may switch the
+    // checker off for a line or a file
+    if (file.isDeclarationFile) {
+      const named = (node) => {
+        if (ts.isTypeReferenceNode(node) && brandNamesOf(checker, checker.getTypeFromTypeNode(node)).size)
+          fail(node, "a declaration file names a prompt brand; brands are made only by their owners");
+        ts.forEachChild(node, named);
+      };
+      named(file);
+      continue;
+    }
+    const commentText = file.getFullText();
+    ts.forEachChild(file, function comments(node) {
+      for (const range of ts.getLeadingCommentRanges(commentText, node.getFullStart()) ?? []) {
+        if (SUPPRESSION.test(commentText.slice(range.pos, range.end)))
+          failures.push(
+            `${path}:${file.getLineAndCharacterOfPosition(range.pos).line + 1}: a type-check suppression (a @ts- ignore, expect-error or nocheck directive) outside a test`,
+          );
+      }
+      ts.forEachChild(node, comments);
+    });
     const unowned = (names) => [...names].filter((name) => !owned.has(name));
     const anyInto = (expr) => {
       if (!expr) return;
@@ -232,6 +278,30 @@ export function programFailures(program, root, only) {
         if (asserted.length) fail(node, `a type guard asserts a prompt brand (${asserted.join(", ")})`);
       }
       if (ts.isVariableDeclaration(node) && node.type) anyInto(node.initializer);
+      if (ts.isParameter(node) && node.type) anyInto(node.initializer);
+      if (ts.isSatisfiesExpression(node)) {
+        const forged = made(
+          checker.getTypeFromTypeNode(node.type),
+          checker.getTypeAtLocation(node.expression),
+        );
+        if (forged.length)
+          fail(node, `\`satisfies\` claims a prompt brand (${forged.join(", ")}) the value doesn't carry`);
+      }
+      // an overload signature claiming a brand its implementation needn't
+      // return (`function f(v): PromptText; function f(v): any { … }`)
+      if (
+        ts.isFunctionDeclaration(node) &&
+        !node.body &&
+        node.type &&
+        !node.modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword)
+      ) {
+        const claimed = unowned(brandNamesOf(checker, checker.getTypeFromTypeNode(node.type)));
+        if (claimed.length)
+          fail(
+            node,
+            `an overload claims a prompt brand (${claimed.join(", ")}); return one built by its owner`,
+          );
+      }
       if (ts.isReturnStatement(node)) anyInto(node.expression);
       if (ts.isPropertyAssignment(node)) anyInto(node.initializer);
       if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken)
@@ -246,6 +316,12 @@ export function programFailures(program, root, only) {
         );
         if (name === "prompt")
           fail(node, "prompt is a template tag: write prompt`…`, never call it on a hand-built array");
+        if (
+          name === "promptJson" &&
+          node.arguments[0] &&
+          holdsAny(checker, checker.getTypeAtLocation(node.arguments[0]))
+        )
+          fail(node, "promptJson's value holds an `any`; every string in it must be a typed piece");
         if (name === "fixed") {
           const arg = node.arguments[0];
           if (!arg || !(ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)))
@@ -361,7 +437,23 @@ function compilerOptions(root) {
 export function projectFailures(root) {
   const config = compilerOptions(root);
   const program = ts.createProgram(config.fileNames, config.options);
-  return programFailures(program, root);
+  return [
+    ...programFailures(program, root),
+    ...scriptFailures(ts.sys.readDirectory(join(root, "src")).map((file) => relative(root, file))),
+  ];
+}
+
+const SCRIPT = /\.(?:js|jsx|mjs|cjs)$/;
+
+/** Plain JavaScript under src/ is never type-checked, so a brand could be
+ * forged there unseen; the app is TypeScript throughout, so any is refused. */
+export function scriptFailures(paths) {
+  return paths
+    .filter((path) => path.startsWith("src/") && SCRIPT.test(path))
+    .map(
+      (path) =>
+        `${path}: JavaScript under src/ isn't type-checked, so the prompt brands can't be checked there; write it in TypeScript`,
+    );
 }
 
 /** Check extra in-memory sources (path relative to `root`) against the real
@@ -380,7 +472,10 @@ export function sourceFailures(root, sources) {
   const readFile = host.readFile.bind(host);
   host.readFile = (name) => virtual.get(resolve(name)) ?? readFile(name);
   const program = ts.createProgram([...virtual.keys()], config.options, host);
-  return programFailures(program, root, new Set(Object.keys(sources)));
+  return [
+    ...programFailures(program, root, new Set(Object.keys(sources))),
+    ...scriptFailures(Object.keys(sources)),
+  ];
 }
 
 if (import.meta.main) {

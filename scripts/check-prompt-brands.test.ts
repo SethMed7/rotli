@@ -89,6 +89,66 @@ describe("check:prompt-brands refuses the fourth review's bypasses", () => {
   });
 });
 
+// The fifth review's probes: each compiled and passed the fourth round's check.
+describe("check:prompt-brands refuses the fifth review's bypasses", () => {
+  test.each([
+    [
+      "`any` satisfies a brand",
+      "export const p = JSON.parse(raw) satisfies PromptText;",
+      /`satisfies` claims a prompt brand/,
+    ],
+    [
+      "an `as const` object with `any` spread into promptJson",
+      "const loose: any = JSON.parse(raw);\nconst base = { a: 1 } as const;\nexport const p: PromptText = promptJson({ ...base, loose });",
+      /promptJson's value holds an `any`/,
+    ],
+    [
+      "a brand-typed default parameter from `any`",
+      "export function f(p: PromptText = JSON.parse(raw)) { return p; }",
+      /an `any` value becomes PromptText/,
+    ],
+    [
+      "an overload claiming a branded return",
+      "export function f(v: string): PromptText;\nexport function f(v: string): any { return v; }",
+      /an overload claims a prompt brand/,
+    ],
+    [
+      "@ts-expect-error on a plain-string assignment",
+      "// @ts-expect-error -- forged\nexport const p: PromptText = raw;",
+      /type-check suppression/,
+    ],
+    // spelled in two halves: the code-shape check refuses the directive itself
+    [
+      "the ignore directive",
+      `// @ts-${"ignore"}\nexport const p: PromptText = raw;`,
+      /type-check suppression/,
+    ],
+  ])("%s", (_name, body, message) => {
+    const failures = check(body);
+    expect(failures.length).toBeGreaterThan(0);
+    expect(failures.join("\n")).toMatch(message);
+  });
+
+  test("a declaration file under src/ naming a brand", () => {
+    const failures = check(
+      "export declare const forged: PromptText;\n",
+      "src/probe/forged.d.ts",
+      'import type { PromptText } from "../lib/promptText";\n',
+    );
+    expect(failures.join("\n")).toMatch(/a declaration file names a prompt brand/);
+  });
+
+  test("a declaration file without a brand is fine", () => {
+    expect(check("export declare const plain: string;\n", "src/probe/plain.d.ts", "")).toEqual([]);
+  });
+
+  test("plain JavaScript under src/", () => {
+    expect(check("export const p = 1;\n", "src/probe/forged.js", "").join("\n")).toMatch(
+      /JavaScript under src\/ isn't type-checked/,
+    );
+  });
+});
+
 describe("check:prompt-brands still allows what the brands are for", () => {
   test("literals, typed pieces, and reshapes that transform their text", () => {
     expect(
