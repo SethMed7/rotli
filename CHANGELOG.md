@@ -157,30 +157,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that fails keeps the note marked unsaved, shows why, keeps your words in
   the note (on Rotli Web also in its recovery copy, for the next visit) and
   tries again. Closing a tab starts its save right after the tab closes, and
-  the words stay in memory until the save lands. Quitting waits for every
-  save; when one can't finish, Rotli stays open and names the note and what
-  is still outstanding.
+  the words stay in memory until the save lands. Quitting waits up to 12
+  seconds (inside the Mac's own 15) for the saves still out; if one hasn't
+  finished, Rotli stays open and names the note and what is outstanding. The
+  Mac keeps no copy of unsaved words outside memory, so a force quit still
+  loses what hadn't been saved; Rotli Web keeps a recovery copy.
 - **Words typed while Rotli copies aside a conflict are kept.** When another
   app changed a note you had unsaved edits in, quitting keeps your version as
   a copy beside it. Anything typed while that copy was being made was
   dropped, and the note looked saved. It's now part of the note's saves: the
-  newer words are kept and copied too. This happens in 1.9.1.
-- **A save that never finishes no longer holds the note, or quit.** A disk
-  that stopped answering left every later save of that note waiting, and
-  every quit ran into its 15-second limit. After 8 seconds the note now says
-  which note didn't finish saving and keeps your words; the next try first
-  checks whether the stalled save reached the disk. If that save arrives
-  late, your newest words still win.
+  newer words go into that same copy (never a second one), and the note is
+  read again before it takes the other app's version. This happens in
+  1.9.1.
+- **A slow save is waited for, never raced.** A disk that stopped answering
+  left every later save of that note waiting, and every quit ran into its
+  15-second limit. An earlier fix in this release tried again beside the
+  slow save, which let the old save land after Rotli had quit, over newer
+  words. Now Rotli sends one change per note at a time and waits for it:
+  after 8 seconds the note says, by name, that it is taking longer than
+  expected, keeps your words and stays unsaved, and nothing else goes out
+  for it until the disk answers; then your newest words are saved on top.
+  While that save is out, quitting is refused after 12 seconds, naming the
+  note. If the disk never answers, the only way out today is a force quit,
+  which loses that note's unsaved words on the Mac.
+- **A save whose answer was lost isn't mistaken for another app's edit.**
+  When a save landed but its answer didn't come back, Rotli could later
+  take its own words on disk for someone else's change: merge your newer
+  words away, or make a conflict copy of your own text. It now remembers
+  such a save's words and builds on them, and doesn't merge while it can't
+  tell. A conflict copy whose answer was lost is looked for before another
+  is made, so each conflict gets one copy.
 - **A note deleted while it had unsaved words asks what to do.** Its saves
   failed with no way out, and Rotli couldn't quit. A notice in the sidebar
-  now offers to keep the words as a new note in your Inbox (secure when the
-  deleted note was) or to discard them; either lets Rotli quit. This happens
-  in 1.9.1.
+  now offers to keep the words as a new note in your Inbox (secure and
+  locked when the deleted note was) or to discard them; either lets Rotli
+  quit, and anything typed while the new note is being made goes into it.
+  This happens in 1.9.1.
 - **A secure note's conflict copy stays secure on the Mac.** The copy Rotli
   keeps of your version when another app changed the note was created as an
   ordinary note, because the Mac's note read didn't say the note was secure.
-  The read now returns a note's protection with its words. This happens in
-  1.9.1.
+  The read now returns a note's protection with its words, and a locked
+  note's copy is created locked, in the same step. This happens in 1.9.1.
 - **A protected chat saved with Windows line endings stays protected.** A
   chat marked as holding secure-note content lost that mark when another
   editor saved it with Windows line endings, so a remote model could continue

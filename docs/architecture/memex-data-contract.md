@@ -216,8 +216,12 @@ second user-visible product or storage location.
 - Quit and in-app restart are coordinated with all three webviews. Every
   registered editor, board, document, sheet, settings, and projection flush must
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
-  the main window with an error. Forced process/OS termination can still lose
-  unsaved in-memory debounce work; no durable draft journal exists yet.
+  the main window with an error. The editor's quit flush refuses within 12
+  seconds (inside Rust's 15) while any note has a write still on its way to
+  the disk, naming the note: such a write could land after exit. The Mac app
+  keeps no durable draft journal, so a forced process/OS termination (the only
+  way out while the disk never answers) loses an unsaved buffer; Rotli Web
+  writes its unsaved buffers to a recovery journal on unload.
 - A sheet's unsaved edits are written when the window hides and at quit; a
   background save that fails says why. Edits parked from an earlier session
   whose file changed on disk since are never written over the newer file and
