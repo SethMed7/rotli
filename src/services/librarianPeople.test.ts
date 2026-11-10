@@ -166,6 +166,16 @@ describe("looking a person up locally", () => {
     expect(await existingPersonIn("Sam", notes, reads({ p1: false, x1: false }))).toBeNull();
   });
 
+  test("a fresh read saying protected refuses, whatever the listing's summary said", async () => {
+    const notes = [{ ...summary("x1", "Ana", "Projects"), secure: false }];
+    expect(await existingPersonIn("Ana", notes, reads({ x1: true }))).toBe("protected");
+  });
+
+  test("a protected namesake outside People doesn't block a person with an ordinary People note", async () => {
+    const notes = [summary("x1", "Ana", "Projects"), summary("p1", "Ana", "wiki/People/Friends")];
+    expect(await existingPersonIn("Ana", notes, reads({ x1: true, p1: false }))).toBe("plain");
+  });
+
   test("a People note whose read can't say counts as protected", async () => {
     expect(await existingPersonIn("Ana", [summary("p1", "Ana", "wiki/People")], reads({}))).toBe("protected");
   });

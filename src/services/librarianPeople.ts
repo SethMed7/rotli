@@ -46,27 +46,25 @@ const inPeople = (folder: string) => {
   return lower === "wiki/people" || lower.startsWith("wiki/people/");
 };
 
-/** Look for someone who already has a note, by name, locally. A People note
- * answers "plain" or "protected" by its own read (a read that can't say counts
- * as protected). A note made secure leaves People for the secure home (Rust
- * keeps where it came from), so a protected note by the same name anywhere
- * also answers "protected" (eighth review: it answered "absent", and the
- * Librarian made the person a second note). Fails closed: a protected note
- * with the same name that isn't a person refuses too. */
+/** Look for someone who already has a note, by name, locally, by each
+ * note's own fresh read (a listing's summary can be out of date; a read that
+ * can't say counts as protected). A People note by that name decides: one is
+ * protected, or they are plain. With none in People, a protected note by that
+ * name anywhere answers "protected": a note made secure leaves People for the
+ * secure home (Rust keeps where it came from), and the look-up fails closed.
+ * Ninth review: a namesake outside People no longer blocks a person who has an
+ * ordinary People note, and a summary saying unprotected no longer overrides
+ * a read saying protected. */
 export async function existingPersonIn(
   name: string,
   notes: readonly NoteSummary[],
   read: (id: string) => Promise<Note | null>,
 ): Promise<"protected" | "plain" | null> {
-  let found: "plain" | null = null;
-  for (const note of notes) {
-    if ((note.kind ?? "note") !== "note" || !same(note.title, name)) continue;
-    const people = inPeople(note.diskFolderId ?? note.folderId);
-    const protectedNote = (await read(note.id))?.secure !== false;
-    if (protectedNote && (people || note.secure !== false)) return "protected";
-    if (people) found = "plain";
-  }
-  return found;
+  const named = notes.filter((note) => (note.kind ?? "note") === "note" && same(note.title, name));
+  const isProtected = async (note: NoteSummary) => (await read(note.id))?.secure !== false;
+  const people = named.filter((note) => inPeople(note.diskFolderId ?? note.folderId));
+  for (const note of people.length > 0 ? people : named) if (await isProtected(note)) return "protected";
+  return people.length > 0 ? "plain" : null;
 }
 
 const existingPerson = async (name: string) =>

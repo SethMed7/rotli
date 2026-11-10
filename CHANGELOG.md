@@ -50,9 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name and say it; switched to a remote model, the next message carried that
   reply to it. Secure People are now left out of what the Librarian sees,
   on-device or remote. If a reply would then make a note for someone who
-  already has a protected one, Rotli looks the name up on your Mac first
-  (People, and any protected note by that name, since a note made secure
-  leaves People for the secure home), makes and changes nothing, and says
+  already has a protected one, Rotli looks the name up on your Mac first,
+  by each note's own fresh read (their People note decides; with none, any
+  protected note by that name, since a note made secure leaves People for
+  the secure home), makes and changes nothing, and says
   "That person’s note is protected, so the Librarian can’t change it". Leaving People out doesn't hide names: a
   secure person's name can still reach the model through the note you ask
   about (its words, tags and links) and through your own rules and groups.
