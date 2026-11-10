@@ -13,6 +13,7 @@ import { qualifiedArtifactId } from "../ai/imageLinks";
 import type { Host } from "../ai/types";
 import { resolveWikiEmbed } from "../editor/fileEmbeds";
 import { flushNote } from "../editor/model";
+import { savedVersionMismatch } from "../editor/savedVersion";
 import { type AttachmentLink, type AttachmentPlace, attachmentLinks } from "../lib/handToAi";
 import { secureByName } from "../lib/librarianRules";
 import type { ApprovedText } from "../lib/promptText";
@@ -215,7 +216,8 @@ export async function handToAiFor(
   noteId: string,
   locate: LocateAttachment = locateAttachment,
 ): Promise<HandToAi> {
-  // the last keystrokes may still sit in the editor's 400ms save window
+  // the last keystrokes may still sit in the editor's 400ms save window, or
+  // a save may be out: wait for it (a failed save throws its own words)
   await flushNote(noteId);
   const note = await notesService.getNote(noteId);
   if (!note) throw new Error("Rotli couldn’t find this note.");
@@ -226,7 +228,12 @@ export async function handToAiFor(
   // in the Mac app, the web AI corpus on Rotli Web): an earlier read can hold
   // an older, secure version with no secure flag (reviews of pull request 267)
   const approved = await approvedNote(noteId, HANDOFF_READER, { browserFallback: true }).catch(() => null);
-  if (approved === null) return { kind: "secure", title: shown };
+  // the handoff reads as a remote-class reader, so the gate never marks it
+  // on-device only; if it ever did, it would not leave Rotli
+  if (approved === null || approved.onDeviceOnly) return { kind: "secure", title: shown };
+  // what leaves must be the version the editor just saved, or nothing does
+  const unsaved = savedVersionMismatch(noteId, approved);
+  if (unsaved) throw new Error(unsaved);
   const title = approved.title || "Untitled";
   const body = approved.body;
   if (looksSecret(body)) return { kind: "secret", title };

@@ -91,7 +91,12 @@ export function openNoteChat(note: NoteSummary, slug: string): void {
 /** Open a note's chat by id — for callers that hold only the id (a chord, or
  * the Quick Note's request to main). A note that is gone opens nothing and
  * answers false. */
-export async function openChatForNoteId(id: string, opts?: { create?: boolean }): Promise<boolean> {
+/** `secureContext`: the chat is born carrying the secure-context mark, so it
+ * never continues on a remote model (a hand-over from an on-device-only
+ * Librarian conversation; fourth review of pull request 267). */
+type OpenChatOptions = { create?: boolean; secureContext?: boolean };
+
+export async function openChatForNoteId(id: string, opts?: OpenChatOptions): Promise<boolean> {
   if (!noteChatReady()) return false;
   const note = (await notesService.listNotes()).find((n) => n.id === id);
   if (!note) return false;
@@ -99,15 +104,16 @@ export async function openChatForNoteId(id: string, opts?: { create?: boolean })
   return true;
 }
 
-export async function openChatForNote(note: NoteSummary, opts?: { create?: boolean }): Promise<void> {
+export async function openChatForNote(note: NoteSummary, opts?: OpenChatOptions): Promise<void> {
   if (!noteChatReady()) return;
   const { instance, stem, secure, chats, attached } = await noteChatContext(note);
 
-  let slug = opts?.create ? null : (attached[0]?.slug ?? null);
+  // a marked hand-over always starts its own chat, never an unmarked one
+  let slug = opts?.create || opts?.secureContext ? null : (attached[0]?.slug ?? null);
   if (!slug) {
     const chatSubject = secure ? "secure note" : note.title;
     const base = noteChatSlug(chatSubject, note.id);
-    if (!opts?.create && chats.some((chat) => chat.slug === base)) {
+    if (!opts?.create && !opts?.secureContext && chats.some((chat) => chat.slug === base)) {
       // The deterministic chat file exists but lost its attachment metadata —
       // repair it in place rather than overwriting (or duplicating) its bytes.
       await setChatAttachedTo(instance, base, stem);
@@ -129,6 +135,7 @@ export async function openChatForNote(note: NoteSummary, opts?: { create?: boole
         title: ordinal ? `${baseTitle} · ${ordinal}` : baseTitle,
         attachedTo: stem,
         messages: [],
+        ...(opts?.secureContext ? { secureContext: true } : {}),
       });
     }
     await invalidateMemex();

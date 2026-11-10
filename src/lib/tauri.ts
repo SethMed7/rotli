@@ -310,6 +310,7 @@ export interface CorpusNoteMeta {
    * file — image/pdf/…, surfaced read-only, opened in the OS default app). Rust
    * serde-defaults to "note" for back-compat, so it's optional on the wire. */
   kind?: "note" | "board" | "file";
+  onDeviceOnly?: boolean; // an AI row the gate passed only for an on-device reader
 }
 
 /** What corpus_read_board returns — the raw .excalidraw JSON plus file meta.
@@ -1507,6 +1508,7 @@ export interface CorpusAiRead {
   revision: string;
   /** The editor's copy of the note, when asked for (desktop only). */
   editor?: string;
+  onDeviceOnly?: boolean; // passed only because the reader is on-device
 }
 
 export async function corpusReadAiVersioned(

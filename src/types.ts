@@ -95,6 +95,8 @@ export interface SearchHit {
    * for 2–3, empty for 4. matchStart/matchLen mirror the first span. */
   spans: [number, number][];
   updatedAt: number;
+  /** An AI hit the gate passed only for an on-device reader (fourth review). */
+  onDeviceOnly?: boolean;
 }
 
 /** Per-tab view state only — the document buffer is shared per noteId

@@ -10,6 +10,7 @@ import { approvedNote } from "../ai/approvedRead";
 import { type InlineVerdict, askInline } from "../ai/inlineAi";
 import type { Host } from "../ai/types";
 import { flushNote, reloadDocumentIfClean } from "../editor/model";
+import { STILL_SAVING } from "../editor/savedVersion";
 import { consentedInsertRefusal } from "../lib/aiEditPolicy";
 import { corpusInsertAi } from "../lib/aiInsert";
 import { type ApprovedText, personText, reshape } from "../lib/promptText";
@@ -45,7 +46,6 @@ export const INLINE_AI_DEPS: InlineAiDeps = {
   },
 };
 
-const STILL_SAVING = "The note is still saving. Try again in a moment.";
 const PROTECTION_UNREADABLE = "This note’s protection couldn’t be read, so nothing was sent or written.";
 
 function reasonOf(error: unknown): string {
@@ -69,9 +69,10 @@ async function gatedRead(
   model: Model,
   docText: string,
 ): Promise<{ ok: true; revision: string; body: ApprovedText } | { ok: false; reason: string }> {
-  await deps.flush(noteId);
   let read: { revision: string; body: ApprovedText };
   try {
+    // a failed save is said in its own words; nothing is read or sent
+    await deps.flush(noteId);
     read = await deps.read(noteId, model);
   } catch (error) {
     return { ok: false, reason: reasonOf(error) };

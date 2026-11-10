@@ -93,7 +93,26 @@ describe("asking — the gates before any model runs", () => {
   test("a note still saving is not guessed at", async () => {
     const { d } = deps({ body: `${DOC} (older)` });
     const h = host();
-    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toMatchObject({ ok: false });
+    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toEqual({
+      ok: false,
+      reason: "Still saving. Try again in a moment.",
+    });
+    expect(h.sent).toHaveLength(0);
+  });
+
+  // fourth review of pull request 267 (#2): a save that failed is said in its
+  // own words; nothing is read or sent
+  test("a failed save is the refusal, in its own words", async () => {
+    const { d, calls } = deps();
+    d.flush = async () => {
+      throw new Error("The disk is full.");
+    };
+    const h = host();
+    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toEqual({
+      ok: false,
+      reason: "The disk is full.",
+    });
+    expect(calls).not.toContain("read");
     expect(h.sent).toHaveLength(0);
   });
 });

@@ -1,4 +1,6 @@
 import { type ApprovedNote, approvedNote } from "../ai/approvedRead";
+import { flushNote } from "../editor/model";
+import { savedVersionMismatch } from "../editor/savedVersion";
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
 import { reshape } from "../lib/promptText";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
@@ -121,19 +123,32 @@ const NO_MODEL: Reader = { id: "", endpoint: "" };
  * paths read the note through the editor's ungated lane, so a note that turned
  * secure mid-turn had its notes sent to a remote model). Throws
  * MEMORY_NOTE_WITHHELD when the gate refuses. */
+/** How memory waits for, and checks, the editor's save of a note. */
+export interface SavedVersion {
+  flush: (noteId: string) => Promise<void>;
+  mismatch: (noteId: string, read: { revision: string; body: string }) => string | null;
+}
+const EDITOR_SAVES: SavedVersion = { flush: flushNote, mismatch: savedVersionMismatch };
+
 export async function memoryNoteFor(
   id: string,
   stem: string,
   aiEditable: boolean,
   reader: Reader,
   read: (id: string, reader: Reader) => Promise<ApprovedNote> = approvedNote,
+  saved: SavedVersion = EDITOR_SAVES,
 ): Promise<ChatMemoryNote> {
+  // the note as its editor last saved it, or nothing (fourth review): a save
+  // still out is waited for, and a failed one is said in its own words
+  await saved.flush(id);
   let note: ApprovedNote;
   try {
     note = await read(id, reader);
   } catch {
     throw new Error(MEMORY_NOTE_WITHHELD);
   }
+  const unsaved = saved.mismatch(id, note);
+  if (unsaved) throw new Error(unsaved);
   const notes = reshape(note.body, (body) => extractChatNotes(body) ?? "");
   return {
     id,

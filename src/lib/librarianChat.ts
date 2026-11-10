@@ -66,6 +66,9 @@ export interface LibrarianContext {
   rules: LibrarianRules;
   /** The people the vault already has notes for. */
   known: readonly Approved<PersonNote>[];
+  /** Something here was readable only by an on-device model (the gate said
+   * so): the conversation stays on-device from this turn on. */
+  onDeviceOnly: boolean;
 }
 
 const SYSTEM =
@@ -118,12 +121,15 @@ ${reshape(ctx.doc, (doc) => doc.slice(0, EXCERPT_MAX))}`;
 }
 
 /** A user turn: what they typed, after the passage they had highlighted when
- * that passage is (still) in the note as approved for this send. A passage
- * the approved note no longer holds is not sent (it came from the editor). */
+ * that passage is (still) in the note as approved for this send. The newest
+ * turn's passage must be (sendToLibrarian refuses otherwise); an earlier
+ * turn's passage that has since been edited away is said to be gone, never
+ * dropped silently. Only text from the approved note is sent. */
 function userContent(turn: Extract<LibrarianTurn, { role: "user" }>, doc: ApprovedText): PromptText {
   const exact = turn.highlight?.exact ?? "";
   const at = exact ? doc.indexOf(exact) : -1;
-  if (at < 0) return prompt`${turn.text}`;
+  if (!exact) return prompt`${turn.text}`;
+  if (at < 0) return prompt`(The passage highlighted then is no longer in the note.)\n\n${turn.text}`;
   const passage = reshape(doc, (text) => text.slice(at, at + exact.length));
   return prompt`Highlighted passage: """${passage}"""\n\n${turn.text}`;
 }

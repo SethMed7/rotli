@@ -37,6 +37,10 @@ const pendingDocuments = new Set<string>();
 const protections = new Map<string, { secure: boolean; locked: boolean }>();
 const subs = new Map<string, Set<() => void>>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+// Each note's write out right now (flushNote waits for it), and the notes
+// whose timer is a retry after a failed save rather than new typing.
+const inflight = new Map<string, Promise<void>>();
+const retrying = new Set<string>();
 
 // The one write funnel syncNow uses — swappable so tests can simulate the disk
 // failing (the in-memory test service can't fail any other way).
@@ -243,6 +247,7 @@ export function evictDocument(noteId: string): void {
   clearTimeout(releaseTimers.get(noteId));
   releaseTimers.delete(noteId);
   timers.delete(noteId);
+  retrying.delete(noteId);
   docs.delete(noteId);
   revisions.delete(noteId);
   persistedBodies.delete(noteId);
@@ -274,6 +279,14 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
 }
 
 function syncNow(noteId: string): Promise<void> {
+  const write = writeNow(noteId);
+  inflight.set(noteId, write);
+  const settle = () => inflight.get(noteId) === write && inflight.delete(noteId);
+  void write.then(settle, settle);
+  return write;
+}
+
+function writeNow(noteId: string): Promise<void> {
   const lines = docs.get(noteId);
   if (!lines) return Promise.resolve();
   const expectedRevision = revisions.get(noteId);
@@ -381,10 +394,12 @@ async function keepConflictCopies(): Promise<string[]> {
 
 function scheduleRetry(noteId: string): void {
   if (timers.has(noteId)) return; // newer keystrokes already queued a sync
+  retrying.add(noteId);
   timers.set(
     noteId,
     setTimeout(() => {
       timers.delete(noteId);
+      retrying.delete(noteId);
       void syncNow(noteId);
     }, RETRY_DELAY_MS),
   );
@@ -395,6 +410,7 @@ function scheduleSync(noteId: string): void {
   if (pendingDocuments.has(noteId)) return;
   const pending = timers.get(noteId);
   if (pending !== undefined) clearTimeout(pending);
+  retrying.delete(noteId);
   timers.set(
     noteId,
     setTimeout(() => {
@@ -404,16 +420,35 @@ function scheduleSync(noteId: string): void {
   );
 }
 
-/** Flush ONE note's pending debounced sync — the note/tab-switch path.
- * The timer would still fire 400ms later, but flushing at the switch means
- * the list row and the disk are already true when the eye lands elsewhere. */
-export function flushNote(noteId: string): Promise<void> {
-  const pending = timers.get(noteId);
-  if (pending === undefined) return Promise.resolve();
-  clearTimeout(pending);
-  timers.delete(noteId);
-  return syncNow(noteId);
+/** Flush ONE note: resolve once no timer waits and no save is out; reject
+ * with a failed save's error (its retry stays on the timer). What every read
+ * for a model waits on first: it used to return while a fired timer's save
+ * was still out (fourth review of pull request 267). */
+export async function flushNote(noteId: string): Promise<void> {
+  // a save can queue another (keystrokes meanwhile): settle, up to a bound
+  for (let round = 0; round < 8; round += 1) {
+    const pending = timers.get(noteId);
+    // new typing is saved now; a retry after a failed save is left to its timer
+    if (pending !== undefined && !retrying.has(noteId)) {
+      clearTimeout(pending);
+      timers.delete(noteId);
+      void syncNow(noteId);
+    }
+    const write = inflight.get(noteId);
+    if (!write) break;
+    await write;
+  }
+  const failed = isDirty(noteId) ? documentSaveError(noteId) : null;
+  if (failed) throw new Error(failed);
 }
+
+/** One note's save state for savedVersion.ts: the editor's text, whether a
+ * save waits or is out, and the revision it last saved. */
+export const saveState = (noteId: string) => ({
+  text: docs.get(noteId)?.join("\n"),
+  pending: timers.has(noteId) || inflight.has(noteId),
+  revision: revisions.get(noteId),
+});
 
 type AfterPaintScheduler = (task: () => void) => void;
 
@@ -436,7 +471,8 @@ export function flushNoteAfterPaint(
   schedule: AfterPaintScheduler = scheduleAfterNextPaint,
 ): void {
   if (!timers.has(noteId)) return;
-  schedule(() => void flushNote(noteId));
+  // a failed save stays on the editor's save dot; nothing awaits it here
+  schedule(() => void flushNote(noteId).catch(() => {}));
 }
 
 /** Flush every pending debounced sync immediately — the quit/reload path. The
@@ -450,6 +486,7 @@ export async function flushSyncs(): Promise<void> {
     pending.push(syncNow(noteId));
   }
   timers.clear();
+  retrying.clear();
   await Promise.allSettled(pending);
   await keepConflictCopies();
   const unsaved = [...dirtyNoteIds()];

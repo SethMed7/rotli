@@ -62,6 +62,9 @@ export interface ApprovedNote {
   /** The editor's copy, without frontmatter. */
   readonly body: ApprovedText;
   readonly title: ApprovedText;
+  /** The gate passed it only because the reader is on-device: whatever is
+   * built from it never goes to a remote model (fourth review). */
+  readonly onDeviceOnly: boolean;
 }
 
 /** The gate's read of one note: Rust in the Mac app, the registered web AI
@@ -85,7 +88,7 @@ export async function approvedNote(
   reader: Reader,
   opts: { browserFallback?: boolean } = {},
 ): Promise<ApprovedNote> {
-  const read: { body: string; revision: string; editor?: string } = await gatedRead(
+  const read: { body: string; revision: string; editor?: string; onDeviceOnly?: boolean } = await gatedRead(
     id,
     reader,
     opts.browserFallback === true,
@@ -97,6 +100,7 @@ export async function approvedNote(
     text: approve(read.body),
     body: approve(body),
     title: approve(titleOf(body)),
+    onDeviceOnly: read.onDeviceOnly === true,
   };
 }
 
@@ -203,11 +207,12 @@ export async function approvedKnowledgeMap(
   contextWindow: number,
   maxChars: number,
   keep: (row: Approved<CorpusNoteMeta>) => boolean,
-): Promise<{ map: ApprovedText; ids: string[] }> {
+): Promise<{ map: ApprovedText; ids: string[]; onDeviceOnly: boolean }> {
   const rows = (await approvedNoteRows(reader)).filter(keep);
   return {
     map: approve(buildModelMap(rows as unknown as ModelMapNote[], contextWindow, maxChars)),
     ids: rows.map((row) => row.id),
+    onDeviceOnly: rows.some((row) => row.onDeviceOnly === true),
   };
 }
 

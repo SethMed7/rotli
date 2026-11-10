@@ -91,6 +91,9 @@ export function makeTauriHost(
      * model creates in that state is stamped `secure: true`, so a same-run
      * create_note can't launder secure prose into an open note (PR #4 P1). */
     isSecureContext?: () => boolean;
+    /** Is a note's approved read the version its editor just saved? Null when
+     * it is; otherwise why not, and nothing from it is sent. */
+    savedVersion?: (noteId: string, read: { revision: string; body: string }) => string | null;
     /** Register a newly created conventional artifact with its originating
      * chat. Presentation remains click-to-open so the final reply stays put. */
     onArtifactCreated?: (artifact: CreatedChatArtifact) => void | Promise<void>;
@@ -121,6 +124,21 @@ export function makeTauriHost(
         return;
       }
     }
+  };
+
+  /** The gate's own word that something it approved may go only to an
+   * on-device model: the chat is marked secure-context from then on, for
+   * every read path, not only the ones recognised as secure below (fourth
+   * review of pull request 267). */
+  const marked = (onDeviceOnly: boolean): void => {
+    if (onDeviceOnly && modelIsOnDevice(model)) opts?.onSecureNoteRead?.();
+  };
+  const markedRows = (
+    rows: readonly { id: string; onDeviceOnly?: boolean }[],
+    shown: readonly { id: string }[],
+  ) => {
+    const only = new Set(rows.filter((row) => row.onDeviceOnly === true).map((row) => row.id));
+    marked(shown.some((hit) => only.has(hit.id)));
   };
 
   const host: Host = {
@@ -200,13 +218,16 @@ export function makeTauriHost(
               byFolder.filter((h) => permitted.has(h.id)),
               limit,
             );
+        markedRows([...found, ...listed], result);
         await markSecureIds(result.map((hit) => hit.id));
         return result;
       } catch {
         // the browser twin and a search error still answer from the listing —
         // through the GATED listing, so the fallback is not a way around it
-        const ranked = rankNotes(await approvedNoteRows(model), query, limit);
+        const rows = await approvedNoteRows(model);
+        const ranked = rankNotes(rows, query, limit);
         const result = await aiReadableHits(ranked, model);
+        markedRows(rows, result);
         await markSecureIds(result.map((hit) => hit.id));
         return result;
       }
@@ -215,7 +236,11 @@ export function makeTauriHost(
       // Rust verifies model id + provider registration + loopback endpoint.
       // A localhost proxy for a frontier provider therefore remains remote.
       const protectedLocation = await assertAiNoteLocation(id, model);
-      const { text } = await approvedNote(id, model);
+      const approved = await approvedNote(id, model);
+      const unsaved = opts?.savedVersion?.(id, approved) ?? null;
+      if (unsaved) return prompt`error: ${externalText(unsaved)}`;
+      const { text, onDeviceOnly } = approved;
+      marked(onDeviceOnly);
       if (protectedLocation) opts?.onSecureNoteRead?.();
       if (opts?.onSecureNoteRead) {
         try {
@@ -375,7 +400,10 @@ export function makeTauriHost(
         ...(isAreaIndex(hit.title, hit.folderId) ? { role: "area-index" as const } : {}),
       }));
       const instance = activeInstance(await loadConfig());
-      if (!instance) return noteHits.slice(0, limit);
+      if (!instance) {
+        markedRows(noteResults.flat(), noteHits.slice(0, limit));
+        return noteHits.slice(0, limit);
+      }
       // A remote model never receives a secret-shaped chat, nor one whose
       // secureContext marker says a secure note fed its transcript
       // (approvedRead.ts). The provider's Rust egress detector is the final
@@ -388,6 +416,7 @@ export function makeTauriHost(
         selected.push(...noteHits.slice(limit - chatQuota, limit - chatQuota + limit - selected.length));
       }
       const result = selected.slice(0, limit);
+      markedRows(noteResults.flat(), result);
       await markSecureIds(result.filter((hit) => hit.source === "note").map((hit) => hit.id));
       if (modelIsOnDevice(model) && result.some((hit) => protectedIds.has(hit.id))) {
         opts?.onSecureNoteRead?.();
@@ -397,7 +426,8 @@ export function makeTauriHost(
     async readMemory(id) {
       if (!id.startsWith("chat:")) {
         await assertAiNoteLocation(id, model);
-        const { text } = await approvedNote(id, model);
+        const { text, onDeviceOnly } = await approvedNote(id, model);
+        marked(onDeviceOnly);
         await markSecureIds([id]);
         return text;
       }
@@ -528,7 +558,7 @@ export function makeTauriHost(
       // same ids through `corpus_readable_ids` — pure duplication on THIS path.
       // (The SEARCH lane still probes: it unions folder-name hits the listing gate
       // never saw, so those need their own read check.) (perf audit, 2026-08)
-      const { map, ids } = await approvedKnowledgeMap(
+      const { map, ids, onDeviceOnly } = await approvedKnowledgeMap(
         model,
         contextWindowFor(model),
         maxChars,
@@ -536,6 +566,7 @@ export function makeTauriHost(
           modelIsOnDevice(model) ||
           ![note.id, note.folderId, note.diskFolderId].some((path) => path && inSecureHome(path)),
       );
+      marked(onDeviceOnly);
       await markSecureIds(ids);
       return prompt`${map}`;
     },

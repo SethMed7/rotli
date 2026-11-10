@@ -14,6 +14,7 @@ import { approved, approvedRow, model, person } from "./promptText.fixtures";
 const NOTE =
   "# Maya Chen\n\nMet Maya at the design meetup. She runs research at Northwind.\n\nFollow up in March.";
 const CTX: LibrarianContext = {
+  onDeviceOnly: false,
   title: approved("Maya Chen"),
   doc: approved(NOTE),
   areas: [approved("people"), approved("projects")],

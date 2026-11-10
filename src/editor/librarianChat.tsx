@@ -48,6 +48,7 @@ import {
   onEscapeHere,
   refusalNow,
   sendToLibrarian,
+  startOver,
   takeToChat,
   tauriHostFor,
   useLibrarianModels,
@@ -139,7 +140,7 @@ export function ChatPanel({
   const { groups, models } = useLibrarianModels();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(chat.draft ?? "");
   const log = useRef<HTMLOListElement | null>(null);
   const box = useRef<HTMLTextAreaElement | null>(null);
   const thinking = chat.status === "thinking";
@@ -166,10 +167,17 @@ export function ChatPanel({
       (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
       hostFor,
-    );
+    ).then((outcome) => {
+      // refused before anything was sent: the words go back to the composer
+      if (outcome === "onDeviceOnly") setDraft(text);
+    });
   };
 
-  const pick = (id: string) => updateLibrarianChat(chat.id, () => ({ modelId: id }));
+  const pick = (id: string) =>
+    updateLibrarianChat(chat.id, () => ({
+      modelId: id,
+      ...(chat.restartWith ? { restartWith: null, error: null } : {}),
+    }));
   // the question a reply answered: what "Take this to Chat" carries over
   const askedBefore = (index: number) =>
     chat.turns
@@ -274,6 +282,15 @@ export function ChatPanel({
         <p className="libbar-note err libchat-error" role="alert">
           {chat.error}
         </p>
+      )}
+      {chat.restartWith && (
+        <button
+          type="button"
+          className="libbar-link libchat-restart"
+          onClick={() => startOver(chat, chat.restartWith ?? chat.modelId, draft)}
+        >
+          Start a new conversation
+        </button>
       )}
 
       <form

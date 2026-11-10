@@ -31,6 +31,10 @@ import {
   setWriteNoteBodyForTests,
 } from "./model";
 
+/** Flush, keeping the old tests' view: a failed save is read off the save
+ * state after; the rejection itself is asserted in "flushNote's contract". */
+const flushed = (noteId: string) => flushNote(noteId).catch(() => {});
+
 // Track buffer ids we create so cleanup can clear their pending sync timers.
 const touched = new Set<string>();
 function buffer(id: string, body: string): void {
@@ -103,7 +107,7 @@ describe("reloadDocumentIfClean", () => {
 
     reloadDocumentIfClean("moved-clean", "same prose", "test:moved-clean:2");
     editDocument("moved-clean", () => ["later edit"]);
-    await flushNote("moved-clean");
+    await flushed("moved-clean");
 
     expect(presented).toBe("test:moved-clean:2");
   });
@@ -118,7 +122,7 @@ describe("reloadDocumentIfClean", () => {
     editDocument("moved-dirty", () => ["local draft"]);
 
     reloadDocumentIfClean("moved-dirty", "disk prose", "test:moved-dirty:2");
-    await flushNote("moved-dirty");
+    await flushed("moved-dirty");
 
     expect(writes).toEqual([{ body: "local draft", revision: "test:moved-dirty:2" }]);
     expect(read("moved-dirty")).toEqual(["local draft"]);
@@ -134,7 +138,7 @@ describe("reloadDocumentIfClean", () => {
     editDocument("real-conflict", () => ["local draft"]);
 
     reloadDocumentIfClean("real-conflict", "external draft", "test:real-conflict:2");
-    await flushNote("real-conflict");
+    await flushed("real-conflict");
 
     expect(presented).toBe("test:real-conflict:1");
     expect(read("real-conflict")).toEqual(["local draft"]);
@@ -194,7 +198,7 @@ describe("optimistic pending documents", () => {
       body: "",
       revision: "test:durable-note:1",
     });
-    await flushNote("durable-note");
+    await flushed("durable-note");
 
     expect(read("durable-note")).toEqual(["typed before creation returned"]);
     expect(writes).toEqual([
@@ -222,7 +226,7 @@ describe("sync failure surfacing", () => {
     setWriteNoteBodyForTests(() => Promise.reject(new Error("disk full")));
     buffer("fail", "hello");
     editDocument("fail", () => ["hello world"]);
-    await flushNote("fail");
+    await flushed("fail");
     expect(read("fail")).toEqual(["hello world"]);
     expect(documentSaveError("fail")).toBe("disk full");
   });
@@ -235,7 +239,7 @@ describe("sync failure surfacing", () => {
     });
     buffer("conflict", "old");
     editDocument("conflict", () => ["local"]);
-    await flushNote("conflict");
+    await flushed("conflict");
     expect(presented).toBe("test:conflict:1");
     expect(read("conflict")).toEqual(["local"]);
     expect(documentSaveError("conflict")).toContain("revision conflict");
@@ -251,11 +255,11 @@ describe("sync failure surfacing", () => {
     });
     buffer("move-recover", "disk prose");
     editDocument("move-recover", () => ["local draft"]);
-    await flushNote("move-recover");
+    await flushed("move-recover");
     expect(documentSaveError("move-recover")).toContain("revision conflict");
 
     reloadDocumentIfClean("move-recover", "disk prose", "test:move-recover:2");
-    await flushNote("move-recover");
+    await flushed("move-recover");
 
     expect(revisions).toEqual(["test:move-recover:1", "test:move-recover:2"]);
     expect(documentSaveError("move-recover")).toBeNull();
@@ -269,10 +273,10 @@ describe("sync failure surfacing", () => {
     );
     buffer("recover", "x");
     editDocument("recover", () => ["y"]);
-    await flushNote("recover");
+    await flushed("recover");
     expect(documentSaveError("recover")).toBe("transient");
     editDocument("recover", () => ["z"]);
-    await flushNote("recover");
+    await flushed("recover");
     expect(documentSaveError("recover")).toBeNull();
   });
 
@@ -280,7 +284,7 @@ describe("sync failure surfacing", () => {
     setWriteNoteBodyForTests(() => Promise.reject(new Error("unknown note: ghost2")));
     buffer("ghost2", "x");
     editDocument("ghost2", () => ["y"]);
-    await flushNote("ghost2");
+    await flushed("ghost2");
     expect(read("ghost2")).toEqual(["y"]);
     expect(documentSaveError("ghost2")).toBe("unknown note: ghost2");
   });
@@ -289,7 +293,7 @@ describe("sync failure surfacing", () => {
     setWriteNoteBodyForTests(() => Promise.reject(new Error("io error")));
     buffer("gone", "x");
     editDocument("gone", () => ["y"]);
-    await flushNote("gone");
+    await flushed("gone");
     expect(documentSaveError("gone")).toBe("io error");
     evictDocument("gone");
     expect(documentSaveError("gone")).toBeNull();
@@ -348,7 +352,7 @@ describe("conflicts resolve themselves (2026-09-03)", () => {
     const disk = base.replace("- [ ] buy milk", "- [x] buy milk");
     reloadDocumentIfClean("fold", disk, "test:fold:2");
     expect(read("fold")).toEqual(["# Plan", "", "- [x] buy milk", "", "Notes.", "Typed meanwhile."]);
-    await flushNote("fold");
+    await flushed("fold");
     expect(writes.at(-1)).toEqual({
       body: `${disk}\nTyped meanwhile.`,
       revision: "test:fold:2",
@@ -377,10 +381,10 @@ describe("conflicts resolve themselves (2026-09-03)", () => {
     );
     buffer("stuck", base);
     editDocument("stuck", (lines) => ["# Plan for Monday", ...lines.slice(1)]);
-    await flushNote("stuck");
+    await flushed("stuck");
     // the failed save triggered the reconcile; give it a tick, then flush the queued save
     await new Promise((resolve) => setTimeout(resolve, 0));
-    await flushNote("stuck");
+    await flushed("stuck");
     expect(attempts).toBe(2);
     expect(read("stuck")).toEqual([
       "# Plan for Monday",
@@ -401,7 +405,7 @@ describe("conflicts resolve themselves (2026-09-03)", () => {
     setReadNoteForTests(() => notesService.getNote(seeded.id));
     ensureDocument(seeded.id, "# Plan\n\nNotes.", "test:seeded:1");
     editDocument(seeded.id, () => ["# Plan", "", "Notes, mine."]);
-    await flushNote(seeded.id);
+    await flushed(seeded.id);
     expect(documentSaveError(seeded.id)).toContain("revision conflict");
 
     await flushSyncs(); // must resolve, not throw
@@ -440,7 +444,7 @@ test("a quit conflict copy keeps a secure locked note protected", async () => {
   setReadNoteForTests(() => notesService.getNote(note.id));
   ensureDocument(note.id, note.body, note.revision, note);
   editDocument(note.id, () => ["# Private", "", "mine"]);
-  await flushNote(note.id);
+  await flushed(note.id);
   await flushSyncs();
   const copy = (await notesService.listNotes(folder.id)).find((item) => item.id !== note.id);
   expect(copy).toMatchObject({ secure: true, locked: true });
@@ -506,5 +510,60 @@ describe("releasing closed buffers", () => {
     await settle(40);
     expect(getDocumentText("release-reopen")).toBe("# release-reopen\nbody");
     reopen();
+  });
+});
+
+// Fourth review of pull request 267 (#2): flushNote returned at once when the
+// debounce timer had already fired, though that save was still out, so a
+// model read the previous version. It now resolves only when nothing waits
+// to be written and nothing is in flight, and rejects with a failed save.
+describe("flushNote's contract", () => {
+  test("waits for a save already in flight", async () => {
+    let release!: () => void;
+    const landed: string[] = [];
+    setWriteNoteBodyForTests(async (_id, body) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      landed.push(body);
+    });
+    buffer("flight", "old");
+    editDocument("flight", () => ["new"]);
+    const first = flushNote("flight"); // the write is now out, no timer left
+    let second = false;
+    const waiting = flushNote("flight").then(() => {
+      second = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(second).toBe(false);
+    release();
+    await Promise.all([first, waiting]);
+    expect(landed).toEqual(["new"]);
+    expect(second).toBe(true);
+  });
+
+  test("rejects with the failed save's own words, and leaves the retry to its timer", async () => {
+    let writes = 0;
+    setWriteNoteBodyForTests(() => {
+      writes += 1;
+      return Promise.reject(new Error("disk full"));
+    });
+    buffer("broken", "x");
+    editDocument("broken", () => ["y"]);
+    await expect(flushNote("broken")).rejects.toThrow("disk full");
+    await expect(flushNote("broken")).rejects.toThrow("disk full");
+    expect(writes).toBe(1);
+  });
+
+  test("new typing after a failed save is saved by the next flush", async () => {
+    let fail = true;
+    setWriteNoteBodyForTests(() => (fail ? Promise.reject(new Error("transient")) : Promise.resolve()));
+    buffer("again", "x");
+    editDocument("again", () => ["y"]);
+    await expect(flushNote("again")).rejects.toThrow("transient");
+    fail = false;
+    editDocument("again", () => ["z"]);
+    await flushNote("again");
+    expect(documentSaveError("again")).toBeNull();
   });
 });

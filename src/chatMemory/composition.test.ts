@@ -87,6 +87,7 @@ describe("conversation memory reads its note through the gate", () => {
         text: approved(body),
         body: approved(body),
         title: approved("Plan"),
+        onDeviceOnly: false,
       };
     };
 
@@ -134,5 +135,50 @@ describe("conversation memory reads its note through the gate", () => {
     await done;
     expect(composed).toEqual(["- launch on friday"]);
     expect(writes).toEqual(["attached@rev-attached"]);
+  });
+});
+
+// Fourth review (#2): memory waits for the note's save and sends nothing when
+// the read isn't the version the editor just saved, or the save failed.
+describe("conversation memory reads its note as just saved", () => {
+  const MODEL = { id: "local", endpoint: "http://127.0.0.1:11434" };
+  const read = async (id: string): Promise<ApprovedNote> => ({
+    id,
+    revision: "r-disk",
+    text: approved("# Plan"),
+    body: approved("# Plan"),
+    title: approved("Plan"),
+    onDeviceOnly: false,
+  });
+
+  test("a failed save is the refusal, in its own words, before anything is read", async () => {
+    let reads = 0;
+    const saved = {
+      flush: async () => {
+        throw new Error("The disk is full.");
+      },
+      mismatch: () => null,
+    };
+    await expect(
+      memoryNoteFor(
+        "n",
+        "plan",
+        true,
+        MODEL,
+        async (id) => {
+          reads += 1;
+          return read(id);
+        },
+        saved,
+      ),
+    ).rejects.toThrow("The disk is full.");
+    expect(reads).toBe(0);
+  });
+
+  test("a read that isn't the editor's saved version is refused: still saving", async () => {
+    const saved = { flush: async () => {}, mismatch: () => "Still saving. Try again in a moment." };
+    await expect(memoryNoteFor("n", "plan", true, MODEL, read, saved)).rejects.toThrow(
+      "Still saving. Try again in a moment.",
+    );
   });
 });

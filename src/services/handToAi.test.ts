@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { CompleteReq } from "../ai/types";
+import { ensureDocument, evictDocument } from "../editor/model";
 import { currentWebFileStore, registerWebAiCorpus, registerWebFileStore } from "../lib/webAiSeam";
 import { useLibrarianRules } from "../state/librarianRules";
 import { DEST } from "./destinations";
@@ -395,6 +396,37 @@ describe("the title a handoff carries", () => {
       expect(JSON.stringify(result)).not.toContain(canary);
     } finally {
       notesService.getNote = real;
+    }
+  });
+});
+
+// Fourth review of pull request 267: nothing crosses from an on-device read
+// to Refined's model, and nothing leaves unless it is the version the editor
+// just saved.
+describe("what Hand to AI hands over", () => {
+  test("a read the gate marked on-device only is refused, and Refined's model is never asked", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const base = createWebAiCorpus(() => notesService);
+    registerWebAiCorpus({
+      ...base,
+      read: async (id: string) => ({ ...(await base.read(id)), onDeviceOnly: true }),
+    });
+    const model = stubModel(faithful);
+    expect((await refineHandToAiFor(note.id, model.host, locate)).kind).toBe("secure");
+    expect(model.sent).toHaveLength(0);
+  });
+
+  test("a note whose editor holds another version sends nothing: still saving", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    ensureDocument(note.id, "# Harbor plan\n\nharbor opens at ten", "r-editor");
+    const model = stubModel(faithful);
+    try {
+      await expect(refineHandToAiFor(note.id, model.host, locate)).rejects.toThrow(
+        "Still saving. Try again in a moment.",
+      );
+      expect(model.sent).toHaveLength(0);
+    } finally {
+      evictDocument(note.id);
     }
   });
 });

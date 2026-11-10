@@ -14,211 +14,23 @@
 // `mock.module` is process-wide and outlives this file, so every mock spreads
 // the REAL module and afterAll puts the real ones back.
 
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
-import type { AiBodyEdit } from "../lib/aiEditPolicy";
 import { promptOf } from "../lib/promptText.fixtures";
-import * as realTauri from "../lib/tauri";
-import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import { inSecureHome } from "../security/secureNotes";
-import type { SearchHit } from "../types";
-import type { WebSearchProvider } from "./searchProvider";
+import {
+  CODEX,
+  cliRequests,
+  fake,
+  FRONTIER,
+  LOCAL,
+  readable,
+  type Row,
+  webRequests,
+  writes,
+} from "./host.fixtures";
 import { registeredToolSpecs } from "./toolSchemas";
 import type { Host } from "./types";
-
-const LOCAL: ChatModelInfo = {
-  id: "gemma-3-12b-it-qat-4bit",
-  label: "Gemma",
-  provider: "mlx",
-  endpoint: "http://localhost:11435",
-  api: "generate",
-  vision: false,
-  isDefault: true,
-  localDefault: true,
-};
-const FRONTIER: ChatModelInfo = {
-  ...LOCAL,
-  id: "claude-sonnet",
-  label: "Claude",
-  provider: "claude",
-  endpoint: "https://api.anthropic.com",
-  api: "cli",
-};
-const CODEX: ChatModelInfo = {
-  ...FRONTIER,
-  id: "gpt-5.6-sol",
-  label: "GPT-5.6 Sol",
-  provider: "codex",
-};
-
-/** The fake vault. `secure` notes are the ones a frontier model may never see;
- * `locked` ones are the ones no model may edit. */
-interface Row {
-  id: string;
-  title: string;
-  body: string;
-  folderId: string;
-  secure?: boolean;
-  locked?: boolean;
-  reference?: boolean;
-  aiBodyEdit?: AiBodyEdit;
-  kind?: "note" | "file";
-}
-
-let rows: Row[] = [];
-/** Set by the test when the batched permission probe should blow up. */
-let probeThrows = false;
-const writes: { id: string; body: string; modelId: string; consented?: boolean }[] = [];
-const webRequests: Array<{
-  provider: WebSearchProvider;
-  query: string;
-  limit: number;
-}> = [];
-const cliRequests: Array<Parameters<typeof realTauri.cliComplete>[0]> = [];
-
-const meta = (row: Row): CorpusNoteMeta => ({
-  id: row.id,
-  title: row.title,
-  snippet: row.body.slice(0, 40),
-  aliases: [],
-  folderId: row.folderId,
-  diskFolderId: row.folderId,
-  createdAt: 0,
-  updatedAt: 0,
-  pinned: false,
-  origin: null,
-  kind: row.kind ?? "note",
-});
-
-/** Match Rust's secure-home location rule (parity.json secureHomeCases), as
- * well as the explicit flag. Rust's real gate is proved by
- * ai_note_read_gate_refuses_plain_text_in_secure_homes and
- * ai_file_gate_refuses_secure_home_and_honors_local_knob in cargo tests. */
-const readable = (row: Row, model: ChatModelInfo) =>
-  !(row.secure || inSecureHome(row.id) || inSecureHome(row.folderId)) || model.provider === "mlx";
-
-void mock.module("../lib/tauri", () => ({
-  ...realTauri,
-  corpusList: async () => ({
-    folders: [],
-    notes: rows.filter((r) => !r.reference).map(meta),
-  }),
-  corpusNotePath: async (id: string) => {
-    const row = rows.find((r) => r.id === id);
-    return row ? (id.includes("/") ? id : `${row.folderId}/${id}.md`) : id;
-  },
-  // The AI lanes are GATED IN RUST since 2026-08-01 (GAP 1): the command
-  // itself applies `read_for_ai` per hit, so the fake enforces `readable`
-  // here — a secure row never crosses the boundary for a frontier model, with
-  // or without a probe call afterwards.
-  corpusNotesAi: async (model: ChatModelInfo) => rows.filter((r) => readable(r, model)).map(meta),
-  corpusSearchAi: async (
-    query: string,
-    limit: number | undefined,
-    includeReference: boolean,
-    model: ChatModelInfo,
-  ) => {
-    const q = query.toLowerCase();
-    return rows
-      .filter((r) => (includeReference ? true : !r.reference))
-      .filter((r) => readable(r, model))
-      .filter((r) => `${r.title} ${r.body}`.toLowerCase().includes(q))
-      .slice(0, limit ?? 50)
-      .map<SearchHit>((r) => ({
-        id: r.id,
-        title: r.title,
-        folderId: r.folderId,
-        kind: "note",
-        rank: 1,
-        snippet: r.body.slice(0, 40),
-        matchStart: 0,
-        matchLen: 1,
-        spans: [],
-        updatedAt: 0,
-      }));
-  },
-  corpusReadableIds: async (ids: string[], model: ChatModelInfo) => {
-    if (probeThrows) throw new Error("probe worker failed");
-    return ids.filter((id) => {
-      const row = rows.find((r) => r.id === id);
-      return !!row && readable(row, model);
-    });
-  },
-  corpusReadAi: async (id: string, model: ChatModelInfo) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) throw new Error(`unknown note: ${id}`);
-    if (!readable(row, model)) {
-      throw new Error("This note is secure and can never be sent to a remote model.");
-    }
-    return `---\nid: ${row.id}\n---\n\n${row.body}`;
-  },
-  corpusReadAiVersioned: async (id: string, model: ChatModelInfo) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) throw new Error(`unknown note: ${id}`);
-    if (!readable(row, model)) {
-      throw new Error("This note is secure and can never be sent to a remote model.");
-    }
-    return {
-      body: `---\nid: ${row.id}\n---\n\n${row.body}`,
-      revision: `test:${row.id}:${row.body}`,
-    };
-  },
-  corpusFrontmatter: async (id: string): Promise<FrontmatterView | null> => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) return null;
-    return {
-      id,
-      created: "",
-      updated: "",
-      locked: !!row.locked,
-      secure: !!row.secure,
-      localAiAllowed: true,
-      pinned: false,
-      // these rows default to AI-made; a row names `aiBodyEdit` to say otherwise
-      aiBodyEdit: row.locked ? "locked" : (row.aiBodyEdit ?? "allowed"),
-      fields: [],
-    };
-  },
-  corpusWriteAi: async (
-    id: string,
-    body: string,
-    model: ChatModelInfo,
-    _revision: string,
-    consented = false,
-  ) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) throw new Error(`unknown note: ${id}`);
-    // the Rust lane's own refusals, mirrored: read gate, then LOCKED
-    if (!readable(row, model)) {
-      throw new Error("This note is secure and can never be sent to a remote model.");
-    }
-    if (row.locked) {
-      throw new Error("This note is locked — no AI may edit it. Unlock it from the note's menu first.");
-    }
-    writes.push({ id, body, modelId: model.id, ...(consented ? { consented } : {}) });
-    row.body = body;
-    return meta(row);
-  },
-  cliComplete: async (request: Parameters<typeof realTauri.cliComplete>[0]) => {
-    cliRequests.push(request);
-    return "frontier reply";
-  },
-  webSearch: async (provider: WebSearchProvider, query: string, limit: number) => {
-    webRequests.push({ provider, query, limit });
-    return [
-      {
-        provider,
-        title: "Result",
-        url: "https://example.com",
-        snippet: "evidence",
-      },
-    ];
-  },
-}));
-
-afterAll(() => {
-  void mock.module("../lib/tauri", () => realTauri);
-});
 
 const { makeTauriHost } = await import("./host");
 
@@ -241,11 +53,11 @@ function updateVia(host: Host, id: string, body: string): Promise<string> {
 }
 
 beforeEach(() => {
-  probeThrows = false;
+  fake.probeThrows = false;
   writes.length = 0;
   webRequests.length = 0;
   cliRequests.length = 0;
-  rows = [
+  fake.rows = [
     {
       id: "n-open",
       title: "Kelpie plan",
@@ -347,7 +159,7 @@ describe("SECURE is a visibility control against remote", () => {
   });
 
   test("a failed permission probe means NOTHING is readable — fail closed, never open", async () => {
-    probeThrows = true;
+    fake.probeThrows = true;
     // SEARCH unions folder-name hits the listing gate never saw, so it probes
     // read_for_ai over the union — a downed probe fails that whole lane closed.
     expect(await makeTauriHost(LOCAL).searchNotes("kelpie", 10)).toEqual([]);
@@ -359,7 +171,7 @@ describe("SECURE is a visibility control against remote", () => {
     // Prove independence by breaking the probe and asserting the map is unchanged:
     // the SECURE title stays out (gated by corpus_notes_ai) and the OPEN note is
     // still present (not fail-closed to empty the way the probe path would be).
-    probeThrows = true;
+    fake.probeThrows = true;
     const map = await makeTauriHost(FRONTIER).knowledgeMap(4000);
     expect(map).not.toContain("Kelpie passphrase"); // secure title — still gated
     expect(map).toContain("Kelpie plan"); // open note — probe state is irrelevant
@@ -389,7 +201,7 @@ describe("the brain's memory lanes are retrievable by BOTH classes", () => {
 
 test("read_note and read_memory refuse secret-free paths inside either secure home", async () => {
   for (const id of ["wiki/_secure/plan.csv", "Secure notes/plan.txt"]) {
-    rows.push({
+    fake.rows.push({
       id,
       title: "Plan",
       body: "task,status\nDraft,ready",
@@ -405,7 +217,7 @@ test("read_note and read_memory refuse secret-free paths inside either secure ho
 
 test("a local AI edit reading secure-home text taints its chat", async () => {
   const id = "Secure notes/plan.txt";
-  rows.push({ id, title: "Plan", body: "task,status\nDraft,ready", folderId: "Secure notes" });
+  fake.rows.push({ id, title: "Plan", body: "task,status\nDraft,ready", folderId: "Secure notes" });
   let tainted = false;
   const host = makeTauriHost(LOCAL, {
     onSecureNoteRead: () => {
@@ -439,7 +251,7 @@ test("every registered vault-content tool refuses secure-home content for a remo
     "read_file",
     "edit_document",
   ]);
-  rows.push(
+  fake.rows.push(
     {
       id: "wiki/_secure/plan.csv",
       title: "Plan CSV",
@@ -503,7 +315,7 @@ describe("a person's note is closed to AI edits until they grant it", () => {
       expect(out).toMatch(/^blocked: the user wrote this note themselves/);
       expect(out).toContain("Let AI edit the text");
     }
-    expect(rows.find((r) => r.id === "n-mine")?.body).toBe("my own kelpie diary");
+    expect(fake.rows.find((r) => r.id === "n-mine")?.body).toBe("my own kelpie diary");
     expect(writes).toEqual([]);
   });
 
@@ -529,7 +341,7 @@ describe("LOCKED is an edit control that binds every class", () => {
       expect(out).toMatch(/blocked/);
       expect(out).toMatch(/locked/);
     }
-    expect(rows.find((r) => r.id === "n-locked")?.body).toBe("a kelpie charter");
+    expect(fake.rows.find((r) => r.id === "n-locked")?.body).toBe("a kelpie charter");
     expect(writes).toEqual([]);
   });
 
@@ -580,6 +392,40 @@ describe("secure content flows only into secure containers", () => {
     expect(tainted).toBe(false);
     await host.readNote("n-secure");
     expect(tainted).toBe(true);
+  });
+
+  // Fourth review of pull request 267 (#1): the chat tainted itself only for
+  // reads it recognised as secure (a flag, a secure folder). The gate's own
+  // mark now taints it on every read path, so a note only the gate knows is
+  // secure keeps the chat on-device too.
+  test.each([
+    ["read_note", (host: Host) => host.readNote("n-gate")],
+    ["search_notes", (host: Host) => host.searchNotes("ledger", 5)],
+    ["search_memory", (host: Host) => host.searchMemory!("ledger", 5)],
+    ["read_memory", (host: Host) => host.readMemory!("n-gate")],
+    ["the knowledge map", (host: Host) => host.knowledgeMap(4000)],
+  ])("%s taints the chat when the gate passed a note only for an on-device model", async (_path, use) => {
+    // only the open note and this one: nothing else could taint the chat
+    fake.rows = fake.rows.filter((row) => row.id === "n-open");
+    fake.rows.push({
+      id: "n-gate",
+      title: "Kelpie ledger",
+      body: "harbor ledger totals",
+      folderId: "Projects",
+      gateOnly: true,
+    });
+    let tainted = false;
+    const host = makeTauriHost(LOCAL, { onSecureNoteRead: () => (tainted = true) });
+    await use(host);
+    expect(tainted).toBe(true);
+  });
+
+  // fourth review (#2): a chat attached to a note reads it as its editor just
+  // saved it; another version sends nothing of the note
+  test("a note read that isn't the editor's saved version is not sent", async () => {
+    const host = makeTauriHost(LOCAL, { savedVersion: () => "Still saving. Try again in a moment." });
+    const answer = String(await host.readNote("n-open"));
+    expect(answer).toBe("error: Still saving. Try again in a moment.");
   });
 
   test("once a secure read taints a run, even a paraphrased web query is refused", async () => {

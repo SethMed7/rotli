@@ -42,6 +42,7 @@ import {
 } from "../../chatMemory/model";
 import { renderMermaidElement } from "../../editor/mermaidRender";
 import { renderInline } from "../../editor/render";
+import { saveFailure, savedVersionMismatch } from "../../editor/savedVersion";
 import {
   CHAT_IMAGE_ASSET_EXTS,
   CHAT_IMAGE_ASSET_MAX_BYTES,
@@ -1592,6 +1593,10 @@ export function ChatSurface({
         ]);
         return;
       }
+      // a model reads the attached note as saved: wait for its save, or say why not
+      const unsaved = await saveFailure(attachedNoteId);
+      if (unsaved)
+        return setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${unsaved}` }]);
     }
     // the whole secure lineage: attached-secure, or the chat's own taint
     const attachedSecure = attachmentIsSecure || secureReadRef.current;
@@ -1775,6 +1780,7 @@ export function ChatSurface({
       ...(turnModel.id === picked.id && serviceTier ? { serviceTier } : {}),
       onSecureNoteRead,
       isSecureContext,
+      savedVersion: savedVersionMismatch,
       webSearchProvider,
       artifactRootId: active.id === CORPUS_INSTANCE_ID ? "default" : active.id,
       onArtifactCreated: async (artifact: ChatArtifact) => {

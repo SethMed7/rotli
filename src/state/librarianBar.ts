@@ -50,6 +50,15 @@ export interface LibrarianChat {
   status: "idle" | "thinking";
   error: string | null;
   minimized: boolean;
+  /** A turn was built from text the gate let only an on-device model read
+   * (a secure note, a secure person's name): from then on this conversation
+   * is never sent to a remote model (fourth review of pull request 267). */
+  onDeviceOnly?: boolean;
+  /** The remote model a send was refused for: the panel offers to start a
+   * new conversation with it. */
+  restartWith?: string | null;
+  /** Text to put back in the composer of a conversation just started. */
+  draft?: string;
 }
 
 export const useLibrarianBar = create<{ paneId: string | null; chat: LibrarianChat | null }>(() => ({

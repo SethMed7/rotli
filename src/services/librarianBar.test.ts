@@ -122,6 +122,7 @@ describe("who may ask", () => {
 
 describe("asking", () => {
   const ctx: LibrarianContext = {
+    onDeviceOnly: false,
     title: approved("Maya"),
     doc: approved("Met Maya at the meetup."),
     areas: [approved("Projects")],

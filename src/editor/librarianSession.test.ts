@@ -1,15 +1,12 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { ApprovedNote } from "../ai/approvedRead";
-import type { CompleteReq } from "../ai/types";
-import type { LibrarianContext } from "../lib/librarianChat";
-import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import { approved, approvedRows, person } from "../lib/promptText.fixtures";
-import type { ChatModelInfo, CorpusNoteMeta } from "../lib/tauri";
+import type { CorpusNoteMeta } from "../lib/tauri";
 import { IMPORTED_FOLDER_ROLES } from "../services/destinations";
 import { LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
-import { closeLibrarianChat, startLibrarianChat, useLibrarianBar } from "../state/librarianBar";
+import { closeLibrarianChat, useLibrarianBar } from "../state/librarianBar";
 import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import {
@@ -21,58 +18,9 @@ import {
   sendToLibrarian,
   takeToChat,
 } from "./librarianSession";
-
-const MODEL: ChatModelInfo = {
-  id: "claude-opus",
-  label: "Claude Opus",
-  provider: "claude",
-  endpoint: "",
-  api: "cli",
-  vision: false,
-  isDefault: false,
-};
-const NOTE = "# Maya Chen\n\nMet Maya at the design meetup.";
-const context = async (): Promise<LibrarianContext> => ({
-  title: approved("Maya Chen"),
-  doc: approved(NOTE),
-  areas: [approved("people")],
-  tags: [],
-  people: [person("People")],
-  filing: [],
-  rules: structuredClone(DEFAULT_LIBRARIAN_RULES),
-  known: [],
-});
-const HIGHLIGHT = { exact: "design meetup", prefix: "Met Maya at the ", suffix: "." };
-
-function start(id = "chat-1") {
-  startLibrarianChat({
-    id,
-    paneId: "p1",
-    noteId: "n1",
-    modelId: MODEL.id,
-    turns: [],
-    status: "idle",
-    error: null,
-    minimized: false,
-  });
-}
-
-/** A model that answers with `reply` and remembers what it was sent. */
-function fakeModel(reply: string | (() => Promise<string>)) {
-  const sent: CompleteReq["messages"][] = [];
-  return {
-    sent,
-    hostFor: () => ({
-      complete: async ({ messages }: CompleteReq) => {
-        sent.push(messages);
-        return typeof reply === "string" ? reply : reply();
-      },
-    }),
-  };
-}
+import { allow, context, fakeModel, HIGHLIGHT, MODEL, NOTE, start } from "./librarianSession.fixtures";
 
 const chat = () => useLibrarianBar.getState().chat!;
-const allow = async () => null;
 
 beforeEach(() => closeLibrarianChat());
 
@@ -99,7 +47,14 @@ describe("the People the Librarian is told about", () => {
     flush: async (id) => void asked.push(`flush ${id}`),
     note: async (id, model): Promise<ApprovedNote> => {
       asked.push(`note ${id} ${model.id}`);
-      return { id, revision: "r1", text: approved(NOTE), body: approved(NOTE), title: approved("Maya Chen") };
+      return {
+        id,
+        revision: "r1",
+        text: approved(NOTE),
+        body: approved(NOTE),
+        title: approved("Maya Chen"),
+        onDeviceOnly: false,
+      };
     },
     listing: async (model) => {
       asked.push(`listing ${model.id}`);
