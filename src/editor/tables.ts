@@ -181,15 +181,23 @@ function delimCell(a: Align, w: number): string {
   return dashes(w);
 }
 
+/** A cell's pipes as splitRow reads them back. splitRow takes backslashes in
+ * pairs, so a pipe after an even run (none, `\\`, …) is cell text and gets its
+ * `\`; a pipe after an odd run is already GFM's escaped pipe and stays as it
+ * is. Escaping only by the pipe, as before, turned a typed `\|` into `\\|`: an
+ * escaped backslash and then a real separator, which split the cell. */
+function escapeCellPipes(cell: string): string {
+  return cell.replace(/(\\*)\|/g, (whole, run: string) => (run.length % 2 === 0 ? `${run}\\|` : whole));
+}
+
 /** Serialize a shape back to markdown (no trailing newline). Short rows pad to
  * the header's column count; long (ragged) rows keep their overflow cells —
  * truncation was silent data loss. Cell pipes serialize as GFM `\|` so a pipe
  * typed into a cell can never split it. Columns pad to their widest cell. */
 export function tableToText(t: TableShape): string {
   const cols = Math.max(1, t.header.length);
-  const esc = (c: string) => c.replace(/\|/g, "\\|");
   const norm = (r: string[]) =>
-    (r.length > cols ? r : Array.from({ length: cols }, (_, i) => r[i] ?? "")).map(esc);
+    (r.length > cols ? r : Array.from({ length: cols }, (_, i) => r[i] ?? "")).map(escapeCellPipes);
   const header = norm(t.header);
   const rows = t.rows.map(norm);
   const widths = Array.from({ length: cols }, (_, i) =>
