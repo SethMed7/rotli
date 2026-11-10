@@ -127,6 +127,9 @@ mod tests {
                 &["rotli", "mcp", "config", "--librarian"],
                 &["rotli", "librarian", "status"],
                 &["rotli", "librarian", "apply", "01PROPOSAL"],
+                // the gate covers the command, so a subcommand added later is
+                // refused by the real dispatcher without being listed here
+                &["rotli", "librarian", "some-future-command"],
             ] {
                 assert_eq!(crate::workspace::run_if_requested(&args(entry)), Some(1), "{entry:?}");
             }

@@ -222,21 +222,32 @@ in development builds, behind the same gate as the rest of `rotli mcp`
 independent review has checked the fixes.** No automated reviewer ran on that
 pull request.
 
-Fixed in 1.10.0, because shipped features reached them too:
+Fixed in 1.10.0, because shipped features reached them too (a second
+independent review found the first fixes incomplete; both passes are in
+docs/architecture/egress-threat-model.md, rows 16b–16f):
 
-- **#1 Search showed bytes the gate never judged.** Fixed for every AI lane:
-  the in-app chat's search and listing, the `rotli notes` CLI, and the route.
-- **#4 Hard-linked notes crossed the vault boundary.** Every note read and the
-  walk now refuse a file with more than one name.
-- **#5 A move went ahead after the note was locked.** The agent move checks
-  secure and locked again inside the note's lock.
+- **#1 Search showed bytes the gate never judged.** Every AI row (search,
+  listing, folders) is built only from the one approved read, in the app,
+  the `rotli notes` CLI, Rotli Web, and the route.
+- **#4 Hard-linked notes crossed the vault boundary.** Every read of a vault
+  file's contents goes through the checked open, and `check:vault-reads`
+  fails the build on any other read.
+- **#5 A move went ahead after the note was locked.** Every note mutation
+  takes its lock through `lock_note` with an `Authority`, checked inside the
+  lock.
 
 Still open, reachable only through the route:
 
 1. **#2 The index and log keep what a note said before it turned secure.**
    `librarian_index` and `librarian_log` store titles and summaries the agent
    wrote. When a note later turns secure, those lines stay in two public
-   pages, and search returns them. Fix: the route writes only note ids into
+   pages, and search returns them. The gate doesn't change that for pages
+   the route already wrote: a vault used with a development build keeps its
+   Librarian index and log as ordinary Markdown notes, which a public build
+   lists, searches, and lets AI lanes read like any public note
+   (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); the gate
+   turns the route off and cleans nothing. Delete those pages by hand if they
+   mention notes that are secure now. Fix: the route writes only note ids into
    its pages and renders titles at read time through the gate, or rescans its
    pages and drops lines about notes it may no longer read. Test: record a
    note in both pages, mark it secure, and search the index and log for its

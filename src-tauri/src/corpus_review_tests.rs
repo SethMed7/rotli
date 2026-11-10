@@ -403,3 +403,22 @@ fn every_note_lock_names_its_authority() {
     }
     assert_eq!(seen.len(), SIDECAR_LOCKS.len(), "the scan found {seen:?}; update this guard");
 }
+
+/// Deferred finding #2's qualifier (docs/design/librarian-mcp-and-t3-chat.md):
+/// an index or log page the route wrote in a development build stays an
+/// ordinary note in any build. The gate turns the route off; it doesn't clean
+/// or hide the pages, so they are listed, searched, and readable by AI lanes
+/// like any other public note, including any line about a note made secure
+/// since.
+#[test]
+fn a_page_the_route_wrote_stays_an_ordinary_searchable_note() {
+    let (_dir, mut store) = bare();
+    let page = store
+        .create_librarian_page("Inbox", "# Librarian index\n\n- [[Harbor plan]]: when the harbor opens\n", "index")
+        .unwrap();
+    let listed = store.list().unwrap().notes;
+    assert!(listed.iter().any(|m| m.id == page.id), "listed");
+    let hits = store.search("harbor opens", 10, false).unwrap();
+    assert!(hits.iter().any(|h| h.id == page.id), "searchable");
+    assert!(store.note_row_for_ai(&page.id, false).is_some(), "readable by AI lanes as a public note");
+}
