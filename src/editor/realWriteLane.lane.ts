@@ -231,9 +231,20 @@ test("F1: a conflict, and words typed while its copy is made, all survive quit",
   model.setDocumentText(id, "# Conflict\n\nmine A plus B");
   await release("corpus_create");
   await quit;
-  const bodies = (await everyNote()).map((note) => note.body);
-  expect(bodies.some((body) => body.includes("mine A plus B"))).toBe(true);
+  const copies = (await everyNote()).filter((note) => note.body.startsWith("# Conflict (unsaved edits"));
+  expect(copies.map((note) => note.body.split("\n")[2])).toEqual(["mine A plus B"]); // one copy, newest words
   expect((await disk(id)).body).toBe("# Conflict\n\noutside");
+});
+
+test("a write whose answer was lost isn't taken for another app's edit: the undo it was followed by lands", async () => {
+  const id = await open("# Lost\n\nbase");
+  model.setDocumentText(id, "# Lost\n\nchanged");
+  losing.corpus_write = () => true; // Rust wrote "changed"; the answer is lost
+  await model.flushNote(id).catch(() => {});
+  model.setDocumentText(id, "# Lost\n\nbase"); // the person undoes
+  expect(await outcome(model.flushSyncs(20_000))).toBe("done");
+  expect((await disk(id)).body).toBe("# Lost\n\nbase");
+  expect((await everyNote()).filter((note) => note.body.startsWith("# Lost"))).toHaveLength(1); // no conflict copy
 });
 
 test("1: a write past its bound, then undo: quit refuses until that write lands, and the restored words land last", async () => {
