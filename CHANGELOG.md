@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A table cell with a backslash right before a pipe stays one cell.**
+  Typing `\|` into a table cell wrote it back as `\\|`, and the next edit
+  to the table split the cell in two and moved the rest of the row one
+  column right. A `\|` you type is now kept as Markdown's escaped pipe.
+- **Breve's summaries, page watchers and creator alerts read entities
+  once.** A web page or video title that showed the text `&lt;` came
+  through as `<`, because `&amp;` was decoded before the rest.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
