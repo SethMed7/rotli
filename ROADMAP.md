@@ -30,9 +30,9 @@ id repeats (`site/src/roadmap.ts`).
 
 - **Graph and Canvas** <!-- id: canvas --> · L — see how your notes link up as
   a graph, and lay them out on a canvas saved as `.canvas` files that
-  Obsidian also opens. The graph is built for the next release: ⌘K → Graph
-  shows every note and every `[[link]]`, and Show in graph the notes around
-  one; a secure note shows only its title. The canvas, JSON Canvas cards on an
+  Obsidian also opens. The graph is built and in development builds, not in
+  a release yet: ⌘K → Graph shows every note and every `[[link]]`, and Show
+  in graph the notes around one; a secure note shows only its title. The canvas, JSON Canvas cards on an
   open plane, is in development builds: New → Canvas makes one beside your
   notes, found in ⌘K and All notes, and Archive and Trash take it like a note. Type a card, or put just `[[a note]]` in one
   to show that note; connect cards with lines and gather them into groups.
@@ -41,23 +41,25 @@ id repeats (`site/src/roadmap.ts`).
   stay as they are, for drawing (owner decisions 2026-10-06,
   [design](docs/design/canvas-and-graph-2026-10-05.md)).
 - **Sheets (Beta)** <!-- id: sheets-beta --> · L — spreadsheets (XLSX and CSV)
-  inside Rotli, built for the next release in Beta beside Word documents. Left:
+  inside Rotli, released in Beta beside Word documents: on the Mac since 1.8.0
+  and on Rotli Web since 1.8.1. Left:
   keep undo across a theme or tab switch, carry dropdowns and colour rules
   through the grid, then drop the Beta mark.
 - **Word documents (Beta)** <!-- id: docs-beta --> · M — DOCX files open and
-  edit in Rotli, marked Beta in the next release. Chat already reads and edits
+  edit in Rotli, released in Beta: marked Beta on the Mac since 1.8.0 and on
+  Rotli Web since 1.8.1. Chat already reads and edits
   the Word documents it made, and links, numbered lists, and comments
   survive an edit. Univer is the engine under both Sheets and Docs.
 - **Charts (`/chart`)** <!-- id: charts --> · L — type `/chart`, pick one of
   ten kinds, and the chart is drawn from a plain-text fence in the note, so
-  the data stays readable Markdown. Built for the next release.
+  the data stays readable Markdown. Shipped in 1.8.0.
 - **`/ai` in a note** <!-- id: ai-inline --> · M — type `/ai` (or `/ask`), say
   what you want, and the answer lands in the note where you typed it. Secure
-  and locked notes follow the same AI rules as everywhere else. Built for the
-  next release.
+  and locked notes follow the same AI rules as everywhere else. Shipped in
+  1.8.0.
 - **Chat attachments you can see** <!-- id: chat-attachments --> · M — an image
   you attach to a chat sits where you mention it, so you can tell what went
-  with each question. Built for the next release; in Rotli Web, chat images
+  with each question. Shipped on the Mac in 1.8.0; in Rotli Web, chat images
   still need the Mac app.
 - **Mermaid visual editor** <!-- id: mermaid-visual --> · M — edit a Mermaid
   diagram by hand on a canvas instead of only in code. View and Code already
@@ -66,7 +68,8 @@ id repeats (`site/src/roadmap.ts`).
   in the vault through Rotli's own rules: the `rotli mcp` server, the agent
   commands, and the remote relay a Grok Bot connects through
   ([contract](docs/architecture/agent-workspace.md)). Development builds only
-  for now (owner, 2026-10-02: not yet stable). Built: rename, trash,
+  for now (owner, 2026-10-02: not yet stable), except the opt-in Librarian
+  route (`rotli mcp --librarian`), which every build has from 1.10.0. Built: rename, trash,
   attachments, several vault roots, `rotli agent config` for each agent, Word
   documents through the running app, and a record of every AI edit. Includes
   a custom Grok Bot that manages Rotli: create, file, search, and organize
@@ -75,8 +78,8 @@ id repeats (`site/src/roadmap.ts`).
   to you, on-device.
 - **Hand to AI, Refined** <!-- id: hand-to-ai --> · S–M — a fuller prompt
   for Claude Code or another agent: Refined has the Librarian's model rewrite
-  it, and the note's files go along with their paths. Both are built for the
-  next release, and Basic stays. Left: "Open in chat" to send it on in Rotli.
+  it, and the note's files go along with their paths. Both shipped in 1.8.0,
+  and Basic stays. Left: "Open in chat" to send it on in Rotli.
   Hand to AI itself shipped in 1.6: "Hand to AI…" in the palette and a note's
   menu writes the prompt from the note, editable, with Copy; a secure note,
   or one that looks like it holds a secret, is refused.
