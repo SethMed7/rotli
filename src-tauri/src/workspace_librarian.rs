@@ -442,6 +442,9 @@ pub(super) fn append_log(ws: &mut Workspace, entry: &str) -> Result<(), String> 
     ws.update_note(&local, &body, &current.revision).map(|_| ())
 }
 
+/// The person's side of the route, `rotli librarian <command>`.
+pub(crate) const PERSON_COMMANDS: [&str; 4] = ["status", "proposals", "apply", "dismiss"];
+
 /// `rotli librarian …`: the person's side — status, the waiting proposals, and
 /// apply/dismiss. Not an agent tool.
 pub(super) fn cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
@@ -461,7 +464,7 @@ pub(super) fn cli(args: &[String], root_id: Option<&str>) -> Result<Value, Strin
         "proposals" => json_value(pending(&ws.root.path)),
         "apply" => decide(&mut ws, positional(args, 2, "apply needs a proposal id")?, true),
         "dismiss" => decide(&mut ws, positional(args, 2, "dismiss needs a proposal id")?, false),
-        _ => Err(format!("unknown librarian command: {sub}")),
+        _ => Err(format!("unknown librarian command: {sub} (one of {})", PERSON_COMMANDS.join(", "))),
     }
 }
 

@@ -5,6 +5,19 @@
 use super::tests::bare;
 use super::*;
 
+/// Finding #1's fixture: a public note, and the secure version of it the walk
+/// cached, which holds a canary that must never reach an AI lane.
+pub(crate) const HARBOR_TITLE: &str = "Harbor plan";
+pub(crate) const HARBOR_BODY: &str = "harbor opens at nine";
+pub(crate) const CANARY: &str = "canary-7Q4";
+
+pub(crate) fn with_canary(public: &str) -> String {
+    public
+        .replacen("---\n", "---\nsecure: true\n", 1)
+        .replace(&format!("# {HARBOR_TITLE}"), &format!("# Harbor {CANARY} plan"))
+        .replace(HARBOR_BODY, &format!("harbor code {CANARY} opens at nine"))
+}
+
 /// Review 2026-11-09 #5: an agent's move checked secure and locked
 /// before waiting for the note's lock. Another writer holding the lock
 /// could lock the note meanwhile, and the move went ahead on release. The
@@ -77,24 +90,21 @@ fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
 #[test]
 fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     let (_dir, mut store) = bare();
-    let n = store.create("Inbox", "# Harbor plan\n\nharbor opens at nine\n").unwrap();
+    let n = store.create("Inbox", &format!("# {HARBOR_TITLE}\n\n{HARBOR_BODY}\n")).unwrap();
     let rel = store.resolve_note_rel(&n.id).unwrap();
     let abs = store.abs(&rel);
     let public = fs::read_to_string(&abs).unwrap();
-    let secure = public
-        .replacen("---\n", "---\nsecure: true\n", 1)
-        .replace("# Harbor plan", "# Harbor canary-7Q4 plan")
-        .replace("harbor opens at nine", "harbor code canary-7Q4 opens at nine");
+    let secure = with_canary(&public);
     fs::write(&abs, &secure).unwrap();
     let hits = store.search("harbor", 10, false).unwrap(); // the walk caches the secure version
-    assert!(hits[0].snippet.contains("canary-7Q4"), "the person's own search sees their note");
+    assert!(hits[0].snippet.contains(CANARY), "the person's own search sees their note");
     fs::write(&abs, &public).unwrap(); // public again, with no walk in between
 
     let shown: Vec<SearchHit> =
         hits.into_iter().filter_map(|hit| store.present_hit_for_ai("harbor", hit, false)).collect();
     assert_eq!(shown.len(), 1, "the public note is still found");
-    assert!(!format!("{shown:?}").contains("canary-7Q4"), "{shown:?}");
-    assert_eq!(shown[0].title, "Harbor plan");
+    assert!(!format!("{shown:?}").contains(CANARY), "{shown:?}");
+    assert_eq!(shown[0].title, HARBOR_TITLE);
 
     // a hit the public bytes no longer match is dropped, not shown from the cache
     fs::write(&abs, &secure).unwrap();
@@ -104,7 +114,7 @@ fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     assert!(canary.into_iter().filter_map(|hit| store.present_hit_for_ai("canary", hit, false)).next().is_none());
 
     let meta = store.list().unwrap().notes.into_iter().find(|m| m.id == n.id).unwrap();
-    assert!(meta.title.contains("canary-7Q4"), "the cached listing row is the secure version");
+    assert!(meta.title.contains(CANARY), "the cached listing row is the secure version");
     let row = store.present_meta_for_ai(meta, false).expect("the public note is listed");
-    assert!(!format!("{row:?}").contains("canary-7Q4"), "{row:?}");
+    assert!(!format!("{row:?}").contains(CANARY), "{row:?}");
 }

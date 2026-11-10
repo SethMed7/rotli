@@ -1,4 +1,5 @@
 use super::tests::test_workspace;
+use crate::corpus::review_tests::{with_canary, CANARY, HARBOR_BODY, HARBOR_TITLE};
 use super::*;
 use tempfile::TempDir;
 
@@ -164,22 +165,18 @@ fn workspace_policy_describes_secure_home_and_keyword_board_protection() {
 fn the_notes_cli_shows_agents_only_the_bytes_the_gate_judged() {
     let temp = TempDir::new().unwrap();
     let mut ws = test_workspace(&temp);
-    let meta = ws.create_note("Harbor plan", "harbor opens at nine", MAIN_ROOT).unwrap();
+    let meta = ws.create_note(HARBOR_TITLE, HARBOR_BODY, MAIN_ROOT).unwrap();
     let local = ws.local_id(&meta.id).unwrap();
     let abs = temp.path().join(ws.store.resolve_note_rel(&local).unwrap());
     let public = fs::read_to_string(&abs).unwrap();
-    let secure = public
-        .replacen("---\n", "---\nsecure: true\n", 1)
-        .replace("# Harbor plan", "# Harbor canary-7Q4 plan")
-        .replace("harbor opens at nine", "harbor code canary-7Q4 opens at nine");
-    fs::write(&abs, &secure).unwrap();
+    fs::write(&abs, with_canary(&public)).unwrap();
     let _ = ws.store.search("harbor", 10, false).unwrap(); // the walk caches the secure version
     fs::write(&abs, &public).unwrap();
 
     let searched = serde_json::to_string(&ws.search_remote("harbor", 10).unwrap()).unwrap();
-    assert!(searched.contains("Harbor plan") && !searched.contains("canary-7Q4"), "{searched}");
+    assert!(searched.contains(HARBOR_TITLE) && !searched.contains(CANARY), "{searched}");
     let listed = serde_json::to_string(&ws.list_remote(50).unwrap()).unwrap();
-    assert!(listed.contains("Harbor plan") && !listed.contains("canary-7Q4"), "{listed}");
+    assert!(listed.contains(HARBOR_TITLE) && !listed.contains(CANARY), "{listed}");
     let queried = serde_json::to_string(&ws.query_remote("harbor", 50).unwrap()).unwrap();
-    assert!(!queried.contains("canary-7Q4"), "{queried}");
+    assert!(!queried.contains(CANARY), "{queried}");
 }

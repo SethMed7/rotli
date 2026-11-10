@@ -103,16 +103,10 @@ mod tests {
     /// development builds until its review findings are fixed).
     #[test]
     fn the_librarian_route_is_refused_in_stable_and_open_in_dev() {
-        let entries: [&[&str]; 8] = [
-            &["mcp", "--librarian"],
-            &["mcp", "--librarian", "--vault", "/v"],
-            &["mcp", "config", "--librarian"],
-            &["librarian"],
-            &["librarian", "status"],
-            &["librarian", "proposals"],
-            &["librarian", "apply", "01PROPOSAL"],
-            &["librarian", "dismiss", "01PROPOSAL"],
-        ];
+        let mut entries: Vec<Vec<&str>> =
+            vec![vec!["mcp", "--librarian"], vec!["mcp", "--librarian", "--vault", "/v"], vec!["mcp", "config", "--librarian"], vec!["librarian"]];
+        // every person command the route has, so a new one is checked too
+        entries.extend(crate::workspace::librarian::PERSON_COMMANDS.iter().map(|command| vec!["librarian", command, "01PROPOSAL"]));
         for entry in entries {
             assert_eq!(cli_gate_for(entry[0], "stable"), Err(AGENTS_UNAVAILABLE.to_string()), "{entry:?}");
             assert_eq!(cli_gate_for(entry[0], ""), Err(AGENTS_UNAVAILABLE.to_string()), "{entry:?}");

@@ -8911,7 +8911,7 @@ mod in_place_marked_tests;
 
 #[cfg(test)]
 #[path = "corpus_review_tests.rs"]
-mod review_tests;
+pub(crate) mod review_tests;
 
 #[cfg(test)]
 mod tests {

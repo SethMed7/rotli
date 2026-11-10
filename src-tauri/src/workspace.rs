@@ -34,7 +34,7 @@ mod file_visibility;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
 #[path = "workspace_librarian.rs"]
-mod librarian;
+pub(crate) mod librarian;
 
 const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
