@@ -187,11 +187,11 @@ never written to the vault.
 
 ## Statements: keeping the vault
 
-The owner, 2026-09-28: "/librarian Whenever I mention Kunal or Dhaval those
-are work people, they both work for MSD, so did Madhav, Jim, Vaishnavi and
-Rohini but they no longer work with us — this should update the rules, add any
-missing people, and for the people it has, if it needs to make changes it
-should ask me." So a reply may also carry vault actions
+The owner, 2026-09-28, asked for this with a sentence of the shape
+"/librarian Whenever I mention Ana or Leo those are work people, they both work
+at Northwind, and so did four others who have since left": it should update the
+rules, add any missing people, and ask before changing the people it already
+has. (The names here are invented.) So a reply may also carry vault actions
 (`src/lib/librarianPeople.ts`, parsed from the same JSON object):
 
 ```json

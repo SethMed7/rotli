@@ -4,8 +4,8 @@
 // organizes (tags, marked passages, filing). Every reply can say something and
 // propose actions (the same tag / mark / file grammar as the bar), and a
 // request that belongs in Chat comes back flagged, so the person is offered
-// "Take this to Chat". The person can also tell it how things are ("Kunal and
-// Dhaval are work people"): then the reply carries vault actions too — rules,
+// "Take this to Chat". The person can also tell it how things are ("Ana and
+// Leo are work people"): then the reply carries vault actions too — rules,
 // People groups, new people, and questions about people it already has
 // (librarianPeople.ts). The pure half: the messages a turn sends, and a reply
 // split into what is said, what is proposed, and whether it belongs in Chat.

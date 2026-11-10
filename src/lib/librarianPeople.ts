@@ -1,6 +1,6 @@
 // The Librarian keeps the vault, not just the open note (the owner,
-// 2026-09-28: "/librarian Whenever I mention Kunal or Dhaval those are work
-// people…"). When the person *tells* it something, a reply can carry vault
+// 2026-09-28, with a sentence like "/librarian Whenever I mention Ana or Leo
+// those are work people…"). When the person *tells* it something, a reply can carry vault
 // actions besides the note's tag / mark / file:
 //
 // - `rule`: a filing sentence added to the Librarian rules;
