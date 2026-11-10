@@ -1597,8 +1597,10 @@ export function ChatSurface({
       if (unsaved)
         return setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${unsaved}` }]);
     }
-    // the whole secure lineage: attached-secure, or the chat's own taint
-    const attachedSecure = attachmentIsSecure || secureReadRef.current;
+    // the whole secure lineage, captured with this turn: every write it makes goes by
+    // `turnMark`, which only this turn's own reads can raise (sixth review of PR 267)
+    const attachedSecure = attachmentIsSecure || secureReadRef.current,
+      turnMark = { marked: attachedSecure };
     if (attachedSecure && !modelIsOnDevice(turnModel)) {
       setMessages((previous) => [
         ...previous,
@@ -1760,15 +1762,13 @@ export function ChatSurface({
     // a preset pick routes through the hybrid layer; everything else is the
     // normal loop. Both yield the same event stream.
     const preset = presetFor(turnModel.id, hybridPresets);
-    // a secure-note read mid-run taints the chat immediately (UI + this
-    // turn's persistence) and one-way — the marker lands on the chat file below
+    // a secure-note read mid-run marks this turn (its persistence and memory) and
+    // the chat on screen, one-way; a create_note after it already sees it (PR #4 P1)
     const onSecureNoteRead = () => {
-      secureReadRef.current = true;
+      turnMark.marked = secureReadRef.current = true;
       setSecureContext(true);
     };
-    // live view of the taint, so a create_note AFTER a secure read in the
-    // same run already sees the secure context (PR #4 P1)
-    const isSecureContext = () => secureReadRef.current || attachedSecure;
+    const isSecureContext = () => turnMark.marked;
     const webSearchProvider = useUiStore.getState().webSearchProvider;
     const consent = retry?.consent ? typedConsent(prior, [userText, providerUserText]) : undefined;
     const baseOpts = {
@@ -1888,7 +1888,7 @@ export function ChatSurface({
                 { speaker: "you", text: userText, at: userAt },
                 { speaker: "rotli", text: reply, at: assistantAt },
               ],
-          secureContext: secureReadRef.current || attachedSecure,
+          secureContext: turnMark.marked,
         });
         ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
         setSaveErr(null);
@@ -1936,7 +1936,7 @@ export function ChatSurface({
           existingSlug: sentSlug,
           title: memoryTitle,
           messages: diskTurn,
-          secureContext: secureReadRef.current || attachedSecure,
+          secureContext: turnMark.marked,
         });
         // the reply is on disk: a surface that remounted mid-run rereads now
         ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
@@ -1963,7 +1963,7 @@ export function ChatSurface({
         // a TAINTED loose chat writes no memory note — its prose must not
         // land in a fresh unlabeled note remote models could read. An
         // attached-secure chat keeps syncing into its own (secure) note.
-        if (!secureReadRef.current || attachmentIsSecure) {
+        if (!turnMark.marked || attachmentIsSecure) {
           await syncManagedChatMemory({
             instance: active,
             title: memoryTitle,
@@ -1972,7 +1972,7 @@ export function ChatSurface({
             ...(composeNotes ? { composeNotes } : {}),
             model: turnModel,
             turns: memoryTurns,
-            protectedOnly: attachedSecure,
+            protectedOnly: turnMark.marked,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
       } else {
@@ -1982,7 +1982,7 @@ export function ChatSurface({
           instance: active,
           title: sentTitle,
           messages: turn,
-          secureContext: secureReadRef.current || attachedSecure,
+          secureContext: turnMark.marked,
         });
         if (createdArtifacts.length) {
           try {
@@ -2002,7 +2002,7 @@ export function ChatSurface({
             );
           }
         }
-        if (!secureReadRef.current) {
+        if (!turnMark.marked) {
           await syncManagedChatMemory({
             instance: active,
             title: sentTitle,
@@ -2010,7 +2010,7 @@ export function ChatSurface({
             ...(composeNotes ? { composeNotes } : {}),
             model: turnModel,
             turns: memoryTurns,
-            protectedOnly: attachedSecure,
+            protectedOnly: turnMark.marked,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
         bindChat(paneId, tabId, res.slug, active.id); // this tab now IS that chat

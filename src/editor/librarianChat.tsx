@@ -22,7 +22,6 @@ import {
   describeLibrarianAction,
   type LibrarianAction,
 } from "../lib/librarianActions";
-import { personText } from "../lib/promptText";
 import { type applyLibrarian, LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import {
   type ChatTurn,
@@ -47,7 +46,7 @@ import {
   noteTitle,
   onEscapeHere,
   refusalNow,
-  sendToLibrarian,
+  sendTyped,
   startOver,
   takeToChat,
   tauriHostFor,
@@ -160,12 +159,13 @@ export function ChatPanel({
   useEscapeCloses(() => setMinimized(true));
 
   const send = (typed = draft) => {
-    const text = typed.trim();
-    if (!text || !model || thinking || blocked) return;
+    if (!typed.trim() || !model || thinking || blocked) return;
     if (typed === draft) setDraft("");
-    void sendToLibrarian(
+    // as typed: a refusal keeps the words exactly (sendTyped trims the turn)
+    void sendTyped(
       chat.id,
-      { text: personText(text), highlight: passage.anchor() },
+      typed,
+      passage.anchor(),
       model,
       (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
@@ -187,7 +187,7 @@ export function ChatPanel({
   const lastAsked = askedBefore(chat.turns.length);
   const toChat = (asked: ChatTurn | null, from?: string) => {
     const message = asked?.role === "user" ? { text: asked.text, highlight: asked.highlight } : null;
-    void takeToChat(noteId, message).then((opened) => {
+    void takeToChat(noteId, message, chat.onDeviceOnly === true).then((opened) => {
       if (opened && from) updateLibrarianTurn(chat.id, from, () => ({ handedOff: true }));
     });
   };

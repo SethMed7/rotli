@@ -97,9 +97,10 @@ export const CONSTRUCTOR_USERS = {
     uses: ["personText"],
     why: "the person's description of their usage",
   },
-  "src/editor/librarianBar.tsx": { uses: ["personText"], why: "the person's Librarian ask" },
-  "src/editor/librarianChat.tsx": { uses: ["personText"], why: "the person's Librarian ask" },
-  "src/editor/librarianSession.ts": { uses: ["personText"], why: "the person's own Librarian rules" },
+  "src/editor/librarianSession.ts": {
+    uses: ["personText"],
+    why: "the person's own Librarian rules, and the ask a composer sends (sendTyped)",
+  },
   "src/lib/claudeSession.ts": { uses: ["externalText"], why: "a tool that threw: its error line" },
   "src/lib/librarianChat.ts": {
     uses: ["personText", "reshape"],

@@ -39,6 +39,7 @@ import {
   type LibrarianChat,
   startLibrarianChat,
   type ProposalState,
+  type TurnProtection,
   updateLibrarianChat,
   updateLibrarianTurn,
   useLibrarianBar,
@@ -48,7 +49,7 @@ import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
-import { markedConversation, NOT_WRITTEN, settleVault } from "./librarianKeep";
+import { refuseWrite, settleVault } from "./librarianKeep";
 import { flushNote } from "./model";
 import { savedVersionMismatch } from "./savedVersion";
 
@@ -202,8 +203,11 @@ export async function librarianContext(
     people: peopleAreas(rules).map(personText),
     filing: rules.filing.map(personText),
     rules,
-    known: approvedPeopleNotes(listing.people),
-    onDeviceOnly: note.onDeviceOnly || listing.people.some((person) => person.onDeviceOnly === true),
+    // secure People never reach the Librarian, on-device or remote (sixth
+    // review of pull request 267): listing People can't mark a conversation;
+    // only the note it was asked about can
+    known: approvedPeopleNotes(listing.people.filter((person) => person.onDeviceOnly !== true)),
+    onDeviceOnly: note.onDeviceOnly,
   };
 }
 
@@ -274,8 +278,8 @@ export async function sendToLibrarian(
   // a conversation that has held on-device-only text never reaches a remote
   // model: refused before anything is read or sent (fourth review)
   if (chat.onDeviceOnly === true && !modelIsOnDevice(model)) {
-    // the question is kept in the conversation itself, not in whichever
-    // composer sent it (the bar closes as it sends): the restart puts it back
+    // the question is kept in the conversation itself, exactly as typed, not
+    // in whichever composer sent it (the bar closes as it sends)
     updateLibrarianChat(chatId, () => ({
       error: onDeviceOnlyRefusal(model.label),
       restartWith: model.id,
@@ -283,7 +287,8 @@ export async function sendToLibrarian(
     }));
     return "onDeviceOnly";
   }
-  const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...message }];
+  const asked = { ...message, text: personText(message.text.trim()) };
+  const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...asked }];
   updateLibrarianChat(chatId, () => ({
     turns,
     status: "thinking",
@@ -299,6 +304,11 @@ export async function sendToLibrarian(
       return "stopped";
     }
     const ctx = await context(model);
+    // the turn's protection, captured once from what it read: every write
+    // of this turn goes by it (sixth review)
+    const protection: TurnProtection = Object.freeze({
+      onDeviceOnly: chat.onDeviceOnly === true || ctx.onDeviceOnly,
+    });
     // marked before the model is asked: the mark outlives a failed call
     if (ctx.onDeviceOnly) updateLibrarianChat(chatId, () => ({ onDeviceOnly: true }));
     if (message.highlight && !ctx.doc.includes(message.highlight.exact)) {
@@ -322,6 +332,7 @@ export async function sendToLibrarian(
             : "I don’t have an answer for that. Try asking another way."),
       raw: reply.raw,
       actions: reply.actions,
+      protection,
       ...(reply.handoff && { handoff: true }),
       ...(reply.actions.length > 0 && {
         proposal: { kind: "open" as const, picked: reply.actions.map(() => true) },
@@ -329,7 +340,9 @@ export async function sendToLibrarian(
       ...(reply.vault.length > 0 && { vault: reply.vault }),
     };
     updateLibrarianChat(chatId, (now) => ({ turns: [...now.turns, answer], status: "idle" }));
-    await settleVault(chatId, answer.id, reply.vault, model.id);
+    // closed or replaced while the reply was on its way: nothing is kept
+    if (useLibrarianBar.getState().chat?.id !== chatId) return "stopped";
+    await settleVault(chatId, answer.id, reply.vault, model.id, protection);
     return "sent";
   } catch (error) {
     updateLibrarianChat(chatId, () => ({
@@ -338,6 +351,21 @@ export async function sendToLibrarian(
     }));
     return "stopped";
   }
+}
+
+/** Send what a composer holds, as typed: blank asks nothing, the refusal
+ * keeps the words exactly (sixth review, F10), and the turn trims them. */
+export function sendTyped(
+  chatId: string,
+  typed: string,
+  highlight: Anchor | null,
+  model: ChatModelInfo,
+  context: (model: ChatModelInfo) => Promise<LibrarianContext>,
+  refusal: () => Promise<string | null>,
+  hostFor: HostFor = tauriHostFor,
+): Promise<SendOutcome> {
+  if (!typed.trim()) return Promise.resolve("stopped");
+  return sendToLibrarian(chatId, { text: personText(typed), highlight }, model, context, refusal, hostFor);
 }
 
 /** Apply the picked proposals of one reply. The note's words are never
@@ -349,14 +377,15 @@ export async function applyProposal(
   note: { id: string; title: string; model: string },
   apply: typeof applyLibrarian = applyLibrarian,
 ): Promise<void> {
-  // a marked conversation's proposals would write into the open note, which
-  // is never secure (the Librarian refuses secure notes): not applied
-  if (markedConversation(chatId)) {
-    updateLibrarianChat(chatId, () => ({ error: NOT_WRITTEN }));
-    return;
-  }
+  const chat = useLibrarianBar.getState().chat;
+  const turn = chat?.id === chatId ? chat.turns.find((t) => t.id === turnId) : undefined;
+  if (!turn) return; // closed or replaced: nothing is applied
+  // a marked turn's proposals would write into the open note, which is never
+  // secure (the Librarian refuses secure notes): its own protection says no,
+  // and a turn without one counts as marked
+  if (turn.protection?.onDeviceOnly !== false) return refuseWrite(chatId);
   const setProposal = (proposal: ProposalState) => updateLibrarianTurn(chatId, turnId, () => ({ proposal }));
-  const before = useLibrarianBar.getState().chat?.turns.find((turn) => turn.id === turnId)?.proposal;
+  const before = turn.proposal;
   setProposal({ kind: "applying" });
   try {
     const count = await apply(actions, note);
@@ -387,8 +416,9 @@ export function chatDraft(message: { text: string; highlight: Anchor | null } | 
 export async function takeToChat(
   noteId: string,
   message: { text: string; highlight: Anchor | null } | null,
+  /** The conversation's own mark, from the caller that holds it. */
+  onDeviceOnly: boolean,
   open: typeof openChatForNoteId = openChatForNoteId,
-  onDeviceOnly = useLibrarianBar.getState().chat?.onDeviceOnly === true,
 ): Promise<boolean> {
   const tabsNow = () => {
     const panes = usePanesStore.getState();

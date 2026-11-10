@@ -61,6 +61,10 @@ export async function syncChatMemory(
   input: SyncChatMemoryInput,
 ): Promise<ChatMemoryNote | null> {
   let note = input.attachedStem ? await repository.findByStem(input.attachedStem) : null;
+  // protection accumulates from every read in this pass before anything is
+  // composed or written: a note made secure since the send counts (sixth
+  // review of pull request 267, F6)
+  let marked = input.protectedOnly === true || note?.secure === true;
   // A chat that points at a note this listing cannot reach (deleted, or a
   // cold vault) gets NO new note: minting one beside the pointer made a fresh
   // duplicate every turn and never attached it (2026-09-17). The pointer
@@ -76,13 +80,14 @@ export async function syncChatMemory(
     seedNotes = note.notes;
     const own = await repository.findMemoryNote();
     if (own && !own.aiEditable) return null; // the person turned it off there too
+    marked ||= own?.secure === true;
     note = own;
     separate = !own;
   }
   // a marked conversation writes only where it stays protected: the note it
   // would update must itself be secure (a new one is created secure, below),
   // and nothing is composed when there's nowhere protected to put it
-  if (input.protectedOnly && note && note.secure !== true) throw new Error(MEMORY_NOT_PROTECTED);
+  if (marked && note && note.secure !== true) throw new Error(MEMORY_NOT_PROTECTED);
   const currentNotes = note ? note.notes : seedNotes;
 
   let notes: string | null = null;
@@ -97,7 +102,7 @@ export async function syncChatMemory(
 
   if (!note) {
     const body = mergeChatMemory("", input.title, input.chatSlug, content);
-    note = await repository.create(body, input.protectedOnly ? { secure: true } : undefined);
+    note = await repository.create(body, marked ? { secure: true } : undefined);
     if (separate) {
       await repository.setMemoryNote(note.stem);
       return note;

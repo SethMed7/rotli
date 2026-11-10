@@ -330,6 +330,7 @@ describe("taking a request to Chat", () => {
     const opened = await takeToChat(
       "n1",
       { text: person("Write her an email"), highlight: null },
+      false,
       async () => {
         usePanesStore.getState().openChat("chat-about-maya", { newTab: true });
         return true;
@@ -345,7 +346,9 @@ describe("taking a request to Chat", () => {
   });
 
   test("a note that is gone opens nothing", async () => {
-    expect(await takeToChat("gone", { text: person("x"), highlight: null }, async () => false)).toBe(false);
+    expect(await takeToChat("gone", { text: person("x"), highlight: null }, false, async () => false)).toBe(
+      false,
+    );
   });
 });
 

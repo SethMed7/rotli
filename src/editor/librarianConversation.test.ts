@@ -27,7 +27,8 @@ beforeEach(() => closeLibrarianChat());
 // listing included a secure person; its reply named her; switched to a remote
 // model, the next send carried that reply in its history. A conversation now
 // remembers that it held text only an on-device model may read, and never
-// goes to a remote model again.
+// goes to a remote model again. Since the sixth review secure People never
+// reach the Librarian; these tests mark a conversation through its note.
 describe("a conversation that held on-device-only text", () => {
   const LOCAL: ChatModelInfo = {
     ...MODEL,
@@ -38,17 +39,18 @@ describe("a conversation that held on-device-only text", () => {
     api: "generate",
   };
   const SECURE_PERSON = "Velmora";
-  /** The gate's answers: the on-device reader also gets a secure person,
-   * marked on-device only; the remote reader doesn't get her at all. */
+  /** The gate's answers: the on-device reader gets the note marked on-device
+   * only, and a secure person the Librarian leaves out (sixth review: listing
+   * People never marks a conversation); the remote reader gets neither. */
   const gated: LibrarianReads = {
     flush: async () => {},
-    note: async (id) => ({
+    note: async (id, model) => ({
       id,
       revision: "r1",
       text: approved(NOTE),
       body: approved(NOTE),
       title: approved("Maya Chen"),
-      onDeviceOnly: false,
+      onDeviceOnly: model.id === LOCAL.id,
     }),
     listing: async (model) => ({
       folderIds: [approved("wiki/People")],
@@ -85,7 +87,7 @@ describe("a conversation that held on-device-only text", () => {
       allow,
       local.hostFor,
     );
-    expect(JSON.stringify(local.sent)).toContain(SECURE_PERSON);
+    expect(JSON.stringify(local.sent)).not.toContain(SECURE_PERSON);
     expect(useLibrarianBar.getState().chat?.onDeviceOnly).toBe(true);
   }
 
@@ -147,15 +149,20 @@ describe("a conversation that held on-device-only text", () => {
   test("Open in Chat hands the mark over: the new chat is born secure-context", async () => {
     await onDeviceTurn();
     const opened: unknown[] = [];
-    await takeToChat("n1", { text: "Continue", highlight: null }, async (id, opts) => {
-      opened.push([id, opts]);
-      return true;
-    });
+    await takeToChat(
+      "n1",
+      { text: "Continue", highlight: null },
+      useLibrarianBar.getState().chat?.onDeviceOnly === true,
+      async (id, opts) => {
+        opened.push([id, opts]);
+        return true;
+      },
+    );
     expect(opened).toEqual([["n1", { create: true, secureContext: true }]]);
     // an ordinary conversation hands over nothing extra
     start("chat-2");
     opened.length = 0;
-    await takeToChat("n1", null, async (id, opts) => {
+    await takeToChat("n1", null, useLibrarianBar.getState().chat?.onDeviceOnly === true, async (id, opts) => {
       opened.push([id, opts]);
       return true;
     });
@@ -208,7 +215,7 @@ describe("a conversation that held on-device-only text", () => {
       { type: "person", name: "Velmora", area: "People/Work", about: "A harbor pilot.", tags: [] },
       { type: "rule", text: "Notes about Velmora go to People/Work" },
     ];
-    await settleVault("chat-1", reply.id, vault, "local-gemma", deps);
+    await settleVault("chat-1", reply.id, vault, "local-gemma", reply.protection!, deps);
     expect(written).toEqual([]);
     const kept = useLibrarianBar.getState().chat!.turns[1]!.kept;
     expect(kept).toEqual({ kind: "kept", lines: [{ text: NOT_WRITTEN, failed: true }] });

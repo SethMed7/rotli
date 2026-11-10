@@ -253,7 +253,14 @@ impl CorpusStore {
             .filter(|m| m.kind == NoteKind::Note && in_people(&m.disk_folder_id))
             .map(|m| m.id.clone())
             .collect();
-        let people = candidates.iter().filter_map(|id| self.note_ai_row(id, model_is_local)).collect();
+        // secure People never reach the Librarian, on-device or remote (sixth
+        // review of pull request 267): listing People must not mark a
+        // conversation that then can't write anything
+        let people = candidates
+            .iter()
+            .filter_map(|id| self.note_ai_row(id, model_is_local))
+            .filter(|row| !row.on_device_only)
+            .collect();
         Ok(LibrarianListing { folders, people })
     }
 }

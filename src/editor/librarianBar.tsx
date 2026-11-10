@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { ModelPicker } from "../components/chat/chatModelPicker";
 import { parseAnchors, resolveAnchor } from "../lib/librarianActions";
-import { personText } from "../lib/promptText";
 import { corpusFrontmatter, isTauri } from "../lib/tauri";
 import { librarianRefusal } from "../services/librarianBar";
 import {
@@ -32,7 +31,7 @@ import {
   librarianContext,
   noteTitle,
   onEscapeHere,
-  sendToLibrarian,
+  sendTyped,
   useLibrarianModels,
   usePassage,
 } from "./librarianSession";
@@ -92,8 +91,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
 
   // the first ask pops the conversation out; asking again here continues it
   const ask = () => {
-    const text = request.trim();
-    if (!text || !model || phase.kind !== "ready") return;
+    if (!request.trim() || !model || phase.kind !== "ready") return;
     const existing = useLibrarianBar.getState().chat;
     const chatId =
       existing?.noteId === noteId && existing.paneId === paneId ? existing.id : crypto.randomUUID();
@@ -112,9 +110,10 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
         minimized: false,
       });
     }
-    void sendToLibrarian(
+    void sendTyped(
       chatId,
-      { text: personText(text), highlight: passage.anchor() },
+      request,
+      passage.anchor(),
       model,
       (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),

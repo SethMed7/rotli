@@ -45,6 +45,7 @@ beforeEach(() => {
         raw: model(""),
         actions: [],
         vault: VAULT,
+        protection: { onDeviceOnly: false },
       },
     ],
     status: "idle",
@@ -55,7 +56,7 @@ beforeEach(() => {
 
 describe("a statement's vault actions in the conversation", () => {
   test("new people are added at once; someone known becomes an open question", async () => {
-    await settleVault("c1", "t1", VAULT, "m", deps);
+    await settleVault("c1", "t1", VAULT, "m", { onDeviceOnly: false }, deps);
     expect(turn()).toMatchObject({
       kept: { kind: "kept", lines: [{ text: "Added Ana to People/Work", noteId: "01ANA" }] },
       asks: [{ kind: "open" }],
@@ -64,7 +65,7 @@ describe("a statement's vault actions in the conversation", () => {
   });
 
   test("yes changes the known person's note; no leaves it; either answers the question once", async () => {
-    await settleVault("c1", "t1", VAULT, "m", deps);
+    await settleVault("c1", "t1", VAULT, "m", { onDeviceOnly: false }, deps);
     await answerAsk("c1", "t1", 0, false, deps);
     expect(turn().asks).toEqual([{ kind: "answered", yes: false, message: "Left Sam as they are." }]);
     await answerAsk("c1", "t1", 0, true, deps); // already answered: nothing happens
@@ -72,7 +73,7 @@ describe("a statement's vault actions in the conversation", () => {
   });
 
   test("yes applies, and a failure puts the question back with the reason", async () => {
-    await settleVault("c1", "t1", VAULT, "m", deps);
+    await settleVault("c1", "t1", VAULT, "m", { onDeviceOnly: false }, deps);
     await answerAsk("c1", "t1", 0, true, deps);
     expect(turn().asks).toEqual([{ kind: "answered", yes: true, message: "Updated Sam." }]);
     expect(applied).toEqual(["01ANA", "01SAM"]);

@@ -489,10 +489,10 @@ fn the_librarian_listing_reads_only_people_notes_through_the_gate() {
     let remote = ai_rows::librarian_ai_inner(&state, false).unwrap();
     let people: Vec<&str> = remote.people.iter().map(|row| row.title.as_str()).collect();
     assert_eq!(people, vec!["Ana"]);
+    // sixth review: a secure person is left out for an on-device model too
     let local = ai_rows::librarian_ai_inner(&state, true).unwrap();
-    let mut people: Vec<&str> = local.people.iter().map(|row| row.title.as_str()).collect();
-    people.sort_unstable();
-    assert_eq!(people, vec!["Ana", "Bob"], "an on-device model may read a secure note");
+    let people: Vec<&str> = local.people.iter().map(|row| row.title.as_str()).collect();
+    assert_eq!(people, vec!["Ana"], "secure People never reach the Librarian");
     let json = serde_json::to_string(&remote).unwrap();
     assert!(remote.folders.iter().any(|folder| folder.id.ends_with("People/Work")), "{json}");
     assert_nothing_private(&json);
@@ -576,9 +576,10 @@ fn the_gate_marks_what_only_an_on_device_reader_may_see() {
     assert_eq!(marked(hits.clone(), "Velmora"), Some(true));
     assert_eq!(marked(hits, "Ana"), Some(false));
 
+    // the Librarian's listing leaves her out altogether (sixth review)
     let people = ai_rows::librarian_ai_inner(&state, true).unwrap();
     let json = serde_json::to_string(&people).unwrap();
-    assert!(json.contains("\"title\":\"Velmora\"") && json.contains("\"onDeviceOnly\":true"), "{json}");
+    assert!(!json.contains("Velmora") && json.contains("\"title\":\"Ana\""), "{json}");
 
     let read = state.route(DEFAULT_ROOT_ID, |s| read_ai_versioned(s, "wiki/People/velmora.md", true, false)).unwrap();
     assert!(read.on_device_only);
