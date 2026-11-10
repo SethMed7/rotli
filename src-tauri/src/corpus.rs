@@ -5971,6 +5971,20 @@ impl CorpusStore {
         self.create_marked(folder_id, body, secure, creator, None)
     }
 
+    /// `create_as`, with the AI lock written in the same create (a recovery
+    /// copy of a locked note is locked from its first byte; seventh review of
+    /// pull request 267: `corpus_create` dropped it).
+    pub(crate) fn create_protected(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        secure: bool,
+        locked: bool,
+        creator: Option<crate::ai_edit_policy::Creator>,
+    ) -> Result<NoteMeta, String> {
+        self.create_marked(folder_id, body, secure, creator, locked.then_some("locked: true"))
+    }
+
     fn create_marked(
         &mut self,
         folder_id: &str,
@@ -8518,6 +8532,8 @@ pub fn corpus_create(
     folder_id: String,
     body: String,
     secure: Option<bool>,
+    // a recovery copy of a locked note is created locked, in the one create
+    locked: Option<bool>,
     // "chat" | "agent" | "librarian" when an AI makes the note; absent for a person
     created_by: Option<String>,
 ) -> Result<NoteMeta, String> {
@@ -8531,7 +8547,7 @@ pub fn corpus_create(
     let (root, rel) = split_root_id(&folder_id);
     state
         .route(&root, |s| {
-            s.create_as(&rel, &body, secure.unwrap_or(false), creator)
+            s.create_protected(&rel, &body, secure.unwrap_or(false), locked.unwrap_or(false), creator)
         })
         .map(|mut m| {
             m = prefix_meta(&root, m);

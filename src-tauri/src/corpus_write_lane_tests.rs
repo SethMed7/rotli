@@ -86,10 +86,11 @@ fn run_step(
     match step["op"].as_str().unwrap() {
         "create" => {
             let meta = store
-                .create_as(
+                .create_protected(
                     "Inbox",
                     &text("body"),
                     step["secure"].as_bool().unwrap_or(false),
+                    step["locked"].as_bool().unwrap_or(false),
                     None,
                 )
                 .unwrap();

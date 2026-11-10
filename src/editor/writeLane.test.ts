@@ -30,7 +30,10 @@ test.each(contract.scenarios.map((s) => [s.name, s.steps as Step[]] as const))("
   for (const step of steps) {
     switch (step.op) {
       case "create":
-        ids.set(step.note, lane.create("Inbox", step.body!, { secure: step.secure === true }).id);
+        ids.set(
+          step.note,
+          lane.create("Inbox", step.body!, { secure: step.secure === true, locked: step.locked === true }).id,
+        );
         break;
       case "read": {
         const note = lane.read(id(step));

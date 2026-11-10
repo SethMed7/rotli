@@ -2,6 +2,15 @@
   "about": "The editor's write lane, as Rust's corpus implements it (CorpusStore::write_if_revision_with_body_base). Run by src-tauri/src/corpus_write_lane_tests.rs against the real store and by src/editor/writeLane.test.ts against the test fake, so the fake can't drift from Rust (sixth review of pull request 267). A revision names the complete file, frontmatter included; `base` is the editor body the write was typed against.",
   "scenarios": [
     {
+      "name": "a create carries protection and the AI lock in the one create",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Ledger\n\nprivate", "secure": true, "locked": true },
+        { "op": "read", "note": "n", "secure": true, "locked": true },
+        { "op": "create", "note": "m", "body": "# Plan\n\nwords", "locked": true },
+        { "op": "read", "note": "m", "secure": false, "locked": true }
+      ]
+    },
+    {
       "name": "a write on the current revision lands and returns the landed file's revision",
       "steps": [
         { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },

@@ -409,14 +409,11 @@ export function corpusWrite(
 export function corpusCreate(
   folderId: string,
   body: string,
-  policy?: { secure?: boolean; createdBy?: NoteCreator },
+  policy?: { secure?: boolean; locked?: boolean; createdBy?: NoteCreator },
 ): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_create", {
-    folderId,
-    body,
-    secure: policy?.secure ?? false,
-    ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
-  });
+  const { secure = false, locked = false, createdBy } = policy ?? {};
+  const by = createdBy ? { createdBy } : {};
+  return corpusInvoke("corpus_create", { folderId, body, secure, locked, ...by });
 }
 
 export function corpusDelete(id: string): Promise<void> {

@@ -1,6 +1,7 @@
 // The native adapter's contract for a note read (sixth review of pull request
 // 267): content, revision and effective protection come back together, from
-// one read. Conflict recovery copies a note from that read, so a read that
+// one read. And for a create (seventh review): protection and the AI lock go
+// to Rust in the one create, so a locked note's recovery copy is locked. Conflict recovery copies a note from that read, so a read that
 // lost `secure` made an unprotected copy of a secure note. Rust's side of the
 // contract is corpus_write_lane_tests.rs (`a_read_carries_the_effective_protection_the_ipc_sends`).
 import { afterEach, expect, test } from "bun:test";
@@ -46,4 +47,25 @@ test("a native read carries the note's protection with its body and revision", a
 test("a read without its protection counts as protected (an older or broken shape fails closed)", async () => {
   nativeRead(wire);
   expect(await new FsNotesService().getNote("n1")).toMatchObject({ secure: true, locked: true });
+});
+
+test("a native create sends protection and the AI lock in the one corpus_create", async () => {
+  const sent: Record<string, unknown>[] = [];
+  host.__TAURI_INTERNALS__ = {
+    invoke: async (cmd: string, args: Record<string, unknown>) => {
+      if (cmd === "corpus_create") {
+        sent.push(args);
+        return { ...wire, id: "n2", secure: args.secure, locked: args.locked };
+      }
+      if (cmd === "corpus_read") return { ...wire, id: "n2", secure: true, locked: true };
+      throw new Error(`unexpected ${cmd}`);
+    },
+    transformCallback: () => 0,
+  };
+  await new FsNotesService().createNote("Inbox", wire.body, { secure: true, locked: true });
+  await new FsNotesService().createNote("Inbox", wire.body, { locked: true });
+  expect(sent.map(({ secure, locked }) => ({ secure, locked }))).toEqual([
+    { secure: true, locked: true },
+    { secure: false, locked: true },
+  ]);
 });
