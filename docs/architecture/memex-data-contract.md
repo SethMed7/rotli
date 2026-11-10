@@ -216,16 +216,21 @@ second user-visible product or storage location.
 - Quit and in-app restart are coordinated with all three webviews. Every
   registered editor, board, document, sheet, settings, and projection flush must
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
-  the main window with an error. In each window quit is a transaction
-  (`src/lib/quitFlush.ts`): from the request until it is refused or the
-  process exits the editors take no input ("Finishing saving…"), every
-  flusher runs, and the window acknowledges only when a final check after all
-  of them finds nothing unsaved or outstanding in any note. The editor's
-  flush refuses within 12 seconds (inside Rust's 15) while any note has a
-  write still on its way to the disk, naming the note: such a write could
-  land after exit. A window whose input was taken away gets it back on its
-  own refusal, on the main window's failure notice, or 20 seconds after an
-  acknowledgement that didn't end the process. The Mac app keeps no durable
+  the main window with an error. The attempt has two phases
+  (`src-tauri/src/quit_flush.rs`, `src/lib/quitFlush.ts`) and never makes
+  anything read-only: every window flushes and answers flushed or refused
+  (bounded 15 seconds); only when all flushed, every window that exists then
+  answers at once, from its buffers with no flushing, whether anything is
+  unsaved or outstanding (bounded 2 seconds); any yes refuses, naming the
+  note, and all no lets the host act at once, with nothing awaited between
+  the last answer and the exit. One attempt runs at a time (a second request
+  joins it); each ends with one event to every window it asked. Vault
+  switches and folder-window closes use the same attempt. What remains:
+  words typed in a window after its own phase-2 answer and before the last
+  answer arrives (at most the 2-second bound; milliseconds unless a window is
+  hung), and the exit itself. The editor's flush refuses within 12 seconds
+  while any note has a write still on its way to the disk, naming the note:
+  such a write could land after exit. The Mac app keeps no durable
   draft journal, so a forced process/OS termination loses everything typed
   since the last save that landed; while a write never answers, that is the
   only way out, and the person can only copy the note's text first. Rotli

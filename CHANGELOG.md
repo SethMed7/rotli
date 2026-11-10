@@ -172,24 +172,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recovery copy.
 - **Quit can't go ahead with words you just typed.** A note that finished
   saving early kept taking typing while another window or a workbook was
-  still saving, and quit went ahead with those words unsaved. From the
-  moment you quit until Rotli has finished or stayed open, the editors take
-  no typing ("Finishing saving…"), and quit goes ahead only when a last
-  check, after everything has saved, finds nothing unsaved in any note. This
+  still saving, and quit went ahead with those words unsaved. Quit now has
+  two steps and never locks the editors: every window saves; then, only
+  when every window has, each is asked at once whether anything is unsaved
+  right now, and any yes keeps Rotli open, naming the note. All no, and
+  Rotli quits at once. A second quit while one is deciding joins it. A
+  vault switch and closing a folder window go the same way. What's left:
+  words typed in a window after it answered and before the last window
+  answers (at most 2 seconds, milliseconds unless a window hangs). This
   happens in 1.9.1.
 - **A late read can't put older words back.** If a note's file was read
   just before your newest save landed and that read answered afterwards,
   the editor took the older words and showed them as saved. Each read now
   carries when it started, and one older than what the editor already has is
-  dropped. This happens in 1.9.1.
+  dropped. A read dropped or cancelled that may have seen something newer is
+  followed by one fresh read, and a save whose answer arrives after a newer
+  version was read takes that version in, so a newer file is never left
+  unread. This happens in 1.9.1.
 - **Words typed while Rotli copies aside a conflict are kept.** When another
   app changed a note you had unsaved edits in, quitting keeps your version as
   a copy beside it. Anything typed while that copy was being made was
   dropped, and the note looked saved. It's now part of the note's saves: the
   newer words go into that same copy (never a second one), and the note is
   read again before it takes the other app's version. A notice in the
-  sidebar now says where your words went and opens the copy; before, nothing
-  did. This happens in 1.9.1.
+  sidebar now names each copy and opens it, and stays (across a restart)
+  until you open the copy or dismiss it; before, nothing said where your
+  words went. This happens in 1.9.1.
 - **A slow save is waited for, never raced.** A disk that stopped answering
   left every later save of that note waiting, and every quit ran into its
   15-second limit. An earlier fix in this release tried again beside the
@@ -213,10 +221,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers with exactly what it wrote, so another writer's change right after
   it can't be taken for Rotli's.
 - **A note deleted while it had unsaved words says so.** Its saves failed
-  with no way out. Now its words stay in its editor, a notice in the
-  sidebar says the file is gone and offers to copy the words or discard
-  them, and quit names the note until they are discarded. This happens in
-  1.9.1.
+  with no way out, and once the file list refreshed the editor showed
+  nothing at all. Now its words stay in its editor, in every pane, still
+  editable; a notice in the sidebar says the file is gone and offers to copy
+  the words or discard them (which closes its panes); and quit names the
+  note until they are discarded. If the file comes back, the note saves
+  again and the notice clears. This happens in 1.9.1.
 - **A secure note's conflict copy stays secure on the Mac.** The copy Rotli
   keeps of your version when another app changed the note was created as an
   ordinary note, because the Mac's note read didn't say the note was secure.
