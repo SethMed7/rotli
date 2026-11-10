@@ -115,7 +115,7 @@ export const CONSTRUCTOR_USERS = {
 };
 
 /** Test-side: a test, or a `*.fixtures.ts` module tests share. */
-const isTestSide = (path) => /\.(test|fixtures)\.tsx?$/.test(path);
+const isTestSide = (path) => /\.(test|fixtures|lane)\.tsx?$/.test(path);
 
 function brandNamesOf(checker, type, seen = new Set(), depth = 0) {
   const found = new Set();
@@ -177,24 +177,31 @@ function usesItsParameter(checker, fn) {
   return used;
 }
 
-/** Does `type` hold an `any` anywhere a JSON value could carry it? */
-function holdsAny(checker, type, depth = 0) {
-  if (!type || depth > 3) return false;
-  if (type.flags & ts.TypeFlags.Any) return true;
-  if (type.isUnion() || type.isIntersection())
-    return type.types.some((part) => holdsAny(checker, part, depth));
-  if (checker.isArrayType(type) || checker.isTupleType(type))
-    return checker.getTypeArguments(type).some((arg) => holdsAny(checker, arg, depth + 1));
-  if (type.flags & ts.TypeFlags.Object && type.getCallSignatures().length === 0) {
-    return checker
-      .getPropertiesOfType(type)
-      .slice(0, 64)
-      .some((prop) => {
+/** Does `type` hold an `any` anywhere a JSON value could carry it? Walks the
+ * whole value once, each type at most once (a recursive type ends), and fails
+ * closed: a value too large to walk within the budget counts as holding one
+ * (sixth review of pull request 267: the walk stopped at depth three). */
+function holdsAny(checker, root) {
+  const seen = new Set();
+  const pending = [root];
+  let budget = 5000;
+  while (pending.length > 0) {
+    const type = pending.pop();
+    if (!type || seen.has(type)) continue;
+    seen.add(type);
+    if ((budget -= 1) < 0) return true;
+    if (type.flags & ts.TypeFlags.Any) return true;
+    if (type.isUnion() || type.isIntersection()) pending.push(...type.types);
+    else if (checker.isArrayType(type) || checker.isTupleType(type))
+      pending.push(...checker.getTypeArguments(type));
+    else if (type.flags & ts.TypeFlags.Object && type.getCallSignatures().length === 0) {
+      for (const prop of checker.getPropertiesOfType(type)) {
         const declaration = prop.valueDeclaration ?? prop.declarations?.[0];
-        return (
-          !!declaration && holdsAny(checker, checker.getTypeOfSymbolAtLocation(prop, declaration), depth + 1)
-        );
-      });
+        if (declaration) pending.push(checker.getTypeOfSymbolAtLocation(prop, declaration));
+      }
+      const index = checker.getIndexInfosOfType(type);
+      for (const info of index) pending.push(info.type);
+    }
   }
   return false;
 }

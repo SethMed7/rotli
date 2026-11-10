@@ -103,6 +103,16 @@ describe("check:prompt-brands refuses the fifth review's bypasses", () => {
       /promptJson's value holds an `any`/,
     ],
     [
+      "an `any` four objects deep in a promptJson value",
+      "export const p: PromptText = promptJson({ a: { b: { c: { d: JSON.parse(raw) } } } });",
+      /promptJson's value holds an `any`/,
+    ],
+    [
+      "an `any` behind a recursive type in a promptJson value",
+      "interface Tree { kids: Tree[]; leaf: any }\ndeclare const tree: Tree;\nexport const p: PromptText = promptJson({ tree });",
+      /promptJson's value holds an `any`/,
+    ],
+    [
       "a brand-typed default parameter from `any`",
       "export function f(p: PromptText = JSON.parse(raw)) { return p; }",
       /an `any` value becomes PromptText/,
