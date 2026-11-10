@@ -19,6 +19,10 @@
 // CONTRACT_VERSION or changes the chat/inbox shape. All functions here are PURE
 // (no I/O, no React) so they unit-test in a plain browser.
 
+// A chat file's first frontmatter block is read and written through the one
+// shared, CRLF-aware parser (sixth review of pull request 267, F5).
+import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "../lib/frontmatterBlock";
+
 // rotli is built against the v3.5 note contract (it writes the per-note frontmatter
 // + the wiki/_inbox staging path). v3.6 split the brain's self/ → identity/ +
 // personality/ and added the org layer — but rotli's WRITE surfaces (chats/ and
@@ -228,15 +232,13 @@ export function setChatTitle(contents: string, title: string): string {
     .trim()
     .slice(0, 120);
   if (!clean) return contents;
-  const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!frontmatter || frontmatter[1] === undefined) return contents;
-
-  const body = frontmatter[1];
-  const nextBody = /^title:.*$/m.test(body)
-    ? body.replace(/^title:.*$/m, `title: ${clean}`)
-    : `title: ${clean}\n${body}`;
-  const next = `---\n${nextBody}\n---${contents.slice(frontmatter[0].length)}`;
-  return next.replace(/^(---\n[\s\S]*?\n---\n\n)# [^\n]*/, `$1# ${clean}`);
+  const fm = frontmatterBlock(contents);
+  if (!fm) return contents;
+  const nextBody = /^title:.*$/m.test(fm.inner)
+    ? fm.inner.replace(/^title:.*$/m, `title: ${clean}`)
+    : `title: ${clean}\n${fm.inner}`;
+  const head = withFrontmatterBlock(contents.slice(0, fm.end), fm, nextBody);
+  return head + contents.slice(fm.end).replace(/^(\r?\n\r?\n)# [^\r\n]*/, `$1# ${clean}`);
 }
 
 /** Build the full bytes of a brand-NEW chat (header + any initial messages),
@@ -259,14 +261,14 @@ export { setAttachedTo } from "./chatNotePointers";
  * first-frontmatter-block discipline as setAttachedTo. Unpinning a chat that was
  * never pinned is a no-op (no line is added just to say `false`). */
 export function setChatPinned(contents: string, pinned: boolean): string {
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
-  const block = fm[1];
+  const fm = frontmatterBlock(contents);
+  if (!fm) return contents; // no frontmatter — leave the file alone
+  const block = fm.inner;
   let next: string;
   if (/^pinned:.*$/m.test(block)) next = block.replace(/^pinned:.*$/m, `pinned: ${pinned}`);
   else if (pinned) next = `${block}\npinned: true`;
   else return contents;
-  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+  return withFrontmatterBlock(contents, fm, next);
 }
 
 /** Mark a chat as SECURE-CONTEXT: a turn's tool trace read a secure note, so
@@ -274,21 +276,20 @@ export function setChatPinned(contents: string, pinned: boolean): string {
  * even after a model switch (audit 2026-07-29 #7). One-way: nothing unsets it.
  * Pure; same first-frontmatter-block discipline as setChatPinned. */
 export function setChatSecureContext(contents: string): string {
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return contents; // no frontmatter — leave the file alone
-  const block = fm[1];
+  const fm = frontmatterBlock(contents);
+  if (!fm) return contents; // no frontmatter — leave the file alone
+  const block = fm.inner;
   if (/^secureContext:\s*true\s*$/m.test(block)) return contents;
   const next = /^secureContext:.*$/m.test(block)
     ? block.replace(/^secureContext:.*$/m, "secureContext: true")
     : `${block}\nsecureContext: true`;
-  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+  return withFrontmatterBlock(contents, fm, next);
 }
 
 /** Whether a chat file carries the secure-context marker (first frontmatter
  * block only — a message line can never match). */
 export function hasSecureContext(contents: string): boolean {
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  return !!fm && fm[1] !== undefined && /^secureContext:\s*true\s*$/m.test(fm[1]);
+  return protectionMark(contents, "secureContext");
 }
 
 const CHAT_ARTIFACTS_KEY = "rotliArtifacts";
@@ -314,9 +315,9 @@ function validChatArtifact(value: unknown): value is ChatArtifact {
 /** Parse Rotli's additive artifact metadata from the first frontmatter block.
  * Unknown/malformed values fail to an empty list; body text never participates. */
 export function parseChatArtifacts(contents: string): ChatArtifact[] {
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return [];
-  const raw = new RegExp(`^${CHAT_ARTIFACTS_KEY}:\\s*(.*)$`, "m").exec(fm[1])?.[1];
+  const fm = frontmatterBlock(contents);
+  if (!fm) return [];
+  const raw = new RegExp(`^${CHAT_ARTIFACTS_KEY}:\\s*(.*)$`, "m").exec(fm.inner)?.[1];
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -335,16 +336,16 @@ export function parseChatArtifacts(contents: string): ChatArtifact[] {
 /** Idempotently attach one artifact reference without touching chat messages. */
 export function addChatArtifact(contents: string, artifact: ChatArtifact): string {
   if (!validChatArtifact(artifact)) return contents;
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return contents;
+  const fm = frontmatterBlock(contents);
+  if (!fm) return contents;
   const artifacts = parseChatArtifacts(contents);
   if (artifacts.some((item) => item.kind === artifact.kind && item.id === artifact.id)) return contents;
   const line = `${CHAT_ARTIFACTS_KEY}: ${JSON.stringify([...artifacts.slice(-99), artifact])}`;
-  const block = fm[1];
+  const block = fm.inner;
   const next = new RegExp(`^${CHAT_ARTIFACTS_KEY}:.*$`, "m").test(block)
     ? block.replace(new RegExp(`^${CHAT_ARTIFACTS_KEY}:.*$`, "m"), line)
     : `${block}\n${line}`;
-  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+  return withFrontmatterBlock(contents, fm, next);
 }
 
 function validChatArtifactTurn(value: unknown): value is ChatArtifactTurn {
@@ -360,9 +361,9 @@ function validChatArtifactTurn(value: unknown): value is ChatArtifactTurn {
 
 /** Read durable per-response artifact ownership from frontmatter only. */
 export function parseChatArtifactTurns(contents: string): ChatArtifactTurn[] {
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return [];
-  const raw = new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:\\s*(.*)$`, "m").exec(fm[1])?.[1];
+  const fm = frontmatterBlock(contents);
+  if (!fm) return [];
+  const raw = new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:\\s*(.*)$`, "m").exec(fm.inner)?.[1];
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -393,17 +394,17 @@ export function addChatArtifactTurn(
   if (!Number.isSafeInteger(assistant) || assistant < 0 || assistant > 10_000) return contents;
   const valid = artifacts.filter(validChatArtifact).slice(-24);
   if (valid.length === 0) return contents;
-  const fm = /^---\n([\s\S]*?)\n---/.exec(contents);
-  if (!fm || fm[1] === undefined) return contents;
+  const fm = frontmatterBlock(contents);
+  if (!fm) return contents;
   const turns = parseChatArtifactTurns(contents).filter((turn) => turn.assistant !== assistant);
   turns.push({ assistant, artifacts: valid });
   turns.sort((a, b) => a.assistant - b.assistant);
   const line = `${CHAT_ARTIFACT_TURNS_KEY}: ${JSON.stringify(turns.slice(-100))}`;
-  const block = fm[1];
+  const block = fm.inner;
   const next = new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:.*$`, "m").test(block)
     ? block.replace(new RegExp(`^${CHAT_ARTIFACT_TURNS_KEY}:.*$`, "m"), line)
     : `${block}\n${line}`;
-  return `${contents.slice(0, fm.index)}---\n${next}\n---${contents.slice(fm.index + fm[0].length)}`;
+  return withFrontmatterBlock(contents, fm, next);
 }
 
 /** Keep the attached note's `## Chat` backlink in sync (byte-identical to
@@ -456,6 +457,8 @@ export interface NoteMeta {
   owner?: string;
   /** Corpus security policy. Remote AI is always blocked; local AI is opt-in. */
   secure?: boolean;
+  /** No AI may edit it (`locked: true`); written by the composer, never patched in. */
+  locked?: boolean;
   /** Which AI made it (`created_by`); absent = a person (src/lib/aiEditPolicy.ts). */
   createdBy?: "chat" | "agent" | "librarian";
 }
@@ -487,6 +490,7 @@ export function composeNote(meta: NoteMeta, body: string, date: string): string 
     "tags: []", //  ”
     "links: []", //  ”
     ...(meta.secure ? ["secure: true"] : []),
+    ...(meta.locked ? ["locked: true"] : []),
     ...(meta.createdBy ? [`created_by: ${meta.createdBy}`] : []),
     "---",
     "",

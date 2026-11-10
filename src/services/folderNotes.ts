@@ -404,13 +404,13 @@ export class FolderNotesService implements NotesService {
         shelf: this.imported ? [] : [DEST.inbox],
         reach: [],
         ...(policy?.secure ? { secure: true } : {}),
+        ...(policy?.locked ? { locked: true } : {}),
         ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
       },
       body,
       today(),
     );
-    const protectedText = policy?.locked ? text.replace("\n---\n", "\nlocked: true\n---\n") : text;
-    const exactBodyText = body && !body.endsWith("\n") ? protectedText.slice(0, -1) : protectedText;
+    const exactBodyText = body && !body.endsWith("\n") ? text.slice(0, -1) : text;
     if (policy?.secure) await ignoreInGit(this.dir, path);
     await this.writeFile(path, exactBodyText);
     this.reindex(id, id, path);

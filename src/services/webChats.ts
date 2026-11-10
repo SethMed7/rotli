@@ -6,6 +6,7 @@
 
 import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
+import { frontmatterBlock } from "../lib/frontmatterBlock";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { lastReplyMs } from "../memex/chatRecency";
@@ -20,11 +21,8 @@ const removedKey = (bin: "trash" | "archive", slug: string) => `chat-${bin}:${sl
 const INDEX_RETRIES = 4;
 
 function frontmatterField(contents: string, name: string): string {
-  const opening = /^---\r?\n/.exec(contents);
-  const block = opening
-    ? contents.slice(opening[0].length, contents.indexOf("\n---", opening[0].length))
-    : "";
-  const line = block.split(/\r?\n/).find((l) => l.startsWith(`${name}:`));
+  const block = frontmatterBlock(contents)?.inner ?? "";
+  const line = block.split("\n").find((l) => l.startsWith(`${name}:`));
   return line ? line.slice(name.length + 1).trim() : "";
 }
 

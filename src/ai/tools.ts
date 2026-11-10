@@ -48,16 +48,16 @@ function argText(value: unknown): string {
 export function stripLeadingFrontmatter(body: string): string {
   // fence lines tolerate trailing spaces — gemma emits "--- \n" (live eval
   // 2026-07-30, the frontmatter-leak case)
-  const m = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+  const m = body.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n)?/);
   if (!m) return body;
   // strip ONLY a block that reads as metadata (key: value lines, plus yaml
   // list/continuation lines) — a body OPENING with a thematic break must not
   // lose real prose sitting between two --- lines (Greptile PR #19)
-  const lines = (m[1] ?? "").split("\n").filter((line) => line.trim() !== "");
+  const lines = (m[1] ?? "").split(/\r?\n/).filter((line) => line.trim() !== "");
   const metadataish =
     lines.length > 0 && lines.every((line) => /^([A-Za-z_][\w-]*[ \t]*:|[ \t]|-)/.test(line));
   if (!metadataish) return body;
-  return body.slice(m[0].length).replace(/^\n+/, "");
+  return body.slice(m[0].length).replace(/^(?:\r?\n)+/, "");
 }
 
 /** Frame the `links:` line inside a READ note's metadata fence. That one line
@@ -74,7 +74,7 @@ export function frameLinksMetadata<T extends PromptPart>(value: T): T {
 }
 
 function frameLinks(body: string): string {
-  const fence = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+  const fence = body.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n)?/);
   if (!fence) return body;
   const block = fence[1] ?? "";
   const framed = block.replace(

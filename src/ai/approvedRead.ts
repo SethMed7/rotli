@@ -12,6 +12,7 @@ import { type Attachments, buildHandToAiPrompt } from "../lib/handToAi";
 import type { Approved, ApprovedText } from "../lib/promptText";
 
 export type { Approved } from "../lib/promptText";
+import { frontmatterBlock } from "../lib/frontmatterBlock";
 import { type PersonNote, peopleNotes } from "../lib/librarianPeople";
 import {
   type ChatModelInfo,
@@ -114,8 +115,10 @@ export function approvedHandoff(note: ApprovedNote, attachments: Attachments): A
 
 /** The tags in an approved note's own frontmatter (the same read as its words). */
 export function approvedTags(note: ApprovedNote): ApprovedText[] {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(note.text);
-  const line = match?.[1]?.split(/\r?\n/).find((field) => /^tags\s*:/.test(field)) ?? "";
+  const line =
+    frontmatterBlock(note.text)
+      ?.inner.split("\n")
+      .find((field) => /^tags\s*:/.test(field)) ?? "";
   return line
     .slice(line.indexOf(":") + 1)
     .trim()
