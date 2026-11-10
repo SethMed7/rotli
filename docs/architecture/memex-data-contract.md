@@ -216,8 +216,29 @@ second user-visible product or storage location.
 - Quit and in-app restart are coordinated with all three webviews. Every
   registered editor, board, document, sheet, settings, and projection flush must
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
-  the main window with an error. Forced process/OS termination can still lose
-  unsaved in-memory debounce work; no durable draft journal exists yet.
+  the main window with an error. The attempt has two phases
+  (`src-tauri/src/quit_flush.rs`, `src/lib/quitFlush.ts`) and never makes
+  anything read-only: every window flushes and answers flushed or refused
+  (bounded 15 seconds); only when all flushed, every window that exists then
+  answers at once, from its buffers with no flushing, whether anything is
+  unsaved or outstanding (bounded 2 seconds); any yes refuses, naming the
+  note, and all no lets the host act at once, with nothing awaited between
+  the last answer and the exit. One attempt runs at a time: a request with the
+  same intent (a second quit, a second close of the same folder window)
+  joins it and does nothing of its own; any other request (a quit during a
+  folder-window close, a vault switch) waits for it to end and then runs as
+  its own attempt. Each ends with one event to every window it asked, and
+  ends even if something panics. Vault
+  switches and folder-window closes use the same attempt. What remains:
+  words typed in a window after its own phase-2 answer and before the last
+  answer arrives (at most the 2-second bound; milliseconds unless a window is
+  hung), and the exit itself. The editor's flush refuses within 12 seconds
+  while any note has a write still on its way to the disk, naming the note:
+  such a write could land after exit. The Mac app keeps no durable
+  draft journal, so a forced process/OS termination loses everything typed
+  since the last save that landed; while a write never answers, that is the
+  only way out, and the person can only copy the note's text first. Rotli
+  Web writes its unsaved buffers to a recovery journal on unload.
 - A sheet's unsaved edits are written when the window hides and at quit; a
   background save that fails says why. Edits parked from an earlier session
   whose file changed on disk since are never written over the newer file and
@@ -979,7 +1000,9 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `"folders": {"inbox": "Inbox", "archive": "Archive (Rotli)", "trash":
   "Trash (Rotli)", "chats": "chats (Rotli)", "storage": "storage (Rotli)"}`
   (`src-tauri/src/vault_roles.rs`; TS twin `IMPORTED_FOLDER_ROLES` in
-  `src/services/destinations.ts`, pinned by `parity.json`). Rotli's folders
+  `src/services/destinations.ts`, pinned by `parity.json`). Chat listing paths
+  use the resolved chat role folder, matching reads and writes; Web listings
+  do not assume `chats/` for an imported vault. Rotli's folders
   are always suffixed, so a copied `Archive/`, `Trash/`, `chats/`, `storage/`,
   or `wiki/` is the person's ordinary folder; new notes and captures land in a
   top-level `Inbox/`, and a copied `Inbox/` is used as it. An unusable or

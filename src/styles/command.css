@@ -100,6 +100,16 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
+/* files left out because they have a hard link: one quiet line under the
+   results (src/lib/hardLinks.ts) */
+.pal-skipped {
+  margin: 0;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
 .pal-foot {
   display: flex;
   gap: 16px;
@@ -3224,12 +3234,12 @@
   background: var(--hov);
 }
 .rename-btn.primary {
-  background: var(--accent);
+  background: var(--accent-text);
   color: var(--on-accent);
   border-color: transparent;
 }
 .rename-btn.primary:hover {
-  background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
+  background: var(--accent-text);
 }
 /* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
    read and edit a prompt; the prompt box scrolls, never the card */

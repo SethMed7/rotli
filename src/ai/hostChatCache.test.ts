@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { CHAT_MEMORY_WINDOW, touchBounded } from "./host";
+import { CHAT_MEMORY_WINDOW, touchBounded } from "./approvedRead";
 
 const entry = (body: string) => ({ modifiedMs: 1, body });
 const bounds = (entries: number, chars: number) => ({ entries, chars });

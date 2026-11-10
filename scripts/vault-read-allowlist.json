@@ -1,0 +1,81 @@
+{
+  "why": "Raw file reads in production Rust that may stay raw, by file and category (identity, outside-vault, import, private-output, dir-sync; scripts/check-vault-reads.mjs says what each means). Each is marked `// raw read (<category>): <reason>` beside the call; a vault sidecar that holds content goes through fsutil's checked open instead. The check fails on an unmarked read or a count above these. Raising a count is a reviewed change.",
+  "files": {
+    "antigravity.rs": {
+      "outside-vault": 1
+    },
+    "app_settings.rs": {
+      "outside-vault": 1
+    },
+    "breve.rs": {
+      "outside-vault": 1
+    },
+    "chat.rs": {
+      "outside-vault": 1
+    },
+    "chat_registry.rs": {
+      "outside-vault": 1
+    },
+    "corpus.rs": {
+      "outside-vault": 4,
+      "identity": 1
+    },
+    "corpus_files.rs": {
+      "import": 1
+    },
+    "corpus_layout.rs": {
+      "identity": 1
+    },
+    "document_conversion.rs": {
+      "private-output": 2
+    },
+    "finder_quick_action.rs": {
+      "outside-vault": 1
+    },
+    "helper_token.rs": {
+      "outside-vault": 2
+    },
+    "helper_vault.rs": {
+      "outside-vault": 1,
+      "identity": 1,
+      "private-output": 1
+    },
+    "localmodel.rs": {
+      "outside-vault": 1
+    },
+    "memex.rs": {
+      "identity": 2,
+      "outside-vault": 1
+    },
+    "native_drag.rs": {
+      "outside-vault": 1
+    },
+    "provider_models_fetch.rs": {
+      "outside-vault": 1
+    },
+    "routines.rs": {
+      "outside-vault": 1,
+      "dir-sync": 1
+    },
+    "usage_lines.rs": {
+      "outside-vault": 1
+    },
+    "vault_import.rs": {
+      "import": 1
+    },
+    "vault_location.rs": {
+      "outside-vault": 1,
+      "identity": 1
+    },
+    "vault_marker.rs": {
+      "identity": 4
+    },
+    "vault_roles.rs": {
+      "identity": 2
+    },
+    "workspace.rs": {
+      "outside-vault": 1,
+      "import": 1
+    }
+  }
+}

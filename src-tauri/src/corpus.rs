@@ -363,6 +363,7 @@ fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 }
 
 fn read_config_path(path: &Path) -> Option<CorpusConfig> {
+    // raw read (outside-vault): app config outside any vault
     fs::read_to_string(path)
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -545,6 +546,7 @@ pub fn seed_demo_memex(root: &Path) -> Result<(), String> {
 /// A memex marked demo-only in its own config (`memex.json` `demo: true`) — hidden
 /// from onboarding/detection; only opened while demo mode is on.
 pub fn is_demo_memex(root: &Path) -> bool {
+    // raw read (identity): a vault's memex.json demo flag
     fs::read_to_string(root.join("memex.json"))
         .ok()
         .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
@@ -580,7 +582,8 @@ pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
 fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
     let demo = demo_root(app)?;
     let stamp = demo.join(DOT_DIR).join("demo-seed-version");
-    let current = fs::read_to_string(&stamp).ok();
+    // the stamp is in the demo vault's .rotli: the checked open
+    let current = crate::fsutil::read_own_sidecar(&stamp).ok().flatten();
     if !is_memex_root(&demo) || current.as_deref() != Some(DEMO_SEED_VERSION) {
         let _ = seed_demo_memex(&demo);
         if let Some(p) = stamp.parent() {
@@ -699,6 +702,7 @@ struct LegacyInstance {
 }
 
 fn read_txt_pointer(config_dir: &Path, name: &str) -> Option<PathBuf> {
+    // raw read (outside-vault): app config outside any vault
     let raw = fs::read_to_string(config_dir.join(name)).ok()?;
     let t = raw.trim();
     if t.is_empty() {
@@ -763,6 +767,7 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
 /// via memexId.
 fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
     let read_roots = || {
+        // raw read (outside-vault): app config outside any vault
         fs::read_to_string(config_dir.join("corpus-roots.json"))
             .ok()
             .and_then(|t| serde_json::from_str::<RootRegistry>(&t).ok())
@@ -803,6 +808,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
         }
     }
 
+    // raw read (outside-vault): app config outside any vault
     let legacy: LegacyInstances = fs::read_to_string(config_dir.join("memex-instances.json"))
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -864,6 +870,8 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
 /// them silently re-enabled the Brain on a vault the user explicitly chose raw
 /// (pressure-test). A destination that already has settings keeps them: its
 /// own prior choices outrank this flow's. Never touches any other file.
+/// The Librarian route's opt-in (`librarianMcp`) belongs to the one vault the
+/// person turned it on for, so it is left behind.
 pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
     let src = current.join(".rotli").join("settings.json");
     let dst_dir = new_root.join(".rotli");
@@ -872,10 +880,20 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
-    fs::copy(&src, &dst)
-        .map_err(|e| format!("carry settings: {e}"))
-        .map(|_| ())
+    let raw = crate::fsutil::read_own_text(&src).map_err(|e| format!("carry settings: {e}"))?;
+    let carried = match serde_json::from_str::<serde_json::Value>(&raw) {
+        Ok(serde_json::Value::Object(mut settings)) if settings.contains_key(LIBRARIAN_MCP_SETTING) => {
+            settings.remove(LIBRARIAN_MCP_SETTING);
+            serde_json::to_string(&settings).map_err(|e| format!("carry settings: {e}"))?
+        }
+        _ => raw,
+    };
+    fs::write(&dst, carried).map_err(|e| format!("carry settings: {e}"))
 }
+
+/// The per-vault switch for the Librarian agent route (`rotli mcp
+/// --librarian`, workspace_librarian.rs) in `.rotli/settings.json`.
+pub(crate) const LIBRARIAN_MCP_SETTING: &str = "librarianMcp";
 
 fn upsert_brain_config(
     cfg: &mut CorpusConfig,
@@ -1279,12 +1297,15 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
-pub(crate) fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+pub(crate) fn walked_secure(fm: &Frontmatter, body: &str, text: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
         || fm
             .foreign
             .iter()
             .any(|l| secure_context_field(l) == Some(true))
+        // the chat mark by the grammar TypeScript shares (eighth review: the
+        // line rule above missed `TRUE`, a quoted true, `key : true`)
+        || crate::protection_mark::marked(text, "secureContext")
         || looks_secure(body)
 }
 
@@ -1335,7 +1356,9 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
 /// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
 /// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
-const RESERVED_KEYS: [&str; 14] = [
+/// `librarian_page` marks the Librarian route's own index and log
+/// (workspace_librarian.rs); only that route's page creation writes it.
+const RESERVED_KEYS: [&str; 15] = [
     "id",
     "created",
     "updated",
@@ -1350,7 +1373,14 @@ const RESERVED_KEYS: [&str; 14] = [
     "view_tag",
     "created_by",
     "ai_edit",
+    "librarian_page",
 ];
+
+/// The frontmatter line that marks one of the Librarian route's own pages
+/// (`index` or `log`).
+pub(crate) fn librarian_page_line(page: &str) -> String {
+    format!("librarian_page: {page}")
+}
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
@@ -1539,7 +1569,7 @@ pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
     "id",
     "created",
     "owner",
@@ -1547,6 +1577,7 @@ pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "view_tag",
     "created_by",
     "ai_edit",
+    "librarian_page",
 ];
 
 /// Rebuild a document from a user-typed raw frontmatter block (the "Show file
@@ -2220,6 +2251,33 @@ pub struct FolderMeta {
 pub struct CorpusList {
     pub folders: Vec<FolderMeta>,
     pub notes: Vec<NoteMeta>,
+    /// The files the walk left out, and why (third review of pull request
+    /// 267, 2026-11-09). A hard-linked file was dropped silently; now the
+    /// listing says so, and the app tells the person. Rotli never repairs one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skipped: Vec<SkippedFile>,
+}
+
+/// One file a listing left out.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedFile {
+    /// Its path, relative to the vault (root-prefixed like a folder id).
+    pub path: String,
+    pub reason: SkipReason,
+    /// A note's id from the previous walk, when it had one: a tab already
+    /// open on it keeps resolving, and reads the hard-link refusal rather
+    /// than "note not found" (fourth review of pull request 267).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SkipReason {
+    /// The file has another name too (a hard link): it may be a file outside
+    /// the vault, so Rotli doesn't open it.
+    HardLink,
 }
 
 /// What Settings → Storage shows: the REAL corpus, not a mock. Root with the
@@ -2251,6 +2309,10 @@ pub struct NoteDoc {
     /// See `NoteMeta::origin`. `corpus_read` returns it so the UI can offer
     /// "restore to <origin>".
     pub origin: Option<String>,
+    /// Effective protection, from the same read as the body (sixth review of
+    /// pull request 267): a copy made from this read keeps it.
+    pub secure: bool,
+    pub locked: bool,
 }
 
 /// What `corpus_read_board` returns: the raw Excalidraw scene JSON for a board.
@@ -2288,6 +2350,11 @@ pub struct CorpusAiRead {
     /// `/ai` checks its view against.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub editor: Option<String>,
+    /// The gate passed it only because the reader is on-device (a remote
+    /// reader would be refused): the app keeps a conversation built from it
+    /// on-device from then on (fourth review of pull request 267).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub on_device_only: bool,
 }
 
 /// A memex's board lane: where a board is born when the caller's folder isn't a
@@ -2377,7 +2444,7 @@ fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
 /// blank is exactly what discard destroys and what a rewrite starts from
 /// (audit 2026-07-29: fail-open reads).
 fn read_existing_text(path: &Path) -> Result<String, String> {
-    match fs::read_to_string(path) {
+    match crate::fsutil::read_own_text(path) {
         Ok(text) => Ok(text),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
         Err(e) => Err(format!("couldn't read the existing file: {e}")),
@@ -2540,6 +2607,9 @@ struct ListCache {
     /// sidebar to stay clean. Only the AI lanes ask for these.
     reference: Vec<NoteMeta>,
     texts: HashMap<String, CachedNoteText>,
+    /// The walked directories only, before any shelf folder was synthesized
+    /// from a note's frontmatter (`ai_rows::folders_for_ai`).
+    dir_folders: Vec<FolderMeta>,
 }
 
 fn valid_view_name(name: &str) -> bool {
@@ -2954,7 +3024,7 @@ impl CorpusStore {
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
         }
-        let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         self.write_file_bytes(rel, bytes, bak)?;
         Ok(crate::fsutil::revision(bytes))
@@ -3064,11 +3134,11 @@ impl CorpusStore {
                 GENERATED_PDF_SOURCE_MAX_BYTES / 1_000_000
             ));
         }
-        let text = fs::read_to_string(abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (frontmatter, raw) = parse_document(&text);
         let frontmatter = frontmatter.unwrap_or_default();
         let body = editor_body(raw);
-        if walked_secure(&frontmatter, body) {
+        if walked_secure(&frontmatter, body, &text) {
             return Err(
                 "Protected or secret-shaped notes cannot be exported to an unprotected PDF copy."
                     .into(),
@@ -3137,7 +3207,7 @@ impl CorpusStore {
     fn read_frontmatter(&mut self, id_or_rel: &str) -> Result<FrontmatterView, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(&rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
         let (fm_opt, body) = parse_document(&text);
         let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
@@ -3220,8 +3290,8 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| locked_field(l).is_none());
@@ -3244,8 +3314,8 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.pinned = Some(pinned);
@@ -3277,8 +3347,8 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.writable(rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| field_key(l) != Some(key));
@@ -3306,7 +3376,7 @@ impl CorpusStore {
         id_or_rel: &str,
     ) -> Result<crate::fsutil::VersionedText, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         Ok(crate::fsutil::VersionedText {
             contents: raw_frontmatter_block(&text).to_string(),
             revision: crate::fsutil::revision(text.as_bytes()),
@@ -3336,8 +3406,8 @@ impl CorpusStore {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
             if out == text {
@@ -3383,15 +3453,14 @@ impl CorpusStore {
     fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || self.set_secure_resolved(&rel, secure).map(|_| ()))
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| self.set_secure_resolved(&rel, secure).map(|_| ()))
     }
 
     /// Returns the note's new meta when making it secure moved it into the
     /// protected folder (None when it was already there, or when unsecuring).
     fn set_secure_resolved(&mut self, rel: &str, secure: bool) -> Result<Option<NoteMeta>, String> {
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let mut fm = fm.unwrap_or_default();
         if !secure && looks_secure(body) {
@@ -3466,7 +3535,7 @@ impl CorpusStore {
             rel.to_string()
         };
         let final_path = self.abs(&final_rel);
-        let final_text = fs::read_to_string(&final_path).map_err(|e| e.to_string())?;
+        let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
         final_fm.foreign.retain(|line| {
@@ -3513,7 +3582,7 @@ impl CorpusStore {
         names.sort();
         for name in names {
             let rel = format!("{intake}/{name}");
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else {
+            let Ok(text) = crate::fsutil::read_own_text(&self.abs(&rel)) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);
@@ -3565,7 +3634,7 @@ impl CorpusStore {
             return Err("A folder opened in place keeps its notes where they are; there is nothing to move.".into());
         }
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, _) = parse_document(&text);
         let fm = fm.unwrap_or_default();
         if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
@@ -3613,8 +3682,8 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
@@ -3663,8 +3732,30 @@ impl CorpusStore {
         if surfaced(self.layout, rel) == Surface::Hidden {
             return Err(format!("not available to AI: {rel}"));
         }
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
+        let abs = self.guard_rel(rel)?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        self.judge_for_ai(rel, &text, model_is_local)?;
+        Ok(text)
+    }
+
+    /// An agent's whole read in ONE read of the file: the gate judges these
+    /// bytes, and the document and its revision are built from the same bytes.
+    /// Gating one read and returning another let a file swapped in between
+    /// (secure ↔ plain) reach a remote model (audit 2026-11-08).
+    pub(crate) fn read_doc_for_ai(&mut self, id: &str, model_is_local: bool) -> Result<NoteDoc, String> {
+        let rel = self.path_of(id)?;
+        if surfaced(self.layout, &rel) == Surface::Hidden {
+            return Err(format!("not available to AI: {rel}"));
+        }
+        let abs = self.guard_rel(&rel)?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        self.judge_for_ai(&rel, &text, model_is_local)?;
+        Ok(self.doc_from_text(id, &rel, &abs, &text))
+    }
+
+    /// The AI read gate over one file's text (see `read_for_ai`).
+    fn judge_for_ai(&mut self, rel: &str, text: &str, model_is_local: bool) -> Result<(), String> {
+        let (fm, body) = parse_document(text);
         let fm = fm.unwrap_or_default();
         let secure = self.file_is_protected(rel)
             || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
@@ -3672,6 +3763,7 @@ impl CorpusStore {
                 .foreign
                 .iter()
                 .any(|l| secure_context_field(l) == Some(true))
+            || crate::protection_mark::marked(text, "secureContext")
             || looks_secure(body)
             || self.secure_by_name(&title_of(editor_body(body)), rel);
         if secure {
@@ -3693,7 +3785,7 @@ impl CorpusStore {
             // the same choke point that decided the read.
             crate::secret::remember_secure_text(body);
         }
-        Ok(text)
+        Ok(())
     }
 
     /// AI-purpose access to a frontmatter-free file. The editor's file reads
@@ -3717,13 +3809,38 @@ impl CorpusStore {
         Ok(abs)
     }
 
+    /// The person's editor reading a surfaced file (a sheet, a Word document,
+    /// a CSV): the same traversal guard as the write lanes (audit 2026-07), so
+    /// a raw "../…" from the webview never leaves the corpus, and never through
+    /// a hard link to a file elsewhere (review 2026-11-09).
+    pub(crate) fn read_user_file_bytes(&self, rel: &str) -> Result<Vec<u8>, String> {
+        validate_rel(rel)?;
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err(format!("not a file: {rel}"));
+        }
+        crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))
+    }
+
+    /// An absolute path the webview's asset protocol will read by itself.
+    /// That read can't use a checked descriptor, so a file with a second name
+    /// (a hard link that can be a file outside the vault) is refused here, the
+    /// last point Rotli decides (second review of PR #267).
+    pub(crate) fn webview_path(&self, rel: &str) -> Result<String, String> {
+        let abs = self.guard_rel(rel)?;
+        if fs::symlink_metadata(&abs).is_ok_and(|m| m.is_file() && !crate::fsutil::has_one_name(&m)) {
+            return Err(format!("not a file of its own: {rel}"));
+        }
+        Ok(abs.to_string_lossy().into_owned())
+    }
+
     pub(crate) fn read_file_bytes_for_ai(
         &self,
         rel: &str,
         model_is_local: bool,
     ) -> Result<Vec<u8>, String> {
         let abs = self.file_for_ai(rel, model_is_local)?;
-        let data = fs::read(abs).map_err(|e| e.to_string())?;
+        let data = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         if model_is_local && self.file_is_protected(rel) {
             let ext = Path::new(rel)
                 .extension()
@@ -3839,8 +3956,7 @@ impl CorpusStore {
     ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Model { local: model_is_local }).and_then(|_held| {
             let text = self.read_for_ai(&rel, model_is_local)?;
             let (fm, target_body) = parse_document(&text);
             let fm = fm.unwrap_or_default();
@@ -3885,7 +4001,7 @@ impl CorpusStore {
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
             let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
             let landed_rel = self.path_of(id_or_rel)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             let editor = match mode {
                 AiWrite::Replace | AiWrite::ConsentedReplace => ai_journal::AiEditor::chat(model_is_local),
@@ -3943,8 +4059,7 @@ impl CorpusStore {
         } else {
             self.writable(&rel)?;
         }
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Agent).and_then(|_held| {
             let text = self.read_for_ai(&rel, false)?;
             let fm = parse_document(&text).0.unwrap_or_default();
             if fm
@@ -3960,7 +4075,7 @@ impl CorpusStore {
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let meta = self.write_resolved(id, body, rel.clone())?;
             let landed_rel = self.path_of(id)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             let editor = ai_journal::AiEditor::agent(undo_of);
             self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, true, &editor);
@@ -4009,23 +4124,18 @@ impl CorpusStore {
         target_folder: &str,
     ) -> Result<NoteMeta, String> {
         let rel = self.resolve_note_rel(id)?;
-        let text = self.read_for_ai(&rel, false)?;
-        let fm = parse_document(&text).0.unwrap_or_default();
-        if fm
-            .foreign
-            .iter()
-            .any(|line| locked_field(line) == Some(true))
-        {
-            return Err("note is locked — an external agent may not move it".into());
-        }
+        self.ai_may_change(&rel, false)?;
         self.refuse_breaking_locked_links(&rel)?;
+        // checked again inside the note's lock, right before the move: another
+        // writer holding the lock may lock or secure the note meanwhile
+        // (review 2026-11-09)
         if self.layout == Layout::Memex
             && (rel == "wiki" || rel.starts_with("wiki/"))
             && (target_folder == "wiki" || target_folder.starts_with("wiki/"))
         {
-            self.filer_move(id, target_folder)
+            self.filer_move_as(id, target_folder, Authority::Agent)
         } else {
-            self.move_note(id, target_folder)
+            self.move_note_as(id, target_folder, Authority::Agent)
         }
     }
 
@@ -4034,18 +4144,38 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
     ) -> Result<NoteMeta, String> {
+        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent, None)
+    }
+
+    /// The same seam for the Librarian route's own index or log: stamped
+    /// `created_by: librarian` and marked `librarian_page: <page>`, the
+    /// reserved line that alone tells its pages from any other note.
+    pub(crate) fn create_librarian_page(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        page: &str,
+    ) -> Result<NoteMeta, String> {
+        let marker = librarian_page_line(page);
+        let creator = crate::ai_edit_policy::Creator::Librarian;
+        self.create_remote(folder_id, body, creator, Some(&marker))
+    }
+
+    fn create_remote(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        creator: crate::ai_edit_policy::Creator,
+        marker: Option<&str>,
+    ) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "add files to")?;
         if looks_secure(body) {
             return Err(
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create_as(
-            folder_id,
-            body,
-            false,
-            Some(crate::ai_edit_policy::Creator::Agent),
-        )
+        self.create_marked(folder_id, body, false, Some(creator), marker.as_slice())
+            .map(|(meta, _)| meta)
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -4090,7 +4220,8 @@ impl CorpusStore {
         let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) else {
             return;
         };
-        if let Ok(text) = fs::read_to_string(&path) {
+        // an unreadable index (a hard link included) is rebuilt by the next walk
+        if let Ok(Some(text)) = crate::fsutil::read_own_sidecar(&path) {
             if let Ok(file) = serde_json::from_str::<IndexFile>(&text) {
                 self.index = file.notes;
             }
@@ -4329,9 +4460,11 @@ impl CorpusStore {
             list: CorpusList {
                 folders: walked.folders,
                 notes: walked.notes,
+                skipped: walked.skipped,
             },
             reference: walked.reference,
             texts: walked.texts,
+            dir_folders: walked.dir_folders,
         });
         true
     }
@@ -4663,7 +4796,7 @@ impl CorpusStore {
     ) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, raw) = parse_document(&text);
         let body = match &fm {
             Some(_) => editor_body(raw),
@@ -4755,19 +4888,32 @@ impl CorpusStore {
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
         let rel = self.path_of(id)?;
         let abs = self.guard_rel(&rel)?;
-        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
-        let (fm, raw) = parse_document(&text);
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        Ok(self.doc_from_text(id, &rel, &abs, &text))
+    }
+
+    fn doc_from_text(&self, id: &str, rel: &str, abs: &Path, text: &str) -> NoteDoc {
+        let (fm, raw) = parse_document(text);
         let body = match &fm {
             Some(_) => editor_body(raw),
             None => raw,
         };
-        let (file_created, file_updated) = file_stamps(&abs);
+        let (file_created, file_updated) = file_stamps(abs);
         let fm = fm.unwrap_or_default();
-        let disk_folder = folder_of(&rel);
+        let disk_folder = folder_of(rel);
         // origin is a DISK-location fact (Archive/Trash); the wire folder_id is the
         // shelf-projected view — they can differ for a memex wiki note.
         let folder = project_folder(self.layout, &disk_folder, &fm);
-        Ok(NoteDoc {
+        // a chat's taint mark counts too, read by the grammar TypeScript
+        // shares (seventh review of pull request 267: it was left out)
+        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || crate::protection_mark::marked(text, "secureContext")
+            || self.in_secure_home(rel)
+            || looks_secure(body)
+            || self.protected_by_name(&title_of(body), rel);
+        NoteDoc {
+            secure,
+            locked: fm.foreign.iter().any(|l| locked_field(l) == Some(true)),
             id: id.to_string(),
             origin: if is_hidden_root(self.layout, &disk_folder) {
                 fm.origin.clone()
@@ -4789,7 +4935,7 @@ impl CorpusStore {
                 .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                 .unwrap_or(file_updated),
             pinned: fm.pinned.unwrap_or(false),
-        })
+        }
     }
 
     /// Atomic save. Mints/keeps the four facts (foreign keys ride along
@@ -4822,8 +4968,8 @@ impl CorpusStore {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.guard_rel(&rel)?;
-        crate::fsutil::with_file_lock(&abs, || {
-            let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| {
+            let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
             if crate::fsutil::revision(&current) != expected_revision {
                 let current_text = std::str::from_utf8(&current)
                     .map_err(|e| format!("read {rel} as UTF-8: {e}"))?;
@@ -4839,7 +4985,7 @@ impl CorpusStore {
             }
             let meta = self.write_resolved(id, body, rel.clone())?;
             let landed_rel = self.path_of(id)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             Ok(CorpusWriteResult {
                 meta,
@@ -5016,6 +5162,11 @@ impl CorpusStore {
     /// `target_folder == ""` means the corpus root (no validation, no dir).
     /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        self.move_note_as(id, target_folder, Authority::Person)
+    }
+
+    /// `move_note` on behalf of `authority`, checked inside the note's lock.
+    fn move_note_as(&mut self, id: &str, target_folder: &str, authority: Authority) -> Result<NoteMeta, String> {
         // resolve_note_rel, not path_of: a BOARD (and any surfaced file) travels
         // as its rel path and never enters the ULID index, so path_of refused it
         // outright — "note not found: storage/excalidraw/untitled-2.excalidraw"
@@ -5045,13 +5196,11 @@ impl CorpusStore {
             } else {
                 target_folder.clone()
             };
-            let path = self.abs(&rel);
-            let meta = crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &dest))?;
+            let meta = self.lock_note(&rel, None, authority).and_then(|_held| self.relocate_opaque(&rel, &dest))?;
             self.follow_moves(&[(rel, meta.id.clone())])?;
             return Ok(meta);
         }
-        let path = self.abs(&rel);
-        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(id, &rel, &target_folder))?;
+        let meta = self.lock_note(&rel, None, authority).and_then(|_held| self.relocate(id, &rel, &target_folder))?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel, new_rel)])?;
         Ok(meta)
@@ -5126,7 +5275,7 @@ impl CorpusStore {
     fn relocate(&mut self, id: &str, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "move or delete")?;
         let abs = self.abs(rel);
-        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
         let had_frontmatter = fm.is_some();
         let body = match &fm {
@@ -5299,6 +5448,10 @@ impl CorpusStore {
     /// edits and Breve's managed writes, which are vault features, not Brain
     /// features (pressure-test 2026-07-26 — the broad placement broke both).
     fn brain_gate(&self) -> Result<(), String> {
+        // settings that can't be read say so, rather than "off"
+        if !self.adopted && self.dot_read("settings").is_err() {
+            return Err(crate::librarian_rules::SETTINGS_UNREADABLE.into());
+        }
         if !self.brain_enabled() {
             return Err("This vault's Librarian is off — nothing files or enriches it.".into());
         }
@@ -5330,7 +5483,7 @@ impl CorpusStore {
         }
         let abs = self.abs(rel);
         if abs.is_file() {
-            let text = fs::read_to_string(&abs).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&abs).map_err(|e| e.to_string())?;
             let fm = parse_document(&text).0.unwrap_or_default();
             let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
             if locked {
@@ -5365,8 +5518,8 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        self.lock_note(rel, None, Authority::Filer).and_then(|_held| {
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| field_key(l) != Some(key));
@@ -5386,7 +5539,7 @@ impl CorpusStore {
     /// must restore "no file", not leave a 0-byte generated husk behind. Gated
     /// by `filer_writable`. pub(crate): the organizer daemon's RefreshIndex
     /// applies through this same gate — no second write lane.
-    pub(crate) fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
+    pub(crate) fn write_index(&mut self, area: &str, body: &str) -> Result<(), String> {
         self.brain_gate()?;
         if area.contains('/') || area.contains("..") || area.trim().is_empty() {
             return Err(format!("invalid area: {area}"));
@@ -5395,7 +5548,7 @@ impl CorpusStore {
         let dir = self.abs(&map.area_dir(area));
         let rel = map.index_rel(area);
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Filer).and_then(|_held| {
             // Re-check after acquiring the same lock used by every other Rotli
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
@@ -5421,7 +5574,7 @@ impl CorpusStore {
     pub fn file_note(&mut self, id_or_rel: &str) -> Result<NoteMeta, String> {
         self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
         let area = parse_document(&text)
             .0
             .unwrap_or_default()
@@ -5438,8 +5591,10 @@ impl CorpusStore {
         // another area (never one it invents)
         let map = crate::librarian_map::LibrarianMap::at(&self.root);
         let people = crate::librarian_rules::PEOPLE_AREA;
+        // filing follows the person's rules, so it refuses without them
+        let rules = self.librarian_rules()?;
         let area = if area.contains('/') {
-            crate::librarian_rules::people_group_area(&area, &self.librarian_rules())
+            crate::librarian_rules::people_group_area(&area, &rules)
                 .or_else(|| {
                     let top = area.split('/').next().unwrap_or_default();
                     (!top.eq_ignore_ascii_case(people))
@@ -5461,6 +5616,12 @@ impl CorpusStore {
     /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
     /// from the note's own frontmatter.
     pub fn filer_move(&mut self, id_or_rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        self.filer_move_as(id_or_rel, target_folder, Authority::Filer)
+    }
+
+    /// `filer_move` on behalf of `authority`, checked inside the note's lock
+    /// (the filer's own authority re-checks the destination too).
+    fn filer_move_as(&mut self, id_or_rel: &str, target_folder: &str, authority: Authority) -> Result<NoteMeta, String> {
         self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
@@ -5472,8 +5633,9 @@ impl CorpusStore {
         // the store's stable id: a Rotli note's frontmatter ULID, and in a
         // copy the id `.rotli/index.json` keeps for a note with none
         let id = self.wire_id_of(rel)?;
-        let path = self.abs(rel);
-        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(&id, rel, target_folder))?;
+        let meta = self
+            .lock_note(rel, Some(target_folder), authority)
+            .and_then(|_held| self.relocate(&id, rel, target_folder))?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel.clone(), new_rel)])?;
         Ok(meta)
@@ -5502,7 +5664,7 @@ impl CorpusStore {
     /// Read the whole brain journal (`""` when none yet).
     pub fn journal_read(&self) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
-        Ok(fs::read_to_string(path).unwrap_or_default())
+        Ok(crate::fsutil::read_own_sidecar(&path)?.unwrap_or_default())
     }
 
     /// Prune resolved journal entries older than `keep_days` (0 = all of them).
@@ -5517,7 +5679,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).unwrap_or_default();
+            let text = crate::fsutil::read_own_sidecar(&path)?.unwrap_or_default();
             if text.is_empty() {
                 return Ok(0);
             }
@@ -5721,14 +5883,14 @@ impl CorpusStore {
         }
 
         let manifest_path = self.root.join(DOT_DIR).join("views.json");
-        let previous_manifest = fs::read_to_string(&manifest_path).ok();
+        let previous_manifest = crate::fsutil::read_own_sidecar(&manifest_path)?;
         let mut written: Vec<(PathBuf, String, String)> = Vec::new();
         for (path, tag) in &prepared {
-            let result = crate::fsutil::with_file_lock(path, || {
+            let result = self.lock_note_at(path, Authority::Person).and_then(|_held| {
                 // Read only after acquiring the note lock. Building `updated`
                 // from an earlier snapshot could replace a user, CLI, MCP, or
                 // Librarian edit that landed while the view transaction waited.
-                let original = fs::read_to_string(path)
+                let original = crate::fsutil::read_own_text(path)
                     .map_err(|error| format!("read {}: {error}", path.display()))?;
                 let updated = if self.keeps_as_written(&original) {
                     in_place::with_top_level_line(&original, "view_tag", tag.as_deref())
@@ -5778,10 +5940,10 @@ impl CorpusStore {
     /// Best-effort rollback for a failed multi-file view update. Never replace
     /// bytes written after this transaction: another writer's newer content is
     /// more important than restoring perfect projection consistency.
-    fn rollback_view_note_writes(&self, written: &[(PathBuf, String, String)]) {
+    fn rollback_view_note_writes(&mut self, written: &[(PathBuf, String, String)]) {
         for (path, prior, applied) in written.iter().rev() {
-            let _ = crate::fsutil::with_file_lock(path, || {
-                let current = fs::read_to_string(path).map_err(|error| error.to_string())?;
+            let _ = self.lock_note_at(path, Authority::Person).and_then(|_held| {
+                let current = crate::fsutil::read_own_text(path).map_err(|error| error.to_string())?;
                 if current == *applied {
                     self.suppress.mark(path);
                     atomic_write(path, prior)?;
@@ -5814,6 +5976,21 @@ impl CorpusStore {
         secure: bool,
         creator: Option<crate::ai_edit_policy::Creator>,
     ) -> Result<NoteMeta, String> {
+        self.create_marked(folder_id, body, secure, creator, &[])
+            .map(|(meta, _)| meta)
+    }
+
+    /// The create every other one goes through: the note's metadata, and the
+    /// revision of the very bytes it wrote. `markers` are extra frontmatter
+    /// lines (the AI lock, a recovery event, a remote agent's marker).
+    fn create_marked(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        secure: bool,
+        creator: Option<crate::ai_edit_policy::Creator>,
+        markers: &[&str],
+    ) -> Result<(NoteMeta, String), String> {
         raw::refuse_in_raw(self, "create notes beside")?;
         let secure = secure
             || folder_id == "Secure notes"
@@ -5852,7 +6029,6 @@ impl CorpusStore {
         let id = Ulid::new().to_string();
         let now = now_stamp();
         let title = title_of(body);
-        let rel = self.free_note_name(disk_folder, &filename_for(&title, &id), None);
         let mut foreign = vec!["aliases: []".to_string()];
         if self.layout == Layout::Memex {
             let shelf = if secure
@@ -5881,6 +6057,7 @@ impl CorpusStore {
         if let Some(creator) = creator {
             foreign.push(creator.line());
         }
+        foreign.extend(markers.iter().map(|line| line.to_string()));
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
@@ -5889,17 +6066,34 @@ impl CorpusStore {
             origin: None,
             foreign,
         };
-        let abs = self.abs(&rel);
-        self.suppress.mark(&abs);
-        if secure {
-            self.gitignore_add(&rel)?;
-        }
-        atomic_write(&abs, &compose_document(&fm, &format!("\n{body}")))?;
+        let document = compose_document(&fm, &format!("\n{body}"));
+        // Claim the name without replacing anything: another process (a second
+        // agent, the app) may pick the same free name between our look and our
+        // write, and a plain rename would silently overwrite its note. A secure
+        // note's ignore line goes first; one left by a lost race over-ignores,
+        // which fails safe.
+        let mut attempts = 0;
+        let rel = loop {
+            let rel = self.free_note_name(disk_folder, &filename_for(&title, &id), None);
+            let abs = self.abs(&rel);
+            self.suppress.mark(&abs);
+            if secure {
+                self.gitignore_add(&rel)?;
+            }
+            if crate::fsutil::atomic_write_new(&abs, &document, ".rotli-write-")? {
+                break rel;
+            }
+            attempts += 1;
+            if attempts == 64 {
+                return Err(format!("no free file name for {title} in {disk_folder}"));
+            }
+        };
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
         let ms = stamp_to_ms(&now, None).unwrap_or_else(now_ms);
         let aliases = note_aliases(&rel, &title, &id, &fm);
-        Ok(NoteMeta {
+        let revision = crate::fsutil::revision(document.as_bytes());
+        Ok((NoteMeta {
             id,
             title,
             snippet: snippet_of(body),
@@ -5912,7 +6106,7 @@ impl CorpusStore {
             pinned: false,
             origin: None,
             kind: NoteKind::Note,
-        })
+        }, revision))
     }
 
     // Boards are a parallel surface: raw `*.excalidraw` JSON files, NO
@@ -5937,7 +6131,7 @@ impl CorpusStore {
         if !abs.is_file() {
             return Err(format!("board not found: {id}"));
         }
-        let body = fs::read_to_string(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        let body = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {id}: {e}"))?;
         let (created_at, updated_at) = file_stamps(&abs);
         Ok(CorpusBoardDoc {
             id: id.to_string(),
@@ -5997,7 +6191,7 @@ impl CorpusStore {
         }
         self.writable(id)?;
         let abs = self.guard_rel(id)?;
-        let current = fs::read(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {id}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         let meta = self.write_board(id, body)?;
         Ok(CorpusWriteResult {
@@ -6288,11 +6482,9 @@ impl CorpusStore {
     /// so removing the shelved Glass feature never deletes user data.
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
-        match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {which}: {e}")),
-        }
+        Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {which}: {e}"))?
+            .unwrap_or_else(|| "{}".into()))
     }
 
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
@@ -6381,6 +6573,53 @@ fn user_dot_writable(which: &str) -> Result<(), String> {
     }
 }
 
+/// A reference-lane note's row (identity/, MAP.md …): its id is its path, it
+/// sits in its disk folder, and it carries no aliases, pin, or origin.
+fn reference_row(rel: &str, abs: &Path, fm: &Frontmatter, body: &str) -> NoteMeta {
+    let disk_folder = folder_of(rel);
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: title_of(body),
+        snippet: snippet_of(body),
+        body_empty: body.trim().is_empty(),
+        aliases: Vec::new(),
+        folder_id: disk_folder.clone(),
+        disk_folder_id: disk_folder,
+        created_at: fm.created.as_deref().and_then(|s| stamp_to_ms(s, Some(file_created))).unwrap_or(file_created),
+        updated_at: fm.updated.as_deref().and_then(|s| stamp_to_ms(s, Some(file_updated))).unwrap_or(file_updated),
+        pinned: false,
+        origin: None,
+        kind: NoteKind::Note,
+    }
+}
+
+/// A note's row, built from its file's text alone: the one place a note's
+/// `NoteMeta` comes from its bytes, for the walk and for the AI lanes'
+/// approved snapshot (corpus_ai_rows.rs), so neither can show a field the
+/// other derives differently. A wiki note appears under its shelf (v3.5), and
+/// only a note physically under a hidden root (Archive/Trash) carries an
+/// origin out to the wire.
+fn note_row(layout: Layout, id: String, rel: &str, abs: &Path, fm: &Frontmatter, body: &str) -> NoteMeta {
+    let disk_folder = folder_of(rel);
+    let title = title_of(body);
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        aliases: note_aliases(rel, &title, &id, fm),
+        folder_id: project_folder(layout, &disk_folder, fm),
+        origin: if is_hidden_root(layout, &disk_folder) { fm.origin.clone() } else { None },
+        snippet: snippet_of(body),
+        body_empty: body.trim().is_empty(),
+        created_at: fm.created.as_deref().and_then(|s| stamp_to_ms(s, Some(file_created))).unwrap_or(file_created),
+        updated_at: fm.updated.as_deref().and_then(|s| stamp_to_ms(s, Some(file_updated))).unwrap_or(file_updated),
+        pinned: fm.pinned.unwrap_or(false),
+        kind: NoteKind::Note,
+        disk_folder_id: disk_folder,
+        id,
+        title,
+    }
+}
+
 pub(crate) fn folder_of(rel: &str) -> String {
     match rel.rsplit_once('/') {
         Some((dir, _)) => dir.to_string(),
@@ -6429,7 +6668,9 @@ struct WalkPlan {
 struct Walked {
     generation: u64,
     index: HashMap<String, String>,
+    skipped: Vec<SkippedFile>,
     folders: Vec<FolderMeta>,
+    dir_folders: Vec<FolderMeta>,
     notes: Vec<NoteMeta>,
     reference: Vec<NoteMeta>,
     texts: HashMap<String, CachedNoteText>,
@@ -6443,6 +6684,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
     let mut reference: Vec<NoteMeta> = Vec::new();
     let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
     let mut index: HashMap<String, String> = HashMap::new();
+    let mut skipped: Vec<SkippedFile> = Vec::new();
     walk(
         plan.layout,
         &plan.root,
@@ -6454,9 +6696,13 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
         &mut notes,
         &mut reference,
         &mut texts,
+        &mut skipped,
     )?;
     // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
     // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
+    // The directories alone are kept too: a shelf comes from a note's content,
+    // so an AI lane synthesizes only the shelves of rows it may see.
+    let dir_folders = folders.clone();
     ensure_backing_folders(&mut folders, &notes);
     folders.sort_by(|a, b| a.id.cmp(&b.id));
     notes.sort_by(|a, b| {
@@ -6469,7 +6715,9 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
     Ok(Walked {
         generation: plan.generation,
         index,
+        skipped,
         folders,
+        dir_folders,
         notes,
         reference,
         texts,
@@ -6504,6 +6752,7 @@ fn walk(
     notes: &mut Vec<NoteMeta>,
     reference: &mut Vec<NoteMeta>,
     texts: &mut HashMap<String, CachedNoteText>,
+    skipped: &mut Vec<SkippedFile>,
 ) -> Result<(), String> {
     let dir = if prefix.is_empty() {
         root.to_path_buf()
@@ -6544,6 +6793,19 @@ fn walk(
         if surface == Surface::Hidden {
             continue;
         }
+        // a file with a second name can be a file outside the vault: never
+        // listed, so no board, file, or note row points at one; the listing
+        // says it left it out, so the person is told (third review)
+        if kind.is_file() && !fs::symlink_metadata(entry.path()).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
+            // a note the last walk knew keeps its id → path entry, so a read
+            // by that id still reaches this file and is refused as a hard link
+            let id = reverse.get(&rel).filter(|id| !new_index.contains_key(*id)).cloned();
+            if let Some(id) = &id {
+                new_index.insert(id.clone(), rel.clone());
+            }
+            skipped.push(SkippedFile { path: rel, reason: SkipReason::HardLink, id });
+            continue;
+        }
         // The REFERENCE lane (2026-08-01): identity/ personality/ history/
         // MAP.md inbox.md are collected for the AI's retrieval tools only. They
         // never become folder rows or tree notes, they never enter the ULID
@@ -6552,11 +6814,11 @@ fn walk(
         if surface == Surface::Reference {
             if kind.is_dir() {
                 walk(
-                    layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
+                    layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts, skipped,
                 )?;
             } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
                 let abs = entry.path();
-                let Ok(text) = fs::read_to_string(&abs) else {
+                let Ok(text) = crate::fsutil::read_own_text(&abs) else {
                     continue;
                 };
                 let (fm, raw) = parse_document(&text);
@@ -6575,32 +6837,10 @@ fn walk(
                         } else {
                             String::new()
                         },
-                        secure: walked_secure(&fm, body),
+                        secure: walked_secure(&fm, body, &text),
                     },
                 );
-                let (file_created, file_updated) = file_stamps(&abs);
-                reference.push(NoteMeta {
-                    id: rel.clone(),
-                    title: title_of(body),
-                    snippet: snippet_of(body),
-                    body_empty: body.trim().is_empty(),
-                    aliases: Vec::new(),
-                    folder_id: prefix.to_string(),
-                    disk_folder_id: prefix.to_string(),
-                    created_at: fm
-                        .created
-                        .as_deref()
-                        .and_then(|s| stamp_to_ms(s, Some(file_created)))
-                        .unwrap_or(file_created),
-                    updated_at: fm
-                        .updated
-                        .as_deref()
-                        .and_then(|s| stamp_to_ms(s, Some(file_updated)))
-                        .unwrap_or(file_updated),
-                    pinned: false,
-                    origin: None,
-                    kind: NoteKind::Note,
-                });
+                reference.push(reference_row(&rel, &abs, &fm, body));
             }
             continue;
         }
@@ -6629,11 +6869,11 @@ fn walk(
                 });
             }
             walk(
-                layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
+                layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts, skipped,
             )?;
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
             let abs = entry.path();
-            let Ok(text) = fs::read_to_string(&abs) else {
+            let Ok(text) = crate::fsutil::read_own_text(&abs) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);
@@ -6643,9 +6883,6 @@ fn walk(
             };
             let had_fm = fm.is_some();
             let fm = fm.unwrap_or_default();
-            // shelf-projection (v3.5): a wiki note appears under its shelf (the
-            // user's folder), not its disk path. Computed BEFORE fm.id is moved.
-            let folder_id = project_folder(layout, prefix, &fm);
             // identity: frontmatter id → previous index (path-stable for
             // frontmatter-less files) → fresh mint. Duplicate ids (a copied
             // file) never collapse two notes into one.
@@ -6673,91 +6910,69 @@ fn walk(
                     } else {
                         String::new()
                     },
-                    secure: walked_secure(&fm, body),
+                    secure: walked_secure(&fm, body, &text),
                 },
             );
-            let title = title_of(body);
-            let aliases = note_aliases(&rel, &title, &id, &fm);
-            let (file_created, file_updated) = file_stamps(&abs);
-            // only notes physically under a hidden root (Archive/Trash) carry
-            // an origin out to the wire; everything else is None.
-            let origin = if is_hidden_root(layout, prefix) {
-                fm.origin.clone()
-            } else {
-                None
-            };
-            notes.push(NoteMeta {
-                id,
-                title,
-                snippet: snippet_of(body),
-                body_empty: body.trim().is_empty(),
-                aliases,
-                folder_id,
-                disk_folder_id: prefix.to_string(),
-                created_at: fm
-                    .created
-                    .as_deref()
-                    .and_then(|s| stamp_to_ms(s, Some(file_created)))
-                    .unwrap_or(file_created),
-                updated_at: fm
-                    .updated
-                    .as_deref()
-                    .and_then(|s| stamp_to_ms(s, Some(file_updated)))
-                    .unwrap_or(file_updated),
-                pinned: fm.pinned.unwrap_or(false),
-                origin,
-                kind: NoteKind::Note,
-            });
+            notes.push(note_row(layout, id, &rel, &abs, &fm, body));
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".excalidraw") {
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
             // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
             // title = the file stem. They live next to `.md` notes in the tree.
-            let abs = entry.path();
-            let (file_created, file_updated) = file_stamps(&abs);
-            notes.push(NoteMeta {
-                id: rel.clone(),
-                title: board_title(&rel),
-                snippet: String::new(),
-                body_empty: false,
-                aliases: Vec::new(),
-                folder_id: prefix.to_string(),
-                disk_folder_id: prefix.to_string(),
-                created_at: file_created,
-                updated_at: file_updated,
-                pinned: false,
-                origin: None,
-                kind: NoteKind::Board,
-            });
+            notes.push(board_row(&rel, prefix, &entry.path()));
         } else if kind.is_file() && !files::is_withheld_canvas(&rel) {
             // Any OTHER file (image, pdf, txt, …): surfaced read-only so a folder
             // like Storage shows what's actually in it. id == its relative path,
             // title = the filename WITH its extension (so "photo.png" reads true)
             // — except a JSON Canvas, named like a board without its extension.
-            let abs = entry.path();
-            let (file_created, file_updated) = file_stamps(&abs);
-            notes.push(NoteMeta {
-                id: rel.clone(),
-                title: if is_canvas_path(&rel) {
-                    board_title(&rel)
-                } else {
-                    name
-                },
-                snippet: String::new(),
-                body_empty: false,
-                aliases: Vec::new(),
-                // a memex storage/ binary re-homes to the Storage destination; a
-                // plain-corpus file stays in its own folder.
-                folder_id: project_folder(layout, prefix, &Frontmatter::default()),
-                disk_folder_id: prefix.to_string(),
-                created_at: file_created,
-                updated_at: file_updated,
-                pinned: false,
-                origin: None,
-                kind: NoteKind::File,
-            });
+            notes.push(file_row(layout, &rel, name, prefix, &entry.path()));
         }
     }
     Ok(())
+}
+
+/// A board's row, from its path alone (a board has no frontmatter; its id is
+/// its relative path and its title its file stem). The walk and the AI
+/// listing's board lane both build it here.
+pub(crate) fn board_row(rel: &str, prefix: &str, abs: &Path) -> NoteMeta {
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: board_title(rel),
+        snippet: String::new(),
+        body_empty: false,
+        aliases: Vec::new(),
+        folder_id: prefix.to_string(),
+        disk_folder_id: prefix.to_string(),
+        created_at: file_created,
+        updated_at: file_updated,
+        pinned: false,
+        origin: None,
+        kind: NoteKind::Board,
+    }
+}
+
+/// Any other surfaced file's row, from its path alone: id = its relative path,
+/// title = the filename WITH its extension (so "photo.png" reads true), except
+/// a JSON Canvas, named like a board. The walk and the AI listing's file lane
+/// both build it here.
+pub(crate) fn file_row(layout: Layout, rel: &str, name: String, prefix: &str, abs: &Path) -> NoteMeta {
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: if is_canvas_path(rel) { board_title(rel) } else { name },
+        snippet: String::new(),
+        body_empty: false,
+        aliases: Vec::new(),
+        // a memex storage/ binary re-homes to the Storage destination; a
+        // plain-corpus file stays in its own folder.
+        folder_id: project_folder(layout, prefix, &Frontmatter::default()),
+        disk_folder_id: prefix.to_string(),
+        created_at: file_created,
+        updated_at: file_updated,
+        pinned: false,
+        origin: None,
+        kind: NoteKind::File,
+    }
 }
 
 /// A board's display title = its filename without the `.excalidraw` extension.
@@ -7383,26 +7598,53 @@ pub async fn corpus_search_ai(
     include_reference: Option<bool>,
     model_id: String,
     endpoint: String,
-) -> Result<Vec<SearchHit>, String> {
+) -> Result<Vec<ai_rows::AiRow<SearchHit>>, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let hits = corpus_search_inner(&state, &query, limit, include_reference)?;
-        let mut permitted = Vec::with_capacity(hits.len());
-        for hit in hits {
-            let (root, rel) = split_root_id(&hit.id);
-            if state
-                .route(&root, |s| s.read_for_ai(&rel, model_is_local))
-                .is_ok()
-            {
-                permitted.push(hit);
-            }
-        }
-        Ok(permitted)
+        search_ai_inner(&state, &query, limit, include_reference, model_is_local)
     })
     .await
     .map_err(|e| format!("ai search worker failed ({e})"))?
+}
+
+/// `corpus_search_ai`'s work: each hit gated and shown from one read, never
+/// the walk cache's older copy (review 2026-11-09).
+fn search_ai_inner(
+    state: &CorpusState,
+    query: &str,
+    limit: Option<usize>,
+    include_reference: Option<bool>,
+    model_is_local: bool,
+) -> Result<Vec<ai_rows::AiRow<SearchHit>>, String> {
+    let hits = corpus_search_inner(state, query, limit, include_reference)?;
+    let mut permitted = Vec::with_capacity(hits.len());
+    for hit in hits {
+        let (root, rel) = split_root_id(&hit.id);
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.search_row_for_ai(query, &rel, model_is_local))) {
+            shown.id = hit.id;
+            permitted.push(shown);
+        }
+    }
+    Ok(permitted)
+}
+
+/// `corpus_notes_ai`'s work: each row gated and shown from one read.
+fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<ai_rows::AiRow<NoteMeta>>, String> {
+    let listed = corpus_list_inner(state, false)?;
+    let reference = corpus_reference_notes_inner(state)?;
+    let mut permitted = Vec::new();
+    for meta in listed.notes.into_iter().chain(reference) {
+        let (root, rel) = split_root_id(&meta.id);
+        // a board or a file keeps its own lane (third review, 2026-11-09:
+        // building every row as a note turned boards into notes)
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.row_for_ai(&rel, model_is_local))) {
+            shown.id = meta.id;
+            permitted.push(shown);
+        }
+    }
+    Ok(permitted)
 }
 
 /// The AI's LISTING lane — every note meta the model may retrieve, Notes tree
@@ -7414,24 +7656,12 @@ pub async fn corpus_notes_ai(
     app: tauri::AppHandle,
     model_id: String,
     endpoint: String,
-) -> Result<Vec<NoteMeta>, String> {
+) -> Result<Vec<ai_rows::AiRow<NoteMeta>>, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let listed = corpus_list_inner(&state, false)?;
-        let reference = corpus_reference_notes_inner(&state)?;
-        let mut permitted = Vec::new();
-        for meta in listed.notes.into_iter().chain(reference) {
-            let (root, rel) = split_root_id(&meta.id);
-            if state
-                .route(&root, |s| s.read_for_ai(&rel, model_is_local))
-                .is_ok()
-            {
-                permitted.push(meta);
-            }
-        }
-        Ok(permitted)
+        notes_ai_inner(&state, model_is_local)
     })
     .await
     .map_err(|e| format!("ai listing worker failed ({e})"))?
@@ -7479,15 +7709,8 @@ pub fn corpus_file_text(
     max_bytes: Option<usize>,
 ) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
-    // Same traversal guard as the write lanes (audit 2026-07): a raw "../…"
-    // from the webview must never read a file outside the corpus root.
-    validate_rel(&rel)?;
-    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
-    if !abs.is_file() {
-        return Err(format!("not a file: {}", abs.display()));
-    }
     let cap = max_bytes.unwrap_or(200_000);
-    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |s| s.read_user_file_bytes(&rel))?;
     let end = data.len().min(cap);
     Ok(String::from_utf8_lossy(&data[..end]).into_owned())
 }
@@ -7507,14 +7730,8 @@ pub fn corpus_file_bytes(
 ) -> Result<String, String> {
     use base64::Engine;
     let (root, rel) = split_root_id(&id);
-    // Same traversal guard as the write lanes (audit 2026-07).
-    validate_rel(&rel)?;
-    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
-    if !abs.is_file() {
-        return Err(format!("not a file: {}", abs.display()));
-    }
     let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
-    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |s| s.read_user_file_bytes(&rel))?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
 }
@@ -7907,9 +8124,7 @@ pub fn corpus_abs(
     rel: String,
 ) -> Result<String, String> {
     validate_rel(&rel)?;
-    state.route(&root_id, |s| {
-        Ok(s.guard_rel(&rel)?.to_string_lossy().into_owned())
-    })
+    state.route(&root_id, |s| s.webview_path(&rel))
 }
 
 /// The note's frontmatter for the metadata panel (read-only display + lock state).
@@ -8185,23 +8400,10 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
+        ai_rows::read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
     })
 }
 
-fn read_ai_versioned(
-    store: &mut CorpusStore,
-    rel: &str,
-    model_is_local: bool,
-    with_editor: bool,
-) -> Result<CorpusAiRead, String> {
-    let body = store.read_for_ai(rel, model_is_local)?;
-    Ok(CorpusAiRead {
-        revision: crate::fsutil::revision(body.as_bytes()),
-        editor: with_editor.then(|| ai_journal::editor_text(&body).to_string()),
-        body,
-    })
-}
 
 /// Batch form of the AI read-permission probe (perf audit 2026-07-30, #4):
 /// which of `ids` may this model read? The verdict comes from the EXACT same
@@ -8329,9 +8531,13 @@ pub fn corpus_create(
     folder_id: String,
     body: String,
     secure: Option<bool>,
+    // a recovery copy of a locked note is created locked, in the one create
+    locked: Option<bool>,
     // "chat" | "agent" | "librarian" when an AI makes the note; absent for a person
     created_by: Option<String>,
-) -> Result<NoteMeta, String> {
+    // a recovery note's event id: asked again, the note made for it comes back
+    recovery_event: Option<String>,
+) -> Result<recovery::CreatedNote, String> {
     let creator = match created_by.as_deref() {
         None => None,
         Some(value) => Some(
@@ -8342,12 +8548,19 @@ pub fn corpus_create(
     let (root, rel) = split_root_id(&folder_id);
     state
         .route(&root, |s| {
-            s.create_as(&rel, &body, secure.unwrap_or(false), creator)
+            s.create_with(
+                &rel,
+                &body,
+                secure.unwrap_or(false),
+                locked.unwrap_or(false),
+                creator,
+                recovery_event.as_deref(),
+            )
         })
-        .map(|mut m| {
-            m = prefix_meta(&root, m);
-            m.id = compose_root_id(&root, &m.id);
-            m
+        .map(|mut created| {
+            created.meta = prefix_meta(&root, created.meta);
+            created.meta.id = compose_root_id(&root, &created.meta.id);
+            created
         })
 }
 
@@ -8580,20 +8793,16 @@ pub fn corpus_settings_read(
     file: String,
 ) -> Result<String, String> {
     if let Some(path) = dev_machine_dot_path(&app, &file) {
-        return match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {file}: {e}")),
-        };
+        return Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {file}: {e}"))?
+            .unwrap_or_else(|| "{}".into()));
     }
     // settings/viewstate live in the DEFAULT root's `.rotli/` — except in
     // demo mode, where per-machine chrome stays with the user's real corpus (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
-        return match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {file}: {e}")),
-        };
+        return Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {file}: {e}"))?
+            .unwrap_or_else(|| "{}".into()));
     }
     let default_id = state
         .0
@@ -8746,9 +8955,18 @@ pub(crate) use files::is_canvas_path;
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
 
-/// The prompt-injection evals — a fully cooperating, fully compromised caller
-/// driven against the real gates. Kept in its own file because it is a
-/// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
+/// The rows an AI lane may show, built from the one read the gate judged.
+#[path = "corpus_ai_rows.rs"]
+pub mod ai_rows;
+/// One create that answers with what it wrote, and a recovery note's identity.
+#[path = "corpus_recovery.rs"]
+pub mod recovery;
+#[cfg(test)]
+use ai_rows::read_ai_versioned;
+/// The note lock and the authority checked inside it.
+#[path = "corpus_note_lock.rs"]
+mod note_lock;
+pub(crate) use note_lock::Authority;
 /// The AI edit control on the store: the person's grant (2026-09-29) and the
 /// `/ai` insert lane (2026-10-05).
 #[path = "corpus_ai_edit.rs"]
@@ -8758,6 +8976,9 @@ pub(crate) use ai_edit::AiWrite;
 #[path = "corpus_ai_journal.rs"]
 pub(crate) mod ai_journal;
 
+/// The prompt-injection evals — a fully cooperating, fully compromised caller
+/// driven against the real gates. Kept in its own file because it is a
+/// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
 #[cfg(test)]
 #[path = "injection_evals.rs"]
 mod injection_evals;
@@ -8779,6 +9000,14 @@ mod adopted_tests;
 #[cfg(test)]
 #[path = "corpus_in_place_marked_tests.rs"]
 mod in_place_marked_tests;
+
+#[cfg(test)]
+#[path = "corpus_review_tests.rs"]
+pub(crate) mod review_tests;
+
+#[cfg(test)]
+#[path = "corpus_write_lane_tests.rs"]
+mod write_lane_tests;
 
 #[cfg(test)]
 mod tests {
@@ -10237,67 +10466,6 @@ mod tests {
     }
 
     #[test]
-    fn stale_editor_write_must_not_overwrite_an_external_edit() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
-        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
-        let opened = store.read(&note.id).unwrap();
-        let rel = store.path_of(&note.id).unwrap();
-
-        fs::write(
-            store.root().join(&rel),
-            "---\nid: 01EXTERNAL\n---\n\n# External\n\nnewer",
-        )
-        .unwrap();
-
-        let result = store.write_if_revision_with_body_base(
-            &note.id,
-            &format!("{}\n\nlocal", opened.body),
-            &opened.revision,
-            Some(&opened.body),
-        );
-        assert!(
-            result.is_err(),
-            "a stale editor save must report a conflict"
-        );
-        let current = fs::read_to_string(store.root().join(&rel)).unwrap();
-        assert!(current.contains("# External\n\nnewer"));
-    }
-
-    #[test]
-    fn stale_complete_revision_merges_when_only_rotli_metadata_changed() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
-        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
-        let opened = store.read(&note.id).unwrap();
-
-        // A pin is representative of the Librarian's metadata/location work:
-        // complete-file bytes and revision move, editor prose does not.
-        store.set_pinned(&note.id, true).unwrap();
-        let after_metadata = store.read(&note.id).unwrap();
-        assert_ne!(after_metadata.revision, opened.revision);
-        assert_eq!(after_metadata.body, opened.body);
-
-        let result = store
-            .write_if_revision_with_body_base(
-                &note.id,
-                "# Original\n\nlocal edit",
-                &opened.revision,
-                Some(&opened.body),
-            )
-            .unwrap();
-
-        assert_eq!(
-            store.read(&note.id).unwrap().body,
-            "# Original\n\nlocal edit"
-        );
-        assert!(
-            result.meta.pinned,
-            "the newer metadata must survive the body save"
-        );
-    }
-
-    #[test]
     fn set_pinned_toggles_without_bumping_updated() {
         let (_dir, mut store) = bare();
         let meta = store.create("Inbox", "# Pin me\n\nBody.\n").unwrap();
@@ -11561,6 +11729,29 @@ mod tests {
         let bare = tmp.path().join("bare");
         fs::create_dir_all(&bare).unwrap();
         carry_settings(&bare, &fresh).unwrap();
+    }
+
+    /// The Librarian route is turned on per vault (`librarianMcp`). A vault
+    /// created, adopted, or imported from one that had it on must start with
+    /// it off; every other choice still rides along.
+    #[test]
+    fn carry_settings_never_carries_the_librarian_opt_in() {
+        let tmp = TempDir::new().unwrap();
+        let old = tmp.path().join("old");
+        let fresh = tmp.path().join("fresh");
+        fs::create_dir_all(old.join(".rotli")).unwrap();
+        fs::create_dir_all(&fresh).unwrap();
+        fs::write(
+            old.join(".rotli/settings.json"),
+            r#"{"brainEnabled":false,"librarianMcp":true,"librarianRules":{"secureKeywords":["bank"]}}"#,
+        )
+        .unwrap();
+        carry_settings(&old, &fresh).unwrap();
+        let carried: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(fresh.join(".rotli/settings.json")).unwrap()).unwrap();
+        assert_eq!(carried.get(LIBRARIAN_MCP_SETTING), None, "the opt-in stays with its vault");
+        assert_eq!(carried["brainEnabled"], serde_json::json!(false));
+        assert_eq!(carried["librarianRules"]["secureKeywords"][0], "bank", "secure keywords still ride along");
     }
 
     /// The Tasks projection (decision 2026-07-25): open checkboxes only, fenced

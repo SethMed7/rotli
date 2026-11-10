@@ -18,6 +18,7 @@ import { runAgent } from "../src/ai/loop";
 import { folderHits, mergeFolderHits, stripLeadingFrontmatter } from "../src/ai/tools";
 import type { AgentEvent, ChatTurn, Host, NoteHit } from "../src/ai/types";
 import { webGroundingIssue } from "../src/ai/webEvidence";
+import { approvedRow, approvedRows, brandHost, model, person } from "../src/lib/promptText.fixtures";
 import type { CorpusNoteMeta } from "../src/lib/tauri";
 import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
 
@@ -494,13 +495,18 @@ function rankFixture(query: string, limit: number): NoteHit[] {
   if (q === "") return [];
   const hits: { hit: NoteHit; rank: number; recency: number }[] = [];
   FIXTURE_NOTES.forEach((n, i) => {
-    const hit = { id: n.id, title: n.title, snippet: snippetOf(n.body), folder: n.folderId };
+    const hit: NoteHit = approvedRow({
+      id: n.id,
+      title: n.title,
+      snippet: snippetOf(n.body),
+      folder: n.folderId,
+    });
     const recency = FIXTURE_NOTES.length - i;
     if (n.title.toLowerCase().includes(q)) hits.push({ hit, rank: 0, recency });
     else if (n.body.toLowerCase().includes(q)) hits.push({ hit, rank: 1, recency });
   });
   hits.sort((a, b) => a.rank - b.rank || b.recency - a.recency || a.hit.id.localeCompare(b.hit.id));
-  return mergeFolderHits(hits, folderHits(FIXTURE_META, query, limit), limit);
+  return mergeFolderHits(hits, folderHits(approvedRows(FIXTURE_META), query, limit), limit);
 }
 
 type StepLog = { kind: "complete"; formatJson: boolean; prompt: string; raw: string; ms: number };
@@ -508,7 +514,8 @@ type StepLog = { kind: "complete"; formatJson: boolean; prompt: string; raw: str
 function makeFixtureHost(modelId: string, log: StepLog[], webFixtureName: WebFixtureName): Host {
   const meta = { id: modelId };
   const webFixture = WEB_FIXTURES[webFixtureName];
-  return {
+  // a scripted host answers plain strings; the brands are the real host's
+  return brandHost({
     createNote: async () => "error: the fixture host cannot create notes",
     async complete({ messages, formatJson }) {
       const prompt = messages.map((m) => m.content).join("\n\n");
@@ -579,7 +586,7 @@ function makeFixtureHost(modelId: string, log: StepLog[], webFixtureName: WebFix
       }));
       return buildModelMap(mapNotes, contextWindowFor(meta), maxChars);
     },
-  };
+  });
 }
 
 // update_note calls recorded per case (reset in runCase) — the edit case
@@ -1000,16 +1007,16 @@ async function runCase(c: EvalCase, modelId: string, logDir: string): Promise<bo
     final = "";
     const gen = runAgent(host, {
       history: [...history],
-      userText,
+      userText: person(userText),
       web: c.web ?? false,
       model: { id: modelId },
-      userName: "Avery",
+      userName: person("Avery"),
     });
     for await (const ev of gen as AsyncGenerator<AgentEvent>) {
       if (ev.type === "tool") events.push(`tool: ${ev.tool} ${JSON.stringify(ev.args)}`);
       if (ev.type === "final") final = ev.text;
     }
-    history.push({ role: "user", text: userText }, { role: "assistant", text: final });
+    history.push({ role: "user", text: person(userText) }, { role: "assistant", text: model(final) });
   }
 
   const { pass, detail } = c.score(final, { modelCalls: log.length });

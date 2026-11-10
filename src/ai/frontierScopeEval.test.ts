@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { person, promptOf } from "../lib/promptText.fixtures";
 import { frontierAdapter } from "./prompt";
 import type { ToolName } from "./types";
 
@@ -23,7 +24,7 @@ interface EvalCase {
 const CASES: EvalCase[] = [
   {
     name: "general knowledge → answered from the model's own knowledge",
-    userText: "What do you know about Grok 4.7?",
+    userText: person("What do you know about Grok 4.7?"),
     must: [
       "answer general-knowledge questions",
       "straight from your own knowledge",
@@ -37,7 +38,7 @@ const CASES: EvalCase[] = [
   },
   {
     name: "about the user → the notes are searched first",
-    userText: "What did I decide about the launch schedule last week?",
+    userText: person("What did I decide about the launch schedule last week?"),
     must: [
       "search the notes only when the question concerns the user",
       "their past decisions or conversations",
@@ -47,7 +48,7 @@ const CASES: EvalCase[] = [
   },
   {
     name: "live data → what the model knows, qualified, and the globe mentioned once",
-    userText: "What is the price of bitcoin right now?",
+    userText: person("What is the price of bitcoin right now?"),
     must: ["as of your training", "may be out of date", "turn on the globe"],
     mustNot: ["you can't confirm it", "needs up-to-date information you can't verify"],
   },
@@ -59,9 +60,9 @@ describe("frontier scope eval (globe off)", () => {
       const prompt = frontierAdapter.renderPrompt({
         offeredTools: new Set<ToolName>(["search_memory", "read_memory", "search_notes", "read_note"]),
         web: false,
-        knowledge: "",
+        knowledge: promptOf(""),
         history: [],
-        userText: c.userText,
+        userText: person(c.userText),
         scratch: [],
         maxSteps: 6,
       });

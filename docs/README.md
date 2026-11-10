@@ -72,7 +72,11 @@ fix both in the same change.
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 | Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 | Opt-in cloud MCP relay boundary | [`architecture/remote-agent-relay.md`](architecture/remote-agent-relay.md) |
+| Vault threads protocol v1: a vault as a T3 project, the Librarian in its threads, no project (shared with Tesven) | [`architecture/vault-thread-protocol.md`](architecture/vault-thread-protocol.md) |
+| The Librarian MCP route, Rotli chat on T3, and what shrinks (proposal) | [`design/librarian-mcp-and-t3-chat.md`](design/librarian-mcp-and-t3-chat.md) |
+| Librarian MCP and T3 vault threads validated end to end with a real AI (2026-11-08) | [`architecture/librarian-t3-validation-2026-11-08.md`](architecture/librarian-t3-validation-2026-11-08.md) |
 | Rotli Web: the required vault, Rotli Helper's vault lane, staying connected, and the no-egress rule | [`architecture/web-vault-connection.md`](architecture/web-vault-connection.md) |
+| Native command availability on web and its exhaustive inventory gate | [`architecture/web-vault-connection.md#native-command-availability`](architecture/web-vault-connection.md#native-command-availability) |
 
 ## Source-of-truth boundaries
 

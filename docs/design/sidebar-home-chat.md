@@ -62,8 +62,10 @@ Now the sidebar has **one top switcher and one body**:
     where it is; the arriving answer lifts it (2026-10-15). The reply time is
     read from the transcript's last non-`you` message line (Rust
     `memex_chat_scan.rs`, the TS twin `src/memex/chatRecency.ts` for Rotli Web; a chat with
-    no reply yet uses its file time). The row's age shows the same time. The
-    old per-folder manual drag order is retired (the manifest field still
+    no reply yet uses its file time). Web folder listings scan the complete
+    transcript they read for reply time, independently of the 41-line metadata
+    header, so long conversations retain their newest reply. The row's age shows
+    the same time. The old per-folder manual drag order is retired (the manifest field still
     parses for older builds); dragging a chat onto a folder still files it
     there.
   - **Pinned and recent folders** — an explicit pin wins; otherwise the folder
@@ -78,6 +80,9 @@ Now the sidebar has **one top switcher and one body**:
     provider mark is the vendor's own full-color file in `src/brand/providers/`
     (OpenAI's black Blossom in light environments, white in dark), never a
     mask in Rotli ink — in every theme family and with Neutral sidebar icons.
+    Web chat headers accept LF and CRLF line endings equally, keeping saved
+    titles, pins, attached-note labels, and provider metadata without rewriting
+    the file.
   - **Views** — chats join named views (`chats: [slug]` on the view in
     `views.json`, singular membership like notes): the row menu's "Move to
     view", an active view narrows the front to its chats, and a chat born

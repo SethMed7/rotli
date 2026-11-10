@@ -2,7 +2,6 @@
 //! Rotli shares) out of git — split from corpus.rs at its size ceiling.
 //! Declared as a CHILD of `corpus`, so it reuses the store's own gates.
 
-use std::fs;
 
 use super::*;
 
@@ -40,7 +39,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
         crate::fsutil::with_file_lock(&path, || {
-            let Ok(existing) = fs::read_to_string(&path) else {
+            let Some(existing) = crate::fsutil::read_own_sidecar(&path)? else {
                 return Ok(());
             };
             if !existing.lines().any(|l| l.trim() == rel) {

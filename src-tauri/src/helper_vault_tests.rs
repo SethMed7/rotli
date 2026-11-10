@@ -1,4 +1,5 @@
 use super::*;
+use crate::corpus::review_tests::{OUTSIDE_NOTE, OUTSIDE_WORDS};
 use tempfile::TempDir;
 
 /// A served vault over a fresh folder, with a picker that answers `pick`.
@@ -534,4 +535,43 @@ fn read_many_defers_lossy_text_that_would_exceed_the_budget() {
     assert_eq!(answer["more"], json!(["lossy.md"]));
     assert_eq!(answer["files"]["normal.md"], "normal");
     assert!(answer["files"].get("lossy.md").is_none());
+}
+
+/// Review 2026-11-09 #4 on the web's Helper road: a hard link in the vault to
+/// a file outside it is neither read nor listed, like on the Mac.
+#[cfg(unix)]
+#[test]
+fn a_hard_link_to_a_file_outside_the_vault_is_never_served() {
+    let (vault, _config, served) = serving();
+    let outside = TempDir::new().unwrap();
+    let elsewhere = outside.path().join("elsewhere.md");
+    fs::write(&elsewhere, OUTSIDE_NOTE).unwrap();
+    fs::create_dir_all(vault.path().join("wiki")).unwrap();
+    fs::hard_link(&elsewhere, vault.path().join("wiki/linked.md")).unwrap();
+    fs::write(vault.path().join("wiki/plain.md"), "# Plain\n").unwrap();
+    assert!(call(&served, "vault_read", json!({ "path": "wiki/linked.md" })).is_err());
+    let many = call(&served, "vault_read_many", json!({ "paths": ["wiki/linked.md"] })).map(|v| v.to_string()).unwrap_or_default();
+    assert!(!many.contains(OUTSIDE_WORDS), "{many}");
+    for verb in ["vault_walk", "vault_list"] {
+        let listed = call(&served, verb, json!({ "path": "wiki" })).unwrap().to_string();
+        assert!(listed.contains("plain.md") && !listed.contains("linked.md"), "{verb}: {listed}");
+    }
+}
+
+/// Third review of pull request 267, #5: a hard-linked file is still never
+/// listed or read, but a walk that asks for it names it, with the reason, so
+/// Rotli Web can tell the person. An older page's plain walk is unchanged.
+#[cfg(unix)]
+#[test]
+fn a_walk_names_the_hard_linked_files_it_left_out() {
+    let (vault, _config, served) = serving();
+    fs::create_dir_all(vault.path().join("wiki")).unwrap();
+    fs::write(vault.path().join("wiki/own.md"), "# Own\n").unwrap();
+    let _outside = crate::fsutil::hard_link_outside(&vault.path().join("wiki/linked.md"), OUTSIDE_NOTE.as_bytes());
+    let plain = call(&served, "vault_walk", json!({ "path": "" })).unwrap();
+    assert!(plain.as_array().unwrap().iter().all(|e| e["path"] != "wiki/linked.md"), "{plain}");
+    let walked = call(&served, "vault_walk", json!({ "path": "", "skipped": true })).unwrap();
+    assert!(walked["entries"].as_array().unwrap().iter().any(|e| e["path"] == "wiki/own.md"), "{walked}");
+    assert_eq!(walked["skipped"], json!([{ "path": "wiki/linked.md", "reason": "hardLink" }]));
+    assert!(!walked.to_string().contains(OUTSIDE_WORDS));
 }

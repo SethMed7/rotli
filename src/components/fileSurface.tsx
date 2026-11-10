@@ -41,7 +41,7 @@ import { deriveSheetFacts, describeShape, formatStamp, sizeLine, truncatedRowsNo
 import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { FileHeaderMarks } from "./fileHeaderMarks";
+import { FileHeaderMarks, FileViewButton, HtmlViewModes } from "./fileHeaderMarks";
 import { OfficeMount } from "./fileOffice/officeMount";
 import { officeEditability, probeOffice } from "./fileOffice/officeProbe";
 
@@ -417,24 +417,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         </span>
         <FileHeaderMarks {...{ kind, ext, stat, probed, tooLarge, sheetEditable, documentEditable }} />
         <span className="file-head-gap" aria-hidden="true" />
-        {kind === "html" && !tooLarge && (
-          <div className="file-mode-tabs" role="tablist" aria-label="View mode">
-            <button
-              type="button"
-              className={htmlMode === "preview" ? "fsh-tab on" : "fsh-tab"}
-              onClick={() => setHtmlMode("preview")}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              className={htmlMode === "code" ? "fsh-tab on" : "fsh-tab"}
-              onClick={() => setHtmlMode("code")}
-            >
-              Code
-            </button>
-          </div>
-        )}
+        {kind === "html" && !tooLarge && <HtmlViewModes mode={htmlMode} onChange={setHtmlMode} />}
         {kind === "image" && imgNat && (
           <button
             type="button"
@@ -668,14 +651,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             {tables.length > 1 && (
               <div className="file-sheet-tabs">
                 {tables.map((t, i) => (
-                  <button
-                    key={t.name}
-                    type="button"
-                    className={i === activeSheet ? "fsh-tab on" : "fsh-tab"}
-                    onClick={() => setActiveSheet(i)}
-                  >
+                  <FileViewButton key={t.name} active={i === activeSheet} onClick={() => setActiveSheet(i)}>
                     {t.name}
-                  </button>
+                  </FileViewButton>
                 ))}
               </div>
             )}

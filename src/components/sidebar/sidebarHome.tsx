@@ -14,12 +14,12 @@
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type MouseEvent as ReactMouseEvent,
   useEffect,
   useEffectEvent,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 
 import { dispatch } from "../../keys/registry";
@@ -30,7 +30,6 @@ import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { rangeBetween } from "../../lib/rangeSelect";
-import { iconKind } from "../../lib/sidebarLook";
 import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
 import { DEST, folderRoles, isRootMarker, isStorageDisk } from "../../services/destinations";
@@ -77,7 +76,7 @@ import { useContextMenu } from "../../state/contextMenu";
 import { useHidden } from "../../state/hidden";
 import { useMainStore } from "../../state/main";
 import { type DropPreview, sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
-import { QUICK_MAX, togglePinQuick } from "../../state/quick";
+import { QUICK_MAX } from "../../state/quick";
 import { ALL_NOTES, SEC_SYSTEM, TASKS, useUiStore } from "../../state/ui";
 import { useVaultView } from "../../state/vaultView";
 import { useViewsStore } from "../../state/views";
@@ -88,23 +87,22 @@ import {
   FolderGlyph,
   NewFileGlyph,
   NewFolderGlyph,
-  PinGlyph,
-  StarGlyph,
   StorageGlyph,
   TrashGlyph,
 } from "../glyphs";
-import { glyphForNote } from "../noteGlyph";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
 import { mainFolderMenuItems } from "./mainFolderMenu";
+import { MainNoteRow } from "./mainNoteRow";
+import { rowInset, ROW_INSET_LEAD } from "./mainRowStyle";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { FolderRenameRow, NoteRenameRow } from "./sidebarRenameRows";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
-import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
+import { useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
 import { ViewNameEditor } from "./viewNameEditor";
@@ -117,16 +115,6 @@ const destRows = (): SystemDestRow[] => [
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
-
-/** How far left of a row's icon its hover/selected wash begins (the owner,
- * 2026-09-18: "only a tad to the left of the file icon, not all the way to the
- * edge" — inside folders a full-width wash hid the nesting). */
-const ROW_INSET_LEAD = 8;
-
-/** A Main row's indent plus where its wash starts (`--row-inset`, notes.css). */
-function rowInset(paddingLeft: number, inset: number): CSSProperties {
-  return { paddingLeft, "--row-inset": `${Math.max(0, inset)}px` } as CSSProperties;
-}
 
 export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatData }) {
   const foldersData = useFolders().data;
@@ -227,6 +215,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const mainProjection = useMemo(() => buildMainTree(activeTree, noteIndex), [activeTree, noteIndex]);
   // per-parent lookups, built once per projection — never a full scan per folder
   const mainIndex = useMemo(() => indexMainProjection(mainProjection), [mainProjection]);
+  const mainNotesById = useMemo(
+    () => new Map(mainProjection.notes.map((note) => [note.id, note])),
+    [mainProjection],
+  );
   // ONE open rule for every Main folder site (render, roving, toggle, collapse):
   // an explicit expand/collapse wins; otherwise open, unless this is the Vault
   // view or Main is too large to paint whole
@@ -513,6 +505,98 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     });
   };
 
+  // Delegate note pointer actions once at the tree boundary. Rows retain
+  // stable props while handlers always see the current selection/projection.
+  const mainNoteAt = (target: EventTarget | null) => {
+    const row = target instanceof Element ? target.closest<HTMLElement>(".main-row[data-note-id]") : null;
+    const n = mainNotesById.get(row?.dataset.noteId ?? "");
+    return row && n ? { row, n, parentId: row.dataset.mainParent ?? MAIN_ROOT } : null;
+  };
+  const onMainNotePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const hit = mainNoteAt(e.target);
+    if (!hit) return;
+    const title = noteDisplayTitle(hit.n.title, mainIndex.folderName(hit.parentId)) || "Empty note";
+    startMainDrag(e, hit.n.id, title);
+  };
+  const onMainNoteClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const hit = mainNoteAt(e.target);
+    if (!hit) return;
+    const { n, parentId } = hit;
+
+    if (didMainDragRef.current) return;
+    // ⌘-click gathers for a multi-drag instead of opening;
+    // ⇧-click gathers the whole range from the last click
+    if (e.shiftKey && mainAnchorRef.current) {
+      // the rendered rows ARE the visible order — read them, never re-derive
+      const scope = e.currentTarget.closest(".main-tree") ?? document;
+      const order = [...scope.querySelectorAll<HTMLElement>(".main-row[data-main-id]")].map(
+        (el) => el.dataset.mainId ?? "",
+      );
+      const range = rangeBetween(order, (id) => id, mainAnchorRef.current, n.id);
+      if (range) {
+        setMainSel((prev) => new Set([...prev, ...range]));
+        return;
+      }
+    }
+    mainAnchorRef.current = n.id;
+    if (e.metaKey) {
+      setMainSel((prev) => {
+        const next = new Set(prev);
+        // Finder's rule (the owner, 2026-09-18): the open note already
+        // reads as selected, so the first ⌘-click gathers it too —
+        // otherwise dragging by it moved it alone
+        const open = focusedItemId;
+        if (prev.size === 0 && open && open !== n.id && mainProjection.notes.some((m) => m.id === open)) {
+          next.add(open);
+        }
+        if (next.has(n.id)) next.delete(n.id);
+        else next.add(n.id);
+        return next;
+      });
+      return;
+    }
+    setMainSel((previous) => (previous.size ? new Set() : previous));
+    // Main is the creation context as well as the visible projection:
+    // ⌘T / New note must not inherit a stale Library/Storage selection
+    // from before this row was opened.
+    setSelectedFolderId(parentId);
+    setContentView("panes");
+    usePanesStore.getState().openSummary(n);
+  };
+  const onMainNoteAuxClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const hit = mainNoteAt(e.target);
+    if (!hit) return;
+    const { n, parentId } = hit;
+
+    if (e.button === 1) {
+      e.preventDefault();
+      setSelectedFolderId(parentId);
+      setContentView("panes");
+      usePanesStore.getState().openSummary(n, { newTab: true });
+    }
+  };
+  const onMainNoteContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const hit = mainNoteAt(e.target);
+    if (!hit) return;
+    const { n } = hit;
+
+    const selectedItems = mainSel.has(n.id)
+      ? mainProjection.notes.filter((item) => mainSel.has(item.id))
+      : [n];
+    if (!mainSel.has(n.id)) setMainSel(new Set([n.id]));
+    openNoteMenu(e, n, {
+      selectedItems,
+      renameInline: () => setRenamingNoteId(n.id),
+      trashSelection: (items) => {
+        trashItems.mutate([...items], {
+          // their Main slots stay (2026-09-16): the projection
+          // hides sink-resident notes and Restore returns them
+          onSuccess: () => setMainSel(new Set()),
+        });
+      },
+    });
+  };
+
   // the live filter narrows the compact rows by title OR snippet (applied per
   // section — including Main, which the first filter pass skipped entirely)
   const q = filter.trim().toLowerCase();
@@ -545,50 +629,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       // with mainRovingRows so j/k always mirrors the rendered order
       .sort(mainRowSort);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
-    // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
-    // window cycles (the maintainer, 2026-07-01 — "anything starred opens with my hotkey").
-    const starBtn = (id: string) => {
-      const starred = quickNoteIds.includes(id);
-      const full = !starred && quickNoteIds.length >= QUICK_MAX;
-      const label = starred
-        ? "Unstar — remove from Quick access"
-        : full
-          ? `Quick access is full (${QUICK_MAX}) — unstar one first`
-          : SHOW_HOTKEYS
-            ? "Star for Quick access (the ⌥ Quick window)"
-            : "Star for Quick access";
-      return (
-        <span
-          role="button"
-          tabIndex={0}
-          className={`snactbtn mstar${starred ? " on" : ""}${full ? " full" : ""}`}
-          aria-label={label}
-          aria-pressed={starred}
-          title={label}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            if (full) {
-              // the disabled star must explain itself — a silent no-op read as
-              // broken (slice 5, 2026-07-28); the inline error lane is right here
-              setRowActionError(`Quick access is full (${QUICK_MAX}) — unstar one first.`);
-              return;
-            }
-            togglePinQuick(id);
-          }}
-          // a span with role="button" gets no synthetic click from the
-          // keyboard — wire Enter/Space by hand (slice 5, 2026-07-28)
-          onKeyDown={(ev) => {
-            if (ev.key === "Enter" || ev.key === " ") {
-              ev.preventDefault();
-              ev.stopPropagation();
-              ev.currentTarget.click();
-            }
-          }}
-        >
-          <StarGlyph size={13} filled={starred} />
-        </span>
-      );
-    };
     return (
       <>
         {childNotes.map((n, noteIndex) => {
@@ -609,100 +649,21 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             );
           }
           return (
-            <button
+            <MainNoteRow
               key={`main:${n.id}`}
-              type="button"
-              data-main-id={n.id}
-              data-note-id={n.id}
-              data-main-slot={slot}
-              /* the current file's Main copy wins the highlight (#25) — the same
-                 accent pill a compact row gets when it's the focused note */
-              className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${mainSel.has(n.id) ? " msel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
-              style={rowInset(contentPad, contentPad - ROW_INSET_LEAD)}
-              onPointerDown={(e) => startMainDrag(e, n.id, displayTitle)}
-              onClick={(e) => {
-                if (didMainDragRef.current) return;
-                // ⌘-click gathers for a multi-drag instead of opening;
-                // ⇧-click gathers the whole range from the last click
-                if (e.shiftKey && mainAnchorRef.current) {
-                  // the rendered rows ARE the visible order — read them, never re-derive
-                  const scope = e.currentTarget.closest(".main-tree") ?? document;
-                  const order = [...scope.querySelectorAll<HTMLElement>(".main-row[data-main-id]")].map(
-                    (el) => el.dataset.mainId ?? "",
-                  );
-                  const range = rangeBetween(order, (id) => id, mainAnchorRef.current, n.id);
-                  if (range) {
-                    setMainSel((prev) => new Set([...prev, ...range]));
-                    return;
-                  }
-                }
-                mainAnchorRef.current = n.id;
-                if (e.metaKey) {
-                  setMainSel((prev) => {
-                    const next = new Set(prev);
-                    // Finder's rule (the owner, 2026-09-18): the open note already
-                    // reads as selected, so the first ⌘-click gathers it too —
-                    // otherwise dragging by it moved it alone
-                    const open = focusedItemId;
-                    if (
-                      prev.size === 0 &&
-                      open &&
-                      open !== n.id &&
-                      mainProjection.notes.some((m) => m.id === open)
-                    ) {
-                      next.add(open);
-                    }
-                    if (next.has(n.id)) next.delete(n.id);
-                    else next.add(n.id);
-                    return next;
-                  });
-                  return;
-                }
-                setMainSel(new Set());
-                // Main is the creation context as well as the visible projection:
-                // ⌘T / New note must not inherit a stale Library/Storage selection
-                // from before this row was opened.
-                setSelectedFolderId(parentId);
-                setContentView("panes");
-                usePanesStore.getState().openSummary(n);
-              }}
-              onAuxClick={(e) => {
-                if (e.button === 1) {
-                  e.preventDefault();
-                  setSelectedFolderId(parentId);
-                  setContentView("panes");
-                  usePanesStore.getState().openSummary(n, { newTab: true });
-                }
-              }}
-              onContextMenu={(e) => {
-                const selectedItems = mainSel.has(n.id)
-                  ? mainProjection.notes.filter((item) => mainSel.has(item.id))
-                  : [n];
-                if (!mainSel.has(n.id)) setMainSel(new Set([n.id]));
-                openNoteMenu(e, n, {
-                  selectedItems,
-                  renameInline: () => setRenamingNoteId(n.id),
-                  trashSelection: (items) => {
-                    trashItems.mutate([...items], {
-                      // their Main slots stay (2026-09-16): the projection
-                      // hides sink-resident notes and Restore returns them
-                      onSuccess: () => setMainSel(new Set()),
-                    });
-                  },
-                });
-              }}
+              note={n}
+              parentId={parentId}
+              title={displayTitle}
+              slot={slot}
+              focused={n.id === focusedItemId}
+              gathered={mainSel.has(n.id)}
+              dropClass={dropCls(n.id)}
+              dragging={mainDragId === n.id}
+              padding={contentPad}
+              starred={quickNoteIds.includes(n.id)}
+              quickFull={!quickNoteIds.includes(n.id) && quickNoteIds.length >= QUICK_MAX}
               {...rp({ id: `main>${n.id}`, kind: "note" })}
-            >
-              {glyphForNote(n, { size: 14, className: `snicon kind-${iconKind(n)}` })}
-              <span className="snt">{displayTitle}</span>
-              <MainSlotHint slot={slot} />
-              {/* the floated pin's marker — same quiet glyph as pinned chats */}
-              {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-              {starBtn(n.id)}
-              {/* the hover-× is GONE (the maintainer, 2026-07-09: its reserved slot read as
-                  a broken gap next to the star) — the context menu owns
-                  "Remove from Main"; folder rows keep their × below */}
-            </button>
+            />
           );
         })}
         {childFolders.map((f) => {
@@ -1076,9 +1037,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           positioned popovers (RowMenu, the New… menu) sit OUTSIDE this node, so
           their pixel coordinates stay unscaled. */}
       <div className="sb-rows" aria-label="Home" style={{ zoom }}>
-        {/* This wrapper is the roving listbox: Tab enters at the one tabIndex=0
+        {/* This wrapper owns roving button focus: Tab enters at the one tabIndex=0
             row, j/k walk it; the keyboard highlight is :focus-visible. */}
-        <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
+        <div className="sb-notes-tree" role="group" aria-label="Notes tree">
           <HomeShortcuts
             dashboard={dashboard}
             counts={{ allNotes: searchableCount, captures: captureCount, tasks: openTaskCount }}
@@ -1195,7 +1156,15 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               )}
             </p>
           ) : (
-            <div data-main-id="main:" data-active-view={activeView ?? "Main"} className="main-tree">
+            <div
+              data-main-id="main:"
+              data-active-view={activeView ?? "Main"}
+              className="main-tree"
+              onPointerDown={onMainNotePointerDown}
+              onClick={onMainNoteClick}
+              onAuxClick={onMainNoteAuxClick}
+              onContextMenu={onMainNoteContextMenu}
+            >
               {renderMainTree(MAIN_ROOT, 0, rowProps)}
               {/* while a row is dragged, the space under the list takes it out
                   of its folder — even when Main is one open folder with no row

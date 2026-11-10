@@ -1,4 +1,8 @@
+import { type ApprovedNote, approvedNote } from "../ai/approvedRead";
+import { flushNote } from "../editor/model";
+import { savedVersionMismatch } from "../editor/savedVersion";
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
+import { reshape } from "../lib/promptText";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { noteSlugify } from "../memex/contract";
@@ -17,6 +21,7 @@ import { inboxFolderId, notesService } from "../services/notes";
 import {
   type AttachedNoteCandidate,
   attachedNoteMatches,
+  extractChatNotes,
   type MemoryTurn,
   pickChatNote,
   pickMemoryNote,
@@ -32,6 +37,9 @@ export interface ManagedChatMemoryInput {
   /** The model that rewrites the conversation notes each turn (optional —
    * without it, existing notes are kept and new notes get the topics digest). */
   composeNotes?: ComposeChatNotes;
+  /** The conversation carries the on-device-only mark (a secure read, or a
+   * secure attachment): its notes go only to a protected note. */
+  protectedOnly?: boolean;
   /** The chat's model. The per-turn note rewrite is an AI WRITE, so it rides
    * `corpus_write_ai` — Rust re-derives locality, re-runs the read gate, and
    * refuses a locked note (docs/design/ai-visibility-matrix.md). Absent ⇒ the
@@ -103,7 +111,62 @@ export function chatNoteListingFolder(scope: ChatNoteScope): string | undefined 
   return scope.kind === "brain" ? scope.root : undefined;
 }
 
+/** Why a memory sync stopped: the note can't be read for the chat's model
+ * any more (it turned secure mid-turn, or was locked or removed). */
+export const MEMORY_NOTE_WITHHELD =
+  "This chat’s note can’t be read for this model any more, so its conversation notes weren’t sent or updated.";
+
+type Reader = Pick<ChatModelInfo, "id" | "endpoint">;
+/** No model: the read is judged as a remote one, the fail-closed direction. */
+const NO_MODEL: Reader = { id: "", endpoint: "" };
+
+/** A chat's note as the gated, versioned read for `reader` returns it: the
+ * body and revision a write builds on, and the notes section a model is given,
+ * all from that one read (third review of pull request 267, #3: both memory
+ * paths read the note through the editor's ungated lane, so a note that turned
+ * secure mid-turn had its notes sent to a remote model). Throws
+ * MEMORY_NOTE_WITHHELD when the gate refuses. */
+/** How memory waits for, and checks, the editor's save of a note. */
+export interface SavedVersion {
+  flush: (noteId: string) => Promise<void>;
+  mismatch: (noteId: string, read: { revision: string; body: string }) => string | null;
+}
+const EDITOR_SAVES: SavedVersion = { flush: flushNote, mismatch: savedVersionMismatch };
+
+export async function memoryNoteFor(
+  id: string,
+  stem: string,
+  aiEditable: boolean,
+  reader: Reader,
+  read: (id: string, reader: Reader) => Promise<ApprovedNote> = approvedNote,
+  saved: SavedVersion = EDITOR_SAVES,
+): Promise<ChatMemoryNote> {
+  // the note as its editor last saved it, or nothing (fourth review): a save
+  // still out is waited for, and a failed one is said in its own words
+  await saved.flush(id);
+  let note: ApprovedNote;
+  try {
+    note = await read(id, reader);
+  } catch {
+    throw new Error(MEMORY_NOTE_WITHHELD);
+  }
+  const unsaved = saved.mismatch(id, note);
+  if (unsaved) throw new Error(unsaved);
+  const notes = reshape(note.body, (body) => extractChatNotes(body) ?? "");
+  return {
+    id,
+    stem,
+    body: note.body,
+    revision: note.revision,
+    notes: notes === "" ? null : notes,
+    aiEditable,
+    // the gate's own word: only an on-device model may read it (secure)
+    secure: note.onDeviceOnly,
+  };
+}
+
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote | null> {
+  const reader = input.model ?? NO_MODEL;
   const listingFolder = chatNoteListingFolder(chatNoteScope(input.instance));
   const attachedStem =
     input.attachedStem ||
@@ -123,10 +186,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
         summaries.filter((note) => !isChatsPath(note.folderId)),
       );
       if (!id) return null;
-      const note = await notesService.getNote(id);
-      return note
-        ? { id, stem, body: note.body, revision: note.revision, aiEditable: await aiEditable(id) }
-        : null;
+      return memoryNoteFor(id, stem, await aiEditable(id), reader);
     },
     async findMemoryNote(): Promise<ChatMemoryNote | null> {
       const stem = await readChatMemoryNoteStem(input.instance, input.chatSlug).catch(() => null);
@@ -146,35 +206,47 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
         })),
       );
       const id = pickMemoryNote(matches);
-      const note = id ? await notesService.getNote(id) : null;
-      if (!id || !note) return null;
+      if (!id) return null;
       const verdict = matches.find((match) => match.id === id)?.verdict;
-      return { id, stem, body: note.body, revision: note.revision, aiEditable: verdict === "allowed" };
+      return memoryNoteFor(id, stem, verdict === "allowed", reader);
     },
     setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
-    async create(body: string): Promise<ChatMemoryNote> {
+    async create(body: string, opts?: { secure?: boolean }): Promise<ChatMemoryNote> {
+      const secure = opts?.secure === true;
       // Rotli Web: the notes service IS the vault (no memex note command), and
       // the note's slug alias is the stem the chat attaches to. It is a note,
       // not a capture, so it is born in the Inbox folder, never on the board.
       if (!isTauri()) {
-        const note = await notesService.createNote(inboxFolderId, body, { createdBy: "chat" });
+        const note = await notesService.createNote(inboxFolderId, body, {
+          createdBy: "chat",
+          ...(secure ? { secure } : {}),
+        });
         return {
           id: note.id,
           // the adapter's real filename stem comes first in aliases
           stem: note.aliases?.[0] || noteSlugify(titleOf(body)) || "note",
           body,
           revision: note.revision,
+          notes: null,
           aiEditable: true,
+          secure,
         };
       }
       // no shelf: a chat's note is a background note, not a capture — it
       // projects to where it lives (staging, then the area the Librarian files
       // it under), never to the Captures board (the owner, 2026-09-17)
       // (a brought-in vault's lands in its Inbox: createChatNote)
-      const { id, stem } = await createChatNote(input.instance, body, "chat");
+      // a marked conversation's note is created the way the app creates
+      // secure notes: the secure lane, `secure: true` (fifth review)
+      const { id, stem } = await createChatNote(
+        input.instance,
+        body,
+        "chat",
+        secure ? { secure } : undefined,
+      );
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
-      return { id, stem, body, revision: note.revision, aiEditable: true };
+      return { id, stem, body, revision: note.revision, notes: null, aiEditable: true, secure };
     },
     // one gated write on both platforms: Rust on the Mac, the web AI corpus's
     // twin of it in Rotli Web (webAiCorpus.write)

@@ -5,7 +5,12 @@
 > only** until refined. Stable builds refuse them with
 > "MCP and agent integrations are available only in development builds" and
 > hide their Settings surface. The plain JSON CLI (`rotli notes …`,
-> `rotli views …`, `rotli main …`, and the rest) is not gated.
+> `rotli views …`, `rotli main …`, and the rest) is not gated. The Librarian
+> route (`rotli mcp --librarian` and `rotli librarian …`) is gated with the rest
+> of MCP (2026-11-09): it stays in development builds until the review findings
+> in [`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)
+> are fixed and reviewed. `feature_policy::cli_gate` decides it once for every
+> agent command. `rotli --version` answers headlessly.
 
 Rotli exposes one headless workspace application service through the packaged
 CLI, local stdio MCP, authenticated loopback HTTP, and the opt-in remote relay
@@ -208,6 +213,99 @@ before it leaves Rust. A headless `rotli mcp` reaches the app through
 `agent-bridge/bridge.sock` in Rotli's app-support folder (a 0700 folder, a
 0600 socket); the paired relay runs inside the app.
 
+## The Librarian route
+
+`rotli mcp --librarian` is a second stdio server, `rotli-librarian`, over the
+same workspace service (`src-tauri/src/workspace_librarian.rs`; plan and
+rationale in
+[`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md);
+how hosts wire it per vault in [`vault-thread-protocol.md`](vault-thread-protocol.md)).
+It is the opt-in, much smaller surface for keeping a vault organised; the full
+`rotli-workspace` server is unchanged.
+
+- **One vault per process, bound at start.** `rotli mcp --librarian --vault
+  PATH` serves that vault; without `--vault` it serves the folder it was
+  started in. Either must resolve (links followed, then compared by real path)
+  to a vault registered in Rotli with the Librarian on, or the server refuses
+  to start. Every call then opens that vault and never the app's default, so
+  switching the default mid-session can't redirect a thread (audit
+  2026-11-08). The server also records the folder's identity (device and
+  inode, read without following a link) at start, and every call refuses if
+  another folder, or a link, now stands at that path. `--root` is refused here.
+- **Off by default.** Every call except `librarian_guide` refuses unless the
+  vault's `.rotli/settings.json` holds `"librarianMcp": true` (anything else,
+  missing or malformed, is off). Rust only reads that file, except that a
+  vault created, adopted, or brought in as a copy starts with the switch off:
+  `carry_settings` copies the other settings across and leaves this one behind.
+  The refusal names the switch. Like the rest of MCP, the route runs only in
+  development builds: `cli_gate` refuses `rotli mcp --librarian`, `rotli mcp
+  config`, and every `rotli librarian …` command in a public build, and the
+  switch itself reads as off there, so `"librarianMcp": true` does nothing.
+- **Nine tools:** `librarian_guide`, `librarian_search`, `librarian_read`,
+  `librarian_capture`, `librarian_file`, `librarian_link`, `librarian_index`,
+  `librarian_log`, `librarian_review`. Behaviour lives in five skills compiled
+  from `src-tauri/librarian-skills/*/SKILL.md` and served by `librarian_guide`.
+- **Reads** use the remote read gate exactly as `rotli_read_note` and
+  `rotli_search` do; secure notes are never listed, read, or proposable. A
+  read judges and returns the same bytes (`read_doc_for_ai`): one read of the
+  file, gated, with the revision of exactly what was returned.
+- **Creates** use the remote-agent create seam in intake: a capture carries
+  `created_by: agent`, the two pages `created_by: librarian` plus
+  `librarian_page: index` or `librarian_page: log`. A new note's
+  file name is claimed without replacing anything, so two captures that pick
+  the same name at once both survive.
+- **Rewrites** are limited to the Librarian's own pages, "Librarian index"
+  and "Librarian log", through `write_for_remote_agent_if_revision`. Its own
+  means the exact title, the `created_by: librarian` stamp, and the
+  `librarian_page` marker. `created_by: librarian` alone is not enough: Rotli's
+  in-app Librarian stamps the People notes it makes the same way, and a
+  person may be called "Librarian index". `librarian_page` is a Rotli-reserved
+  key that only this route's page creation writes: agents never write
+  frontmatter, the metadata editor refuses reserved keys, the raw editor
+  restores them (`RAW_IMMUTABLE_KEYS`), and no other create path sets it. A
+  note that only shares the title, carries it as an alias, or lacks the
+  marker is never touched, and the Librarian makes its own page instead.
+  Pages made before the marker existed (unreleased builds only) are left
+  alone and replaced by new ones.
+- **Proposals:** `librarian_file` and `librarian_link` append to
+  `.rotli/librarian/proposals.jsonl` (JSON per line, `id`, `ts`, `kind`,
+  `note`, `noteTitle`, `folder` or `target` with `targetId`, `reason`,
+  `status`; a later line for the same id wins; a deletable sidecar). The file
+  is opened through `containment::open_sidecar`: on Unix each folder from the
+  vault root down is opened through the one before it with `openat` and
+  `O_NOFOLLOW | O_DIRECTORY`, so a link at any step is refused even if it was
+  swapped in after an earlier check, and the opened file must be a regular
+  file with one link (checked on the open descriptor), so a hard link to a
+  file outside the vault is refused for appends and reads alike. A repeated
+  pending proposal returns the existing one. `librarian_review` lists only
+  proposals whose note, and link target, the agent may still read. The
+  target checked is `targetId`, the exact note the title named when the link
+  was proposed; resolving the title again could let another public note's
+  alias stand in for a page that has since turned secure. A row written
+  before `targetId` existed is shown only when exactly one note has that
+  exact title and it is readable. The person's `rotli librarian proposals`
+  lists them all. Reasons, sources, and log entries are one line and
+  refused when secret-shaped.
+- **Every result is an MCP object.** `structuredContent` must be a JSON
+  object, so a list answer (search, review, and the workspace server's list
+  tools) travels as `{"items": [...]}`, and any other non-object as
+  `{"value": …}`. The text part carries the same value. Found by a real Claude
+  Code session on 2026-11-08, which rejected list results as malformed.
+- **No tool applies a proposal.** The person runs `rotli librarian apply ID`
+  or `dismiss ID` (a Rotli review list is next). Apply uses
+  `move_for_remote_agent` for a move and the agent write seam for a link (one
+  `[[target]]` added to the note's closing `Related:` line), so secure,
+  locked, and person-written rules still hold; a refused apply stays pending.
+- **What it doesn't stop.** A process running as the same user that swaps
+  files under the vault while a call runs is outside the threat model
+  ([`egress-threat-model.md`](egress-threat-model.md) O5). The checks above
+  narrow it: the proposals file can't be reached through a link at any step,
+  and a replaced vault folder is refused at the start of each call. Note
+  reads and writes still go through paths, so a swap made after that check
+  and before the store's own containment check is not caught; on Windows the
+  proposals file falls back to the path check, and the folder identity check
+  is skipped.
+
 ## Opening in Rotli
 
 `rotli open` and the MCP `rotli_open` tool write one item ID and kind to the
@@ -273,6 +371,8 @@ rotli rename "Old" "New" # rename one exact note title and its physical file
 rotli notes query 'area:projects tags:payments' # inspectable metadata filters
 rotli views list        # named reference trees (Main remains global)
 rotli mcp               # stdio protocol process used by either client
+rotli mcp --librarian --vault PATH   # the opt-in Librarian route for one vault (see above)
+rotli librarian status  # is it on for this vault; proposals, apply, dismiss
 ```
 
 `rotli agent config` (also available as `rotli mcp config`) prints the exact

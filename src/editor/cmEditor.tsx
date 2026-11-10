@@ -558,6 +558,7 @@ function CmEditorImpl({
         Prec.high(keymap.of(rotliKeymap)),
         keymap.of(vendorKeymap()), // stock CM, yielding to registry-claimed chords (⌘I/⌘U/⌘[/⌘])
         EditorView.lineWrapping,
+        EditorView.contentAttributes.of({ "aria-label": "Note text" }),
         // never let the caret slide behind the floating format bar: CM treats
         // the bottom strip as invisible when scrolling the caret into view, so
         // typing the last line pushes the text up instead (the maintainer, 2026-06-24)
@@ -617,6 +618,7 @@ function CmEditorImpl({
       ],
     });
     const view = new EditorView({ state, parent: host });
+    view.scrollDOM.tabIndex = 0;
     viewRef.current = view;
     // Reuse the existing scroller styling and shared paper-canvas theming, which
     // all targets .ed-scroll (themes.css) — the CM scroller becomes the canvas

@@ -270,7 +270,7 @@ impl Workspace {
             return out;
         };
         let cap = cap.clamp(1, TEXT_MAX_BYTES);
-        let Ok(bytes) = std::fs::read(&path) else {
+        let Ok(bytes) = crate::fsutil::read_own_bytes(&path) else {
             return out;
         };
         let text = String::from_utf8_lossy(&bytes[..bytes.len().min(cap)]).into_owned();

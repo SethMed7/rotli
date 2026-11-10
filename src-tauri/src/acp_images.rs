@@ -48,7 +48,7 @@ pub(crate) fn prompt_blocks(
         ));
     }
     for path in image_paths {
-        let bytes = std::fs::read(path).map_err(|e| format!("couldn't read an attached image: {e}"))?;
+        let bytes = crate::fsutil::read_own_bytes(std::path::Path::new(path)).map_err(|e| format!("couldn't read an attached image: {e}"))?;
         blocks.push(json!({
             "type": "image",
             "mimeType": image_mime(&bytes),
@@ -67,6 +67,18 @@ mod tests {
             Some(flag) => json!({ "agentCapabilities": { "promptCapabilities": { "image": flag } } }),
             None => json!({ "agentCapabilities": {} }),
         }
+    }
+
+    /// Second review of PR #267 (#3): an attached image that is a hard link to
+    /// a file elsewhere is never sent to the agent.
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_linked_image_is_never_sent() {
+        let vault = tempfile::TempDir::new().unwrap();
+        let abs = vault.path().join("attachments/screenshot.png");
+        let _outside = crate::fsutil::hard_link_outside(&abs, b"\x89PNG a picture from elsewhere");
+        let path = abs.to_string_lossy().into_owned();
+        assert!(prompt_blocks(&init(Some(true)), "look", &[path], "Agent").is_err());
     }
 
     #[test]

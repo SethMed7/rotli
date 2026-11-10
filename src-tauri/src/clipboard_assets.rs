@@ -36,20 +36,36 @@ pub fn corpus_image_data_url(
     validate_rel(&rel)?;
     let mime = mime_of(&rel).ok_or_else(|| format!("not an image: {rel}"))?;
     let abs = state.route(&root_id, |s| s.guard_rel(&rel))?;
-    if !abs.is_file() {
-        return Err(format!("not a file: {}", abs.display()));
-    }
-    let len = std::fs::metadata(&abs).map_err(|e| e.to_string())?.len() as usize;
+    data_url_of(&abs, mime)
+}
+
+/// A vault image as a data URL, read through the checked open: never a hard
+/// link to a file elsewhere (second review of PR #267).
+fn data_url_of(abs: &std::path::Path, mime: &str) -> Result<String, String> {
+    let mut file = crate::fsutil::open_own_file(abs).map_err(|e| format!("not a file of its own: {e}"))?;
+    let len = file.metadata().map_err(|e| e.to_string())?.len() as usize;
     if len > MAX_DATA_URL_BYTES {
         return Err(format!("image too large to inline ({len} bytes)"));
     }
-    let bytes = std::fs::read(&abs).map_err(|e| e.to_string())?;
+    let mut bytes = Vec::with_capacity(len);
+    std::io::Read::read_to_end(&mut file, &mut bytes).map_err(|e| e.to_string())?;
     Ok(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::mime_of;
+    use super::{data_url_of, mime_of};
+
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_linked_image_is_never_inlined() {
+        let vault = tempfile::TempDir::new().unwrap();
+        let abs = vault.path().join("storage/linked.png");
+        let _outside = crate::fsutil::hard_link_outside(&abs, b"\x89PNG outside the vault");
+        assert!(data_url_of(&abs, "image/png").is_err());
+        std::fs::write(vault.path().join("storage/own.png"), b"\x89PNG").unwrap();
+        assert!(data_url_of(&vault.path().join("storage/own.png"), "image/png").unwrap().starts_with("data:image/png"));
+    }
 
     #[test]
     fn only_image_extensions_get_a_mime() {

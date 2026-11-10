@@ -3452,7 +3452,7 @@ dependencies = [
 
 [[package]]
 name = "rotli"
-version = "1.9.1"
+version = "1.10.0"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -3467,6 +3467,7 @@ dependencies = [
  "percent-encoding",
  "quick-xml",
  "regex",
+ "rustix",
  "security-framework",
  "serde",
  "serde_json",
@@ -3483,6 +3484,7 @@ dependencies = [
  "time",
  "trash",
  "ulid",
+ "unicode-normalization",
  "ureq",
  "uuid",
 ]

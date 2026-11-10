@@ -15,7 +15,7 @@ test("a new vault's Tasks page and This week card count the Welcome lessons with
   const week = page.getByRole("button", { name: "Open Rotli activity dashboard" });
   await expect(week).toContainText(/4 new/);
 
-  await page.locator("[role=option]", { hasText: "Tasks" }).first().click();
+  await page.locator(".sb-notes-tree button, .sb-system button", { hasText: "Tasks" }).first().click();
   const tasks = page.locator(".tasks-surface, [class*=tasks]").first();
   await expect(tasks).not.toContainText("Nothing open");
   await expect(tasks).toContainText("Try a lesson");

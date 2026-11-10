@@ -6,6 +6,7 @@
 // the public web. It is host-agnostic: the ONLY rotli/Tauri coupling is the `Host`,
 // so the whole module lifts into the shared ~/.memex/ai client layer later.
 
+import type { ApprovedText, ExternalText, ModelText, PersonText, PromptText } from "../lib/promptText";
 import type { ChatArtifactKind } from "./artifacts";
 import type { ModelMeta } from "./budget";
 import type { WebSearchProvider } from "./searchProvider";
@@ -32,17 +33,17 @@ export type ToolName =
 
 /** A note the model can read, surfaced by search_notes / the index. */
 export interface NoteHit {
-  id: string;
-  title: string;
-  snippet: string;
-  folder: string;
+  id: ApprovedText;
+  title: ApprovedText;
+  snippet: ApprovedText;
+  folder: ApprovedText;
 }
 
 export interface MemoryHit {
   /** Note id, or a `chat:<slug>` reference. */
-  id: string;
-  title: string;
-  snippet: string;
+  id: ApprovedText | PromptText;
+  title: ApprovedText;
+  snippet: ApprovedText;
   source: "note" | "chat";
   /** "area-index" — the Filer's generated `_index` note for an area, whose body
    * is the one complete roster of what's filed there. Nothing else in a hit
@@ -53,24 +54,25 @@ export interface MemoryHit {
 /** A web result surfaced by web_search. */
 export interface WebHit {
   provider: WebSearchProvider;
-  title: string;
-  url: string;
-  snippet: string;
+  title: ExternalText;
+  url: ExternalText;
+  snippet: ExternalText;
 }
 
 export interface WebEvidenceSource {
-  sourceId: string;
+  sourceId: PromptText;
   provider: WebSearchProvider;
-  title: string;
-  url: string;
-  searchExcerpt: string;
-  evidence: string;
+  title: ExternalText;
+  url: ExternalText;
+  searchExcerpt: ExternalText;
+  evidence: ExternalText;
 }
 
 /** A prior conversation turn (the user-visible thread, not the scratchpad). */
 export interface ChatTurn {
   role: "user" | "assistant";
-  text: string;
+  /** The person's words, a model's, or a fixed marker Rotli adds. */
+  text: PersonText | ModelText | PromptText;
 }
 
 /** A bounded choice the model cannot safely infer. The application renders
@@ -81,7 +83,9 @@ export interface AgentQuestion {
 }
 
 export interface CompleteReq {
-  messages: { role: "system" | "user" | "assistant"; content: string; images?: string[] }[];
+  /** Only `PromptText` (lib/promptText.ts): note-derived text gets in only as
+   * ApprovedText from the gated read for this model. */
+  messages: { role: "system" | "user" | "assistant"; content: PromptText; images?: string[] }[];
   /** Ask the model server to coerce a single JSON object (MLX generate shape). */
   formatJson?: boolean;
 }
@@ -99,48 +103,48 @@ export interface Host {
   searchNotes(query: string, limit: number): Promise<NoteHit[]>;
   /** Read one note by id. Secure notes require explicit local-AI permission;
    * remote models can never read them. */
-  readNote(id: string): Promise<string>;
+  readNote(id: string): Promise<ApprovedText | PromptText>;
   /** CREATE a note — the same intake lane as the workspace CLI (staging/Inbox;
    * the organizer files it later). Returns the observation the model reports. */
-  createNote(title: string, body: string): Promise<string>;
+  createNote(title: string, body: string): Promise<PromptText>;
   /** Create a conventional editable Word document through the desktop's
    * managed-document workflow. Optional so browser/headless hosts do not
    * pretend to provide native file creation. */
-  createDocument?(title: string, body: string): Promise<string>;
+  createDocument?(title: string, body: string): Promise<PromptText>;
   /** Edit a Word document Rotli's AI created, by the block numbers read_file
    * gave (src/documents/aiEdit.ts); Rust refuses one a person made. */
-  editDocument?(file: string, actions: unknown[]): Promise<string>;
+  editDocument?(file: string, actions: unknown[]): Promise<PromptText>;
   /** REWRITE an existing note's editor body (frontmatter preserved). Gated
    * like a read — the model may only edit what it could read — and a
    * secure-context chat may only edit notes that are themselves secure.
    * Optional so headless/portable hosts can stay read-only. */
-  updateNote?(id: string, body: string): Promise<string>;
+  updateNote?(id: string, body: string): Promise<PromptText>;
   /** Open a note on screen (a tab in the app). Optional — headless hosts skip it. */
-  openNote?(id: string): Promise<string>;
+  openNote?(id: string): Promise<PromptText>;
   /** Master retrieval across organized notes and prior chats. Optional so a
    * portable host can degrade to note search without implementing chat IO. */
   searchMemory?(query: string, limit: number): Promise<MemoryHit[]>;
-  readMemory?(id: string): Promise<string>;
+  readMemory?(id: string): Promise<ApprovedText | PromptText>;
   /** Read a surfaced FILE by name (text, or a spreadsheet as CSV) so the model can
    * answer questions about it. Returns a not-found message if no file matches. */
-  readFile(query: string): Promise<string>;
+  readFile(query: string): Promise<ApprovedText | PromptText>;
   webSearch(query: string, limit: number): Promise<WebHit[]>;
-  webFetch(url: string, maxChars: number): Promise<string>;
+  webFetch(url: string, maxChars: number): Promise<ExternalText>;
   /** Generate an image into this chat's assets via a connected engine. Returns
    * the saved corpus-relative path (the observation the model reports). */
-  generateImage(prompt: string): Promise<string>;
+  generateImage(prompt: string): Promise<PromptText>;
   /** Create a conventional editable work product through Rotli's existing
    * document/sheet/PDF-source workflows. */
-  createArtifact?(kind: ChatArtifactKind, title: string, content: string): Promise<string>;
+  createArtifact?(kind: ChatArtifactKind, title: string, content: string): Promise<PromptText>;
   /** Turn Mermaid flowchart source into an editable Excalidraw board in the
    * user's boards and show it (generative UI, 2026-08-03). Mermaid is the wire
    * format on purpose: every model — especially local ones — writes it far
    * more reliably than raw Excalidraw JSON; the conversion is local. Optional
    * — headless/portable hosts skip it. */
-  drawBoard?(title: string, mermaid: string): Promise<string>;
+  drawBoard?(title: string, mermaid: string): Promise<PromptText>;
   /** A compact index of the knowledge base so the model sees what exists up front.
    * Bounded by `maxChars`: a full per-note index if it fits, else an areas map. */
-  knowledgeMap(maxChars: number): Promise<string>;
+  knowledgeMap(maxChars: number): Promise<PromptText>;
 }
 
 /** The classified result of a model step. */
@@ -154,11 +158,11 @@ export type Parsed =
 /** One entry in the agent's working memory (its tool calls + their observations). */
 export interface ScratchStep {
   /** A stable signature of the action (drives the duplicate guard) or the raw reply. */
-  action: string;
+  action: ModelText | PromptText;
   /** Bounded, model-authored reasoning checkpoint. It is private working
    * memory: defused before re-entry and never emitted as an AgentEvent. */
-  thought?: string;
-  result: string;
+  thought?: ModelText;
+  result: PromptText;
   /** Snapshot written when the step completes; never recomputed later. */
   remainingSteps?: number;
 }
@@ -177,7 +181,8 @@ export interface RunInput {
   /** Prior user-visible turns. */
   history: ChatTurn[];
   /** The new user message. */
-  userText: string;
+  /** What the person typed, or a hybrid organizer's rewrite of it. */
+  userText: PersonText | ModelText;
   /** Per-chat web toggle (the composer globe). */
   web: boolean;
   /** The picked model — drives the context budget (index size, caps, steps). */
@@ -199,7 +204,7 @@ export interface RunInput {
   /** Offer conventional document, sheet, and PDF-copy creation. */
   artifactTool?: boolean;
   /** The user's name for prompt personalization — omit when unset. */
-  userName?: string;
+  userName?: PersonText;
   /** Stream the final answer token-by-token when the host supports it (default
    * true). The hybrid layer sets this false — its legs run to completion and
    * only the outer final is surfaced, so an inner leg mustn't stream deltas. */

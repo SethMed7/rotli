@@ -27,15 +27,14 @@ export function OverviewCard({
     <button
       type="button"
       className={`sb-home-dashboard${variant ? ` ${variant}` : ""}${current ? " sel" : ""}`}
-      aria-label={label}
       aria-current={current ? "page" : undefined}
       onClick={onOpen}
     >
+      <span className="sr-only">{label} </span>
       <div className="sb-home-dashboard-head">
-        <span>{head[0]}</span>
-        <span>{head[1]}&nbsp; ↗</span>
-      </div>
-      <div className="sb-home-dashboard-row">{rows[0]}</div>
+        <span>{head[0]}</span> <span>{head[1]}&nbsp; ↗</span>
+      </div>{" "}
+      <div className="sb-home-dashboard-row">{rows[0]}</div>{" "}
       {rows[1] !== undefined && <div className="sb-home-dashboard-row chat">{rows[1]}</div>}
     </button>
   );

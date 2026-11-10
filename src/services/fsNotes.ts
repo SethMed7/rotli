@@ -18,7 +18,7 @@ import {
   isTauri,
 } from "../lib/tauri";
 import type { NoteCreationPolicy } from "../security/secureNotes";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { snippetOf, titleOf } from "./derive";
 import {
   DEST,
@@ -125,6 +125,11 @@ export class FsNotesService implements NotesService {
     return [...notes]; // the payload may be shared with other callers
   }
 
+  /** What the same walk left out (a hard-linked file), from the same listing. */
+  async listSkipped(): Promise<SkippedFile[]> {
+    return [...((await corpusList()).skipped ?? [])];
+  }
+
   /** FULL-TEXT search — Rust walks + reads + matches (corpus_search), same
    * cost class as one corpus_list. Scope/ranking live on the Rust side. */
   async searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
@@ -148,6 +153,10 @@ export class FsNotesService implements NotesService {
         pinned: doc.pinned,
         body: doc.body,
         revision: doc.revision,
+        // content, revision and protection from one read; a shape without
+        // them counts as protected (sixth review of pull request 267)
+        secure: doc.secure !== false,
+        locked: doc.locked !== false,
       };
     } catch (err) {
       if (isNotFound(err)) return null;
@@ -156,9 +165,9 @@ export class FsNotesService implements NotesService {
   }
 
   async createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note> {
-    const meta = await corpusCreate(folderId, body, policy);
-    const doc = await corpusRead(meta.id);
-    return { ...meta, body, revision: doc.revision };
+    // the words and revision of what was written, from the create itself: a
+    // second read could see another writer's change and certify the wrong body
+    return corpusCreate(folderId, body, policy);
   }
 
   async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {

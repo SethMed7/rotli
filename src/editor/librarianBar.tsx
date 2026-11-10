@@ -14,7 +14,6 @@ import { useEffect, useRef, useState } from "react";
 import { ModelPicker } from "../components/chat/chatModelPicker";
 import { parseAnchors, resolveAnchor } from "../lib/librarianActions";
 import { corpusFrontmatter, isTauri } from "../lib/tauri";
-import { useFolders } from "../services/hooks";
 import { librarianRefusal } from "../services/librarianBar";
 import {
   closeLibrarianBar,
@@ -30,22 +29,18 @@ import {
   useEscapeCloses,
   clip,
   librarianContext,
-  libraryAreas,
   noteTitle,
   onEscapeHere,
-  sendToLibrarian,
+  sendTyped,
   useLibrarianModels,
   usePassage,
-  usePeopleNotes,
 } from "./librarianSession";
 
 type Phase = { kind: "checking" } | { kind: "refused"; message: string } | { kind: "ready" };
 
 export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: string }) {
   const librarianOn = useUiStore((s) => s.brainEnabled);
-  const folders = useFolders();
   const { groups, models, preferred } = useLibrarianModels();
-  const known = usePeopleNotes();
   const [picked, setPicked] = useState<string | null>(null);
   const model = models.find((m) => m.id === (picked ?? preferred)) ?? models[0] ?? null;
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
@@ -96,8 +91,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
 
   // the first ask pops the conversation out; asking again here continues it
   const ask = () => {
-    const text = request.trim();
-    if (!text || !model || phase.kind !== "ready") return;
+    if (!request.trim() || !model || phase.kind !== "ready") return;
     const existing = useLibrarianBar.getState().chat;
     const chatId =
       existing?.noteId === noteId && existing.paneId === paneId ? existing.id : crypto.randomUUID();
@@ -116,12 +110,12 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
         minimized: false,
       });
     }
-    const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
-    void sendToLibrarian(
+    void sendTyped(
       chatId,
-      { text, highlight: passage.anchor() },
+      request,
+      passage.anchor(),
       model,
-      () => librarianContext(noteId, paneId, areas, known),
+      (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
     );
   };

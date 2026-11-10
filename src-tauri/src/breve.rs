@@ -282,6 +282,7 @@ pub struct BreveDeliverySettings {
 fn production_roots_for_dev(app: &tauri::AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(config_dir) = app.path().app_config_dir() {
+        // raw read (outside-vault): app config outside any vault
         if let Some(config) = fs::read_to_string(config_dir.join("corpus.json"))
             .ok()
             .and_then(|body| serde_json::from_str::<crate::corpus::CorpusConfig>(&body).ok())
@@ -1535,12 +1536,12 @@ fn brief_skill_at(root: &Path, dev_custom: Option<String>) -> BreveBriefSkill {
     // the source fallback still carries the {{BREVE_HOME}} placeholder —
     // substitute it like sync_runtime would, or a save of the displayed text
     // would hand the wrappers literal template paths (review, 2026-07-31)
-    let default_text = fs::read_to_string(&materialized)
+    let default_text = crate::fsutil::read_own_text(&materialized)
         .unwrap_or_else(|_| materialize_skill_text(SKILL_SOURCE, root, &home));
     let custom = if cfg!(debug_assertions) {
         dev_custom
     } else {
-        fs::read_to_string(root.join(SKILL_CUSTOM_REL)).ok()
+        crate::fsutil::read_own_text(&root.join(SKILL_CUSTOM_REL)).ok()
     };
     BreveBriefSkill {
         is_custom: custom.is_some(),
@@ -1673,20 +1674,13 @@ fn write_watchlist_at(root: &Path, markdown: &str) -> Result<BreveSnapshot, Stri
 }
 
 fn append_scheduler_event(root: &Path, routine: &str, message: &str) -> Result<(), String> {
-    let path = root
-        .join(routines::MANAGED_DIR)
-        .join("logs/rotli-scheduler.log");
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("create {}: {error}", parent.display()))?;
-    }
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    // the log lives in the vault (.rotli/breve): the checked sidecar opener,
+    // so a hard link there is refused rather than appended to
+    let relative = Path::new(routines::MANAGED_DIR).join("logs/rotli-scheduler.log");
+    let mut file = crate::containment::open_sidecar(root, &relative, crate::containment::Sidecar::Append)?
+        .ok_or("open the scheduler log")?;
     writeln!(file, "{} [{}] {}", now_stamp(), routine, message)
-        .map_err(|error| format!("write {}: {error}", path.display()))
+        .map_err(|error| format!("write the scheduler log: {error}"))
 }
 
 /// Explicit watchlist refresh. This is intentionally not coupled to Save:

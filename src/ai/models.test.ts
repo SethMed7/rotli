@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { DiscoveredModel } from "../lib/cliModelTypes";
+import { person, promptOf } from "../lib/promptText.fixtures";
 import type { ChatModelInfo } from "../lib/tauri";
 import type { DiscoveryLanes } from "../state/connectedModels";
 import { parseHybridPresets } from "../state/persist";
@@ -404,9 +405,9 @@ describe("the frontier/local split (budget + adapter)", () => {
     const prompt = frontierAdapter.renderPrompt({
       offeredTools: new Set(["search_memory", "read_memory", "search_notes", "read_note", "read_file"]),
       web: false,
-      knowledge: "AREAS: projects",
+      knowledge: promptOf("AREAS: projects"),
       history: [],
-      userText: "what's in my notes?",
+      userText: person("what's in my notes?"),
       scratch: [],
       maxSteps: 8,
     });

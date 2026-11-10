@@ -29,8 +29,19 @@ export type AskState =
   | { kind: "applying" }
   | { kind: "answered"; yes: boolean; message: string };
 
+/** A turn's protection, captured once when the turn was sent and read
+ * (sixth review of pull request 267): the one value every write of that turn
+ * goes by. No writer asks the conversation again, so closing or replacing it
+ * never unmarks a turn. */
+export interface TurnProtection {
+  /** The turn read something only an on-device model may read. */
+  readonly onDeviceOnly: boolean;
+}
+
 export type ChatTurn = LibrarianTurn & {
   id: string;
+  /** On a reply: its turn's protection. A reply without one writes nothing. */
+  protection?: TurnProtection;
   proposal?: ProposalState;
   /** What the reply's vault additions came to (rules, groups, new people). */
   kept?: { kind: "keeping" } | { kind: "kept"; lines: KeptLine[] };
@@ -50,6 +61,15 @@ export interface LibrarianChat {
   status: "idle" | "thinking";
   error: string | null;
   minimized: boolean;
+  /** A turn was built from text the gate let only an on-device model read
+   * (a secure note, a secure person's name): from then on this conversation
+   * is never sent to a remote model (fourth review of pull request 267). */
+  onDeviceOnly?: boolean;
+  /** The remote model a send was refused for: the panel offers to start a
+   * new conversation with it. */
+  restartWith?: string | null;
+  /** Text to put back in the composer of a conversation just started. */
+  draft?: string;
 }
 
 export const useLibrarianBar = create<{ paneId: string | null; chat: LibrarianChat | null }>(() => ({

@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { CompleteReq } from "../ai/types";
-import { currentWebFileStore, registerWebFileStore } from "../lib/webAiSeam";
+import { ensureDocument, evictDocument } from "../editor/model";
+import { currentWebFileStore, registerWebAiCorpus, registerWebFileStore } from "../lib/webAiSeam";
 import { useLibrarianRules } from "../state/librarianRules";
 import { DEST } from "./destinations";
 import {
@@ -14,6 +15,12 @@ import {
   secureByNameOrUnknown,
 } from "./handToAi";
 import { notesService } from "./notes";
+import { createWebAiCorpus } from "./webAiCorpus";
+
+// Hand to AI reads the note through the AI read gate; in Rotli Web (these
+// tests) that gate is the web AI corpus over the notes service. Registered
+// before each test: other test files share the process-wide seam.
+beforeEach(() => registerWebAiCorpus(createWebAiCorpus(() => notesService)));
 
 /** A synthetic vault on disk: `storage/shot.png` exists, nothing else does. */
 const locate: LocateAttachment = (_rootId, rel) =>
@@ -264,7 +271,7 @@ describe("Hand to AI, Refined — what reaches the model", () => {
     if (result.kind !== "fallback") return;
     expect(result.reason).toBe("The model's answer dropped a file path.");
     const basic = await handToAiFor(note.id, locate);
-    expect(basic.kind === "ready" && basic.prompt).toBe(result.prompt);
+    expect<string | false>(basic.kind === "ready" && basic.prompt).toBe(result.prompt);
     expect(result.prompt).toContain("## Attachments");
   });
 
@@ -314,11 +321,112 @@ describe("Hand to AI — which notes may leave Rotli", () => {
   test("a note whose text looks like a secret is refused", async () => {
     // a test card number (Luhn-valid, never a real account)
     const note = await notesService.createNote(DEST.inbox, "# Checkout\n\ncard 4242 4242 4242 4242");
-    expect((await handToAiFor(note.id)).kind).toBe("secret");
+    // with the web AI corpus registered, its frontmatter already calls such a
+    // note secure (a refusal either way); without it, the text check itself
+    // refuses it, before any gated read
+    expect((await handToAiFor(note.id)).kind).toBe("secure");
+    registerWebAiCorpus(null);
+    try {
+      expect((await handToAiFor(note.id)).kind).toBe("secret");
+    } finally {
+      registerWebAiCorpus(createWebAiCorpus(() => notesService));
+    }
   });
 
   test("an empty note has nothing to hand off", async () => {
     const note = await notesService.createNote(DEST.inbox, "   ");
     expect((await handToAiFor(note.id)).kind).toBe("empty");
+  });
+});
+
+// Second review of pull request 267 (#4): Hand to AI took the note's words
+// from one read and decided "secure" from others. A first read holding a
+// secure version's words with no secure flag (as a native summary has none)
+// went out while a later read looked public. The words that leave now come
+// from the gated AI read itself.
+describe("the words a handoff carries", () => {
+  test("come from the read the gate judged, not an earlier unflagged read", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const canary = "PRIVATE-CANARY-7Q4";
+    const real = notesService.getNote.bind(notesService);
+    let first = true;
+    notesService.getNote = async (id: string) => {
+      const current = await real(id);
+      if (!current || id !== note.id || !first) return current;
+      first = false;
+      const { secure: _flag, ...unflagged } = current;
+      return { ...unflagged, body: `# Harbor plan\n\n${canary} opens at nine` };
+    };
+    try {
+      const result = await handToAiFor(note.id, locate);
+      expect(result.kind).toBe("ready");
+      expect(JSON.stringify(result)).not.toContain(canary);
+    } finally {
+      notesService.getNote = real;
+    }
+  });
+});
+
+// Third review of pull request 267 (#1): the words came from the gated read,
+// but the TITLE still came from the first, ungated one, and the Basic prompt
+// heads with it, so a secure version's title reached Refined's request.
+describe("the title a handoff carries", () => {
+  test("comes from the same approved read: a poisoned title never reaches the Refined request", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const canary = "PRIVATE-CANARY-7Q4";
+    const real = notesService.getNote.bind(notesService);
+    let reads = 0;
+    // alternating reads: every other one holds a secure version's title with no
+    // secure flag (as a native summary has none), the rest the public note
+    notesService.getNote = async (id: string) => {
+      const current = await real(id);
+      if (!current || id !== note.id) return current;
+      reads += 1;
+      if (reads % 2 === 0) return current;
+      const { secure: _flag, ...unflagged } = current;
+      return { ...unflagged, title: `Harbor ${canary} plan` };
+    };
+    try {
+      const model = stubModel(faithful);
+      const result = await refineHandToAiFor(note.id, model.host, locate);
+      expect(model.sent).toHaveLength(1);
+      const request = JSON.stringify(model.sent[0]);
+      expect(request).toContain("Harbor plan");
+      expect(request).not.toContain(canary);
+      expect(JSON.stringify(result)).not.toContain(canary);
+    } finally {
+      notesService.getNote = real;
+    }
+  });
+});
+
+// Fourth review of pull request 267: nothing crosses from an on-device read
+// to Refined's model, and nothing leaves unless it is the version the editor
+// just saved.
+describe("what Hand to AI hands over", () => {
+  test("a read the gate marked on-device only is refused, and Refined's model is never asked", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const base = createWebAiCorpus(() => notesService);
+    registerWebAiCorpus({
+      ...base,
+      read: async (id: string) => ({ ...(await base.read(id)), onDeviceOnly: true }),
+    });
+    const model = stubModel(faithful);
+    expect((await refineHandToAiFor(note.id, model.host, locate)).kind).toBe("secure");
+    expect(model.sent).toHaveLength(0);
+  });
+
+  test("a note whose editor holds another version sends nothing: still saving", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    ensureDocument(note.id, "# Harbor plan\n\nharbor opens at ten", "r-editor");
+    const model = stubModel(faithful);
+    try {
+      await expect(refineHandToAiFor(note.id, model.host, locate)).rejects.toThrow(
+        "Still saving. Try again in a moment.",
+      );
+      expect(model.sent).toHaveLength(0);
+    } finally {
+      evictDocument(note.id);
+    }
   });
 });

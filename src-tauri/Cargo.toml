@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "1.9.1"
+version = "1.10.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
@@ -38,6 +38,7 @@ ureq = { version = "2", features = ["json"] }                   # Chat front: PO
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"                                                     # secret-pattern detection (the `secure` flag)
+unicode-normalization = "0.1"                                   # NFKC before secure-keyword matching (already transitive via idna)
 base64 = "0.22"                                                 # surfaced binary files → base64 for the in-app viewer (xlsx, …)
 pdf-extract = "0.12"                                            # offline embedded-text extraction for PDF → editable DOCX copies
 flate2 = "1"                                                     # read word/document.xml for the AI write secret check (already built for pdf-extract)
@@ -63,6 +64,10 @@ tauri-plugin-clipboard-manager = "2"
 # transitively — this only names the edge.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+# Opening a sidecar one directory at a time (openat + O_NOFOLLOW), so a
+# folder swapped for a link after a path check is refused. Already in the tree
+# through tempfile with the same features — this only names the edge.
+rustix = { version = "1", default-features = false, features = ["fs", "std"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Keychain-backed user secrets — never argv/ps/config. keychain.rs carries the
