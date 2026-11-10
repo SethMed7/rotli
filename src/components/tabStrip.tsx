@@ -165,6 +165,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   );
 
   const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
+  // A focused tab that closes is removed without a blur, so its id can
+  // outlive it; the active tab then keeps the strip's one Tab stop.
+  const rovingTabId =
+    focusedTabId && pane.tabs.some((tab) => tab.id === focusedTabId) ? focusedTabId : pane.activeTabId;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
   const browserActive = activeTabOf(pane)?.surfaceKind === "browser";
@@ -351,7 +355,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     id={`tab-${encodeURIComponent(pane.id)}-${encodeURIComponent(tab.id)}`}
                     role={renaming ? undefined : "tab"}
                     aria-selected={renaming ? undefined : tab.id === pane.activeTabId}
-                    tabIndex={tab.id === (focusedTabId ?? pane.activeTabId) ? 0 : -1}
+                    tabIndex={tab.id === rovingTabId ? 0 : -1}
                     onFocus={(event) => {
                       if (event.target === event.currentTarget) setFocusedTabId(tab.id);
                     }}

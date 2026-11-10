@@ -33,7 +33,7 @@ export function AppIconSettings({ platform = PLATFORM }: { platform?: Platform }
           <p className="lead">
             Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
           </p>
-          <div className="appicon-row" role="radiogroup" aria-label="App icon">
+          <div className="appicon-row" role="group" aria-label="App icon">
             {APP_ICONS.map(({ id, label, src }) => (
               <button
                 type="button"

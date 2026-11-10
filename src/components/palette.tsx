@@ -25,8 +25,7 @@ import { ChatGlyph, FocusGlyph, KeyboardGlyph, PlusGlyph, SplitGlyph, SunGlyph }
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
 import { glyphForNote } from "./noteGlyph";
-import { searchActionLabel } from "./paletteModel";
-import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
+import { paletteMatchScore, rankSearchGroups, searchActionLabel } from "./paletteModel";
 
 function actionIcon(id: string): ReactNode {
   if (id === "notes.new" || id === "tabs.new") return <PlusGlyph size={15} />;

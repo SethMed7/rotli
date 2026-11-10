@@ -18,8 +18,8 @@ const backToNotes = (page: Page) => page.getByRole("button", { name: "Back to no
 test("the desktop icon picker keeps every released choice and updates its selection", async ({ page }) => {
   await gotoApp(page);
   await appearance(page);
-  const icons = page.getByRole("radiogroup", { name: "App icon", exact: true });
-  for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black"]) {
+  const icons = page.getByRole("group", { name: "App icon", exact: true });
+  for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black", "Tesven"]) {
     const button = icons.getByRole("button", { name, exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");

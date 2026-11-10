@@ -21,9 +21,11 @@ test("web explains availability without mounting Dock choices or images", () => 
 test("desktop keeps all released icon choices and the saved selection", () => {
   useUiStore.setState({ appIcon: "black" });
   const html = renderToStaticMarkup(<AppIconSettings platform="desktop" />);
-  expect(html).toContain('role="radiogroup" aria-label="App icon"');
+  // toggle buttons (aria-pressed) belong in a group; a radiogroup needs radios
+  expect(html).toContain('role="group" aria-label="App icon"');
+  expect(html).not.toContain("radiogroup");
   expect(html).toContain("Pick the Dock icon");
-  for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black"])
+  for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black", "Tesven"])
     expect(html).toContain(`<span class="appicon-label">${name}</span>`);
   expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
   expect(html).toContain('class="appicon sel" aria-pressed="true"><img class="appicon-tile" src=');

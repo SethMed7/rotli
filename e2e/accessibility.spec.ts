@@ -71,3 +71,16 @@ test("tab controls support arrows, Home and End without swallowing close actions
   await page.locator(".tab.active").getByRole("button", { name: "Close tab" }).click();
   await expect(tabs).toHaveCount(1);
 });
+
+test("closing the keyboard-focused tab leaves the strip reachable with Tab", async ({ page }) => {
+  await gotoApp(page);
+  const tabs = page.getByRole("tab");
+  await page.locator(".tabplus").click();
+  await expect(tabs).toHaveCount(2);
+  await tabs.last().focus();
+  await expect(tabs.last()).toBeFocused();
+  // middle-click closes the focused tab, and its element goes with it
+  await tabs.last().click({ button: "middle" });
+  await expect(tabs).toHaveCount(1);
+  await expect(tabs.first()).toHaveAttribute("tabindex", "0");
+});
