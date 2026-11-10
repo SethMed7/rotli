@@ -53,7 +53,6 @@ import {
   tauriHostFor,
   useLibrarianModels,
   usePassage,
-  usePeopleNotes,
 } from "./librarianSession";
 
 /** Quick asks that keep the Librarian to its job. */
@@ -140,7 +139,6 @@ export function ChatPanel({
   const blocked = refusal !== null;
   const folders = useFolders();
   const { groups, models } = useLibrarianModels();
-  const known = usePeopleNotes();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
   const [draft, setDraft] = useState("");
@@ -168,7 +166,7 @@ export function ChatPanel({
       chat.id,
       { text, highlight: passage.anchor() },
       model,
-      () => librarianContext(noteId, paneId, areas, known),
+      (model) => librarianContext(noteId, paneId, areas, model),
       () => refusalNow(noteId, paneId),
       hostFor,
     );

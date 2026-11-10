@@ -9,7 +9,14 @@ import { useChatDrafts } from "../state/chatDrafts";
 import { closeLibrarianChat, startLibrarianChat, useLibrarianBar } from "../state/librarianBar";
 import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
-import { applyProposal, chatDraft, libraryAreas, sendToLibrarian, takeToChat } from "./librarianSession";
+import {
+  applyProposal,
+  chatDraft,
+  librarianContext,
+  libraryAreas,
+  sendToLibrarian,
+  takeToChat,
+} from "./librarianSession";
 
 const MODEL: ChatModelInfo = {
   id: "claude-opus",
@@ -64,6 +71,60 @@ const chat = () => useLibrarianBar.getState().chat!;
 const allow = async () => null;
 
 beforeEach(() => closeLibrarianChat());
+
+// Second review of pull request 267 (#4): the People context came from the
+// UI's note index, which carries no secure flag in the Mac app and can be
+// stale, so a secure People note's title reached the prompt. It now comes
+// from the gated AI listing for the model in use, asked on every send.
+describe("the People the Librarian is told about", () => {
+  // what the read gate answers for this model: Wilhelmina's People note is
+  // secure, so the gated listing leaves her out, whatever any UI summary says
+  const gated = async () => [
+    {
+      id: "leo",
+      title: "Leo",
+      folderId: "wiki/People",
+      diskFolderId: "wiki/People",
+      updatedAt: 2,
+      kind: "note" as const,
+    },
+    {
+      id: "plan",
+      title: "Plan",
+      folderId: "wiki/Projects",
+      diskFolderId: "wiki/Projects",
+      updatedAt: 1,
+      kind: "note" as const,
+    },
+  ];
+
+  test("come from the gated listing for the model in use", async () => {
+    const asked: string[] = [];
+    const listing = async (model: { id: string }) => {
+      asked.push(model.id);
+      return gated();
+    };
+    const ctx = await librarianContext("n1", "p1", ["people"], MODEL, listing);
+    expect(ctx.known.map((person) => person.title)).toEqual(["Leo"]);
+    expect(asked).toEqual([MODEL.id]);
+  });
+
+  test("a secure People note's title never reaches the prompt", async () => {
+    start();
+    const model = fakeModel('{"actions":[]}');
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Who do I know?", highlight: null },
+      MODEL,
+      (sending) => librarianContext("n1", "p1", ["people"], sending, gated),
+      allow,
+      model.hostFor,
+    );
+    const prompt = JSON.stringify(model.sent);
+    expect(prompt).toContain("Leo (People)");
+    expect(prompt).not.toContain("Wilhelmina");
+  });
+});
 
 describe("a conversation with the Librarian", () => {
   test("a message joins the chat, and the reply comes back with its proposals ready to apply", async () => {

@@ -24,6 +24,7 @@ import {
   corpusFileStat,
   corpusFrontmatter,
   corpusNotePath,
+  corpusReadAiVersioned,
   isTauri,
   rootIdOf,
   splitRootId,
@@ -34,6 +35,7 @@ import { useLibrarianRules } from "../state/librarianRules";
 import type { Note } from "../types";
 import { imageSrcToRel } from "./imageRepair";
 import { notesService } from "./notes";
+import { createWebAiCorpus } from "./webAiCorpus";
 
 export type HandToAi =
   /** `paths`: every path the Attachments list names (found and missing); a
@@ -210,6 +212,19 @@ async function placesOf(
   return new Map(places);
 }
 
+/** A handoff is read as a remote model would read it: anything not on this
+ * Mac's local-model registry gets the remote rules. */
+const HANDOFF_READER = { id: "hand-to-ai", endpoint: "" };
+
+/** The note's words through the AI read gate, judged and returned in one
+ * read: Rust's corpus_read_ai in the Mac app (its editor copy, without
+ * frontmatter), the web AI corpus over the same notes on Rotli Web. */
+async function gatedBody(noteId: string): Promise<string> {
+  if (!isTauri()) return (await createWebAiCorpus(() => notesService).read(noteId)).body;
+  const read = await corpusReadAiVersioned(noteId, HANDOFF_READER, { withEditor: true });
+  return read.editor ?? read.body;
+}
+
 export async function handToAiFor(
   noteId: string,
   locate: LocateAttachment = locateAttachment,
@@ -221,18 +236,24 @@ export async function handToAiFor(
   const title = note.title || "Untitled";
   if (await isSecure(note)) return { kind: "secure", title };
   if (looksSecret(note.body)) return { kind: "secret", title };
-  if (!note.body.trim()) return { kind: "empty", title };
-  const links = attachmentLinks(note.body);
+  // the words that leave are the words the read gate judged, in one read: an
+  // earlier read can hold an older, secure version with no secure flag (second
+  // review of pull request 267)
+  const body = await gatedBody(noteId).catch(() => null);
+  if (body === null) return { kind: "secure", title };
+  if (looksSecret(body)) return { kind: "secret", title };
+  if (!body.trim()) return { kind: "empty", title };
+  const links = attachmentLinks(body);
   const { secureKeywords } = useLibrarianRules.getState().rules;
   const folder = note.diskFolderId ?? note.folderId;
   // an Obsidian ![[file]] names a file the Refined model can open by that name:
   // resolve it as the editor does, and refuse when it is a secure file
-  for (const [, target = ""] of note.body.matchAll(/!\[\[([^\]|#\n]+)/g)) {
+  for (const [, target = ""] of body.matchAll(/!\[\[([^\]|#\n]+)/g)) {
     const id = await resolveWikiEmbed(target.trim(), rootIdOf(note.id), folder).catch(() => null);
     if (id && attachmentIsSecure(splitRootId(id).rel, secureKeywords))
       return { kind: "secureAttachment", title };
   }
-  const embedded = embeddedFileReferences(note.body);
+  const embedded = embeddedFileReferences(body);
   for (const { source, rootId } of embedded) {
     const rel = attachmentRel(source);
     if (!rel) continue;
@@ -254,7 +275,7 @@ export async function handToAiFor(
   return {
     kind: "ready",
     title,
-    prompt: buildHandToAiPrompt({ title, body: note.body, attachments }),
+    prompt: buildHandToAiPrompt({ title, body: body, attachments }),
     paths,
   };
 }

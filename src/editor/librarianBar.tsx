@@ -36,7 +36,6 @@ import {
   sendToLibrarian,
   useLibrarianModels,
   usePassage,
-  usePeopleNotes,
 } from "./librarianSession";
 
 type Phase = { kind: "checking" } | { kind: "refused"; message: string } | { kind: "ready" };
@@ -45,7 +44,6 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
   const librarianOn = useUiStore((s) => s.brainEnabled);
   const folders = useFolders();
   const { groups, models, preferred } = useLibrarianModels();
-  const known = usePeopleNotes();
   const [picked, setPicked] = useState<string | null>(null);
   const model = models.find((m) => m.id === (picked ?? preferred)) ?? models[0] ?? null;
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
@@ -121,7 +119,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
       chatId,
       { text, highlight: passage.anchor() },
       model,
-      () => librarianContext(noteId, paneId, areas, known),
+      (model) => librarianContext(noteId, paneId, areas, model),
       () => refusalNow(noteId, paneId),
     );
   };

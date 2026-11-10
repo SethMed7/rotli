@@ -189,6 +189,43 @@ for (const name of Object.keys(LIB_EFFECTFUL_FILE_OWNERS)) {
   }
 }
 
+// Prompt-building modules never read the UI's note state (second review of
+// pull request 267): in the Mac app a UI note summary carries no secure flag
+// and can be stale, so a secure People note's title reached the Librarian's
+// prompt. What a model is told about notes comes from the gated AI reads
+// (corpus_notes_ai, corpus_search_ai, corpus_read_ai). Invalidating caches
+// after a write is fine; reading hooks (`use…`) and the note index are not.
+const promptModules = [
+  ...readdirSync(join(root, "src", "ai"))
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .map((name) => `src/ai/${name}`),
+  "src/lib/librarianChat.ts",
+  "src/lib/librarianPeople.ts",
+  "src/editor/librarianSession.ts",
+  "src/services/handToAi.ts",
+  "src/services/inlineAi.ts",
+  "src/services/librarianBar.ts",
+  "src/services/chatAutoTitle.ts",
+];
+for (const file of promptModules) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const m of source.matchAll(
+    /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"(?:\.\.\/services\/|\.\/)hooks"/g,
+  )) {
+    for (const raw of m[1].split(",")) {
+      const name = raw
+        .trim()
+        .replace(/^type\s+/, "")
+        .split(/\s+as\s+/)[0];
+      if (/^use[A-Z]/.test(name) || /noteindex|searchablenotes/i.test(name)) {
+        violations.push(
+          `${file}: a prompt-building module reads UI note state (${name}); use the gated AI reads`,
+        );
+      }
+    }
+  }
+}
+
 for (const layer of protectedLayers) {
   for (const file of layer.files) {
     const source = readFileSync(file, "utf8");

@@ -43,9 +43,13 @@ export interface KeptLine {
 
 export const PERSON_LIMITS = { name: 80, about: 280, perReply: 20, listed: 200 } as const;
 
+/** What a People row needs: a gated AI listing row or a note summary. */
+export type PersonSource = Pick<NoteSummary, "id" | "title" | "folderId" | "updatedAt"> &
+  Partial<Pick<NoteSummary, "diskFolderId" | "secure" | "kind">>;
+
 /** The People notes in a note list: files under wiki/People (any case), not
  * secure, newest first, at most PERSON_LIMITS.listed of them. */
-export function peopleNotes(notes: Iterable<NoteSummary>): PersonNote[] {
+export function peopleNotes(notes: Iterable<PersonSource>): PersonNote[] {
   const found: (PersonNote & { at: number })[] = [];
   const seen = new Set<string>();
   for (const note of notes) {

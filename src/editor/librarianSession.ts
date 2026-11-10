@@ -5,7 +5,7 @@
 // state/librarianBar.ts, so it outlives the bar that started it.
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
@@ -13,13 +13,12 @@ import { mergedModels } from "../ai/models";
 import type { Host } from "../ai/types";
 import { type Anchor, anchorFromSelection, type LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianContext } from "../lib/librarianChat";
-import { type PersonNote, peopleNotes } from "../lib/librarianPeople";
+import { type PersonNote, type PersonSource, peopleNotes } from "../lib/librarianPeople";
 import { peopleAreas } from "../lib/librarianRules";
-import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
+import { type ChatModelInfo, chatModels, corpusNotesAi, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
 import { type FolderRoles, folderRoles } from "../services/destinations";
-import { useNoteIndex } from "../services/hooks";
 import {
   applyLibrarian,
   converseLibrarian,
@@ -112,10 +111,16 @@ export function useLibrarianModels() {
 }
 
 /** The people the vault already has notes for (what a statement is checked
- * against, so someone known is asked about rather than added twice). */
-export function usePeopleNotes(): PersonNote[] {
-  const index = useNoteIndex();
-  return useMemo(() => peopleNotes(index.values()), [index]);
+ * against, so someone known is asked about rather than added twice), from the
+ * gated AI listing for the model that will read them, on every send. Never the
+ * UI's note index: in the Mac app it carries no secure flag and can be stale,
+ * so a secure People note's title reached the prompt (second review of pull
+ * request 267). */
+export async function knownPeople(
+  model: ChatModelInfo,
+  listing: (model: ChatModelInfo) => Promise<readonly PersonSource[]> = corpusNotesAi,
+): Promise<PersonNote[]> {
+  return peopleNotes(await listing(model));
 }
 
 export interface Passage {
@@ -160,7 +165,8 @@ export async function librarianContext(
   noteId: string,
   paneId: string,
   areas: readonly string[],
-  known: readonly PersonNote[] = [],
+  model: ChatModelInfo,
+  listing?: (model: ChatModelInfo) => Promise<readonly PersonSource[]>,
 ): Promise<LibrarianContext> {
   const doc = editorFor(paneId)?.getSelection?.()?.doc ?? "";
   const { rules } = useLibrarianRules.getState();
@@ -172,7 +178,7 @@ export async function librarianContext(
     people: peopleAreas(rules),
     filing: rules.filing,
     rules,
-    known,
+    known: await knownPeople(model, listing),
   };
 }
 
@@ -202,7 +208,7 @@ export async function sendToLibrarian(
   chatId: string,
   message: { text: string; highlight: Anchor | null },
   model: ChatModelInfo,
-  context: () => Promise<LibrarianContext>,
+  context: (model: ChatModelInfo) => Promise<LibrarianContext>,
   refusal: () => Promise<string | null>,
   hostFor: HostFor = tauriHostFor,
 ): Promise<void> {
@@ -217,7 +223,7 @@ export async function sendToLibrarian(
       updateLibrarianChat(chatId, () => ({ status: "idle", error: refused }));
       return;
     }
-    const reply = await converseLibrarian(await context(), turns, hostFor(model));
+    const reply = await converseLibrarian(await context(model), turns, hostFor(model));
     if (reply.kind === "secret") {
       updateLibrarianChat(chatId, () => ({ status: "idle", error: LIBRARIAN_REFUSALS.secret }));
       return;

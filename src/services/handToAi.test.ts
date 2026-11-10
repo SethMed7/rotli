@@ -322,3 +322,31 @@ describe("Hand to AI — which notes may leave Rotli", () => {
     expect((await handToAiFor(note.id)).kind).toBe("empty");
   });
 });
+
+// Second review of pull request 267 (#4): Hand to AI took the note's words
+// from one read and decided "secure" from others. A first read holding a
+// secure version's words with no secure flag (as a native summary has none)
+// went out while a later read looked public. The words that leave now come
+// from the gated AI read itself.
+describe("the words a handoff carries", () => {
+  test("come from the read the gate judged, not an earlier unflagged read", async () => {
+    const note = await notesService.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const canary = "PRIVATE-CANARY-7Q4";
+    const real = notesService.getNote.bind(notesService);
+    let first = true;
+    notesService.getNote = async (id: string) => {
+      const current = await real(id);
+      if (!current || id !== note.id || !first) return current;
+      first = false;
+      const { secure: _flag, ...unflagged } = current;
+      return { ...unflagged, body: `# Harbor plan\n\n${canary} opens at nine` };
+    };
+    try {
+      const result = await handToAiFor(note.id, locate);
+      expect(result.kind).toBe("ready");
+      expect(JSON.stringify(result)).not.toContain(canary);
+    } finally {
+      notesService.getNote = real;
+    }
+  });
+});
