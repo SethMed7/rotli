@@ -27,7 +27,10 @@ export interface FakeLane {
   read(id: string): Note | null;
   /** The editor's save: Rust's rules, checked when the write lands. */
   write(id: string, body: string, expectedRevision: string, expectedBody?: string): Note;
-  create(folder: string, body: string, policy?: { secure?: boolean; locked?: boolean }): Note;
+  /** Rust's create: a secure note goes to the secure home (a legacy vault's
+   * "Secure notes"), and a recovery event makes it idempotent: the note made
+   * for that event before comes back, if its protection is the same. */
+  create(folder: string, body: string, policy?: { secure?: boolean; locked?: boolean; event?: string }): Note;
   /** Another app (or the CLI) writes the body without a revision. */
   external(id: string, body: string): void;
   /** Rotli's own metadata change: the revision moves, the body doesn't. */
@@ -76,12 +79,23 @@ export function fakeLane(prefix = "note"): FakeLane {
       return note(id);
     },
     create(folder, body, policy) {
+      const marker = policy?.event ? `recovery: ${policy.event}` : null;
+      const made = marker ? [...files.entries()].find(([, file]) => file.meta.includes(marker)) : undefined;
+      if (made) {
+        const same =
+          made[1].meta.includes("secure: true") === !!policy?.secure &&
+          made[1].meta.includes("locked: true") === !!policy?.locked;
+        if (!same) throw new Error("the recovery note made for this event doesn't carry the same protection");
+        return note(made[0]);
+      }
       next += 1;
       const id = `${prefix}-${next}`;
       const meta = [`id: ${id}`];
       if (policy?.secure) meta.push("secure: true");
       if (policy?.locked) meta.push("locked: true");
-      files.set(id, { folder, meta, body });
+      if (marker) meta.push(marker);
+      const home = policy?.secure && !folder.startsWith("Secure notes") ? "Secure notes" : folder;
+      files.set(id, { folder: home, meta, body });
       return note(id);
     },
     external(id, body) {

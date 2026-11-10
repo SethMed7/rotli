@@ -85,16 +85,24 @@ fn run_step(
     let at = format!("{scenario}: {step}");
     match step["op"].as_str().unwrap() {
         "create" => {
-            let meta = store
-                .create_protected(
-                    "Inbox",
-                    &text("body"),
-                    step["secure"].as_bool().unwrap_or(false),
-                    step["locked"].as_bool().unwrap_or(false),
-                    None,
-                )
-                .unwrap();
-            ids.insert(note, meta.id);
+            let made = store.create_with(
+                step["folder"].as_str().unwrap_or("Inbox"),
+                &text("body"),
+                step["secure"].as_bool().unwrap_or(false),
+                step["locked"].as_bool().unwrap_or(false),
+                None,
+                step["event"].as_str(),
+            );
+            let expected = step["expect"].as_str().unwrap_or("ok");
+            assert_eq!(if made.is_ok() { "ok" } else { "error" }, expected, "{at}: {made:?}");
+            let Ok(made) = made else { return };
+            if let Some(label) = step["as"].as_str() {
+                revs.insert(label.into(), made.revision.clone());
+            }
+            if let Some(other) = step["sameAs"].as_str() {
+                assert_eq!(made.meta.id, ids[other], "{at}");
+            }
+            ids.insert(note, made.meta.id);
         }
         "read" => {
             let read = store.read(&ids[&note]);
@@ -120,6 +128,9 @@ fn run_step(
             }
             if let Some(locked) = step["locked"].as_bool() {
                 assert_eq!(doc.locked, locked, "{at}");
+            }
+            if let Some(folder) = step["inFolder"].as_str() {
+                assert_eq!(doc.folder_id, folder, "{at}");
             }
             if let Some(label) = step["as"].as_str() {
                 revs.insert(label.into(), doc.revision);
@@ -237,13 +248,17 @@ fn harness_answer(store: &mut CorpusStore, cmd: &str, args: &Value) -> Result<Va
                 )?,
             ))
         }
-        "corpus_create" => to(serde_json::to_value(store.create_protected(
-            &arg("folderId"),
-            &arg("body"),
-            args["secure"].as_bool().unwrap_or(false),
-            args["locked"].as_bool().unwrap_or(false),
-            None,
-        )?)),
+        "corpus_create" => {
+            let event = args["recoveryEvent"].as_str().map(str::to_string);
+            to(serde_json::to_value(store.create_with(
+                &arg("folderId"),
+                &arg("body"),
+                args["secure"].as_bool().unwrap_or(false),
+                args["locked"].as_bool().unwrap_or(false),
+                None,
+                event.as_deref(),
+            )?))
+        }
         "corpus_list" => to(serde_json::to_value(store.list()?)),
         "corpus_move" => to(serde_json::to_value(
             store.move_note(&arg("id"), &arg("targetFolder"))?,

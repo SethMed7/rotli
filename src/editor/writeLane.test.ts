@@ -20,6 +20,9 @@ interface Step {
   locked?: boolean;
   missing?: boolean;
   folder?: string;
+  event?: string;
+  sameAs?: string;
+  inFolder?: string;
 }
 
 test.each(contract.scenarios.map((s) => [s.name, s.steps as Step[]] as const))("%s", (_name, steps) => {
@@ -29,12 +32,24 @@ test.each(contract.scenarios.map((s) => [s.name, s.steps as Step[]] as const))("
   const id = (step: Step) => ids.get(step.note)!;
   for (const step of steps) {
     switch (step.op) {
-      case "create":
-        ids.set(
-          step.note,
-          lane.create("Inbox", step.body!, { secure: step.secure === true, locked: step.locked === true }).id,
-        );
+      case "create": {
+        let made: { id: string; revision: string } | null = null;
+        try {
+          made = lane.create(step.folder ?? "Inbox", step.body!, {
+            secure: step.secure === true,
+            locked: step.locked === true,
+            ...(step.event ? { event: step.event } : {}),
+          });
+        } catch {
+          made = null;
+        }
+        expect(made ? "ok" : "error").toBe(step.expect ?? "ok");
+        if (!made) break;
+        ids.set(step.note, made.id);
+        if (step.as) revs.set(step.as, made.revision);
+        if (step.sameAs) expect(made.id).toBe(ids.get(step.sameAs)!);
         break;
+      }
       case "read": {
         const note = lane.read(id(step));
         if (step.missing) {
@@ -47,6 +62,7 @@ test.each(contract.scenarios.map((s) => [s.name, s.steps as Step[]] as const))("
         if (step.pinned !== undefined) expect(note!.pinned).toBe(step.pinned);
         if (step.secure !== undefined) expect(note!.secure).toBe(step.secure);
         if (step.locked !== undefined) expect(note!.locked).toBe(step.locked);
+        if (step.inFolder !== undefined) expect(note!.folderId).toBe(step.inFolder);
         if (step.as) revs.set(step.as, note!.revision);
         break;
       }

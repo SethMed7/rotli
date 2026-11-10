@@ -69,3 +69,29 @@ test("a native create sends protection and the AI lock in the one corpus_create"
     { secure: false, locked: true },
   ]);
 });
+
+test("a native create is one call that answers with the words and revision it wrote (no read-back)", async () => {
+  const calls: string[] = [];
+  host.__TAURI_INTERNALS__ = {
+    invoke: async (cmd: string, args: Record<string, unknown>) => {
+      calls.push(cmd);
+      if (cmd === "corpus_create")
+        return {
+          ...wire,
+          id: "n3",
+          body: args.body,
+          revision: "fnv1a64:00000000000000aa",
+          secure: false,
+          locked: false,
+        };
+      // what a read-back would see: another writer got in first
+      if (cmd === "corpus_read")
+        return { ...wire, id: "n3", body: "# Other writer", revision: "fnv1a64:00000000000000bb" };
+      throw new Error(`unexpected ${cmd}`);
+    },
+    transformCallback: () => 0,
+  };
+  const note = await new FsNotesService().createNote("Inbox", "# Mine\n\nfirst");
+  expect(calls).toEqual(["corpus_create"]);
+  expect(note).toMatchObject({ body: "# Mine\n\nfirst", revision: "fnv1a64:00000000000000aa" });
+});

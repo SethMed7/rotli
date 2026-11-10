@@ -287,6 +287,9 @@ export interface CorpusFolder {
   parentId: string | null;
 }
 
+/** `corpus_create`'s answer: the note, with the words and revision it wrote (or found). */
+export type CorpusCreated = CorpusNoteMeta & { body: string; revision: string };
+
 export interface CorpusNoteMeta {
   id: string;
   title: string;
@@ -409,11 +412,11 @@ export function corpusWrite(
 export function corpusCreate(
   folderId: string,
   body: string,
-  policy?: { secure?: boolean; locked?: boolean; createdBy?: NoteCreator },
-): Promise<CorpusNoteMeta> {
-  const { secure = false, locked = false, createdBy } = policy ?? {};
-  const by = createdBy ? { createdBy } : {};
-  return corpusInvoke("corpus_create", { folderId, body, secure, locked, ...by });
+  policy?: { secure?: boolean; locked?: boolean; createdBy?: NoteCreator; recoveryEvent?: string },
+): Promise<CorpusCreated> {
+  const { secure = false, locked = false, createdBy, recoveryEvent } = policy ?? {};
+  const extra = { ...(createdBy ? { createdBy } : {}), ...(recoveryEvent ? { recoveryEvent } : {}) };
+  return corpusInvoke("corpus_create", { folderId, body, secure, locked, ...extra });
 }
 
 export function corpusDelete(id: string): Promise<void> {

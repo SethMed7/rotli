@@ -4171,7 +4171,8 @@ impl CorpusStore {
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create_marked(folder_id, body, false, Some(creator), marker)
+        self.create_marked(folder_id, body, false, Some(creator), marker.as_slice())
+            .map(|(meta, _)| meta)
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -5972,31 +5973,21 @@ impl CorpusStore {
         secure: bool,
         creator: Option<crate::ai_edit_policy::Creator>,
     ) -> Result<NoteMeta, String> {
-        self.create_marked(folder_id, body, secure, creator, None)
+        self.create_marked(folder_id, body, secure, creator, &[])
+            .map(|(meta, _)| meta)
     }
 
-    /// `create_as`, with the AI lock written in the same create (a recovery
-    /// copy of a locked note is locked from its first byte; seventh review of
-    /// pull request 267: `corpus_create` dropped it).
-    pub(crate) fn create_protected(
-        &mut self,
-        folder_id: &str,
-        body: &str,
-        secure: bool,
-        locked: bool,
-        creator: Option<crate::ai_edit_policy::Creator>,
-    ) -> Result<NoteMeta, String> {
-        self.create_marked(folder_id, body, secure, creator, locked.then_some("locked: true"))
-    }
-
+    /// The create every other one goes through: the note's metadata, and the
+    /// revision of the very bytes it wrote. `markers` are extra frontmatter
+    /// lines (the AI lock, a recovery event, a remote agent's marker).
     fn create_marked(
         &mut self,
         folder_id: &str,
         body: &str,
         secure: bool,
         creator: Option<crate::ai_edit_policy::Creator>,
-        marker: Option<&str>,
-    ) -> Result<NoteMeta, String> {
+        markers: &[&str],
+    ) -> Result<(NoteMeta, String), String> {
         raw::refuse_in_raw(self, "create notes beside")?;
         let secure = secure
             || folder_id == "Secure notes"
@@ -6063,7 +6054,7 @@ impl CorpusStore {
         if let Some(creator) = creator {
             foreign.push(creator.line());
         }
-        foreign.extend(marker.map(str::to_string));
+        foreign.extend(markers.iter().map(|line| line.to_string()));
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
@@ -6098,7 +6089,8 @@ impl CorpusStore {
         self.persist_index();
         let ms = stamp_to_ms(&now, None).unwrap_or_else(now_ms);
         let aliases = note_aliases(&rel, &title, &id, &fm);
-        Ok(NoteMeta {
+        let revision = crate::fsutil::revision(document.as_bytes());
+        Ok((NoteMeta {
             id,
             title,
             snippet: snippet_of(body),
@@ -6111,7 +6103,7 @@ impl CorpusStore {
             pinned: false,
             origin: None,
             kind: NoteKind::Note,
-        })
+        }, revision))
     }
 
     // Boards are a parallel surface: raw `*.excalidraw` JSON files, NO
@@ -8540,7 +8532,9 @@ pub fn corpus_create(
     locked: Option<bool>,
     // "chat" | "agent" | "librarian" when an AI makes the note; absent for a person
     created_by: Option<String>,
-) -> Result<NoteMeta, String> {
+    // a recovery note's event id: asked again, the note made for it comes back
+    recovery_event: Option<String>,
+) -> Result<recovery::CreatedNote, String> {
     let creator = match created_by.as_deref() {
         None => None,
         Some(value) => Some(
@@ -8551,12 +8545,19 @@ pub fn corpus_create(
     let (root, rel) = split_root_id(&folder_id);
     state
         .route(&root, |s| {
-            s.create_protected(&rel, &body, secure.unwrap_or(false), locked.unwrap_or(false), creator)
+            s.create_with(
+                &rel,
+                &body,
+                secure.unwrap_or(false),
+                locked.unwrap_or(false),
+                creator,
+                recovery_event.as_deref(),
+            )
         })
-        .map(|mut m| {
-            m = prefix_meta(&root, m);
-            m.id = compose_root_id(&root, &m.id);
-            m
+        .map(|mut created| {
+            created.meta = prefix_meta(&root, created.meta);
+            created.meta.id = compose_root_id(&root, &created.meta.id);
+            created
         })
 }
 
@@ -8954,6 +8955,9 @@ pub mod rules_store;
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]
 pub mod ai_rows;
+/// One create that answers with what it wrote, and a recovery note's identity.
+#[path = "corpus_recovery.rs"]
+pub mod recovery;
 #[cfg(test)]
 use ai_rows::read_ai_versioned;
 /// The note lock and the authority checked inside it.

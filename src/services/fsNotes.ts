@@ -165,9 +165,9 @@ export class FsNotesService implements NotesService {
   }
 
   async createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note> {
-    const meta = await corpusCreate(folderId, body, policy);
-    const doc = await corpusRead(meta.id);
-    return { ...meta, body, revision: doc.revision };
+    // the words and revision of what was written, from the create itself: a
+    // second read could see another writer's change and certify the wrong body
+    return corpusCreate(folderId, body, policy);
   }
 
   async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
