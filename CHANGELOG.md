@@ -54,8 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only an on-device model can read. Start a new one to use …", and one
   button starts the new one. "Open in Chat" carries the same mark into the
   chat it opens, and a chat marks itself the same way whenever any of its
-  reads was on-device only. A note that was public when it was read and is
-  made secure later isn't taken back out of a conversation.
+  reads was on-device only. Nothing from such a conversation is written
+  where a remote model could read it: a chat's conversation notes go only
+  into a secure note (the attached note when it's secure, or a new secure
+  one), and otherwise aren't saved, with one line saying so; the chat's note
+  button makes a secure note; the chat's own file, title included, is kept
+  from remote models; and a marked Librarian conversation writes nothing at
+  all (no rules, People notes or proposals) and says so. A note that was
+  public when it was read and is made secure later isn't taken back out of a
+  conversation.
 - **A model is sent a note as you last saved it.** The Librarian could
   answer about the version before your last few keystrokes while that save
   was still on its way, and a passage you had just highlighted silently
@@ -113,8 +120,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   settings can't be read, it doesn't classify, organise or file anything,
   instead of working without your filing rules and secure keywords.
   Librarian Activity says so, says where the settings file is, and says
-  that changing any setting saves a new one, keeping the unreadable file
-  beside it.
+  what to do for the trouble it finds: a file that isn't valid settings is
+  replaced when you change any setting, with the old one kept beside it; a
+  file with a hard link needs an independent copy in its place; a file Rotli
+  can't open needs to be made readable. Rotli changes neither of the last
+  two.
 - **A note locked or made secure while a change waits is left alone.** An
   agent's move or edit, the Librarian's filing, and its field writes check
   the note again at the moment they act, not only before waiting their turn.

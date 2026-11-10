@@ -10,10 +10,12 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isCanvasPath } from "../lib/fileKind";
 import { hardLinked } from "../lib/hardLinks";
 import { replaceTitleLine } from "../lib/noteTitle";
+import { isSettingsUnreadable, settingsTrouble } from "../lib/settingsTrouble";
 import {
   corpusFileStat,
   corpusLinks,
   corpusMoveFileToSink,
+  corpusSettingsRead,
   corpusTasks,
   isTauri,
   organizerSecureHints,
@@ -449,6 +451,17 @@ export function useJournal() {
  * 2026-07-30, finding 23). */
 export function useOrganizerStatus() {
   return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus });
+}
+
+/** Which of the three settings troubles stopped the organizer (lib/settingsTrouble.ts):
+ * read once per distinct error, only while Activity shows the refusal. */
+export function useSettingsTrouble(error: string | null | undefined) {
+  return useQuery({
+    queryKey: ["settingsTrouble", error ?? ""],
+    queryFn: () => settingsTrouble(() => corpusSettingsRead("settings")),
+    enabled: isSettingsUnreadable(error),
+    staleTime: Infinity,
+  });
 }
 
 /** Legacy secure-intake notes awaiting the explicit repair (decision
