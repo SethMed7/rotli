@@ -10,6 +10,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The Librarian as an agent route (off by default).**
+  `rotli mcp --librarian` gives any agent host (T3 Code, Claude Code, Codex) a
+  small set of tools to keep a vault organised the LLM-wiki way: capture a
+  source, propose where a note goes or what it links to, keep a Librarian index
+  and log. How it works is in five skills it serves itself. Secure notes are
+  never shown to it, it writes only through Rotli, and moving or editing your
+  notes is a proposal you approve with `rotli librarian apply`. Turn it on per
+  vault with `"librarianMcp": true` in the vault's settings; a Settings toggle
+  comes next.
+- **`rotli --version`** prints the version instead of opening the app.
+
+### Security
+
+- **Vault threads can't use T3 Code's own tools.** The vault threads spec now
+  denies `mcp__t3-code` alongside the file tools and the shell. T3 approves its
+  own tools in every thread, and some of them message other threads directly,
+  so a note with hidden instructions could otherwise steer another agent
+  without anyone's yes.
+- **The Librarian stays in the vault you set it up for.** Each
+  `rotli mcp --librarian` serves one vault, named with `--vault` or the
+  folder it starts in, and refuses to start for anything else. It used to
+  follow whichever vault was the default, so a thread in one vault could read
+  and write another. It also refuses if the vault folder is replaced by
+  another folder, or a link, while it runs.
+- **Secure-note keywords match every spelling.** A keyword like "café" now
+  protects a title however its accented letters are typed or stored, and
+  full-width letters count as the plain ones. A name the earlier matching
+  caught is still caught: "bank™" and a "bank" with an accent mark added
+  after the k stay secure under the keyword "bank". Rotli and its agent
+  tools also read a file name's short id ending the same way, so they never
+  disagree on whether a note is secure.
+- **An agent's read can't be swapped mid-read.** Rotli checks a note and
+  hands an agent the very same bytes, so a note changed to secure at that
+  instant is never sent.
+- **The Librarian's waiting proposals stop showing a note once you make it
+  secure**, or the page it would link to. A proposal remembers that exact
+  page, so another note that has the page's title as an alias can't stand in
+  for it. You still see them all.
+- **The Librarian's files stay inside the vault.** It refuses to read or
+  write its proposals through a link that points elsewhere, at any folder on
+  the way, and refuses a proposals file that is a hard link to another file.
+- **The Librarian rewrites only the index and log it made.** A note of yours
+  with the same title, or that title as an alias, is left alone, and so is a
+  People note the in-app Librarian made for someone called "Librarian
+  index". Its own pages carry a marker only it writes.
+- **Turning vault threads off keeps what it can't safely undo.** If you
+  changed a file the setup had edited, its backup and the record of it now
+  stay after turning off, so you can still restore it.
+
+### Fixed
+
+- **Agents can search the vault again.** Claude Code rejected Rotli's search
+  and list results as malformed, because MCP needs them wrapped in an object.
+  They now arrive as `{"items": [...]}`.
+- **Two notes saved with the same name at the same moment both survive.**
+  Rotli used to let the later one replace the earlier when two agents (or an
+  agent and the app) picked the same file name at once.
+- **A Tesven app icon:** Rotli's white line quokka on Tesven's One Blue field,
+  in Settings → Appearance → App icon.
+
 ## [1.9.1] - 2026-10-20
 
 ### Added

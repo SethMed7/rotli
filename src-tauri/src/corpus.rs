@@ -1335,7 +1335,9 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
 /// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
 /// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
-const RESERVED_KEYS: [&str; 14] = [
+/// `librarian_page` marks the Librarian route's own index and log
+/// (workspace_librarian.rs); only that route's page creation writes it.
+const RESERVED_KEYS: [&str; 15] = [
     "id",
     "created",
     "updated",
@@ -1350,7 +1352,14 @@ const RESERVED_KEYS: [&str; 14] = [
     "view_tag",
     "created_by",
     "ai_edit",
+    "librarian_page",
 ];
+
+/// The frontmatter line that marks one of the Librarian route's own pages
+/// (`index` or `log`).
+pub(crate) fn librarian_page_line(page: &str) -> String {
+    format!("librarian_page: {page}")
+}
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
@@ -1539,7 +1548,7 @@ pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
     "id",
     "created",
     "owner",
@@ -1547,6 +1556,7 @@ pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "view_tag",
     "created_by",
     "ai_edit",
+    "librarian_page",
 ];
 
 /// Rebuild a document from a user-typed raw frontmatter block (the "Show file
@@ -3664,7 +3674,28 @@ impl CorpusStore {
             return Err(format!("not available to AI: {rel}"));
         }
         let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
-        let (fm, body) = parse_document(&text);
+        self.judge_for_ai(rel, &text, model_is_local)?;
+        Ok(text)
+    }
+
+    /// An agent's whole read in ONE read of the file: the gate judges these
+    /// bytes, and the document and its revision are built from the same bytes.
+    /// Gating one read and returning another let a file swapped in between
+    /// (secure ↔ plain) reach a remote model (audit 2026-11-08).
+    pub(crate) fn read_doc_for_ai(&mut self, id: &str, model_is_local: bool) -> Result<NoteDoc, String> {
+        let rel = self.path_of(id)?;
+        if surfaced(self.layout, &rel) == Surface::Hidden {
+            return Err(format!("not available to AI: {rel}"));
+        }
+        let abs = self.guard_rel(&rel)?;
+        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        self.judge_for_ai(&rel, &text, model_is_local)?;
+        Ok(self.doc_from_text(id, &rel, &abs, &text))
+    }
+
+    /// The AI read gate over one file's text (see `read_for_ai`).
+    fn judge_for_ai(&mut self, rel: &str, text: &str, model_is_local: bool) -> Result<(), String> {
+        let (fm, body) = parse_document(text);
         let fm = fm.unwrap_or_default();
         let secure = self.file_is_protected(rel)
             || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
@@ -3693,7 +3724,7 @@ impl CorpusStore {
             // the same choke point that decided the read.
             crate::secret::remember_secure_text(body);
         }
-        Ok(text)
+        Ok(())
     }
 
     /// AI-purpose access to a frontmatter-free file. The editor's file reads
@@ -4034,18 +4065,37 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
     ) -> Result<NoteMeta, String> {
+        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent, None)
+    }
+
+    /// The same seam for the Librarian route's own index or log: stamped
+    /// `created_by: librarian` and marked `librarian_page: <page>`, the
+    /// reserved line that alone tells its pages from any other note.
+    pub(crate) fn create_librarian_page(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        page: &str,
+    ) -> Result<NoteMeta, String> {
+        let marker = librarian_page_line(page);
+        let creator = crate::ai_edit_policy::Creator::Librarian;
+        self.create_remote(folder_id, body, creator, Some(&marker))
+    }
+
+    fn create_remote(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        creator: crate::ai_edit_policy::Creator,
+        marker: Option<&str>,
+    ) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "add files to")?;
         if looks_secure(body) {
             return Err(
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create_as(
-            folder_id,
-            body,
-            false,
-            Some(crate::ai_edit_policy::Creator::Agent),
-        )
+        self.create_marked(folder_id, body, false, Some(creator), marker)
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -4756,18 +4806,22 @@ impl CorpusStore {
         let rel = self.path_of(id)?;
         let abs = self.guard_rel(&rel)?;
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
-        let (fm, raw) = parse_document(&text);
+        Ok(self.doc_from_text(id, &rel, &abs, &text))
+    }
+
+    fn doc_from_text(&self, id: &str, rel: &str, abs: &Path, text: &str) -> NoteDoc {
+        let (fm, raw) = parse_document(text);
         let body = match &fm {
             Some(_) => editor_body(raw),
             None => raw,
         };
-        let (file_created, file_updated) = file_stamps(&abs);
+        let (file_created, file_updated) = file_stamps(abs);
         let fm = fm.unwrap_or_default();
-        let disk_folder = folder_of(&rel);
+        let disk_folder = folder_of(rel);
         // origin is a DISK-location fact (Archive/Trash); the wire folder_id is the
         // shelf-projected view — they can differ for a memex wiki note.
         let folder = project_folder(self.layout, &disk_folder, &fm);
-        Ok(NoteDoc {
+        NoteDoc {
             id: id.to_string(),
             origin: if is_hidden_root(self.layout, &disk_folder) {
                 fm.origin.clone()
@@ -4789,7 +4843,7 @@ impl CorpusStore {
                 .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                 .unwrap_or(file_updated),
             pinned: fm.pinned.unwrap_or(false),
-        })
+        }
     }
 
     /// Atomic save. Mints/keeps the four facts (foreign keys ride along
@@ -5814,6 +5868,17 @@ impl CorpusStore {
         secure: bool,
         creator: Option<crate::ai_edit_policy::Creator>,
     ) -> Result<NoteMeta, String> {
+        self.create_marked(folder_id, body, secure, creator, None)
+    }
+
+    fn create_marked(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        secure: bool,
+        creator: Option<crate::ai_edit_policy::Creator>,
+        marker: Option<&str>,
+    ) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "create notes beside")?;
         let secure = secure
             || folder_id == "Secure notes"
@@ -5852,7 +5917,6 @@ impl CorpusStore {
         let id = Ulid::new().to_string();
         let now = now_stamp();
         let title = title_of(body);
-        let rel = self.free_note_name(disk_folder, &filename_for(&title, &id), None);
         let mut foreign = vec!["aliases: []".to_string()];
         if self.layout == Layout::Memex {
             let shelf = if secure
@@ -5881,6 +5945,7 @@ impl CorpusStore {
         if let Some(creator) = creator {
             foreign.push(creator.line());
         }
+        foreign.extend(marker.map(str::to_string));
         let fm = Frontmatter {
             id: Some(id.clone()),
             created: Some(now.clone()),
@@ -5889,12 +5954,28 @@ impl CorpusStore {
             origin: None,
             foreign,
         };
-        let abs = self.abs(&rel);
-        self.suppress.mark(&abs);
-        if secure {
-            self.gitignore_add(&rel)?;
-        }
-        atomic_write(&abs, &compose_document(&fm, &format!("\n{body}")))?;
+        let document = compose_document(&fm, &format!("\n{body}"));
+        // Claim the name without replacing anything: another process (a second
+        // agent, the app) may pick the same free name between our look and our
+        // write, and a plain rename would silently overwrite its note. A secure
+        // note's ignore line goes first; one left by a lost race over-ignores,
+        // which fails safe.
+        let mut attempts = 0;
+        let rel = loop {
+            let rel = self.free_note_name(disk_folder, &filename_for(&title, &id), None);
+            let abs = self.abs(&rel);
+            self.suppress.mark(&abs);
+            if secure {
+                self.gitignore_add(&rel)?;
+            }
+            if crate::fsutil::atomic_write_new(&abs, &document, ".rotli-write-")? {
+                break rel;
+            }
+            attempts += 1;
+            if attempts == 64 {
+                return Err(format!("no free file name for {title} in {disk_folder}"));
+            }
+        };
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
         let ms = stamp_to_ms(&now, None).unwrap_or_else(now_ms);

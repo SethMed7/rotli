@@ -178,6 +178,33 @@ pub(crate) fn atomic_write(path: &Path, contents: &str, prefix: &str) -> Result<
 }
 
 pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> Result<(), String> {
+    let (dir, tmp) = synced_temp_beside(path, contents, prefix)?;
+    tmp.persist(path)
+        .map_err(|e| format!("rename into {}: {e}", path.display()))?;
+    sync_dir(dir);
+    Ok(())
+}
+
+/// `atomic_write` for a NEW file: the full contents appear at `path` at once,
+/// and only if nothing is there. `Ok(false)` means another writer took the
+/// name first; nothing of theirs was replaced.
+pub(crate) fn atomic_write_new(path: &Path, contents: &str, prefix: &str) -> Result<bool, String> {
+    let (dir, tmp) = synced_temp_beside(path, contents.as_bytes(), prefix)?;
+    match tmp.persist_noclobber(path) {
+        Ok(_) => {
+            sync_dir(dir);
+            Ok(true)
+        }
+        Err(e) if e.error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+        Err(e) => Err(format!("create {}: {}", path.display(), e.error)),
+    }
+}
+
+fn synced_temp_beside<'a>(
+    path: &'a Path,
+    contents: &[u8],
+    prefix: &str,
+) -> Result<(&'a Path, tempfile::NamedTempFile), String> {
     let dir = path
         .parent()
         .ok_or_else(|| format!("no parent dir for {}", path.display()))?;
@@ -190,14 +217,15 @@ pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> 
     tmp.as_file()
         .sync_all()
         .map_err(|e| format!("sync {}: {e}", path.display()))?;
-    tmp.persist(path)
-        .map_err(|e| format!("rename into {}: {e}", path.display()))?;
-    // best-effort: the rename is only durable across power loss once the
-    // directory entry is synced; a filesystem that refuses dir-fsync is fine.
+    Ok((dir, tmp))
+}
+
+/// Best-effort: a rename is only durable across power loss once the directory
+/// entry is synced; a filesystem that refuses dir-fsync is fine.
+fn sync_dir(dir: &Path) {
     if let Ok(d) = std::fs::File::open(dir) {
         let _ = d.sync_all();
     }
-    Ok(())
 }
 
 /// Before Rotli replaces a settings file that won't parse, it keeps a copy:

@@ -368,6 +368,17 @@ cold because search now uses an index.
   to the fetch path, worth doing, not in this commit.
 - **`brief_model` has no allowlist** (only a length bound), unlike every other
   model id in the codebase.
+- **Same-user replacement races on the Librarian route.** Another process
+  running as the person can swap a folder or file under the vault between a
+  check and the open that follows it; the stated trust model excludes it.
+  `rotli mcp --librarian` narrows what is cheap to narrow: the proposals file
+  is opened one folder at a time with `openat` and `O_NOFOLLOW`, then checked
+  on its descriptor (regular file, one link), and each call refuses when the
+  bound vault folder's device and inode no longer match the ones recorded at
+  start. Notes are still opened by path after the store's containment check,
+  and a swap of the vault folder between the per-call identity check and the
+  opens that follow is not caught. On Windows only the path checks apply
+  (agent-workspace.md, "The Librarian route").
 
 ---
 

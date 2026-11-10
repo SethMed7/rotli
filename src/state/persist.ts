@@ -304,7 +304,7 @@ interface PersistedSettings {
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
   /** The macOS Dock/app icon variant. */
-  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay" | "black";
+  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay" | "black" | "tesven";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
   fileMetadata: "hide" | "show";
   /** The vault's Brain master switch (vault-vs-brain, 2026-07-26). The Rust
@@ -612,7 +612,8 @@ export function parseSettings(raw: string): PersistedSettings {
       data.appIcon === "paper" ||
       data.appIcon === "charcoal" ||
       data.appIcon === "clay" ||
-      data.appIcon === "black"
+      data.appIcon === "black" ||
+      data.appIcon === "tesven"
         ? data.appIcon
         : "default",
     // hide is the safe default — metadata never surprises a fresh (or old) config

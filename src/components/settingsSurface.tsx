@@ -43,6 +43,7 @@ import appIconCharcoal from "../assets/appIcons/charcoal.png";
 import appIconClay from "../assets/appIcons/clay.png";
 import appIconDefault from "../assets/appIcons/default.png";
 import appIconPaper from "../assets/appIcons/paper.png";
+import appIconTesven from "../assets/appIcons/tesven.png";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -1003,6 +1004,7 @@ const APP_ICONS: { id: AppIcon; label: string; src: string }[] = [
   { id: "charcoal", label: "Charcoal", src: appIconCharcoal },
   { id: "clay", label: "Clay", src: appIconClay },
   { id: "black", label: "Black", src: appIconBlack },
+  { id: "tesven", label: "Tesven", src: appIconTesven },
 ];
 
 /** The primary-color swatch row — shared by Appearance and onboarding's theme

@@ -165,27 +165,76 @@ pub(crate) fn secure_keywords(root: &Path) -> Vec<String> {
     keywords
 }
 
-/// Lowercased words of a name: letters and digits, everything else a break.
-fn words(text: &str) -> Vec<String> {
-    text.split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .map(str::to_lowercase)
-        .collect()
+/// The ways a name is cut into lowercased words. A note is secure when ANY of
+/// them finds the keyword, because this is a deny list: a new way of reading a
+/// name may only ever add protection. Each is defined the same way in
+/// src/lib/librarianRules.ts, from Unicode properties both languages share
+/// (Alphabetic, Number, Mark):
+/// - `Plain`: letters and digits, everything else a break (the first matcher).
+/// - `MarksBreak`: the same, with combining marks as breaks too, so `banḱ`
+///   (k + U+0301) still holds the word "bank" (the first TS matcher).
+/// - `Folded`: NFKC first, marks kept inside words, so a decomposed `é`
+///   (e + U+0301) is the `é` a person types, and compatibility forms
+///   (fullwidth `ｂａｎｋ`, ligatures) fold to plain letters. Folding alone
+///   lost names the others catch (`bank™` folds to "banktm").
+#[derive(Clone, Copy)]
+enum Words {
+    Plain,
+    MarksBreak,
+    Folded,
 }
 
-/// The words of a note's file name, without its folder, `.md`, and the short
-/// id suffix Rotli adds to a colliding name (`bank-login-3f9k2a.md`).
-fn file_words(rel: &str) -> Vec<String> {
+const EVERY_WAY: [Words; 3] = [Words::Plain, Words::MarksBreak, Words::Folded];
+
+fn words(text: &str, way: Words) -> Vec<String> {
+    use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+    let cut = |text: &str, joins: &dyn Fn(char) -> bool| -> Vec<String> {
+        text.split(|c: char| !joins(c))
+            .filter(|w| !w.is_empty())
+            .map(str::to_lowercase)
+            .collect()
+    };
+    match way {
+        Words::Plain => cut(text, &|c| c.is_alphanumeric()),
+        Words::MarksBreak => cut(text, &|c| c.is_alphanumeric() && !is_combining_mark(c)),
+        Words::Folded => cut(&text.nfkc().collect::<String>(), &|c| {
+            c.is_alphanumeric() || is_combining_mark(c)
+        })
+        .into_iter()
+        .map(|w| w.nfkc().collect())
+        .collect(),
+    }
+}
+
+/// The short id suffix an older Rotli added to a colliding file name
+/// (`bank-login-3f9k2a.md`): a dash and the last six characters of the note's
+/// ULID, lowercased (corpus.rs `legacy_filename_stem`). Only that exact ASCII
+/// shape, with a digit in it, is dropped; anything else stays a word.
+fn without_id_suffix(stem: &str) -> &str {
+    const ULID_TAIL: &[u8] = b"0123456789abcdefghjkmnpqrstvwxyz";
+    match stem.rsplit_once('-') {
+        Some((head, tail))
+            if !head.is_empty()
+                && tail.len() == 6
+                && tail.bytes().all(|b| ULID_TAIL.contains(&b))
+                && tail.bytes().any(|b| b.is_ascii_digit()) =>
+        {
+            head
+        }
+        _ => stem,
+    }
+}
+
+/// The words of a note's file name, without its folder, `.md`, and an id suffix.
+fn file_words(rel: &str, way: Words) -> Vec<String> {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     let stem = name.strip_suffix(".md").unwrap_or(name);
-    let mut w = words(stem);
-    if w.len() > 1
-        && w.last()
-            .is_some_and(|last| last.len() == 6 && last.chars().any(|c| c.is_ascii_digit()))
-    {
-        w.pop();
+    let head = words(without_id_suffix(stem), way);
+    if head.is_empty() {
+        words(stem, way)
+    } else {
+        head
     }
-    w
 }
 
 /// Does a keyword appear in the title or the file name, as whole words, in
@@ -195,13 +244,15 @@ pub(crate) fn secure_by_name(title: &str, rel: &str, keywords: &[String]) -> boo
     if keywords.is_empty() {
         return false;
     }
-    let names = [words(title), file_words(rel)];
-    keywords.iter().any(|keyword| {
-        let k = words(keyword);
-        !k.is_empty()
-            && names
-                .iter()
-                .any(|name| name.windows(k.len()).any(|at| at == k.as_slice()))
+    EVERY_WAY.into_iter().any(|way| {
+        let names = [words(title, way), file_words(rel, way)];
+        keywords.iter().any(|keyword| {
+            let k = words(keyword, way);
+            !k.is_empty()
+                && names
+                    .iter()
+                    .any(|name| name.windows(k.len()).any(|at| at == k.as_slice()))
+        })
     })
 }
 
