@@ -2556,7 +2556,8 @@
 /* The vault's notice for files Rotli left out because they have a hard link
    (src/components/skippedFilesNotice.tsx): quiet text on the sidebar's own
    ground, a hairline above, no badge or alarm colour. */
-.skipped-notice {
+.skipped-notice,
+.gone-notice {
   flex: 0 0 auto;
   margin: 0 12px;
   padding: 10px 2px 4px;
@@ -2566,10 +2567,12 @@
   color: var(--text-muted);
 }
 .skipped-notice-text,
-.skipped-notice-help {
+.skipped-notice-help,
+.gone-notice-text {
   margin: 0;
 }
-.skipped-notice-toggle {
+.skipped-notice-toggle,
+.gone-notice-action {
   margin-top: 4px;
   padding: 2px 0;
   border: 0;
@@ -2580,10 +2583,22 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
-.skipped-notice-toggle:focus-visible {
+.skipped-notice-toggle:focus-visible,
+.gone-notice-action:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-control);
+}
+.gone-notice-row + .gone-notice-row {
+  margin-top: 8px;
+}
+.gone-notice-actions {
+  display: flex;
+  gap: 12px;
+}
+.gone-notice-action:disabled {
+  color: var(--text-muted);
+  text-decoration: none;
 }
 .skipped-notice-list {
   margin: 6px 0;

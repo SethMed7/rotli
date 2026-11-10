@@ -286,7 +286,8 @@ describe("sync failure surfacing", () => {
     editDocument("ghost2", () => ["y"]);
     await flushed("ghost2");
     expect(read("ghost2")).toEqual(["y"]);
-    expect(documentSaveError("ghost2")).toBe("unknown note: ghost2");
+    // plain words, and a choice (saveRecovery.test.ts), never "unknown note: …"
+    expect(documentSaveError("ghost2")).toContain("was deleted while it had unsaved words");
   });
 
   test("evicting a note clears its surfaced error", async () => {

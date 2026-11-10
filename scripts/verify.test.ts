@@ -47,6 +47,9 @@ test("a recognized lane still runs its checks", () => {
   expect(result.code).toBe(0);
   expect(result.commands).toContain("cargo clippy");
   expect(result.commands).toContain("cargo test");
-  expect(result.commands).not.toContain("bun ");
+  // its one bun step: the save queue against the real Rust write lane
+  expect(result.commands.split("\n").filter((line) => line.startsWith("bun "))).toEqual([
+    "bun run test:write-lane",
+  ]);
   expect(result.output).toContain("verify passed");
 });

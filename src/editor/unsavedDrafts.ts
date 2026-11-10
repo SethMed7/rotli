@@ -32,6 +32,11 @@ export function setDocumentProtection(noteId: string, note: Pick<Note, "secure" 
   protections.set(noteId, { secure: note.secure === true, locked: note.locked === true });
 }
 
+/** What the note's last read said about its protection, if anything. */
+export function protectionOf(noteId: string): { secure: boolean; locked: boolean } | undefined {
+  return protections.get(noteId);
+}
+
 export function forgetProtection(noteId: string): void {
   protections.delete(noteId);
 }

@@ -122,6 +122,11 @@ if wants rust; then
 
   step "rust — cargo test"
   cargo test --manifest-path src-tauri/Cargo.toml
+
+  # the TypeScript save queue against the production Rust store, headless
+  # (src/editor/realWriteLane.lane.ts; the test binary is built just above)
+  step "rust — the editor's save queue on the real write lane"
+  bun run test:write-lane
 fi
 
 printf '\n\033[1m✓ verify passed\033[0m — lanes: %s\n' "${LANES[*]}"

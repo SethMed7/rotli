@@ -39,6 +39,7 @@ import { useUiStore } from "../state/ui";
 import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
+import { GoneNotesNotice } from "./sidebar/goneNotesNotice";
 import { MediaPlayer } from "./sidebar/mediaPlayer";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
@@ -482,6 +483,7 @@ export function Sidebar() {
           and the ambient track when Ambient audio is on */}
       <MediaPlayer />
       <SkippedFilesNotice />
+      <GoneNotesNotice />
       <SidebarFooter />
     </aside>
   );

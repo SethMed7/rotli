@@ -47,7 +47,13 @@ import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
-import { ensureDocument, reloadDocumentIfClean, useDocumentDirty, useDocumentSaveError } from "./model";
+import {
+  ensureDocument,
+  reloadDocumentIfClean,
+  useDocumentDirty,
+  useDocumentSaveError,
+  useGoneNotes,
+} from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -158,6 +164,7 @@ export function EditorSurface({
   const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
+  const deleted = useGoneNotes().includes(noteId);
 
   const [aaOpen, setAaOpen] = useState(false);
   // Restore for a sink-resident note (declared up here: hooks before the
@@ -531,7 +538,9 @@ export function EditorSurface({
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
       {saveError && (
         <div className="ed-saveerr" role="alert">
-          ⚠ This note isn’t saving — {saveError}. Your text is kept here and rotli keeps retrying.
+          {deleted
+            ? `⚠ ${saveError}. Keep them as a new note or discard them from the notice in the sidebar.`
+            : `⚠ This note isn’t saving — ${saveError}. Your text is kept here and Rotli keeps trying.`}
         </div>
       )}
       <CmEditor

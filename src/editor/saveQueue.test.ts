@@ -3,9 +3,9 @@
 // again before A finished: both writes carried the same base revision, A
 // cleared the dirty flag, B failed as a revision conflict, and nothing said
 // the buffer was unsaved, so quit went ahead. The same sequence loses typing
-// in the released 1.9.1 and 1.8.0. These tests run against a fake disk that,
-// like Rust's write lane, refuses a write whose base revision isn't the
-// current one, checked when the write lands.
+// in the released 1.9.1 and 1.8.0. These tests run against the fake that
+// follows Rust's write contract (writeLane.fixtures.ts), checked when the
+// write lands.
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { Note } from "../types";
@@ -22,45 +22,46 @@ import {
   unsavedDrafts,
 } from "./model";
 import { documentSaveError, isDirty } from "./saveStatus";
+import { settle, within } from "./saveTest.fixtures";
+import { fakeLane } from "./writeLane.fixtures";
 
 const ID = "save-queue";
 
-/** The note on disk, and the write lane in front of it. `hold()` keeps each
- * write from landing until `releaseNext()` (or `release()`) lets it. */
+/** The note on disk, and the write lane in front of it: the fake that follows
+ * Rust's contract (writeLane.fixtures.ts). `hold()` keeps each write from
+ * landing until `releaseNext()` (or `release()`) lets it. Revisions are
+ * reported as r0, r1, … in the order they first appear. */
 function fakeDisk(initial = "old", latencyMs = 0) {
-  const disk = { body: initial, revision: "r0", count: 0 };
+  const lane = fakeLane();
+  const id = lane.create("Inbox", initial).id;
+  const labels = new Map<string, string>();
+  const label = (revision: string) => {
+    if (!labels.has(revision)) labels.set(revision, `r${labels.size}`);
+    return labels.get(revision)!;
+  };
   const bases: string[] = [];
   const waiting: (() => void)[] = [];
   let holding = false;
   let fail: ((body: string) => Error | null) | null = null;
-  const note = (body: string): Note => ({
-    id: ID,
-    title: body.split("\n")[0] ?? "",
-    snippet: "",
-    folderId: "Inbox",
-    createdAt: 0,
-    updatedAt: 1,
-    pinned: false,
-    body,
-    revision: disk.revision,
-  });
-  setWriteNoteBodyForTests(async (_id, body, expectedRevision) => {
-    bases.push(expectedRevision);
+  const asNote = (note: Note): Note => ({ ...note, id: ID });
+  setWriteNoteBodyForTests(async (_id, body, expectedRevision, expectedBody) => {
+    bases.push(label(expectedRevision));
     if (holding) await new Promise<void>((resolve) => waiting.push(resolve));
     if (latencyMs) await new Promise((resolve) => setTimeout(resolve, latencyMs));
     const failure = fail?.(body);
     if (failure) throw failure;
-    if (expectedRevision !== disk.revision)
-      throw new Error(`revision conflict: expected ${expectedRevision}; found ${disk.revision}`);
-    disk.body = body;
-    disk.count += 1;
-    disk.revision = `r${disk.count}`;
-    return note(body);
+    return asNote(lane.write(id, body, expectedRevision, expectedBody)); // Rust's check, when it lands
   });
-  setReadNoteForTests(async () => note(disk.body));
-  ensureDocument(ID, initial, "r0");
+  setReadNoteForTests(async () => asNote(lane.read(id)!));
+  const first = lane.read(id)!;
+  label(first.revision);
+  ensureDocument(ID, initial, first.revision);
   return {
-    disk,
+    disk: {
+      get body() {
+        return lane.read(id)!.body;
+      },
+    },
     bases,
     hold: () => {
       holding = true;
@@ -78,19 +79,9 @@ function fakeDisk(initial = "old", latencyMs = 0) {
       fail = rule;
     },
     /** Another app writes the file. */
-    external: (body: string) => {
-      disk.body = body;
-      disk.count += 1;
-      disk.revision = `r${disk.count}`;
-    },
+    external: (body: string) => lane.external(id, body),
   };
 }
-
-const settle = async () => {
-  for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
-};
-const within = <T>(promise: Promise<T>, ms: number) =>
-  Promise.race([promise, new Promise<"timed out">((resolve) => setTimeout(() => resolve("timed out"), ms))]);
 
 afterEach(() => {
   evictDocument(ID);
@@ -195,7 +186,7 @@ describe("dirty is derived from what last landed", () => {
     });
     setDocumentText(ID, "first");
     const flushed = await within(
-      flushNote(ID).then(
+      flushNote(ID, 300).then(
         () => "resolved",
         (error: Error) => error.message,
       ),
