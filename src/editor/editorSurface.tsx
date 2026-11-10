@@ -41,18 +41,13 @@ import type { Note } from "../types";
 import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
+import { flushNoteAfterPaint } from "./flushAfterPaint";
 import { FormatBar } from "./formatBar";
 import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
-import {
-  ensureDocument,
-  flushNoteAfterPaint,
-  reloadDocumentIfClean,
-  useDocumentDirty,
-  useDocumentSaveError,
-} from "./model";
+import { ensureDocument, reloadDocumentIfClean, useDocumentDirty, useDocumentSaveError } from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */

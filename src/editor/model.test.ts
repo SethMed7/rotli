@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { notesService } from "../services/notes";
+import { flushNoteAfterPaint } from "./flushAfterPaint";
 import {
   unsavedDrafts,
   adoptPendingDocument,
@@ -21,7 +22,6 @@ import {
   ensurePendingDocument,
   evictDocument,
   flushNote,
-  flushNoteAfterPaint,
   flushSyncs,
   getDocumentText,
   onDocumentChange,

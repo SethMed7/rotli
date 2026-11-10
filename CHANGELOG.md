@@ -131,6 +131,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Typing while a save is on its way is no longer lost.** If you kept
+  typing while Rotli was still saving the note (a slow disk, or switching
+  away, closing the tab or quitting right after a pause), the second save
+  could be refused, and the note then looked saved with your last words
+  missing from the file, and Rotli quit without asking. This happens in
+  1.9.1 and earlier. Rotli now saves a note one write at a time: a later
+  save waits for the one in progress, then saves your newest words. A note
+  counts as saved only when the file holds your last change. A save that
+  fails keeps the note marked unsaved, shows why, keeps your words in
+  Rotli's recovery copy and tries again. Closing the tab and quitting wait
+  for the save; a quit that would lose words doesn't happen, and if a save
+  takes longer than 15 seconds Rotli stays open and says so.
 - **Two notes saved with the same name at the same moment both survive.**
   Rotli used to let the later one replace the earlier when two agents (or an
   agent and the app) picked the same file name at once.

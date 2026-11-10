@@ -3,7 +3,9 @@
 // (fourth review of pull request 267: the Librarian could read the version
 // before a save still in flight). Split from model.ts, which owns the state.
 
-import { flushNote, saveState } from "./model";
+import { flushNote, saveState, STILL_SAVING } from "./model";
+
+export { STILL_SAVING };
 import { documentSaveError, isDirty } from "./saveStatus";
 
 /** `flushNote`, answering why the note couldn't be saved (null when it was). */
@@ -12,9 +14,6 @@ export const saveFailure = (noteId: string): Promise<string | null> =>
     () => null,
     (error: unknown) => (error instanceof Error ? error.message : String(error)),
   );
-
-/** What a model must not be sent while it's true, in the person's words. */
-export const STILL_SAVING = "Still saving. Try again in a moment.";
 
 /** After `flushNote`: is `read` (a gated read for a model) the version the
  * editor holds? Null when it is, or when the note isn't open in an editor

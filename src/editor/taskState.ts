@@ -55,3 +55,13 @@ export function nextTaskState(state: TaskState, threeState: boolean): TaskState 
   if (!threeState) return "done";
   return state === "open" ? "doing" : "done";
 }
+
+const TASK_LINE = new RegExp(`^\\s*(?:[-*+]|\\d+\\.)\\s+\\[${MARK}\\](?=\\s)`);
+
+/** A note's checkbox lines, as one string: the Tasks projection walks the
+ * corpus, so a body sync invalidates it only when this changes. */
+export function taskSignature(lines: readonly string[]): string {
+  let sig = "";
+  for (const line of lines) if (TASK_LINE.test(line)) sig += `${line}\n`;
+  return sig;
+}
