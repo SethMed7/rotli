@@ -37,6 +37,9 @@ export interface ManagedChatMemoryInput {
   /** The model that rewrites the conversation notes each turn (optional —
    * without it, existing notes are kept and new notes get the topics digest). */
   composeNotes?: ComposeChatNotes;
+  /** The conversation carries the on-device-only mark (a secure read, or a
+   * secure attachment): its notes go only to a protected note. */
+  protectedOnly?: boolean;
   /** The chat's model. The per-turn note rewrite is an AI WRITE, so it rides
    * `corpus_write_ai` — Rust re-derives locality, re-runs the read gate, and
    * refuses a locked note (docs/design/ai-visibility-matrix.md). Absent ⇒ the
@@ -157,6 +160,8 @@ export async function memoryNoteFor(
     revision: note.revision,
     notes: notes === "" ? null : notes,
     aiEditable,
+    // the gate's own word: only an on-device model may read it (secure)
+    secure: note.onDeviceOnly,
   };
 }
 
@@ -206,12 +211,16 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       return memoryNoteFor(id, stem, verdict === "allowed", reader);
     },
     setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
-    async create(body: string): Promise<ChatMemoryNote> {
+    async create(body: string, opts?: { secure?: boolean }): Promise<ChatMemoryNote> {
+      const secure = opts?.secure === true;
       // Rotli Web: the notes service IS the vault (no memex note command), and
       // the note's slug alias is the stem the chat attaches to. It is a note,
       // not a capture, so it is born in the Inbox folder, never on the board.
       if (!isTauri()) {
-        const note = await notesService.createNote(inboxFolderId, body, { createdBy: "chat" });
+        const note = await notesService.createNote(inboxFolderId, body, {
+          createdBy: "chat",
+          ...(secure ? { secure } : {}),
+        });
         return {
           id: note.id,
           // the adapter's real filename stem comes first in aliases
@@ -220,16 +229,24 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
           revision: note.revision,
           notes: null,
           aiEditable: true,
+          secure,
         };
       }
       // no shelf: a chat's note is a background note, not a capture — it
       // projects to where it lives (staging, then the area the Librarian files
       // it under), never to the Captures board (the owner, 2026-09-17)
       // (a brought-in vault's lands in its Inbox: createChatNote)
-      const { id, stem } = await createChatNote(input.instance, body, "chat");
+      // a marked conversation's note is created the way the app creates
+      // secure notes: the secure lane, `secure: true` (fifth review)
+      const { id, stem } = await createChatNote(
+        input.instance,
+        body,
+        "chat",
+        secure ? { secure } : undefined,
+      );
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
-      return { id, stem, body, revision: note.revision, notes: null, aiEditable: true };
+      return { id, stem, body, revision: note.revision, notes: null, aiEditable: true, secure };
     },
     // one gated write on both platforms: Rust on the Mac, the web AI corpus's
     // twin of it in Rotli Web (webAiCorpus.write)

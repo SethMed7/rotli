@@ -148,18 +148,28 @@ export async function createChatNote(
   instance: MemexInstance,
   body: string,
   createdBy?: NoteCreator,
+  policy?: { secure?: boolean },
 ): Promise<{ id: string; stem: string }> {
   const prefix = instance.id === CORPUS_INSTANCE_ID ? "" : `${instance.id}:`;
+  // `secure`: a note written from a conversation that carries the on-device-
+  // only mark (fifth review of pull request 267): the secure lane and flag,
+  // the same path the app's own secure notes take
+  const secure = policy?.secure === true;
   if (noteLaneWritable(instance)) {
-    const created = await writeNote({ instance, body, shelf: [], ...(createdBy ? { createdBy } : {}) });
+    const created = await writeNote({
+      instance,
+      body,
+      shelf: [],
+      ...(createdBy ? { createdBy } : {}),
+      ...(secure ? { secure } : {}),
+    });
     return { id: `${prefix}${created.id}`, stem: created.stem };
   }
   const inbox = instance.folderRoles?.inbox ?? "Inbox";
-  const note = await notesService.createNote(
-    `${prefix}${inbox}`,
-    body,
-    createdBy ? { createdBy } : undefined,
-  );
+  const note = await notesService.createNote(`${prefix}${inbox}`, body, {
+    ...(createdBy ? { createdBy } : {}),
+    ...(secure ? { secure } : {}),
+  });
   const path = isTauri() ? await corpusNotePath(note.id) : note.id;
   const stem = path.split("/").pop()?.replace(/\.md$/i, "") || note.aliases?.[0] || "note";
   return { id: note.id, stem };

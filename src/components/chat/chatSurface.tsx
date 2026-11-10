@@ -88,9 +88,9 @@ import {
   useUpdateChatTitle,
   useWriteChat,
 } from "../../memex/useMemex";
-import { splitMessageBlocks } from "../../noteChat/chatMessageBlocks";
-import { structureMessageLines } from "../../noteChat/chatMessageBlocks";
+import { splitMessageBlocks, structureMessageLines } from "../../noteChat/chatMessageBlocks";
 import { formatChatTime } from "../../noteChat/chatTime";
+import { createNoteForChat } from "../../noteChat/composition";
 import { rememberedChatNote, rememberChatNote } from "../../noteChat/session";
 import { nameNewChat } from "../../services/chatAutoTitle";
 import {
@@ -101,7 +101,6 @@ import {
 } from "../../services/chatFolders";
 import { syncChatModelMeta } from "../../services/chatModelMeta";
 import { useConnectedLanes } from "../../services/connectedModels";
-import { createChatNote } from "../../services/createNote";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
@@ -1973,6 +1972,7 @@ export function ChatSurface({
             ...(composeNotes ? { composeNotes } : {}),
             model: turnModel,
             turns: memoryTurns,
+            protectedOnly: attachedSecure,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
       } else {
@@ -2010,6 +2010,7 @@ export function ChatSurface({
             ...(composeNotes ? { composeNotes } : {}),
             model: turnModel,
             turns: memoryTurns,
+            protectedOnly: attachedSecure,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
         bindChat(paneId, tabId, res.slug, active.id); // this tab now IS that chat
@@ -2316,7 +2317,8 @@ export function ChatSurface({
     try {
       const name = storedTitle || chatSlug.replace(/-/g, " ");
       // not a capture: a Rotli vault's Library lane, or a brought-in vault's Inbox
-      const { id: noteId, stem } = await createChatNote(active, `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`);
+      const marked = secureChat || secureReadRef.current;
+      const { id: noteId, stem } = await createNoteForChat(active, chatSlug, name, marked);
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();
       rememberChatNote(chatSlug, noteId);

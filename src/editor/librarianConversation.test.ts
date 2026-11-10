@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import type { VaultAction } from "../lib/librarianPeople";
+import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import { approved, approvedRows, person, promptOf } from "../lib/promptText.fixtures";
 import type { ChatModelInfo } from "../lib/tauri";
+import type { KeepDeps } from "../services/librarianPeople";
 import { closeLibrarianChat, useLibrarianBar } from "../state/librarianBar";
+import { NOT_WRITTEN, settleVault } from "./librarianKeep";
 import type { LibrarianReads } from "./librarianSession";
 import {
+  applyProposal,
   librarianContext,
   PASSAGE_NOT_SAVED,
   sendToLibrarian,
@@ -155,6 +160,68 @@ describe("a conversation that held on-device-only text", () => {
       return true;
     });
     expect(opened).toEqual([["n1", { create: true }]]);
+  });
+
+  // Fifth review (#3): the Librarian bar closes as it sends, and its question
+  // lived only in the bar, so a refusal lost it and the restart had nothing.
+  test("a refused question from the bar is kept, and the restart puts it back with no old history", async () => {
+    await onDeviceTurn();
+    const remote = fakeModel("Noted.");
+    await sendToLibrarian(
+      "chat-1",
+      ask("What about the harbor lease?"),
+      MODEL,
+      (m) => librarianContext("n1", m, gated),
+      allow,
+      remote.hostFor,
+    );
+    const chat = useLibrarianBar.getState().chat!;
+    expect(remote.sent).toEqual([]);
+    expect(chat.draft).toBe("What about the harbor lease?");
+    startOver(chat, chat.restartWith!, chat.draft!);
+    const fresh = useLibrarianBar.getState().chat!;
+    expect([fresh.draft, fresh.turns.length, fresh.modelId]).toEqual([
+      "What about the harbor lease?",
+      0,
+      MODEL.id,
+    ]);
+  });
+
+  // Fifth review (#2): a marked conversation writes nothing where a remote
+  // model could read it: no People notes, rules or groups, no answered
+  // question, no proposal into the open note (never secure).
+  test("writes nothing unprotected, and says so", async () => {
+    await onDeviceTurn();
+    const written: string[] = [];
+    const deps: KeepDeps = {
+      rules: () => structuredClone(DEFAULT_LIBRARIAN_RULES),
+      setRules: () => void written.push("rules"),
+      saveRules: async () => void written.push("rules saved"),
+      createNote: async () => (written.push("person note"), "01NEW"),
+      notePath: async (id) => `wiki/People/${id}.md`,
+      log: async () => {},
+      apply: async () => (written.push("update"), 1),
+      refresh: async () => {},
+    };
+    const reply = useLibrarianBar.getState().chat!.turns[1]!;
+    const vault: VaultAction[] = [
+      { type: "person", name: "Velmora", area: "People/Work", about: "A harbor pilot.", tags: [] },
+      { type: "rule", text: "Notes about Velmora go to People/Work" },
+    ];
+    await settleVault("chat-1", reply.id, vault, "local-gemma", deps);
+    expect(written).toEqual([]);
+    const kept = useLibrarianBar.getState().chat!.turns[1]!.kept;
+    expect(kept).toEqual({ kind: "kept", lines: [{ text: NOT_WRITTEN, failed: true }] });
+    let applied = 0;
+    await applyProposal(
+      "chat-1",
+      reply.id,
+      [{ type: "tag", tags: ["velmora"] }],
+      { id: "n1", title: "Maya Chen", model: "local-gemma" },
+      async () => ++applied,
+    );
+    expect(applied).toBe(0);
+    expect(useLibrarianBar.getState().chat!.error).toBe(NOT_WRITTEN);
   });
 });
 

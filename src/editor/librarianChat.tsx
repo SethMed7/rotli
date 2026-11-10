@@ -140,7 +140,10 @@ export function ChatPanel({
   const { groups, models } = useLibrarianModels();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
-  const [draft, setDraft] = useState(chat.draft ?? "");
+  // the composer's words live in the conversation, not in this component: a
+  // refused question survives the bar closing, and a restart starts with it
+  const draft = chat.draft ?? "";
+  const setDraft = (text: string) => updateLibrarianChat(chat.id, () => ({ draft: text }));
   const log = useRef<HTMLOListElement | null>(null);
   const box = useRef<HTMLTextAreaElement | null>(null);
   const thinking = chat.status === "thinking";
@@ -167,10 +170,7 @@ export function ChatPanel({
       (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
       hostFor,
-    ).then((outcome) => {
-      // refused before anything was sent: the words go back to the composer
-      if (outcome === "onDeviceOnly") setDraft(text);
-    });
+    );
   };
 
   const pick = (id: string) =>

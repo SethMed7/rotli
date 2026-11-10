@@ -10,6 +10,7 @@ import type { MemexInstance } from "../memex/config";
 import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { createChatNote } from "../services/createNote";
 import { notesService } from "../services/notes";
 import { webNoteFilePath } from "../services/webNotes";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
@@ -142,4 +143,21 @@ export async function openChatForNote(note: NoteSummary, opts?: OpenChatOptions)
   }
 
   showChat(slug, note.id, instance.id);
+}
+
+/** The note a chat's note button creates for an unattached chat. Secure when
+ * the chat holds on-device-only text: its title may come from that text
+ * (fifth review of pull request 267). */
+export function createNoteForChat(
+  instance: MemexInstance,
+  chatSlug: string,
+  title: string,
+  secure: boolean,
+): Promise<{ id: string; stem: string }> {
+  return createChatNote(
+    instance,
+    `# ${title}\n\n> chat: [[${chatSlug}]]\n\n`,
+    undefined,
+    secure ? { secure } : undefined,
+  );
 }

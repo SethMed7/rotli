@@ -48,7 +48,7 @@ import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
-import { settleVault } from "./librarianKeep";
+import { markedConversation, NOT_WRITTEN, settleVault } from "./librarianKeep";
 import { flushNote } from "./model";
 import { savedVersionMismatch } from "./savedVersion";
 
@@ -274,7 +274,13 @@ export async function sendToLibrarian(
   // a conversation that has held on-device-only text never reaches a remote
   // model: refused before anything is read or sent (fourth review)
   if (chat.onDeviceOnly === true && !modelIsOnDevice(model)) {
-    updateLibrarianChat(chatId, () => ({ error: onDeviceOnlyRefusal(model.label), restartWith: model.id }));
+    // the question is kept in the conversation itself, not in whichever
+    // composer sent it (the bar closes as it sends): the restart puts it back
+    updateLibrarianChat(chatId, () => ({
+      error: onDeviceOnlyRefusal(model.label),
+      restartWith: model.id,
+      draft: message.text,
+    }));
     return "onDeviceOnly";
   }
   const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...message }];
@@ -343,6 +349,12 @@ export async function applyProposal(
   note: { id: string; title: string; model: string },
   apply: typeof applyLibrarian = applyLibrarian,
 ): Promise<void> {
+  // a marked conversation's proposals would write into the open note, which
+  // is never secure (the Librarian refuses secure notes): not applied
+  if (markedConversation(chatId)) {
+    updateLibrarianChat(chatId, () => ({ error: NOT_WRITTEN }));
+    return;
+  }
   const setProposal = (proposal: ProposalState) => updateLibrarianTurn(chatId, turnId, () => ({ proposal }));
   const before = useLibrarianBar.getState().chat?.turns.find((turn) => turn.id === turnId)?.proposal;
   setProposal({ kind: "applying" });
