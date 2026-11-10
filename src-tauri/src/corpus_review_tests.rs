@@ -288,3 +288,118 @@ fn hard_linked_files_are_neither_listed_nor_handed_to_the_webview() {
     fs::write(store.abs("Storage/own.png"), b"\x89PNG").unwrap();
     assert!(store.webview_path("Storage/own.png").is_ok());
 }
+
+/// Hold `abs`'s note lock on another thread, set `flag: true` in it while
+/// `act` waits for that lock, then release.
+fn with_policy_changed_while_waiting<T>(
+    store: &mut CorpusStore,
+    abs: &Path,
+    flag: &str,
+    act: impl FnOnce(&mut CorpusStore) -> Result<T, String>,
+) -> Result<T, String> {
+    let (held, wait_for_hold) = std::sync::mpsc::channel();
+    let writer = {
+        let abs = abs.to_path_buf();
+        let line = format!("---\n{flag}: true\n");
+        std::thread::spawn(move || {
+            crate::fsutil::with_file_lock(&abs, || {
+                held.send(()).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let text = fs::read_to_string(&abs).unwrap();
+                fs::write(&abs, text.replacen("---\n", &line, 1)).unwrap();
+                Ok(())
+            })
+            .unwrap();
+        })
+    };
+    wait_for_hold.recv().unwrap();
+    let result = act(store);
+    writer.join().unwrap();
+    result
+}
+
+/// Second review #5: the in-app filer and the filer's field writes checked
+/// policy before waiting for the note's lock, so a note locked or made
+/// secure by a writer holding that lock was moved or written on release.
+#[test]
+fn the_filer_and_its_field_writes_recheck_policy_inside_the_lock() {
+    for flag in ["locked", "secure"] {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        super::tests::seed_memex(&root);
+        fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+        fs::create_dir_all(root.join("wiki/Projects")).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        store.os_trash = false;
+
+        let ferry = store.create("wiki/_inbox", "# Ferry\n\nboats at noon\n").unwrap();
+        let rel = store.path_of(&ferry.id).unwrap();
+        let abs = store.abs(&rel);
+        let moved = with_policy_changed_while_waiting(&mut store, &abs, flag, |s| s.filer_move(&rel, "wiki/Projects"));
+        assert!(moved.is_err(), "{flag}: the filer moved a note that became {flag} while it waited");
+        assert!(abs.is_file());
+
+        let tide = store.create("wiki/_inbox", "# Tide\n\nlow at six\n").unwrap();
+        let rel = store.path_of(&tide.id).unwrap();
+        let abs = store.abs(&rel);
+        let written =
+            with_policy_changed_while_waiting(&mut store, &abs, flag, |s| s.set_ai_field(&rel, "summary", "one line"));
+        assert!(written.is_err(), "{flag}: the filer wrote a field into a note that became {flag}");
+        assert!(!fs::read_to_string(&abs).unwrap().contains("one line"));
+    }
+}
+
+/// The guard for the class behind second-review #5 (a note lock taken
+/// without its policy checked inside it): `lock_note` is the only way a
+/// corpus module locks a note, and it requires an `Authority`, which has no
+/// default. A plain file lock is allowed only for Rotli's own sidecars below.
+#[test]
+fn every_note_lock_names_its_authority() {
+    const SIDECAR_LOCKS: [&str; 11] = [
+        "journal_append",
+        "journal_prune",
+        "main_write",
+        "main_write_if_revision",
+        "main_update",
+        "views_write_if_revision",
+        "views_update",
+        "gitignore_add",
+        "gitignore_remove",
+        "ensure_main_committable",
+        "ai_journal_append",
+    ];
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut seen = std::collections::BTreeSet::new();
+    for entry in fs::read_dir(&dir).unwrap().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with("corpus") || !name.ends_with(".rs") || name.ends_with("_tests.rs") {
+            continue;
+        }
+        let source = fs::read_to_string(entry.path()).unwrap();
+        let production = source.split("#[cfg(test)]\nmod tests").next().unwrap();
+        let lines: Vec<&str> = production.lines().collect();
+        for (at, line) in lines.iter().enumerate() {
+            let enclosing = || {
+                lines[..at]
+                    .iter()
+                    .rev()
+                    .find_map(|l| l.split("fn ").nth(1).filter(|_| l.trim_start().starts_with(['p', 'f'])))
+                    .map(|rest| rest.split(['(', '<']).next().unwrap_or_default().to_string())
+                    .unwrap_or_default()
+            };
+            if line.contains("with_file_lock(") {
+                let function = enclosing();
+                seen.insert(function.clone());
+                assert!(
+                    SIDECAR_LOCKS.contains(&function.as_str()),
+                    "{name}:{} {function} locks a file without lock_note's authority check",
+                    at + 1
+                );
+            }
+            if line.contains("fsutil::lock_file(") {
+                assert_eq!(enclosing(), "lock_note", "{name}:{} takes a raw file lock", at + 1);
+            }
+        }
+    }
+    assert_eq!(seen.len(), SIDECAR_LOCKS.len(), "the scan found {seen:?}; update this guard");
+}

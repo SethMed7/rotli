@@ -2348,9 +2348,6 @@ fn normalized_watch_path(path: &Path) -> PathBuf {
     }
 }
 
-/// A last check on a note, run inside its lock right before a move.
-type MoveCheck = dyn Fn(&mut CorpusStore, &str) -> Result<(), String>;
-
 #[derive(Clone, Default)]
 pub struct SuppressSet {
     paths: Arc<Mutex<HashMap<PathBuf, Instant>>>,
@@ -3255,7 +3252,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -3279,7 +3276,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -3312,7 +3309,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.writable(rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -3371,7 +3368,7 @@ impl CorpusStore {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
@@ -3418,8 +3415,7 @@ impl CorpusStore {
     fn set_secure(&mut self, id_or_rel: &str, secure: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || self.set_secure_resolved(&rel, secure).map(|_| ()))
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| self.set_secure_resolved(&rel, secure).map(|_| ()))
     }
 
     /// Returns the note's new meta when making it secure moved it into the
@@ -3648,7 +3644,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -3921,8 +3917,7 @@ impl CorpusStore {
     ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Model { local: model_is_local }).and_then(|_held| {
             let text = self.read_for_ai(&rel, model_is_local)?;
             let (fm, target_body) = parse_document(&text);
             let fm = fm.unwrap_or_default();
@@ -4025,8 +4020,7 @@ impl CorpusStore {
         } else {
             self.writable(&rel)?;
         }
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Agent).and_then(|_held| {
             let text = self.read_for_ai(&rel, false)?;
             let fm = parse_document(&text).0.unwrap_or_default();
             if fm
@@ -4091,7 +4085,7 @@ impl CorpusStore {
         target_folder: &str,
     ) -> Result<NoteMeta, String> {
         let rel = self.resolve_note_rel(id)?;
-        Self::remote_move_policy(self, &rel)?;
+        self.ai_may_change(&rel, false)?;
         self.refuse_breaking_locked_links(&rel)?;
         // checked again inside the note's lock, right before the move: another
         // writer holding the lock may lock or secure the note meanwhile
@@ -4100,21 +4094,10 @@ impl CorpusStore {
             && (rel == "wiki" || rel.starts_with("wiki/"))
             && (target_folder == "wiki" || target_folder.starts_with("wiki/"))
         {
-            self.filer_move_checked(id, target_folder, &Self::remote_move_policy)
+            self.filer_move_as(id, target_folder, Authority::Agent)
         } else {
-            self.move_note_checked(id, target_folder, &Self::remote_move_policy)
+            self.move_note_as(id, target_folder, Authority::Agent)
         }
-    }
-
-    /// What an external agent's move requires of the note now: the AI read
-    /// gate (secure notes refuse) and not locked.
-    fn remote_move_policy(&mut self, rel: &str) -> Result<(), String> {
-        let text = self.read_for_ai(rel, false)?;
-        let fm = parse_document(&text).0.unwrap_or_default();
-        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
-            return Err("note is locked — an external agent may not move it".into());
-        }
-        Ok(())
     }
 
     pub(crate) fn create_for_remote_agent(
@@ -4935,7 +4918,7 @@ impl CorpusStore {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.guard_rel(&rel)?;
-        crate::fsutil::with_file_lock(&abs, || {
+        self.lock_note(&rel, None, Authority::Person).and_then(|_held| {
             let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
             if crate::fsutil::revision(&current) != expected_revision {
                 let current_text = std::str::from_utf8(&current)
@@ -5129,12 +5112,11 @@ impl CorpusStore {
     /// `target_folder == ""` means the corpus root (no validation, no dir).
     /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
-        self.move_note_checked(id, target_folder, &|_, _| Ok(()))
+        self.move_note_as(id, target_folder, Authority::Person)
     }
 
-    /// `move_note`, with `check` run on the note inside its lock, right before
-    /// it moves.
-    fn move_note_checked(&mut self, id: &str, target_folder: &str, check: &MoveCheck) -> Result<NoteMeta, String> {
+    /// `move_note` on behalf of `authority`, checked inside the note's lock.
+    fn move_note_as(&mut self, id: &str, target_folder: &str, authority: Authority) -> Result<NoteMeta, String> {
         // resolve_note_rel, not path_of: a BOARD (and any surfaced file) travels
         // as its rel path and never enters the ULID index, so path_of refused it
         // outright — "note not found: storage/excalidraw/untitled-2.excalidraw"
@@ -5164,19 +5146,11 @@ impl CorpusStore {
             } else {
                 target_folder.clone()
             };
-            let path = self.abs(&rel);
-            let meta = crate::fsutil::with_file_lock(&path, || {
-                check(self, &rel)?;
-                self.relocate_opaque(&rel, &dest)
-            })?;
+            let meta = self.lock_note(&rel, None, authority).and_then(|_held| self.relocate_opaque(&rel, &dest))?;
             self.follow_moves(&[(rel, meta.id.clone())])?;
             return Ok(meta);
         }
-        let path = self.abs(&rel);
-        let meta = crate::fsutil::with_file_lock(&path, || {
-            check(self, &rel)?;
-            self.relocate(id, &rel, &target_folder)
-        })?;
+        let meta = self.lock_note(&rel, None, authority).and_then(|_held| self.relocate(id, &rel, &target_folder))?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel, new_rel)])?;
         Ok(meta)
@@ -5490,7 +5464,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, Authority::Filer).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -5511,7 +5485,7 @@ impl CorpusStore {
     /// must restore "no file", not leave a 0-byte generated husk behind. Gated
     /// by `filer_writable`. pub(crate): the organizer daemon's RefreshIndex
     /// applies through this same gate — no second write lane.
-    pub(crate) fn write_index(&self, area: &str, body: &str) -> Result<(), String> {
+    pub(crate) fn write_index(&mut self, area: &str, body: &str) -> Result<(), String> {
         self.brain_gate()?;
         if area.contains('/') || area.contains("..") || area.trim().is_empty() {
             return Err(format!("invalid area: {area}"));
@@ -5520,7 +5494,7 @@ impl CorpusStore {
         let dir = self.abs(&map.area_dir(area));
         let rel = map.index_rel(area);
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, Authority::Filer).and_then(|_held| {
             // Re-check after acquiring the same lock used by every other Rotli
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
@@ -5586,12 +5560,12 @@ impl CorpusStore {
     /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
     /// from the note's own frontmatter.
     pub fn filer_move(&mut self, id_or_rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
-        self.filer_move_checked(id_or_rel, target_folder, &|_, _| Ok(()))
+        self.filer_move_as(id_or_rel, target_folder, Authority::Filer)
     }
 
-    /// `filer_move`, with `check` run on the note inside its lock, right
-    /// before it moves.
-    fn filer_move_checked(&mut self, id_or_rel: &str, target_folder: &str, check: &MoveCheck) -> Result<NoteMeta, String> {
+    /// `filer_move` on behalf of `authority`, checked inside the note's lock
+    /// (the filer's own authority re-checks the destination too).
+    fn filer_move_as(&mut self, id_or_rel: &str, target_folder: &str, authority: Authority) -> Result<NoteMeta, String> {
         self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
@@ -5603,11 +5577,9 @@ impl CorpusStore {
         // the store's stable id: a Rotli note's frontmatter ULID, and in a
         // copy the id `.rotli/index.json` keeps for a note with none
         let id = self.wire_id_of(rel)?;
-        let path = self.abs(rel);
-        let meta = crate::fsutil::with_file_lock(&path, || {
-            check(self, rel)?;
-            self.relocate(&id, rel, target_folder)
-        })?;
+        let meta = self
+            .lock_note(rel, Some(target_folder), authority)
+            .and_then(|_held| self.relocate(&id, rel, target_folder))?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel.clone(), new_rel)])?;
         Ok(meta)
@@ -5861,7 +5833,7 @@ impl CorpusStore {
         let previous_manifest = fs::read_to_string(&manifest_path).ok();
         let mut written: Vec<(PathBuf, String, String)> = Vec::new();
         for (path, tag) in &prepared {
-            let result = crate::fsutil::with_file_lock(path, || {
+            let result = self.lock_note_at(path, Authority::Person).and_then(|_held| {
                 // Read only after acquiring the note lock. Building `updated`
                 // from an earlier snapshot could replace a user, CLI, MCP, or
                 // Librarian edit that landed while the view transaction waited.
@@ -5915,9 +5887,9 @@ impl CorpusStore {
     /// Best-effort rollback for a failed multi-file view update. Never replace
     /// bytes written after this transaction: another writer's newer content is
     /// more important than restoring perfect projection consistency.
-    fn rollback_view_note_writes(&self, written: &[(PathBuf, String, String)]) {
+    fn rollback_view_note_writes(&mut self, written: &[(PathBuf, String, String)]) {
         for (path, prior, applied) in written.iter().rev() {
-            let _ = crate::fsutil::with_file_lock(path, || {
+            let _ = self.lock_note_at(path, Authority::Person).and_then(|_held| {
                 let current = crate::fsutil::read_own_text(path).map_err(|error| error.to_string())?;
                 if current == *applied {
                     self.suppress.mark(path);
@@ -8918,6 +8890,10 @@ pub mod rules_store;
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]
 mod ai_rows;
+/// The note lock and the authority checked inside it.
+#[path = "corpus_note_lock.rs"]
+mod note_lock;
+pub(crate) use note_lock::Authority;
 /// The AI edit control on the store: the person's grant (2026-09-29) and the
 /// `/ai` insert lane (2026-10-05).
 #[path = "corpus_ai_edit.rs"]

@@ -35,7 +35,8 @@ const LOCK_STALE: Duration = Duration::from_secs(30);
 const LOCK_ATTEMPTS: u32 = 200;
 const LOCK_WAIT: Duration = Duration::from_millis(50);
 
-struct FileLockGuard(PathBuf);
+/// A held file lock: released (its `.lock` file removed) when dropped.
+pub(crate) struct FileLockGuard(PathBuf);
 
 impl Drop for FileLockGuard {
     fn drop(&mut self) {
@@ -55,6 +56,17 @@ pub(crate) fn with_file_lock_attempts<T>(
     attempts: u32,
     f: impl FnOnce() -> Result<T, String>,
 ) -> Result<T, String> {
+    let _guard = lock_file_attempts(target, attempts)?;
+    f()
+}
+
+/// Hold `target`'s lock until the returned guard drops. A note mutation takes
+/// it through `CorpusStore::lock_note`, which re-checks policy inside it.
+pub(crate) fn lock_file(target: &Path) -> Result<FileLockGuard, String> {
+    lock_file_attempts(target, LOCK_ATTEMPTS)
+}
+
+fn lock_file_attempts(target: &Path, attempts: u32) -> Result<FileLockGuard, String> {
     let lock = PathBuf::from(format!("{}.lock", target.to_string_lossy()));
     let mut guard = None;
     for _ in 0..attempts {
@@ -87,13 +99,12 @@ pub(crate) fn with_file_lock_attempts<T>(
             }
         }
     }
-    let _guard = guard.ok_or_else(|| {
+    guard.ok_or_else(|| {
         format!(
             "another writer is holding {} — try again in a moment",
             lock.display()
         )
-    })?;
-    f()
+    })
 }
 
 /// A slow, healthy writer must never have its lock stolen merely because an

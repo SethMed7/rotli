@@ -45,7 +45,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, super::Authority::Person).and_then(|_held| {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
@@ -75,8 +75,7 @@ impl CorpusStore {
         let trash = lifecycle_disk_folder(self.layout, self.layout.trash_id());
         self.writable(&rel)?;
         self.writable(&trash)?;
-        let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(&rel, None, super::Authority::Agent).and_then(|_held| {
             let text = self.read_for_ai(&rel, false)?;
             let fm = parse_document(&text).0.unwrap_or_default();
             if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {

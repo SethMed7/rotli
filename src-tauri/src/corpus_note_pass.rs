@@ -20,7 +20,7 @@ impl CorpusStore {
             return Ok(false);
         }
         let path = self.abs(rel);
-        crate::fsutil::with_file_lock(&path, || {
+        self.lock_note(rel, None, super::Authority::Person).and_then(|_held| {
             let current = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let Some(text) = next(self, &current) else {
                 return Ok(false);
