@@ -12,38 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **The Librarian as an agent route (off by default).**
-  `rotli mcp --librarian` gives any agent host (T3 Code, Claude Code, Codex) a
-  small set of tools to keep a vault organised the LLM-wiki way: capture a
-  source, propose where a note goes or what it links to, keep a Librarian index
-  and log. How it works is in five skills it serves itself. Secure notes are
-  never shown to it, it writes only through Rotli, and moving or editing your
-  notes is a proposal you approve with `rotli librarian apply`. Turn it on per
-  vault with `"librarianMcp": true` in the vault's `.rotli/settings.json`; a
-  Settings toggle comes next. A vault you create or bring in from that one
-  starts with it off.
-- **The vault threads protocol (a draft spec for host apps).**
-  `docs/architecture/vault-thread-protocol.md` describes how a host such as
-  T3 Code runs a vault as a project with the Librarian in its threads. Rotli
-  doesn't set vault threads up itself yet. The spec denies T3 Code's own
-  tools (`mcp__t3-code`) alongside the file tools and the shell, because T3
-  approves its own tools in every thread and some of them message other
-  threads directly, so a note with hidden instructions could otherwise steer
-  another agent without anyone's yes. Turning vault threads off keeps a
-  file's backup, and the record of it, when you changed that file after the
-  setup edited it, so you can still restore it.
 - **`rotli --version`** prints the version instead of opening the app.
 - **A Tesven app icon:** Rotli's white line quokka on Tesven's One Blue field,
   in Settings → Appearance → App icon.
+- **The Librarian as an agent route, in development builds only.**
+  `rotli mcp --librarian` gives an agent host a small set of tools to keep one
+  vault organised: capture a source, propose where a note goes or what it
+  links to, keep a Librarian index and log. It is off by default even there,
+  and it isn't in the public app yet: like the rest of `rotli mcp`, a public
+  build refuses it, along with `rotli librarian …`, and ignores the vault's
+  `librarianMcp` switch. It stays that way until the problems a review found
+  in it are fixed.
 
 ### Security
 
-- **The Librarian stays in the vault you set it up for.** Each
-  `rotli mcp --librarian` serves one vault, named with `--vault` or the
-  folder it starts in, and refuses to start for anything else. Switching
-  Rotli's default vault never redirects it, so a thread in one vault can't
-  read or write another. It also refuses if the vault folder is replaced by
-  another folder, or a link, while it runs.
+- **AI search and listings show only what the read check approved.** The
+  in-app chat's search and note list for cloud models, and `rotli notes
+  search|list|query`, took titles and snippets from Rotli's cache and then
+  checked the note's current file. A note that was secure a moment earlier
+  could pass that check as its new, public version while the result still
+  showed the secure version's title and snippet. Each result is now built
+  from the same read the check approved.
+- **Notes that are hard links are never read.** A hard link in your vault to
+  a Markdown file somewhere else on your Mac looked like an ordinary note, so
+  opening it, the chat's note reads, and search showed that outside file.
+  Rotli now reads a note only when the file has no other name, and leaves
+  hard-linked notes out of lists and search.
+- **An agent can't move a note you lock while its move waits.** Rotli
+  checks whether the note is secure or locked again at the moment it moves
+  it, not only before waiting its turn.
 - **Secure-note keywords match every spelling.** A keyword like "café" now
   protects a title however its accented letters are typed or stored, and
   full-width letters count as the plain ones. A name the earlier matching
@@ -54,23 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An agent's read can't be swapped mid-read.** Rotli checks a note and
   hands an agent the very same bytes, so a note changed to secure at that
   instant is never sent.
-- **The Librarian's waiting proposals stop showing a note once you make it
-  secure**, or the page it would link to. A proposal remembers that exact
-  page, so another note that has the page's title as an alias can't stand in
-  for it. You still see them all.
-- **The Librarian's files stay inside the vault.** It refuses to read or
-  write its proposals through a link that points elsewhere, at any folder on
-  the way, and refuses a proposals file that is a hard link to another file.
-- **The Librarian rewrites only the index and log it made.** A note of yours
-  with the same title, or that title as an alias, is left alone, and so is a
-  People note the in-app Librarian made for someone called "Librarian
-  index". Its own pages carry a marker only it writes.
 
 ### Fixed
 
-- **Agents can search the vault again.** Claude Code rejected Rotli's search
-  and list results as malformed, because MCP needs them wrapped in an object.
-  They now arrive as `{"items": [...]}`.
 - **Two notes saved with the same name at the same moment both survive.**
   Rotli used to let the later one replace the earlier when two agents (or an
   agent and the app) picked the same file name at once.

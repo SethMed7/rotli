@@ -68,8 +68,9 @@ id repeats (`site/src/roadmap.ts`).
   in the vault through Rotli's own rules: the `rotli mcp` server, the agent
   commands, and the remote relay a Grok Bot connects through
   ([contract](docs/architecture/agent-workspace.md)). Development builds only
-  for now (owner, 2026-10-02: not yet stable), except the opt-in Librarian
-  route (`rotli mcp --librarian`), which every build has from 1.10.0. Built: rename, trash,
+  for now (owner, 2026-10-02: not yet stable). That includes the Librarian
+  route (`rotli mcp --librarian`), off by default and not in the public app
+  until its review findings are fixed (owner, 2026-11-09). Built: rename, trash,
   attachments, several vault roots, `rotli agent config` for each agent, Word
   documents through the running app, and a record of every AI edit. Includes
   a custom Grok Bot that manages Rotli: create, file, search, and organize
