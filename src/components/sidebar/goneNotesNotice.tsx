@@ -7,13 +7,27 @@
 import { useState } from "react";
 
 import { discardGoneNote, keepGoneNote, noteName, useGoneNotes } from "../../editor/model";
+import { pathId } from "../../lib/corpusWireId";
+import { usePanesStore } from "../../state/panes";
+
+/** Keep the words, and let every tab on the deleted note follow them to the
+ * note that was made (words typed meanwhile went with them). */
+async function keepAndFollow(noteId: string): Promise<void> {
+  const kept = await keepGoneNote(noteId);
+  if (kept) usePanesStore.getState().retargetNote(pathId(noteId), pathId(kept));
+}
 
 export const KEEP_WORDS = "Keep as a new note";
 export const DISCARD_WORDS = "Discard";
 
 export function GoneNotesNotice() {
   return (
-    <GoneNotesNoticeView ids={useGoneNotes()} name={noteName} keep={keepGoneNote} discard={discardGoneNote} />
+    <GoneNotesNoticeView
+      ids={useGoneNotes()}
+      name={noteName}
+      keep={keepAndFollow}
+      discard={discardGoneNote}
+    />
   );
 }
 

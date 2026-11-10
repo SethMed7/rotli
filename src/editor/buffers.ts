@@ -128,14 +128,6 @@ export function recordLanded(noteId: string, body: string, revision: string): vo
   persistedBodies.set(noteId, body);
 }
 
-/** The disk no longer holds what the buffer last saved (Rotli's own older
- * write landed late): the same words become unsaved again. */
-export function markUnsaved(noteId: string): void {
-  if (!docs.has(noteId)) return;
-  bumpGeneration(noteId);
-  refreshDirty(noteId);
-}
-
 /** The Tasks projection's checkbox signature after a save landed. */
 export function setTaskSignature(noteId: string, signature: string): void {
   taskSigs.set(noteId, signature);

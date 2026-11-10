@@ -205,8 +205,8 @@ fn a_read_carries_the_effective_protection_the_ipc_sends() {
 }
 
 /// What the harness answers for one IPC command: the same store methods the
-/// Tauri commands call (corpus_read, corpus_write, corpus_create, corpus_move,
-/// corpus_delete, corpus_purge, corpus_set_secure), plus test-only steps:
+/// Tauri commands call (corpus_read, corpus_write, corpus_create, corpus_list,
+/// corpus_move, corpus_delete, corpus_purge, corpus_set_secure), plus test-only steps:
 /// `external` (another app writes the note), `pin`, `notes` (every note's id,
 /// body and protection) and `rel` (the note's path).
 fn harness_answer(store: &mut CorpusStore, cmd: &str, args: &Value) -> Result<Value, String> {
@@ -225,15 +225,14 @@ fn harness_answer(store: &mut CorpusStore, cmd: &str, args: &Value) -> Result<Va
                 )?,
             ))
         }
-        "corpus_create" => {
-            let secure = args["secure"].as_bool().unwrap_or(false);
-            to(serde_json::to_value(store.create_as(
-                &arg("folderId"),
-                &arg("body"),
-                secure,
-                None,
-            )?))
-        }
+        "corpus_create" => to(serde_json::to_value(store.create_protected(
+            &arg("folderId"),
+            &arg("body"),
+            args["secure"].as_bool().unwrap_or(false),
+            args["locked"].as_bool().unwrap_or(false),
+            None,
+        )?)),
+        "corpus_list" => to(serde_json::to_value(store.list()?)),
         "corpus_move" => to(serde_json::to_value(
             store.move_note(&arg("id"), &arg("targetFolder"))?,
         )),
@@ -255,7 +254,7 @@ fn harness_answer(store: &mut CorpusStore, cmd: &str, args: &Value) -> Result<Va
             let mut out = Vec::new();
             for id in ids {
                 let doc = store.read(&id)?;
-                out.push(json!({ "id": id, "body": doc.body, "secure": doc.secure, "folderId": doc.folder_id }));
+                out.push(json!({ "id": id, "body": doc.body, "secure": doc.secure, "locked": doc.locked, "folderId": doc.folder_id }));
             }
             Ok(Value::Array(out))
         }
@@ -277,6 +276,13 @@ fn write_lane_harness() {
             continue;
         }
         let request: Value = serde_json::from_str(&line).unwrap();
+        // Real slowness inside Rust, around the store call: the harness answers
+        // one request at a time, as the app's registry mutex serialises store
+        // operations (corpus.rs), so a slow call holds everything behind it.
+        // Test-only: this module is compiled only under cfg(test).
+        if let Some(ms) = request["delayMs"].as_u64() {
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+        }
         let answer = match harness_answer(
             &mut store,
             request["cmd"].as_str().unwrap_or_default(),

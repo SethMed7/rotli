@@ -37,7 +37,8 @@ export interface FakeLane {
   purge(id: string): void;
 }
 
-export function fakeLane(): FakeLane {
+/** `prefix` names the notes it creates (`<prefix>-1`, …), so lanes never share an id. */
+export function fakeLane(prefix = "note"): FakeLane {
   const files = new Map<string, FakeFile>();
   let next = 0;
   const note = (id: string): Note => {
@@ -76,7 +77,7 @@ export function fakeLane(): FakeLane {
     },
     create(folder, body, policy) {
       next += 1;
-      const id = `note-${next}`;
+      const id = `${prefix}-${next}`;
       const meta = [`id: ${id}`];
       if (policy?.secure) meta.push("secure: true");
       if (policy?.locked) meta.push("locked: true");

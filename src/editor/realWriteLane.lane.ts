@@ -6,8 +6,14 @@
 // the same commands the Tauri shell would, one JSON line each.
 //
 // Run: `bun run test:write-lane` (also the last step of `bun run verify rust`).
-// What it can't show: two windows writing the same note, slow storage inside
-// Rust (a held IPC stands in for a stall), and native paint and window events.
+// It can hold an IPC call before Rust sees it (a stall in transit), make Rust
+// itself sleep before the store call (`delayMs`, answered one request at a
+// time like the app's registry mutex), and lose an answer after Rust did the
+// work (a create whose read-back failed). The schedules replayed here are the
+// ones the save-state explorer (saveExplorer.test.ts) and the seventh review
+// found, translated by hand onto the real store.
+// What it can't show: two windows writing the same note, slow storage below
+// Rust's own calls, and native paint and window events.
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { type ChildProcessByStdio, spawn } from "node:child_process";
@@ -35,8 +41,15 @@ let status: Status;
 const gates: Record<string, { held: boolean; waiting: (() => void)[] }> = {
   corpus_write: { held: false, waiting: [] },
   corpus_create: { held: false, waiting: [] },
+  corpus_read: { held: false, waiting: [] },
 };
+// How long Rust sleeps before the store call, per command; and requests whose
+// answer is lost after Rust did the work (`lose(args)` says which).
+const delays: Record<string, number> = {};
+const losing: Record<string, (args: Record<string, unknown>) => boolean> = {};
+const sent: Record<string, number> = {};
 const ANSWERED = new Set([
+  "corpus_list",
   "corpus_read",
   "corpus_write",
   "corpus_create",
@@ -50,7 +63,8 @@ function rust(cmd: string, args: Record<string, unknown> = {}): Promise<unknown>
   seq += 1;
   const id = seq;
   const answer = new Promise<unknown>((resolve, reject) => pending.set(id, { resolve, reject }));
-  child!.stdin.write(`${JSON.stringify({ seq: id, cmd, args })}\n`);
+  const delayMs = delays[cmd];
+  child!.stdin.write(`${JSON.stringify({ seq: id, cmd, args, ...(delayMs ? { delayMs } : {}) })}\n`);
   return answer;
 }
 
@@ -63,7 +77,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
   }
   const gate = gates[cmd];
   if (gate?.held) await new Promise<void>((resolve) => gate.waiting.push(resolve));
-  return rust(cmd, args);
+  sent[cmd] = (sent[cmd] ?? 0) + 1;
+  const value = await rust(cmd, args);
+  const lose = losing[cmd];
+  if (lose?.(args)) {
+    delete losing[cmd];
+    throw new Error(`${cmd}: the answer was lost`);
+  }
+  return value;
 }
 
 function readAnswers(stream: NodeJS.ReadableStream) {
@@ -125,35 +146,29 @@ afterAll(async () => {
 const settle = () => settleFor(10, 2);
 const until = (ready: () => boolean) => untilFor(ready, 500, 2);
 
-function hold(cmd: "corpus_write" | "corpus_create") {
+type Gated = "corpus_write" | "corpus_create" | "corpus_read";
+function hold(cmd: Gated) {
   gates[cmd]!.held = true;
 }
-async function releaseFirst(cmd: "corpus_write" | "corpus_create") {
-  gates[cmd]!.waiting.shift()?.();
-  await settle();
-}
-async function releaseLast(cmd: "corpus_write" | "corpus_create") {
-  gates[cmd]!.waiting.pop()?.();
-  await settle();
-}
-async function release(cmd: "corpus_write" | "corpus_create") {
+async function release(cmd: Gated) {
   gates[cmd]!.held = false;
   while (gates[cmd]!.waiting.length) gates[cmd]!.waiting.shift()?.();
   await settle();
 }
-const waiting = (cmd: "corpus_write" | "corpus_create") => gates[cmd]!.waiting.length;
+const waiting = (cmd: Gated) => gates[cmd]!.waiting.length;
 
 interface Listed {
   id: string;
   body: string;
   secure: boolean;
+  locked: boolean;
 }
 const everyNote = async () => (await rust("notes")) as Listed[];
 const disk = async (id: string) => (await rust("corpus_read", { id })) as Note & { secure: boolean };
 
 /** A new note in the temporary vault, open in the editor as the app opens one. */
-async function open(body: string, secure = false): Promise<string> {
-  const meta = (await rust("corpus_create", { folderId: "Inbox", body, secure })) as { id: string };
+async function open(body: string, secure = false, locked = false): Promise<string> {
+  const meta = (await rust("corpus_create", { folderId: "Inbox", body, secure, locked })) as { id: string };
   const { notesService } = await import("../services/notes");
   const note = (await notesService.getNote(meta.id))!;
   model.ensureDocument(note.id, note.body, note.revision, note);
@@ -221,46 +236,99 @@ test("F1: a conflict, and words typed while its copy is made, all survive quit",
   expect((await disk(id)).body).toBe("# Conflict\n\noutside");
 });
 
-test("F2: a stalled write names the note within quit's bound; arriving late, after newer words, Rust refuses it", async () => {
+test("1: a write past its bound, then undo: quit refuses until that write lands, and the restored words land last", async () => {
   model.setWriteLimitForTests(60);
   try {
-    const id = await open("# Stall\n\nfirst");
+    const id = await open("# Stall\n\nbase");
     hold("corpus_write");
-    model.setDocumentText(id, "# Stall\n\nchanged");
-    expect(await outcome(model.flushSyncs())).toContain("“Stall”");
-    model.setDocumentText(id, "# Stall\n\nchanged and more");
-    const retry = outcome(model.flushSyncs());
-    await until(() => waiting("corpus_write") === 2);
-    await releaseLast("corpus_write"); // the retry lands
-    await release("corpus_write"); // the stalled write arrives late
-    await retry;
-    await outcome(model.flushSyncs());
-    expect((await disk(id)).body).toBe("# Stall\n\nchanged and more");
-    expect(status.isDirty(id)).toBe(false);
+    model.setDocumentText(id, "# Stall\n\nobsolete");
+    expect(await outcome(model.flushSyncs(200))).toContain("“Stall” is still waiting on the disk");
+    model.setDocumentText(id, "# Stall\n\nbase"); // restored
+    expect(await outcome(model.flushSyncs(200))).toContain("“Stall” is still waiting on the disk");
+    expect(waiting("corpus_write")).toBe(1); // nothing went out beside it
+    await release("corpus_write"); // Rust accepts it: the body still equals its base
+    expect(await outcome(model.flushSyncs())).toBe("done");
+    expect((await disk(id)).body).toBe("# Stall\n\nbase");
   } finally {
     model.setWriteLimitForTests(null);
   }
 });
 
-test("F2: the stalled write lands between the retry's read and its write: Rotli's own words never merge back in", async () => {
+test("real delay inside Rust: an honest write past the bound is waited for, and one write at a time goes out", async () => {
+  model.setWriteLimitForTests(40);
+  delays.corpus_write = 150; // Rust sleeps before the store call, holding everything behind it
+  try {
+    const id = await open("# Slow\n\nfirst");
+    const before = sent.corpus_write ?? 0;
+    model.setDocumentText(id, "# Slow\n\nA");
+    const quit = outcome(model.flushSyncs(80));
+    await settle();
+    model.setDocumentText(id, "# Slow\n\nA and B"); // typed while Rust sleeps
+    expect(await quit).toContain("“Slow” is still waiting on the disk");
+    expect((sent.corpus_write ?? 0) - before).toBe(1);
+    expect(await outcome(model.flushSyncs(2000))).toBe("done");
+    expect((await disk(id)).body).toBe("# Slow\n\nA and B");
+    expect((sent.corpus_write ?? 0) - before).toBe(2);
+  } finally {
+    delete delays.corpus_write;
+    model.setWriteLimitForTests(null);
+  }
+});
+
+test("2: keep a deleted note's words and type while it is made: the newest words go to that one note", async () => {
+  const id = await open("# Kept\n\nfirst", true);
+  model.setDocumentText(id, "# Kept\n\nmine");
+  await rust("corpus_delete", { id });
+  await rust("corpus_purge", { id });
+  await model.flushNote(id).catch(() => {});
+  hold("corpus_create");
+  const kept = model.keepGoneNote(id);
+  await until(() => waiting("corpus_create") === 1);
+  model.setDocumentText(id, "# Kept\n\nmine, and more"); // typed while the note is made
+  await release("corpus_create");
+  const madeId = await kept;
+  expect(await outcome(model.flushSyncs())).toBe("done");
+  const notes = (await everyNote()).filter((note) => note.body.startsWith("# Kept"));
+  expect(notes.map((note) => ({ id: note.id, body: note.body, secure: note.secure }))).toEqual([
+    { id: madeId!, body: "# Kept\n\nmine, and more", secure: true },
+  ]);
+});
+
+test("3: a read that never answers is left behind at the bound: the conflict is copied once the disk answers", async () => {
   model.setWriteLimitForTests(60);
   try {
-    const id = await open("# Late\n\nfirst");
-    hold("corpus_write");
-    model.setDocumentText(id, "# Late\n\nchanged");
-    await outcome(model.flushSyncs());
-    model.setDocumentText(id, "# Late\n\nfirst"); // typed back
-    const retry = outcome(model.flushSyncs());
-    await until(() => waiting("corpus_write") === 2);
-    await releaseFirst("corpus_write"); // the stalled write lands first
-    await release("corpus_write");
-    await retry;
-    await outcome(model.flushSyncs());
-    expect((await disk(id)).body).toBe("# Late\n\nfirst");
-    expect((await everyNote()).filter((note) => note.body.includes("Late"))).toHaveLength(1);
+    const id = await open("# Unread\n\nbase");
+    model.setDocumentText(id, "# Unread\n\nmine");
+    await rust("external", { id, body: "# Unread\n\ntheirs" });
+    hold("corpus_read");
+    expect(await outcome(model.flushSyncs(400))).toContain("“Unread”");
+    await release("corpus_read");
+    expect(await outcome(model.flushSyncs())).toBe("done");
+    const copies = (await everyNote()).filter((note) => note.body.startsWith("# Unread (unsaved edits"));
+    expect(copies.map((note) => note.body.split("\n")[2])).toEqual(["mine"]);
+    expect((await disk(id)).body).toBe("# Unread\n\ntheirs");
   } finally {
     model.setWriteLimitForTests(null);
   }
+});
+
+test("a conflict copy whose create answered with an error is found, not made twice", async () => {
+  const id = await open("# Twice\n\nbase");
+  model.setDocumentText(id, "# Twice\n\nmine");
+  await rust("external", { id, body: "# Twice\n\ntheirs" });
+  losing.corpus_create = () => true; // Rust made the copy; the answer is lost
+  expect(await outcome(model.flushSyncs())).toBe("done");
+  const copies = (await everyNote()).filter((note) => note.body.startsWith("# Twice (unsaved edits"));
+  expect(copies).toHaveLength(1);
+});
+
+test("5: a locked note's conflict copy is locked, from the native create", async () => {
+  const id = await open("# Locked\n\nbase", false, true);
+  model.setDocumentText(id, "# Locked\n\nmine");
+  await rust("external", { id, body: "# Locked\n\ntheirs" });
+  expect(await outcome(model.flushSyncs())).toBe("done");
+  const copy = (await everyNote()).find((note) => note.body.startsWith("# Locked (unsaved edits"));
+  expect(copy).toMatchObject({ secure: false, locked: true });
 });
 
 test("F3: a note purged with unsaved words: quit names it until the words are kept, protected", async () => {

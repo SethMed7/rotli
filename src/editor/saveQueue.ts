@@ -4,43 +4,53 @@
 // and it saves the newest buffer against the revision the first produced. Two
 // writes on the same base revision lost the newest typing in 1.9.1 and 1.8.0
 // (fifth review of pull request 267); recovery running beside the queue lost
-// it again (sixth review). Buffers are buffers.ts's; this file decides when to
-// write and what a write's outcome means.
+// it again (sixth review).
+//
+// A slow disk gets a message, never a second attempt (seventh review): every
+// write and every recovery note's creation is waited for until it settles, so
+// at most one change per note is ever on its way to the disk. After the bound
+// the note says, by name, that it is taking longer than expected; its words
+// stay in the buffer, it reads unsaved, and quit names it. Starting a second
+// attempt beside an unresolved one is what let an old write land after quit
+// was acknowledged. A read changes nothing, so a slow read is left behind.
+//
+// Buffers are buffers.ts's; this file decides when to write and what a write's
+// outcome means. src/editor/saveExplorer.test.ts searches its schedules.
 
 import { useSyncExternalStore } from "react";
 
 import { applyNoteWrite } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
-import { inboxFolderId, notesService } from "../services/notes";
+import { inboxFolderId } from "../services/notes";
 import type { Note } from "../types";
 import {
   adopt,
   baselineOf,
   bufferLines,
   bufferText,
+  edit,
   forget,
   hasBuffer,
   isPendingDocument,
-  markUnsaved,
   recordLanded,
   refreshDirty,
   revisionOf,
+  seed,
   setTaskSignature,
   taskSignatureOf,
 } from "./buffers";
 import { threeWayMerge } from "./merge";
+import { clock, type TimerHandle } from "./saveClock";
 import { editGeneration, hasUnsavedEdits } from "./saveGenerations";
+import { bounded, lane, type Protection, slowAfter } from "./saveLane";
 import { dirtyNoteIds, documentSaveError, isDirty, setSaveError } from "./saveStatus";
 import { taskSignature } from "./taskState";
-import { protectionOf } from "./unsavedDrafts";
+import { protectionOf, setDocumentProtection } from "./unsavedDrafts";
 
 const SYNC_DEBOUNCE_MS = 400;
 // a failed write retries on its own — waiting for the next keystroke would
 // leave a note that's done being typed in unsaved forever
 const RETRY_DELAY_MS = 5000;
-/** How long one write may take before the note says it didn't finish. The
- * write itself can't be cancelled; the queue moves on and checks the disk. */
-let writeLimitMs = 8000;
 /** What a caller hears while a note is still being saved. */
 export const STILL_SAVING = "Still saving. Try again in a moment.";
 /** How long a flush waits for writes before it gives up (the writes go on). */
@@ -48,47 +58,36 @@ const FLUSH_LIMIT_MS = 10_000;
 /** Quit's own bound, inside Rust's 15 seconds, so the refusal names the notes. */
 const QUIT_LIMIT_MS = 12_000;
 
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-const running = new Map<string, { kind: "write" | "recovery"; done: Promise<void> }>();
+type Recovery = { id: string; revision: string; body: string };
+
+const timers = new Map<string, TimerHandle>();
+const running = new Map<string, { kind: "write" | "recovery"; done: Promise<unknown> }>();
 const queued = new Map<string, Promise<void>>();
 // the notes whose timer is a retry after a failed save rather than new typing
 const retrying = new Set<string>();
-// A write that hit the bound: its body, until the retry has read the disk.
-const stalled = new Map<string, string>();
-// Bodies of writes that hit the bound and haven't settled: if one of them is
-// what a conflict finds on disk, it's Rotli's own late write, not an outside
-// edit, and the buffer (newer) wins.
-const lateBodies = new Map<string, Set<string>>();
+// Notes whose one change on its way to the disk passed the bound, and what
+// each one says.
+const slow = new Map<string, string>();
+// Bodies of this note's writes that failed without saying whether they landed
+// (the answer was lost after the write): if the disk later holds one, it is
+// Rotli's own, not another app's.
+const unsure = new Map<string, Set<string>>();
+// The recovery note made for each event (a conflict at one disk revision, or a
+// deletion), so a later round updates it rather than making another; and the
+// events whose creation answered with an error (it may still have landed).
+const recoveries = new Map<string, Recovery>();
+const attempted = new Set<string>();
+const stamps = new Map<string, string>();
 // Notes deleted while they had unsaved words, waiting for the person's choice.
 const gone = new Set<string>();
 const goneSubs = new Set<() => void>();
 
-// The write lane, the read and the create — swappable so tests can drive a
-// fake that follows Rust's contract, or the real Rust store (harness).
-type WriteBody = (noteId: string, body: string, revision: string, base: string) => Promise<Note | void>;
-type ReadNote = (noteId: string) => Promise<Note | null>;
-type CreateNote = (
-  folderId: string,
-  body: string,
-  protection: { secure: boolean; locked: boolean },
-) => Promise<Note>;
-const lane = {
-  write: ((id, body, revision, base) => notesService.updateNote(id, body, revision, base)) as WriteBody,
-  read: ((id) => notesService.getNote(id)) as ReadNote,
-  create: ((folder, body, protection) => notesService.createNote(folder, body, protection)) as CreateNote,
-};
-const defaults = { ...lane };
-export function setWriteNoteBodyForTests(fn: WriteBody | null): void {
-  lane.write = fn ?? defaults.write;
-}
-export function setReadNoteForTests(fn: ReadNote | null): void {
-  lane.read = fn ?? defaults.read;
-}
-export function setCreateNoteForTests(fn: CreateNote | null): void {
-  lane.create = fn ?? defaults.create;
-}
-export function setWriteLimitForTests(ms: number | null): void {
-  writeLimitMs = ms ?? 8000;
+/** Forget every note's queue, as a fresh process would start (the save-state
+ * explorer runs thousands of schedules in one process). */
+export function resetSaveQueueForTests(): void {
+  for (const timer of timers.values()) clock.clearTimeout(timer);
+  for (const set of [timers, running, queued, retrying, slow, unsure, recoveries, attempted, stamps, gone])
+    set.clear();
 }
 
 /** The note's name, for messages that must say which note. */
@@ -104,7 +103,7 @@ const isGone = (error: unknown) =>
   error instanceof Error && /^(unknown note|note not found)/.test(error.message);
 
 /** Run `op` as the note's one operation, after whatever is running or queued. */
-function exclusive(noteId: string, kind: "write" | "recovery", op: () => Promise<void>): Promise<void> {
+function exclusive<T>(noteId: string, kind: "write" | "recovery", op: () => Promise<T>): Promise<T> {
   const before = queued.get(noteId) ?? running.get(noteId)?.done;
   if (before) {
     const again = () => exclusive(noteId, kind, op);
@@ -118,6 +117,29 @@ function exclusive(noteId: string, kind: "write" | "recovery", op: () => Promise
   };
   void done.then(settle, settle);
   return done;
+}
+
+/** A change on its way to the disk for `noteId` (a write, or a recovery note's
+ * creation). It is waited for until it settles: past the bound the note says
+ * so, by name, and nothing is cancelled or started beside it. */
+async function mutation<T>(noteId: string, change: () => Promise<T>): Promise<T> {
+  // what the note said before (a conflict, say) comes back when the disk answers
+  let before: string | null = null;
+  const timer = clock.setTimeout(() => {
+    const words = `${noteName(noteId)} is taking longer than expected to save. Its words are kept here; Rotli waits for the disk before it tries anything else`;
+    before = documentSaveError(noteId);
+    slow.set(noteId, words);
+    setSaveError(noteId, words);
+    refreshDirty(noteId);
+  }, slowAfter());
+  try {
+    return await change();
+  } finally {
+    clock.clearTimeout(timer);
+    const words = slow.get(noteId);
+    slow.delete(noteId);
+    if (words && documentSaveError(noteId) === words) setSaveError(noteId, before);
+  }
 }
 
 /** Save the note's newest buffer. With an operation already running, wait for
@@ -145,33 +167,25 @@ export function syncNow(noteId: string): Promise<void> {
 
 async function writeNow(noteId: string): Promise<void> {
   if (gone.has(noteId)) return;
-  if (stalled.has(noteId)) await checkStalled(noteId);
   const lines = bufferLines(noteId);
   const expectedRevision = revisionOf(noteId);
   const expectedBody = baselineOf(noteId);
-  if (!lines) return;
+  // the newest edit has already landed (a timer outlived it): nothing to write
+  if (!lines || !hasUnsavedEdits(noteId)) return;
   if (!expectedRevision)
     return setSaveError(noteId, "This note has no save revision. Reload it before editing.");
   if (expectedBody === undefined)
     return setSaveError(noteId, "This note has no saved-body baseline. Reload it before editing.");
   const generation = editGeneration(noteId);
   const body = lines.join("\n");
-  const write = lane.write(noteId, body, expectedRevision, expectedBody);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const result = await Promise.race([
-    write.then(
-      (note) => ({ landed: note }),
-      (error: unknown) => ({ error }),
-    ),
-    new Promise<"stalled">((resolve) => {
-      timer = setTimeout(() => resolve("stalled"), writeLimitMs);
-    }),
-  ]);
-  clearTimeout(timer);
-  if (result === "stalled") return onStall(noteId, body, write);
-  if ("error" in result) return onFailure(noteId, result.error);
+  let note: Note | void;
+  try {
+    note = await mutation(noteId, () => lane.write(noteId, body, expectedRevision, expectedBody));
+  } catch (error) {
+    return onFailure(noteId, error, body);
+  }
   setSaveError(noteId, null);
-  const note = result.landed;
+  unsure.delete(noteId);
   if (note) recordLanded(noteId, body, note.revision);
   // what this write carried is on disk; typing since keeps the note unsaved
   adopt(noteId, generation, { saved: true });
@@ -190,75 +204,43 @@ async function writeNow(noteId: string): Promise<void> {
 /** Any failure (read-only volume, permissions, disk full) keeps the buffer AND
  * says so: the note stays unsaved, the editor shows the error, and a retry
  * timer keeps the sync alive even with no further keystroke. */
-async function onFailure(noteId: string, error: unknown): Promise<void> {
-  if (isGone(error)) {
-    gone.add(noteId);
-    for (const fn of goneSubs) fn();
-    setSaveError(noteId, `${noteName(noteId)} was deleted while it had unsaved words`);
-    refreshDirty(noteId);
-    return;
-  }
+async function onFailure(noteId: string, error: unknown, body: string): Promise<void> {
+  if (isGone(error)) return markGone(noteId);
   setSaveError(noteId, error instanceof Error ? error.message : String(error));
   refreshDirty(noteId);
-  // A conflict never retries blindly: it gets ONE honest attempt at
-  // self-resolution, inside this operation, before anything else writes.
+  // A conflict wrote nothing, and never retries blindly: it gets ONE honest
+  // attempt at self-resolution, inside this operation, before anything else
+  // writes.
   if (isConflict(error)) return reconcileFromDisk(noteId);
+  // Anything else may have been written before it failed.
+  const mine = unsure.get(noteId) ?? new Set<string>();
+  mine.add(body);
+  unsure.set(noteId, mine);
   scheduleRetry(noteId);
 }
 
-/** The write didn't finish within the bound. The note says so, by name; its
- * words stay in the buffer and the recovery copy; the retry reads the disk
- * first (did it land?) and writes against what it finds. A late landing is
- * handled when it comes, in the queue. */
-function onStall(noteId: string, body: string, write: Promise<Note | void>): void {
-  stalled.set(noteId, body);
-  const late = lateBodies.get(noteId) ?? new Set<string>();
-  late.add(body);
-  lateBodies.set(noteId, late);
-  setSaveError(
-    noteId,
-    `${noteName(noteId)} didn’t finish saving in time; Rotli checks what reached the disk before it tries again`,
-  );
+function markGone(noteId: string): void {
+  gone.add(noteId);
+  for (const fn of goneSubs) fn();
+  setSaveError(noteId, `${noteName(noteId)} was deleted while it had unsaved words`);
   refreshDirty(noteId);
-  scheduleRetry(noteId);
-  const settled = (landed: Note | void | null) =>
-    void exclusive(noteId, "recovery", async () => {
-      if (landed) adoptOwnLanding(noteId, body, landed.revision);
-      lateBodies.get(noteId)?.delete(body);
-    });
-  write.then(settled, () => settled(null));
-}
-
-/** Rotli's own stalled write is on disk at `revision`. The buffer is the
- * person's newest words, so it wins: the baseline moves to the disk, and the
- * buffer saves again unless it already says the same. */
-function adoptOwnLanding(noteId: string, body: string, revision: string): void {
-  if (!hasBuffer(noteId) || revisionOf(noteId) === revision) return;
-  recordLanded(noteId, body, revision);
-  if (documentSaveError(noteId)) setSaveError(noteId, null);
-  if (bufferText(noteId) === body) {
-    adopt(noteId, editGeneration(noteId), { saved: true });
-    return;
-  }
-  markUnsaved(noteId);
-  scheduleSync(noteId);
-}
-
-/** Before a retry after a stall: read the disk. */
-async function checkStalled(noteId: string): Promise<void> {
-  const body = stalled.get(noteId)!;
-  stalled.delete(noteId);
-  const disk = await lane.read(noteId).catch(() => null);
-  if (!disk) return;
-  if (disk.body === body) adoptOwnLanding(noteId, body, disk.revision);
-  else if (disk.revision !== revisionOf(noteId)) reloadDocument(noteId, disk.body, disk.revision);
 }
 
 async function reconcileFromDisk(noteId: string): Promise<void> {
-  const note = await lane.read(noteId).catch(() => null);
+  const note = await bounded(() => lane.read(noteId));
   if (!note || !isDirty(noteId)) return;
-  if (lateBodies.get(noteId)?.has(note.body)) return adoptOwnLanding(noteId, note.body, note.revision);
+  if (unsure.get(noteId)?.has(note.body)) return rebaseOnOwn(noteId, note);
   reloadDocument(noteId, note.body, note.revision);
+}
+
+/** The disk holds a write of Rotli's own whose answer was lost: it becomes the
+ * base, and the buffer (the person's newest words) saves on it. */
+function rebaseOnOwn(noteId: string, note: Note): void {
+  unsure.delete(noteId);
+  recordLanded(noteId, note.body, note.revision);
+  setSaveError(noteId, null);
+  if (bufferText(noteId) === note.body) adopt(noteId, editGeneration(noteId), { saved: true });
+  else scheduleSync(noteId);
 }
 
 /** Disk truth for a note that has a buffer. A clean buffer takes it; one with
@@ -272,6 +254,9 @@ export function reloadDocument(noteId: string, body: string, revision: string): 
     adopt(noteId, generation, { disk, lines: body.split("\n"), saved: true });
     return;
   }
+  // a write of Rotli's own may have landed without saying so: the true base
+  // isn't known, so nothing is merged and the conflict stays visible
+  if (unsure.has(noteId)) return;
   const base = baselineOf(noteId);
   const moved = revisionOf(noteId) !== revision;
   if (base !== body) {
@@ -287,29 +272,93 @@ export function reloadDocument(noteId: string, body: string, revision: string): 
   scheduleSync(noteId);
 }
 
+/** The recovery note for one event, made at most once. A later round with
+ * newer words updates it; after a creation that answered with an error (it
+ * may have landed), Rotli looks for it before making another. */
+async function recoveryNote(
+  noteId: string,
+  event: string,
+  folder: string,
+  body: string,
+  protection: Protection,
+): Promise<Recovery> {
+  let made = recoveries.get(event);
+  if (!made && attempted.has(event)) {
+    const found = await bounded(() => lane.find(folder, body));
+    if (found) made = { id: found.id, revision: found.revision, body: found.body };
+  }
+  if (made) {
+    if (made.body !== body) made = await updateRecovery(noteId, made, body);
+  } else {
+    attempted.add(event);
+    let note: Note | null;
+    try {
+      note = await mutation(noteId, () => lane.create(folder, body, protection));
+    } catch (error) {
+      note = (await bounded(() => lane.find(folder, body))) ?? null;
+      if (!note) throw error;
+    }
+    made = { id: note.id, revision: note.revision, body };
+  }
+  recoveries.set(event, made);
+  attempted.delete(event);
+  return made;
+}
+
+/** Newer words into a recovery note already made for the same event. */
+async function updateRecovery(noteId: string, made: Recovery, body: string): Promise<Recovery> {
+  try {
+    const written = await mutation(noteId, () => lane.write(made.id, body, made.revision, made.body));
+    return { id: made.id, revision: written ? written.revision : made.revision, body };
+  } catch (error) {
+    // the answer may have been lost after the write: look before trying again
+    const now = await bounded(() => lane.read(made.id));
+    if (now?.body !== body) throw error;
+    return { id: made.id, revision: now.revision, body };
+  }
+}
+
 /** Quit must never be held hostage by a conflict. The unsaved buffer becomes a
- * sibling note (same folder, title suffixed, same protection) and the open
- * note adopts the disk version, unless the person typed while the copy was
- * made: then the newer words stay and the next round copies them too. */
+ * sibling note (same folder, title suffixed, same protection and lock) and the
+ * open note adopts the disk version, read again after the copy is made. Words
+ * typed while the copy was made stay in the buffer, and the next round writes
+ * them into the same copy. */
 async function keepConflictCopy(noteId: string): Promise<void> {
   if (!isDirty(noteId) || !documentSaveError(noteId)?.startsWith("revision conflict")) return;
   const generation = editGeneration(noteId);
   const mine = bufferText(noteId);
-  const note = await lane.read(noteId).catch(() => null);
+  const note = await bounded(() => lane.read(noteId));
+  // No file to read (or no answer; a Mac read says null for both): the write
+  // lane tells the two apart. One attempt: it lands, says the note is gone, or
+  // conflicts again.
+  if (note === null) return writeNow(noteId);
   if (mine === undefined || !note) return;
-  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  // the "conflict" is Rotli's own write whose answer was lost: no copy
+  if (unsure.get(noteId)?.has(note.body)) return rebaseOnOwn(noteId, note);
+  const event = `${noteId}@${note.revision}`;
+  const stamp = stamps.get(event) ?? new Date(clock.now()).toISOString().slice(0, 16).replace("T", " ");
+  stamps.set(event, stamp);
   const body = mine.startsWith("# ")
     ? mine.replace(/^# (.*)$/m, `# $1 (unsaved edits ${stamp})`)
     : `# Unsaved edits ${stamp}\n\n${mine}`;
   try {
     // a read that can't say the note is unprotected counts as protected
-    await lane.create(note.folderId, body, { secure: note.secure !== false, locked: note.locked === true });
+    await recoveryNote(noteId, event, note.folderId, body, {
+      secure: note.secure !== false,
+      locked: note.locked === true,
+    });
   } catch {
     return; // still unsaved: quit reports it
   }
-  const disk = { body: note.body, revision: note.revision };
-  if (adopt(noteId, generation, { disk, lines: note.body.split("\n"), saved: true }))
+  // the file may have changed again while the copy was made
+  const now = await bounded(() => lane.read(noteId));
+  if (!now || now.revision !== note.revision) return;
+  const disk = { body: now.body, revision: now.revision };
+  if (adopt(noteId, generation, { disk, lines: now.body.split("\n"), saved: true })) {
     setSaveError(noteId, null);
+    recoveries.delete(event);
+    stamps.delete(event);
+  }
 }
 
 function scheduleRetry(noteId: string): void {
@@ -317,7 +366,7 @@ function scheduleRetry(noteId: string): void {
   retrying.add(noteId);
   timers.set(
     noteId,
-    setTimeout(() => {
+    clock.setTimeout(() => {
       timers.delete(noteId);
       retrying.delete(noteId);
       void syncNow(noteId);
@@ -328,11 +377,11 @@ function scheduleRetry(noteId: string): void {
 export function scheduleSync(noteId: string): void {
   refreshDirty(noteId);
   if (isPendingDocument(noteId) || gone.has(noteId)) return;
-  clearTimeout(timers.get(noteId));
+  clock.clearTimeout(timers.get(noteId));
   retrying.delete(noteId);
   timers.set(
     noteId,
-    setTimeout(() => {
+    clock.setTimeout(() => {
       timers.delete(noteId);
       void syncNow(noteId);
     }, SYNC_DEBOUNCE_MS),
@@ -342,10 +391,10 @@ export function scheduleSync(noteId: string): void {
 /** Forget a note's queue state (its buffer is going away). Running writes
  * finish; their outcome finds no buffer and changes nothing. */
 export function forgetQueue(noteId: string): void {
-  clearTimeout(timers.get(noteId));
+  clock.clearTimeout(timers.get(noteId));
   timers.delete(noteId);
   retrying.delete(noteId);
-  stalled.delete(noteId);
+  unsure.delete(noteId);
   if (gone.delete(noteId)) for (const fn of goneSubs) fn();
 }
 
@@ -355,12 +404,12 @@ export function forgetQueue(noteId: string): void {
  * the saves or the writes don't settle within `limitMs`; the saves are never
  * cancelled. What every read for a model waits on first. */
 export async function flushNote(noteId: string, limitMs = FLUSH_LIMIT_MS): Promise<void> {
-  const deadline = Date.now() + limitMs;
-  while (Date.now() < deadline) {
+  const deadline = clock.now() + limitMs;
+  while (clock.now() < deadline) {
     const pending = timers.get(noteId);
     // new typing is saved now; a retry after a failed save is left to its timer
     if (pending !== undefined && !retrying.has(noteId)) {
-      clearTimeout(pending);
+      clock.clearTimeout(pending);
       timers.delete(noteId);
       void syncNow(noteId);
     }
@@ -373,9 +422,9 @@ export async function flushNote(noteId: string, limitMs = FLUSH_LIMIT_MS): Promi
 }
 
 async function settlesBy(work: Promise<unknown>, deadline: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: TimerHandle | undefined;
   const outOfTime = new Promise<false>((resolve) => {
-    timer = setTimeout(() => resolve(false), Math.max(0, deadline - Date.now()));
+    timer = clock.setTimeout(() => resolve(false), Math.max(0, deadline - clock.now()));
   });
   const settled = await Promise.race([
     work.then(
@@ -384,7 +433,7 @@ async function settlesBy(work: Promise<unknown>, deadline: number): Promise<bool
     ),
     outOfTime,
   ]);
-  clearTimeout(timer);
+  clock.clearTimeout(timer);
   return settled;
 }
 
@@ -405,6 +454,7 @@ function outstanding(noteId: string): string | null {
   const name = noteName(noteId);
   if (gone.has(noteId))
     return `${name} was deleted while it had unsaved words: keep them as a new note or discard them`;
+  if (slow.has(noteId)) return `${name} is still waiting on the disk: its words are kept here, not saved`;
   const work = running.get(noteId);
   if (work?.kind === "recovery") return `${name} is still being recovered`;
   if (work || queued.has(noteId)) return `${name} is still saving`;
@@ -419,14 +469,15 @@ function outstanding(noteId: string): string | null {
 /** The quit and reload path: save every note now. Resolves only when no note
  * has a timer, a queued write, a running write or recovery, or unsaved edits
  * outstanding; otherwise rejects, naming each note and what is outstanding,
- * within its own bound (Rust's 15-second wait is the backstop). */
+ * within its own bound (Rust's 15-second wait is the backstop). A write still
+ * on its way to the disk always refuses quit: it could land afterwards. */
 export async function flushSyncs(limitMs = QUIT_LIMIT_MS): Promise<void> {
-  const deadline = Date.now() + limitMs;
-  for (let round = 0; round < 6 && Date.now() < deadline; round += 1) {
+  const deadline = clock.now() + limitMs;
+  for (let round = 0; round < 6 && clock.now() < deadline; round += 1) {
     for (const [noteId, timer] of [...timers]) {
       // a retry after a failure gets one attempt per quit, not one per round
       if (round > 0 && retrying.has(noteId)) continue;
-      clearTimeout(timer);
+      clock.clearTimeout(timer);
       timers.delete(noteId);
       retrying.delete(noteId);
       void syncNow(noteId);
@@ -457,6 +508,9 @@ export async function flushSyncs(limitMs = QUIT_LIMIT_MS): Promise<void> {
 // ——— a note deleted while it had unsaved words (sixth review, F3): the
 // person chooses, in plain words; either choice lets quit complete. ———
 
+/** The notes waiting for the person's choice, read once (not a hook). */
+export const goneNotes = (): string[] => [...gone];
+
 export function useGoneNotes(): string[] {
   return useSyncExternalStore((fn) => {
     goneSubs.add(fn);
@@ -470,23 +524,33 @@ function goneSnapshot(): string[] {
 }
 
 /** Keep the words as a new note in the Inbox, protected as the deleted note
- * was (or protected, when that isn't known). */
-export function keepGoneNote(noteId: string): Promise<void> {
+ * was (or protected, when that isn't known). Words typed while it is made go
+ * with the buffer to that note (seventh review: they were left behind), and
+ * the old buffer is retired only then. Resolves with the new note's id, so
+ * the tab can follow it. */
+export function keepGoneNote(noteId: string): Promise<string | null> {
   return exclusive(noteId, "recovery", async () => {
-    const text = bufferText(noteId);
-    if (!gone.has(noteId) || text === undefined) return;
-    const protection = protectionOf(noteId);
-    await lane.create(inboxFolderId, text, {
-      secure: protection?.secure ?? true,
-      locked: protection?.locked ?? false,
-    });
+    if (!gone.has(noteId) || !hasBuffer(noteId)) return null;
+    const generation = editGeneration(noteId);
+    const protection = protectionOf(noteId) ?? { secure: true, locked: false };
+    const event = `${noteId}@deleted`;
+    const made = await recoveryNote(noteId, event, inboxFolderId, bufferText(noteId)!, protection);
+    recoveries.delete(event);
+    const newest = [...bufferLines(noteId)!];
+    seed(made.id, made.body.split("\n"), { body: made.body, revision: made.revision });
+    setDocumentProtection(made.id, protection);
+    if (editGeneration(noteId) !== generation || newest.join("\n") !== made.body) {
+      edit(made.id, newest);
+      scheduleSync(made.id);
+    }
     letGo(noteId);
+    return made.id;
   });
 }
 
-/** Let the words go. */
+/** Let the words go; not while they are being kept (that choice was made). */
 export function discardGoneNote(noteId: string): void {
-  if (gone.has(noteId)) letGo(noteId);
+  if (gone.has(noteId) && running.get(noteId)?.kind !== "recovery") letGo(noteId);
 }
 
 const letGo = (noteId: string) => {

@@ -29,6 +29,7 @@ import {
   subscribe,
   viewers,
 } from "./buffers";
+import { clock } from "./saveClock";
 import { editGeneration } from "./saveGenerations";
 import { flushSyncs, forgetQueue, queueBusy, reloadDocument, scheduleSync } from "./saveQueue";
 import { documentSaveError, isDirty, setSaveError } from "./saveStatus";
@@ -36,16 +37,19 @@ import { draftsOf, setDocumentProtection, type UnsavedDraft } from "./unsavedDra
 
 export { documentSaveError, useDocumentDirty, useDocumentSaveError } from "./saveStatus";
 export {
+  setCreateNoteForTests,
+  setFindNoteForTests,
+  setReadNoteForTests,
+  setWriteLimitForTests,
+  setWriteNoteBodyForTests,
+} from "./saveLane";
+export {
   discardGoneNote,
   flushNote,
   flushSyncs,
   keepGoneNote,
   noteName,
   saveState,
-  setCreateNoteForTests,
-  setReadNoteForTests,
-  setWriteLimitForTests,
-  setWriteNoteBodyForTests,
   STILL_SAVING,
   useGoneNotes,
 } from "./saveQueue";
@@ -123,7 +127,7 @@ export function reloadDocumentIfClean(noteId: string, body: string, revision: st
 /** Drop a note's buffer + pending sync. The hook for the delete path — a dead
  * buffer must never keep shadowing (or writing over) service state. */
 export function evictDocument(noteId: string): void {
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.delete(noteId);
   forgetQueue(noteId);
   forget(noteId);
@@ -179,10 +183,10 @@ function releasable(noteId: string): boolean {
 }
 
 function scheduleRelease(noteId: string): void {
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.set(
     noteId,
-    setTimeout(() => {
+    clock.setTimeout(() => {
       releaseTimers.delete(noteId);
       if (!hasBuffer(noteId) || viewers(noteId)) return;
       // still unsaved, saving, or failed: look again later rather than keep
@@ -194,7 +198,7 @@ function scheduleRelease(noteId: string): void {
 }
 
 function subscribeDocument(noteId: string, fn: () => void): () => void {
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.delete(noteId);
   return subscribe(noteId, fn, () => scheduleRelease(noteId));
 }
