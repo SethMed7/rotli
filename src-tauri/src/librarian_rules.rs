@@ -332,6 +332,13 @@ pub(crate) fn people_group_area(area: &str, rules: &LibrarianRules) -> Option<St
 
 #[cfg(test)]
 mod tests {
+    /// Librarian Activity recognises the refusal by its first words
+    /// (src/components/librarianSettingsNotice.tsx SETTINGS_UNREADABLE).
+    #[test]
+    fn the_settings_refusal_keeps_the_words_activity_recognises() {
+        assert!(super::SETTINGS_UNREADABLE.starts_with("Rotli couldn’t read this vault’s settings"));
+    }
+
     use super::*;
 
     fn kw(list: &[&str]) -> Vec<String> {

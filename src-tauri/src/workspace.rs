@@ -302,7 +302,7 @@ impl Workspace {
             // and a board's or a file's from its path, in its own lane
             let shown = match meta.kind {
                 NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
-                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false),
+                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false).map(|marked| marked.row),
                 _ => None,
             };
             kept.extend(shown);
@@ -349,7 +349,7 @@ impl Workspace {
             .search(query, limit.saturating_mul(4).max(limit), false)?;
         // each hit is gated and shown from one read (review 2026-11-09)
         let mut hits: Vec<SearchHit> =
-            hits.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false)).collect();
+            hits.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false).map(|marked| marked.row)).collect();
         hits.truncate(limit.min(100));
         for hit in &mut hits {
             hit.id = self.wire(&hit.id);

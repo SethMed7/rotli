@@ -2262,6 +2262,11 @@ pub struct SkippedFile {
     /// Its path, relative to the vault (root-prefixed like a folder id).
     pub path: String,
     pub reason: SkipReason,
+    /// A note's id from the previous walk, when it had one: a tab already
+    /// open on it keeps resolving, and reads the hard-link refusal rather
+    /// than "note not found" (fourth review of pull request 267).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -2338,6 +2343,11 @@ pub struct CorpusAiRead {
     /// `/ai` checks its view against.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub editor: Option<String>,
+    /// The gate passed it only because the reader is on-device (a remote
+    /// reader would be refused): the app keeps a conversation built from it
+    /// on-device from then on (fourth review of pull request 267).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub on_device_only: bool,
 }
 
 /// A memex's board lane: where a board is born when the caller's folder isn't a
@@ -6764,7 +6774,13 @@ fn walk(
         // listed, so no board, file, or note row points at one; the listing
         // says it left it out, so the person is told (third review)
         if kind.is_file() && !fs::symlink_metadata(entry.path()).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
-            skipped.push(SkippedFile { path: rel, reason: SkipReason::HardLink });
+            // a note the last walk knew keeps its id → path entry, so a read
+            // by that id still reaches this file and is refused as a hard link
+            let id = reverse.get(&rel).filter(|id| !new_index.contains_key(*id)).cloned();
+            if let Some(id) = &id {
+                new_index.insert(id.clone(), rel.clone());
+            }
+            skipped.push(SkippedFile { path: rel, reason: SkipReason::HardLink, id });
             continue;
         }
         // The REFERENCE lane (2026-08-01): identity/ personality/ history/
@@ -7559,7 +7575,7 @@ pub async fn corpus_search_ai(
     include_reference: Option<bool>,
     model_id: String,
     endpoint: String,
-) -> Result<Vec<SearchHit>, String> {
+) -> Result<Vec<ai_rows::AiRow<SearchHit>>, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
@@ -7578,7 +7594,7 @@ fn search_ai_inner(
     limit: Option<usize>,
     include_reference: Option<bool>,
     model_is_local: bool,
-) -> Result<Vec<SearchHit>, String> {
+) -> Result<Vec<ai_rows::AiRow<SearchHit>>, String> {
     let hits = corpus_search_inner(state, query, limit, include_reference)?;
     let mut permitted = Vec::with_capacity(hits.len());
     for hit in hits {
@@ -7592,7 +7608,7 @@ fn search_ai_inner(
 }
 
 /// `corpus_notes_ai`'s work: each row gated and shown from one read.
-fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<NoteMeta>, String> {
+fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<ai_rows::AiRow<NoteMeta>>, String> {
     let listed = corpus_list_inner(state, false)?;
     let reference = corpus_reference_notes_inner(state)?;
     let mut permitted = Vec::new();
@@ -7617,7 +7633,7 @@ pub async fn corpus_notes_ai(
     app: tauri::AppHandle,
     model_id: String,
     endpoint: String,
-) -> Result<Vec<NoteMeta>, String> {
+) -> Result<Vec<ai_rows::AiRow<NoteMeta>>, String> {
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
@@ -8361,23 +8377,10 @@ pub fn corpus_read_ai(
     let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
     let (root, rel) = split_root_id(&id);
     state.route(&root, |s| {
-        read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
+        ai_rows::read_ai_versioned(s, &rel, model_is_local, with_editor.unwrap_or(false))
     })
 }
 
-fn read_ai_versioned(
-    store: &mut CorpusStore,
-    rel: &str,
-    model_is_local: bool,
-    with_editor: bool,
-) -> Result<CorpusAiRead, String> {
-    let body = store.read_for_ai(rel, model_is_local)?;
-    Ok(CorpusAiRead {
-        revision: crate::fsutil::revision(body.as_bytes()),
-        editor: with_editor.then(|| ai_journal::editor_text(&body).to_string()),
-        body,
-    })
-}
 
 /// Batch form of the AI read-permission probe (perf audit 2026-07-30, #4):
 /// which of `ids` may this model read? The verdict comes from the EXACT same
@@ -8921,6 +8924,8 @@ pub mod rules_store;
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]
 pub mod ai_rows;
+#[cfg(test)]
+use ai_rows::read_ai_versioned;
 /// The note lock and the authority checked inside it.
 #[path = "corpus_note_lock.rs"]
 mod note_lock;

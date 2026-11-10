@@ -149,7 +149,7 @@ fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     fs::write(&abs, &public).unwrap(); // public again, with no walk in between
 
     let shown: Vec<SearchHit> =
-        hits.into_iter().filter_map(|hit| store.search_row_for_ai("harbor", &hit.id, false)).collect();
+        hits.into_iter().filter_map(|hit| store.search_row_for_ai("harbor", &hit.id, false).map(|marked| marked.row)).collect();
     assert_eq!(shown.len(), 1, "the public note is still found");
     assert!(!format!("{shown:?}").contains(CANARY), "{shown:?}");
     assert_eq!(shown[0].title, HARBOR_TITLE);
@@ -524,4 +524,65 @@ fn an_ai_search_sees_an_in_app_save_at_once_and_an_outside_edit_after_the_watche
     assert!(search_ai_inner(&state, "dusk", None, None, false).unwrap().is_empty());
     state.route(DEFAULT_ROOT_ID, |s| { s.suppress.bump(); Ok(()) }).unwrap();
     assert_eq!(search_ai_inner(&state, "midnight", None, None, false).unwrap().len(), 1, "after the watcher");
+}
+
+/// Fourth review (#4): a note open in a tab that is then given a second name
+/// outside the vault reads, by its original id, the hard-link refusal (which
+/// the open tab shows as the notice), not "note not found", after the next
+/// listing rebuild; and the listing names it with that id.
+#[cfg(unix)]
+#[test]
+fn an_open_note_given_a_hard_link_keeps_its_id_and_reads_the_refusal() {
+    let (dir, mut store) = bare();
+    let note = store.create("Inbox", "# Harbor\n\nordinary words\n").unwrap();
+    let rel = store.resolve_note_rel(&note.id).unwrap();
+    store.read(&note.id).unwrap();
+    store.list().unwrap();
+    fs::hard_link(store.abs(&rel), dir.path().join("second-name.md")).unwrap();
+    store.suppress.bump();
+    let list = store.list().unwrap();
+    assert!(list.skipped.iter().any(|s| s.path == rel && s.id.as_deref() == Some(note.id.as_str())), "{:?}", list.skipped);
+    let error = store.read(&note.id).unwrap_err();
+    assert!(error.contains("has a hard link"), "{error}");
+}
+
+/// Fourth review (#1): every AI answer says when the gate passed it only
+/// because the reader is on-device. A secure note read by an on-device model
+/// is marked in the listing, search, the Librarian's People rows and the
+/// read; a public note never is; a remote reader never gets the secure one.
+#[test]
+fn the_gate_marks_what_only_an_on_device_reader_may_see() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("brain");
+    fs::create_dir_all(&root).unwrap();
+    alternating_memex(&root);
+    fs::create_dir_all(root.join("wiki/People")).unwrap();
+    fs::write(root.join("wiki/People/velmora.md"), "---\nsecure: true\n---\n\n# Velmora\n\nharbor pilot\n").unwrap();
+    fs::write(root.join("wiki/People/ana.md"), "# Ana\n\nharbor pilot too\n").unwrap();
+    let mut store = CorpusStore::open(root).unwrap();
+    store.os_trash = false;
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    let marked = |rows: Vec<(String, bool)>, title: &str| rows.into_iter().find(|(t, _)| t == title).map(|(_, m)| m);
+
+    let local: Vec<(String, bool)> = notes_ai_inner(&state, true).unwrap().into_iter().map(|r| (r.title.clone(), r.on_device_only)).collect();
+    assert_eq!(marked(local.clone(), "Velmora"), Some(true));
+    assert_eq!(marked(local, "Ana"), Some(false));
+    let remote: Vec<(String, bool)> = notes_ai_inner(&state, false).unwrap().into_iter().map(|r| (r.title.clone(), r.on_device_only)).collect();
+    assert_eq!(marked(remote, "Velmora"), None);
+
+    let hits: Vec<(String, bool)> = search_ai_inner(&state, "pilot", None, None, true).unwrap().into_iter().map(|h| (h.title.clone(), h.on_device_only)).collect();
+    assert_eq!(marked(hits.clone(), "Velmora"), Some(true));
+    assert_eq!(marked(hits, "Ana"), Some(false));
+
+    let people = ai_rows::librarian_ai_inner(&state, true).unwrap();
+    let json = serde_json::to_string(&people).unwrap();
+    assert!(json.contains("\"title\":\"Velmora\"") && json.contains("\"onDeviceOnly\":true"), "{json}");
+
+    let read = state.route(DEFAULT_ROOT_ID, |s| read_ai_versioned(s, "wiki/People/velmora.md", true, false)).unwrap();
+    assert!(read.on_device_only);
+    let public = state.route(DEFAULT_ROOT_ID, |s| read_ai_versioned(s, "wiki/People/ana.md", true, false)).unwrap();
+    assert!(!public.on_device_only);
+    assert!(state.route(DEFAULT_ROOT_ID, |s| read_ai_versioned(s, "wiki/People/velmora.md", false, false)).is_err());
 }

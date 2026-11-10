@@ -331,14 +331,18 @@ pub(crate) fn is_json_object(contents: &str) -> bool {
 
 /// Keep a copy of the settings file at `path` when what's there won't parse,
 /// before it is replaced. A missing or readable file needs nothing; a file
-/// that can't be read at all (a disk error) is never replaced.
+/// that can't be read at all (a disk error) is never replaced. A hard link
+/// is a second name for another file: its words are never copied into the
+/// vault, and replacing it breaks only the link (fourth review of pull
+/// request 267: this read used to go through the link).
 pub(crate) fn keep_unreadable_settings(path: &Path) -> Result<(), String> {
-    match std::fs::read_to_string(path) {
+    match read_own_text(path) {
         Ok(old) if !is_json_object(&old) => set_aside_unreadable(path)
             .map(|_| ())
             .ok_or_else(|| "could not keep a copy of the unreadable settings; not replacing them".into()),
         Ok(_) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) if std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file() && !has_one_name(&m)) => Ok(()),
         Err(error) => Err(format!("could not read the settings ({error}); not replacing them")),
     }
 }
@@ -383,6 +387,18 @@ mod set_aside_tests {
             .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains(".unreadable-"))
             .count();
         assert_eq!(copies, 2);
+    }
+
+    /// Fourth review: a hard-linked settings file's words (another file's)
+    /// are never copied into the vault; replacing it breaks only the link.
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_linked_settings_file_is_not_copied_into_the_vault() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let _outside = super::hard_link_outside(&path, b"words from beyond the vault");
+        keep_unreadable_settings(&path).unwrap();
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "no copy made");
     }
 
     #[test]
