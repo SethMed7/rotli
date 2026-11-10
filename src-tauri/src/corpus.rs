@@ -363,6 +363,7 @@ fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 }
 
 fn read_config_path(path: &Path) -> Option<CorpusConfig> {
+    // raw read: app config outside any vault
     fs::read_to_string(path)
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -545,6 +546,7 @@ pub fn seed_demo_memex(root: &Path) -> Result<(), String> {
 /// A memex marked demo-only in its own config (`memex.json` `demo: true`) — hidden
 /// from onboarding/detection; only opened while demo mode is on.
 pub fn is_demo_memex(root: &Path) -> bool {
+    // raw read: a vault's memex.json demo flag
     fs::read_to_string(root.join("memex.json"))
         .ok()
         .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
@@ -580,6 +582,7 @@ pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
 fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
     let demo = demo_root(app)?;
     let stamp = demo.join(DOT_DIR).join("demo-seed-version");
+    // raw read: the demo seed stamp in app data
     let current = fs::read_to_string(&stamp).ok();
     if !is_memex_root(&demo) || current.as_deref() != Some(DEMO_SEED_VERSION) {
         let _ = seed_demo_memex(&demo);
@@ -699,6 +702,7 @@ struct LegacyInstance {
 }
 
 fn read_txt_pointer(config_dir: &Path, name: &str) -> Option<PathBuf> {
+    // raw read: app config outside any vault
     let raw = fs::read_to_string(config_dir.join(name)).ok()?;
     let t = raw.trim();
     if t.is_empty() {
@@ -763,6 +767,7 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
 /// via memexId.
 fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
     let read_roots = || {
+        // raw read: app config outside any vault
         fs::read_to_string(config_dir.join("corpus-roots.json"))
             .ok()
             .and_then(|t| serde_json::from_str::<RootRegistry>(&t).ok())
@@ -803,6 +808,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
         }
     }
 
+    // raw read: app config outside any vault
     let legacy: LegacyInstances = fs::read_to_string(config_dir.join("memex-instances.json"))
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -874,6 +880,7 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
+    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
     let raw = fs::read_to_string(&src).map_err(|e| format!("carry settings: {e}"))?;
     let carried = match serde_json::from_str::<serde_json::Value>(&raw) {
         Ok(serde_json::Value::Object(mut settings)) if settings.contains_key(LIBRARIAN_MCP_SETTING) => {
@@ -2402,7 +2409,7 @@ fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
 /// blank is exactly what discard destroys and what a rewrite starts from
 /// (audit 2026-07-29: fail-open reads).
 fn read_existing_text(path: &Path) -> Result<String, String> {
-    match fs::read_to_string(path) {
+    match crate::fsutil::read_own_text(path) {
         Ok(text) => Ok(text),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
         Err(e) => Err(format!("couldn't read the existing file: {e}")),
@@ -2982,7 +2989,7 @@ impl CorpusStore {
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
         }
-        let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         self.write_file_bytes(rel, bytes, bak)?;
         Ok(crate::fsutil::revision(bytes))
@@ -3092,7 +3099,7 @@ impl CorpusStore {
                 GENERATED_PDF_SOURCE_MAX_BYTES / 1_000_000
             ));
         }
-        let text = fs::read_to_string(abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (frontmatter, raw) = parse_document(&text);
         let frontmatter = frontmatter.unwrap_or_default();
         let body = editor_body(raw);
@@ -3165,7 +3172,7 @@ impl CorpusStore {
     fn read_frontmatter(&mut self, id_or_rel: &str) -> Result<FrontmatterView, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(&rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
         let (fm_opt, body) = parse_document(&text);
         let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
@@ -3249,7 +3256,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| locked_field(l).is_none());
@@ -3273,7 +3280,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.pinned = Some(pinned);
@@ -3306,7 +3313,7 @@ impl CorpusStore {
         self.writable(rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| field_key(l) != Some(key));
@@ -3334,7 +3341,7 @@ impl CorpusStore {
         id_or_rel: &str,
     ) -> Result<crate::fsutil::VersionedText, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         Ok(crate::fsutil::VersionedText {
             contents: raw_frontmatter_block(&text).to_string(),
             revision: crate::fsutil::revision(text.as_bytes()),
@@ -3365,7 +3372,7 @@ impl CorpusStore {
         self.writable(&rel)?;
         let path = self.abs(&rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
             if out == text {
@@ -3419,7 +3426,7 @@ impl CorpusStore {
     /// protected folder (None when it was already there, or when unsecuring).
     fn set_secure_resolved(&mut self, rel: &str, secure: bool) -> Result<Option<NoteMeta>, String> {
         let path = self.abs(rel);
-        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
         let mut fm = fm.unwrap_or_default();
         if !secure && looks_secure(body) {
@@ -3494,7 +3501,7 @@ impl CorpusStore {
             rel.to_string()
         };
         let final_path = self.abs(&final_rel);
-        let final_text = fs::read_to_string(&final_path).map_err(|e| e.to_string())?;
+        let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
         final_fm.foreign.retain(|line| {
@@ -3541,7 +3548,7 @@ impl CorpusStore {
         names.sort();
         for name in names {
             let rel = format!("{intake}/{name}");
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else {
+            let Ok(text) = crate::fsutil::read_own_text(&self.abs(&rel)) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);
@@ -3593,7 +3600,7 @@ impl CorpusStore {
             return Err("A folder opened in place keeps its notes where they are; there is nothing to move.".into());
         }
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, _) = parse_document(&text);
         let fm = fm.unwrap_or_default();
         if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
@@ -3642,7 +3649,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
@@ -3778,6 +3785,18 @@ impl CorpusStore {
             return Err(format!("not a file: {rel}"));
         }
         crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))
+    }
+
+    /// An absolute path the webview's asset protocol will read by itself.
+    /// That read can't use a checked descriptor, so a file with a second name
+    /// (a hard link that can be a file outside the vault) is refused here, the
+    /// last point Rotli decides (second review of PR #267).
+    pub(crate) fn webview_path(&self, rel: &str) -> Result<String, String> {
+        let abs = self.guard_rel(rel)?;
+        if fs::symlink_metadata(&abs).is_ok_and(|m| m.is_file() && !crate::fsutil::has_one_name(&m)) {
+            return Err(format!("not a file of its own: {rel}"));
+        }
+        Ok(abs.to_string_lossy().into_owned())
     }
 
     pub(crate) fn read_file_bytes_for_ai(
@@ -3948,7 +3967,7 @@ impl CorpusStore {
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
             let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
             let landed_rel = self.path_of(id_or_rel)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             let editor = match mode {
                 AiWrite::Replace | AiWrite::ConsentedReplace => ai_journal::AiEditor::chat(model_is_local),
@@ -4023,7 +4042,7 @@ impl CorpusStore {
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let meta = self.write_resolved(id, body, rel.clone())?;
             let landed_rel = self.path_of(id)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             let editor = ai_journal::AiEditor::agent(undo_of);
             self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, true, &editor);
@@ -4178,6 +4197,7 @@ impl CorpusStore {
         let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) else {
             return;
         };
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         if let Ok(text) = fs::read_to_string(&path) {
             if let Ok(file) = serde_json::from_str::<IndexFile>(&text) {
                 self.index = file.notes;
@@ -4752,7 +4772,7 @@ impl CorpusStore {
     ) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(&rel)).map_err(|e| e.to_string())?;
+        let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, raw) = parse_document(&text);
         let body = match &fm {
             Some(_) => editor_body(raw),
@@ -4916,7 +4936,7 @@ impl CorpusStore {
         self.writable(&rel)?;
         let abs = self.guard_rel(&rel)?;
         crate::fsutil::with_file_lock(&abs, || {
-            let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+            let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
             if crate::fsutil::revision(&current) != expected_revision {
                 let current_text = std::str::from_utf8(&current)
                     .map_err(|e| format!("read {rel} as UTF-8: {e}"))?;
@@ -4932,7 +4952,7 @@ impl CorpusStore {
             }
             let meta = self.write_resolved(id, body, rel.clone())?;
             let landed_rel = self.path_of(id)?;
-            let landed = fs::read(self.guard_rel(&landed_rel)?)
+            let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
             Ok(CorpusWriteResult {
                 meta,
@@ -5231,7 +5251,7 @@ impl CorpusStore {
     fn relocate(&mut self, id: &str, rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "move or delete")?;
         let abs = self.abs(rel);
-        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
         let had_frontmatter = fm.is_some();
         let body = match &fm {
@@ -5435,7 +5455,7 @@ impl CorpusStore {
         }
         let abs = self.abs(rel);
         if abs.is_file() {
-            let text = fs::read_to_string(&abs).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&abs).map_err(|e| e.to_string())?;
             let fm = parse_document(&text).0.unwrap_or_default();
             let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
             if locked {
@@ -5471,7 +5491,7 @@ impl CorpusStore {
         self.filer_writable(rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| field_key(l) != Some(key));
@@ -5526,7 +5546,7 @@ impl CorpusStore {
     pub fn file_note(&mut self, id_or_rel: &str) -> Result<NoteMeta, String> {
         self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&self.abs(rel)).map_err(|e| format!("read {rel}: {e}"))?;
         let area = parse_document(&text)
             .0
             .unwrap_or_default()
@@ -5616,6 +5636,7 @@ impl CorpusStore {
     /// Read the whole brain journal (`""` when none yet).
     pub fn journal_read(&self) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         Ok(fs::read_to_string(path).unwrap_or_default())
     }
 
@@ -5631,6 +5652,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
         crate::fsutil::with_file_lock(&path, || {
+            // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
             let text = fs::read_to_string(&path).unwrap_or_default();
             if text.is_empty() {
                 return Ok(0);
@@ -5835,6 +5857,7 @@ impl CorpusStore {
         }
 
         let manifest_path = self.root.join(DOT_DIR).join("views.json");
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         let previous_manifest = fs::read_to_string(&manifest_path).ok();
         let mut written: Vec<(PathBuf, String, String)> = Vec::new();
         for (path, tag) in &prepared {
@@ -5842,7 +5865,7 @@ impl CorpusStore {
                 // Read only after acquiring the note lock. Building `updated`
                 // from an earlier snapshot could replace a user, CLI, MCP, or
                 // Librarian edit that landed while the view transaction waited.
-                let original = fs::read_to_string(path)
+                let original = crate::fsutil::read_own_text(path)
                     .map_err(|error| format!("read {}: {error}", path.display()))?;
                 let updated = if self.keeps_as_written(&original) {
                     in_place::with_top_level_line(&original, "view_tag", tag.as_deref())
@@ -5895,7 +5918,7 @@ impl CorpusStore {
     fn rollback_view_note_writes(&self, written: &[(PathBuf, String, String)]) {
         for (path, prior, applied) in written.iter().rev() {
             let _ = crate::fsutil::with_file_lock(path, || {
-                let current = fs::read_to_string(path).map_err(|error| error.to_string())?;
+                let current = crate::fsutil::read_own_text(path).map_err(|error| error.to_string())?;
                 if current == *applied {
                     self.suppress.mark(path);
                     atomic_write(path, prior)?;
@@ -6138,7 +6161,7 @@ impl CorpusStore {
         }
         self.writable(id)?;
         let abs = self.guard_rel(id)?;
-        let current = fs::read(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {id}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         let meta = self.write_board(id, body)?;
         Ok(CorpusWriteResult {
@@ -6429,6 +6452,7 @@ impl CorpusStore {
     /// so removing the shelved Glass feature never deletes user data.
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         match fs::read_to_string(&path) {
             Ok(s) => Ok(s),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
@@ -6727,6 +6751,11 @@ fn walk(
             Err(_) => continue,
         };
         if kind.is_dir() && is_skipped_dir(&name) {
+            continue;
+        }
+        // a file with a second name can be a file outside the vault: never
+        // listed, so no board, file, or note row points at one
+        if kind.is_file() && !fs::symlink_metadata(entry.path()).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
             continue;
         }
         // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
@@ -8044,9 +8073,7 @@ pub fn corpus_abs(
     rel: String,
 ) -> Result<String, String> {
     validate_rel(&rel)?;
-    state.route(&root_id, |s| {
-        Ok(s.guard_rel(&rel)?.to_string_lossy().into_owned())
-    })
+    state.route(&root_id, |s| s.webview_path(&rel))
 }
 
 /// The note's frontmatter for the metadata panel (read-only display + lock state).
@@ -8717,6 +8744,7 @@ pub fn corpus_settings_read(
     file: String,
 ) -> Result<String, String> {
     if let Some(path) = dev_machine_dot_path(&app, &file) {
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         return match fs::read_to_string(&path) {
             Ok(s) => Ok(s),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
@@ -8726,6 +8754,7 @@ pub fn corpus_settings_read(
     // settings/viewstate live in the DEFAULT root's `.rotli/` — except in
     // demo mode, where per-machine chrome stays with the user's real corpus (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         return match fs::read_to_string(&path) {
             Ok(s) => Ok(s),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),

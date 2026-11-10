@@ -40,6 +40,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
         crate::fsutil::with_file_lock(&path, || {
+            // raw read: the vault's .gitignore, edited for a secure note
             let Ok(existing) = fs::read_to_string(&path) else {
                 return Ok(());
             };

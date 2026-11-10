@@ -1075,6 +1075,7 @@ struct BrainRootView {
 /// `CorpusStore::brain_enabled`: missing file/field ⇒ on; a real IO error ⇒
 /// off (fail closed on the consent boundary).
 fn root_brain_enabled(root: &std::path::Path) -> bool {
+    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
     match std::fs::read_to_string(root.join(".rotli").join("settings.json")) {
         Ok(s) => serde_json::from_str::<serde_json::Value>(&s)
             .ok()
@@ -1699,6 +1700,7 @@ fn write_new_vault_settings(
     let dot = root.join(".rotli");
     std::fs::create_dir_all(&dot).map_err(|e| format!("create {}: {e}", dot.display()))?;
     let path = dot.join("settings.json");
+    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
     let mut value = std::fs::read_to_string(&path)
         .ok()
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())

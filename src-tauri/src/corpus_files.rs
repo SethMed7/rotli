@@ -60,6 +60,7 @@ impl CorpusStore {
         if size > crate::board::BOARD_MAX_BYTES as u64 {
             return Err("this board is larger than Rotli opens".into());
         }
+        // raw read: a board the person drops from outside the vault, copied in
         let body = fs::read_to_string(src).map_err(|e| format!("read the board: {e}"))?;
         let name = src
             .file_stem()

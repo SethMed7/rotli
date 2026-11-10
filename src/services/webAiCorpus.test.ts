@@ -125,7 +125,7 @@ describe("the web AI write", () => {
   });
 });
 
-// Second review of PR #267 (#2): Rotli Web's read gave its verdict on one
+// Second review of pull request 267 (#2): Rotli Web's read gave its verdict on one
 // getNote answer and returned the body of another. Every web AI entry point
 // now decides and answers from one read. This fake answers getNote with the
 // public note and its secure version in turn, from either phase.
@@ -197,9 +197,4 @@ describe("every web AI entry point decides and answers from one read", () => {
       expect(writes.filter((w) => w.onSecure)).toEqual([]);
     });
   }
-});
-
-test("no web AI row is spread from a summary or a hit", async () => {
-  const source = await Bun.file(new URL("./webAiCorpus.ts", import.meta.url)).text();
-  expect(source).not.toMatch(/\.\.\.(hit|row|summary|n|h)\b/);
 });

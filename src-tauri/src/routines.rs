@@ -251,7 +251,7 @@ fn prepare_runtime_stage(
     fs::copy(source.join("defaults/bun.lock"), next.join("bun.lock"))
         .map_err(|error| format!("stage Breve runtime lockfile: {error}"))?;
     let skill = next.join("skills/breve/SKILL.md");
-    if let Ok(text) = fs::read_to_string(&skill) {
+    if let Ok(text) = fs::read_to_string(&skill) {  // raw read: the Breve runtime's bundled skill outside any vault
         let root = home.parent().and_then(Path::parent).unwrap_or(home);
         fs::write(&skill, crate::breve::materialize_skill_text(&text, root, home))
             .map_err(|error| format!("materialize {}: {error}", skill.display()))?;
@@ -295,7 +295,7 @@ fn commit_runtime_swap(runtime: &Path, next: &Path, previous: &Path) -> Result<(
         });
     }
     if let Some(parent) = runtime.parent() {
-        if let Ok(directory) = fs::File::open(parent) {
+        if let Ok(directory) = fs::File::open(parent) {  // raw read: opens a directory to sync it
             let _ = directory.sync_all();
         }
     }
@@ -458,7 +458,7 @@ fn scheduler_command(root: &Path) -> Result<Child, String> {
     let logs = home.join("logs");
     fs::create_dir_all(&logs).map_err(|e| format!("create {}: {e}", logs.display()))?;
     let log_path = logs.join("rotli-supervisor.log");
-    let stdout = OpenOptions::new()
+    let stdout = OpenOptions::new()  // raw read: the scheduler's log in app data
         .create(true)
         .append(true)
         .open(&log_path)

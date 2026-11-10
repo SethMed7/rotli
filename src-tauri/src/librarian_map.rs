@@ -200,6 +200,7 @@ fn rotli_owned(roles: &FolderRoles, rel: &str) -> bool {
 /// to each note, not one folder, so it names nothing here.
 fn obsidian_set_aside(root: &Path) -> Vec<String> {
     let setting = |file: &str, key: &str| -> Option<String> {
+        // raw read: the vault's .obsidian settings, read as config
         let text = std::fs::read_to_string(root.join(".obsidian").join(file)).ok()?;
         let value: serde_json::Value = serde_json::from_str(&text).ok()?;
         let path = value.get(key)?.as_str()?.trim();

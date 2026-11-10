@@ -10,6 +10,7 @@ pub(super) fn read_text(path: &Path) -> Option<String> {
     if meta.file_type().is_symlink() || !meta.is_file() || meta.len() > MAX_TEXT_BYTES {
         return None;
     }
+    // raw read: a Breve library file outside any vault
     fs::read_to_string(path).ok()
 }
 

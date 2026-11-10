@@ -2,7 +2,6 @@
 //! without limit, so the listing never reads it whole: the frontmatter lives in
 //! the HEAD window and the newest reply in the TAIL window.
 
-use std::fs;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 
@@ -19,7 +18,7 @@ use time::{Date, Month, OffsetDateTime};
 /// (read_to_string failed → ""); the head read now returns it, so such a chat
 /// gains its real title/pinned instead of the "Untitled" fallback.
 pub(crate) fn frontmatter_head(p: &Path) -> String {
-    let Ok(f) = fs::File::open(p) else {
+    let Ok(f) = crate::fsutil::open_own_file(p) else {
         return String::new();
     };
     let mut reader = BufReader::new(f).take(32 * 1024);
@@ -45,7 +44,7 @@ const TAIL_WINDOW: u64 = 64 * 1024;
 /// so a send — which writes the person's turn at once — leaves the chat in
 /// place, and the arriving answer lifts it to the top (the owner, 2026-10-15).
 pub(crate) fn last_reply_ms(p: &Path) -> u64 {
-    let Ok(mut f) = fs::File::open(p) else {
+    let Ok(mut f) = crate::fsutil::open_own_file(p) else {
         return 0;
     };
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
@@ -97,6 +96,7 @@ fn stamp_ms(at: &str) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use super::*;
 
     fn chat_with(body: &str) -> (tempfile::TempDir, std::path::PathBuf) {

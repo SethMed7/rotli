@@ -36,6 +36,7 @@ fn checked_bundle_id(bundle_id: &str) -> Result<&str, String> {
 
 pub(crate) fn status(services: &Path) -> Installed {
     let info = workflow_dir(services).join("Contents/Info.plist");
+    // raw read: the Finder Quick Action's Info.plist in the user's Services folder
     match fs::read_to_string(&info) {
         Ok(text) if text.contains(&format!("<key>{MARKER}</key>")) => Installed::Ours,
         Ok(_) => Installed::Theirs,

@@ -80,6 +80,7 @@ pub(crate) fn debug_drops() -> bool {
 pub(crate) fn debug_log(line: &str) {
     eprintln!("rotli: {line}");
     let path = std::env::temp_dir().join("rotli-drops-debug.log");
+    // raw read: a debug log in app data
     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         use std::io::Write;
         let _ = writeln!(file, "{} rotli: {line}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));

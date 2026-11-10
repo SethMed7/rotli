@@ -6,7 +6,6 @@
 //! Declared as a CHILD of `corpus` (`#[path]` mod in corpus.rs) so it reuses
 //! the store's own gates and the secure flow (ignore before move).
 
-use std::fs;
 
 use super::{
     editor_body, parse_document, secure_field, title_of, CorpusState, CorpusStore, Layout,
@@ -79,7 +78,7 @@ impl CorpusStore {
         rels.sort();
         let mut protected = 0;
         for rel in rels {
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else {
+            let Ok(text) = crate::fsutil::read_own_text(&self.abs(&rel)) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);

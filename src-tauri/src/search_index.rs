@@ -356,6 +356,7 @@ fn regex_escape(s: &str) -> String {
 }
 
 fn read_stamp(dir: &Path) -> Option<u32> {
+    // raw read: the search index's own stamp in app data
     let raw = fs::read_to_string(dir.join(META_FILE)).ok()?;
     serde_json::from_str::<serde_json::Value>(&raw)
         .ok()?

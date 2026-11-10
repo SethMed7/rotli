@@ -120,6 +120,7 @@ pub(crate) fn export_markdown_pdf_bytes_themed(
             format!("themed PDF renderer: {}", detail.chars().take(300).collect::<String>())
         });
     }
+    // raw read: the renderer's output in a private temp folder
     let bytes = fs::read(&output).map_err(|error| format!("read rendered PDF: {error}"))?;
     if !bytes.starts_with(b"%PDF-") {
         return Err("the themed PDF renderer did not produce a valid PDF copy".into());
@@ -228,6 +229,13 @@ fn pdf_text_for_docx(source: &Path) -> Result<String, String> {
 pub(crate) fn convert_document_bytes(source: &Path, ext: &str) -> Result<Vec<u8>, String> {
     let temp =
         tempfile::tempdir().map_err(|error| format!("create conversion workspace: {error}"))?;
+    // The converters read by path, so they get a private copy made through the
+    // checked open: never a hard link to a file outside the vault (second
+    // review of PR #267).
+    let own = temp.path().join(format!("source.{ext}"));
+    let bytes = crate::fsutil::read_own_bytes(source).map_err(|error| format!("read the source: {error}"))?;
+    fs::write(&own, bytes).map_err(|error| format!("prepare the source: {error}"))?;
+    let source = own.as_path();
     let output = temp.path().join("editable.docx");
     let input = if ext == "pdf" {
         let input = temp.path().join("editable.txt");
@@ -258,6 +266,7 @@ pub(crate) fn convert_document_bytes(source: &Path, ext: &str) -> Result<Vec<u8>
             format!("The macOS document converter failed: {detail}")
         });
     }
+    // raw read: the converter's output in a private temp folder
     let bytes = fs::read(&output).map_err(|error| format!("read converted DOCX: {error}"))?;
     if !bytes.starts_with(b"PK") {
         return Err("The local converter did not produce a valid DOCX package.".into());
@@ -295,6 +304,17 @@ mod tests {
             assert!(bytes.starts_with(b"%PDF-"));
             assert!(bytes.len() > 1_000);
         }
+    }
+
+    /// Second review of PR #267 (#3): the converter read its source by path,
+    /// so a hard-linked source brought an outside file into the vault.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_hard_linked_source_is_never_converted() {
+        let vault = tempfile::TempDir::new().unwrap();
+        let abs = vault.path().join("Docs/linked.rtf");
+        let _outside = crate::fsutil::hard_link_outside(&abs, b"{\\rtf1 words from beyond the vault}");
+        assert!(convert_document_bytes(&abs, "rtf").is_err());
     }
 
     #[cfg(target_os = "macos")]

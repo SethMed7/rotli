@@ -39,7 +39,7 @@ function meta(note: NoteSummary): CorpusNoteMeta {
 /** The web's answer to the Rust read gate, over one notes service.
  *
  * Every entry point decides AND answers from ONE `getNote` read (review of PR
- * #267, twice): a verdict on one answer and a body, row, or write from
+ * pull request 267, twice): a verdict on one answer and a body, row, or write from
  * another let a note that turned secure in between reach a model. A row is
  * built only from that judged note, never spread from a summary or a hit. */
 export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {

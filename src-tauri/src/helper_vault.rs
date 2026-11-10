@@ -221,6 +221,7 @@ impl ServedVault {
 }
 
 fn read_config(path: &Path) -> Option<VaultConfig> {
+    // raw read: app config outside any vault
     let raw: Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     let root = PathBuf::from(raw.get("root")?.as_str()?);
     let id = raw.get("id")?.as_str()?.to_string();
@@ -497,6 +498,7 @@ fn same_file(source: &Path, target: &Path) -> bool {
             fn GetFileInformationByHandle(handle: *mut std::ffi::c_void, info: *mut FileInfo) -> i32;
         }
         let identity = |path: &Path| {
+            // raw read: opens a file only to compare identities
             let file = fs::File::open(path).ok()?;
             let mut info = std::mem::MaybeUninit::<FileInfo>::uninit();
             // The OS initializes BY_HANDLE_FILE_INFORMATION only on success.
@@ -531,6 +533,7 @@ fn publish_no_replace(source: &Path, target: &Path) -> Result<(), String> {
         .prefix(WRITE_PREFIX)
         .tempfile_in(dir)
         .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
+    // raw read: copies the Helper's own staged temp file into place
     let mut input = fs::File::open(source).map_err(|e| e.to_string())?;
     std::io::copy(&mut input, tmp.as_file_mut()).map_err(|e| e.to_string())?;
     tmp.as_file().sync_all().map_err(|e| e.to_string())?;

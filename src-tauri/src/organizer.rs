@@ -478,7 +478,7 @@ struct NoteSnapshot {
 
 fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let abs = root.join(rel);
-    let text = std::fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+    let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
     let mtime_age = std::fs::metadata(&abs)
         .and_then(|m| m.modified())
         .ok()
@@ -612,7 +612,7 @@ fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
     names
         .into_iter()
         .map(|name| {
-            let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
+            let desc = crate::fsutil::read_own_text(&root.join(map.index_rel(&name)))
                 .ok()
                 .and_then(|t| {
                     let (_, body) = corpus::parse_document(&t);
@@ -1449,7 +1449,7 @@ pub(crate) fn run_cycle(
 
                         // the write window — one short route(); re-check the note first
                         let outcome = corpus_state.route(root_id, |s| {
-                            let fresh = std::fs::read_to_string(root.join(&rel))
+                            let fresh = crate::fsutil::read_own_text(&root.join(&rel))
                                 .map_err(|e| e.to_string())?;
                             let (_, fresh_body) = corpus::parse_document(&fresh);
                             if fnv1a64(fresh_body.as_bytes()) != snap.body_hash {
@@ -1622,7 +1622,7 @@ pub(crate) fn run_cycle(
 
         // the write window — one short route(); re-check the note first
         let outcome = corpus_state.route(root_id, |s| {
-            let fresh = std::fs::read_to_string(root.join(&rel)).map_err(|e| e.to_string())?;
+            let fresh = crate::fsutil::read_own_text(&root.join(&rel)).map_err(|e| e.to_string())?;
             let (fresh_fm, fresh_body) = corpus::parse_document(&fresh);
             if fnv1a64(fresh_body.as_bytes()) != snap.body_hash {
                 return Ok(EnrichOutcome::Requeue); // edited under us — re-evaluate (§4.8)
@@ -1730,7 +1730,7 @@ fn refresh_indexes(
         }
         let body = render_index(&area, &members);
         let rel = map.index_rel(&area);
-        let disk = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
+        let disk = crate::fsutil::read_own_text(&root.join(&rel)).unwrap_or_default();
         if body == disk {
             // fixed point — record it (this is also how a FRONTEND approval
             // settles: the approved body is already on disk, we just catch up).
@@ -2440,6 +2440,9 @@ pub mod secure;
 mod coverage;
 #[path = "organizer_wake.rs"]
 mod wake;
+#[cfg(all(test, unix))]
+#[path = "organizer_hard_link_tests.rs"]
+mod hard_link_tests;
 #[cfg(test)]
 #[path = "organizer_coverage_tests.rs"]
 mod coverage_tests;

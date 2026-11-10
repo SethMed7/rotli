@@ -108,7 +108,7 @@ fn read_bytes(root: &Path, rel: &[String], limit: usize) -> Result<Vec<u8>, Refu
         Ok(())
     };
     check(&fs::symlink_metadata(&path).map_err(&io_error)?)?;
-    let file = fs::File::open(&path).map_err(&io_error)?;
+    let file = crate::fsutil::open_own_file(&path).map_err(&io_error)?;
     let metadata = file.metadata().map_err(&io_error)?;
     check(&metadata)?;
     let mut bytes = Vec::with_capacity(metadata.len() as usize);

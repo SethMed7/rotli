@@ -42,6 +42,7 @@ fn grants_path(root: &Path) -> PathBuf {
 
 /// The vault's records; a missing or unreadable file grants nothing.
 fn read_grants(root: &Path) -> Grants {
+    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
     std::fs::read_to_string(grants_path(root))
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())

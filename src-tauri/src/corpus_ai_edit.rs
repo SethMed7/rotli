@@ -4,7 +4,6 @@
 //! Trash under that same policy; `insert_for_ai_if_revision` is the `/ai`
 //! insert lane (2026-10-05), the AI write in its narrower Insert mode.
 
-use std::fs;
 
 use super::{
     atomic_write, lifecycle_disk_folder, parse_document, prefix_write_result,
@@ -47,7 +46,7 @@ impl CorpusStore {
         let rel = &self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(rel);
         crate::fsutil::with_file_lock(&path, || {
-            let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| ai_edit_field(l).is_none());

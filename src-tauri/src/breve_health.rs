@@ -40,6 +40,7 @@ const BREVE_NOTIFICATION_TAIL_BYTES: u64 = 512 * 1024;
 pub(crate) const BREVE_NOTIFICATION_LIMIT: usize = 48;
 
 fn read_tail(path: &Path, max_bytes: u64) -> Option<String> {
+    // raw read: a Breve log outside any vault
     let mut file = fs::File::open(path).ok()?;
     let len = file.metadata().ok()?.len();
     let start = len.saturating_sub(max_bytes);

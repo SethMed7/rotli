@@ -248,6 +248,7 @@ impl CorpusStore {
         let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/{AI_EDIT_JOURNAL}")) else {
             return Vec::new();
         };
+        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         std::fs::read_to_string(path)
             .unwrap_or_default()
             .lines()

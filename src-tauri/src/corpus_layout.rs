@@ -205,6 +205,7 @@ fn under(folder: &str, root: &str) -> bool {
 /// detection IDEA mirrors `memex::detect_one`; this is a tiny local probe so
 /// corpus.rs never depends on the memex module's wire types.
 pub fn is_memex_root(root: &Path) -> bool {
+    // raw read: a vault's memex.json identity, read to detect the layout
     let text = match fs::read_to_string(root.join("memex.json")) {
         Ok(t) => t,
         Err(_) => return false,

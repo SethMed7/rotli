@@ -272,3 +272,19 @@ fn no_cached_row_reaches_an_ai_row() {
         }
     }
 }
+
+/// Second review #3: the walk lists no board, file, or note that is a hard
+/// link, and the path handed to the webview's asset protocol refuses one.
+#[cfg(unix)]
+#[test]
+fn hard_linked_files_are_neither_listed_nor_handed_to_the_webview() {
+    let (_dir, mut store) = bare();
+    let _board = crate::fsutil::hard_link_outside(&store.abs("Inbox/linked.excalidraw"), b"{}");
+    let _image = crate::fsutil::hard_link_outside(&store.abs("Storage/linked.png"), b"\x89PNG");
+    store.suppress.bump();
+    let listed = serde_json::to_string(&store.list().unwrap()).unwrap();
+    assert!(!listed.contains("linked."), "{listed}");
+    assert!(store.webview_path("Storage/linked.png").is_err());
+    fs::write(store.abs("Storage/own.png"), b"\x89PNG").unwrap();
+    assert!(store.webview_path("Storage/own.png").is_ok());
+}

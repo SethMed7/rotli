@@ -158,6 +158,7 @@ pub(crate) fn secure_keywords(root: &Path) -> Vec<String> {
             return keywords.clone();
         }
     }
+    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view (failing closed here would drop secure keywords)
     let keywords = std::fs::read_to_string(&path)
         .map(|text| parse_rules(&text).secure_keywords)
         .unwrap_or_default();

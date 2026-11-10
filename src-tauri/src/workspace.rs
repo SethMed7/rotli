@@ -1243,7 +1243,7 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
 }
 
 fn read_config(path: &Path) -> Option<CorpusConfig> {
-    fs::read_to_string(path)
+    fs::read_to_string(path)  // raw read: app config outside any vault
         .ok()
         .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok())
 }
@@ -1818,7 +1818,7 @@ pub(crate) fn workspace_take_open_request(
         .default_root_path()?
         .join(DOT_DIR)
         .join(OPEN_REQUEST_FILE);
-    let raw = match fs::read_to_string(&path) {
+    let raw = match fs::read_to_string(&path) {  // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
         Ok(raw) => raw,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(format!("read open request: {error}")),
@@ -2219,7 +2219,7 @@ fn input_text(args: &[String], direct_name: &str) -> Result<String, String> {
         return Ok(value.to_string());
     }
     if let Some(path) = option(args, &format!("{direct_name}-file")) {
-        return fs::read_to_string(path).map_err(|error| format!("read {path}: {error}"));
+        return fs::read_to_string(path).map_err(|error| format!("read {path}: {error}"));  // raw read: a `--body-file` the person names on the command line
     }
     if flag(args, "--stdin") {
         let mut value = String::new();
@@ -2369,7 +2369,7 @@ fn agent_self_test() -> Result<Value, String> {
     workspace.view_create("OpenSource")?;
     workspace.view_assign(&created.id, Some("OpenSource"), MAIN_ROOT)?;
     let view_rel = workspace.store.resolve_note_rel(&created.id)?;
-    let view_text = fs::read_to_string(workspace.store.root().join(view_rel))
+    let view_text = crate::fsutil::read_own_text(&workspace.store.root().join(view_rel))
         .map_err(|error| error.to_string())?;
     if !view_text.contains("view_tag: OpenSource")
         || !main_contains(&workspace.read_main()?.tree, &created.id)

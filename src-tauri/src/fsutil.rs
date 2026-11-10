@@ -311,6 +311,21 @@ pub(crate) fn keep_unreadable_settings(path: &Path) -> Result<(), String> {
     }
 }
 
+/// Test support: make `in_vault` a hard link to a new file outside any vault
+/// holding `contents`. The returned folder keeps the outside file alive.
+#[cfg(all(test, unix))]
+pub(crate) fn hard_link_outside(in_vault: &Path, contents: &[u8]) -> tempfile::TempDir {
+    let outside = tempfile::TempDir::new().unwrap();
+    let far = outside.path().join("far-away");
+    std::fs::write(&far, contents).unwrap();
+    if let Some(parent) = in_vault.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    let _ = std::fs::remove_file(in_vault);
+    std::fs::hard_link(&far, in_vault).unwrap();
+    outside
+}
+
 #[cfg(test)]
 mod set_aside_tests {
     use super::{is_json_object, keep_unreadable_settings};
