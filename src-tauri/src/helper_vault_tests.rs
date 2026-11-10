@@ -1,4 +1,5 @@
 use super::*;
+use crate::corpus::review_tests::{OUTSIDE_NOTE, OUTSIDE_WORDS};
 use tempfile::TempDir;
 
 /// A served vault over a fresh folder, with a picker that answers `pick`.
@@ -534,4 +535,25 @@ fn read_many_defers_lossy_text_that_would_exceed_the_budget() {
     assert_eq!(answer["more"], json!(["lossy.md"]));
     assert_eq!(answer["files"]["normal.md"], "normal");
     assert!(answer["files"].get("lossy.md").is_none());
+}
+
+/// Review 2026-11-09 #4 on the web's Helper road: a hard link in the vault to
+/// a file outside it is neither read nor listed, like on the Mac.
+#[cfg(unix)]
+#[test]
+fn a_hard_link_to_a_file_outside_the_vault_is_never_served() {
+    let (vault, _config, served) = serving();
+    let outside = TempDir::new().unwrap();
+    let elsewhere = outside.path().join("elsewhere.md");
+    fs::write(&elsewhere, OUTSIDE_NOTE).unwrap();
+    fs::create_dir_all(vault.path().join("wiki")).unwrap();
+    fs::hard_link(&elsewhere, vault.path().join("wiki/linked.md")).unwrap();
+    fs::write(vault.path().join("wiki/plain.md"), "# Plain\n").unwrap();
+    assert!(call(&served, "vault_read", json!({ "path": "wiki/linked.md" })).is_err());
+    let many = call(&served, "vault_read_many", json!({ "paths": ["wiki/linked.md"] })).map(|v| v.to_string()).unwrap_or_default();
+    assert!(!many.contains(OUTSIDE_WORDS), "{many}");
+    for verb in ["vault_walk", "vault_list"] {
+        let listed = call(&served, verb, json!({ "path": "wiki" })).unwrap().to_string();
+        assert!(listed.contains("plain.md") && !listed.contains("linked.md"), "{verb}: {listed}");
+    }
 }

@@ -1,5 +1,5 @@
 use super::tests::test_workspace;
-use crate::corpus::review_tests::{with_canary, CANARY, HARBOR_BODY, HARBOR_TITLE};
+use crate::corpus::review_tests::{with_canary, CANARY, HARBOR_BODY, HARBOR_TITLE, OUTSIDE_NOTE};
 use super::*;
 use tempfile::TempDir;
 
@@ -179,4 +179,47 @@ fn the_notes_cli_shows_agents_only_the_bytes_the_gate_judged() {
     assert!(listed.contains(HARBOR_TITLE) && !listed.contains(CANARY), "{listed}");
     let queried = serde_json::to_string(&ws.query_remote("harbor", 50).unwrap()).unwrap();
     assert!(!queried.contains(CANARY), "{queried}");
+}
+
+/// Review pass on #4 and #5 through the CLI agents use: `rotli notes read`
+/// refuses a note whose file became a hard link to a file outside the vault,
+/// and `rotli notes move` leaves a note locked while the move waited.
+#[cfg(unix)]
+#[test]
+fn the_notes_cli_refuses_hard_links_and_moves_no_note_locked_meanwhile() {
+    let temp = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    let mut ws = test_workspace(&temp);
+    let linked = ws.create_note("Ledger link", "ordinary words", MAIN_ROOT).unwrap();
+    let local = ws.local_id(&linked.id).unwrap();
+    let abs = temp.path().join(ws.store.resolve_note_rel(&local).unwrap());
+    let far = outside.path().join("far.md");
+    fs::write(&far, OUTSIDE_NOTE).unwrap();
+    fs::remove_file(&abs).unwrap();
+    fs::hard_link(&far, &abs).unwrap();
+    assert!(ws.read_note(&local).is_err(), "rotli notes read");
+
+    ws.store.create_folder("Projects", None).unwrap();
+    let ferry = ws.create_note("Ferry timetable", "boats at noon", MAIN_ROOT).unwrap();
+    let local = ws.local_id(&ferry.id).unwrap();
+    let abs = temp.path().join(ws.store.resolve_note_rel(&local).unwrap());
+    let (held, wait_for_hold) = std::sync::mpsc::channel();
+    let writer = {
+        let abs = abs.clone();
+        std::thread::spawn(move || {
+            crate::fsutil::with_file_lock(&abs, || {
+                held.send(()).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let text = fs::read_to_string(&abs).unwrap();
+                fs::write(&abs, text.replacen("---\n", "---\nlocked: true\n", 1)).unwrap();
+                Ok(())
+            })
+            .unwrap();
+        })
+    };
+    wait_for_hold.recv().unwrap();
+    let moved = ws.move_note(&local, "Projects");
+    writer.join().unwrap();
+    assert!(moved.expect_err("rotli notes move refuses").contains("locked"));
+    assert!(abs.is_file());
 }

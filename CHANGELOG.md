@@ -27,17 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - **AI search and listings show only what the read check approved.** The
-  in-app chat's search and note list for cloud models, and `rotli notes
-  search|list|query`, took titles and snippets from Rotli's cache and then
-  checked the note's current file. A note that was secure a moment earlier
+  in-app chat's search and note list for models, on the Mac and on Rotli Web,
+  and `rotli notes search|list|query`, took titles and snippets from a cache
+  and then checked the note's current file. A note that was secure a moment earlier
   could pass that check as its new, public version while the result still
   showed the secure version's title and snippet. Each result is now built
   from the same read the check approved.
-- **Notes that are hard links are never read.** A hard link in your vault to
-  a Markdown file somewhere else on your Mac looked like an ordinary note, so
-  opening it, the chat's note reads, and search showed that outside file.
-  Rotli now reads a note only when the file has no other name, and leaves
-  hard-linked notes out of lists and search.
+- **Files that are hard links are never read.** A hard link in your vault to
+  a file somewhere else on your Mac looked like an ordinary note, sheet,
+  document, board, or attachment, so opening it, the chat's reads, and search
+  showed that outside file, and Rotli Helper served it to Rotli Web. Rotli now
+  reads a file only when it has no other name, and leaves such files out of
+  lists and search. (A folder Rotli Web opens directly in the browser can't
+  tell a hard link apart, so connect it through Rotli Helper for this check.)
 - **An agent can't move a note you lock while its move waits.** Rotli
   checks whether the note is secure or locked again at the moment it moves
   it, not only before waiting its turn.

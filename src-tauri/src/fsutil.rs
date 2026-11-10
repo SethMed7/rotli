@@ -177,12 +177,13 @@ pub(crate) fn atomic_write(path: &Path, contents: &str, prefix: &str) -> Result<
     atomic_write_bytes(path, contents.as_bytes(), prefix)
 }
 
-/// A note's text, read only when the file at `path` is a regular file with
-/// this one name. A hard link passes every path check (it has no link to
+/// A file under the vault, opened for reading only when it is a regular file
+/// with this one name. A hard link passes every path check (it has no link to
 /// follow) yet can be the very file of a document outside the vault, so its
 /// link count is checked on the opened descriptor, the one the bytes come
 /// from (review 2026-11-09). The leaf is opened without following a symlink.
-pub(crate) fn read_own_text(path: &Path) -> std::io::Result<String> {
+/// Every read of a note's or a file's bytes beneath a vault goes through this.
+pub(crate) fn open_own_file(path: &Path) -> std::io::Result<std::fs::File> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -190,18 +191,34 @@ pub(crate) fn read_own_text(path: &Path) -> std::io::Result<String> {
         use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
-    let mut file = options.open(path)?;
-    let metadata = file.metadata()?;
-    #[cfg(unix)]
-    let other_names = std::os::unix::fs::MetadataExt::nlink(&metadata) != 1;
-    #[cfg(not(unix))]
-    let other_names = false;
-    if !metadata.is_file() || other_names {
+    let file = options.open(path)?;
+    if !has_one_name(&file.metadata()?) {
         return Err(std::io::Error::other("not a plain file of its own (a hard link or special file)"));
     }
+    Ok(file)
+}
+
+/// A regular file with no other name (no hard link elsewhere).
+pub(crate) fn has_one_name(metadata: &std::fs::Metadata) -> bool {
+    #[cfg(unix)]
+    let one = std::os::unix::fs::MetadataExt::nlink(metadata) == 1;
+    #[cfg(not(unix))]
+    let one = true;
+    metadata.is_file() && one
+}
+
+/// `open_own_file`, read whole as text (a note, a board).
+pub(crate) fn read_own_text(path: &Path) -> std::io::Result<String> {
     let mut text = String::new();
-    file.read_to_string(&mut text)?;
+    open_own_file(path)?.read_to_string(&mut text)?;
     Ok(text)
+}
+
+/// `open_own_file`, read whole as bytes (a sheet, a document, an attachment).
+pub(crate) fn read_own_bytes(path: &Path) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    open_own_file(path)?.read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> Result<(), String> {

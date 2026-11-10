@@ -42,6 +42,35 @@ describe("web AI corpus", () => {
     await expect(corpus.read(flagged.id)).rejects.toThrow(/secure/);
   });
 
+  // review 2026-11-09 #1, on the web: the list and search rows came from the
+  // notes service's summaries, and the verdict from a separate read of the
+  // note. A summary still holding a secure version's words rode out on the
+  // approval of the public version.
+  test("rows show only the note read the verdict judged", async () => {
+    const svc = new InMemoryNotesService();
+    const note = await svc.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    const canary = "canary-7Q4";
+    const staleCopy = <T extends { id: string; title: string; snippet: string }>(row: T): T =>
+      row.id === note.id
+        ? { ...row, title: `Harbor ${canary} plan`, snippet: `harbor code ${canary} opens at nine` }
+        : row;
+    const staleList = (await svc.listNotes()).map(staleCopy);
+    const staleHits = (await svc.searchNotes("harbor", 10)).map(staleCopy);
+    const stale = Object.assign(Object.create(svc) as InMemoryNotesService, {
+      listNotes: async () => staleList,
+      searchNotes: async () => staleHits,
+    });
+    const corpus = createWebAiCorpus(() => stale);
+    const listed = await corpus.list();
+    expect(listed.map((n) => n.title)).toEqual(["Harbor plan"]);
+    expect(JSON.stringify(listed)).not.toContain(canary);
+    const hits = await corpus.search("harbor", 10);
+    expect(hits.map((h) => h.title)).toEqual(["Harbor plan"]);
+    expect(JSON.stringify(hits)).not.toContain(canary);
+    // a hit the current note no longer matches is dropped
+    expect(await corpus.search(canary, 10)).toEqual([]);
+  });
+
   test("search answers only with readable notes", async () => {
     const { corpus, ids } = await corpusWith({
       Inbox: "# Plan\n\nlaunch checklist",

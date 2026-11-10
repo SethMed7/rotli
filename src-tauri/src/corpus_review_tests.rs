@@ -11,6 +11,11 @@ pub(crate) const HARBOR_TITLE: &str = "Harbor plan";
 pub(crate) const HARBOR_BODY: &str = "harbor opens at nine";
 pub(crate) const CANARY: &str = "canary-7Q4";
 
+/// Finding #4's fixture: a Markdown file outside the vault that a hard link
+/// inside it must never expose.
+pub(crate) const OUTSIDE_NOTE: &str = "# Ledger\n\nwords from beyond the vault\n";
+pub(crate) const OUTSIDE_WORDS: &str = "beyond the vault";
+
 pub(crate) fn with_canary(public: &str) -> String {
     public
         .replacen("---\n", "---\nsecure: true\n", 1)
@@ -60,7 +65,7 @@ fn a_note_locked_while_an_agent_move_waits_is_not_moved() {
 fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
     let (dir, mut store) = bare();
     let outside = dir.path().join("outside.md");
-    fs::write(&outside, "# Ledger\n\nwords from beyond the vault\n").unwrap();
+    fs::write(&outside, OUTSIDE_NOTE).unwrap();
 
     // a note whose file is swapped for a hard link to the outside file
     let n = store.create("Inbox", "# Plain\n\nan ordinary note\n").unwrap();
@@ -79,7 +84,7 @@ fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
     let listed = store.list().unwrap().notes;
     assert!(!listed.iter().any(|m| m.title == "Ledger"), "{listed:?}");
     assert!(store.search("beyond", 10, false).unwrap().is_empty());
-    assert_eq!(fs::read_to_string(&outside).unwrap(), "# Ledger\n\nwords from beyond the vault\n");
+    assert_eq!(fs::read_to_string(&outside).unwrap(), OUTSIDE_NOTE);
 }
 
 /// Review 2026-11-09 #1: an AI lane gated one read of a note and showed
@@ -117,4 +122,49 @@ fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     assert!(meta.title.contains(CANARY), "the cached listing row is the secure version");
     let row = store.present_meta_for_ai(meta, false).expect("the public note is listed");
     assert!(!format!("{row:?}").contains(CANARY), "{row:?}");
+}
+
+/// Review pass on #1 through the app's own commands: the in-app chat's
+/// search and note list for a model (`corpus_search_ai`, `corpus_notes_ai`)
+/// run these functions over the app's corpus state.
+#[test]
+fn the_apps_ai_search_and_list_show_only_judged_bytes() {
+    let (_dir, mut store) = bare();
+    let n = store.create("Inbox", &format!("# {HARBOR_TITLE}\n\n{HARBOR_BODY}\n")).unwrap();
+    let rel = store.resolve_note_rel(&n.id).unwrap();
+    let abs = store.abs(&rel);
+    let public = fs::read_to_string(&abs).unwrap();
+    fs::write(&abs, with_canary(&public)).unwrap();
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    let warmed = corpus_search_inner(&state, "harbor", None, None).unwrap(); // the person's search walks the secure version
+    assert!(format!("{warmed:?}").contains(CANARY));
+    fs::write(&abs, &public).unwrap();
+
+    let hits = search_ai_inner(&state, "harbor", None, None, false).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert!(!format!("{hits:?}").contains(CANARY), "{hits:?}");
+    let notes = notes_ai_inner(&state, false).unwrap();
+    assert!(notes.iter().any(|m| m.title == HARBOR_TITLE));
+    assert!(!format!("{notes:?}").contains(CANARY), "{notes:?}");
+}
+
+/// Review pass on #4: every read of a file's bytes under the vault refuses a
+/// hard link, not only note reads: the editor's file reads (sheets, Word
+/// documents, CSV), the AI file lane, and board reads.
+#[cfg(unix)]
+#[test]
+fn no_file_read_crosses_the_vault_through_a_hard_link() {
+    let (dir, mut store) = bare();
+    let outside = dir.path().join("outside.csv");
+    fs::write(&outside, "account,balance\n").unwrap();
+    fs::create_dir_all(store.abs("Storage")).unwrap();
+    fs::hard_link(&outside, store.abs("Storage/linked.csv")).unwrap();
+    fs::hard_link(&outside, store.abs("Inbox/linked.excalidraw")).unwrap();
+    assert!(store.read_user_file_bytes("Storage/linked.csv").is_err(), "the editor's file read");
+    assert!(store.read_file_bytes_for_ai("Storage/linked.csv", true).is_err(), "the AI file lane");
+    assert!(store.read_board("Inbox/linked.excalidraw").is_err(), "a board read");
+    fs::write(store.abs("Storage/plain.csv"), "a,b\n").unwrap();
+    assert_eq!(store.read_user_file_bytes("Storage/plain.csv").unwrap(), b"a,b\n");
 }

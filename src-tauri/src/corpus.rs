@@ -3764,13 +3764,26 @@ impl CorpusStore {
         Ok(abs)
     }
 
+    /// The person's editor reading a surfaced file (a sheet, a Word document,
+    /// a CSV): the same traversal guard as the write lanes (audit 2026-07), so
+    /// a raw "../…" from the webview never leaves the corpus, and never through
+    /// a hard link to a file elsewhere (review 2026-11-09).
+    pub(crate) fn read_user_file_bytes(&self, rel: &str) -> Result<Vec<u8>, String> {
+        validate_rel(rel)?;
+        let abs = self.guard_rel(rel)?;
+        if !abs.is_file() {
+            return Err(format!("not a file: {rel}"));
+        }
+        crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))
+    }
+
     pub(crate) fn read_file_bytes_for_ai(
         &self,
         rel: &str,
         model_is_local: bool,
     ) -> Result<Vec<u8>, String> {
         let abs = self.file_for_ai(rel, model_is_local)?;
-        let data = fs::read(abs).map_err(|e| e.to_string())?;
+        let data = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         if model_is_local && self.file_is_protected(rel) {
             let ext = Path::new(rel)
                 .extension()
@@ -6061,7 +6074,7 @@ impl CorpusStore {
         if !abs.is_file() {
             return Err(format!("board not found: {id}"));
         }
-        let body = fs::read_to_string(&abs).map_err(|e| format!("read {id}: {e}"))?;
+        let body = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {id}: {e}"))?;
         let (created_at, updated_at) = file_stamps(&abs);
         Ok(CorpusBoardDoc {
             id: id.to_string(),
@@ -7512,23 +7525,48 @@ pub async fn corpus_search_ai(
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let hits = corpus_search_inner(&state, &query, limit, include_reference)?;
-        let mut permitted = Vec::with_capacity(hits.len());
-        for hit in hits {
-            // gated and shown from one read: never the walk cache's older copy
-            let (root, rel) = split_root_id(&hit.id);
-            let id = hit.id.clone();
-            let local = SearchHit { id: rel, ..hit };
-            if let Ok(Some(shown)) =
-                state.route(&root, |s| Ok(s.present_hit_for_ai(&query, local, model_is_local)))
-            {
-                permitted.push(SearchHit { id, ..shown });
-            }
-        }
-        Ok(permitted)
+        search_ai_inner(&state, &query, limit, include_reference, model_is_local)
     })
     .await
     .map_err(|e| format!("ai search worker failed ({e})"))?
+}
+
+/// `corpus_search_ai`'s work: each hit gated and shown from one read, never
+/// the walk cache's older copy (review 2026-11-09).
+fn search_ai_inner(
+    state: &CorpusState,
+    query: &str,
+    limit: Option<usize>,
+    include_reference: Option<bool>,
+    model_is_local: bool,
+) -> Result<Vec<SearchHit>, String> {
+    let hits = corpus_search_inner(state, query, limit, include_reference)?;
+    let mut permitted = Vec::with_capacity(hits.len());
+    for hit in hits {
+        let (root, rel) = split_root_id(&hit.id);
+        let id = hit.id.clone();
+        let local = SearchHit { id: rel, ..hit };
+        if let Ok(Some(shown)) = state.route(&root, |s| Ok(s.present_hit_for_ai(query, local, model_is_local))) {
+            permitted.push(SearchHit { id, ..shown });
+        }
+    }
+    Ok(permitted)
+}
+
+/// `corpus_notes_ai`'s work: each row gated and shown from one read.
+fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<NoteMeta>, String> {
+    let listed = corpus_list_inner(state, false)?;
+    let reference = corpus_reference_notes_inner(state)?;
+    let mut permitted = Vec::new();
+    for meta in listed.notes.into_iter().chain(reference) {
+        let (root, rel) = split_root_id(&meta.id);
+        let id = meta.id.clone();
+        let local = NoteMeta { id: rel, ..meta };
+        if let Ok(Some(shown)) = state.route(&root, |s| Ok(s.present_meta_for_ai(local, model_is_local))) {
+            permitted.push(NoteMeta { id, ..shown });
+        }
+    }
+    Ok(permitted)
 }
 
 /// The AI's LISTING lane — every note meta the model may retrieve, Notes tree
@@ -7545,19 +7583,7 @@ pub async fn corpus_notes_ai(
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
         let state = app.state::<CorpusState>();
-        let listed = corpus_list_inner(&state, false)?;
-        let reference = corpus_reference_notes_inner(&state)?;
-        let mut permitted = Vec::new();
-        for meta in listed.notes.into_iter().chain(reference) {
-            // gated and shown from one read: never the walk cache's older copy
-            let (root, rel) = split_root_id(&meta.id);
-            let id = meta.id.clone();
-            let local = NoteMeta { id: rel, ..meta };
-            if let Ok(Some(shown)) = state.route(&root, |s| Ok(s.present_meta_for_ai(local, model_is_local))) {
-                permitted.push(NoteMeta { id, ..shown });
-            }
-        }
-        Ok(permitted)
+        notes_ai_inner(&state, model_is_local)
     })
     .await
     .map_err(|e| format!("ai listing worker failed ({e})"))?
@@ -7605,15 +7631,8 @@ pub fn corpus_file_text(
     max_bytes: Option<usize>,
 ) -> Result<String, String> {
     let (root, rel) = split_root_id(&id);
-    // Same traversal guard as the write lanes (audit 2026-07): a raw "../…"
-    // from the webview must never read a file outside the corpus root.
-    validate_rel(&rel)?;
-    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
-    if !abs.is_file() {
-        return Err(format!("not a file: {}", abs.display()));
-    }
     let cap = max_bytes.unwrap_or(200_000);
-    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |s| s.read_user_file_bytes(&rel))?;
     let end = data.len().min(cap);
     Ok(String::from_utf8_lossy(&data[..end]).into_owned())
 }
@@ -7633,14 +7652,8 @@ pub fn corpus_file_bytes(
 ) -> Result<String, String> {
     use base64::Engine;
     let (root, rel) = split_root_id(&id);
-    // Same traversal guard as the write lanes (audit 2026-07).
-    validate_rel(&rel)?;
-    let abs = state.route(&root, |s| s.guard_rel(&rel))?;
-    if !abs.is_file() {
-        return Err(format!("not a file: {}", abs.display()));
-    }
     let cap = max_bytes.unwrap_or(SHEET_EDIT_MAX_BYTES);
-    let data = fs::read(&abs).map_err(|e| e.to_string())?;
+    let data = state.route(&root, |s| s.read_user_file_bytes(&rel))?;
     let end = data.len().min(cap);
     Ok(base64::engine::general_purpose::STANDARD.encode(&data[..end]))
 }

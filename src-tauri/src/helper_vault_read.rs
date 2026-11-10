@@ -12,6 +12,12 @@ use serde_json::{json, Map, Value};
 
 use super::{joined, millis, parse_rel, resolve, skipped_dir, stat_json, Refusal, MAX_WALK_ENTRIES, READ_MANY_BUDGET, READ_ONE_LIMIT};
 
+/// Never listed or walked: a link (symlink or junction), or a file with a
+/// second name, whose hard link can be a file outside the vault.
+fn skipped_entry(metadata: &fs::Metadata) -> bool {
+    crate::containment::is_link_like(metadata) || (metadata.is_file() && !crate::fsutil::has_one_name(metadata))
+}
+
 /// Every file and directory beneath `rel`, one call: what the page's notes
 /// service would otherwise ask for one `stat` at a time.
 pub(super) fn walk(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
@@ -30,7 +36,7 @@ fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refus
         // file_type() does not follow links: a symlink is neither, and skipped;
         // a Windows junction can report as a directory, so check the reparse bit too
         let Ok(kind) = entry.file_type() else { continue };
-        if fs::symlink_metadata(entry.path()).map_or(true, |m| crate::containment::is_link_like(&m)) {
+        if fs::symlink_metadata(entry.path()).map_or(true, |m| skipped_entry(&m)) {
             continue;
         }
         let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
@@ -62,7 +68,7 @@ pub(super) fn list(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         let Ok(kind) = entry.file_type() else { continue };
-        if fs::symlink_metadata(entry.path()).map_or(true, |m| crate::containment::is_link_like(&m)) {
+        if fs::symlink_metadata(entry.path()).map_or(true, |m| skipped_entry(&m)) {
             continue;
         }
         if kind.is_dir() && !skipped_dir(&name) {
@@ -92,8 +98,9 @@ fn read_bytes(root: &Path, rel: &[String], limit: usize) -> Result<Vec<u8>, Refu
         else { (500, format!("couldn't read {}: {e}", joined(rel))) }
     };
     let check = |metadata: &fs::Metadata| {
-        if !metadata.is_file() {
-            return Err((400, format!("not a regular file: {}", joined(rel))));
+        // a hard link can be a file outside the vault (review 2026-11-09)
+        if !crate::fsutil::has_one_name(metadata) {
+            return Err((400, format!("not a regular file of its own: {}", joined(rel))));
         }
         if metadata.len() > limit as u64 {
             return Err((413, format!("file too large for this read (limit {limit} bytes): {}", joined(rel))));
@@ -134,7 +141,7 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize, prompt: Option<&s
     for entry in entries {
         let entry = entry.map_err(|e| (500, e.to_string()))?;
         let metadata = fs::symlink_metadata(entry.path()).map_err(|e| (500, e.to_string()))?;
-        if crate::containment::is_link_like(&metadata) {
+        if skipped_entry(&metadata) {
             continue;
         }
         *seen += 1;

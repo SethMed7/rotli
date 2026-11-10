@@ -11,8 +11,9 @@ import { looksSecret } from "../ai/guard";
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
 import type { CorpusNoteMeta, CorpusWriteResult, FrontmatterView, WebAiCorpus } from "../lib/tauri";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
-import type { NoteSummary, SearchHit } from "../types";
+import type { Note, NoteSummary, SearchHit } from "../types";
 import type { NotesService } from "./notesPort";
+import { searchMatch } from "./search";
 
 function secureByLocation(note: Pick<NoteSummary, "folderId" | "diskFolderId">): boolean {
   const disk = note.diskFolderId ?? note.folderId;
@@ -37,11 +38,20 @@ function meta(note: NoteSummary): CorpusNoteMeta {
 
 /** The web's answer to the Rust read gate, over one notes service. */
 export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
+  const secureNote = (note: Note): boolean =>
+    note.secure === true || secureByLocation(note) || looksSecret(note.body);
   const secure = async (id: string): Promise<boolean> => {
     const note = await notes().getNote(id);
     if (!note) return true; // unknowable = withheld
     if (note.kind && note.kind !== "note") return false;
-    return note.secure === true || secureByLocation(note) || looksSecret(note.body);
+    return secureNote(note);
+  };
+  // One read decides AND supplies what a model sees of a note: a list or
+  // search row from the service's summaries could still hold an older,
+  // secure version's title and snippet (review 2026-11-09).
+  const judged = async (id: string): Promise<Note | null> => {
+    const note = await notes().getNote(id);
+    return note && !secureNote(note) ? note : null;
   };
   const readableOnly = async <T extends { id: string }>(items: T[]): Promise<T[]> => {
     const verdicts = await Promise.all(items.map((item) => secure(item.id)));
@@ -50,11 +60,17 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
   return {
     async list(): Promise<CorpusNoteMeta[]> {
       const visible = (await notes().listNotes()).filter((n) => !n.kind || n.kind === "note");
-      return (await readableOnly(visible)).map(meta);
+      const read = await Promise.all(visible.map((n) => judged(n.id)));
+      return read.flatMap((note) => (note ? [meta(note)] : []));
     },
     async search(query: string, limit: number | undefined): Promise<SearchHit[]> {
       const hits = (await notes().searchNotes(query, limit)).filter((h) => h.kind === "note");
-      return readableOnly(hits);
+      const read = await Promise.all(hits.map((h) => judged(h.id)));
+      return hits.flatMap((hit, index) => {
+        const note = read[index];
+        const match = note && searchMatch(query, note.title, note.body, note.snippet);
+        return note && match ? [{ ...hit, title: note.title, folderId: note.folderId, ...match }] : [];
+      });
     },
     async read(id: string): Promise<{ body: string; revision: string }> {
       if (await secure(id)) throw new Error("This note is secure and never leaves this computer.");

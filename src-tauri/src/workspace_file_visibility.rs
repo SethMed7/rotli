@@ -17,7 +17,7 @@ impl Workspace {
         if metadata.len() > 16 * 1024 * 1024 {
             return false;
         }
-        let Ok(bytes) = fs::read(path) else {
+        let Ok(bytes) = crate::fsutil::read_own_bytes(&path) else {
             return false;
         };
         let ext = Path::new(rel)
