@@ -6,6 +6,11 @@
       "platform": "mac"
     },
     {
+      "title": "Files Rotli leaves alone, named",
+      "body": "When a file in your vault has a hard link, Rotli doesn't open it, and now a quiet note at the foot of the sidebar says which. Search mentions them too, and your files stay as they are on disk.",
+      "platform": "mac"
+    },
+    {
       "title": "Easier by keyboard and screen reader",
       "body": "Tabs move with the arrow keys, Home and End, controls have real names and roles, and dialogs keep focus inside until you close them."
     },
