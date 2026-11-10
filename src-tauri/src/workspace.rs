@@ -298,10 +298,12 @@ impl Workspace {
         let CorpusList { folders, notes } = self.store.list()?;
         let mut kept = Vec::with_capacity(notes.len());
         for meta in notes {
-            let visible = self.remote_meta_visible(&meta);
-            if visible {
-                kept.push(meta);
-            }
+            // a note's row is rebuilt from the bytes the gate judged
+            let shown = match meta.kind {
+                NoteKind::Note => self.store.present_meta_for_ai(meta, false),
+                _ => self.remote_meta_visible(&meta).then_some(meta),
+            };
+            kept.extend(shown);
         }
         let folders = folders
             .into_iter()
@@ -338,10 +340,12 @@ impl Workspace {
         // surface. The 2026-08-01 reference lane is the interactive chat's
         // retrieval scope; widening an external agent's reach is a separate
         // decision (docs/design/ai-visibility-matrix.md).
-        let mut hits = self
+        let hits = self
             .store
             .search(query, limit.saturating_mul(4).max(limit), false)?;
-        hits.retain(|hit| self.store.read_for_ai(&hit.id, false).is_ok());
+        // each hit is gated and shown from one read (review 2026-11-09)
+        let mut hits: Vec<SearchHit> =
+            hits.into_iter().filter_map(|hit| self.store.present_hit_for_ai(query, hit, false)).collect();
         hits.truncate(limit.min(100));
         for hit in &mut hits {
             hit.id = self.wire(&hit.id);
@@ -361,6 +365,8 @@ impl Workspace {
                 Ok(text) => text,
                 Err(_) => continue,
             };
+            // the row's title and snippet come from the bytes the gate judged
+            let Some(meta) = self.store.present_meta_for_ai(meta, false) else { continue };
             let rel = self.store.resolve_note_rel(&meta.id)?;
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             let frontmatter = frontmatter.unwrap_or_default();
@@ -3074,6 +3080,34 @@ mod tests {
             is_default: true,
         })
         .unwrap()
+    }
+
+    /// Review 2026-11-09 #1 through the CLI agents use (`rotli notes search`,
+    /// `list`, `query`): the walk cached a secure version with a canary, the
+    /// note went public, and the cached title and snippet rode out on the
+    /// approval of the public bytes.
+    #[test]
+    fn the_notes_cli_shows_agents_only_the_bytes_the_gate_judged() {
+        let temp = TempDir::new().unwrap();
+        let mut ws = test_workspace(&temp);
+        let meta = ws.create_note("Harbor plan", "harbor opens at nine", MAIN_ROOT).unwrap();
+        let local = ws.local_id(&meta.id).unwrap();
+        let abs = temp.path().join(ws.store.resolve_note_rel(&local).unwrap());
+        let public = fs::read_to_string(&abs).unwrap();
+        let secure = public
+            .replacen("---\n", "---\nsecure: true\n", 1)
+            .replace("# Harbor plan", "# Harbor canary-7Q4 plan")
+            .replace("harbor opens at nine", "harbor code canary-7Q4 opens at nine");
+        fs::write(&abs, &secure).unwrap();
+        let _ = ws.store.search("harbor", 10, false).unwrap(); // the walk caches the secure version
+        fs::write(&abs, &public).unwrap();
+
+        let searched = serde_json::to_string(&ws.search_remote("harbor", 10).unwrap()).unwrap();
+        assert!(searched.contains("Harbor plan") && !searched.contains("canary-7Q4"), "{searched}");
+        let listed = serde_json::to_string(&ws.list_remote(50).unwrap()).unwrap();
+        assert!(listed.contains("Harbor plan") && !listed.contains("canary-7Q4"), "{listed}");
+        let queried = serde_json::to_string(&ws.query_remote("harbor", 50).unwrap()).unwrap();
+        assert!(!queried.contains("canary-7Q4"), "{queried}");
     }
 
     #[test]
