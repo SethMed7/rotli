@@ -9,7 +9,7 @@
 import { approvedNote } from "../ai/approvedRead";
 import { type InlineVerdict, askInline } from "../ai/inlineAi";
 import type { Host } from "../ai/types";
-import { flushNote, reloadDocumentIfClean } from "../editor/model";
+import { adoptWrittenText, flushNote } from "../editor/model";
 import { STILL_SAVING } from "../editor/savedVersion";
 import { consentedInsertRefusal } from "../lib/aiEditPolicy";
 import { corpusInsertAi } from "../lib/aiInsert";
@@ -41,7 +41,7 @@ export const INLINE_AI_DEPS: InlineAiDeps = {
   read: approvedNote,
   insert: corpusInsertAi,
   adopt: (noteId, body, revision) => {
-    reloadDocumentIfClean(noteId, body, revision);
+    adoptWrittenText(noteId, body, revision);
     void invalidateNotes();
   },
 };

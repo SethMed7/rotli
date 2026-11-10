@@ -12,7 +12,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import { onQuitCheck, onQuitFlush } from "../lib/quitFlush";
 import { markNoteDraftChanged } from "../services/noteDrafts";
-import { takeRead } from "../services/noteReads";
+import { readAgain, startRead, takeRead } from "../services/noteReads";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
 import {
@@ -32,7 +32,15 @@ import {
 } from "./buffers";
 import { clock } from "./saveClock";
 import { editGeneration } from "./saveGenerations";
-import { flushSyncs, forgetQueue, queueBusy, quitReasons, reloadDocument, scheduleSync } from "./saveQueue";
+import {
+  flushSyncs,
+  forgetQueue,
+  queueBusy,
+  quitReasons,
+  reloadDocument,
+  reviveGoneNote,
+  scheduleSync,
+} from "./saveQueue";
 import { documentSaveError, isDirty, setSaveError } from "./saveStatus";
 import { draftsOf, setDocumentProtection, type UnsavedDraft } from "./unsavedDrafts";
 
@@ -120,10 +128,35 @@ export function adoptPendingDocument(pendingId: string, note: Note): boolean {
  * editor: dropped when it started before something newer was taken in (a
  * write of Rotli's own landing, a newer read; services/noteReads.ts), else
  * seeded or folded in like any disk truth. */
-export function adoptReadNote(note: Note): void {
-  if (!takeRead(note)) return;
+// The last note each read gave the editor, so a note whose file vanished
+// (deleted outside) still shows its retained words (ninth review: the editor
+// rendered an empty container, in every pane, though the buffer survived).
+const lastRead = new Map<string, Note>();
+
+/** The note to show for `noteId` when its query finds nothing: the last one
+ * read, while its buffer (the person's words) is still here. */
+export function retainedNote(noteId: string): Note | undefined {
+  return hasBuffer(noteId) ? lastRead.get(noteId) : undefined;
+}
+
+export function adoptReadNote(note: Note): boolean {
+  if (!takeRead(note)) {
+    // older than what the editor holds, yet it saw another version: read again
+    if (note.revision !== revisionOf(note.id)) readAgain(note.id);
+    return false;
+  }
+  lastRead.set(note.id, note);
+  reviveGoneNote(note.id);
   ensureDocument(note.id, note.body, note.revision, note);
   reloadDocumentIfClean(note.id, note.body, note.revision);
+  return true;
+}
+
+/** Text Rotli itself just wrote outside the editor's queue (`/ai`), shown at
+ * once: a read that starts now, numbered like any other. */
+export function adoptWrittenText(noteId: string, body: string, revision: string): void {
+  if (!takeRead({ id: noteId, body, revision, readAt: startRead() } as Note)) return;
+  reloadDocumentIfClean(noteId, body, revision);
 }
 
 /** Disk truth for a note (external edit / agent write). A clean buffer takes
@@ -144,6 +177,7 @@ export function evictDocument(noteId: string): void {
   releaseTimers.delete(noteId);
   forgetQueue(noteId);
   forget(noteId);
+  lastRead.delete(noteId);
 }
 
 /** Apply an edit to the shared buffer: notify every pane synchronously,

@@ -388,6 +388,7 @@
         "hide_chat_window",
         "hide_main_window",
         "hide_quick_window",
+        "quit_check_done",
         "quit_flush_done",
         "restart_after_flush",
         "set_dock_visible",

@@ -78,10 +78,10 @@ mod workspace;
 mod workspace_help;
 mod workspace_documents;
 
-use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
 use std::time::{Duration, Instant};
 
-use quit_flush::{QuitFlush, QuitFlushStatus};
+use quit_flush::QuitFlush;
 use summon::{LastBlurHide, SummonIntent};
 
 use tauri::image::Image;
@@ -483,13 +483,16 @@ mod capture_return_tests {
     }
 }
 
-/// The longest a quit will wait for the webview's flush ack. The idle ack is
-/// milliseconds (the listener lives in the always-loaded persist chunk); this
-/// bound only matters when a big workbook is mid-serialize or the webview hung.
+/// The longest phase 1 of a save attempt waits for every window's flush. The
+/// idle answer is milliseconds; this bound only matters when a big workbook is
+/// mid-serialize or a webview hung.
 const QUIT_FLUSH_MAX: Duration = Duration::from_secs(15);
+/// The longest phase 2 waits for the immediate "anything unsaved?" answers,
+/// which do no work: also the most a word typed after a window's own answer
+/// can wait for the others' before the exit (quit_flush.rs).
+const QUIT_CHECK_MAX: Duration = Duration::from_secs(2);
 
-/// One webview finished its pre-quit flush — release `graceful_quit`'s wait
-/// once EVERY emitted webview has acked (saturating: a double ack never wraps).
+/// Phase 1: one window finished (or refused) its flush.
 #[tauri::command]
 fn quit_flush_done(
     webview: tauri::Webview,
@@ -497,104 +500,58 @@ fn quit_flush_done(
     ok: bool,
     error: Option<String>,
 ) {
-    record_quit_flush(webview.app_handle(), webview.label(), attempt_id, ok, error);
+    let state = webview.app_handle().state::<QuitFlush>();
+    state.answer(attempt_id, 1, webview.label(), ok, error);
 }
 
-fn record_quit_flush(app: &AppHandle, label: &str, attempt_id: u64, ok: bool, error: Option<String>) {
-    let state = app.state::<QuitFlush>();
-    let mut status = state.status.lock().unwrap();
-    if status.ack(attempt_id, label, ok, error) {
-        state.cv.notify_all();
+/// Phase 2: one window's immediate answer, computed from its buffers with no
+/// flushing: clean, or what is unsaved or outstanding.
+#[tauri::command]
+fn quit_check_done(webview: tauri::Webview, attempt_id: u64, clean: bool, reasons: Option<String>) {
+    let state = webview.app_handle().state::<QuitFlush>();
+    state.answer(attempt_id, 2, webview.label(), clean, reasons);
+}
+
+/// The app's windows, as the save attempt talks to them.
+struct AppWindows<'a>(&'a AppHandle);
+
+impl quit_flush::Windows for AppWindows<'_> {
+    fn emit(&self, label: &str, event: &str, payload: serde_json::Value) -> bool {
+        self.0.emit_to(label, event, payload).is_ok()
+    }
+    fn live(&self) -> Vec<String> {
+        webview_labels(self.0)
     }
 }
 
-/// Quit, but let every live webview flush dirty state first (see QuitFlush).
-/// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
-/// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
-fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
+/// Every live webview that can hold typing: main, quick, capture, chat and the
+/// folder windows.
+fn webview_labels(app: &AppHandle) -> Vec<String> {
     let mut labels: Vec<String> = ["main", "quick", "capture", chat_window::LABEL]
         .into_iter()
         .filter(|label| app.get_webview_window(label).is_some())
         .map(str::to_string)
         .collect();
     labels.extend(app.webview_windows().into_keys().filter(|label| folder_window::is_folder_window(label)));
-    flush_windows(app, &labels).inspect_err(|detail| {
-        SummonIntent::ShowMain.perform(app);
-        let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
+    labels
+}
+
+/// Quit (or restart, or switch vaults), but let every live webview save first,
+/// in the two phases of quit_flush.rs. A refusal is shown in main; a request
+/// that joined a live attempt shows nothing of its own.
+fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
+    let labels = webview_labels(app);
+    app.state::<QuitFlush>().attempt(&AppWindows(app), &labels, true).inspect_err(|detail| {
+        if detail != quit_flush::JOINED {
+            SummonIntent::ShowMain.perform(app);
+            let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
+        }
     })
 }
 
-/// Ask each window in `labels` to save what's typing, and wait (bounded).
+/// The same attempt over just `labels` (a folder window closing).
 fn flush_windows(app: &AppHandle, labels: &[String]) -> Result<(), String> {
-    if labels.is_empty() {
-        return Ok(());
-    }
-    let state = app.state::<QuitFlush>();
-    let attempt_id = {
-        let mut status = state.status.lock().unwrap();
-        if !status.pending.is_empty() {
-            return Err("another quit or restart is already waiting for saves".into());
-        }
-        status.attempt_id = status.attempt_id.wrapping_add(1).max(1);
-        status.pending = labels.iter().map(|label| label.to_string()).collect();
-        status.failed = false;
-        status.errors.clear();
-        status.attempt_id
-    };
-    for label in labels {
-        let label = label.as_str();
-        if app
-            .emit_to(
-                label,
-                "rotli:flush-before-quit",
-                serde_json::json!({ "attemptId": attempt_id }),
-            )
-            .is_err()
-        {
-            record_quit_flush(
-                app,
-                label,
-                attempt_id,
-                false,
-                Some(format!("{label} did not receive the save request")),
-            );
-        }
-    }
-    let deadline = Instant::now() + QUIT_FLUSH_MAX;
-    let mut status = state.status.lock().unwrap();
-    while status.attempt_id == attempt_id && !status.pending.is_empty() {
-        let now = Instant::now();
-        if now >= deadline {
-            break;
-        }
-        let (guard, _timeout) = state.cv.wait_timeout(status, deadline - now).unwrap();
-        status = guard;
-    }
-    if status.attempt_id != attempt_id {
-        return Err("save handshake was superseded".into());
-    }
-    let timed_out = !status.pending.is_empty();
-    let failed = status.failed;
-    let detail = if timed_out {
-        "Rotli did not quit because one or more windows did not finish saving. Your files remain open; try Save again or resolve the shown error."
-            .to_string()
-    } else if failed {
-        let suffix = status
-            .errors
-            .first()
-            .map(|error| format!(" ({error})"))
-            .unwrap_or_default();
-        format!("Rotli did not quit because some changes could not be saved{suffix}. Your files remain open.")
-    } else {
-        String::new()
-    };
-    status.pending.clear();
-    drop(status);
-    if timed_out || failed {
-        Err(detail)
-    } else {
-        Ok(())
-    }
+    app.state::<QuitFlush>().attempt(&AppWindows(app), labels, false)
 }
 
 fn graceful_shutdown(app: &AppHandle, restart: bool) {
@@ -2112,7 +2069,7 @@ pub fn run() {
         .manage(CaptureReturn(Mutex::new(CaptureReturnPlan::default())))
         .manage(quick_window::QuickPlaced(Mutex::new(false)))
         .manage(quick_window::QuickReturn::default())
-        .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
+        .manage(QuitFlush::new(QUIT_FLUSH_MAX, QUIT_CHECK_MAX))
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
@@ -2140,6 +2097,7 @@ pub fn run() {
             agent_bridge::agent_bridge_reply,
             toggle_main_window,
             quit_flush_done,
+            quit_check_done,
             restart_after_flush,
             hide_main_window,
             show_main_window,

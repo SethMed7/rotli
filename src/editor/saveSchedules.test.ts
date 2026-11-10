@@ -16,11 +16,13 @@ test("1: a write past its bound, then undo: quit is refused until that write set
     "undo A", // back to the saved words; nothing new starts beside v1
     "advance",
     "advance", // 12 s: the note's flush gives up, naming the note
-    "release flusher", // another window finishes: quit is refused
+    "release flush", // another window finished: quit is refused
     "release write", // v1 lands; only now does the restored text go out
     "release write",
     "quit",
-    "release flusher",
+    "release flush",
+    "release question",
+    "release question",
   ]);
   expect(run.failure).toBeNull();
   expect(run.trace.join("\n")).toContain("“A” is still waiting on the disk");
@@ -39,10 +41,10 @@ test("2: a deleted note's words stay in its editor; quit names it until they are
       "purge A",
       "quit",
       "release write",
-      "release flusher",
+      "release flush",
       "type A",
       "quit",
-      "release flusher",
+      "release flush",
       "discard A",
       "quit",
     ],
@@ -67,11 +69,12 @@ test("3: a read that never settles doesn't hold the note's queue: it is left beh
 
 // The eighth review's save findings, as the explorer found them on 1880e044.
 
-test("F1: typing while another window is still flushing refuses the quit, never acknowledges it unsaved", async () => {
+test("F1: typing while another window is still flushing is caught by the question after every flush", async () => {
   const run = await replay(one(["type", "quit", "release", "advance"]), [
-    "quit",
-    "type A", // the editors are read-only now; a keystroke that slips in must refuse the quit
-    "release flusher",
+    "quit", // main flushes at once (nothing unsaved); another window is still flushing
+    "type A", // nothing is read-only: the person types
+    "release flush", // another window finished: every window is asked the immediate question
+    "release question", // main answers at once: “A” has a save waiting
   ]);
   expect(run.failure).toBeNull();
   expect(run.trace.join("\n")).toContain("(quit refused: “A”");
@@ -95,4 +98,50 @@ test("F6: a conflict copy counts only because the notice names it", async () => 
     ["type A", "outside A", "quit", "release notice", "release write"],
   );
   expect(run.failure).toBeNull();
+});
+
+// The ninth review's findings.
+
+test("2 (reads): a publish that cancelled a read reads again: a newer version on disk isn't left unread", async () => {
+  const run = await replay(
+    {
+      ...one(["type", "refetch", "quiet", "quit", "release", "land", "advance"]),
+      caps: { type: 2, refetch: 2 },
+    },
+    [
+      "type A",
+      "quit", // Rotli writes “v1”; its answer is delayed
+      "land write", // it reached the disk
+      "outside A unnoticed", // another app writes, inside the watcher's quiet time
+      "refetch A", // a query reads that and waits to deliver
+      "release write", // Rotli's answer arrives: publishing cancels that query, and reads again
+    ],
+  );
+  expect(run.failure).toBeNull();
+});
+
+test("3: an older answer that is dropped forgives nothing: the person's words are still owed", async () => {
+  const run = await replay(one(["type", "refetch", "quit", "release", "advance"]), [
+    "type A",
+    "refetch A", // reads “base”
+    "quit",
+    "release write", // “v1” lands
+    "release flush",
+    "release answer", // the old answer arrives, and is dropped
+  ]);
+  expect(run.failure).toBeNull();
+  expect(run.owed.A).toBe(true);
+});
+
+test("4: a deleted note whose file comes back saves again, and quit no longer names it", async () => {
+  const run = await replay(
+    {
+      name: "deleted",
+      notes: [{ name: "A" }],
+      moves: ["type", "purge", "restore", "quit", "release", "advance"],
+    },
+    ["type A", "purge A", "quit", "release write", "release flush", "restore A", "release notice", "quit"],
+  );
+  expect(run.failure).toBeNull();
+  expect(run.trace.join("\n")).toContain("(quit refused: 1 save operation failed: “A” was deleted");
 });

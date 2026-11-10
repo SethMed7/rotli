@@ -14,14 +14,15 @@
 // attempt beside an unresolved one is what let an old write land after quit
 // was acknowledged. A read changes nothing, so a slow read is left behind.
 //
-// Buffers are buffers.ts's; this file decides when to write and what a write's
-// outcome means. src/editor/saveExplorer.test.ts searches its schedules.
+// Buffers are buffers.ts's; saveExplorer.test.ts searches this file's schedules.
 
 import { useSyncExternalStore } from "react";
 
+import { titleOf } from "../services/derive";
 import { applyNoteWrite, invalidateNotes } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
-import { writeLanded } from "../services/noteReads";
+import { acceptedSince, readAgain, startRead, stampRead, takeRead, writeLanded } from "../services/noteReads";
+import { type CopiedAside, useUiStore } from "../state/ui";
 import type { Note } from "../types";
 import {
   adopt,
@@ -77,11 +78,6 @@ const unsure = new Map<string, Set<string>>();
 const recoveries = new Map<string, Recovery>();
 const eventIds = new Map<string, string>();
 const stamps = new Map<string, string>();
-// Notes whose unsaved words went into a conflict copy, and the copy: shown to
-// the person until they dismiss it (eighth review: nothing said where their
-// words went).
-const aside = new Map<string, { noteId: string; copyId: string; name: string }>();
-const asideSubs = new Set<() => void>();
 // Notes deleted while they had unsaved words, waiting for the person's choice.
 const gone = new Set<string>();
 const goneSubs = new Set<() => void>();
@@ -90,20 +86,9 @@ const goneSubs = new Set<() => void>();
  * explorer runs thousands of schedules in one process). */
 export function resetSaveQueueForTests(): void {
   for (const timer of timers.values()) clock.clearTimeout(timer);
-  for (const set of [
-    timers,
-    running,
-    queued,
-    retrying,
-    slow,
-    unsure,
-    recoveries,
-    eventIds,
-    stamps,
-    gone,
-    aside,
-  ])
+  for (const set of [timers, running, queued, retrying, slow, unsure, recoveries, eventIds, stamps, gone])
     set.clear();
+  useUiStore.getState().setCopiedAside([]);
 }
 
 /** The note's name, for messages that must say which note. */
@@ -195,6 +180,7 @@ async function writeNow(noteId: string): Promise<void> {
   const generation = editGeneration(noteId);
   const body = lines.join("\n");
   let note: Note | void;
+  const since = startRead();
   try {
     note = await mutation(noteId, () => lane.write(noteId, body, expectedRevision, expectedBody));
   } catch (error) {
@@ -207,6 +193,13 @@ async function writeNow(noteId: string): Promise<void> {
   if (note) recordLanded(noteId, body, note.revision);
   // what this write carried is on disk; typing since keeps the note unsaved
   adopt(noteId, generation, { saved: true });
+  // An answer's arrival isn't the order things happened on disk: a read taken
+  // in while this write was out may have shown a version newer than it (not
+  // what it wrote, nor what it was based on). Fold that in, never call the
+  // older words saved over it.
+  const seen = note ? acceptedSince(noteId, since) : null;
+  if (note && seen && seen.revision !== note.revision && seen.revision !== expectedRevision)
+    reloadDocument(noteId, seen.body, seen.revision);
   if (!note) return; // test stub — no cache to patch
   // SCOPED refresh (audit 2026-07-30, #1): patch the fresh note into the
   // caches instead of invalidating ["notes"]. Tasks re-derive only when the
@@ -244,8 +237,21 @@ function markGone(noteId: string): void {
   refreshDirty(noteId);
 }
 
-async function reconcileFromDisk(noteId: string): Promise<void> {
+/** The queue's own read, numbered like every other (noteReads.ts): undefined when
+ * it didn't answer or something newer was taken in (then it reads again), null when gone. */
+async function readFile(noteId: string): Promise<Note | null | undefined> {
+  const startedAt = startRead();
   const note = await bounded(() => lane.read(noteId));
+  if (!note) return note;
+  if (!takeRead(stampRead(note, startedAt))) {
+    if (note.revision !== revisionOf(noteId)) readAgain(noteId);
+    return undefined;
+  }
+  return note;
+}
+
+async function reconcileFromDisk(noteId: string): Promise<void> {
+  const note = await readFile(noteId);
   if (!note || !isDirty(noteId)) return;
   if (unsure.get(noteId)?.has(note.body)) return rebaseOnOwn(noteId, note);
   reloadDocument(noteId, note.body, note.revision);
@@ -340,7 +346,7 @@ async function keepConflictCopy(noteId: string): Promise<void> {
   if (!isDirty(noteId) || !documentSaveError(noteId)?.startsWith("revision conflict")) return;
   const generation = editGeneration(noteId);
   const mine = bufferText(noteId);
-  const note = await bounded(() => lane.read(noteId));
+  const note = await readFile(noteId);
   // No file to read (or no answer; a Mac read says null for both): the write
   // lane tells the two apart. One attempt: it lands, says the note is gone, or
   // conflicts again.
@@ -364,7 +370,7 @@ async function keepConflictCopy(noteId: string): Promise<void> {
     return; // still unsaved: quit reports it
   }
   // the file may have changed again while the copy was made
-  const now = await bounded(() => lane.read(noteId));
+  const now = await readFile(noteId);
   if (!now || now.revision !== note.revision) return;
   const disk = { body: now.body, revision: now.revision };
   const made = recoveries.get(event)!;
@@ -373,9 +379,16 @@ async function keepConflictCopy(noteId: string): Promise<void> {
     recoveries.delete(event);
     eventIds.delete(event);
     stamps.delete(event);
-    // say where the words went, and let the copy show in the lists
-    aside.set(noteId, { noteId, copyId: made.id, name: noteName(noteId) });
-    for (const fn of asideSubs) fn();
+    // say where the words went (one entry per copy, kept across a restart),
+    // and let the copy show in the lists
+    const told = useUiStore.getState().copiedAside;
+    if (!told.some((entry) => entry.copyId === made.id))
+      useUiStore
+        .getState()
+        .setCopiedAside([
+          ...told,
+          { copyId: made.id, copyName: `“${titleOf(made.body)}”`, noteName: noteName(noteId) },
+        ]);
     void invalidateNotes();
   }
 }
@@ -549,6 +562,15 @@ function goneSnapshot(): string[] {
   return goneCache;
 }
 
+/** A deleted note's file is there again (a fresh read found it): it saves
+ * again. The caller folds the file in through the merge path. */
+export function reviveGoneNote(noteId: string): void {
+  if (!gone.delete(noteId)) return;
+  for (const fn of goneSubs) fn();
+  setSaveError(noteId, null);
+  scheduleSync(noteId);
+}
+
 /** Let the words go. Rotli doesn't make a note of them itself (eighth review:
  * that handoff couldn't be shown safe); the notice offers to copy them first. */
 export function discardGoneNote(noteId: string): void {
@@ -557,25 +579,16 @@ export function discardGoneNote(noteId: string): void {
 
 // ——— a conflict copy: the person is told where their words went ———
 
-/** The notes whose unsaved words went into a conflict copy, read once. */
-export const copiedAside = (): { noteId: string; copyId: string; name: string }[] => [...aside.values()];
+/** The conflict copies the person hasn't opened or dismissed, read once. */
+export const copiedAside = (): CopiedAside[] => useUiStore.getState().copiedAside;
 
-export function useCopiedAside(): { noteId: string; copyId: string; name: string }[] {
-  return useSyncExternalStore((fn) => {
-    asideSubs.add(fn);
-    return () => asideSubs.delete(fn);
-  }, asideSnapshot);
-}
-let asideCache: { noteId: string; copyId: string; name: string }[] = [];
-function asideSnapshot() {
-  const now = [...aside.values()];
-  if (now.length !== asideCache.length || now.some((entry, i) => entry !== asideCache[i])) asideCache = now;
-  return asideCache;
-}
+export const useCopiedAside = (): CopiedAside[] => useUiStore((state) => state.copiedAside);
 
-/** The person has seen where the words went. */
-export function dismissCopiedAside(noteId: string): void {
-  if (aside.delete(noteId)) for (const fn of asideSubs) fn();
+/** The person opened the copy, or dismissed the notice. */
+export function dismissCopiedAside(copyId: string): void {
+  const told = useUiStore.getState().copiedAside;
+  if (told.some((entry) => entry.copyId === copyId))
+    useUiStore.getState().setCopiedAside(told.filter((entry) => entry.copyId !== copyId));
 }
 
 const letGo = (noteId: string) => {

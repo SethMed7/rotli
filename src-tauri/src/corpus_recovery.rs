@@ -72,7 +72,7 @@ impl CorpusStore {
 
     /// The note an earlier create made for `event`, from the disk itself (the
     /// walk's cache can predate that create): every folder a create for
-    /// `folder_id` can land in. A file it can't read is an error.
+    /// `folder_id` can land in. A folder or file it can't read is an error.
     fn recovery_note(&mut self, folder_id: &str, event: &str) -> Result<Option<CreatedNote>, String> {
         let wanted = format!("recovery: {event}");
         let mut homes = vec![folder_id.to_string(), "Secure notes".to_string(), "wiki/_secure".to_string()];
@@ -84,7 +84,13 @@ impl CorpusStore {
         homes.dedup();
         for home in homes {
             let dir = self.root().join(&home);
-            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            // a folder that doesn't exist holds no copy; any other error is
+            // "can't tell", never "no copy there" (ninth review)
+            let entries = match fs::read_dir(&dir) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(format!("look for a recovery note in {home}: {error}")),
+            };
             for entry in entries {
                 let path = entry.map_err(|e| format!("look for a recovery note in {home}: {e}"))?.path();
                 if path.extension().and_then(|e| e.to_str()) != Some("md") {
@@ -109,5 +115,27 @@ impl CorpusStore {
             }
         }
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::super::tests::bare;
+
+    /// An unreadable folder is "can't tell", never "no copy there": the
+    /// create refuses instead of making a second copy (ninth review).
+    #[test]
+    fn an_unreadable_home_refuses_rather_than_making_another_copy() {
+        let (_dir, mut store) = bare();
+        let first = store.create_with("Inbox", "# Plan (unsaved edits)\n\nmine", false, false, None, Some("e-9")).unwrap();
+        let inbox = store.root().join("Inbox");
+        std::fs::set_permissions(&inbox, std::fs::Permissions::from_mode(0o300)).unwrap();
+        let again = store.create_with("Inbox", "# Plan (unsaved edits)\n\nmine", false, false, None, Some("e-9"));
+        std::fs::set_permissions(&inbox, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(again.is_err(), "an unreadable folder must not read as absent: {again:?}");
+        let again = store.create_with("Inbox", "# Plan (unsaved edits)\n\nmine", false, false, None, Some("e-9")).unwrap();
+        assert_eq!(again.meta.id, first.meta.id);
     }
 }

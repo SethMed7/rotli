@@ -226,6 +226,9 @@ export const clampSidebarZoom = (z: number): number => Math.min(1.4, Math.max(0.
  * degrades to a safe default rather than crashing. */
 export const RESERVED_DESTS = ["Inbox", "vault:", "Storage", "Board", "Archive", "Trash"] as const;
 
+/** A conflict copy the person is told about: the copy, its title, and the note it came from. */
+export type CopiedAside = { copyId: string; copyName: string; noteName: string };
+
 interface UiState {
   /** Explicit three-way setting. "system" mirrors the OS only while selected;
    * the default is "light" so demos are deterministic. */
@@ -317,6 +320,9 @@ interface UiState {
    * state/quick.ts; these are the raw fields the persistence layer reads. */
   quickNoteIds: string[];
   setQuickNoteIds: (ids: string[]) => void;
+  /** Conflict copies not yet opened or dismissed (persisted: editor/saveQueue.ts). */
+  copiedAside: CopiedAside[];
+  setCopiedAside: (entries: CopiedAside[]) => void;
   /** Manual order of the Captures grid (ids). Unknown ids fall back to
    * newest-first. Persisted in settings.json — never written into the notes. */
   captureOrder: string[];
@@ -776,6 +782,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
+  copiedAside: [],
+  setCopiedAside: (entries) => set({ copiedAside: entries }),
   captureOrder: [],
   setCaptureOrder: (ids) => set({ captureOrder: ids }),
   quickActiveId: null,

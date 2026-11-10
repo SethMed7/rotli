@@ -38,11 +38,16 @@ export interface FakeLane {
   lock(id: string): void;
   move(id: string, folder: string): void;
   purge(id: string): void;
+  /** Purged files, by id, so another app can put one back. */
+  purged: Map<string, FakeFile>;
+  /** Another app puts a purged file back. */
+  restore(id: string): void;
 }
 
 /** `prefix` names the notes it creates (`<prefix>-1`, …), so lanes never share an id. */
 export function fakeLane(prefix = "note"): FakeLane {
   const files = new Map<string, FakeFile>();
+  const purged = new Map<string, FakeFile>();
   let next = 0;
   const note = (id: string): Note => {
     const file = files.get(id)!;
@@ -112,8 +117,15 @@ export function fakeLane(prefix = "note"): FakeLane {
       found(id).meta.push(`origin: moved`);
     },
     purge(id) {
-      found(id);
+      purged.set(id, found(id));
       files.delete(id);
+    },
+    purged,
+    restore(id) {
+      const file = purged.get(id);
+      if (!file) throw new Error(`nothing to restore: ${id}`);
+      purged.delete(id);
+      files.set(id, file);
     },
   };
 }

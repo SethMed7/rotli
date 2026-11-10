@@ -9,6 +9,8 @@ export interface Run {
   radix: number[];
   taken: number[];
   failure: string | null;
+  /** Whether each note's words were still owed at the end (the oracle's own state). */
+  owed: Record<string, boolean>;
 }
 
 /** Run one schedule: at each step `choose` picks one of the open moves (by
@@ -19,7 +21,7 @@ export async function runSchedule(
   depth: number,
 ): Promise<Run> {
   const world = new World(scenario);
-  const run: Run = { trace: world.trace, radix: [], taken: [], failure: null };
+  const run: Run = { trace: world.trace, radix: [], taken: [], failure: null, owed: {} };
   try {
     run.failure = world.check();
     for (let step = 0; step < depth && !run.failure; step += 1) {
@@ -35,6 +37,7 @@ export async function runSchedule(
       run.failure = world.check();
     }
     if (!run.failure) run.failure = await world.finish();
+    run.owed = world.owedNow();
   } finally {
     world.dispose();
   }

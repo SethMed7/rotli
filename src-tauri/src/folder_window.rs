@@ -72,7 +72,9 @@ pub(crate) fn close(app: &AppHandle, label: &str) {
     let label = label.to_string();
     std::thread::spawn(move || {
         if let Err(detail) = crate::flush_windows(&app, std::slice::from_ref(&label)) {
-            let _ = app.emit_to(label.as_str(), "rotli:open-notice", detail);
+            if detail != crate::quit_flush::JOINED {
+                let _ = app.emit_to(label.as_str(), "rotli:open-notice", detail);
+            }
             return;
         }
         if let Some(window) = app.get_webview_window(&label) {

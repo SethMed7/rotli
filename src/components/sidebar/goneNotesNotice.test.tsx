@@ -31,12 +31,13 @@ test("each deleted note with unsaved words gets plain words: copy them, or disca
 test("a conflict copy is named, with a way to open it", () => {
   const shown = renderToStaticMarkup(
     <CopiedAsideNoticeView
-      entries={[{ noteId: "n1", copyId: "c1", name: "“Plan”" }]}
+      entries={[{ copyId: "c1", copyName: "“Plan (unsaved edits 2026-11-10 04:00)”", noteName: "“Plan”" }]}
       open={() => {}}
       dismiss={() => {}}
     />,
   );
   expect(shown).toContain("Another app changed “Plan” while it had unsaved words.");
+  expect(shown).toContain("“Plan (unsaved edits 2026-11-10 04:00)”");
   expect(shown).toContain(OPEN_COPY);
   expect(shown).toContain('aria-label="Unsaved words kept as a copy"');
   expect(

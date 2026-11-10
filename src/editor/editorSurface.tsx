@@ -14,7 +14,6 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isHardLinkRefusal } from "../lib/hardLinks";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
-import { useFinishingSaves } from "../lib/quitFlush";
 import {
   corpusNoteAbsolutePath,
   corpusRawFrontmatter,
@@ -48,7 +47,7 @@ import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
-import { adoptReadNote, useDocumentDirty, useDocumentSaveError, useGoneNotes } from "./model";
+import { adoptReadNote, retainedNote, useDocumentDirty, useDocumentSaveError, useGoneNotes } from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -153,14 +152,13 @@ export function EditorSurface({
     [noteId, pendingCreatedAt],
   );
   const stored = useNote(noteId, { enabled: !pending });
-  const storedNote = stored.data;
+  // a file deleted outside: its words stay in the buffer, so keep showing them
+  const storedNote = stored.data ?? retainedNote(noteId);
   // a note that has (or came to have) a hard link is not shown, even from cache
   const hardLinked = !pending && isHardLinkRefusal(stored.error);
   const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
-  // quit is deciding: the editor takes no input until it is refused (quitFlush.ts)
-  const finishing = useFinishingSaves();
   const deleted = useGoneNotes().includes(noteId);
 
   const [aaOpen, setAaOpen] = useState(false);
@@ -532,11 +530,6 @@ export function EditorSurface({
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
-      {finishing && (
-        <div className="ed-saveerr" role="status">
-          Finishing saving…
-        </div>
-      )}
       {saveError && (
         <div className="ed-saveerr" role="alert">
           {deleted

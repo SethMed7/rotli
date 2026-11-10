@@ -34,17 +34,17 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
     scenario: {
       name: "a query's answer arrives late",
       notes: [{ name: "A" }],
-      moves: ["type", "refetch", "quit", "release", "advance"],
+      moves: ["type", "refetch", "quiet", "quit", "release", "land", "advance"],
       caps: { type: 2, refetch: 2 },
     },
-    depth: 8,
-    full: 11,
+    depth: 7,
+    full: 10,
   },
   {
     scenario: {
       name: "a note deleted with words in it",
       notes: [{ name: "A", secure: true }],
-      moves: ["type", "purge", "discard", "quit", "release", "fail", "advance"],
+      moves: ["type", "purge", "restore", "discard", "quit", "release", "fail", "advance"],
       caps: { type: 2 },
     },
     depth: 8,
@@ -99,13 +99,16 @@ export const WALKS: Scenario = {
     "switch",
     "close",
     "outside",
+    "quiet",
     "purge",
+    "restore",
     "refetch",
     "discard",
     "quit",
     "release",
     "fail",
     "landFail",
+    "land",
     "never",
     "advance",
   ],
@@ -122,7 +125,11 @@ function report(name: string, found: Exploration): string {
     .join("\n\n");
 }
 
-for (const { scenario, depth, full } of SCENARIOS) {
+// EXPLORE_ONLY="name|name" runs only those scenarios (scripts/explore-at.ts)
+const only = process.env.EXPLORE_ONLY?.split("|");
+for (const { scenario, depth, full } of SCENARIOS.filter(
+  ({ scenario }) => !only || only.includes(scenario.name),
+)) {
   const limit = FULL ? full : depth;
   test(`every schedule up to ${limit} moves keeps I1 to I5: ${scenario.name}`, async () => {
     const found = await exhaust(scenario, limit);
@@ -133,12 +140,16 @@ for (const { scenario, depth, full } of SCENARIOS) {
   }, 600_000);
 }
 
-test("seeded random walks of 70 moves keep I1 to I5", async () => {
-  const seed = Number(process.env.EXPLORE_SEED ?? 20261111);
-  const walks = FULL ? 20_000 : 500;
-  const found = await walk(WALKS, seed, walks, 70);
-  console.log(
-    `  random walks: ${found.schedules} walks of up to 70 moves, seed ${seed}, ${Math.round(found.ms)} ms`,
-  );
-  expect(report(`walks (seed ${seed})`, found)).toBe("");
-}, 1_800_000);
+test.skipIf(!!only && !only.includes("random walks"))(
+  "seeded random walks of 70 moves keep I1 to I5",
+  async () => {
+    const seed = Number(process.env.EXPLORE_SEED ?? 20261111);
+    const walks = FULL ? 20_000 : 500;
+    const found = await walk(WALKS, seed, walks, 70);
+    console.log(
+      `  random walks: ${found.schedules} walks of up to 70 moves, seed ${seed}, ${Math.round(found.ms)} ms`,
+    );
+    expect(report(`walks (seed ${seed})`, found)).toBe("");
+  },
+  1_800_000,
+);

@@ -13,17 +13,21 @@
 // Flushers run in parallel. Any failure is reported to Rust, which aborts the
 // normal quit and keeps the user's unsaved buffers alive.
 //
-// Quit is a transaction (eighth review of pull request 267): from the request
-// until it is refused or the process exits, the editors take no input
-// (`useFinishingSaves`, "Finishing saving…"), and the acknowledgement is given
-// only when a final check, after EVERY flusher has finished, finds nothing
-// unsaved or outstanding (`onQuitCheck`). A note whose own flush finished
-// early used to keep taking typing while another flusher (a workbook, another
-// window) was still saving, and quit was acknowledged with those words unsaved.
+// Quit has two phases, driven by Rust (src-tauri/src/quit_flush.rs), and
+// nothing is ever made read-only (ninth review of pull request 267: a lock on
+// the editors could strand a window for good):
+// 1. "rotli:flush-before-quit": every flusher runs; the window answers
+//    flushed, or refused with the reasons (`quit_flush_done`).
+// 2. "rotli:quit-check", only when every window flushed: the window answers at
+//    once, from its buffers' state with no flushing, whether anything is
+//    unsaved or outstanding (`onQuitCheck`, `quit_check_done`). Any yes refuses
+//    the quit; all no, and Rust exits at once. A note whose flush finished
+//    early could keep taking typing while another window was still saving;
+//    that typing is now caught by the question asked after every flush.
+// Each attempt ends with "rotli:save-attempt-ended" to every window it asked.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useSyncExternalStore } from "react";
 
 import { currentWindowLabel, isTauri } from "./tauri";
 
@@ -70,44 +74,17 @@ export function onQuitCheck(fn: QuitCheck): () => void {
   return enrol(checks, fn);
 }
 
-// While quit is being decided, the editors take no input. If the process is
-// still alive this long after an acknowledgement, another window refused the
-// quit (Rust waits 15 seconds), so input comes back.
-const RESTORE_AFTER_MS = 20_000;
-let finishing = false;
-let restoreTimer: ReturnType<typeof setTimeout> | undefined;
-const finishingSubs = new Set<() => void>();
-function setFinishing(value: boolean): void {
-  clearTimeout(restoreTimer);
-  if (finishing === value) return;
-  finishing = value;
-  for (const fn of finishingSubs) fn();
+/** Phase 2's answer, computed now from the buffers' state with no flushing:
+ * what is unsaved or outstanding, in words, or null when nothing is. */
+export function quitCheckNow(): string | null {
+  const reasons = [...checks].map((check) => check()).filter((reason): reason is string => !!reason);
+  return reasons.length > 0 ? reasons.join("; ") : null;
 }
 
-/** True from a quit request until it is refused (or the process exits). */
-export const finishingSaves = (): boolean => finishing;
-export function useFinishingSaves(): boolean {
-  return useSyncExternalStore((fn) => {
-    finishingSubs.add(fn);
-    return () => finishingSubs.delete(fn);
-  }, finishingSaves);
-}
-
-/** The quit transaction: no input from here on, every flusher, then the final
- * checks. Resolves only when nothing is unsaved or outstanding anywhere;
- * otherwise input comes back and it rejects with every reason. */
-export async function runQuitTransaction(): Promise<void> {
-  setFinishing(true);
-  try {
-    await runQuitFlushers();
-    const reasons = [...checks].map((check) => check()).filter((reason): reason is string => !!reason);
-    if (reasons.length > 0) throw new Error(reasons.join("; "));
-  } catch (error) {
-    setFinishing(false);
-    throw error;
-  }
-  restoreTimer = setTimeout(() => setFinishing(false), RESTORE_AFTER_MS);
-}
+/** How one window answers each phase (the listeners below, and the save-state
+ * explorer, which plays the coordinator's part). */
+export const answerFlush = (): Promise<void> => runQuitFlushers();
+export const answerCheck = (): string | null => quitCheckNow();
 
 type QuitFlushPayload = { attemptId: number };
 const failureSubscribers = new Set<(message: string) => void>();
@@ -127,7 +104,7 @@ if (typeof window !== "undefined" && isTauri()) {
     (event) => {
       void (async () => {
         try {
-          await runQuitTransaction();
+          await answerFlush();
           await invoke("quit_flush_done", { attemptId: event.payload.attemptId, ok: true }).catch(() => {});
         } catch (error) {
           await invoke("quit_flush_done", {
@@ -140,12 +117,29 @@ if (typeof window !== "undefined" && isTauri()) {
     },
     { target: currentWindowLabel() },
   );
+  // phase 2: answered at once, synchronously, from the buffers' state
+  void listen<QuitFlushPayload>(
+    "rotli:quit-check",
+    (event) => {
+      const reasons = answerCheck();
+      void invoke("quit_check_done", {
+        attemptId: event.payload.attemptId,
+        clean: reasons === null,
+        reasons,
+      }).catch(() => {});
+    },
+    { target: currentWindowLabel() },
+  );
   void listen<string>(
     "rotli:quit-flush-failed",
     (event) => {
-      setFinishing(false);
       for (const subscriber of failureSubscribers) subscriber(event.payload);
     },
     { target: currentWindowLabel() },
   );
+  // the attempt is over (finished or refused): nothing here was ever locked,
+  // so there is nothing to restore; heard so every window acknowledges it
+  void listen<{ attemptId: number; finished: boolean }>("rotli:save-attempt-ended", () => {}, {
+    target: currentWindowLabel(),
+  });
 }

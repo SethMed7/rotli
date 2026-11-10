@@ -12,7 +12,7 @@
 // unsaved words, so Rotli kept them as a copy beside it and the note took the
 // other app's text. The notice says so, names the copy, and opens it.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   discardGoneNote,
@@ -22,7 +22,8 @@ import {
   useCopiedAside,
   useGoneNotes,
 } from "../../editor/model";
-import { usePanesStore } from "../../state/panes";
+import { leaves, usePanesStore } from "../../state/panes";
+import type { CopiedAside } from "../../state/ui";
 
 export const COPY_WORDS = "Copy the words";
 export const DISCARD_WORDS = "Discard";
@@ -32,15 +33,39 @@ async function copyWords(noteId: string): Promise<void> {
   await navigator.clipboard.writeText(getDocumentText(noteId) ?? "");
 }
 
+/** Let the words go, and every pane that showed them. */
+function discardEverywhere(noteId: string): void {
+  discardGoneNote(noteId);
+  usePanesStore.getState().closeNoteTabs(noteId);
+}
+
+/** Open the copy: that is the person having seen it. */
+function openCopy(copyId: string): void {
+  usePanesStore.getState().openNote(copyId);
+  dismissCopiedAside(copyId);
+}
+
 export function GoneNotesNotice() {
+  const entries = useCopiedAside();
+  // a copy opened any other way (the sidebar, search) counts as seen too
+  const shown = usePanesStore((state) =>
+    leaves(state.root)
+      .flatMap((leaf) => leaf.tabs.map((tab) => (tab.surfaceKind === "note" ? tab.noteId : "")))
+      .join("\n"),
+  );
+  useEffect(() => {
+    const open = new Set(shown.split("\n"));
+    for (const entry of entries) if (open.has(entry.copyId)) dismissCopiedAside(entry.copyId);
+  }, [entries, shown]);
   return (
     <>
-      <GoneNotesNoticeView ids={useGoneNotes()} name={noteName} copy={copyWords} discard={discardGoneNote} />
-      <CopiedAsideNoticeView
-        entries={useCopiedAside()}
-        open={(copyId) => usePanesStore.getState().openNote(copyId)}
-        dismiss={dismissCopiedAside}
+      <GoneNotesNoticeView
+        ids={useGoneNotes()}
+        name={noteName}
+        copy={copyWords}
+        discard={discardEverywhere}
       />
+      <CopiedAsideNoticeView entries={entries} open={openCopy} dismiss={dismissCopiedAside} />
     </>
   );
 }
@@ -99,24 +124,24 @@ export function CopiedAsideNoticeView({
   open,
   dismiss,
 }: {
-  entries: readonly { noteId: string; copyId: string; name: string }[];
+  entries: readonly CopiedAside[];
   open: (copyId: string) => void;
-  dismiss: (noteId: string) => void;
+  dismiss: (copyId: string) => void;
 }) {
   if (entries.length === 0) return null;
   return (
     <section className="gone-notice" aria-label="Unsaved words kept as a copy">
       {entries.map((entry) => (
-        <div key={entry.noteId} className="gone-notice-row">
+        <div key={entry.copyId} className="gone-notice-row">
           <p className="gone-notice-text">
-            Another app changed {entry.name} while it had unsaved words. Your words are in a copy beside it,
-            and {entry.name} now shows the other app’s version.
+            Another app changed {entry.noteName} while it had unsaved words. Your words are in{" "}
+            {entry.copyName}, beside it.
           </p>
           <div className="gone-notice-actions">
             <button type="button" className="gone-notice-action" onClick={() => open(entry.copyId)}>
               {OPEN_COPY}
             </button>
-            <button type="button" className="gone-notice-action" onClick={() => dismiss(entry.noteId)}>
+            <button type="button" className="gone-notice-action" onClick={() => dismiss(entry.copyId)}>
               Dismiss
             </button>
           </div>
