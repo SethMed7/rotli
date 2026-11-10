@@ -2565,6 +2565,9 @@ struct ListCache {
     /// sidebar to stay clean. Only the AI lanes ask for these.
     reference: Vec<NoteMeta>,
     texts: HashMap<String, CachedNoteText>,
+    /// The walked directories only, before any shelf folder was synthesized
+    /// from a note's frontmatter (`ai_rows::folders_for_ai`).
+    dir_folders: Vec<FolderMeta>,
 }
 
 fn valid_view_name(name: &str) -> bool {
@@ -4417,6 +4420,7 @@ impl CorpusStore {
             },
             reference: walked.reference,
             texts: walked.texts,
+            dir_folders: walked.dir_folders,
         });
         true
     }
@@ -6518,6 +6522,53 @@ fn user_dot_writable(which: &str) -> Result<(), String> {
     }
 }
 
+/// A reference-lane note's row (identity/, MAP.md …): its id is its path, it
+/// sits in its disk folder, and it carries no aliases, pin, or origin.
+fn reference_row(rel: &str, abs: &Path, fm: &Frontmatter, body: &str) -> NoteMeta {
+    let disk_folder = folder_of(rel);
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: title_of(body),
+        snippet: snippet_of(body),
+        body_empty: body.trim().is_empty(),
+        aliases: Vec::new(),
+        folder_id: disk_folder.clone(),
+        disk_folder_id: disk_folder,
+        created_at: fm.created.as_deref().and_then(|s| stamp_to_ms(s, Some(file_created))).unwrap_or(file_created),
+        updated_at: fm.updated.as_deref().and_then(|s| stamp_to_ms(s, Some(file_updated))).unwrap_or(file_updated),
+        pinned: false,
+        origin: None,
+        kind: NoteKind::Note,
+    }
+}
+
+/// A note's row, built from its file's text alone: the one place a note's
+/// `NoteMeta` comes from its bytes, for the walk and for the AI lanes'
+/// approved snapshot (corpus_ai_rows.rs), so neither can show a field the
+/// other derives differently. A wiki note appears under its shelf (v3.5), and
+/// only a note physically under a hidden root (Archive/Trash) carries an
+/// origin out to the wire.
+fn note_row(layout: Layout, id: String, rel: &str, abs: &Path, fm: &Frontmatter, body: &str) -> NoteMeta {
+    let disk_folder = folder_of(rel);
+    let title = title_of(body);
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        aliases: note_aliases(rel, &title, &id, fm),
+        folder_id: project_folder(layout, &disk_folder, fm),
+        origin: if is_hidden_root(layout, &disk_folder) { fm.origin.clone() } else { None },
+        snippet: snippet_of(body),
+        body_empty: body.trim().is_empty(),
+        created_at: fm.created.as_deref().and_then(|s| stamp_to_ms(s, Some(file_created))).unwrap_or(file_created),
+        updated_at: fm.updated.as_deref().and_then(|s| stamp_to_ms(s, Some(file_updated))).unwrap_or(file_updated),
+        pinned: fm.pinned.unwrap_or(false),
+        kind: NoteKind::Note,
+        disk_folder_id: disk_folder,
+        id,
+        title,
+    }
+}
+
 pub(crate) fn folder_of(rel: &str) -> String {
     match rel.rsplit_once('/') {
         Some((dir, _)) => dir.to_string(),
@@ -6567,6 +6618,7 @@ struct Walked {
     generation: u64,
     index: HashMap<String, String>,
     folders: Vec<FolderMeta>,
+    dir_folders: Vec<FolderMeta>,
     notes: Vec<NoteMeta>,
     reference: Vec<NoteMeta>,
     texts: HashMap<String, CachedNoteText>,
@@ -6594,6 +6646,9 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
     )?;
     // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
     // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
+    // The directories alone are kept too: a shelf comes from a note's content,
+    // so an AI lane synthesizes only the shelves of rows it may see.
+    let dir_folders = folders.clone();
     ensure_backing_folders(&mut folders, &notes);
     folders.sort_by(|a, b| a.id.cmp(&b.id));
     notes.sort_by(|a, b| {
@@ -6607,6 +6662,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
         generation: plan.generation,
         index,
         folders,
+        dir_folders,
         notes,
         reference,
         texts,
@@ -6715,29 +6771,7 @@ fn walk(
                         secure: walked_secure(&fm, body),
                     },
                 );
-                let (file_created, file_updated) = file_stamps(&abs);
-                reference.push(NoteMeta {
-                    id: rel.clone(),
-                    title: title_of(body),
-                    snippet: snippet_of(body),
-                    body_empty: body.trim().is_empty(),
-                    aliases: Vec::new(),
-                    folder_id: prefix.to_string(),
-                    disk_folder_id: prefix.to_string(),
-                    created_at: fm
-                        .created
-                        .as_deref()
-                        .and_then(|s| stamp_to_ms(s, Some(file_created)))
-                        .unwrap_or(file_created),
-                    updated_at: fm
-                        .updated
-                        .as_deref()
-                        .and_then(|s| stamp_to_ms(s, Some(file_updated)))
-                        .unwrap_or(file_updated),
-                    pinned: false,
-                    origin: None,
-                    kind: NoteKind::Note,
-                });
+                reference.push(reference_row(&rel, &abs, &fm, body));
             }
             continue;
         }
@@ -6780,9 +6814,6 @@ fn walk(
             };
             let had_fm = fm.is_some();
             let fm = fm.unwrap_or_default();
-            // shelf-projection (v3.5): a wiki note appears under its shelf (the
-            // user's folder), not its disk path. Computed BEFORE fm.id is moved.
-            let folder_id = project_folder(layout, prefix, &fm);
             // identity: frontmatter id → previous index (path-stable for
             // frontmatter-less files) → fresh mint. Duplicate ids (a copied
             // file) never collapse two notes into one.
@@ -6813,38 +6844,7 @@ fn walk(
                     secure: walked_secure(&fm, body),
                 },
             );
-            let title = title_of(body);
-            let aliases = note_aliases(&rel, &title, &id, &fm);
-            let (file_created, file_updated) = file_stamps(&abs);
-            // only notes physically under a hidden root (Archive/Trash) carry
-            // an origin out to the wire; everything else is None.
-            let origin = if is_hidden_root(layout, prefix) {
-                fm.origin.clone()
-            } else {
-                None
-            };
-            notes.push(NoteMeta {
-                id,
-                title,
-                snippet: snippet_of(body),
-                body_empty: body.trim().is_empty(),
-                aliases,
-                folder_id,
-                disk_folder_id: prefix.to_string(),
-                created_at: fm
-                    .created
-                    .as_deref()
-                    .and_then(|s| stamp_to_ms(s, Some(file_created)))
-                    .unwrap_or(file_created),
-                updated_at: fm
-                    .updated
-                    .as_deref()
-                    .and_then(|s| stamp_to_ms(s, Some(file_updated)))
-                    .unwrap_or(file_updated),
-                pinned: fm.pinned.unwrap_or(false),
-                origin,
-                kind: NoteKind::Note,
-            });
+            notes.push(note_row(layout, id, &rel, &abs, &fm, body));
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".excalidraw") {
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
             // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
@@ -7544,10 +7544,9 @@ fn search_ai_inner(
     let mut permitted = Vec::with_capacity(hits.len());
     for hit in hits {
         let (root, rel) = split_root_id(&hit.id);
-        let id = hit.id.clone();
-        let local = SearchHit { id: rel, ..hit };
-        if let Ok(Some(shown)) = state.route(&root, |s| Ok(s.present_hit_for_ai(query, local, model_is_local))) {
-            permitted.push(SearchHit { id, ..shown });
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.search_row_for_ai(query, &rel, model_is_local))) {
+            shown.id = hit.id;
+            permitted.push(shown);
         }
     }
     Ok(permitted)
@@ -7560,10 +7559,9 @@ fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<NoteM
     let mut permitted = Vec::new();
     for meta in listed.notes.into_iter().chain(reference) {
         let (root, rel) = split_root_id(&meta.id);
-        let id = meta.id.clone();
-        let local = NoteMeta { id: rel, ..meta };
-        if let Ok(Some(shown)) = state.route(&root, |s| Ok(s.present_meta_for_ai(local, model_is_local))) {
-            permitted.push(NoteMeta { id, ..shown });
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.note_row_for_ai(&rel, model_is_local))) {
+            shown.id = meta.id;
+            permitted.push(shown);
         }
     }
     Ok(permitted)

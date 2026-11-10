@@ -3,6 +3,7 @@
 //! an agent move after a lock (#5).
 
 use super::tests::bare;
+use tempfile::TempDir;
 use super::*;
 
 /// Finding #1's fixture: a public note, and the secure version of it the walk
@@ -15,6 +16,42 @@ pub(crate) const CANARY: &str = "canary-7Q4";
 /// inside it must never expose.
 pub(crate) const OUTSIDE_NOTE: &str = "# Ledger\n\nwords from beyond the vault\n";
 pub(crate) const OUTSIDE_WORDS: &str = "beyond the vault";
+
+/// The second review's fixture for #1: one note in a Memex vault, in two
+/// versions. The secure one, which the walk caches first, carries a private
+/// value in EVERY field derived from the note's content (title, body, shelf
+/// and so its folder, tags, aliases, origin, and its dates), so a lane that
+/// copies any field from the cache shows it.
+pub(crate) const PRIVATE: &str = "PRIVATE-CANARY-7Q4";
+/// 1999-09-09T00:00:00Z, the secure version's dates, in milliseconds.
+pub(crate) const PRIVATE_STAMP: &str = "936835200000";
+pub(crate) const ALT_ID: &str = "01JREVIEWALTERNATE0000000A";
+
+pub(crate) struct Alternating {
+    pub(crate) abs: std::path::PathBuf,
+    pub(crate) public: String,
+}
+
+pub(crate) fn alternating_memex(root: &Path) -> Alternating {
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_review\",\"contract\":\"3.4\",\"apps\":{}}").unwrap();
+    for dir in ["self", "wiki/Projects", "history", "chats", "archive", "trash"] {
+        fs::create_dir_all(root.join(dir)).unwrap();
+    }
+    let abs = root.join("wiki/Projects/harbor-plan.md");
+    let public = format!(
+        "---\nid: {ALT_ID}\nshelf: Projects\ntags: [harbor]\naliases: []\ncreated: 2026-01-02T00:00:00Z\nupdated: 2026-01-02T00:00:00Z\n---\n\n# {HARBOR_TITLE}\n\n{HARBOR_BODY}\n"
+    );
+    let secure = format!(
+        "---\nid: {ALT_ID}\nsecure: true\nshelf: {PRIVATE}\ntags: [{PRIVATE}]\naliases: [{PRIVATE}]\norigin: {PRIVATE}\ncreated: 1999-09-09T00:00:00Z\nupdated: 1999-09-09T00:00:00Z\n---\n\n# Harbor {PRIVATE} plan\n\nharbor code {PRIVATE} opens at nine\n"
+    );
+    fs::write(&abs, secure).unwrap();
+    Alternating { abs, public }
+}
+
+/// The whole serialized answer, not field by field.
+pub(crate) fn assert_nothing_private(answer: &str) {
+    assert!(!answer.contains(PRIVATE) && !answer.contains(PRIVATE_STAMP), "{answer}");
+}
 
 pub(crate) fn with_canary(public: &str) -> String {
     public
@@ -106,7 +143,7 @@ fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     fs::write(&abs, &public).unwrap(); // public again, with no walk in between
 
     let shown: Vec<SearchHit> =
-        hits.into_iter().filter_map(|hit| store.present_hit_for_ai("harbor", hit, false)).collect();
+        hits.into_iter().filter_map(|hit| store.search_row_for_ai("harbor", &hit.id, false)).collect();
     assert_eq!(shown.len(), 1, "the public note is still found");
     assert!(!format!("{shown:?}").contains(CANARY), "{shown:?}");
     assert_eq!(shown[0].title, HARBOR_TITLE);
@@ -116,11 +153,11 @@ fn ai_lanes_show_only_the_bytes_the_gate_judged() {
     store.suppress.bump(); // the watcher saw the change
     let canary = store.search("canary", 10, false).unwrap();
     fs::write(&abs, &public).unwrap();
-    assert!(canary.into_iter().filter_map(|hit| store.present_hit_for_ai("canary", hit, false)).next().is_none());
+    assert!(canary.into_iter().filter_map(|hit| store.search_row_for_ai("canary", &hit.id, false)).next().is_none());
 
     let meta = store.list().unwrap().notes.into_iter().find(|m| m.id == n.id).unwrap();
     assert!(meta.title.contains(CANARY), "the cached listing row is the secure version");
-    let row = store.present_meta_for_ai(meta, false).expect("the public note is listed");
+    let row = store.note_row_for_ai(&meta.id, false).expect("the public note is listed");
     assert!(!format!("{row:?}").contains(CANARY), "{row:?}");
 }
 
@@ -167,4 +204,71 @@ fn no_file_read_crosses_the_vault_through_a_hard_link() {
     assert!(store.read_board("Inbox/linked.excalidraw").is_err(), "a board read");
     fs::write(store.abs("Storage/plain.csv"), "a,b\n").unwrap();
     assert_eq!(store.read_user_file_bytes("Storage/plain.csv").unwrap(), b"a,b\n");
+}
+
+/// Second review #1 through the app's own commands: every field of the chat's
+/// search and note list (folder, aliases, dates, everything) comes from the
+/// approved snapshot, never the cached secure version.
+#[test]
+fn the_apps_ai_rows_carry_no_field_from_the_cached_version() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("brain");
+    fs::create_dir_all(&root).unwrap();
+    let alt = alternating_memex(&root);
+    let mut store = CorpusStore::open(root).unwrap();
+    store.os_trash = false;
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    let warmed = serde_json::to_string(&corpus_list_inner(&state, false).unwrap()).unwrap();
+    assert!(warmed.contains(PRIVATE), "the person's own listing walks the secure version");
+    let _ = corpus_search_inner(&state, "harbor", None, None).unwrap();
+    fs::write(&alt.abs, &alt.public).unwrap();
+
+    let hits = search_ai_inner(&state, "harbor", None, None, false).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_nothing_private(&serde_json::to_string(&hits).unwrap());
+    let notes = notes_ai_inner(&state, false).unwrap();
+    assert!(notes.iter().any(|m| m.title == HARBOR_TITLE && m.folder_id == "Projects"));
+    assert_nothing_private(&serde_json::to_string(&notes).unwrap());
+}
+
+/// The guard for the class behind second-review #1 (a field copied from a
+/// cached row into what a model sees): the AI row builders take no cached
+/// row, and neither they nor the lanes that hand AI rows out build one with
+/// struct-update syntax (`..hit`) from another row.
+#[test]
+fn no_cached_row_reaches_an_ai_row() {
+    fn code(text: &str) -> Vec<&str> {
+        text.lines().filter(|line| !line.trim_start().starts_with("//")).collect()
+    }
+    fn spreads(line: &str) -> bool {
+        line.match_indices("..").any(|(at, _)| line[at + 2..].starts_with(|c: char| c.is_alphabetic() || c == '_'))
+    }
+    fn body<'a>(text: &'a str, start: &str, end: &str) -> &'a str {
+        let from = text.find(start).unwrap_or_else(|| panic!("{start} is gone; update this guard"));
+        let to = from + text[from..].find(end).unwrap_or_else(|| panic!("no end after {start}"));
+        &text[from..to]
+    }
+    for line in code(include_str!("corpus_ai_rows.rs")) {
+        let signature = line.contains("fn ");
+        assert!(
+            !(signature && (line.contains(": NoteMeta") || line.contains(": SearchHit"))),
+            "an AI row builder takes a cached row: {line}"
+        );
+        assert!(!spreads(line), "an AI row copies fields with struct-update syntax: {line}");
+    }
+    let corpus = include_str!("corpus.rs");
+    let workspace = include_str!("workspace.rs");
+    for lane in [
+        body(corpus, "fn search_ai_inner(", "\n}\n"),
+        body(corpus, "fn notes_ai_inner(", "\n}\n"),
+        body(workspace, "    fn list_remote(", "\n    }\n"),
+        body(workspace, "    fn search_remote(", "\n    }\n"),
+        body(workspace, "    fn query_remote(", "\n    }\n"),
+    ] {
+        for line in code(lane) {
+            assert!(!spreads(line), "an AI lane copies a row's fields: {line}");
+        }
+    }
 }

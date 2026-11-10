@@ -162,10 +162,12 @@ mod tests {
             let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(dir);
             for entry in walkdir_files(&root) {
                 let name = entry.to_string_lossy().to_string();
-                if name.contains("workspace_librarian") || name.ends_with("corpus.rs") || name.ends_with("feature_policy.rs") {
+                let text = std::fs::read_to_string(&entry).unwrap_or_default();
+                // the route itself, this test, and the file that defines the switch
+                let defines = text.contains("pub(crate) const LIBRARIAN_MCP_SETTING");
+                if name.contains("workspace_librarian") || name.ends_with("feature_policy.rs") || defines {
                     continue;
                 }
-                let text = std::fs::read_to_string(&entry).unwrap_or_default();
                 assert!(!text.contains("librarianMcp") && !text.contains("LIBRARIAN_MCP_SETTING"), "{name} reads the Librarian route's switch");
             }
         }

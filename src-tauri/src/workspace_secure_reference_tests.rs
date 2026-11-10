@@ -1,5 +1,7 @@
 use super::tests::test_workspace;
-use crate::corpus::review_tests::{with_canary, CANARY, HARBOR_BODY, HARBOR_TITLE, OUTSIDE_NOTE};
+use crate::corpus::review_tests::{
+    alternating_memex, assert_nothing_private, with_canary, CANARY, HARBOR_BODY, HARBOR_TITLE, OUTSIDE_NOTE, PRIVATE,
+};
 use super::*;
 use tempfile::TempDir;
 
@@ -222,4 +224,25 @@ fn the_notes_cli_refuses_hard_links_and_moves_no_note_locked_meanwhile() {
     writer.join().unwrap();
     assert!(moved.expect_err("rotli notes move refuses").contains("locked"));
     assert!(abs.is_file());
+}
+
+/// Second review #1 through the CLI agents use: search, list (its folder rows
+/// included), and query carry no field from the cached secure version.
+#[test]
+fn the_notes_cli_rows_carry_no_field_from_the_cached_version() {
+    let temp = TempDir::new().unwrap();
+    let alt = alternating_memex(temp.path());
+    let mut ws = test_workspace(&temp);
+    let warmed = serde_json::to_string(&ws.store.list().unwrap()).unwrap();
+    assert!(warmed.contains(PRIVATE), "the walk cached the secure version");
+    let _ = ws.store.search("harbor", 10, false).unwrap();
+    fs::write(&alt.abs, &alt.public).unwrap();
+
+    let searched = serde_json::to_string(&ws.search_remote("harbor", 10).unwrap()).unwrap();
+    assert!(searched.contains(HARBOR_TITLE), "{searched}");
+    assert_nothing_private(&searched);
+    let listed = serde_json::to_string(&ws.list_remote(50).unwrap()).unwrap();
+    assert!(listed.contains(HARBOR_TITLE), "{listed}");
+    assert_nothing_private(&listed);
+    assert_nothing_private(&serde_json::to_string(&ws.query_remote("harbor", 50).unwrap()).unwrap());
 }

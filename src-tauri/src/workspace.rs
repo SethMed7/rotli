@@ -295,20 +295,19 @@ impl Workspace {
     }
 
     fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
-        let CorpusList { folders, notes } = self.store.list()?;
+        let notes = self.store.list()?.notes;
         let mut kept = Vec::with_capacity(notes.len());
         for meta in notes {
-            // a note's row is rebuilt from the bytes the gate judged
+            // a note's row is built from the one read the gate approved
             let shown = match meta.kind {
-                NoteKind::Note => self.store.present_meta_for_ai(meta, false),
+                NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
                 _ => self.remote_meta_visible(&meta).then_some(meta),
             };
             kept.extend(shown);
         }
-        let folders = folders
-            .into_iter()
-            .filter(|folder| self.store.agent_listable(&folder.id))
-            .collect();
+        // directories, and only the shelves of the rows shown
+        let folders = self.store.folders_for_ai(&kept)?;
+        let folders = folders.into_iter().filter(|folder| self.store.agent_listable(&folder.id)).collect();
         let mut list = CorpusList {
             notes: kept,
             folders,
@@ -345,7 +344,7 @@ impl Workspace {
             .search(query, limit.saturating_mul(4).max(limit), false)?;
         // each hit is gated and shown from one read (review 2026-11-09)
         let mut hits: Vec<SearchHit> =
-            hits.into_iter().filter_map(|hit| self.store.present_hit_for_ai(query, hit, false)).collect();
+            hits.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false)).collect();
         hits.truncate(limit.min(100));
         for hit in &mut hits {
             hit.id = self.wire(&hit.id);
@@ -366,7 +365,7 @@ impl Workspace {
                 Err(_) => continue,
             };
             // the row's title and snippet come from the bytes the gate judged
-            let Some(meta) = self.store.present_meta_for_ai(meta, false) else { continue };
+            let Some(meta) = self.store.note_row_for_ai(&meta.id, false) else { continue };
             let rel = self.store.resolve_note_rel(&meta.id)?;
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             let frontmatter = frontmatter.unwrap_or_default();
