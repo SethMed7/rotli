@@ -4,6 +4,9 @@
     "append": {
       "src/lib/quitFlush.ts": "\n/** Shim (scripts/explore-at.ts): one transaction per window, nothing asked after. */\nexport const answerFlush = runQuitTransaction;\nexport const answerCheck = (): string | null => null;\n",
       "src/services/noteReads.ts": "\n/** Shim (scripts/explore-at.ts): c9601494 had no read hooks. */\nexport function setReadHooksForTests(_hooks: unknown): void {}\n"
+    },
+    "create": {
+      "src/editor/copiedAside.ts": "/** Shim (scripts/explore-at.ts): the conflict-copy notice's list lived in saveQueue.ts. */\nexport { copiedAside } from \"./saveQueue\";\n"
     }
   },
   "1880e044": {
@@ -14,7 +17,8 @@
       "src/editor/saveQueue.ts": "\n/** Shim (scripts/explore-at.ts): no notice named a conflict copy. */\nexport const copiedAside = (): { copyId: string }[] => [];\n"
     },
     "create": {
-      "src/services/noteReads.ts": "/** Shim (scripts/explore-at.ts): 1880e044 had no read numbering or hooks. */\nexport function setReadHooksForTests(_hooks: unknown): void {}\n"
+      "src/services/noteReads.ts": "/** Shim (scripts/explore-at.ts): 1880e044 had no read numbering or hooks. */\nexport function setReadHooksForTests(_hooks: unknown): void {}\n",
+      "src/editor/copiedAside.ts": "/** Shim (scripts/explore-at.ts): the conflict-copy notice's list lived in saveQueue.ts. */\nexport { copiedAside } from \"./saveQueue\";\n"
     }
   }
 }

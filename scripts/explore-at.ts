@@ -90,6 +90,9 @@ try {
     }
   }
   const counts = lines.filter((line) => /^\s*\d+ (pass|fail)$/.test(line)).map((line) => line.trim());
+  // a run that failed without a finding failed to run: show why
+  if (![...seen].some((text) => / I\d /.test(text)) && result.status !== 0)
+    console.log(lines.slice(-25).join("\n"));
   console.log(`${commit}: ${counts.join(", ") || "no results (see the explorer's own output)"}`);
 } finally {
   rmSync(dir, { recursive: true, force: true });

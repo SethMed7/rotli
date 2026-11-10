@@ -52,16 +52,14 @@ export {
   setWriteLimitForTests,
   setWriteNoteBodyForTests,
 } from "./saveLane";
+export { copiedAside, dismissCopiedAside, useCopiedAside } from "./copiedAside";
 export {
-  copiedAside,
   discardGoneNote,
-  dismissCopiedAside,
   flushNote,
   flushSyncs,
   noteName,
   saveState,
   STILL_SAVING,
-  useCopiedAside,
   useGoneNotes,
 } from "./saveQueue";
 

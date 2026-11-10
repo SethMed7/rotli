@@ -29,8 +29,9 @@
 //    them, not Rotli). One case more is forgiven, the one a three-way merge is
 //    designed for: when the buffer takes in a version another app wrote (an
 //    accepted read, never one that was dropped) and the person's text equals
-//    what Rotli had last saved, the person changed nothing, and the merge took
-//    the other app's text. Nothing else is remembered or forgiven. A recovery
+//    what Rotli had last saved (its baseline, or a write of its own answered
+//    since the last look), the person changed nothing, and the merge took the
+//    other app's text. Nothing else is remembered or forgiven. A recovery
 //    note counts only while the notice naming it is shown.
 // I4 Once every acknowledgement has settled and every timer has run, no note's
 //    queue is busy, and quit succeeds. Exempt, on purpose, note by note against
@@ -47,6 +48,7 @@ import { setReadHooksForTests } from "../services/noteReads";
 import { queryClient } from "../services/query";
 import type { Note } from "../types";
 import { baselineOf, bufferText, hasBuffer } from "./buffers";
+import { copiedAside } from "./copiedAside";
 import { flushNoteAfterPaint } from "./flushAfterPaint";
 import {
   adoptReadNote,
@@ -63,7 +65,7 @@ import {
 import { setClockForTests } from "./saveClock";
 import { copyWords, HandClock, titleOf } from "./saveExplorerClock.fixtures";
 import { checkWorld, finishWorld, quitStart } from "./saveExplorerRules.fixtures";
-import { copiedAside, goneNotes, resetSaveQueueForTests } from "./saveQueue";
+import { goneNotes, resetSaveQueueForTests } from "./saveQueue";
 import { type FakeLane, fakeLane } from "./writeLane.fixtures";
 
 export interface NoteSpec {
@@ -140,9 +142,11 @@ export interface Tracked {
   owed: boolean;
   discarded: boolean;
   ids: string[];
-  /** The buffer and what Rotli had last saved, as of the last look. */
+  /** The buffer and what Rotli had last saved, as of the last look; and the
+   * words Rotli's writes landed with since then. */
   seenText: string;
   seenBaseline: string | undefined;
+  savedSince: Set<string>;
   /** Another app changed the file while the watcher was quiet, and no read
    * has been taken since: Rotli has no way to know yet. */
   unseen: boolean;
@@ -253,6 +257,7 @@ export class World {
         ids: [made.id],
         seenText: base,
         seenBaseline: base,
+        savedSince: new Set(),
         unseen: false,
       });
     }
@@ -471,7 +476,7 @@ export class World {
     const before = this.lane.read(note.id)?.body;
     if (before === note.words) note.owed = false;
     const then = this.attempt?.atAnswer?.get(note);
-    if (then && before === then.words) then.owed = false;
+    if (then && (before === then.words || then.later.has(before ?? ""))) then.owed = false;
   }
 
   /** Look at every buffer: one that changed without typing took a version
@@ -482,11 +487,18 @@ export class World {
     for (const note of this.notes) {
       const text = bufferText(note.id);
       if (text !== undefined && text !== note.seenText) {
-        if (this.outside.has(text) && note.words === note.seenBaseline) note.owed = false;
+        const saved = note.words === note.seenBaseline || note.savedSince.has(note.words);
+        if (this.outside.has(text) && saved) note.owed = false;
         note.seenText = text;
       }
       note.seenBaseline = baselineOf(note.id) ?? note.seenBaseline;
+      note.savedSince.clear();
     }
+  }
+
+  /** The note a write's answer belongs to. */
+  savedOf(ack: Ack): Tracked | undefined {
+    return this.notes.find((note) => note.id === ack.noteId);
   }
 
   /** The recovery notes the person is being shown (the conflict-copy notice). */
@@ -510,7 +522,18 @@ export class World {
       return;
     }
     if (ack.landed) {
+      // it is on disk already: its answer comes, is lost, or never comes
+      if (how === "never") {
+        this.faults += 1;
+        ack.state = "never";
+        return;
+      }
       ack.state = "settled";
+      if (how !== "release") {
+        this.faults += 1;
+        return ack.reject(new Error("it was written, but the answer was lost"));
+      }
+      if (!ack.landed.error && ack.body !== undefined) this.savedOf(ack)?.savedSince.add(ack.body);
       return ack.landed.error ? ack.reject(ack.landed.error) : ack.resolve(ack.landed.value);
     }
     if (how !== "release") this.faults += 1;
@@ -528,6 +551,7 @@ export class World {
     }
     if (ack.event && value) this.copyEvents.set((value as Note).id, ack.event);
     if (how === "landFail") return ack.reject(new Error("it was written, but the answer was lost"));
+    if (ack.kind === "write" && ack.body !== undefined) this.savedOf(ack)?.savedSince.add(ack.body);
     ack.resolve(value);
   }
 

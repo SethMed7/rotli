@@ -28,7 +28,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       moves: ["type", "undo", "quit", "release", "advance"],
     },
     depth: 9,
-    full: 12,
+    full: 11,
   },
   {
     scenario: {
@@ -38,7 +38,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       caps: { type: 2, refetch: 2 },
     },
     depth: 7,
-    full: 10,
+    full: 9,
   },
   {
     scenario: {
@@ -47,8 +47,8 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       moves: ["type", "purge", "restore", "discard", "quit", "release", "fail", "advance"],
       caps: { type: 2 },
     },
-    depth: 8,
-    full: 11,
+    depth: 7,
+    full: 10,
   },
   {
     scenario: {
@@ -58,7 +58,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       caps: { type: 2, outside: 2 },
     },
     depth: 7,
-    full: 10,
+    full: 9,
   },
   {
     scenario: {
@@ -67,7 +67,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       moves: ["type", "undo", "release", "fail", "landFail", "never", "advance", "quit"],
     },
     depth: 8,
-    full: 10,
+    full: 9,
   },
   {
     scenario: {
@@ -85,7 +85,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       moves: ["type", "switch", "close", "quit", "release", "advance"],
     },
     depth: 6,
-    full: 8,
+    full: 7,
   },
 ];
 

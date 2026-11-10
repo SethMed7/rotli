@@ -22,7 +22,7 @@ import { titleOf } from "../services/derive";
 import { applyNoteWrite, invalidateNotes } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
 import { acceptedSince, readAgain, startRead, stampRead, takeRead, writeLanded } from "../services/noteReads";
-import { type CopiedAside, useUiStore } from "../state/ui";
+import { useUiStore } from "../state/ui";
 import type { Note } from "../types";
 import {
   adopt,
@@ -70,6 +70,9 @@ const slow = new Map<string, string>();
 // (the answer was lost after the write): if the disk later holds one, it is
 // Rotli's own, not another app's.
 const unsure = new Map<string, Set<string>>();
+// The words of each note's write on its way: a read showing exactly them is
+// Rotli's own, landed and not yet answered (tenth explorer run).
+const writing = new Map<string, string>();
 // The recovery note made for each event (a conflict at one disk revision), so
 // a later round updates it rather than making another; each event's id, made
 // once and written into the note's metadata, so asking Rust again after an
@@ -181,11 +184,14 @@ async function writeNow(noteId: string): Promise<void> {
   const body = lines.join("\n");
   let note: Note | void;
   const since = startRead();
+  writing.set(noteId, body);
   try {
     note = await mutation(noteId, () => lane.write(noteId, body, expectedRevision, expectedBody));
   } catch (error) {
+    writing.delete(noteId);
     return onFailure(noteId, error, body);
   }
+  writing.delete(noteId);
   setSaveError(noteId, null);
   unsure.delete(noteId);
   // every read of this note that started before now is older than the disk
@@ -278,9 +284,9 @@ export function reloadDocument(noteId: string, body: string, revision: string): 
     adopt(noteId, generation, { disk, lines: body.split("\n"), saved: true });
     return;
   }
-  // a write of Rotli's own may have landed without saying so: the true base
-  // isn't known, so nothing is merged and the conflict stays visible
-  if (unsure.has(noteId)) return;
+  // a write of Rotli's own may have landed without saying so (or is landed and
+  // still unanswered): that is no other app's text, so nothing is merged
+  if (unsure.has(noteId) || writing.get(noteId) === body) return;
   const base = baselineOf(noteId);
   const moved = revisionOf(noteId) !== revision;
   if (base !== body) {
@@ -575,20 +581,6 @@ export function reviveGoneNote(noteId: string): void {
  * that handoff couldn't be shown safe); the notice offers to copy them first. */
 export function discardGoneNote(noteId: string): void {
   if (gone.has(noteId)) letGo(noteId);
-}
-
-// ——— a conflict copy: the person is told where their words went ———
-
-/** The conflict copies the person hasn't opened or dismissed, read once. */
-export const copiedAside = (): CopiedAside[] => useUiStore.getState().copiedAside;
-
-export const useCopiedAside = (): CopiedAside[] => useUiStore((state) => state.copiedAside);
-
-/** The person opened the copy, or dismissed the notice. */
-export function dismissCopiedAside(copyId: string): void {
-  const told = useUiStore.getState().copiedAside;
-  if (told.some((entry) => entry.copyId === copyId))
-    useUiStore.getState().setCopiedAside(told.filter((entry) => entry.copyId !== copyId));
 }
 
 const letGo = (noteId: string) => {
