@@ -188,6 +188,8 @@ export class World {
   /** Which event each copy (by id) was made for. */
   readonly copyEvents = new Map<string, string>();
   faults = 0;
+  /** Each recovery event id's label (note#changes) when it was first asked. */
+  private readonly eventLabels = new Map<string, string>();
   private readonly stopWatchingCache: () => void;
   readonly prefix: string;
 
@@ -215,7 +217,11 @@ export class World {
     );
     setCreateNoteForTests((folder, body, protection, event) => {
       const source = this.notes.find((note) => note.spec.name === titleOf(body));
-      const made = `${source?.spec.name ?? "?"}#${source?.events ?? 0}`;
+      // a retry carries its first ask's event id: label it as that ask was,
+      // not by the changes counted since (tenth review's round, a full walk)
+      const made =
+        (event && this.eventLabels.get(event)) || `${source?.spec.name ?? "?"}#${source?.events ?? 0}`;
+      if (event) this.eventLabels.set(event, made);
       return this.hold(
         "create",
         null,
