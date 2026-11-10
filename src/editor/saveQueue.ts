@@ -19,7 +19,7 @@
 import { useSyncExternalStore } from "react";
 
 import { titleOf } from "../services/derive";
-import { applyNoteWrite, invalidateNotes } from "../services/hooks";
+import { applyNoteWrite, cachedNote, invalidateNotes } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
 import { acceptedSince, readAgain, startRead, stampRead, takeRead, writeLanded } from "../services/noteReads";
 import { useUiStore } from "../state/ui";
@@ -200,12 +200,15 @@ async function writeNow(noteId: string): Promise<void> {
   // what this write carried is on disk; typing since keeps the note unsaved
   adopt(noteId, generation, { saved: true });
   // An answer's arrival isn't the order things happened on disk: a read taken
-  // in while this write was out may have shown a version newer than it (not
-  // what it wrote, nor what it was based on). Fold that in, never call the
-  // older words saved over it.
-  const seen = note ? acceptedSince(noteId, since) : null;
-  if (note && seen && seen.revision !== note.revision && seen.revision !== expectedRevision)
-    reloadDocument(noteId, seen.body, seen.revision);
+  // in while this write was out, or waiting in the cache for the editor, may
+  // have shown a version newer than it (not what it wrote, nor what it was
+  // based on). Fold that in, never call the older words saved over it.
+  const cached = cachedNote(noteId);
+  const waiting = cached?.readAt !== undefined && cached.readAt > since ? cached : null;
+  const newer = (seen: { body: string; revision: string } | null) =>
+    note && seen && seen.revision !== note.revision && seen.revision !== expectedRevision ? seen : null;
+  const superseded = newer(acceptedSince(noteId, since)) ?? newer(waiting);
+  if (superseded) reloadDocument(noteId, superseded.body, superseded.revision);
   if (!note) return; // test stub — no cache to patch
   // SCOPED refresh (audit 2026-07-30, #1): patch the fresh note into the
   // caches instead of invalidating ["notes"]. Tasks re-derive only when the
@@ -213,7 +216,10 @@ async function writeNow(noteId: string): Promise<void> {
   const signature = taskSignature(lines);
   const tasksChanged = taskSignatureOf(noteId) !== signature;
   setTaskSignature(noteId, signature);
-  await applyNoteWrite(note, { tasksChanged });
+  // A superseded answer is never published: the cache already holds the newer
+  // version the editor took, and publishing this one stamped as the newest
+  // read would put the older words back in a clean editor (tenth review, P1).
+  if (!superseded) await applyNoteWrite(note, { tasksChanged });
   // A blank session draft is absent from Main until its first non-empty save.
   markNoteDraftSaved(noteId, body);
 }

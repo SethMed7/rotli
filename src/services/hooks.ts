@@ -388,6 +388,11 @@ export async function invalidateTasks(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
+/** What the note's cache entry holds now (the save queue asks whether a read
+ * newer than its write is waiting there for the editor). */
+export const cachedNote = (noteId: string): Note | undefined =>
+  queryClient.getQueryData<Note>(keys.note(noteId));
+
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.
  * invalidateNotes() here fanned into ~9 uncached full-vault walks per tick
  * (perf audit 2026-07-30, #1): with staleTime ∞, invalidating ["notes"]

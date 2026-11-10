@@ -60,6 +60,7 @@ try {
     "src/editor/saveExplorerSearch.fixtures.ts",
     "src/editor/saveExplorerClock.fixtures.ts",
     "src/editor/saveExplorerRules.fixtures.ts",
+    "src/editor/saveExplorerCache.fixtures.ts",
     "src/editor/writeLane.fixtures.ts",
   ])
     copyFileSync(join(root, file), join(dir, file));

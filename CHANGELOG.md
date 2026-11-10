@@ -190,8 +190,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carries when it started, and one older than what the editor already has is
   dropped. A read dropped or cancelled that may have seen something newer is
   followed by one fresh read, and a save whose answer arrives after a newer
-  version was read takes that version in, so a newer file is never left
-  unread. This happens in 1.9.1.
+  version was read takes that version in, and never puts its own older
+  words back over it, so a newer file is never left unread. This happens in
+  1.9.1.
 - **Words typed while Rotli copies aside a conflict are kept.** When another
   app changed a note you had unsaved edits in, quitting keeps your version as
   a copy beside it. Anything typed while that copy was being made was

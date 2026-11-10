@@ -63,6 +63,7 @@ import {
   stampRead,
 } from "./model";
 import { setClockForTests } from "./saveClock";
+import { refetchInto, watchCache } from "./saveExplorerCache.fixtures";
 import { copyWords, HandClock, titleOf } from "./saveExplorerClock.fixtures";
 import { checkWorld, finishWorld, quitStart } from "./saveExplorerRules.fixtures";
 import { goneNotes, resetSaveQueueForTests } from "./saveQueue";
@@ -108,7 +109,9 @@ export interface Scenario {
   ignore?: string[];
 }
 
-export type AckKind = "write" | "read" | "create" | "notice" | "answer" | "flush" | "question";
+/** "answer": a query's read reaching the cache; "effect": the editor taking
+ * what the cache holds for its note (editorSurface.tsx), a step of its own. */
+export type AckKind = "write" | "read" | "create" | "notice" | "answer" | "effect" | "flush" | "question";
 export interface Ack {
   serial: number;
   kind: AckKind;
@@ -185,6 +188,7 @@ export class World {
   /** Which event each copy (by id) was made for. */
   readonly copyEvents = new Map<string, string>();
   faults = 0;
+  private readonly stopWatchingCache: () => void;
   readonly prefix: string;
 
   constructor(readonly scenario: Scenario) {
@@ -238,6 +242,7 @@ export class World {
         if (note && this.lane.files.has(noteId)) this.refetch(note);
       },
     });
+    this.stopWatchingCache = watchCache(this);
     for (const spec of scenario.notes) {
       const base = `# ${spec.name}\n\nbase`;
       const made = this.lane.create("Inbox", base, spec);
@@ -434,7 +439,7 @@ export class World {
       if (ack.state !== "held") continue;
       if (allowed.has("release"))
         out.push({ label: `release ${ack.label}`, run: () => this.settle(ack, "release") });
-      if (ack.kind === "notice" || ack.kind === "answer" || !faultsLeft) continue;
+      if (ack.kind === "notice" || ack.kind === "answer" || ack.kind === "effect" || !faultsLeft) continue;
       if (allowed.has("fail")) out.push({ label: `fail ${ack.label}`, run: () => this.settle(ack, "fail") });
       if (allowed.has("land") && ack.kind === "write" && !ack.landed)
         out.push({ label: `land ${ack.label} (its answer waits)`, run: () => this.settle(ack, "land") });
@@ -449,13 +454,9 @@ export class World {
     return out;
   }
 
-  /** A query reads the file now; its answer reaches the editor later. */
+  /** A query reads the file now (saveExplorerCache.fixtures.ts). */
   refetch(note: Tracked): void {
-    note.unseen = false;
-    const snapshot = stampRead(this.lane.read(note.id)!);
-    void this.hold("answer", note.id, `“${snapshot.body.split("\n")[2] ?? ""}”`, () =>
-      adoptReadNote(snapshot),
-    ).catch(() => {});
+    refetchInto(this, note);
   }
 
   startQuit(onRefused?: (message: string) => void): void {
@@ -574,6 +575,7 @@ export class World {
   }
 
   dispose(): void {
+    this.stopWatchingCache();
     setReadHooksForTests(null);
     for (const note of this.notes) if (note.open) note.unsubscribe();
     for (const id of [...this.lane.files.keys(), ...this.notes.flatMap((note) => note.ids)])

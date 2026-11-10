@@ -1,4 +1,4 @@
-// The seventh review's three save findings, as plain schedules replayed in the
+// The seventh to tenth reviews' save findings, as plain schedules replayed in the
 // save-state explorer's world (saveExplorer.fixtures.ts): each checks I1 to I5
 // after every move and at the end, and the trace says what the person saw.
 import { expect, test } from "bun:test";
@@ -144,4 +144,50 @@ test("4: a deleted note whose file comes back saves again, and quit no longer na
   );
   expect(run.failure).toBeNull();
   expect(run.trace.join("\n")).toContain("(quit refused: 1 save operation failed: “A” was deleted");
+});
+
+// The tenth review's P1: a save's answer that arrives after the editor took a
+// newer version from another app must not put the older words back through
+// the cache (the publish and the editor taking it are two steps here).
+
+test("P1: a superseded save's answer never reaches the editor as a fresh read", async () => {
+  const run = await replay(
+    {
+      ...one(["type", "refetch", "quiet", "release", "land", "advance"]),
+      caps: { type: 1, refetch: 1 },
+    },
+    [
+      "type A",
+      "advance", // Rotli writes “v1”; its answer is delayed
+      "land write", // it reached the disk
+      "outside A unnoticed", // another app writes “quiet1”
+      "refetch A", // a numbered query reads “quiet1”
+      "release answer", // into the cache
+      "release effect", // the editor takes it
+      "release write", // Rotli's answer arrives: it folds “quiet1” in, and publishes nothing older
+      "release effect",
+    ],
+  );
+  expect(run.failure).toBeNull();
+  expect(run.trace.join("\n")).not.toContain("buffer “v1”");
+});
+
+test("P1 (cache): a newer read still waiting in the cache for the editor isn't overwritten by an older save's answer", async () => {
+  const run = await replay(
+    {
+      ...one(["type", "refetch", "quiet", "release", "land", "advance"]),
+      caps: { type: 1, refetch: 1 },
+    },
+    [
+      "type A",
+      "advance", // Rotli writes “v1”; its answer is delayed
+      "land write", // it reached the disk
+      "outside A unnoticed", // another app writes “quiet1”
+      "refetch A",
+      "release answer", // “quiet1” is in the cache; the editor hasn't taken it yet
+      "release write", // Rotli's answer: folded in, not published over “quiet1”
+      "release effect",
+    ],
+  );
+  expect(run.failure).toBeNull();
 });

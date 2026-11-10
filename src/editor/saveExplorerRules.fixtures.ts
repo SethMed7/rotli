@@ -91,8 +91,13 @@ export function checkWorld(world: World): string | null {
     const file = world.lane.read(id);
     // Rotli can only answer for a file it can see: not while another app's
     // change hasn't reached it yet, or once another app deleted it.
+    // (Nor while the editor's effect hasn't yet taken what reached the cache:
+    // I2 is checked again the moment it has.)
     const unseen = world.acks.some(
-      (ack) => (ack.kind === "notice" || ack.kind === "answer") && ack.noteId === id && ack.state === "held",
+      (ack) =>
+        (ack.kind === "notice" || ack.kind === "answer" || ack.kind === "effect") &&
+        ack.noteId === id &&
+        ack.state === "held",
     );
     if (
       world.on("I2") &&
