@@ -2341,6 +2341,9 @@ fn normalized_watch_path(path: &Path) -> PathBuf {
     }
 }
 
+/// A last check on a note, run inside its lock right before a move.
+type MoveCheck = dyn Fn(&mut CorpusStore, &str) -> Result<(), String>;
+
 #[derive(Clone, Default)]
 pub struct SuppressSet {
     paths: Arc<Mutex<HashMap<PathBuf, Instant>>>,
@@ -4124,24 +4127,30 @@ impl CorpusStore {
         target_folder: &str,
     ) -> Result<NoteMeta, String> {
         let rel = self.resolve_note_rel(id)?;
-        let text = self.read_for_ai(&rel, false)?;
-        let fm = parse_document(&text).0.unwrap_or_default();
-        if fm
-            .foreign
-            .iter()
-            .any(|line| locked_field(line) == Some(true))
-        {
-            return Err("note is locked — an external agent may not move it".into());
-        }
+        Self::remote_move_policy(self, &rel)?;
         self.refuse_breaking_locked_links(&rel)?;
+        // checked again inside the note's lock, right before the move: another
+        // writer holding the lock may lock or secure the note meanwhile
+        // (review 2026-11-09)
         if self.layout == Layout::Memex
             && (rel == "wiki" || rel.starts_with("wiki/"))
             && (target_folder == "wiki" || target_folder.starts_with("wiki/"))
         {
-            self.filer_move(id, target_folder)
+            self.filer_move_checked(id, target_folder, &Self::remote_move_policy)
         } else {
-            self.move_note(id, target_folder)
+            self.move_note_checked(id, target_folder, &Self::remote_move_policy)
         }
+    }
+
+    /// What an external agent's move requires of the note now: the AI read
+    /// gate (secure notes refuse) and not locked.
+    fn remote_move_policy(&mut self, rel: &str) -> Result<(), String> {
+        let text = self.read_for_ai(rel, false)?;
+        let fm = parse_document(&text).0.unwrap_or_default();
+        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+            return Err("note is locked — an external agent may not move it".into());
+        }
+        Ok(())
     }
 
     pub(crate) fn create_for_remote_agent(
@@ -5154,6 +5163,12 @@ impl CorpusStore {
     /// `target_folder == ""` means the corpus root (no validation, no dir).
     /// Filenames collide safely (free_name); the id is the through-line.
     pub fn move_note(&mut self, id: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        self.move_note_checked(id, target_folder, &|_, _| Ok(()))
+    }
+
+    /// `move_note`, with `check` run on the note inside its lock, right before
+    /// it moves.
+    fn move_note_checked(&mut self, id: &str, target_folder: &str, check: &MoveCheck) -> Result<NoteMeta, String> {
         // resolve_note_rel, not path_of: a BOARD (and any surfaced file) travels
         // as its rel path and never enters the ULID index, so path_of refused it
         // outright — "note not found: storage/excalidraw/untitled-2.excalidraw"
@@ -5184,12 +5199,18 @@ impl CorpusStore {
                 target_folder.clone()
             };
             let path = self.abs(&rel);
-            let meta = crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &dest))?;
+            let meta = crate::fsutil::with_file_lock(&path, || {
+                check(self, &rel)?;
+                self.relocate_opaque(&rel, &dest)
+            })?;
             self.follow_moves(&[(rel, meta.id.clone())])?;
             return Ok(meta);
         }
         let path = self.abs(&rel);
-        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(id, &rel, &target_folder))?;
+        let meta = crate::fsutil::with_file_lock(&path, || {
+            check(self, &rel)?;
+            self.relocate(id, &rel, &target_folder)
+        })?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel, new_rel)])?;
         Ok(meta)
@@ -5599,6 +5620,12 @@ impl CorpusStore {
     /// `relocate` (fs-atomic, preserves id, doesn't bump `updated`). The ulid comes
     /// from the note's own frontmatter.
     pub fn filer_move(&mut self, id_or_rel: &str, target_folder: &str) -> Result<NoteMeta, String> {
+        self.filer_move_checked(id_or_rel, target_folder, &|_, _| Ok(()))
+    }
+
+    /// `filer_move`, with `check` run on the note inside its lock, right
+    /// before it moves.
+    fn filer_move_checked(&mut self, id_or_rel: &str, target_folder: &str, check: &MoveCheck) -> Result<NoteMeta, String> {
         self.brain_gate()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
@@ -5611,7 +5638,10 @@ impl CorpusStore {
         // copy the id `.rotli/index.json` keeps for a note with none
         let id = self.wire_id_of(rel)?;
         let path = self.abs(rel);
-        let meta = crate::fsutil::with_file_lock(&path, || self.relocate(&id, rel, target_folder))?;
+        let meta = crate::fsutil::with_file_lock(&path, || {
+            check(self, rel)?;
+            self.relocate(&id, rel, target_folder)
+        })?;
         let new_rel = self.resolve_note_rel(&meta.id)?;
         self.follow_moves(&[(rel.clone(), new_rel)])?;
         Ok(meta)
@@ -10192,6 +10222,39 @@ mod tests {
             store.search("selkie", 50, false).unwrap().is_empty(),
             "trashed note leaves search"
         );
+    }
+
+    /// Review 2026-11-09 #5: an agent's move checked secure and locked
+    /// before waiting for the note's lock. Another writer holding the lock
+    /// could lock the note meanwhile, and the move went ahead on release. The
+    /// policy is checked again inside the lock, right before the move.
+    #[test]
+    fn a_note_locked_while_an_agent_move_waits_is_not_moved() {
+        let (_dir, mut store) = bare();
+        store.create_folder("Projects", None).unwrap();
+        let n = store.create("Inbox", "# Ferry timetable\n\nboats at noon\n").unwrap();
+        let rel = store.resolve_note_rel(&n.id).unwrap();
+        let abs = store.abs(&rel);
+        let (held, wait_for_hold) = std::sync::mpsc::channel();
+        let writer = {
+            let abs = abs.clone();
+            std::thread::spawn(move || {
+                crate::fsutil::with_file_lock(&abs, || {
+                    held.send(()).unwrap();
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                    let text = fs::read_to_string(&abs).unwrap();
+                    fs::write(&abs, text.replacen("---\n", "---\nlocked: true\n", 1)).unwrap();
+                    Ok(())
+                })
+                .unwrap();
+            })
+        };
+        wait_for_hold.recv().unwrap();
+        let moved = store.move_for_remote_agent(&n.id, "Projects");
+        writer.join().unwrap();
+        let error = moved.expect_err("a note locked before the move ran is not moved");
+        assert!(error.contains("locked"), "{error}");
+        assert!(abs.is_file(), "the note stays where it was");
     }
 
     /// Review 2026-11-09 #4: a hard link in the vault to a Markdown file
