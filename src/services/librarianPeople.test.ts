@@ -2,7 +2,14 @@ import { describe, expect, test } from "bun:test";
 
 import type { VaultAction } from "../lib/librarianPeople";
 import { DEFAULT_LIBRARIAN_RULES, type LibrarianRules } from "../lib/librarianRules";
-import { answerUpdate, type KeepDeps, keepVault, PROTECTED_PERSON } from "./librarianPeople";
+import type { Note } from "../types";
+import {
+  answerUpdate,
+  existingPersonIn,
+  type KeepDeps,
+  keepVault,
+  PROTECTED_PERSON,
+} from "./librarianPeople";
 
 function fakeKeep(over: Partial<KeepDeps> = {}) {
   const steps: string[] = [];
@@ -127,5 +134,39 @@ describe("a reply that names someone who already has a note", () => {
     const lines = await keepVault(ana, "claude-opus", keep.deps);
     expect(lines.map((line) => line.text)).toEqual(["Ana already has a note, so no new one was made"]);
     expect(keep.steps.some((step) => step.startsWith("create"))).toBe(false);
+  });
+});
+
+// Eighth review of pull request 267 (P2): a person whose note was made secure
+// is moved to the secure home, so a look-up only under People missed them.
+describe("looking a person up locally", () => {
+  const summary = (id: string, title: string, folder: string) => ({
+    id,
+    title,
+    snippet: "",
+    folderId: folder,
+    diskFolderId: folder,
+    createdAt: 0,
+    updatedAt: 0,
+    pinned: false,
+  });
+  const reads =
+    (secure: Record<string, boolean>) =>
+    async (id: string): Promise<Note | null> =>
+      id in secure ? { ...summary(id, "", ""), body: "", revision: "r", secure: secure[id]! } : null;
+
+  test("a person whose note was made secure and moved to the secure home is protected, not absent", async () => {
+    const notes = [summary("p1", "Ana", "wiki/_secure")];
+    expect(await existingPersonIn("Ana", notes, reads({ p1: true }))).toBe("protected");
+  });
+
+  test("an unprotected People note is plain; nobody by that name is absent", async () => {
+    const notes = [summary("p1", "Ana", "wiki/People/Work"), summary("x1", "Ana", "Projects")];
+    expect(await existingPersonIn("ana", notes, reads({ p1: false, x1: false }))).toBe("plain");
+    expect(await existingPersonIn("Sam", notes, reads({ p1: false, x1: false }))).toBeNull();
+  });
+
+  test("a People note whose read can't say counts as protected", async () => {
+    expect(await existingPersonIn("Ana", [summary("p1", "Ana", "wiki/People")], reads({}))).toBe("protected");
   });
 });

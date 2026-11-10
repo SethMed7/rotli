@@ -14,6 +14,7 @@ import type { LibrarianRules } from "../lib/librarianRules";
 import { corpusNotePath } from "../lib/tauri";
 import { useLibrarianRules } from "../state/librarianRules";
 import { flushSettingsNow } from "../state/persist";
+import type { Note, NoteSummary } from "../types";
 import type { BrainAction } from "./brainJournal";
 import { logAction } from "./brainJournalStore";
 import { createRoutedNote } from "./createNote";
@@ -45,18 +46,31 @@ const inPeople = (folder: string) => {
   return lower === "wiki/people" || lower.startsWith("wiki/people/");
 };
 
-/** Look for an existing People note by name, locally. Its protection comes
- * from the note's own read, and a read that can't say counts as protected. */
-async function existingPerson(name: string): Promise<"protected" | "plain" | null> {
-  const hit = (await notesService.listAll()).find(
-    (note) =>
-      (note.kind ?? "note") === "note" &&
-      inPeople(note.diskFolderId ?? note.folderId) &&
-      same(note.title, name),
-  );
-  if (!hit) return null;
-  return (await notesService.getNote(hit.id))?.secure === false ? "plain" : "protected";
+/** Look for someone who already has a note, by name, locally. A People note
+ * answers "plain" or "protected" by its own read (a read that can't say counts
+ * as protected). A note made secure leaves People for the secure home (Rust
+ * keeps where it came from), so a protected note by the same name anywhere
+ * also answers "protected" (eighth review: it answered "absent", and the
+ * Librarian made the person a second note). Fails closed: a protected note
+ * with the same name that isn't a person refuses too. */
+export async function existingPersonIn(
+  name: string,
+  notes: readonly NoteSummary[],
+  read: (id: string) => Promise<Note | null>,
+): Promise<"protected" | "plain" | null> {
+  let found: "plain" | null = null;
+  for (const note of notes) {
+    if ((note.kind ?? "note") !== "note" || !same(note.title, name)) continue;
+    const people = inPeople(note.diskFolderId ?? note.folderId);
+    const protectedNote = (await read(note.id))?.secure !== false;
+    if (protectedNote && (people || note.secure !== false)) return "protected";
+    if (people) found = "plain";
+  }
+  return found;
 }
+
+const existingPerson = async (name: string) =>
+  existingPersonIn(name, await notesService.listAll(), (id) => notesService.getNote(id));
 
 export const liveKeepDeps: KeepDeps = {
   rules: () => useLibrarianRules.getState().rules,
