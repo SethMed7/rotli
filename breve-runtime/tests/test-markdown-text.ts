@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { inlineHtml, stripMarkdown } from "../scripts/markdown-text";
+import { decodeHtmlEntities, escapeHtml, inlineHtml, stripMarkdown } from "../scripts/markdown-text";
 
 // Shared behavioral fixture — the SAME file drives the app-side mirror in
 // src/editor/stripMarkdown.test.ts. Parity by fixture, not shared impl: the
@@ -37,5 +37,29 @@ describe("markdown-text — stripMarkdown (spoken script cleanup)", () => {
 
   test("bare URLs and list dashes vanish", () => {
     expect(stripMarkdown("- item one\n- item two")).toBe("item one\nitem two");
+  });
+});
+
+// CodeQL #4/#5 (2026-11-10): safe-fetch's page text and creator-alerts' video
+// titles decoded `&amp;` first and then `&lt;`, so a page or title that SHOWED
+// the text "&lt;" came out as "<". One pass reads each entity once.
+describe("markdown-text — decodeHtmlEntities", () => {
+  test("decodes each entity once: an escaped entity stays an entity", () => {
+    expect(decodeHtmlEntities("&amp;lt;b&amp;gt; &amp;amp; &amp;#39;")).toBe("&lt;b&gt; &amp; &#39;");
+  });
+
+  test("reads the entities pages and feeds use", () => {
+    expect(decodeHtmlEntities("Q&amp;A &lt;3 &quot;hi&quot; it&#39;s &apos;x&apos;&nbsp;&#x2192; &#8212;")).toBe(
+      `Q&A <3 "hi" it's 'x' → —`,
+    );
+  });
+
+  test("leaves anything it doesn't know, or that isn't a character, as written", () => {
+    expect(decodeHtmlEntities("&rarr; &#xFFFFFFFF; &#0; & alone &;")).toBe("&rarr; &#xFFFFFFFF; &#0; & alone &;");
+  });
+
+  test("undoes escapeHtml", () => {
+    const text = `a < b && "c" > 'd' &amp;`;
+    expect(decodeHtmlEntities(escapeHtml(text))).toBe(text);
   });
 });
