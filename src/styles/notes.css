@@ -171,7 +171,7 @@
   font-family: var(--font-display);
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
 }
 .sb-switch-seg svg {
@@ -1964,6 +1964,7 @@
 
 /* — tab strip (r2 frame A2; EVERY pane renders it now — the maintainer 2026-06-13) — */
 .tabstrip {
+  position: relative;
   display: flex;
   align-items: flex-end;
   height: 34px;
@@ -2867,12 +2868,8 @@
 /* Rotli Web: a front whose feature lives in the Mac app stays in the
    switcher, quieter, and reads as a link to the download on hover */
 .sb-switch-seg.desktop-only {
-  opacity: 0.55;
   text-decoration: none;
   cursor: default;
-}
-.sb-switch-seg.desktop-only:hover {
-  opacity: 0.8;
 }
 
 /* Rename in place (sidebarRenameRows.tsx): the row keeps its size, chevron and
@@ -2992,3 +2989,27 @@ svg.sb-scene * {
 .sidebar[data-icons="color"] .kind-svg {
   color: var(--syntax-blue);
 }
+
+/* Each Main row keeps its open action beside, not around, its star action. */
+.main-note-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.websearch-option.selected .websearch-optiondetail { color: var(--text); }
+
+/* Own tab semantics separately from sibling Close and media actions. */
+.tab-list-owner { position: absolute; inset: 0; pointer-events: none; }
+.tab-activation {
+  display: flex; align-items: center; gap: 7px; flex: 1 1 auto;
+  min-width: 0; height: 100%;
+}
+.tab-activation:focus-visible { outline: 1px solid var(--accent-text); outline-offset: -1px; }

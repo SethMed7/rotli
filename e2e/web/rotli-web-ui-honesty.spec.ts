@@ -3,7 +3,41 @@ import JSZip from "jszip";
 
 import { createDocxBase64 } from "../../src/documents/create";
 import { fillFromCsvRows, newWorkbook, saveXlsx } from "../../src/sheets/codec/xlsx";
+import { SOLID_THEMES } from "../../src/state/themeChoices";
 import { listOpfsFiles, plantOpfsBinary, plantOpfsFiles, readOpfsBase64, startWithVault } from "./support";
+
+test("web Appearance explains the Dock-only icon in every environment and a narrow window", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 760, height: 720 });
+  await startWithVault(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  const heading = page.getByRole("heading", { name: "App icon", exact: true });
+  const notice = page.getByText("In the Mac app.", { exact: true });
+  const themeButton = page.getByRole("button", { name: /^Theme —/ });
+  for (const { label } of SOLID_THEMES) {
+    await expect(themeButton).toHaveAccessibleName(new RegExp(`^Theme — ${label} · `));
+    await heading.scrollIntoViewIfNeeded();
+    await expect(notice).toBeVisible();
+    await expect(page.getByRole("radiogroup", { name: "App icon", exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Pick the Dock icon/)).toHaveCount(0);
+    const box = await heading.boundingBox();
+    const caption = await notice.boundingBox();
+    expect(box).not.toBeNull();
+    expect(caption).not.toBeNull();
+    if (box && caption) {
+      expect(caption.x).toBeGreaterThanOrEqual(box.x);
+      expect(caption.x + caption.width).toBeLessThanOrEqual(760);
+      await page.screenshot({
+        path: testInfo.outputPath(`app-icon-${label.toLowerCase().replaceAll(" ", "-")}.png`),
+        clip: { x: box.x, y: box.y, width: box.width, height: caption.y + caption.height - box.y },
+      });
+    }
+    await themeButton.click();
+  }
+});
 
 test("search never offers native window or vault-refresh actions", async ({ page }) => {
   await startWithVault(page);
@@ -25,6 +59,26 @@ test("search never offers native window or vault-refresh actions", async ({ page
     await search.fill(name);
     await expect(page.getByRole("option", { name: new RegExp(name, "i") })).toHaveCount(0);
   }
+});
+
+test("General names native update and demo limits without fake controls or version claims", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 760, height: 720 });
+  await startWithVault(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  for (const name of ["Updates", "Demo mode"]) {
+    const heading = page.getByRole("heading", { name, exact: true });
+    await heading.scrollIntoViewIfNeeded();
+    await expect(heading.locator("+ p")).toHaveText("In the Mac app.");
+  }
+  await expect(page.getByRole("button", { name: "Check for updates", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Install & relaunch", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: /^Check for updates automatically / })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: /^Demo mode / })).toHaveCount(0);
+  await expect(page.getByText(/Rotli 0\.1\.0|up to date|toggling relaunches Rotli/)).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("general-native-availability.png") });
 });
 
 test("note chat actions open the web setup guide when no helper is connected", async ({ page }) => {

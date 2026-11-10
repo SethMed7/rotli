@@ -606,6 +606,11 @@ class ImgWidget extends WidgetType {
       window.addEventListener("mouseup", onUp);
       window.addEventListener("keydown", onKey, true);
     });
+    // Missing-file labels must not begin native word selection before the
+    // double-click selects the object. Available video controls keep theirs.
+    wrap.addEventListener("mousedown", (e) => {
+      if (e.button === 0 && wrap.classList.contains("missing")) e.preventDefault();
+    });
     wrap.addEventListener("dblclick", (e) => {
       e.preventDefault();
       e.stopPropagation();

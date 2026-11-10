@@ -42,7 +42,8 @@ test("every major web surface opens without a console error or a failed request"
   test.slow();
   const problems = watchProblems(page);
   await startWithVault(page);
-  const row = (label: string) => page.locator("[role=option]", { hasText: label }).first();
+  const row = (label: string) =>
+    page.locator(".sb-notes-tree button, .sb-system button", { hasText: label }).first();
 
   for (const label of ["All notes", "Captures", "Tasks", "Library", "Assets", "Archive", "Trash"]) {
     await row(label).click();

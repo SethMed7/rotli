@@ -4,7 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { listOpfsFiles, readOpfsBase64, readOpfsFile, startWithVault } from "./support";
+import { listOpfsFiles, readOpfsBase64, readOpfsFile, startWithFolder, startWithVault } from "./support";
 
 // a 1×1 PNG
 const PNG_BASE64 =
@@ -98,4 +98,16 @@ test("pasting image bytes into a note stores the image and inserts its portable 
       return (await Promise.all(files.map((file) => readOpfsFile(page, `wiki/_inbox/${file}`)))).join("\n");
     })
     .toContain("![](../../storage/images/pasted.png)");
+});
+
+test("double-clicking a missing image selects its object and preserves its source", async ({ page }) => {
+  const contents = "# Missing image\n\n![](storage:missing-selection.png)\n\nAfter\n";
+  await startWithFolder(page, { "wiki/missing-image.md": contents });
+  const editor = page.getByRole("textbox", { name: "Note text" });
+  const image = page.locator(".rotli-img.missing");
+  await expect(image.locator(".rotli-img-missing")).toBeVisible();
+  await image.locator(".rotli-img-missing").dblclick();
+  await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
+  await expect(editor).not.toContainText("![](storage:missing-selection.png)");
+  expect(await readOpfsFile(page, "wiki/missing-image.md")).toBe(contents);
 });

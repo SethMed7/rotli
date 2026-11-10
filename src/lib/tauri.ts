@@ -1213,6 +1213,7 @@ export async function corpusFrontmatter(id: string): Promise<FrontmatterView | n
 /** Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
  * note to the top of every list. Does not bump the note's `updated` stamp. */
 export async function corpusSetPinned(id: string, pinned: boolean): Promise<void> {
+  if (!isTauri() && usesWebVaultIo()) return currentWebVaultIo().setPinned(id, pinned);
   if (!isTauri()) return;
   await invoke("corpus_set_pinned", { id, pinned });
 }

@@ -5,6 +5,8 @@
 
 import { type ReactNode, useEffect, useRef } from "react";
 
+import { containDialogFocus } from "../lib/dialogFocus";
+
 export function WebDialogFrame({
   id,
   title,
@@ -42,6 +44,7 @@ export function WebDialogFrame({
         aria-busy={busy}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
+          containDialogFocus(event);
           if (event.key !== "Escape") return;
           event.preventDefault();
           event.stopPropagation();

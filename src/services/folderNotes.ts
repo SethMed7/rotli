@@ -93,6 +93,7 @@ const ROOT_CONTROL_FILES = new Set(["memex.json", "users.json", "memex.local.jso
 interface CachedFile {
   revision: string;
   text: string;
+  document?: ReturnType<typeof parseNoteDocument>;
 }
 
 export class FolderNotesService implements NotesService {
@@ -146,7 +147,7 @@ export class FolderNotesService implements NotesService {
         index.set(path, path);
         continue;
       }
-      const fm = parseNoteDocument(await this.readFile(path)).frontmatter;
+      const fm = this.documentOf(path, await this.readFile(path)).frontmatter;
       index.set(fm?.id || path, path);
     }
     this.index = index;
@@ -178,6 +179,13 @@ export class FolderNotesService implements NotesService {
     return text;
   }
 
+  /** Parsed data shares the byte cache's existing revision invalidation. */
+  private documentOf(path: string, text: string) {
+    const cached = this.cache.get(path);
+    if (cached?.text !== text) return parseNoteDocument(text);
+    return (cached.document ??= parseNoteDocument(text));
+  }
+
   private async writeFile(path: string, text: string, expectedContent?: string): Promise<void> {
     await this.dir.writeText(path, text, expectedContent);
     this.cache.delete(path);
@@ -188,7 +196,7 @@ export class FolderNotesService implements NotesService {
     const text = await this.readFile(path);
     const stat = await this.dir.stat(path);
     if (!stat) throw new Error(`unknown note: ${path}`);
-    const { frontmatter, body } = parseNoteDocument(text);
+    const { frontmatter, body } = this.documentOf(path, text);
     const title = titleOf(body);
     const diskFolderId = parentPath(path);
     const updatedAt = stampToMs(frontmatter?.updated, stat.lastModified) ?? stat.lastModified;

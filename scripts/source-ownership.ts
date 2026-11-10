@@ -180,6 +180,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
+  "appIcon.ts": "app shell (Settings' intent to change the native Dock icon)",
   "vaultImport.ts":
     "vault import (connect a copy with the Librarian: confirm, copy with progress, open the copy)",
   "personSinks.ts": "vault import (a copy's one-time question: move its own Archive and Trash into Rotli's)",

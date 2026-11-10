@@ -216,6 +216,10 @@ test("the Visual canvas has its own camera: zoom controls and empty-space pan", 
 });
 
 test("unapplied diagram edits survive closing the note and reopening it", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
   await gotoApp(page);
   await createDiagramNote(page);
   await expect(page.locator(".main-tree [data-main-id]", { hasText: "Diagram workspace" })).toBeVisible();
@@ -237,4 +241,5 @@ test("unapplied diagram edits survive closing the note and reopening it", async 
   await dialog.getByRole("button", { name: "Code" }).click();
   await expect(dialog.getByLabel("Mermaid source")).toHaveValue(draft);
   await expect(dialog.getByRole("button", { name: "Apply to note" })).toBeEnabled();
+  expect(errors).toEqual([]);
 });

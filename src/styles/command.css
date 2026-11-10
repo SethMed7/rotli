@@ -3224,12 +3224,12 @@
   background: var(--hov);
 }
 .rename-btn.primary {
-  background: var(--accent);
+  background: var(--accent-text);
   color: var(--on-accent);
   border-color: transparent;
 }
 .rename-btn.primary:hover {
-  background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
+  background: var(--accent-text);
 }
 /* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
    read and edit a prompt; the prompt box scrolls, never the card */

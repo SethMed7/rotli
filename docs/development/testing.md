@@ -15,7 +15,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run security:bundle <candidate.app>` | Inspect actual release resources and binary strings for prohibited files, embedded home paths, and symlinks escaping the bundle; required before Apple uploads |
 | `bun run security:changes <base-sha> <head-sha>` | Check proposed Git commits with pinned Gitleaks and redacted diagnostics; CI blocks new findings. New-branch/manual scans cover reachable history, and may surface the separately unresolved historical fixtures |
 | `bun run security:history` | Redacted Gitleaks 8.30.1 scan of all local Git history refs; mandatory before source publication, never proof of image/prose privacy |
-| `bun run lint` | Concurrent fan-out of all four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
+| `bun run lint` | Concurrent fan-out of TypeScript checks on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
 | `bun run lint:serial` | The exact same lint/check set in deterministic sequence. Use it on memory-constrained machines or when one-at-a-time logs are easier to diagnose; CI and the default gate retain the faster parallel path |
 | `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/`, run in Bun's isolated parallel workers |
 | `bun run test:changed` | Fast local feedback: isolated Bun tests related to files changed against the default branch |
@@ -26,6 +26,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
+| `bun run check:web-parity` | Every registered native command has one explicit web/notice/Mac-only decision in `scripts/web-command-parity.json`, with an explanation and existing implementation/test references; included in both lint chains. Fixture tests prove an added native handler fails until classified. Behavior still requires the referenced tests |
 | `bun run check:ratchets` | Numbers that only move one way (`scripts/ratchet-baseline.json`): per-file line ceilings for every source file at or above 600 lines, the count of source-string test assertions, dated provenance comments, and per-directory test-coverage floors (the recorded ratio is the floor once it sits above the 0.40 constant — coverage may only rise). The source-shape number counts `toContain`/`toMatch` assertions inside files that read source text, not the reads. Lower a ceiling with `--update`; never raise one. The checker has its own fixture tests (`scripts/check-ratchets.test.ts`, as do `check:window-events` and `check:code-shape`) |
 | `bun run check:window-events` | Every `rotli:*` / `private-browser-*` event literal in `src/` and `src-tauri/src/` has a row in `docs/architecture/window-events.md` and is wired on a sending and a receiving side |
 | `bun run check:web-privacy` | Rotli Web's no-egress rule: the `/app/` Content-Security-Policy in `site/Caddyfile` may reach only `http://127.0.0.1` (`connect-src`) and names no other host in any directive; `form-action` and `frame-ancestors` stay `'none'`. Fixture tests in `scripts/check-web-privacy.test.ts`; the E2E twin is `e2e/web/rotli-web-privacy.spec.ts` |
@@ -37,6 +38,16 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — redacted proposed-source secret scan, `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes only the advisory dependency audit and the signing/notarization steps `release.sh` owns |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
+
+With no lane arguments, `verify` runs all four lanes. Unknown lane names fail
+before any checks or installs; a misspelling cannot produce a passing run.
+
+Both Playwright lanes start their own server and refuse an occupied port, so
+verification cannot silently exercise another checkout. The desktop twin uses
+1420 (`ROTLI_E2E_PORT` overrides it); Rotli Web uses 1435
+(`ROTLI_WEB_E2E_PORT` overrides it). In a worktree, select free ports for both:
+`ROTLI_E2E_PORT=1458 ROTLI_WEB_E2E_PORT=1459 bun run verify`. Do not stop a
+server owned by another checkout.
 
 Development, formatting, and release commands (`check:docs` verifies this map
 stays complete — every `package.json` script must appear in this document):
@@ -59,10 +70,10 @@ stays complete — every `package.json` script must appear in this document):
 | `bun run capture:site` | Capture the Warm Light workspace for the social card (`site/public/rotli-app-warm-light@3x.png`) and the Welcome folder's Tasks lesson in Main (`site/public/rotli-playground@3x.png`) at 3× density from a running local browser twin; the theme studio's `site/public/themes/` captures are a separate set it does not touch; `site/README.md` owns media regeneration and visual review |
 | `bun run dev:app` | The native desktop development app, branded `Rotli (Dev)` with a fixed blue Rotli Dock icon applied by the Rust shell at launch (including an optically matched safe area for the unbundled `tauri dev` runtime); it uses an isolated `corpus.dev.json` vault selection, keeps the production fallback read-only, and supervises vault-triggered Tauri/Vite restarts from the terminal |
 | `bun run dev:uat` | `dev:app` built on the public (`stable`) channel — the UAT pass before promoting to `main`: every feature a release gates off (`LAUNCH_FEATURES` in `src/lib/featurePolicy.ts`, `feature_policy.rs`) is absent, exactly as in a published build — Breve, agents/MCP, Mermaid visual editing, read-aloud (Sheets ship in both channels as Beta). Every development guard stays on (they key off `import.meta.env.DEV` / `debug_assertions`, not the channel): the isolated `corpus.dev.json` vault, the read-only production fallback, no update check, no scheduler. Switching between `dev:app` and `dev:uat` rebuilds the Rust shell once (`build.rs` reruns on the channel) |
-| `bun run format` / `bun run format:check` | oxfmt write / verify with the explicit repository config over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
-| `bun run typecheck` | The TypeScript compiler over `src` and the Vite/build-policy scope (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth and first step of `lint` (e2e and Breve retain their named lanes) |
-| `bun run typecheck:tsc6` | All four scopes (`src`, Vite/build policy, E2E, and Breve) re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
-| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules). Type awareness and a zero-warning ceiling live in the root config, nested configs are disabled, and an executable contract test proves `oxlint-tsgolint` actually reports a typed promise violation — part of `lint` |
+| `bun run format` / `bun run format:check` | oxfmt write / verify with the explicit repository config over TypeScript in `src`, `e2e`, `scripts`, and `services`, plus `playwright.config.ts` and `vite.config.ts`, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
+| `bun run typecheck` | The TypeScript compiler over the app, Vite/build policy, tooling scripts, and relay configurations (`tsc --noEmit` — `typescript@7`, the Go port). E2E has `check:e2e-types`; the compatibility compiler also checks Breve. These checks run in the `lint` fan-out |
+| `bun run typecheck:tsc6` | All six configurations (app, Vite/build policy, tooling scripts, E2E, Breve, and relay) checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
+| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, the relay, and the root Playwright/Vite configs; oxlint's `correctness` category plus the hand-picked rules). Type awareness and a zero-warning ceiling live in the root config, nested configs are disabled, and an executable contract test proves `oxlint-tsgolint` actually reports a typed promise violation — part of `lint` |
 | `bun run check:react-compiler` | Runs Oxlint's React Compiler analysis in lint-only mode. The per-file/category baseline is a ratchet: existing effect/ref debt may shrink, while any increase fails `lint`; no compiler transform enters the production build |
 | `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint`. Never spell an absolute binary path inside Bun's `$` template shell: knip parses the first token as a binary and resolves it against the **local** filesystem, so a macOS-only path is green on a developer Mac and red on Linux CI. That asymmetry cost #118→#120 a red `main`; resolve the binary through a variable instead, the way `breve-runtime/scripts/chrome-pdf.ts` does |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
@@ -83,8 +94,8 @@ Development-only window state stays in the app cache, and
 live delivery tests remain disabled. Treat manual interaction with a selected
 development vault as real filesystem interaction.
 
-Use the smallest focused command while iterating, then run the three required
-handoff commands from `AGENTS.md`. Never point an automated test at a live memex,
+Use the smallest focused command while iterating, then run the canonical
+`bun run verify` handoff from `AGENTS.md`. Never point an automated test at a live memex,
 Keychain, scheduler, daemon, or production delivery account.
 
 The headless workspace suite lives under `workspace::tests` in the Rust host.
@@ -128,6 +139,32 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
   a disposable native folder prove Home containment, hidden/file/symlink
   exclusion, short-lived authorization, and macOS bookmark recovery after a
   move. Never point that native check at a live vault.
+
+### Performance regressions
+
+`src/services/folderNotesCache.test.ts` counts document parses across indexing,
+listing, search and reads, and checks invalidation after external and app edits.
+The derivation and search suites retain Unicode snippet boundaries and the
+Rust-compatible per-code-point case-folding rules while their fast paths change.
+`e2e/main-row-rendering.spec.ts` uses the dev React profiler's host-row fields
+through its DevTools hook to limit Main note-switch commits to the changed
+rows, while keeping every synthetic row mounted and checking keyboard navigation.
+Timing measurements are descriptive, not wall-clock assertions in CI.
+
+### Automated accessibility
+
+`e2e/accessibility.spec.ts` and `e2e/web/rotli-web-accessibility.spec.ts` run
+whole-document axe scans with synthetic vaults. They cover the note shell,
+Main, system views, search, the item chooser, settings, all fourteen theme
+environments, the development Graph, the Canvas creation refusal, and Web's
+live Excalidraw board. Moderate, serious and critical violations fail the lane; full
+JSON results are attached for review. Checks wait for fonts and finite
+animations to settle, without disabling rules or excluding components.
+Keyboard regressions cover tab navigation and modal focus containment.
+
+Run them through the normal desktop and Web Playwright lanes. These automated
+checks do not prove VoiceOver behavior, native windows, or every possible
+content/contrast combination; retain human assistive-technology review.
 
 ### The Playwright layer
 
@@ -179,10 +216,11 @@ and the invariant that the same item remains visible from global Main.
 | Cross-surface gesture or keyboard flow | Focused policy tests plus Playwright when component-local tests cannot prove real wiring |
 | Architecture, syntax, security, or documentation law | A deterministic checker and a checker fixture proving the forbidden case is rejected |
 
-Run oxfmt and the smallest type/test/check target while editing. Before
-handoff, `bun run check` reruns TypeScript, `format:check`, oxlint, every
-mechanical contract, the full Bun suite, named evals, and runtime/design
-regressions.
+Run oxfmt and the smallest type/test/check target while editing. For handoff,
+`bun run verify` runs the full proof chain. Its `check` phase reruns TypeScript,
+`format:check`, oxlint, mechanical contracts, the Bun suites, named evals, and
+runtime/design regressions; builds, site checks, Playwright, clippy and cargo
+tests are additional verify phases.
 
 ## Regression rules
 
@@ -224,10 +262,13 @@ regressions.
   implement.
 - `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
   and requires multi-segment snake_case command names.
+- `check:web-parity` keeps the native registry and explicit web availability
+  inventory exhaustive in both directions; it rejects missing, stale, duplicate,
+  invalid, or unexplained decisions and missing implementation/test references.
 - `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)
   everywhere under `src/` outside the token-definition layer (`src/brand/`,
   `src/styles/themes.css`; `base.css` may hold functional state tokens).
-- `check:design-system` proves the four themes define every semantic token, that
+- `check:design-system` proves all fourteen theme environments define every required semantic token, that
   product CSS consumes semantic roles rather than literal or fixed-palette
   colors, that first-party CSS contains no glow/shadow/filter/backdrop effects,
   that class selectors stay kebab-case (BEM `--modifier` allowed), and that

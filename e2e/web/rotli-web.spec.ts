@@ -58,7 +58,10 @@ test("New tab → Markdown note creates a file in the vault; the words are there
   await page.getByRole("button", { name: /Search notes and actions/ }).click();
   await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
   await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
-  await page.getByRole("button", { name: /^New Markdown note \(press/ }).click();
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Markdown note / })
+    .click();
   await expect(page.locator(".row-action-error")).toHaveCount(0);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
   await page.locator(".pane.focused .cm-content").click();

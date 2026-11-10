@@ -1,19 +1,8 @@
-// A Word document opened right after a workbook in the same page (2026-10-12,
-// the web office flip's probe saw a page error there). Univer's sheets-ui
-// facade mixes its event wiring into EVERY later Univer instance once the
-// sheets engine has loaded; on the document editor's docs-only injector that
-// wiring asks for the sheets HoverManagerService at the Rendered stage and
-// throws inside its own RxJS subscriber. RxJS reports it asynchronously, no
-// Rotli surface shows it, and the throwing observer only feeds facade events
-// Rotli never subscribes to. This spec pins that verdict: that error is the
-// only one, the document still edits and saves, and a later workbook still
-// edits — mounted through the engine seams, as the DOCX and sheet specs do.
-
+// Document and workbook engines must coexist without leaking facade services
+// across independent Univer instances, including after either engine is disposed.
 import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
-
-const KNOWN_FACADE_NOISE = /\[redi\]: Expect 1 dependency item\(s\) for id "HoverManagerService" but get 0/;
 
 async function mountSheet(page: import("@playwright/test").Page): Promise<void> {
   await page.evaluate(async () => {
@@ -111,12 +100,5 @@ test("a document opened after a workbook edits and saves, and a later workbook s
     .poll(() => page.evaluate(() => (window as unknown as { sheetEdits: number }).sheetEdits))
     .toBeGreaterThan(0);
 
-  // Univer's cross-instance facade wiring is the only page error, ever; the
-  // annotation records whether this Univer still emits it (an upgrade that
-  // stops it lets the ledger entry and this allowance go)
-  test.info().annotations.push({
-    type: "univer-facade-noise",
-    description: String(errors.filter((error) => KNOWN_FACADE_NOISE.test(error)).length),
-  });
-  expect(errors.filter((error) => !KNOWN_FACADE_NOISE.test(error))).toEqual([]);
+  expect(errors).toEqual([]);
 });

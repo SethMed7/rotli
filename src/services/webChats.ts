@@ -20,8 +20,11 @@ const removedKey = (bin: "trash" | "archive", slug: string) => `chat-${bin}:${sl
 const INDEX_RETRIES = 4;
 
 function frontmatterField(contents: string, name: string): string {
-  const block = contents.startsWith("---\n") ? contents.slice(4, contents.indexOf("\n---", 4)) : "";
-  const line = block.split("\n").find((l) => l.startsWith(`${name}:`));
+  const opening = /^---\r?\n/.exec(contents);
+  const block = opening
+    ? contents.slice(opening[0].length, contents.indexOf("\n---", opening[0].length))
+    : "";
+  const line = block.split(/\r?\n/).find((l) => l.startsWith(`${name}:`));
   return line ? line.slice(name.length + 1).trim() : "";
 }
 
@@ -211,7 +214,9 @@ export class FolderChatStore implements ChatStore {
           const fileTime = stat?.lastModified ?? 0;
           const modified =
             fileTime > EPOCH_MS_FLOOR ? fileTime : Date.parse(frontmatterField(head, "updated")) || fileTime;
-          return summarize(slug, head, modified);
+          // Metadata has a bounded header; the newest reply can be anywhere
+          // in the transcript we already read, beyond that header window.
+          return { ...summarize(slug, head, modified), path, repliedMs: lastReplyMs(text) };
         }),
     );
     return rows;

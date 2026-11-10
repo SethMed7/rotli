@@ -25,7 +25,7 @@ test("named views keep Main global and make Command-T context-sensitive", async 
   await viewSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("OpenSource");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await expect(page.getByRole("button", { name: /Current view: OpenSource/ })).toBeVisible();
   await page.keyboard.press("Meta+T");
@@ -76,7 +76,7 @@ test("Chat names the inherited Notes view and can leave it for all chats", async
   await viewSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Client work");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   const context = page.getByRole("group", { name: "Chat view context" });
@@ -104,7 +104,7 @@ test("the new-item chooser keeps the named VIEW as its creation context, at the 
   await viewSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Northstar");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await page.getByRole("button", { name: "New folder in Northstar" }).click();
   await page.getByRole("textbox", { name: "New folder in Main" }).fill("Boards");
@@ -145,7 +145,7 @@ test("any named view can be deleted from Main's picker, and Main keeps its items
     await page.getByRole("button", { name: /Current view:/ }).click();
     await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
     await page.getByRole("textbox", { name: "New view" }).fill(name);
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByRole("button", { name: new RegExp(`Current view: ${name}`) })).toBeVisible();
   }
   // back to Main, then delete Alpha without ever showing it
@@ -177,7 +177,7 @@ test("Chat switches views without leaving Chat, and ⌘T there files into that v
   await homeSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Research");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   // back to Main, then do the rest from Chat
   await page.getByRole("button", { name: /Current view: Research/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
@@ -239,7 +239,7 @@ test("the New view card closes from its ×, Escape, and a click outside", async 
 
   // Escape from the Save button too, where the input's own key handler can't hear it
   await openCard();
-  await card.getByRole("button", { name: "Save" }).focus();
+  await card.getByRole("button", { name: "Save", exact: true }).focus();
   await page.keyboard.press("Escape");
   await expect(card).toHaveCount(0);
 

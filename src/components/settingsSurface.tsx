@@ -38,12 +38,6 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import appIconBlack from "../assets/appIcons/black.png";
-import appIconCharcoal from "../assets/appIcons/charcoal.png";
-import appIconClay from "../assets/appIcons/clay.png";
-import appIconDefault from "../assets/appIcons/default.png";
-import appIconPaper from "../assets/appIcons/paper.png";
-import appIconTesven from "../assets/appIcons/tesven.png";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -84,7 +78,6 @@ import {
   secretDelete,
   secretExists,
   secretStore,
-  setAppIcon,
   setDemoMode,
   setDockVisible,
   setHideOnBlur,
@@ -128,7 +121,6 @@ import {
   ACCENT_COLORS,
   CHAT_NAVIGATOR_STYLES,
   type ChatNavigatorStyle,
-  type AppIcon,
   type OrganizerTrust,
   THEME_FAMILY_PRESENTATIONS,
   type ThemeFamily,
@@ -156,6 +148,7 @@ import { AboutPane } from "./settings/aboutPane";
 import { ALIAS_PASS } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
+import { AppIconSettings } from "./settings/appIconSettings";
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
@@ -323,7 +316,7 @@ function HotkeysPane() {
         <button
           type="button"
           className={recording ? "hkchord recording" : "hkchord"}
-          aria-label={`Rebind ${action.title}`}
+          aria-label={`Rebind ${action.title} — ${recording ? "press keys…" : chord ? formatChord(chord) : "—"}`}
           onClick={(event) => {
             // WebKit does not focus buttons on click — without this the
             // recorder never hears a key and the row sticks on "press keys…"
@@ -544,7 +537,7 @@ function GeneralPane() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [demo, setDemo] = useState(false);
   useEffect(() => {
-    void demoMode().then(setDemo);
+    if (PLATFORM === "desktop") void demoMode().then(setDemo);
   }, []);
   const quickFolder = useUiStore((s) => s.quickFolder);
   const quickVaultId = useUiStore((s) => s.quickVaultId);
@@ -884,19 +877,32 @@ function GeneralPane() {
       <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
       <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
       <FinderQuickActionSettings native={quickActionAvailable()} />
-      <UpdatesSection />
+      {PLATFORM === "desktop" ? (
+        <UpdatesSection />
+      ) : (
+        <>
+          <h4 className="sethead">Updates</h4>
+          <p className="setnote">In the Mac app.</p>
+        </>
+      )}
 
       <h4 className="sethead">Demo mode</h4>
-      <p className="lead">
-        Switch to a separate demo library with sample content — for screenshots or trying things out. Your
-        real notes are never touched; toggling relaunches Rotli.
-      </p>
-      <Toggle
-        on={demo}
-        title="Demo mode"
-        desc="Read and write a throwaway demo library instead of your real notes."
-        onChange={() => void setDemoMode(!demo)}
-      />
+      {PLATFORM === "desktop" ? (
+        <>
+          <p className="lead">
+            Switch to a separate demo library with sample content — for screenshots or trying things out. Your
+            real notes are never touched; toggling relaunches Rotli.
+          </p>
+          <Toggle
+            on={demo}
+            title="Demo mode"
+            desc="Read and write a throwaway demo library instead of your real notes."
+            onChange={() => void setDemoMode(!demo)}
+          />
+        </>
+      ) : (
+        <p className="setnote">In the Mac app.</p>
+      )}
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">
@@ -996,17 +1002,6 @@ function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
   );
 }
 
-/** Dock/app icon options. Each thumbnail is the real Dock artwork, cut by
- * scripts/build-app-icons.mjs from the same render as the native variant. */
-const APP_ICONS: { id: AppIcon; label: string; src: string }[] = [
-  { id: "default", label: "Default", src: appIconDefault },
-  { id: "paper", label: "Paper", src: appIconPaper },
-  { id: "charcoal", label: "Charcoal", src: appIconCharcoal },
-  { id: "clay", label: "Clay", src: appIconClay },
-  { id: "black", label: "Black", src: appIconBlack },
-  { id: "tesven", label: "Tesven", src: appIconTesven },
-];
-
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
  * step (the maintainer, 2026-07-28: "charcoal theme with blue primary color"). Default
  * renders as the current theme's own accent. */
@@ -1082,8 +1077,6 @@ function AppearancePane() {
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
-  const appIcon = useUiStore((s) => s.appIcon);
-  const setAppIconState = useUiStore((s) => s.setAppIcon);
   const pickFamily = (family: ThemeFamily) => setThemeFamily(family);
   const pickMode = (mode: ThemeSetting) => setTheme(mode);
   return (
@@ -1258,27 +1251,7 @@ function AppearancePane() {
         onPick={setSyntaxPalette}
       />
 
-      <h4 className="sethead">App icon</h4>
-      <p className="lead">
-        Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
-      </p>
-      <div className="appicon-row" role="radiogroup" aria-label="App icon">
-        {APP_ICONS.map(({ id, label, src }) => (
-          <button
-            type="button"
-            key={id}
-            className={appIcon === id ? "appicon sel" : "appicon"}
-            aria-pressed={appIcon === id}
-            onClick={() => {
-              setAppIconState(id);
-              void setAppIcon(id);
-            }}
-          >
-            <img className="appicon-tile" src={src} alt="" draggable={false} />
-            <span className="appicon-label">{label}</span>
-          </button>
-        ))}
-      </div>
+      <AppIconSettings />
     </>
   );
 }
@@ -3098,6 +3071,7 @@ export function SettingsSurface() {
 
   return (
     <div className="settings">
+      <h2 className="sr-only">Settings</h2>
       <nav className="set-nav" aria-label="Settings sections">
         <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
           <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">

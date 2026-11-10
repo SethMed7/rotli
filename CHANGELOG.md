@@ -71,6 +71,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent and the app) picked the same file name at once.
 - **A Tesven app icon:** Rotli's white line quokka on Tesven's One Blue field,
   in Settings → Appearance → App icon.
+- **Web chats keep metadata from CRLF files.** Chats saved with Windows-style
+  line endings retain their title, pin, attached-note label, and model details.
+
+- **Long Web chats keep their place.** The chat list uses the newest reply even
+  when it is past the first 41 lines of a conversation. Sending a message still
+  leaves a chat in place until its reply arrives.
+
+- **Missing images stay selected.** Double-clicking a missing-image label
+  selects its image object without intermittently revealing Markdown source.
+
+- **Cleaner office and pane resizing.** Opening a document after a workbook
+  no longer triggers a cross-engine service error. Resizing split panes
+  applies their size limits outside observer delivery, avoiding a browser
+  resize-loop error. Closing a note with a Mermaid workspace also disposes
+  its separate editor root after the note finishes closing.
+
+- **Faster Web folders and large Main lists.** Rotli Web does less repeated
+  work when opening and searching your folder. Switching between notes also
+  keeps large Main lists more responsive on both platforms. In a very large
+  flat Main, focusing and opening a note now updates only the affected rows.
+
+- **A complete workspace outline for screen readers.** The workspace and
+  Settings have a top-level heading, and board controls no longer masquerade
+  as the page footer. Their visual layout stays the same.
+
+- **Clearer keyboard and screen-reader navigation.** Notes have a named editor;
+  sidebar rows and tab controls expose valid roles and independent pin/close
+  actions. Tabs support arrow, Home and End navigation. Naming and Web dialogs
+  keep keyboard focus inside, and board menu/zoom controls have complete names.
+  Small labels remain readable over selected backgrounds and accent fills.
+
+- **Pin to top works on Rotli Web.** Pinning a note now saves to your connected
+  folder and survives a reload. Unpinning works too, without changing the
+  note's words or dates.
+- **App icon choices explain where they work.** Rotli Web's Appearance settings
+  now say "In the Mac app" for the Dock icon, instead of offering choices that
+  do nothing there.
+- **Web settings no longer pretend to update or switch to Demo mode.** These
+  Mac-only actions now say where they work, without a placeholder app version,
+  a false "up to date" result, or a switch that does nothing.
 
 ## [1.9.1] - 2026-10-20
 

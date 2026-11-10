@@ -19,7 +19,7 @@
 :root {
   --accent-hue: 210;
   --theme-accent-swatch: #c97e62;
-  --theme-on-accent: #ffffff;
+  --theme-on-accent: #241d18;
   --accent-custom-swatch: oklch(53% 0.145 var(--accent-hue));
   --accent-custom-on: #ffffff;
   --accent-hue-track: linear-gradient(

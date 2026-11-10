@@ -728,7 +728,6 @@ span.fdr-col {
   font-size: 11.5px;
   line-height: 1.5;
   color: var(--text-muted);
-  opacity: 0.85;
 }
 
 /* Sticky-note cards use a warm fill and outline, without simulated elevation;
@@ -995,7 +994,6 @@ span.fdr-col {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--text-muted);
-  opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -53,7 +53,7 @@ export function SidebarSystem({
   const contentView = useUiStore((s) => s.contentView);
   const systemRoot = useUiStore((s) => s.systemRoot);
   return (
-    <div className="sb-system" style={{ zoom }}>
+    <div className="sb-system" role="group" aria-label="System" style={{ zoom }}>
       {/* the zone header is a disclosure now (the maintainer, 2026-08-01) — the ⌄
           toolbar button's stage 2 folds it too */}
       <button

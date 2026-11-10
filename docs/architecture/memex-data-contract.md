@@ -979,7 +979,9 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `"folders": {"inbox": "Inbox", "archive": "Archive (Rotli)", "trash":
   "Trash (Rotli)", "chats": "chats (Rotli)", "storage": "storage (Rotli)"}`
   (`src-tauri/src/vault_roles.rs`; TS twin `IMPORTED_FOLDER_ROLES` in
-  `src/services/destinations.ts`, pinned by `parity.json`). Rotli's folders
+  `src/services/destinations.ts`, pinned by `parity.json`). Chat listing paths
+  use the resolved chat role folder, matching reads and writes; Web listings
+  do not assume `chats/` for an imported vault. Rotli's folders
   are always suffixed, so a copied `Archive/`, `Trash/`, `chats/`, `storage/`,
   or `wiki/` is the person's ordinary folder; new notes and captures land in a
   top-level `Inbox/`, and a copied `Inbox/` is used as it. An unusable or
