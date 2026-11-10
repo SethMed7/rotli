@@ -162,6 +162,7 @@ interface Listed {
   body: string;
   secure: boolean;
   locked: boolean;
+  folderId: string;
 }
 const everyNote = async () => (await rust("notes")) as Listed[];
 const disk = async (id: string) => (await rust("corpus_read", { id })) as Note & { secure: boolean };
@@ -286,22 +287,33 @@ test("real delay inside Rust: an honest write past the bound is waited for, and 
   }
 });
 
-test("2: keep a deleted note's words and type while it is made: the newest words go to that one note", async () => {
-  const id = await open("# Kept\n\nfirst", true);
-  model.setDocumentText(id, "# Kept\n\nmine");
-  await rust("corpus_delete", { id });
-  await rust("corpus_purge", { id });
-  await model.flushNote(id).catch(() => {});
-  hold("corpus_create");
-  const kept = model.keepGoneNote(id);
-  await until(() => waiting("corpus_create") === 1);
-  model.setDocumentText(id, "# Kept\n\nmine, and more"); // typed while the note is made
-  await release("corpus_create");
-  const madeId = await kept;
+test("F3: a create answers with what it wrote: a writer right after it is never certified as Rotli's", async () => {
+  const { notesService } = await import("../services/notes");
+  hold("corpus_read"); // an adapter that reads back after creating waits here
+  let made: Note | null = null;
+  const making = notesService.createNote("Inbox", "# Mine\n\nfirst").then((note) => (made = note));
+  await settle();
+  const created = (await everyNote()).find((note) => note.body.startsWith("# Mine"))!;
+  await rust("external", { id: created.id, body: "# Mine\n\nother writer" });
+  await release("corpus_read");
+  await making;
+  expect(made!.body).toBe("# Mine\n\nfirst");
+  // a later write on what Rotli wrote is refused, not laid over the other writer
+  expect(
+    await outcome(notesService.updateNote(made!.id, "# Mine\n\nnewer", made!.revision, made!.body)),
+  ).toContain("revision conflict");
+  expect((await disk(made!.id)).body).toBe("# Mine\n\nother writer");
+});
+
+test("F5: a secure conflict copy whose answer was lost is found again where Rust routed it, not made twice", async () => {
+  const id = await open("# Vault\n\nbase", true, true);
+  model.setDocumentText(id, "# Vault\n\nmine");
+  await rust("external", { id, body: "# Vault\n\ntheirs" });
+  losing.corpus_create = () => true; // Rust made the copy in the secure home; the answer is lost
   expect(await outcome(model.flushSyncs())).toBe("done");
-  const notes = (await everyNote()).filter((note) => note.body.startsWith("# Kept"));
-  expect(notes.map((note) => ({ id: note.id, body: note.body, secure: note.secure }))).toEqual([
-    { id: madeId!, body: "# Kept\n\nmine, and more", secure: true },
+  const copies = (await everyNote()).filter((note) => note.body.startsWith("# Vault (unsaved edits"));
+  expect(copies.map((note) => [note.secure, note.locked, note.folderId])).toEqual([
+    [true, true, "Secure notes"],
   ]);
 });
 
@@ -342,16 +354,16 @@ test("5: a locked note's conflict copy is locked, from the native create", async
   expect(copy).toMatchObject({ secure: false, locked: true });
 });
 
-test("F3: a note purged with unsaved words: quit names it until the words are kept, protected", async () => {
+test("a note purged with unsaved words: they stay in its editor, and quit names it until they are discarded", async () => {
   const id = await open("# Purged\n\nfirst", true);
   model.setDocumentText(id, "# Purged\n\nwords nobody saved");
   await rust("corpus_delete", { id });
   await rust("corpus_purge", { id });
   await model.flushNote(id).catch(() => {});
   expect(await outcome(model.flushSyncs())).toContain("“Purged” was deleted");
-  await model.keepGoneNote(id);
-  const kept = (await everyNote()).find((note) => note.body.includes("words nobody saved"));
-  expect(kept?.secure).toBe(true);
+  expect(model.getDocumentText(id)).toBe("# Purged\n\nwords nobody saved");
+  expect((await everyNote()).filter((note) => note.body.includes("words nobody saved"))).toEqual([]);
+  model.discardGoneNote(id);
   expect(await outcome(model.flushSyncs())).toBe("done");
 });
 

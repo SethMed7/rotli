@@ -8,10 +8,12 @@
 // always runs the same way.
 //
 // The invariants, checked after every move and at the end of every schedule:
-// I1 Once quit was acknowledged, whatever lands afterwards (any subset of the
-//    writes and creates already handed to the disk, in any order), each note's
-//    file holds the last words the person had in it, or those words are in a
-//    recovery note that existed when quit was acknowledged, or they chose
+// I1 Once quit was acknowledged (the real acknowledgement: after every quit
+//    flusher, including another window's that settles later, and with typing
+//    legal until then), whatever lands afterwards (any subset of the writes and
+//    creates already handed to the disk, in any order), each note's file holds
+//    the last words the person had in it, or those words are in a recovery note
+//    the person was shown (the conflict-copy notice names it), or they chose
 //    Discard for them.
 // I2 A note reads saved (not dirty) only when its file equals the buffer and
 //    no write for it is unresolved (an unresolved write counts as able to
@@ -20,38 +22,43 @@
 //    (the note's file or a recovery note), unless they chose Discard. Words are
 //    owed until newer typing replaces them, or until another app changes or
 //    deletes the file while those words are on it (then that app replaced
-//    them, not Rotli). Words equal to a version another app overwrote, or to
-//    what Rotli last saved when Rotli sees another app's change, aren't owed
-//    either: a three-way merge reads them as no change of the person's and
-//    takes the other app's text, by design.
+//    them, not Rotli). One case more is forgiven, the one a three-way merge is
+//    designed for: when Rotli sees another app's change (a notice, a query's
+//    answer, or its own read of the file) and the person's text equals what
+//    Rotli last saved, the person changed nothing, and the merge takes the
+//    other app's text. Nothing else is remembered or forgiven. A recovery
+//    note counts only while the notice naming it is shown.
 // I4 Once every acknowledgement has settled and every timer has run, no note's
-//    queue is busy, and quit succeeds. Exempt, on purpose: a note whose write
-//    or create never settles, while it says so by name, stays unsaved and quit
-//    names it (Rotli can't know whether that write will land).
-// I5 A recovery or conflict copy is made at most once per event (an outside
-//    change or a deletion), and carries its source's protection and lock,
-//    whatever lands after a process death.
+//    queue is busy, and quit succeeds. Exempt, on purpose, note by note against
+//    quit's actual reasons: a note whose write or create never settles, while
+//    it says so by name, stays unsaved and quit names it (Rotli can't know
+//    whether that write will land); and a deleted note with unsaved words,
+//    until the person copies or discards them.
+// I5 A recovery or conflict copy is made at most once per event (each copy
+//    is counted against the outside change or deletion that led to it), and
+//    carries its source's protection and lock, whatever lands after a process
+//    death.
 
+import { onQuitFlush, runQuitTransaction } from "../lib/quitFlush";
 import { queryClient } from "../services/query";
+import type { Note } from "../types";
 import { baselineOf, bufferText, hasBuffer } from "./buffers";
 import { flushNoteAfterPaint } from "./flushAfterPaint";
 import {
+  adoptReadNote,
   discardGoneNote,
   ensureDocument,
   evictDocument,
-  flushSyncs,
-  keepGoneNote,
   onDocumentChange,
-  reloadDocumentIfClean,
   setCreateNoteForTests,
   setDocumentText,
-  setFindNoteForTests,
   setReadNoteForTests,
   setWriteNoteBodyForTests,
+  stampRead,
 } from "./model";
 import { setClockForTests } from "./saveClock";
-import { HandClock } from "./saveExplorerClock.fixtures";
-import { goneNotes, queueBusy, resetSaveQueueForTests } from "./saveQueue";
+import { cloneLane, copyWords, HandClock, landings, titleOf } from "./saveExplorerClock.fixtures";
+import { copiedAside, goneNotes, queueBusy, resetSaveQueueForTests } from "./saveQueue";
 import { documentSaveError, isDirty } from "./saveStatus";
 import { type FakeLane, fakeLane } from "./writeLane.fixtures";
 
@@ -67,7 +74,7 @@ export type MoveKind =
   | "close"
   | "outside"
   | "purge"
-  | "keep"
+  | "refetch"
   | "discard"
   | "quit"
   | "release"
@@ -80,14 +87,14 @@ export interface Scenario {
   notes: NoteSpec[];
   moves: MoveKind[];
   /** Per note: how many times each person move may happen in one schedule. */
-  caps?: Partial<Record<"type" | "undo" | "outside" | "purge" | "keep" | "switch" | "close", number>>;
+  caps?: Partial<Record<"type" | "undo" | "outside" | "purge" | "refetch" | "switch" | "close", number>>;
   /** At most this many acknowledgements may be failed or left never settling. */
   faults?: number;
   /** Invariants to leave unchecked (to see what a schedule does past the first one it breaks). */
   ignore?: string[];
 }
 
-type AckKind = "write" | "read" | "create" | "notice";
+type AckKind = "write" | "read" | "create" | "notice" | "answer" | "flusher";
 interface Ack {
   serial: number;
   kind: AckKind;
@@ -95,6 +102,8 @@ interface Ack {
   noteId: string | null;
   /** A write's words. */
   body?: string;
+  /** A create's event: the note and the outside change or deletion that led to it. */
+  event?: string;
   state: "held" | "settled" | "never";
   apply(lane: FakeLane): unknown;
   resolve(value: unknown): void;
@@ -116,9 +125,6 @@ interface Tracked {
   words: string;
   owed: boolean;
   discarded: boolean;
-  /** Every version another app overwrote. */
-  replaced: Set<string>;
-  /** Every id the note's tab has shown (Keep moves it to the note it made). */
   ids: string[];
 }
 
@@ -127,27 +133,6 @@ export const drain = async () => {
   for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setImmediate(resolve));
 };
 const MUTATIONS: AckKind[] = ["write", "create"];
-const titleOf = (body: string) =>
-  body
-    .split("\n")[0]!
-    .replace(/^# /, "")
-    .replace(/ \(unsaved edits [^)]*\)$/, "");
-/** A copy's words as the person typed them (a conflict copy's title is suffixed). */
-const copyWords = (body: string) => body.replace(/^# (.*) \(unsaved edits [^)]*\)$/m, "# $1");
-
-function cloneLane(lane: FakeLane, prefix: string): FakeLane {
-  const copy = fakeLane(prefix);
-  for (const [id, file] of lane.files) copy.files.set(id, { ...file, meta: [...file.meta] });
-  return copy;
-}
-
-/** Every order of every subset of `items`. */
-function* landings<T>(items: T[]): Generator<T[]> {
-  yield [];
-  for (let i = 0; i < items.length; i += 1)
-    for (const rest of landings([...items.slice(0, i), ...items.slice(i + 1)])) yield [items[i]!, ...rest];
-}
-
 export class World {
   readonly lane: FakeLane;
   readonly clock = new HandClock();
@@ -155,9 +140,13 @@ export class World {
   readonly notes: Tracked[] = [];
   readonly trace: string[] = [];
   quit: "idle" | "waiting" | "acked" = "idle";
-  copiesAtQuit: { body: string; meta: string[] }[] = [];
+  /** The copies the person had been shown when quit was acknowledged. */
+  shownAtQuit = new Set<string>();
+  /** Which event each copy (by id) was made for. */
+  readonly copyEvents = new Map<string, string>();
   faults = 0;
   private readonly prefix: string;
+  private readonly unregisterFlusher: () => void;
 
   constructor(readonly scenario: Scenario) {
     worlds += 1;
@@ -175,19 +164,20 @@ export class World {
       ),
     );
     setReadNoteForTests((id) => this.hold("read", id, "", (lane) => lane.read(id)));
-    setCreateNoteForTests((folder, body, protection) =>
-      this.hold("create", null, `${titleOf(body)} “${body.split("\n")[2] ?? ""}”`, (lane) =>
-        lane.create(folder, body, protection),
-      ),
-    );
-    setFindNoteForTests((folder, body) =>
-      this.hold("read", null, "find", (lane) => {
-        const hit = [...lane.files.entries()].find(
-          ([, file]) => file.folder === folder && file.body === body,
-        );
-        return hit ? lane.read(hit[0]) : null;
-      }),
-    );
+    setCreateNoteForTests((folder, body, protection, event) => {
+      const source = this.notes.find((note) => note.spec.name === titleOf(body));
+      const made = `${source?.spec.name ?? "?"}#${source?.events ?? 0}`;
+      return this.hold(
+        "create",
+        null,
+        `${titleOf(body)} “${body.split("\n")[2] ?? ""}”`,
+        (lane) => lane.create(folder, body, { ...protection, ...(event ? { event } : {}) }),
+        undefined,
+        made,
+      );
+    });
+    // another window or a workbook, whose flush settles when the scheduler says
+    this.unregisterFlusher = onQuitFlush(() => this.hold("flusher", null, "another window", () => undefined));
     for (const spec of scenario.notes) {
       const base = `# ${spec.name}\n\nbase`;
       const made = this.lane.create("Inbox", base, spec);
@@ -204,7 +194,6 @@ export class World {
         words: base,
         owed: false,
         discarded: false,
-        replaced: new Set(),
         ids: [made.id],
       });
     }
@@ -215,7 +204,7 @@ export class World {
   }
 
   private owes(note: Tracked): boolean {
-    return note.owed && !note.discarded && !note.replaced.has(note.words);
+    return note.owed && !note.discarded;
   }
 
   /** Read through methods: a callback may have changed it since TypeScript last looked. */
@@ -236,6 +225,7 @@ export class World {
     what: string,
     apply: (lane: FakeLane) => unknown,
     body?: string,
+    event?: string,
   ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const serial = this.acks.length + 1;
@@ -248,6 +238,7 @@ export class World {
         label,
         noteId,
         ...(body === undefined ? {} : { body }),
+        ...(event === undefined ? {} : { event }),
         state: "held",
         apply,
         resolve: resolve as (value: unknown) => void,
@@ -302,12 +293,9 @@ export class World {
             this.byAnotherApp(note);
             this.lane.external(id, `# ${spec.name}\n\nout${note.used.outside}`);
             void this.hold("notice", id, "", (lane) => {
-              // Rotli sees the change now. Words that equal what the other app
-              // replaced, or what Rotli last saved, are no change of the
-              // person's: the merge takes the other app's text, by design.
-              if (note.replaced.has(note.words) || note.words === baselineOf(id)) note.owed = false;
               const file = lane.read(id);
-              if (file) reloadDocumentIfClean(id, file.body, file.revision);
+              if (file) this.sees(note, file.body);
+              if (file) adoptReadNote(stampRead(file));
             });
           },
         });
@@ -320,31 +308,25 @@ export class World {
             this.lane.purge(id);
           },
         });
-      const gone = goneNotes().includes(id);
-      if (gone && may(note, "keep"))
+      if (onDisk && may(note, "refetch"))
         out.push({
-          label: `keep ${spec.name}`,
+          label: `refetch ${spec.name}`,
           run: () => {
-            spend(note, "keep");
-            keepGoneNote(id).then(
-              (kept) => {
-                if (!kept) return;
-                // the tab follows the words to the note that was made
-                if (note.open) note.unsubscribe();
-                note.id = kept;
-                note.ids.push(kept);
-                if (note.open) note.unsubscribe = onDocumentChange(kept, () => {});
-              },
-              () => {},
-            );
+            spend(note, "refetch");
+            // a query reads the file now; its answer reaches the editor later
+            const snapshot = stampRead(this.lane.read(id)!);
+            void this.hold("answer", id, `“${snapshot.body.split("\n")[2] ?? ""}”`, () => {
+              this.sees(note, snapshot.body);
+              adoptReadNote(snapshot);
+            });
           },
         });
+      const gone = goneNotes().includes(id);
       if (gone && allowed.has("discard"))
         out.push({
           label: `discard ${spec.name}`,
           run: () => {
             discardGoneNote(id);
-            // it counts only if it took effect (not while the words are being kept)
             if (goneNotes().includes(id)) return;
             note.discarded = true;
             note.owed = false;
@@ -361,11 +343,11 @@ export class World {
       if (ack.state !== "held") continue;
       if (allowed.has("release"))
         out.push({ label: `release ${ack.label}`, run: () => this.settle(ack, "release") });
-      if (ack.kind === "notice" || !faultsLeft) continue;
+      if (ack.kind === "notice" || ack.kind === "answer" || !faultsLeft) continue;
       if (allowed.has("fail")) out.push({ label: `fail ${ack.label}`, run: () => this.settle(ack, "fail") });
       if (allowed.has("landFail") && MUTATIONS.includes(ack.kind))
         out.push({ label: `land-then-fail ${ack.label}`, run: () => this.settle(ack, "landFail") });
-      if (allowed.has("never"))
+      if (allowed.has("never") && ack.kind !== "flusher")
         out.push({ label: `never ${ack.label}`, run: () => this.settle(ack, "never") });
     }
     if (allowed.has("advance") && this.clock.timers.size > 0)
@@ -376,10 +358,10 @@ export class World {
   /** Ask to quit: acknowledged, quit is a leaf (the process ends); refused, the person may ask again. */
   private startQuit(refused?: (message: string) => void): void {
     this.quit = "waiting";
-    flushSyncs().then(
+    runQuitTransaction().then(
       () => {
         this.quit = "acked";
-        this.copiesAtQuit = this.copies(this.lane).map(({ body, meta }) => ({ body, meta }));
+        this.shownAtQuit = this.shown();
       },
       (error: Error) => {
         this.quit = "idle";
@@ -398,10 +380,20 @@ export class World {
   /** Another app changes or deletes the file: words it overwrites on disk were saved. */
   private byAnotherApp(note: Tracked): void {
     note.events += 1;
-    const before = this.lane.read(note.id)?.body;
-    if (before === undefined) return;
-    if (before === note.words) note.owed = false;
-    note.replaced.add(before);
+    if (this.lane.read(note.id)?.body === note.words) note.owed = false;
+  }
+
+  /** Rotli sees the file's `body`. If it is another version than Rotli last
+   * saved, and the person's text equals what Rotli last saved, the person
+   * changed nothing: the merge takes the other version (the case I3 forgives). */
+  private sees(note: Tracked, body: string): void {
+    const saved = baselineOf(note.id);
+    if (body !== saved && note.words === saved) note.owed = false;
+  }
+
+  /** The recovery notes the person is being shown (the conflict-copy notice). */
+  private shown(): Set<string> {
+    return new Set(copiedAside().map((aside) => aside.copyId));
   }
 
   private afterPaint(noteId: string): void {
@@ -422,6 +414,9 @@ export class World {
     } catch (error) {
       return ack.reject(error as Error);
     }
+    if (ack.event && value) this.copyEvents.set((value as Note).id, ack.event);
+    const owner = this.notes.find((note) => note.id === ack.noteId);
+    if (ack.kind === "read" && owner && value) this.sees(owner, (value as Note).body);
     if (how === "landFail") return ack.reject(new Error("it was written, but the answer was lost"));
     ack.resolve(value);
   }
@@ -431,7 +426,7 @@ export class World {
     const ids = new Set(this.notes.flatMap((note) => note.ids));
     return [...lane.files.entries()]
       .filter(([id]) => !ids.has(id))
-      .map(([, file]) => ({ ...file, source: titleOf(file.body), words: copyWords(file.body) }));
+      .map(([id, file]) => ({ ...file, id, source: titleOf(file.body), words: copyWords(file.body) }));
   }
 
   /** The invariants that hold at every step (I2, I3, I5, and I1 once quit was acknowledged). */
@@ -455,10 +450,11 @@ export class World {
           return `I2 ${spec.name}: reads saved while ${open.label} can still land and change the file`;
       }
       if (this.on("I3") && this.owes(note)) {
+        const shown = this.shown();
         const here =
           bufferText(id) === note.words ||
           file?.body === note.words ||
-          this.copies(this.lane).some((copy) => copy.words === note.words);
+          this.copies(this.lane).some((copy) => shown.has(copy.id) && copy.words === note.words);
         if (!here)
           return `I3 ${spec.name}: the words “${note.words.split("\n")[2]}” are in neither the buffer nor the disk`;
       }
@@ -468,9 +464,11 @@ export class World {
     for (const order of landings(pending)) {
       n += 1;
       const lane = cloneLane(this.lane, `${this.prefix}-death${n}`);
+      const events = new Map(this.copyEvents);
       for (const ack of order) {
         try {
-          ack.apply(lane);
+          const made = ack.apply(lane);
+          if (ack.event && made) events.set((made as Note).id, ack.event);
         } catch {
           // refused by the contract: it doesn't land
         }
@@ -478,13 +476,16 @@ export class World {
       const later = order.length
         ? ` if ${order.map((ack) => ack.label.split(" ")[0]).join(", then ")} land${order.length === 1 ? "s" : ""}`
         : "";
-      const copyFault = this.copyFault(lane);
+      const copyFault = this.copyFault(lane, events);
       if (copyFault && this.on("I5")) return `I5 ${copyFault}${later} after the process dies`;
       if (this.quit === "acked" && this.on("I1")) {
         for (const note of this.notes) {
           if (!this.owes(note)) continue;
           if (lane.read(note.id)?.body === note.words) continue;
-          if (this.copiesAtQuit.some((copy) => copyWords(copy.body) === note.words)) continue;
+          if (
+            this.copies(this.lane).some((copy) => this.shownAtQuit.has(copy.id) && copy.words === note.words)
+          )
+            continue;
           const holds = lane.read(note.id)?.body.split("\n")[2];
           return `I1 ${note.spec.name}: quit was acknowledged, but${later || " as it stands"} the file holds ${holds ? `“${holds}”` : "nothing"}, not “${note.words.split("\n")[2]}”, and no recovery note has them`;
         }
@@ -493,15 +494,17 @@ export class World {
     return null;
   }
 
-  private copyFault(lane: FakeLane): string | null {
+  private copyFault(lane: FakeLane, events: Map<string, string>): string | null {
     for (const note of this.notes) {
-      const kept = note.ids
-        .slice(1)
-        .map((id) => lane.files.get(id))
-        .filter((file) => file !== undefined);
-      const mine = [...this.copies(lane).filter((copy) => copy.source === note.spec.name), ...kept];
-      if (mine.length > note.events)
-        return `${note.spec.name}: ${mine.length} recovery copies for ${note.events} event${note.events === 1 ? "" : "s"}`;
+      const mine = this.copies(lane).filter((copy) => copy.source === note.spec.name);
+      const perEvent = new Map<string, number>();
+      for (const copy of mine) {
+        const event = events.get(copy.id) ?? `${note.spec.name}#?`;
+        perEvent.set(event, (perEvent.get(event) ?? 0) + 1);
+      }
+      for (const [event, count] of perEvent)
+        if (count > 1 || event.endsWith("#0") || event.endsWith("#?"))
+          return `${note.spec.name}: ${count} recovery cop${count === 1 ? "y" : "ies"} for event ${event.split("#")[1]}${event.endsWith("#0") ? " (no outside change or deletion had happened)" : ""}`;
       for (const copy of mine) {
         const secure = copy.meta.includes("secure: true");
         const locked = copy.meta.includes("locked: true");
@@ -530,8 +533,7 @@ export class World {
       // what holds the queue: a write or creation of this note's that never
       // settles (a creation is this note's when it carries the note's title)
       const mine = (ack: Ack) =>
-        ack.state === "never" &&
-        (ack.noteId === id || (ack.kind === "create" && ack.label.split(" ")[1] === spec.name));
+        ack.state === "never" && (ack.noteId === id || ack.event?.startsWith(`${spec.name}#`) === true);
       const never =
         this.acks.find((ack) => mine(ack) && MUTATIONS.includes(ack.kind)) ?? this.acks.find(mine);
       const named = isDirty(id) && (documentSaveError(id) ?? "").includes(spec.name);
@@ -551,18 +553,30 @@ export class World {
       }
       await drain();
       if (!this.acked()) {
-        const excused = this.notes.some(
-          (note) =>
-            goneNotes().includes(note.id) ||
-            this.acks.some((ack) => ack.state === "never" && MUTATIONS.includes(ack.kind)),
-        );
-        if (!excused) return `I4 quit is refused after everything settled: ${refusal || "it never answers"}`;
+        // each reason must be a note that is exempt: deleted with words, or
+        // holding a write or create that never settles
+        // the flushers' wrapper ("1 save operation failed: …") isn't a reason
+        const reasons = (refusal || "it never answers").replace(/^\d+ save operations? failed: /, "");
+        for (const reason of reasons.split("; ")) {
+          const note = this.notes.find((each) => reason.startsWith(`“${each.spec.name}”`));
+          const exempt =
+            note &&
+            (goneNotes().includes(note.id) ||
+              this.acks.some(
+                (ack) =>
+                  ack.state === "never" &&
+                  MUTATIONS.includes(ack.kind) &&
+                  (ack.noteId === note.id || ack.event?.startsWith(`${note.spec.name}#`)),
+              ));
+          if (!exempt) return `I4 quit is refused after everything settled: ${reason}`;
+        }
       }
     }
     return this.check();
   }
 
   dispose(): void {
+    this.unregisterFlusher();
     for (const note of this.notes) if (note.open) note.unsubscribe();
     for (const id of [...this.lane.files.keys(), ...this.notes.flatMap((note) => note.ids)])
       if (hasBuffer(id)) evictDocument(id);
@@ -570,7 +584,6 @@ export class World {
     setWriteNoteBodyForTests(null);
     setReadNoteForTests(null);
     setCreateNoteForTests(null);
-    setFindNoteForTests(null);
     setClockForTests(null);
     queryClient.clear();
   }

@@ -10,11 +10,11 @@ import { afterEach, expect, test } from "bun:test";
 
 import {
   discardGoneNote,
+  getDocumentText,
   ensureDocument,
   evictDocument,
   flushNote,
   flushSyncs,
-  keepGoneNote,
   setCreateNoteForTests,
   setDocumentText,
   setReadNoteForTests,
@@ -122,18 +122,17 @@ test("a write that never settles: the note says so by name, keeps its words, and
   expect(documentSaveError(t.id)).toBeNull();
 });
 
-test("F3: a note purged while it has unsaved words: plain words, quit names it, and keeping makes a protected, locked note", async () => {
+test("F3: a note purged while it has unsaved words: plain words, the words stay in its editor, quit names it", async () => {
   const t = opened("# Ledger\n\nfirst", { secure: true, locked: true });
   setDocumentText(t.id, "# Ledger\n\nwords nobody saved");
   t.lane.purge(t.id);
   await flushNote(t.id).catch(() => {});
   expect(documentSaveError(t.id)).toContain("deleted");
-  expect(await outcome(flushSyncs())).toContain("Ledger");
-  const kept = await keepGoneNote(t.id);
-  const file = kept ? t.lane.files.get(kept) : undefined;
-  expect(file?.body).toBe("# Ledger\n\nwords nobody saved");
-  expect(file?.meta).toEqual(expect.arrayContaining(["secure: true", "locked: true"]));
-  expect(await outcome(flushSyncs())).toBe("done");
+  expect(await outcome(flushSyncs())).toContain(
+    "“Ledger” was deleted while it had unsaved words: copy them, or discard them",
+  );
+  expect(getDocumentText(t.id)).toBe("# Ledger\n\nwords nobody saved");
+  expect(t.bodies()).toEqual([]); // Rotli makes no note of them on its own
 });
 
 test("F3: discarding the words lets quit complete", async () => {

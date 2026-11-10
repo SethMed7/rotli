@@ -17,6 +17,7 @@ import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useS
 
 import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
+import { useFinishingSaves } from "../lib/quitFlush";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
@@ -145,7 +146,9 @@ function CmEditorImpl({
   onContextRef.current = onContext;
 
   // reading mode (editor/readingMode.ts): no spelling marks, handles, or raw Markdown
-  const reading = useUiStore((s) => s.readingMode);
+  // read-only while reading, and while quit is deciding (quitFlush.ts)
+  const finishing = useFinishingSaves();
+  const reading = useUiStore((s) => s.readingMode) || finishing;
   const readingRef = useRef(reading);
   readingRef.current = reading;
   const spellcheck = useUiStore((s) => s.spellcheck && !s.readingMode);

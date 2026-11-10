@@ -30,6 +30,7 @@ import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
+import { startRead, stampRead } from "./noteReads";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 import { listWebLinks } from "./webLinks";
@@ -315,7 +316,13 @@ const NO_SKIPPED: SkippedFile[] = [];
 export function useNote(id: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: keys.note(id),
-    queryFn: () => notesService.getNote(id),
+    // numbered as it starts: an answer older than a save that lands meanwhile
+    // is dropped by the editor (noteReads.ts)
+    queryFn: async () => {
+      const startedAt = startRead();
+      const note = await notesService.getNote(id);
+      return note && stampRead(note, startedAt);
+    },
     enabled: options.enabled ?? true,
   });
 }
@@ -383,7 +390,10 @@ export async function invalidateTasks(): Promise<void> {
 export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): Promise<void> {
   const { body: _body, ...summary } = note;
   const before = queryClient.getQueryData<Note>(keys.note(note.id));
-  queryClient.setQueryData(keys.note(note.id), note);
+  // a refetch still on its way read the file before this write: cancel it, and
+  // publish the written note as the newest read
+  void queryClient.cancelQueries({ queryKey: keys.note(note.id) });
+  queryClient.setQueryData(keys.note(note.id), stampRead(note));
   // the Graph and canvas cards read the Links projection. A save that makes
   // the note secure, or no longer secure, refetches it for an open Graph or
   // canvas now — secure notes fail closed (ROTLI review, PR 173). A save that

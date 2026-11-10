@@ -12,9 +12,18 @@
 // Register work with `onQuitFlush` — SheetEditor parks its dirty-sheet flush here.
 // Flushers run in parallel. Any failure is reported to Rust, which aborts the
 // normal quit and keeps the user's unsaved buffers alive.
+//
+// Quit is a transaction (eighth review of pull request 267): from the request
+// until it is refused or the process exits, the editors take no input
+// (`useFinishingSaves`, "Finishing saving…"), and the acknowledgement is given
+// only when a final check, after EVERY flusher has finished, finds nothing
+// unsaved or outstanding (`onQuitCheck`). A note whose own flush finished
+// early used to keep taking typing while another flusher (a workbook, another
+// window) was still saving, and quit was acknowledged with those words unsaved.
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useSyncExternalStore } from "react";
 
 import { currentWindowLabel, isTauri } from "./tauri";
 
@@ -28,9 +37,14 @@ const flushers = new Set<Flusher>();
  * captured — per board opened or switched, and quit then fanned out over all of
  * them (perf audit 2026-07-30, finding 22). */
 export function onQuitFlush(fn: Flusher): () => void {
-  flushers.add(fn);
+  return enrol(flushers, fn);
+}
+
+/** Add `fn` to `set`; the answer takes it out again. */
+function enrol<T>(set: Set<T>, fn: T): () => void {
+  set.add(fn);
   return () => {
-    flushers.delete(fn);
+    set.delete(fn);
   };
 }
 
@@ -45,6 +59,54 @@ export async function runQuitFlushers(): Promise<void> {
       `${failures.length} save operation${failures.length === 1 ? "" : "s"} failed: ${first instanceof Error ? first.message : String(first)}`,
     );
   }
+}
+
+type QuitCheck = () => string | null;
+const checks = new Set<QuitCheck>();
+
+/** Register a final check: what is still unsaved or outstanding, in words, or
+ * null. Run after every flusher has finished; any answer refuses the quit. */
+export function onQuitCheck(fn: QuitCheck): () => void {
+  return enrol(checks, fn);
+}
+
+// While quit is being decided, the editors take no input. If the process is
+// still alive this long after an acknowledgement, another window refused the
+// quit (Rust waits 15 seconds), so input comes back.
+const RESTORE_AFTER_MS = 20_000;
+let finishing = false;
+let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+const finishingSubs = new Set<() => void>();
+function setFinishing(value: boolean): void {
+  clearTimeout(restoreTimer);
+  if (finishing === value) return;
+  finishing = value;
+  for (const fn of finishingSubs) fn();
+}
+
+/** True from a quit request until it is refused (or the process exits). */
+export const finishingSaves = (): boolean => finishing;
+export function useFinishingSaves(): boolean {
+  return useSyncExternalStore((fn) => {
+    finishingSubs.add(fn);
+    return () => finishingSubs.delete(fn);
+  }, finishingSaves);
+}
+
+/** The quit transaction: no input from here on, every flusher, then the final
+ * checks. Resolves only when nothing is unsaved or outstanding anywhere;
+ * otherwise input comes back and it rejects with every reason. */
+export async function runQuitTransaction(): Promise<void> {
+  setFinishing(true);
+  try {
+    await runQuitFlushers();
+    const reasons = [...checks].map((check) => check()).filter((reason): reason is string => !!reason);
+    if (reasons.length > 0) throw new Error(reasons.join("; "));
+  } catch (error) {
+    setFinishing(false);
+    throw error;
+  }
+  restoreTimer = setTimeout(() => setFinishing(false), RESTORE_AFTER_MS);
 }
 
 type QuitFlushPayload = { attemptId: number };
@@ -65,7 +127,7 @@ if (typeof window !== "undefined" && isTauri()) {
     (event) => {
       void (async () => {
         try {
-          await runQuitFlushers();
+          await runQuitTransaction();
           await invoke("quit_flush_done", { attemptId: event.payload.attemptId, ok: true }).catch(() => {});
         } catch (error) {
           await invoke("quit_flush_done", {
@@ -81,6 +143,7 @@ if (typeof window !== "undefined" && isTauri()) {
   void listen<string>(
     "rotli:quit-flush-failed",
     (event) => {
+      setFinishing(false);
       for (const subscriber of failureSubscribers) subscriber(event.payload);
     },
     { target: currentWindowLabel() },

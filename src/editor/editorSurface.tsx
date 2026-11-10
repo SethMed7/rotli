@@ -14,6 +14,7 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isHardLinkRefusal } from "../lib/hardLinks";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
+import { useFinishingSaves } from "../lib/quitFlush";
 import {
   corpusNoteAbsolutePath,
   corpusRawFrontmatter,
@@ -47,13 +48,7 @@ import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
-import {
-  ensureDocument,
-  reloadDocumentIfClean,
-  useDocumentDirty,
-  useDocumentSaveError,
-  useGoneNotes,
-} from "./model";
+import { adoptReadNote, useDocumentDirty, useDocumentSaveError, useGoneNotes } from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -164,6 +159,8 @@ export function EditorSurface({
   const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
+  // quit is deciding: the editor takes no input until it is refused (quitFlush.ts)
+  const finishing = useFinishingSaves();
   const deleted = useGoneNotes().includes(noteId);
 
   const [aaOpen, setAaOpen] = useState(false);
@@ -361,8 +358,7 @@ export function EditorSurface({
   // the same file (the maintainer, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
     if (!note || pending) return;
-    ensureDocument(note.id, note.body, note.revision, note);
-    reloadDocumentIfClean(note.id, note.body, note.revision);
+    adoptReadNote(note);
   }, [note, pending]);
 
   // Closing/switching paints first; the existing debounce and quit/visibility
@@ -536,11 +532,16 @@ export function EditorSurface({
         </div>
       </div>
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
+      {finishing && (
+        <div className="ed-saveerr" role="status">
+          Finishing saving…
+        </div>
+      )}
       {saveError && (
         <div className="ed-saveerr" role="alert">
           {deleted
-            ? `⚠ ${saveError}. Keep them as a new note or discard them from the notice in the sidebar.`
-            : `⚠ This note isn’t saving — ${saveError}. Your text is kept here and Rotli keeps trying.`}
+            ? `⚠ ${saveError}. Copy them or discard them from the notice in the sidebar.`
+            : `⚠ This note isn’t saving — ${saveError}. Your text is kept here.`}
         </div>
       )}
       <CmEditor

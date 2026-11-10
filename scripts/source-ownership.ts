@@ -217,6 +217,7 @@ export const SERVICE_FILE_OWNERS = {
   "mainDismiss.ts": "Main projection",
   "mainTree.ts": "Main projection",
   "noteDrafts.ts": "note editor",
+  "noteReads.ts": "note editor",
   "noteLifecycle.ts": "vault lifecycle",
   "linkedNotes.ts": "notes",
   "notes.ts": "notes adapter",

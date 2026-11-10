@@ -19,23 +19,21 @@
 
 import { useSyncExternalStore } from "react";
 
-import { applyNoteWrite } from "../services/hooks";
+import { applyNoteWrite, invalidateNotes } from "../services/hooks";
 import { markNoteDraftSaved } from "../services/noteDrafts";
-import { inboxFolderId } from "../services/notes";
+import { writeLanded } from "../services/noteReads";
 import type { Note } from "../types";
 import {
   adopt,
   baselineOf,
   bufferLines,
   bufferText,
-  edit,
   forget,
   hasBuffer,
   isPendingDocument,
   recordLanded,
   refreshDirty,
   revisionOf,
-  seed,
   setTaskSignature,
   taskSignatureOf,
 } from "./buffers";
@@ -45,7 +43,6 @@ import { editGeneration, hasUnsavedEdits } from "./saveGenerations";
 import { bounded, lane, type Protection, slowAfter } from "./saveLane";
 import { dirtyNoteIds, documentSaveError, isDirty, setSaveError } from "./saveStatus";
 import { taskSignature } from "./taskState";
-import { protectionOf, setDocumentProtection } from "./unsavedDrafts";
 
 const SYNC_DEBOUNCE_MS = 400;
 // a failed write retries on its own — waiting for the next keystroke would
@@ -72,12 +69,19 @@ const slow = new Map<string, string>();
 // (the answer was lost after the write): if the disk later holds one, it is
 // Rotli's own, not another app's.
 const unsure = new Map<string, Set<string>>();
-// The recovery note made for each event (a conflict at one disk revision, or a
-// deletion), so a later round updates it rather than making another; and the
-// events whose creation answered with an error (it may still have landed).
+// The recovery note made for each event (a conflict at one disk revision), so
+// a later round updates it rather than making another; each event's id, made
+// once and written into the note's metadata, so asking Rust again after an
+// answer was lost gives back the note it made (never a look-up by text);
+// and the title stamp the event's copy carries.
 const recoveries = new Map<string, Recovery>();
-const attempted = new Set<string>();
+const eventIds = new Map<string, string>();
 const stamps = new Map<string, string>();
+// Notes whose unsaved words went into a conflict copy, and the copy: shown to
+// the person until they dismiss it (eighth review: nothing said where their
+// words went).
+const aside = new Map<string, { noteId: string; copyId: string; name: string }>();
+const asideSubs = new Set<() => void>();
 // Notes deleted while they had unsaved words, waiting for the person's choice.
 const gone = new Set<string>();
 const goneSubs = new Set<() => void>();
@@ -86,7 +90,19 @@ const goneSubs = new Set<() => void>();
  * explorer runs thousands of schedules in one process). */
 export function resetSaveQueueForTests(): void {
   for (const timer of timers.values()) clock.clearTimeout(timer);
-  for (const set of [timers, running, queued, retrying, slow, unsure, recoveries, attempted, stamps, gone])
+  for (const set of [
+    timers,
+    running,
+    queued,
+    retrying,
+    slow,
+    unsure,
+    recoveries,
+    eventIds,
+    stamps,
+    gone,
+    aside,
+  ])
     set.clear();
 }
 
@@ -186,6 +202,8 @@ async function writeNow(noteId: string): Promise<void> {
   }
   setSaveError(noteId, null);
   unsure.delete(noteId);
+  // every read of this note that started before now is older than the disk
+  writeLanded(noteId);
   if (note) recordLanded(noteId, body, note.revision);
   // what this write carried is on disk; typing since keeps the note unsaved
   adopt(noteId, generation, { saved: true });
@@ -273,8 +291,9 @@ export function reloadDocument(noteId: string, body: string, revision: string): 
 }
 
 /** The recovery note for one event, made at most once. A later round with
- * newer words updates it; after a creation that answered with an error (it
- * may have landed), Rotli looks for it before making another. */
+ * newer words updates it. The create carries the event's id, and Rust gives
+ * back the note it made for that id (protection checked) rather than making
+ * another, so a create whose answer was lost is simply asked again. */
 async function recoveryNote(
   noteId: string,
   event: string,
@@ -283,25 +302,19 @@ async function recoveryNote(
   protection: Protection,
 ): Promise<Recovery> {
   let made = recoveries.get(event);
-  if (!made && attempted.has(event)) {
-    const found = await bounded(() => lane.find(folder, body));
-    if (found) made = { id: found.id, revision: found.revision, body: found.body };
+  if (!made) {
+    const id = eventIds.get(event) ?? crypto.randomUUID();
+    eventIds.set(event, id);
+    const ask = () => mutation(noteId, () => lane.create(folder, body, protection, id));
+    // an answer lost after Rust made the note: asking again gives that note back
+    const note = await ask().catch(ask);
+    made = { id: note.id, revision: note.revision, body: note.body };
+    recoveries.set(event, made);
   }
-  if (made) {
-    if (made.body !== body) made = await updateRecovery(noteId, made, body);
-  } else {
-    attempted.add(event);
-    let note: Note | null;
-    try {
-      note = await mutation(noteId, () => lane.create(folder, body, protection));
-    } catch (error) {
-      note = (await bounded(() => lane.find(folder, body))) ?? null;
-      if (!note) throw error;
-    }
-    made = { id: note.id, revision: note.revision, body };
+  if (made.body !== body) {
+    made = await updateRecovery(noteId, made, body);
+    recoveries.set(event, made);
   }
-  recoveries.set(event, made);
-  attempted.delete(event);
   return made;
 }
 
@@ -354,10 +367,16 @@ async function keepConflictCopy(noteId: string): Promise<void> {
   const now = await bounded(() => lane.read(noteId));
   if (!now || now.revision !== note.revision) return;
   const disk = { body: now.body, revision: now.revision };
+  const made = recoveries.get(event)!;
   if (adopt(noteId, generation, { disk, lines: now.body.split("\n"), saved: true })) {
     setSaveError(noteId, null);
     recoveries.delete(event);
+    eventIds.delete(event);
     stamps.delete(event);
+    // say where the words went, and let the copy show in the lists
+    aside.set(noteId, { noteId, copyId: made.id, name: noteName(noteId) });
+    for (const fn of asideSubs) fn();
+    void invalidateNotes();
   }
 }
 
@@ -452,8 +471,7 @@ export const queueBusy = (noteId: string): boolean =>
 /** What is still outstanding for one note, in words for quit's refusal. */
 function outstanding(noteId: string): string | null {
   const name = noteName(noteId);
-  if (gone.has(noteId))
-    return `${name} was deleted while it had unsaved words: keep them as a new note or discard them`;
+  if (gone.has(noteId)) return `${name} was deleted while it had unsaved words: copy them, or discard them`;
   if (slow.has(noteId)) return `${name} is still waiting on the disk: its words are kept here, not saved`;
   const work = running.get(noteId);
   if (work?.kind === "recovery") return `${name} is still being recovered`;
@@ -497,12 +515,20 @@ export async function flushSyncs(limitMs = QUIT_LIMIT_MS): Promise<void> {
     const typing = [...timers.keys()].some((id) => !retrying.has(id));
     if (!typing && running.size === 0 && queued.size === 0) break;
   }
+  const reasons = quitReasons();
+  if (reasons) throw new Error(reasons);
+}
+
+/** What still stands in quit's way, note by note, in words; null when nothing
+ * does. Starts nothing: quit's final check (quitFlush.ts) runs it after every
+ * flusher has finished. */
+export function quitReasons(): string | null {
   const reasons = [
     ...new Set([...dirtyNoteIds(), ...timers.keys(), ...running.keys(), ...queued.keys(), ...gone]),
   ]
     .map(outstanding)
     .filter((reason): reason is string => reason !== null);
-  if (reasons.length > 0) throw new Error(reasons.join("; "));
+  return reasons.length > 0 ? reasons.join("; ") : null;
 }
 
 // ——— a note deleted while it had unsaved words (sixth review, F3): the
@@ -523,34 +549,33 @@ function goneSnapshot(): string[] {
   return goneCache;
 }
 
-/** Keep the words as a new note in the Inbox, protected as the deleted note
- * was (or protected, when that isn't known). Words typed while it is made go
- * with the buffer to that note (seventh review: they were left behind), and
- * the old buffer is retired only then. Resolves with the new note's id, so
- * the tab can follow it. */
-export function keepGoneNote(noteId: string): Promise<string | null> {
-  return exclusive(noteId, "recovery", async () => {
-    if (!gone.has(noteId) || !hasBuffer(noteId)) return null;
-    const generation = editGeneration(noteId);
-    const protection = protectionOf(noteId) ?? { secure: true, locked: false };
-    const event = `${noteId}@deleted`;
-    const made = await recoveryNote(noteId, event, inboxFolderId, bufferText(noteId)!, protection);
-    recoveries.delete(event);
-    const newest = [...bufferLines(noteId)!];
-    seed(made.id, made.body.split("\n"), { body: made.body, revision: made.revision });
-    setDocumentProtection(made.id, protection);
-    if (editGeneration(noteId) !== generation || newest.join("\n") !== made.body) {
-      edit(made.id, newest);
-      scheduleSync(made.id);
-    }
-    letGo(noteId);
-    return made.id;
-  });
+/** Let the words go. Rotli doesn't make a note of them itself (eighth review:
+ * that handoff couldn't be shown safe); the notice offers to copy them first. */
+export function discardGoneNote(noteId: string): void {
+  if (gone.has(noteId)) letGo(noteId);
 }
 
-/** Let the words go; not while they are being kept (that choice was made). */
-export function discardGoneNote(noteId: string): void {
-  if (gone.has(noteId) && running.get(noteId)?.kind !== "recovery") letGo(noteId);
+// ——— a conflict copy: the person is told where their words went ———
+
+/** The notes whose unsaved words went into a conflict copy, read once. */
+export const copiedAside = (): { noteId: string; copyId: string; name: string }[] => [...aside.values()];
+
+export function useCopiedAside(): { noteId: string; copyId: string; name: string }[] {
+  return useSyncExternalStore((fn) => {
+    asideSubs.add(fn);
+    return () => asideSubs.delete(fn);
+  }, asideSnapshot);
+}
+let asideCache: { noteId: string; copyId: string; name: string }[] = [];
+function asideSnapshot() {
+  const now = [...aside.values()];
+  if (now.length !== asideCache.length || now.some((entry, i) => entry !== asideCache[i])) asideCache = now;
+  return asideCache;
+}
+
+/** The person has seen where the words went. */
+export function dismissCopiedAside(noteId: string): void {
+  if (aside.delete(noteId)) for (const fn of asideSubs) fn();
 }
 
 const letGo = (noteId: string) => {

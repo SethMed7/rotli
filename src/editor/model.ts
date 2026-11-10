@@ -10,8 +10,9 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { onQuitFlush } from "../lib/quitFlush";
+import { onQuitCheck, onQuitFlush } from "../lib/quitFlush";
 import { markNoteDraftChanged } from "../services/noteDrafts";
+import { takeRead } from "../services/noteReads";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
 import {
@@ -31,26 +32,28 @@ import {
 } from "./buffers";
 import { clock } from "./saveClock";
 import { editGeneration } from "./saveGenerations";
-import { flushSyncs, forgetQueue, queueBusy, reloadDocument, scheduleSync } from "./saveQueue";
+import { flushSyncs, forgetQueue, queueBusy, quitReasons, reloadDocument, scheduleSync } from "./saveQueue";
 import { documentSaveError, isDirty, setSaveError } from "./saveStatus";
 import { draftsOf, setDocumentProtection, type UnsavedDraft } from "./unsavedDrafts";
 
+export { stampRead } from "../services/noteReads";
 export { documentSaveError, useDocumentDirty, useDocumentSaveError } from "./saveStatus";
 export {
   setCreateNoteForTests,
-  setFindNoteForTests,
   setReadNoteForTests,
   setWriteLimitForTests,
   setWriteNoteBodyForTests,
 } from "./saveLane";
 export {
+  copiedAside,
   discardGoneNote,
+  dismissCopiedAside,
   flushNote,
   flushSyncs,
-  keepGoneNote,
   noteName,
   saveState,
   STILL_SAVING,
+  useCopiedAside,
   useGoneNotes,
 } from "./saveQueue";
 
@@ -113,6 +116,16 @@ export function adoptPendingDocument(pendingId: string, note: Note): boolean {
   return changed;
 }
 
+/** A read of a note (the editor's query, a watcher's refetch) reaching the
+ * editor: dropped when it started before something newer was taken in (a
+ * write of Rotli's own landing, a newer read; services/noteReads.ts), else
+ * seeded or folded in like any disk truth. */
+export function adoptReadNote(note: Note): void {
+  if (!takeRead(note)) return;
+  ensureDocument(note.id, note.body, note.revision, note);
+  reloadDocumentIfClean(note.id, note.body, note.revision);
+}
+
 /** Disk truth for a note (external edit / agent write). A clean buffer takes
  * it; unsaved local edits win until flush, folded together with it when the
  * two touched different lines. Seeds when the buffer doesn't exist yet. */
@@ -160,6 +173,9 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) void flushSyncs().catch(() => {});
 });
 onQuitFlush(flushSyncs);
+// after every flusher (a workbook, another window): quit is acknowledged only
+// when no note has anything unsaved or outstanding (quitFlush.ts)
+onQuitCheck(quitReasons);
 
 // A note's buffer outlived its last editor for the life of the window — two
 // copies of every body ever opened (audit 2026-10-12). A CLEAN buffer nobody

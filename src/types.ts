@@ -64,6 +64,9 @@ export interface Note extends NoteSummary {
   suggestedLinks?: readonly string[];
   /** Opaque complete-file revision returned by the enforcing adapter. */
   revision: string;
+  /** When the read that produced this note started (services/noteReads.ts):
+   * a read older than what the editor already holds is dropped. */
+  readAt?: number;
 }
 
 /** A file a listing left out, and why (Rust `SkippedFile`; the Helper's

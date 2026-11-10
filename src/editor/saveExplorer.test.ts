@@ -16,7 +16,10 @@ import { type Exploration, exhaust, walk } from "./saveExplorerSearch.fixtures";
 
 const FULL = process.env.EXPLORE === "full";
 
-/** Each scenario, with its depth in the bounded run and the full one. */
+/** Each scenario, with its depth in the bounded run and the full one. Every
+ * person move happens at most once per note unless `caps` says otherwise, and
+ * at most one acknowledgement per schedule is failed or left never settling.
+ * Every quit also waits on another window's flush, settled by the scheduler. */
 export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = [
   {
     scenario: {
@@ -29,12 +32,22 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
   },
   {
     scenario: {
+      name: "a query's answer arrives late",
+      notes: [{ name: "A" }],
+      moves: ["type", "refetch", "quit", "release", "advance"],
+      caps: { type: 2, refetch: 2 },
+    },
+    depth: 8,
+    full: 11,
+  },
+  {
+    scenario: {
       name: "a note deleted with words in it",
       notes: [{ name: "A", secure: true }],
-      moves: ["type", "purge", "keep", "discard", "quit", "release", "advance"],
+      moves: ["type", "purge", "discard", "quit", "release", "fail", "advance"],
       caps: { type: 2 },
     },
-    depth: 9,
+    depth: 8,
     full: 11,
   },
   {
@@ -44,7 +57,7 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       moves: ["type", "outside", "quit", "release", "advance"],
       caps: { type: 2, outside: 2 },
     },
-    depth: 8,
+    depth: 7,
     full: 10,
   },
   {
@@ -58,17 +71,8 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
   },
   {
     scenario: {
-      name: "a deleted note, and a disk that misbehaves",
-      notes: [{ name: "A", locked: true }],
-      moves: ["type", "purge", "keep", "release", "fail", "landFail", "never", "advance", "quit"],
-    },
-    depth: 8,
-    full: 10,
-  },
-  {
-    scenario: {
       name: "a conflict, and a disk that misbehaves",
-      notes: [{ name: "A" }],
+      notes: [{ name: "A", secure: true, locked: true }],
       moves: ["type", "outside", "quit", "release", "fail", "landFail", "never", "advance"],
     },
     depth: 8,
@@ -80,15 +84,15 @@ export const SCENARIOS: { scenario: Scenario; depth: number; full: number }[] = 
       notes: [{ name: "A" }, { name: "B", secure: true, locked: true }],
       moves: ["type", "switch", "close", "quit", "release", "advance"],
     },
-    depth: 7,
+    depth: 6,
     full: 8,
   },
 ];
 
-/** The long walks: every move, two notes. */
+/** The long walks (the seventh review's settings): every move, three notes. */
 export const WALKS: Scenario = {
   name: "random walks",
-  notes: [{ name: "A" }, { name: "B", secure: true, locked: true }],
+  notes: [{ name: "A" }, { name: "B", secure: true, locked: true }, { name: "C", locked: true }],
   moves: [
     "type",
     "undo",
@@ -96,7 +100,7 @@ export const WALKS: Scenario = {
     "close",
     "outside",
     "purge",
-    "keep",
+    "refetch",
     "discard",
     "quit",
     "release",
@@ -105,8 +109,8 @@ export const WALKS: Scenario = {
     "never",
     "advance",
   ],
-  caps: { type: 3, undo: 2, outside: 2, switch: 2 },
-  faults: 2,
+  caps: { type: 5, undo: 3, outside: 3, purge: 2, refetch: 3, switch: 3, close: 2 },
+  faults: 3,
 };
 
 function report(name: string, found: Exploration): string {
@@ -129,12 +133,12 @@ for (const { scenario, depth, full } of SCENARIOS) {
   }, 600_000);
 }
 
-test("seeded random walks of 40 moves keep I1 to I5", async () => {
-  const seed = Number(process.env.EXPLORE_SEED ?? 20261110);
-  const walks = FULL ? 20_000 : 400;
-  const found = await walk(WALKS, seed, walks, 40);
+test("seeded random walks of 70 moves keep I1 to I5", async () => {
+  const seed = Number(process.env.EXPLORE_SEED ?? 20261111);
+  const walks = FULL ? 20_000 : 500;
+  const found = await walk(WALKS, seed, walks, 70);
   console.log(
-    `  random walks: ${found.schedules} walks of up to 40 moves, seed ${seed}, ${Math.round(found.ms)} ms`,
+    `  random walks: ${found.schedules} walks of up to 70 moves, seed ${seed}, ${Math.round(found.ms)} ms`,
   );
   expect(report(`walks (seed ${seed})`, found)).toBe("");
 }, 1_800_000);

@@ -1,10 +1,9 @@
 // The disk, as the save queue (saveQueue.ts) sees it: the write lane, the
-// read, the create and the look-up, swappable so tests drive a fake that
+// read and the create, swappable so tests drive a fake that
 // follows Rust's contract (writeLane.fixtures.ts), the save-state explorer's
 // held acknowledgements (saveExplorer.fixtures.ts), or the real Rust store
 // (realWriteLane.lane.ts); and the bound a change or a read is given.
 
-import { titleOf } from "../services/derive";
 import { notesService } from "../services/notes";
 import type { Note } from "../types";
 import { clock, type TimerHandle } from "./saveClock";
@@ -16,25 +15,21 @@ export type Protection = { secure: boolean; locked: boolean };
 let slowAfterMs = 8000;
 export const slowAfter = (): number => slowAfterMs;
 
-// The write lane, the read, the create and the look-up — swappable so tests
-// can drive a fake that follows Rust's contract, or the real Rust store.
+// The write lane, the read and the create — swappable so tests can drive a
+// fake that follows Rust's contract, or the real Rust store. A recovery note's
+// create carries its event's id: Rust gives back the note it made for that id
+// rather than making another (corpus.rs `create_with`).
 type WriteBody = (noteId: string, body: string, revision: string, base: string) => Promise<Note | void>;
 type ReadNote = (noteId: string) => Promise<Note | null>;
-type CreateNote = (folderId: string, body: string, protection: Protection) => Promise<Note>;
-type FindNote = (folderId: string, body: string) => Promise<Note | null>;
+type CreateNote = (folderId: string, body: string, protection: Protection, event?: string) => Promise<Note>;
 export const lane = {
   write: ((id, body, revision, base) => notesService.updateNote(id, body, revision, base)) as WriteBody,
   read: ((id) => notesService.getNote(id)) as ReadNote,
-  create: ((folder, body, protection) => notesService.createNote(folder, body, protection)) as CreateNote,
-  find: (async (folder, body) => {
-    const title = titleOf(body);
-    for (const summary of await notesService.listNotes(folder)) {
-      if (summary.title !== title) continue;
-      const note = await notesService.getNote(summary.id);
-      if (note?.body === body) return note;
-    }
-    return null;
-  }) as FindNote,
+  create: ((folder, body, protection, event) =>
+    notesService.createNote(folder, body, {
+      ...protection,
+      ...(event ? { recoveryEvent: event } : {}),
+    })) as CreateNote,
 };
 const defaults = { ...lane };
 export function setWriteNoteBodyForTests(fn: WriteBody | null): void {
@@ -45,9 +40,6 @@ export function setReadNoteForTests(fn: ReadNote | null): void {
 }
 export function setCreateNoteForTests(fn: CreateNote | null): void {
   lane.create = fn ?? defaults.create;
-}
-export function setFindNoteForTests(fn: FindNote | null): void {
-  lane.find = fn ?? defaults.find;
 }
 export function setWriteLimitForTests(ms: number | null): void {
   slowAfterMs = ms ?? 8000;
