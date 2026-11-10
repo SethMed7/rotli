@@ -177,6 +177,33 @@ pub(crate) fn atomic_write(path: &Path, contents: &str, prefix: &str) -> Result<
     atomic_write_bytes(path, contents.as_bytes(), prefix)
 }
 
+/// A note's text, read only when the file at `path` is a regular file with
+/// this one name. A hard link passes every path check (it has no link to
+/// follow) yet can be the very file of a document outside the vault, so its
+/// link count is checked on the opened descriptor, the one the bytes come
+/// from (review 2026-11-09). The leaf is opened without following a symlink.
+pub(crate) fn read_own_text(path: &Path) -> std::io::Result<String> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let mut file = options.open(path)?;
+    let metadata = file.metadata()?;
+    #[cfg(unix)]
+    let other_names = std::os::unix::fs::MetadataExt::nlink(&metadata) != 1;
+    #[cfg(not(unix))]
+    let other_names = false;
+    if !metadata.is_file() || other_names {
+        return Err(std::io::Error::other("not a plain file of its own (a hard link or special file)"));
+    }
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    Ok(text)
+}
+
 pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> Result<(), String> {
     let (dir, tmp) = synced_temp_beside(path, contents, prefix)?;
     tmp.persist(path)

@@ -3685,7 +3685,8 @@ impl CorpusStore {
         if surfaced(self.layout, rel) == Surface::Hidden {
             return Err(format!("not available to AI: {rel}"));
         }
-        let text = fs::read_to_string(self.abs(rel)).map_err(|e| e.to_string())?;
+        let abs = self.guard_rel(rel)?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         self.judge_for_ai(rel, &text, model_is_local)?;
         Ok(text)
     }
@@ -3771,7 +3772,7 @@ impl CorpusStore {
             return Err(format!("not available to AI: {rel}"));
         }
         let abs = self.guard_rel(&rel)?;
-        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         self.judge_for_ai(&rel, &text, model_is_local)?;
         Ok(self.doc_from_text(id, &rel, &abs, &text))
     }
@@ -4888,7 +4889,7 @@ impl CorpusStore {
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
         let rel = self.path_of(id)?;
         let abs = self.guard_rel(&rel)?;
-        let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         Ok(self.doc_from_text(id, &rel, &abs, &text))
     }
 
@@ -6720,7 +6721,7 @@ fn walk(
                 )?;
             } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
                 let abs = entry.path();
-                let Ok(text) = fs::read_to_string(&abs) else {
+                let Ok(text) = crate::fsutil::read_own_text(&abs) else {
                     continue;
                 };
                 let (fm, raw) = parse_document(&text);
@@ -6797,7 +6798,7 @@ fn walk(
             )?;
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
             let abs = entry.path();
-            let Ok(text) = fs::read_to_string(&abs) else {
+            let Ok(text) = crate::fsutil::read_own_text(&abs) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);
@@ -10191,6 +10192,37 @@ mod tests {
             store.search("selkie", 50, false).unwrap().is_empty(),
             "trashed note leaves search"
         );
+    }
+
+    /// Review 2026-11-09 #4: a hard link in the vault to a Markdown file
+    /// outside it passes every path check, so reading the note's indexed id
+    /// returned the outside file. A note is read only from a regular file with
+    /// one name; a hard-linked one is never read, listed, or searched.
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
+        let (dir, mut store) = bare();
+        let outside = dir.path().join("outside.md");
+        fs::write(&outside, "# Ledger\n\nwords from beyond the vault\n").unwrap();
+
+        // a note whose file is swapped for a hard link to the outside file
+        let n = store.create("Inbox", "# Plain\n\nan ordinary note\n").unwrap();
+        let rel = store.resolve_note_rel(&n.id).unwrap();
+        let abs = store.abs(&rel);
+        fs::remove_file(&abs).unwrap();
+        fs::hard_link(&outside, &abs).unwrap();
+        store.suppress.bump();
+        assert!(store.read(&n.id).is_err(), "the editor's read refuses it");
+        assert!(store.read_for_ai(&n.id, false).is_err(), "the AI read gate refuses it");
+        assert!(store.read_doc_for_ai(&n.id, true).is_err(), "the agent read refuses it");
+
+        // a fresh hard link is never walked: not listed, not searched
+        fs::hard_link(&outside, store.abs("Inbox/linked.md")).unwrap();
+        store.suppress.bump();
+        let listed = store.list().unwrap().notes;
+        assert!(!listed.iter().any(|m| m.title == "Ledger"), "{listed:?}");
+        assert!(store.search("beyond", 10, false).unwrap().is_empty());
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "# Ledger\n\nwords from beyond the vault\n");
     }
 
     /// Review 2026-11-09 #1: an AI lane gated one read of a note and showed
