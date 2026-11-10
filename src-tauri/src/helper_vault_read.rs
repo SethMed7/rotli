@@ -179,7 +179,7 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize, prompt: Option<&s
             let text = String::from_utf8_lossy(&bytes);
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             // the desktop walk's own rule, so the two ledgers can't drift
-            let protected = crate::corpus::walked_secure(&frontmatter.unwrap_or_default(), body);
+            let protected = crate::corpus::walked_secure(&frontmatter.unwrap_or_default(), body, &text);
             if protected {
                 // Check this body before later notes can evict its hashes.
                 // Both direct and ledger checks use secret.rs's same phrases.

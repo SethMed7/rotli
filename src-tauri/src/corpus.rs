@@ -1297,12 +1297,15 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
-pub(crate) fn walked_secure(fm: &Frontmatter, body: &str) -> bool {
+pub(crate) fn walked_secure(fm: &Frontmatter, body: &str, text: &str) -> bool {
     fm.foreign.iter().any(|l| secure_field(l) == Some(true))
         || fm
             .foreign
             .iter()
             .any(|l| secure_context_field(l) == Some(true))
+        // the chat mark by the grammar TypeScript shares (eighth review: the
+        // line rule above missed `TRUE`, a quoted true, `key : true`)
+        || crate::protection_mark::marked(text, "secureContext")
         || looks_secure(body)
 }
 
@@ -3135,7 +3138,7 @@ impl CorpusStore {
         let (frontmatter, raw) = parse_document(&text);
         let frontmatter = frontmatter.unwrap_or_default();
         let body = editor_body(raw);
-        if walked_secure(&frontmatter, body) {
+        if walked_secure(&frontmatter, body, &text) {
             return Err(
                 "Protected or secret-shaped notes cannot be exported to an unprotected PDF copy."
                     .into(),
@@ -6834,7 +6837,7 @@ fn walk(
                         } else {
                             String::new()
                         },
-                        secure: walked_secure(&fm, body),
+                        secure: walked_secure(&fm, body, &text),
                     },
                 );
                 reference.push(reference_row(&rel, &abs, &fm, body));
@@ -6907,7 +6910,7 @@ fn walk(
                     } else {
                         String::new()
                     },
-                    secure: walked_secure(&fm, body),
+                    secure: walked_secure(&fm, body, &text),
                 },
             );
             notes.push(note_row(layout, id, &rel, &abs, &fm, body));

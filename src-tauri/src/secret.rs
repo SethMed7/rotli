@@ -114,8 +114,9 @@ fn marks_protected(line: &str) -> bool {
     // true`, permanently. docs/design/ai-visibility-matrix.md T2 step 5 promises
     // Rust refuses such a transcript "regardless" of the TS filter — before
     // 2026-08-01 that promise was only kept in TypeScript (audit: GAP 4).
-    line.strip_prefix("secureContext:")
-        .is_some_and(|v| v.trim() == "true")
+    // Read by the grammar TypeScript shares (protection_mark.rs): `TRUE`, a
+    // quoted true and `secureContext : true` mark too (eighth review).
+    crate::protection_mark::marks(line, "secureContext")
 }
 
 // ── the secure-prose ledger ───────────────────────────────────────────────────
