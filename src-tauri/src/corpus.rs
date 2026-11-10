@@ -3694,77 +3694,6 @@ impl CorpusStore {
         Ok(text)
     }
 
-    /// One search hit as an AI lane may show it: gated on ONE read of the
-    /// note, and titled, snippeted, and matched from those same bytes. The hit
-    /// itself comes from the walk cache, which can hold an older version: a
-    /// note that was secure when walked and public by the time the gate read
-    /// it carried the secure version's title and snippet out on the public
-    /// version's approval (review 2026-11-09). A hit the judged bytes no longer
-    /// match is dropped; a fuzzy (typo-tolerant) hit is kept only when the
-    /// index saw exactly these bytes.
-    pub(crate) fn present_hit_for_ai(
-        &mut self,
-        query: &str,
-        hit: SearchHit,
-        model_is_local: bool,
-    ) -> Option<SearchHit> {
-        let text = self.read_for_ai(&hit.id, model_is_local).ok()?;
-        let rel = self.resolve_note_rel(&hit.id).ok()?;
-        let (fm, raw) = parse_document(&text);
-        let had_fm = fm.is_some();
-        let body = if had_fm { editor_body(raw) } else { raw };
-        let fm = fm.unwrap_or_default();
-        let title = title_of(body);
-        let metadata = if had_fm { searchable_metadata(&fm) } else { String::new() };
-        let snippet = snippet_of(body);
-        let aliases = note_aliases(&rel, &title, &hit.id, &fm).join("\n");
-        let found = search_match(query, &title, body, &snippet)
-            .or_else(|| search_match(query, &title, &metadata, &snippet))
-            .or_else(|| search_match(query, &title, &aliases, &snippet));
-        let m = match found {
-            Some(m) => m,
-            None => {
-                let indexed = self.list_cache.as_ref().and_then(|cache| cache.texts.get(&hit.id));
-                if !indexed.is_some_and(|cached| cached.body == body && cached.metadata == metadata) {
-                    return None;
-                }
-                SearchMatch {
-                    rank: crate::search_match::RANK_FUZZY,
-                    snippet: leading_snippet(body),
-                    match_start: 0,
-                    match_len: 0,
-                    spans: Vec::new(),
-                }
-            }
-        };
-        Some(SearchHit {
-            title,
-            rank: m.rank,
-            snippet: m.snippet,
-            match_start: m.match_start,
-            match_len: m.match_len,
-            spans: m.spans,
-            ..hit
-        })
-    }
-
-    /// One note's listing row as an AI lane may show it: gated on ONE read,
-    /// with its title, snippet, and aliases rebuilt from those bytes instead of
-    /// the walk cache (see `present_hit_for_ai`). Boards and files are not
-    /// notes and keep their own gates.
-    pub(crate) fn present_meta_for_ai(&mut self, mut meta: NoteMeta, model_is_local: bool) -> Option<NoteMeta> {
-        let text = self.read_for_ai(&meta.id, model_is_local).ok()?;
-        let rel = self.resolve_note_rel(&meta.id).ok()?;
-        let (fm, raw) = parse_document(&text);
-        let body = if fm.is_some() { editor_body(raw) } else { raw };
-        let fm = fm.unwrap_or_default();
-        meta.title = title_of(body);
-        meta.snippet = snippet_of(body);
-        meta.body_empty = body.trim().is_empty();
-        meta.aliases = note_aliases(&rel, &meta.title, &meta.id, &fm);
-        Some(meta)
-    }
-
     /// An agent's whole read in ONE read of the file: the gate judges these
     /// bytes, and the document and its revision are built from the same bytes.
     /// Gating one read and returning another let a file swapped in between
@@ -8946,6 +8875,9 @@ pub mod rules_store;
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
+/// The rows an AI lane may show, built from the one read the gate judged.
+#[path = "corpus_ai_rows.rs"]
+mod ai_rows;
 /// The AI edit control on the store: the person's grant (2026-09-29) and the
 /// `/ai` insert lane (2026-10-05).
 #[path = "corpus_ai_edit.rs"]
@@ -8976,6 +8908,10 @@ mod adopted_tests;
 #[cfg(test)]
 #[path = "corpus_in_place_marked_tests.rs"]
 mod in_place_marked_tests;
+
+#[cfg(test)]
+#[path = "corpus_review_tests.rs"]
+mod review_tests;
 
 #[cfg(test)]
 mod tests {
@@ -10222,110 +10158,6 @@ mod tests {
             store.search("selkie", 50, false).unwrap().is_empty(),
             "trashed note leaves search"
         );
-    }
-
-    /// Review 2026-11-09 #5: an agent's move checked secure and locked
-    /// before waiting for the note's lock. Another writer holding the lock
-    /// could lock the note meanwhile, and the move went ahead on release. The
-    /// policy is checked again inside the lock, right before the move.
-    #[test]
-    fn a_note_locked_while_an_agent_move_waits_is_not_moved() {
-        let (_dir, mut store) = bare();
-        store.create_folder("Projects", None).unwrap();
-        let n = store.create("Inbox", "# Ferry timetable\n\nboats at noon\n").unwrap();
-        let rel = store.resolve_note_rel(&n.id).unwrap();
-        let abs = store.abs(&rel);
-        let (held, wait_for_hold) = std::sync::mpsc::channel();
-        let writer = {
-            let abs = abs.clone();
-            std::thread::spawn(move || {
-                crate::fsutil::with_file_lock(&abs, || {
-                    held.send(()).unwrap();
-                    std::thread::sleep(std::time::Duration::from_millis(300));
-                    let text = fs::read_to_string(&abs).unwrap();
-                    fs::write(&abs, text.replacen("---\n", "---\nlocked: true\n", 1)).unwrap();
-                    Ok(())
-                })
-                .unwrap();
-            })
-        };
-        wait_for_hold.recv().unwrap();
-        let moved = store.move_for_remote_agent(&n.id, "Projects");
-        writer.join().unwrap();
-        let error = moved.expect_err("a note locked before the move ran is not moved");
-        assert!(error.contains("locked"), "{error}");
-        assert!(abs.is_file(), "the note stays where it was");
-    }
-
-    /// Review 2026-11-09 #4: a hard link in the vault to a Markdown file
-    /// outside it passes every path check, so reading the note's indexed id
-    /// returned the outside file. A note is read only from a regular file with
-    /// one name; a hard-linked one is never read, listed, or searched.
-    #[cfg(unix)]
-    #[test]
-    fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
-        let (dir, mut store) = bare();
-        let outside = dir.path().join("outside.md");
-        fs::write(&outside, "# Ledger\n\nwords from beyond the vault\n").unwrap();
-
-        // a note whose file is swapped for a hard link to the outside file
-        let n = store.create("Inbox", "# Plain\n\nan ordinary note\n").unwrap();
-        let rel = store.resolve_note_rel(&n.id).unwrap();
-        let abs = store.abs(&rel);
-        fs::remove_file(&abs).unwrap();
-        fs::hard_link(&outside, &abs).unwrap();
-        store.suppress.bump();
-        assert!(store.read(&n.id).is_err(), "the editor's read refuses it");
-        assert!(store.read_for_ai(&n.id, false).is_err(), "the AI read gate refuses it");
-        assert!(store.read_doc_for_ai(&n.id, true).is_err(), "the agent read refuses it");
-
-        // a fresh hard link is never walked: not listed, not searched
-        fs::hard_link(&outside, store.abs("Inbox/linked.md")).unwrap();
-        store.suppress.bump();
-        let listed = store.list().unwrap().notes;
-        assert!(!listed.iter().any(|m| m.title == "Ledger"), "{listed:?}");
-        assert!(store.search("beyond", 10, false).unwrap().is_empty());
-        assert_eq!(fs::read_to_string(&outside).unwrap(), "# Ledger\n\nwords from beyond the vault\n");
-    }
-
-    /// Review 2026-11-09 #1: an AI lane gated one read of a note and showed
-    /// another. The walk cached a secure version holding a canary; the note
-    /// then went public, the gate approved the public bytes, and the hit still
-    /// carried the cached title and snippet. A hit, and a listing row, now show
-    /// only the bytes the gate judged.
-    #[test]
-    fn ai_lanes_show_only_the_bytes_the_gate_judged() {
-        let (_dir, mut store) = bare();
-        let n = store.create("Inbox", "# Harbor plan\n\nharbor opens at nine\n").unwrap();
-        let rel = store.resolve_note_rel(&n.id).unwrap();
-        let abs = store.abs(&rel);
-        let public = fs::read_to_string(&abs).unwrap();
-        let secure = public
-            .replacen("---\n", "---\nsecure: true\n", 1)
-            .replace("# Harbor plan", "# Harbor canary-7Q4 plan")
-            .replace("harbor opens at nine", "harbor code canary-7Q4 opens at nine");
-        fs::write(&abs, &secure).unwrap();
-        let hits = store.search("harbor", 10, false).unwrap(); // the walk caches the secure version
-        assert!(hits[0].snippet.contains("canary-7Q4"), "the person's own search sees their note");
-        fs::write(&abs, &public).unwrap(); // public again, with no walk in between
-
-        let shown: Vec<SearchHit> =
-            hits.into_iter().filter_map(|hit| store.present_hit_for_ai("harbor", hit, false)).collect();
-        assert_eq!(shown.len(), 1, "the public note is still found");
-        assert!(!format!("{shown:?}").contains("canary-7Q4"), "{shown:?}");
-        assert_eq!(shown[0].title, "Harbor plan");
-
-        // a hit the public bytes no longer match is dropped, not shown from the cache
-        fs::write(&abs, &secure).unwrap();
-        store.suppress.bump(); // the watcher saw the change
-        let canary = store.search("canary", 10, false).unwrap();
-        fs::write(&abs, &public).unwrap();
-        assert!(canary.into_iter().filter_map(|hit| store.present_hit_for_ai("canary", hit, false)).next().is_none());
-
-        let meta = store.list().unwrap().notes.into_iter().find(|m| m.id == n.id).unwrap();
-        assert!(meta.title.contains("canary-7Q4"), "the cached listing row is the secure version");
-        let row = store.present_meta_for_ai(meta, false).expect("the public note is listed");
-        assert!(!format!("{row:?}").contains("canary-7Q4"), "{row:?}");
     }
 
     #[test]

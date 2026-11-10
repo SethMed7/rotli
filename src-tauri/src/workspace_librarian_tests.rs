@@ -21,6 +21,13 @@ fn public_build() -> bool {
     !crate::feature_policy::agents_enabled()
 }
 
+#[test]
+fn a_public_build_ignores_the_vault_switch() {
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    assert_eq!(enabled(temp.path()), !public_build(), "the switch does nothing in a public build");
+}
+
 fn turn_on(temp: &TempDir) {
     fs::create_dir_all(temp.path().join(".rotli")).unwrap();
     fs::write(temp.path().join(".rotli/settings.json"), r#"{"theme":"grove","librarianMcp":true}"#).unwrap();
@@ -68,9 +75,7 @@ fn body_of(ws: &mut Workspace, id: &str) -> String {
 
 #[test]
 fn the_route_is_off_until_the_vault_turns_it_on() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let _ = test_workspace(&temp);
     assert!(!enabled(temp.path()));
@@ -100,9 +105,7 @@ fn the_route_is_off_until_the_vault_turns_it_on() {
 
 #[test]
 fn the_tool_set_is_small_and_has_no_way_to_approve() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let listed: Vec<String> = (SERVER.tools)().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
     assert_eq!(listed, [GUIDE, SEARCH, READ, CAPTURE, FILE, LINK, INDEX, LOG, REVIEW]);
@@ -116,9 +119,7 @@ fn the_tool_set_is_small_and_has_no_way_to_approve() {
 
 #[test]
 fn capture_files_a_raw_source_in_intake_and_logs_it() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let note = ok(mcp(&temp, CAPTURE, json!({"title":"Pricing call","body":"Ana said the tiers are fine.","source":"conversation"})));
@@ -136,9 +137,7 @@ fn capture_files_a_raw_source_in_intake_and_logs_it() {
 
 #[test]
 fn secure_notes_are_never_read_searched_or_proposed() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -152,9 +151,7 @@ fn secure_notes_are_never_read_searched_or_proposed() {
 
 #[test]
 fn filing_is_a_proposal_the_person_applies() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -184,9 +181,7 @@ fn filing_is_a_proposal_the_person_applies() {
 
 #[test]
 fn a_link_on_a_persons_note_waits_for_their_grant() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -216,9 +211,7 @@ fn a_link_on_a_persons_note_waits_for_their_grant() {
 
 #[test]
 fn the_index_and_log_are_the_only_pages_it_rewrites() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     ok(mcp(&temp, INDEX, json!({"body":"## Projects\n- [[Launch plan]] — the plan."})));
@@ -242,9 +235,7 @@ fn the_index_and_log_are_the_only_pages_it_rewrites() {
 /// wrapped in `items`; the text part still carries the whole value.
 #[test]
 fn every_result_is_an_mcp_object_even_when_the_answer_is_a_list() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -263,9 +254,7 @@ fn every_result_is_an_mcp_object_even_when_the_answer_is_a_list() {
 
 #[test]
 fn related_lines_grow_without_touching_prose() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     assert_eq!(with_related("# T\n\nbody", "[[A]]"), "# T\n\nbody\n\nRelated: [[A]]\n");
     assert_eq!(with_related("# T\n\nbody\n\nRelated: [[A]]\n", "[[B]]"), "# T\n\nbody\n\nRelated: [[A]], [[B]]\n");
 }
@@ -283,9 +272,7 @@ fn make_secure(ws: &mut Workspace, id: &str) {
 #[cfg(unix)]
 #[test]
 fn proposals_never_follow_a_symlink_out_of_the_vault() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     use std::os::unix::fs::symlink;
     let temp = TempDir::new().unwrap();
     let outside = TempDir::new().unwrap();
@@ -311,9 +298,7 @@ fn proposals_never_follow_a_symlink_out_of_the_vault() {
 /// for, never whatever the app's default is at the moment of a call.
 #[test]
 fn the_route_serves_the_one_vault_it_was_started_for() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let (a, b, stranger) = (TempDir::new().unwrap(), TempDir::new().unwrap(), TempDir::new().unwrap());
     for vault in [&a, &b] {
         turn_on(vault);
@@ -354,9 +339,7 @@ fn the_route_serves_the_one_vault_it_was_started_for() {
 /// once its note, or the page it links to, turns secure.
 #[test]
 fn review_drops_proposals_whose_notes_turned_secure() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -380,9 +363,7 @@ fn review_drops_proposals_whose_notes_turned_secure() {
 /// title or carries it as an alias.
 #[test]
 fn own_pages_are_matched_by_exact_title_and_the_librarians_stamp() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -404,9 +385,7 @@ fn own_pages_are_matched_by_exact_title_and_the_librarians_stamp() {
 /// once both survive; neither replaces the other.
 #[test]
 fn concurrent_captures_never_overwrite_each_other() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     const WRITERS: usize = 8;
     for round in 0..4 {
         let temp = TempDir::new().unwrap();
@@ -435,9 +414,7 @@ fn concurrent_captures_never_overwrite_each_other() {
 /// gate judged, with the revision of those bytes, even while the file flips.
 #[test]
 fn a_read_returns_exactly_the_bytes_the_gate_checked() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -481,9 +458,7 @@ fn a_read_returns_exactly_the_bytes_the_gate_checked() {
 #[cfg(unix)]
 #[test]
 fn proposals_refuse_a_hard_linked_file() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let outside = TempDir::new().unwrap();
     turn_on(&temp);
@@ -507,9 +482,7 @@ fn proposals_refuse_a_hard_linked_file() {
 #[cfg(unix)]
 #[test]
 fn proposals_refuse_a_linked_rotli_folder() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let outside = TempDir::new().unwrap();
     let mut ws = test_workspace(&temp);
@@ -542,9 +515,7 @@ fn proposals_refuse_a_linked_rotli_folder() {
 #[cfg(unix)]
 #[test]
 fn a_vault_folder_replaced_after_binding_is_refused() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let parent = TempDir::new().unwrap();
     let path = parent.path().join("vault");
     let make = |path: &std::path::Path| {
@@ -570,9 +541,7 @@ fn a_vault_folder_replaced_after_binding_is_refused() {
 /// The index and log are found by a page marker only this route writes.
 #[test]
 fn a_people_note_named_like_the_index_is_never_rewritten() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
@@ -597,9 +566,7 @@ fn a_people_note_named_like_the_index_is_never_rewritten() {
 /// with only the title is shown only when that title still names one page.
 #[test]
 fn review_checks_the_exact_page_a_link_was_proposed_for() {
-    if public_build() {
-        return; // the route is development-only; feature_policy tests its refusal
-    }
+    if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     turn_on(&temp);
     let mut ws = test_workspace(&temp);

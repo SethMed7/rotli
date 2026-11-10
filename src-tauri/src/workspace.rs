@@ -3055,12 +3055,6 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
     }))
 }
 
-/// The Librarian route's per-vault switch, for the public-build gate test.
-#[cfg(test)]
-pub(crate) fn librarian_switch_on(root: &Path) -> bool {
-    librarian::enabled(root)
-}
-
 #[cfg(test)]
 #[path = "workspace_secure_reference_tests.rs"]
 mod secure_reference_tests;
@@ -3080,34 +3074,6 @@ mod tests {
             is_default: true,
         })
         .unwrap()
-    }
-
-    /// Review 2026-11-09 #1 through the CLI agents use (`rotli notes search`,
-    /// `list`, `query`): the walk cached a secure version with a canary, the
-    /// note went public, and the cached title and snippet rode out on the
-    /// approval of the public bytes.
-    #[test]
-    fn the_notes_cli_shows_agents_only_the_bytes_the_gate_judged() {
-        let temp = TempDir::new().unwrap();
-        let mut ws = test_workspace(&temp);
-        let meta = ws.create_note("Harbor plan", "harbor opens at nine", MAIN_ROOT).unwrap();
-        let local = ws.local_id(&meta.id).unwrap();
-        let abs = temp.path().join(ws.store.resolve_note_rel(&local).unwrap());
-        let public = fs::read_to_string(&abs).unwrap();
-        let secure = public
-            .replacen("---\n", "---\nsecure: true\n", 1)
-            .replace("# Harbor plan", "# Harbor canary-7Q4 plan")
-            .replace("harbor opens at nine", "harbor code canary-7Q4 opens at nine");
-        fs::write(&abs, &secure).unwrap();
-        let _ = ws.store.search("harbor", 10, false).unwrap(); // the walk caches the secure version
-        fs::write(&abs, &public).unwrap();
-
-        let searched = serde_json::to_string(&ws.search_remote("harbor", 10).unwrap()).unwrap();
-        assert!(searched.contains("Harbor plan") && !searched.contains("canary-7Q4"), "{searched}");
-        let listed = serde_json::to_string(&ws.list_remote(50).unwrap()).unwrap();
-        assert!(listed.contains("Harbor plan") && !listed.contains("canary-7Q4"), "{listed}");
-        let queried = serde_json::to_string(&ws.query_remote("harbor", 50).unwrap()).unwrap();
-        assert!(!queried.contains("canary-7Q4"), "{queried}");
     }
 
     #[test]

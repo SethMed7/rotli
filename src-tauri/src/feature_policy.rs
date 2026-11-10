@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn stable_build_refuses_every_librarian_entry_and_ignores_the_vault_switch() {
+    fn stable_build_refuses_every_librarian_entry() {
         if env!("ROTLI_BUILD_CHANNEL") == "stable" {
             let args = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
             for entry in [
@@ -136,10 +136,6 @@ mod tests {
             ] {
                 assert_eq!(crate::workspace::run_if_requested(&args(entry)), Some(1), "{entry:?}");
             }
-            let vault = tempfile::TempDir::new().unwrap();
-            std::fs::create_dir_all(vault.path().join(".rotli")).unwrap();
-            std::fs::write(vault.path().join(".rotli/settings.json"), r#"{"librarianMcp":true}"#).unwrap();
-            assert!(!crate::workspace::librarian_switch_on(vault.path()), "the switch has no effect in a public build");
         }
     }
 
