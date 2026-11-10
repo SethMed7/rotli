@@ -2306,6 +2306,10 @@ pub struct NoteDoc {
     /// See `NoteMeta::origin`. `corpus_read` returns it so the UI can offer
     /// "restore to <origin>".
     pub origin: Option<String>,
+    /// Effective protection, from the same read as the body (sixth review of
+    /// pull request 267): a copy made from this read keeps it.
+    pub secure: bool,
+    pub locked: bool,
 }
 
 /// What `corpus_read_board` returns: the raw Excalidraw scene JSON for a board.
@@ -4895,7 +4899,13 @@ impl CorpusStore {
         // origin is a DISK-location fact (Archive/Trash); the wire folder_id is the
         // shelf-projected view — they can differ for a memex wiki note.
         let folder = project_folder(self.layout, &disk_folder, &fm);
+        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || self.in_secure_home(rel)
+            || looks_secure(body)
+            || self.protected_by_name(&title_of(body), rel);
         NoteDoc {
+            secure,
+            locked: fm.foreign.iter().any(|l| locked_field(l) == Some(true)),
             id: id.to_string(),
             origin: if is_hidden_root(self.layout, &disk_folder) {
                 fm.origin.clone()
@@ -8969,6 +8979,10 @@ mod in_place_marked_tests;
 pub(crate) mod review_tests;
 
 #[cfg(test)]
+#[path = "corpus_write_lane_tests.rs"]
+mod write_lane_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -10421,67 +10435,6 @@ mod tests {
         assert_eq!(
             aliases_on_disk(&mut store, &meta.id),
             "aliases: [\"kept-link\",\"Kept title\",\"kept-title\"]"
-        );
-    }
-
-    #[test]
-    fn stale_editor_write_must_not_overwrite_an_external_edit() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
-        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
-        let opened = store.read(&note.id).unwrap();
-        let rel = store.path_of(&note.id).unwrap();
-
-        fs::write(
-            store.root().join(&rel),
-            "---\nid: 01EXTERNAL\n---\n\n# External\n\nnewer",
-        )
-        .unwrap();
-
-        let result = store.write_if_revision_with_body_base(
-            &note.id,
-            &format!("{}\n\nlocal", opened.body),
-            &opened.revision,
-            Some(&opened.body),
-        );
-        assert!(
-            result.is_err(),
-            "a stale editor save must report a conflict"
-        );
-        let current = fs::read_to_string(store.root().join(&rel)).unwrap();
-        assert!(current.contains("# External\n\nnewer"));
-    }
-
-    #[test]
-    fn stale_complete_revision_merges_when_only_rotli_metadata_changed() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
-        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
-        let opened = store.read(&note.id).unwrap();
-
-        // A pin is representative of the Librarian's metadata/location work:
-        // complete-file bytes and revision move, editor prose does not.
-        store.set_pinned(&note.id, true).unwrap();
-        let after_metadata = store.read(&note.id).unwrap();
-        assert_ne!(after_metadata.revision, opened.revision);
-        assert_eq!(after_metadata.body, opened.body);
-
-        let result = store
-            .write_if_revision_with_body_base(
-                &note.id,
-                "# Original\n\nlocal edit",
-                &opened.revision,
-                Some(&opened.body),
-            )
-            .unwrap();
-
-        assert_eq!(
-            store.read(&note.id).unwrap().body,
-            "# Original\n\nlocal edit"
-        );
-        assert!(
-            result.meta.pinned,
-            "the newer metadata must survive the body save"
         );
     }
 

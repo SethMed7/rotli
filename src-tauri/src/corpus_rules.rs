@@ -38,6 +38,16 @@ impl CorpusStore {
             })
     }
 
+    /// Protection a read reports from the note's name. Settings that can't be
+    /// read can't prove a name public, so the answer is yes (sixth review of
+    /// pull request 267: a copy made from that read must not lose protection).
+    pub(crate) fn protected_by_name(&self, title: &str, rel: &str) -> bool {
+        self.layout == Layout::Memex
+            && self.secure_keywords_for_classification().map_or(true, |keywords| {
+                crate::librarian_rules::secure_by_name(title, rel, &keywords)
+            })
+    }
+
     /// Does this path sit in a secure home in either layout?
     pub(crate) fn in_secure_home(&self, rel: &str) -> bool {
         in_secure_home_path(rel)

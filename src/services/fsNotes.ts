@@ -153,6 +153,10 @@ export class FsNotesService implements NotesService {
         pinned: doc.pinned,
         body: doc.body,
         revision: doc.revision,
+        // content, revision and protection from one read; a shape without
+        // them counts as protected (sixth review of pull request 267)
+        secure: doc.secure !== false,
+        locked: doc.locked !== false,
       };
     } catch (err) {
       if (isNotFound(err)) return null;

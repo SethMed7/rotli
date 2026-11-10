@@ -15,7 +15,7 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import { type FolderRoles, folderRoles } from "../services/destinations";
-import type { SearchHit, SkippedFile, WelcomeSeed } from "../types";
+import type { NoteSummary, SearchHit, SkippedFile, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import type { FrontmatterView } from "./corpusFrontmatter";
@@ -331,7 +331,8 @@ export interface CorpusListPayload {
   skipped?: SkippedFile[]; // files the walk left out (absent when none)
 }
 
-export interface CorpusNoteDoc {
+/** With its effective protection (`secure`, `locked`) from the same read as the body (corpus.rs NoteDoc). */
+export interface CorpusNoteDoc extends Pick<NoteSummary, "secure" | "locked"> {
   id: string;
   folderId: string;
   /** Physical folder containing the file (for Brain location/reveal). */

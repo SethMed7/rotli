@@ -1,0 +1,87 @@
+{
+  "about": "The editor's write lane, as Rust's corpus implements it (CorpusStore::write_if_revision_with_body_base). Run by src-tauri/src/corpus_write_lane_tests.rs against the real store and by src/editor/writeLane.test.ts against the test fake, so the fake can't drift from Rust (sixth review of pull request 267). A revision names the complete file, frontmatter included; `base` is the editor body the write was typed against.",
+  "scenarios": [
+    {
+      "name": "a write on the current revision lands and returns the landed file's revision",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0", "body": "# Plan\n\nfirst" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nsecond", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok", "as": "w1" },
+        { "op": "read", "note": "n", "body": "# Plan\n\nsecond", "revisionIs": "w1" }
+      ]
+    },
+    {
+      "name": "a stale revision whose body changed is refused, and the file is untouched",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "external", "note": "n", "body": "# Plan\n\nfrom another app" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nmine", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "conflict" },
+        { "op": "read", "note": "n", "body": "# Plan\n\nfrom another app" }
+      ]
+    },
+    {
+      "name": "a stale revision lands when only metadata changed, and the metadata is kept",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "pin", "note": "n" },
+        { "op": "read", "note": "n", "revisionNot": "r0", "body": "# Plan\n\nfirst" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nmine", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok" },
+        { "op": "read", "note": "n", "body": "# Plan\n\nmine", "pinned": true }
+      ]
+    },
+    {
+      "name": "a second write on the first write's base is refused once the first landed",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nA", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nA and B", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "conflict" },
+        { "op": "read", "note": "n", "body": "# Plan\n\nA" }
+      ]
+    },
+    {
+      "name": "a stale write lands when the current body happens to equal its base (why a late write must be re-checked)",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nchanged", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok", "as": "w1" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nfirst", "revision": "w1", "base": "# Plan\n\nchanged", "expect": "ok" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nlate", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok" },
+        { "op": "read", "note": "n", "body": "# Plan\n\nlate" }
+      ]
+    },
+    {
+      "name": "a retitle and a move keep the note's identity, and a write on the moved note's old revision lands",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "write", "note": "n", "body": "# Renamed plan\n\nfirst", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "ok", "as": "w1" },
+        { "op": "move", "note": "n", "folder": "Archive" },
+        { "op": "write", "note": "n", "body": "# Renamed plan\n\nmoved and edited", "revision": "w1", "base": "# Renamed plan\n\nfirst", "expect": "ok" },
+        { "op": "read", "note": "n", "body": "# Renamed plan\n\nmoved and edited" }
+      ]
+    },
+    {
+      "name": "a purged note's write fails as not found",
+      "steps": [
+        { "op": "create", "note": "n", "body": "# Plan\n\nfirst" },
+        { "op": "read", "note": "n", "as": "r0" },
+        { "op": "purge", "note": "n" },
+        { "op": "write", "note": "n", "body": "# Plan\n\nmine", "revision": "r0", "base": "# Plan\n\nfirst", "expect": "missing" },
+        { "op": "read", "note": "n", "missing": true }
+      ]
+    },
+    {
+      "name": "a read returns the note's protection with its body",
+      "steps": [
+        { "op": "create", "note": "s", "body": "# Ledger\n\nprivate", "secure": true },
+        { "op": "read", "note": "s", "secure": true, "locked": false },
+        { "op": "create", "note": "p", "body": "# Plain\n\nwords" },
+        { "op": "lock", "note": "p" },
+        { "op": "read", "note": "p", "secure": false, "locked": true }
+      ]
+    }
+  ]
+}
