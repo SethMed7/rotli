@@ -48,21 +48,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A conversation that used something only an on-device model may read
   stays on-device.** An on-device Librarian could read a secure person's
   name and say it; switched to a remote model, the next message carried that
-  reply to it. Now, once anything the read check passed only for an
-  on-device model goes into a Librarian conversation, sending it to a remote
-  model is refused, with nothing sent: "This conversation includes notes
-  only an on-device model can read. Start a new one to use …", and one
-  button starts the new one. "Open in Chat" carries the same mark into the
-  chat it opens, and a chat marks itself the same way whenever any of its
-  reads was on-device only. Nothing from such a conversation is written
-  where a remote model could read it: a chat's conversation notes go only
-  into a secure note (the attached note when it's secure, or a new secure
-  one), and otherwise aren't saved, with one line saying so; the chat's note
-  button makes a secure note; the chat's own file, title included, is kept
-  from remote models; and a marked Librarian conversation writes nothing at
-  all (no rules, People notes or proposals) and says so. A note that was
-  public when it was read and is made secure later isn't taken back out of a
-  conversation.
+  reply to it. Secure People are now left out of what the Librarian sees,
+  on-device or remote. Once anything else the read check passed only for an
+  on-device model goes into a Librarian conversation (the note it was asked
+  about), sending it to a remote model is refused, with nothing sent: "This
+  conversation includes notes only an on-device model can read. Start a new
+  one to use …", and one button starts the new one. "Open in Chat" carries
+  the same mark into the chat it opens, and a chat marks itself the same way
+  whenever any of its reads was on-device only.
+- **Nothing from such a conversation is written where a remote model could
+  read it.** A message's protection is settled when it's sent and read, and
+  every write it leads to goes by it, so closing or replacing the
+  conversation while a reply is on its way no longer lets that reply write
+  unprotected. A chat's conversation notes go only into a secure note (the
+  attached note when it's secure, or a new secure one), also when a note
+  turned secure after the message was sent, and otherwise aren't saved, with
+  one line saying so. The chat's note button makes a secure note; the chat's
+  own file, title included, is kept from remote models; and a marked
+  Librarian reply writes nothing (no rules, People notes or proposals), says
+  so, and offers a new conversation. A note that was public when it was
+  read and is made secure later isn't taken back out of a conversation.
 - **A model is sent a note as you last saved it.** The Librarian could
   answer about the version before your last few keystrokes while that save
   was still on its way, and a passage you had just highlighted silently
@@ -143,16 +148,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Typing while a save is on its way is no longer lost.** If you kept
   typing while Rotli was still saving the note (a slow disk, or switching
-  away, closing the tab or quitting right after a pause), the second save
-  could be refused, and the note then looked saved with your last words
-  missing from the file, and Rotli quit without asking. This happens in
-  1.9.1 and earlier. Rotli now saves a note one write at a time: a later
-  save waits for the one in progress, then saves your newest words. A note
-  counts as saved only when the file holds your last change. A save that
-  fails keeps the note marked unsaved, shows why, keeps your words in
-  Rotli's recovery copy and tries again. Closing the tab and quitting wait
-  for the save; a quit that would lose words doesn't happen, and if a save
-  takes longer than 15 seconds Rotli stays open and says so.
+  away or quitting right after a pause), the second save could be refused,
+  and the note then looked saved with your last words missing from the file,
+  and Rotli quit without asking. This happens in 1.9.1, and in 1.8.0, the
+  oldest release checked. Rotli now saves a note one write at a time: a
+  later save waits for the one in progress, then saves your newest words, and
+  a note counts as saved only when the file holds your last change. A save
+  that fails keeps the note marked unsaved, shows why, keeps your words in
+  the note (on Rotli Web also in its recovery copy, for the next visit) and
+  tries again. Closing a tab starts its save right after the tab closes, and
+  the words stay in memory until the save lands. Quitting waits for every
+  save; when one can't finish, Rotli stays open and names the note and what
+  is still outstanding.
+- **Words typed while Rotli copies aside a conflict are kept.** When another
+  app changed a note you had unsaved edits in, quitting keeps your version as
+  a copy beside it. Anything typed while that copy was being made was
+  dropped, and the note looked saved. It's now part of the note's saves: the
+  newer words are kept and copied too. This happens in 1.9.1.
+- **A save that never finishes no longer holds the note, or quit.** A disk
+  that stopped answering left every later save of that note waiting, and
+  every quit ran into its 15-second limit. After 8 seconds the note now says
+  which note didn't finish saving and keeps your words; the next try first
+  checks whether the stalled save reached the disk. If that save arrives
+  late, your newest words still win.
+- **A note deleted while it had unsaved words asks what to do.** Its saves
+  failed with no way out, and Rotli couldn't quit. A notice in the sidebar
+  now offers to keep the words as a new note in your Inbox (secure when the
+  deleted note was) or to discard them; either lets Rotli quit. This happens
+  in 1.9.1.
+- **A secure note's conflict copy stays secure on the Mac.** The copy Rotli
+  keeps of your version when another app changed the note was created as an
+  ordinary note, because the Mac's note read didn't say the note was secure.
+  The read now returns a note's protection with its words. This happens in
+  1.9.1.
+- **A protected chat saved with Windows line endings stays protected.** A
+  chat marked as holding secure-note content lost that mark when another
+  editor saved it with Windows line endings, so a remote model could continue
+  it, and Rotli couldn't mark such a chat. Every reader and writer of a chat
+  file's marks now reads both line endings, and a mark it can't read counts
+  as set. This happens in 1.9.1.
 - **Two notes saved with the same name at the same moment both survive.**
   Rotli used to let the later one replace the earlier when two agents (or an
   agent and the app) picked the same file name at once.
