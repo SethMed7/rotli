@@ -17,6 +17,7 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import { promptOf } from "../lib/promptText.fixtures";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import { inSecureHome } from "../security/secureNotes";
@@ -306,7 +307,7 @@ describe("frontier process controls", () => {
       reasoningEffort: "high",
       serviceTier: "fast",
     }).complete({
-      messages: [{ role: "user", content: "Explain the boundary" }],
+      messages: [{ role: "user", content: promptOf("Explain the boundary") }],
     });
     expect(cliRequests).toHaveLength(1);
     expect(cliRequests[0]).toMatchObject({
@@ -320,7 +321,7 @@ describe("frontier process controls", () => {
 describe("SECURE is a visibility control against remote", () => {
   test("a frontier run receives no secure hit from search — the open note only", async () => {
     const hits = await makeTauriHost(FRONTIER).searchNotes("kelpie", 10);
-    const ids = hits.map((h) => h.id);
+    const ids: string[] = hits.map((h) => h.id);
     expect(ids).not.toContain("n-secure");
     expect(ids).toContain("n-open");
     // and nothing in what it got quotes the secure body
@@ -328,7 +329,7 @@ describe("SECURE is a visibility control against remote", () => {
   });
 
   test("an on-device run receives the same secure hit", async () => {
-    const ids = (await makeTauriHost(LOCAL).searchNotes("kelpie", 10)).map((h) => h.id);
+    const ids: string[] = (await makeTauriHost(LOCAL).searchNotes("kelpie", 10)).map((h) => h.id);
     expect(ids).toContain("n-secure");
   });
 
@@ -368,7 +369,7 @@ describe("SECURE is a visibility control against remote", () => {
 describe("the brain's memory lanes are retrievable by BOTH classes", () => {
   test("search reaches identity/ and personality/ for a frontier and an on-device model", async () => {
     for (const model of [LOCAL, FRONTIER]) {
-      const ids = (await makeTauriHost(model).searchNotes("quokkanaut", 10)).map((h) => h.id);
+      const ids: string[] = (await makeTauriHost(model).searchNotes("quokkanaut", 10)).map((h) => h.id);
       expect(ids).toContain("identity/00-identity.md");
     }
   });

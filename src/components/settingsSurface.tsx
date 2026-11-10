@@ -53,6 +53,7 @@ import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
+import { personText } from "../lib/promptText";
 import {
   type ChatModelInfo,
   type MemexValidateReport,
@@ -2646,7 +2647,11 @@ function ModelsPane() {
     }
     setSuggesting(true);
     setGenNote(null);
-    suggestPresets(makeTauriHost(def), available, usage.trim() || "general note-taking and research")
+    suggestPresets(
+      makeTauriHost(def),
+      available,
+      personText(usage.trim() || "general note-taking and research"),
+    )
       .then((out) => {
         setSuggestions(out);
         if (out.length === 0)

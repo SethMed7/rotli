@@ -52,6 +52,7 @@ import { claudeSession } from "../../lib/claudeSession";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { extOf, fileName, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
+import { type ApprovedText, modelText, personText } from "../../lib/promptText";
 import {
   type LocalQueueEntry,
   chatModels,
@@ -190,6 +191,10 @@ interface Msg {
   images?: string[];
   artifacts?: ChatArtifact[];
 }
+
+/** A turn's words as what they are: the person's, or a model's reply. */
+const said = (m: { speaker: string; text: string }) =>
+  m.speaker === "you" ? personText(m.text) : modelText(m.text);
 
 /** Parse a chat .md's `## Messages` block back into bubbles — rotli writes the
  * `**speaker** · date — text` shape (contract.ts), so this round-trips its own. */
@@ -1618,7 +1623,7 @@ export function ChatSurface({
     // history = the prior turns; the new user message rides as runAgent's userText
     const history: ChatTurn[] = prior.map((m) => ({
       role: m.speaker === "you" ? "user" : "assistant",
-      text: m.text,
+      text: said(m),
     }));
     setMessages((p) => [
       ...p,
@@ -1725,7 +1730,7 @@ export function ChatSurface({
     const userName = useUiStore.getState().userName.trim();
     const runInput: RunInput = {
       history,
-      userText: providerUserText,
+      userText: personText(providerUserText),
       web: webForTurn({
         secure: attachedSecure || secureChat,
         onDevice: modelIsOnDevice(turnModel),
@@ -1745,7 +1750,7 @@ export function ChatSurface({
       // the board tool is local conversion — offered whenever the desktop
       // bridge exists (the host re-checks the secure taint at call time)
       ...(isTauri() ? { boardTool: true } : {}),
-      ...(userName ? { userName } : {}),
+      ...(userName ? { userName: personText(userName) } : {}),
     };
 
     // a preset pick routes through the hybrid layer; everything else is the
@@ -1897,14 +1902,16 @@ export function ChatSurface({
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
     // a failed exchange (the ⚠ notice AND the turn it answered) never reaches
     // the notes model — a replayed safeguard error re-trips the safeguard
-    const memoryTurns = withoutFailedExchanges([...prior, ...turn], (m) => m.speaker === "rotli");
+    const memoryTurns = withoutFailedExchanges([...prior, ...turn], (m) => m.speaker === "rotli").map(
+      (m) => ({ speaker: m.speaker, text: said(m) }),
+    );
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)
     const composeNotes =
       turnModel.api === "preset"
         ? undefined
-        : (context: { turns: readonly MemoryTurn[]; currentNotes: string | null }) =>
+        : (context: { turns: readonly MemoryTurn[]; currentNotes: ApprovedText | null }) =>
             makeTauriHost(turnModel, {}).complete({
               messages: [
                 {

@@ -15,10 +15,11 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import { type FolderRoles, folderRoles } from "../services/destinations";
-import type { SearchHit, WelcomeSeed } from "../types";
+import type { SearchHit, SkippedFile, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import type { FrontmatterView } from "./corpusFrontmatter";
+import type { PromptText } from "./promptText";
 export type { FrontmatterView } from "./corpusFrontmatter";
 import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
@@ -326,6 +327,7 @@ export interface CorpusBoardDoc {
 export interface CorpusListPayload {
   folders: CorpusFolder[];
   notes: CorpusNoteMeta[];
+  skipped?: SkippedFile[]; // files the walk left out (absent when none)
 }
 
 export interface CorpusNoteDoc {
@@ -523,7 +525,7 @@ export function chatModels(): Promise<ChatModelInfo[]> {
  * `data:` URL) and only ride the vision/openai path. */
 export interface ChatWireMsg {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: PromptText; // only PromptText (lib/promptText.ts) reaches a model
   images?: string[];
 }
 
@@ -649,7 +651,7 @@ export function cliComplete(args: {
   requestId: string;
   provider: string;
   model: string;
-  prompt: string;
+  prompt: PromptText; // only PromptText (lib/promptText.ts) reaches a model
   timeoutMs?: number;
   /** Provider-native frontier quality control. Rust validates the allowlist. */
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";

@@ -127,6 +127,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "agentBridge.ts": "the agent bridge's webview side: an admitted agent request in, the window's answer out",
   "aiFiles.ts": "the AI's Word-document lane: create (recorded as AI-made) and edit only those",
   "aiInsert.ts": "the /ai insert lane: an accepted passage added through corpus_insert_ai",
+  "aiListings.ts":
+    "the AI's file and Librarian listings, gated in Rust (corpus_files_ai, corpus_librarian_ai)",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",

@@ -4,11 +4,12 @@
 // file is host-agnostic and liftable into the shared ~/.memex/ai client layer.
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
-import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
+import { memoryKeywords, mergeKeywordHits } from "../chatMemory/retrieval";
 import { documentImageFromBase64 } from "../documents/images";
 import type { DocumentImage } from "../documents/model";
 import { extOf, fileName } from "../lib/fileKind";
 import { corpusSetAiEdit } from "../lib/noteProtection";
+import { externalText, fixed, modelText, prompt } from "../lib/promptText";
 import {
   type ChatModelInfo,
   chatMessages,
@@ -17,18 +18,12 @@ import {
   corpusFrontmatter,
   corpusCreateManagedFile,
   corpusExportNotePdf,
-  corpusNotesAi,
-  corpusReadAi,
-  corpusReadAiVersioned,
-  corpusSearchAi,
   corpusWriteAi,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
-import { hasSecureContext } from "../memex/contract";
-import { buildModelMap } from "../memex/modelMap";
-import { listChats, loadConfig, readChat as readMemexChat } from "../memex/service";
+import { loadConfig } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import {
   createManagedDocumentWithContent,
@@ -37,13 +32,20 @@ import {
 } from "../newItems/composition";
 import { inSecureHome } from "../security/secureNotes";
 import { createRoutedNote } from "../services/createNote";
-import { titleOf } from "../services/derive";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import {
+  approvedChat,
+  approvedChatMemories,
+  approvedKnowledgeMap,
+  approvedNote,
+  approvedNoteRows,
+  approvedSearch,
+} from "./approvedRead";
 import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { askToEdit, type EditAnswer, type EditRequest, UNREADABLE_PROTECTION } from "./editGate";
-import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
+import { endpointIsLocal, modelIsOnDevice } from "./guard";
 import { aiFileAccessById, makeFileTools } from "./hostFiles";
 import { aiReadableHits, assertAiNoteLocation, noteLocationIsProtected } from "./hostReadGate";
 import { completeOnCli } from "./hostRemote";
@@ -60,31 +62,8 @@ import {
 } from "./tools";
 import type { Host } from "./types";
 
-/** Memory search reads only this many newest chats, so the body cache holds no more. */
-export const CHAT_MEMORY_WINDOW = 100;
-type ChatBody = { modifiedMs: number; body: string };
-const CHAT_BOUNDS = { entries: CHAT_MEMORY_WINDOW, chars: 8_000_000 };
-const chatBodyCache = new Map<string, ChatBody>();
-
-/** (Re)insert `key` as newest, then evict oldest-first until both bounds hold (Map order = recency). */
-export function touchBounded(map: Map<string, ChatBody>, key: string, value: ChatBody, max = CHAT_BOUNDS) {
-  map.delete(key);
-  map.set(key, value);
-  let chars = [...map.values()].reduce((sum, entry) => sum + entry.body.length, 0);
-  for (const [oldest, entry] of map) {
-    if (map.size <= max.entries && chars <= max.chars) return;
-    map.delete(oldest);
-    chars -= entry.body.length;
-  }
-}
-
-async function cachedChatBody(root: string, slug: string, modifiedMs: number, read: () => Promise<string>) {
-  const key = `${root}\0${slug}`;
-  const cached = chatBodyCache.get(key);
-  const body = cached?.modifiedMs === modifiedMs ? cached.body : await read();
-  touchBounded(chatBodyCache, key, { modifiedMs, body });
-  return body;
-}
+/** An error's words for the model: Rotli's own refusal text, never a note. */
+const errorText = (e: unknown) => externalText(e instanceof Error ? e.message : String(e));
 
 export type HostArtifactKind = "note" | "file" | "canvas";
 
@@ -191,8 +170,8 @@ export function makeTauriHost(
         // (docs/design/ai-visibility-matrix.md).
         const wantsFolders = folderQuery(query);
         const [hits, listed] = await Promise.all([
-          corpusSearchAi(query, limit, true, model),
-          wantsFolders ? corpusNotesAi(model) : Promise.resolve([]),
+          approvedSearch(query, limit, true, model),
+          wantsFolders ? approvedNoteRows(model) : Promise.resolve([]),
         ]);
         const found = hits.filter((hit) => hit.kind === "note");
         const byFolder = wantsFolders ? folderHits(listed, query, limit) : [];
@@ -226,7 +205,7 @@ export function makeTauriHost(
       } catch {
         // the browser twin and a search error still answer from the listing —
         // through the GATED listing, so the fallback is not a way around it
-        const ranked = rankNotes(await corpusNotesAi(model), query, limit);
+        const ranked = rankNotes(await approvedNoteRows(model), query, limit);
         const result = await aiReadableHits(ranked, model);
         await markSecureIds(result.map((hit) => hit.id));
         return result;
@@ -236,7 +215,7 @@ export function makeTauriHost(
       // Rust verifies model id + provider registration + loopback endpoint.
       // A localhost proxy for a frontier provider therefore remains remote.
       const protectedLocation = await assertAiNoteLocation(id, model);
-      const text = await corpusReadAi(id, model);
+      const { text } = await approvedNote(id, model);
       if (protectedLocation) opts?.onSecureNoteRead?.();
       if (opts?.onSecureNoteRead) {
         try {
@@ -271,7 +250,7 @@ export function makeTauriHost(
       await Promise.all([invalidateNotes(), invalidateMemex()]);
       // like every new note, it lands in Main too: under this chat's folder
       await opts?.onArtifactCreated?.({ kind: "note", id, label: title || "Note" });
-      return `created ${secure ? "SECURE " : ""}note ${id}${title ? ` ("${title}")` : ""} in the intake and in Main${
+      return prompt`created ${secure ? "SECURE " : ""}note ${externalText(id)}${title ? prompt` ("${modelText(title)}")` : prompt``} in the intake and in Main${
         secure ? " (marked secure because this chat carries secure-note content)" : ""
       } — tell the user it's there, and offer open_note to show it.`;
     },
@@ -279,7 +258,9 @@ export function makeTauriHost(
       // DOCX files do not carry note-level secure/locked metadata. Refuse a
       // tainted write instead of laundering protected prose into an open file.
       if (opts?.isSecureContext?.() === true) {
-        return "blocked: this chat carries secure-note content, and Word documents are not protected note files. Create a secure Markdown note instead.";
+        return fixed(
+          "blocked: this chat carries secure-note content, and Word documents are not protected note files. Create a secure Markdown note instead.",
+        );
       }
       const documentTitle = title.trim() || "Document";
       let images: DocumentImage[] = [];
@@ -306,7 +287,7 @@ export function makeTauriHost(
           }),
         );
       } catch (error) {
-        return `error: the generated image could not be embedded safely — ${error instanceof Error ? error.message : String(error)}. The Word document was not created.`;
+        return prompt`error: the generated image could not be embedded safely — ${errorText(error)}. The Word document was not created.`;
       }
       const item = await createManagedDocumentWithContent(documentTitle, body, {
         open: false,
@@ -315,7 +296,7 @@ export function makeTauriHost(
         ...(opts?.artifactRootId ? { rootId: opts.artifactRootId } : {}),
       });
       await opts?.onArtifactCreated?.({ kind: "file", id: item.id, label: documentTitle });
-      return `created editable Word document ${item.id} ("${documentTitle}")${images.length ? ` with ${images.length} embedded image${images.length === 1 ? "" : "s"}` : ""}. It is available in this chat's Artifacts and remains closed until the user clicks it. This is a real .docx file, not a Markdown note.`;
+      return prompt`created editable Word document ${externalText(item.id)} ("${modelText(documentTitle)}")${images.length ? prompt` with ${images.length} embedded image${images.length === 1 ? "" : "s"}` : prompt``}. It is available in this chat's Artifacts and remains closed until the user clicks it. This is a real .docx file, not a Markdown note.`;
     },
     async updateNote(id, body) {
       // EDIT rides the AI write lane (corpus_write_ai: the read gate, then the
@@ -329,11 +310,11 @@ export function makeTauriHost(
       let protectedLocation: boolean;
       try {
         protectedLocation = await assertAiNoteLocation(id, model);
-        const read = await corpusReadAiVersioned(id, model);
+        const read = await approvedNote(id, model);
         readRevision = read.revision;
-        readTitle = titleOf(stripLeadingFrontmatter(read.body)) || readTitle;
+        readTitle = read.title || readTitle;
       } catch (e) {
-        return `blocked: ${e instanceof Error ? e.message : String(e)}`;
+        return prompt`blocked: ${errorText(e)}`;
       }
       // ONE frontmatter read serves the taint marking, the LOCK check, and the
       // secure-context check below (Greptile PR #19: the second fetch doubled
@@ -345,7 +326,7 @@ export function makeTauriHost(
       const gate = await askToEdit(frontmatter, { id, title: readTitle }, opts?.confirmEdit, (note) =>
         corpusSetAiEdit(note, true),
       );
-      if (gate.block || !frontmatter) return gate.block ?? UNREADABLE_PROTECTION;
+      if (gate.block || !frontmatter) return prompt`${externalText(gate.block ?? UNREADABLE_PROTECTION)}`;
       if (opts?.onSecureNoteRead && (frontmatter.secure === true || protectedLocation)) {
         opts.onSecureNoteRead();
       }
@@ -354,28 +335,31 @@ export function makeTauriHost(
       // only edit notes that are THEMSELVES secure. (Re-evaluated AFTER the
       // taint call above, against the same one frontmatter read.)
       if (opts?.isSecureContext?.() === true && frontmatter.secure !== true && !protectedLocation) {
-        return "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.";
+        return fixed(
+          "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.",
+        );
       }
       // the model reads full file text (fences included) and often echoes the
       // CONTENT crosses (a passed-through fence would duplicate inside the body)
       const content = stripLeadingFrontmatter(body);
-      if (!content.trim()) return "error: the new body was only metadata — send the note's full content.";
+      if (!content.trim())
+        return fixed("error: the new body was only metadata — send the note's full content.");
       try {
         await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model, readRevision, gate.consented);
       } catch (e) {
-        return `blocked: ${e instanceof Error ? e.message : String(e)}`;
+        return prompt`blocked: ${errorText(e)}`;
       }
       await Promise.all([invalidateNotes(), invalidateMemex()]);
-      return `updated note ${id} — its content is replaced with your new text. If the note changed after the model read it, Rotli refuses the stale write. Tell the user what you changed.`;
+      return prompt`updated note ${modelText(id)} — its content is replaced with your new text. If the note changed after the model read it, Rotli refuses the stale write. Tell the user what you changed.`;
     },
     async openNote(id) {
       usePanesStore.getState().openNote(id);
-      return `opened note ${id} in a tab. Tell the user it's on screen.`;
+      return prompt`opened note ${modelText(id)} in a tab. Tell the user it's on screen.`;
     },
     async searchMemory(query, limit) {
       const queries = [query, ...memoryKeywords(query)].slice(0, 7);
       const noteResults = await Promise.all(
-        queries.map((part) => corpusSearchAi(part, limit, true, model).catch(() => [])),
+        queries.map((part) => approvedSearch(part, limit, true, model).catch(() => [])),
       );
       const readableNoteHits = await aiReadableHits(
         mergeKeywordHits(noteResults).filter((hit) => hit.kind === "note"),
@@ -392,24 +376,11 @@ export function makeTauriHost(
       }));
       const instance = activeInstance(await loadConfig());
       if (!instance) return noteHits.slice(0, limit);
-      const summaries = (await listChats(instance)).slice(0, CHAT_MEMORY_WINDOW);
-      const documents = await Promise.all(
-        summaries.map(async (summary) => ({
-          slug: summary.slug,
-          title: summary.title,
-          body: await cachedChatBody(instance.root, summary.slug, summary.modifiedMs, () =>
-            readMemexChat(instance, summary.slug),
-          ),
-          modifiedMs: summary.modifiedMs,
-        })),
-      );
       // A remote model never receives a secret-shaped chat, nor one whose
-      // secureContext marker says a secure note fed its transcript. The
-      // provider's Rust egress detector is the final backstop on send.
-      const safeDocuments = modelIsOnDevice(model)
-        ? documents
-        : documents.filter((document) => !looksSecret(document.body) && !hasSecureContext(document.body));
-      const chatHits = rankChatMemories(safeDocuments, query, limit).map(({ score: _score, ...hit }) => hit);
+      // secureContext marker says a secure note fed its transcript
+      // (approvedRead.ts). The provider's Rust egress detector is the final
+      // backstop on send.
+      const { hits: chatHits, protectedIds } = await approvedChatMemories(instance, model, query, limit);
       const chatQuota = Math.ceil(limit / 2);
       const selected = [...chatHits.slice(0, chatQuota), ...noteHits.slice(0, limit - chatQuota)];
       if (selected.length < limit) {
@@ -418,12 +389,7 @@ export function makeTauriHost(
       }
       const result = selected.slice(0, limit);
       await markSecureIds(result.filter((hit) => hit.source === "note").map((hit) => hit.id));
-      const protectedChats = new Set(
-        documents
-          .filter((document) => looksSecret(document.body) || hasSecureContext(document.body))
-          .map((document) => `chat:${document.slug}`),
-      );
-      if (modelIsOnDevice(model) && result.some((hit) => protectedChats.has(hit.id))) {
+      if (modelIsOnDevice(model) && result.some((hit) => protectedIds.has(hit.id))) {
         opts?.onSecureNoteRead?.();
       }
       return result;
@@ -431,19 +397,20 @@ export function makeTauriHost(
     async readMemory(id) {
       if (!id.startsWith("chat:")) {
         await assertAiNoteLocation(id, model);
-        const body = await corpusReadAi(id, model);
+        const { text } = await approvedNote(id, model);
         await markSecureIds([id]);
-        return body;
+        return text;
       }
       const instance = activeInstance(await loadConfig());
-      if (!instance) return "error: no active memory is connected.";
-      const body = await readMemexChat(instance, id.slice("chat:".length));
-      const protectedContent = looksSecret(body) || hasSecureContext(body);
-      if (!modelIsOnDevice(model) && protectedContent) {
-        return "blocked: this prior chat contains secure-tainted content and cannot be sent to a remote model.";
+      if (!instance) return fixed("error: no active memory is connected.");
+      const chat = await approvedChat(instance, id.slice("chat:".length), model);
+      if (!chat) {
+        return fixed(
+          "blocked: this prior chat contains secure-tainted content and cannot be sent to a remote model.",
+        );
       }
-      if (protectedContent) opts?.onSecureNoteRead?.();
-      return body;
+      if (chat.secure) opts?.onSecureNoteRead?.();
+      return chat.text;
     },
     readFile: files.readFile,
     editDocument: files.editDocument,
@@ -453,7 +420,15 @@ export function makeTauriHost(
           new Error("This chat carries secure-note content, so web search is disabled for this run."),
         );
       }
-      return tauriWebSearch(opts?.webSearchProvider ?? DEFAULT_WEB_SEARCH_PROVIDER, query, limit);
+      return tauriWebSearch(opts?.webSearchProvider ?? DEFAULT_WEB_SEARCH_PROVIDER, query, limit).then(
+        (hits) =>
+          hits.map((hit) => ({
+            provider: hit.provider,
+            title: externalText(hit.title),
+            url: externalText(hit.url),
+            snippet: externalText(hit.snippet),
+          })),
+      );
     },
     webFetch(url, maxChars) {
       if (opts?.isSecureContext?.() === true) {
@@ -461,17 +436,19 @@ export function makeTauriHost(
           new Error("This chat carries secure-note content, so web fetch is disabled for this run."),
         );
       }
-      return tauriWebFetch(url, maxChars);
+      return tauriWebFetch(url, maxChars).then(externalText);
     },
     async generateImage(_prompt) {
-      return "error: provider-backed image generation is unavailable; no provider account was used.";
+      return fixed("error: provider-backed image generation is unavailable; no provider account was used.");
     },
     async createArtifact(kind, title, content) {
       if (opts?.isSecureContext?.() === true) {
-        return "blocked: this chat carries secure-note content, so it cannot create an unprotected document, sheet, or PDF. Create a secure Markdown note instead.";
+        return fixed(
+          "blocked: this chat carries secure-note content, so it cannot create an unprotected document, sheet, or PDF. Create a secure Markdown note instead.",
+        );
       }
       const rootId = opts?.artifactRootId;
-      if (!rootId) return "error: file creation isn't set up for this chat.";
+      if (!rootId) return fixed("error: file creation isn't set up for this chat.");
       try {
         if (kind === "document") {
           const item = await createManagedDocumentWithContent(title, content, {
@@ -479,7 +456,7 @@ export function makeTauriHost(
             rootId,
           });
           await opts.onArtifactCreated?.({ kind: "file", id: item.id, label: title });
-          return `created editable Word document ${item.id}. It is available in this chat's Artifacts and remains closed until the user clicks it.`;
+          return prompt`created editable Word document ${externalText(item.id)}. It is available in this chat's Artifacts and remains closed until the user clicks it.`;
         }
         if (kind === "sheet") {
           const name = artifactFileName(title, "xlsx");
@@ -489,7 +466,7 @@ export function makeTauriHost(
             return corpusCreateManagedFile(name, base64, rootId);
           });
           await opts.onArtifactCreated?.({ kind: "file", id: item.id, label: title });
-          return `created editable sheet ${item.id}. It is available in this chat's Artifacts and remains closed until the user clicks it.`;
+          return prompt`created editable sheet ${externalText(item.id)}. It is available in this chat's Artifacts and remains closed until the user clicks it.`;
         }
 
         // A PDF is always derived from an editable Markdown source. The source
@@ -512,16 +489,18 @@ export function makeTauriHost(
         const pdfId = await corpusExportNotePdf(sourceId, artifactFileName(title, "pdf"), title);
         await registerPopulatedManagedItem({ id: pdfId, kind: "document" });
         await opts.onArtifactCreated?.({ kind: "file", id: pdfId, label: title });
-        return `created PDF copy ${pdfId} and kept editable Markdown source ${sourceId}. Both are available in this chat's Artifacts and remain closed until the user clicks them.`;
+        return prompt`created PDF copy ${externalText(pdfId)} and kept editable Markdown source ${externalText(sourceId)}. Both are available in this chat's Artifacts and remain closed until the user clicks them.`;
       } catch (error) {
-        return `error: the work file could not be created — ${error instanceof Error ? error.message : String(error)}`;
+        return prompt`error: the work file could not be created — ${errorText(error)}`;
       }
     },
     async drawBoard(title, mermaid) {
       // the create_note taint law's BOARD twin: boards are never secure-gated
       // files, so a secure-context chat may not launder its prose into one
       if (opts?.isSecureContext?.() === true) {
-        return "blocked: this chat carries secure-note content, and boards are not protected files — put the diagram in a secure note (as a ```mermaid fence) instead.";
+        return fixed(
+          "blocked: this chat carries secure-note content, and boards are not protected files — put the diagram in a secure note (as a ```mermaid fence) instead.",
+        );
       }
       try {
         // mermaid is the wire format on purpose (local models write it far more
@@ -533,9 +512,9 @@ export function makeTauriHost(
         });
         await opts?.onArtifactCreated?.({ kind: "canvas", id: boardId, label: title || "Diagram" });
         await Promise.all([invalidateNotes(), invalidateMemex()]);
-        return `created the board${title ? ` "${title}"` : ""} from your diagram. It is available in this chat's Artifacts and remains closed until the user clicks it — a fully editable visual copy.`;
+        return prompt`created the board${title ? prompt` "${modelText(title)}"` : prompt``} from your diagram. It is available in this chat's Artifacts and remains closed until the user clicks it — a fully editable visual copy.`;
       } catch (e) {
-        return `error: the diagram didn't convert — ${e instanceof Error ? e.message : String(e)}. Keep to a simple flowchart (named nodes, arrows, short labels) and try ONCE more; if it fails again, give the user the \`\`\`mermaid fence in your final answer instead.`;
+        return prompt`error: the diagram didn't convert — ${errorText(e)}. Keep to a simple flowchart (named nodes, arrows, short labels) and try ONCE more; if it fails again, give the user the \`\`\`mermaid fence in your final answer instead.`;
       }
     },
     async knowledgeMap(maxChars) {
@@ -549,14 +528,16 @@ export function makeTauriHost(
       // same ids through `corpus_readable_ids` — pure duplication on THIS path.
       // (The SEARCH lane still probes: it unions folder-name hits the listing gate
       // never saw, so those need their own read check.) (perf audit, 2026-08)
-      const listed = await corpusNotesAi(model);
-      const readable = modelIsOnDevice(model)
-        ? listed
-        : listed.filter(
-            (note) => ![note.id, note.folderId, note.diskFolderId].some((path) => path && inSecureHome(path)),
-          );
-      await markSecureIds(readable.map((note) => note.id));
-      return buildModelMap(readable, contextWindowFor(model), maxChars);
+      const { map, ids } = await approvedKnowledgeMap(
+        model,
+        contextWindowFor(model),
+        maxChars,
+        (note) =>
+          modelIsOnDevice(model) ||
+          ![note.id, note.folderId, note.diskFolderId].some((path) => path && inSecureHome(path)),
+      );
+      await markSecureIds(ids);
+      return prompt`${map}`;
     },
   };
 

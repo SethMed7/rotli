@@ -1,4 +1,6 @@
+import { type ApprovedNote, approvedNote } from "../ai/approvedRead";
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
+import { reshape } from "../lib/promptText";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { noteSlugify } from "../memex/contract";
@@ -17,6 +19,7 @@ import { inboxFolderId, notesService } from "../services/notes";
 import {
   type AttachedNoteCandidate,
   attachedNoteMatches,
+  extractChatNotes,
   type MemoryTurn,
   pickChatNote,
   pickMemoryNote,
@@ -103,7 +106,47 @@ export function chatNoteListingFolder(scope: ChatNoteScope): string | undefined 
   return scope.kind === "brain" ? scope.root : undefined;
 }
 
+/** Why a memory sync stopped: the note can't be read for the chat's model
+ * any more (it turned secure mid-turn, or was locked or removed). */
+export const MEMORY_NOTE_WITHHELD =
+  "This chat’s note can’t be read for this model any more, so its conversation notes weren’t sent or updated.";
+
+type Reader = Pick<ChatModelInfo, "id" | "endpoint">;
+/** No model: the read is judged as a remote one, the fail-closed direction. */
+const NO_MODEL: Reader = { id: "", endpoint: "" };
+
+/** A chat's note as the gated, versioned read for `reader` returns it: the
+ * body and revision a write builds on, and the notes section a model is given,
+ * all from that one read (third review of pull request 267, #3: both memory
+ * paths read the note through the editor's ungated lane, so a note that turned
+ * secure mid-turn had its notes sent to a remote model). Throws
+ * MEMORY_NOTE_WITHHELD when the gate refuses. */
+export async function memoryNoteFor(
+  id: string,
+  stem: string,
+  aiEditable: boolean,
+  reader: Reader,
+  read: (id: string, reader: Reader) => Promise<ApprovedNote> = approvedNote,
+): Promise<ChatMemoryNote> {
+  let note: ApprovedNote;
+  try {
+    note = await read(id, reader);
+  } catch {
+    throw new Error(MEMORY_NOTE_WITHHELD);
+  }
+  const notes = reshape(note.body, (body) => extractChatNotes(body) ?? "");
+  return {
+    id,
+    stem,
+    body: note.body,
+    revision: note.revision,
+    notes: notes === "" ? null : notes,
+    aiEditable,
+  };
+}
+
 export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote | null> {
+  const reader = input.model ?? NO_MODEL;
   const listingFolder = chatNoteListingFolder(chatNoteScope(input.instance));
   const attachedStem =
     input.attachedStem ||
@@ -123,10 +166,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
         summaries.filter((note) => !isChatsPath(note.folderId)),
       );
       if (!id) return null;
-      const note = await notesService.getNote(id);
-      return note
-        ? { id, stem, body: note.body, revision: note.revision, aiEditable: await aiEditable(id) }
-        : null;
+      return memoryNoteFor(id, stem, await aiEditable(id), reader);
     },
     async findMemoryNote(): Promise<ChatMemoryNote | null> {
       const stem = await readChatMemoryNoteStem(input.instance, input.chatSlug).catch(() => null);
@@ -146,10 +186,9 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
         })),
       );
       const id = pickMemoryNote(matches);
-      const note = id ? await notesService.getNote(id) : null;
-      if (!id || !note) return null;
+      if (!id) return null;
       const verdict = matches.find((match) => match.id === id)?.verdict;
-      return { id, stem, body: note.body, revision: note.revision, aiEditable: verdict === "allowed" };
+      return memoryNoteFor(id, stem, verdict === "allowed", reader);
     },
     setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
     async create(body: string): Promise<ChatMemoryNote> {
@@ -164,6 +203,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
           stem: note.aliases?.[0] || noteSlugify(titleOf(body)) || "note",
           body,
           revision: note.revision,
+          notes: null,
           aiEditable: true,
         };
       }
@@ -174,7 +214,7 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       const { id, stem } = await createChatNote(input.instance, body, "chat");
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
-      return { id, stem, body, revision: note.revision, aiEditable: true };
+      return { id, stem, body, revision: note.revision, notes: null, aiEditable: true };
     },
     // one gated write on both platforms: Rust on the Mac, the web AI corpus's
     // twin of it in Rotli Web (webAiCorpus.write)

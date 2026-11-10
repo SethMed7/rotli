@@ -13,8 +13,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { ModelPicker } from "../components/chat/chatModelPicker";
 import { parseAnchors, resolveAnchor } from "../lib/librarianActions";
+import { personText } from "../lib/promptText";
 import { corpusFrontmatter, isTauri } from "../lib/tauri";
-import { useFolders } from "../services/hooks";
 import { librarianRefusal } from "../services/librarianBar";
 import {
   closeLibrarianBar,
@@ -30,7 +30,6 @@ import {
   useEscapeCloses,
   clip,
   librarianContext,
-  libraryAreas,
   noteTitle,
   onEscapeHere,
   sendToLibrarian,
@@ -42,7 +41,6 @@ type Phase = { kind: "checking" } | { kind: "refused"; message: string } | { kin
 
 export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: string }) {
   const librarianOn = useUiStore((s) => s.brainEnabled);
-  const folders = useFolders();
   const { groups, models, preferred } = useLibrarianModels();
   const [picked, setPicked] = useState<string | null>(null);
   const model = models.find((m) => m.id === (picked ?? preferred)) ?? models[0] ?? null;
@@ -114,12 +112,11 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
         minimized: false,
       });
     }
-    const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
     void sendToLibrarian(
       chatId,
-      { text, highlight: passage.anchor() },
+      { text: personText(text), highlight: passage.anchor() },
       model,
-      (model) => librarianContext(noteId, paneId, areas, model),
+      (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
     );
   };

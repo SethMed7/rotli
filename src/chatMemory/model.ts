@@ -1,4 +1,14 @@
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import {
+  type ApprovedText,
+  type ModelText,
+  type PersonText,
+  type PromptText,
+  fixed,
+  joinPrompt,
+  prompt,
+  reshape,
+} from "../lib/promptText";
 
 /** The managed section is a plain HEADING now — HTML comment markers rendered
  * as literal cruft in the editor and the note read like a machine's transcript
@@ -10,7 +20,8 @@ export const CHAT_MEMORY_END = "<!-- rotli:chat-memory:end -->";
 
 export interface MemoryTurn {
   speaker: string;
-  text: string;
+  /** What the person typed ("you"), or what the chat's model replied. */
+  text: PersonText | ModelText;
 }
 
 const MAX_MEMORY_TURNS = 24;
@@ -38,30 +49,37 @@ export function fallbackChatNotes(turns: readonly MemoryTurn[]): string {
 
 /** The instruction for the model that maintains the notes. Pure so evals can
  * pin it. The notes are DATA about the chat, rewritten whole each turn. */
-export function buildChatNotesPrompt(currentNotes: string | null, turns: readonly MemoryTurn[]): string {
-  const transcript = turns
-    .slice(-MAX_MEMORY_TURNS)
-    .map(
-      (turn) => `${turn.speaker.toLowerCase() === "you" ? "User" : "Assistant"}: ${compactText(turn.text)}`,
-    )
-    .join("\n");
-  return [
-    "You maintain the running notes for a conversation, like a sharp colleague taking notes in a meeting.",
-    "Rewrite the FULL notes so they cover the whole conversation so far.",
-    "Rules:",
-    '- Markdown only: optional short "### " topic headers and "- " bullets.',
-    "- Capture what was discussed, decisions made, facts worth keeping, action items, and open questions.",
-    "- Never write a transcript and never use speaker labels.",
-    "- No preamble, no title, no headings larger than ###. At most about 250 words.",
-    "",
-    "Current notes:",
-    currentNotes?.trim() || "(none yet)",
-    "",
-    "Conversation so far (newest last):",
-    transcript,
-    "",
-    "Reply with ONLY the new notes markdown.",
-  ].join("\n");
+export function buildChatNotesPrompt(
+  currentNotes: ApprovedText | null,
+  turns: readonly MemoryTurn[],
+): PromptText {
+  const transcript = joinPrompt(
+    turns
+      .slice(-MAX_MEMORY_TURNS)
+      .map((turn) =>
+        turn.speaker.toLowerCase() === "you"
+          ? prompt`User: ${reshape(turn.text, compactText)}`
+          : prompt`Assistant: ${reshape(turn.text, compactText)}`,
+      ),
+    "\n",
+  );
+  const notes =
+    currentNotes && currentNotes.trim() ? reshape(currentNotes, (text) => text.trim()) : fixed("(none yet)");
+  return prompt`You maintain the running notes for a conversation, like a sharp colleague taking notes in a meeting.
+Rewrite the FULL notes so they cover the whole conversation so far.
+Rules:
+- Markdown only: optional short "### " topic headers and "- " bullets.
+- Capture what was discussed, decisions made, facts worth keeping, action items, and open questions.
+- Never write a transcript and never use speaker labels.
+- No preamble, no title, no headings larger than ###. At most about 250 words.
+
+Current notes:
+${notes}
+
+Conversation so far (newest last):
+${transcript}
+
+Reply with ONLY the new notes markdown.`;
 }
 
 /** Normalize model-written notes: unwrap a fence, demote big headings so the

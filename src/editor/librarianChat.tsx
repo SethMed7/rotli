@@ -22,7 +22,7 @@ import {
   describeLibrarianAction,
   type LibrarianAction,
 } from "../lib/librarianActions";
-import { useFolders } from "../services/hooks";
+import { personText } from "../lib/promptText";
 import { type applyLibrarian, LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import {
   type ChatTurn,
@@ -44,7 +44,6 @@ import {
   clip,
   type HostFor,
   librarianContext,
-  libraryAreas,
   noteTitle,
   onEscapeHere,
   refusalNow,
@@ -137,7 +136,6 @@ export function ChatPanel({
   const refusal = useRefusal(noteId, paneId, chat.turns.length);
   // undefined while the check runs: nothing is sendable until it is known
   const blocked = refusal !== null;
-  const folders = useFolders();
   const { groups, models } = useLibrarianModels();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
@@ -161,12 +159,11 @@ export function ChatPanel({
     const text = typed.trim();
     if (!text || !model || thinking || blocked) return;
     if (typed === draft) setDraft("");
-    const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
     void sendToLibrarian(
       chat.id,
-      { text, highlight: passage.anchor() },
+      { text: personText(text), highlight: passage.anchor() },
       model,
-      (model) => librarianContext(noteId, paneId, areas, model),
+      (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
       hostFor,
     );

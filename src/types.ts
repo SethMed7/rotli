@@ -66,6 +66,15 @@ export interface Note extends NoteSummary {
   revision: string;
 }
 
+/** A file a listing left out, and why (Rust `SkippedFile`; the Helper's
+ * walk). A hard-linked file may be a file outside the vault, so Rotli never
+ * opens one, and says so (third review of pull request 267). */
+export interface SkippedFile {
+  /** Relative to the vault (root-prefixed in a connected vault). */
+  path: string;
+  reason: "hardLink";
+}
+
 /** One FULL-TEXT search hit — the corpus_search wire shape (Rust SearchHit,
  * camelCase) and the browser twin's output. rank 0 = title hit (matchStart/
  * matchLen index the TITLE; snippet is the stored list snippet), rank 1 = body

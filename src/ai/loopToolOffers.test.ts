@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { person, promptOf } from "../lib/promptText.fixtures";
 import { allowedTools } from "./loop";
 import { renderNativeSystem } from "./nativePrompt";
 import { frontierAdapter, gemmaAdapter } from "./prompt";
@@ -40,9 +41,9 @@ test("built prompts name only tools in their offered registry", () => {
           const offeredTools = allowedTools(input, adapter.webStrategy, platform);
           const prompt = adapter.renderPrompt({
             web,
-            knowledge: "",
+            knowledge: promptOf(""),
             history: [],
-            userText: "hi",
+            userText: person("hi"),
             scratch: [],
             maxSteps: 4,
             documentTool: extras,
@@ -58,7 +59,7 @@ test("built prompts name only tools in their offered registry", () => {
           const nativePrompt = renderNativeSystem({
             offeredTools: nativeTools,
             web,
-            knowledge: "",
+            knowledge: promptOf(""),
             maxSteps: 4,
           });
           const nativeNamed = names.filter((name) => new RegExp(`\\b${name}\\b`).test(nativePrompt));

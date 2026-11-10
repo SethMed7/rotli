@@ -7,22 +7,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
+import {
+  type ApprovedNote,
+  approvedLibrarianListing,
+  approvedNote,
+  approvedPeopleNotes,
+  approvedTags,
+} from "../ai/approvedRead";
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
 import { mergedModels } from "../ai/models";
 import type { Host } from "../ai/types";
 import { type Anchor, anchorFromSelection, type LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianContext } from "../lib/librarianChat";
-import { type PersonNote, type PersonSource, peopleNotes } from "../lib/librarianPeople";
 import { peopleAreas } from "../lib/librarianRules";
-import { type ChatModelInfo, chatModels, corpusNotesAi, isTauri } from "../lib/tauri";
+import { type PersonText, personText } from "../lib/promptText";
+import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
 import { type FolderRoles, folderRoles } from "../services/destinations";
 import {
   applyLibrarian,
   converseLibrarian,
-  currentTags,
   LIBRARIAN_REFUSALS,
   librarianRefusal,
 } from "../services/librarianBar";
@@ -40,6 +46,7 @@ import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
 import { settleVault } from "./librarianKeep";
+import { flushNote } from "./model";
 
 /** Escape inside the bar or the chat (not in the portaled model picker, whose
  * own Escape closes only its list): claim it and run `then`. */
@@ -73,18 +80,20 @@ export function noteTitle(doc: string): string {
 
 /** The Library's areas: the top-level folders under wiki/, minus its lanes.
  * In a copy (a role map), the person's own top-level folders, minus the inbox
- * and Rotli's folders (librarian_map.rs owns the full rule; Rust enforces it). */
-export function libraryAreas(
-  folderIds: readonly string[],
+ * and Rotli's folders (librarian_map.rs owns the full rule; Rust enforces it).
+ * Generic so an approved folder id stays approved: an area is an id or the
+ * part of one after `wiki/`. */
+export function libraryAreas<T extends string>(
+  folderIds: readonly T[],
   roles: FolderRoles | null = folderRoles(),
-): string[] {
+): T[] {
   if (roles) {
     const rotli = [roles.inbox, roles.archive, roles.trash, roles.chats, roles.storage];
     return folderIds.filter((id) => !id.includes("/") && !id.startsWith(".") && !rotli.includes(id));
   }
   return folderIds
-    .map((id) => /^wiki\/([^/]+)$/.exec(id)?.[1])
-    .filter((name): name is string => !!name && !name.startsWith("_"));
+    .filter((id) => /^wiki\/[^/]+$/.test(id) && !id.startsWith("wiki/_"))
+    .map((id) => id.slice("wiki/".length) as T);
 }
 
 /** The models the person has connected (grouped the way the chat's picker
@@ -108,19 +117,6 @@ export function useLibrarianModels() {
       ? (groups.local.find((m) => m.localDefault) ?? groups.local[0])?.id
       : librarianModelFor(organizerModel, organizerModelId, providerDefaults, lanes.lanes);
   return { groups, models, preferred };
-}
-
-/** The people the vault already has notes for (what a statement is checked
- * against, so someone known is asked about rather than added twice), from the
- * gated AI listing for the model that will read them, on every send. Never the
- * UI's note index: in the Mac app it carries no secure flag and can be stale,
- * so a secure People note's title reached the prompt (second review of pull
- * request 267). */
-export async function knownPeople(
-  model: ChatModelInfo,
-  listing: (model: ChatModelInfo) => Promise<readonly PersonSource[]> = corpusNotesAi,
-): Promise<PersonNote[]> {
-  return peopleNotes(await listing(model));
 }
 
 export interface Passage {
@@ -160,25 +156,42 @@ export function usePassage(paneId: string, paint = true): Passage {
   };
 }
 
-/** The note as it is right now, for a turn. */
+/** What a turn's context is read through: the gated reads for the
+ * Librarian's model (ai/approvedRead.ts). Injected for tests. */
+export interface LibrarianReads {
+  note: (noteId: string, model: ChatModelInfo) => Promise<ApprovedNote>;
+  listing: typeof approvedLibrarianListing;
+  flush: (noteId: string) => Promise<void>;
+}
+
+const LIVE_READS: LibrarianReads = {
+  note: approvedNote,
+  listing: approvedLibrarianListing,
+  flush: flushNote,
+};
+
+/** The note as it is right now, for a turn: saved, then read through the AI
+ * read gate for `model`, its words, title and tags from that one read. Never
+ * the editor's copy, and never the UI note index (third review of pull
+ * request 267). The areas and People notes come from the Librarian's own
+ * gated listing, which reads only People notes. */
 export async function librarianContext(
   noteId: string,
-  paneId: string,
-  areas: readonly string[],
   model: ChatModelInfo,
-  listing?: (model: ChatModelInfo) => Promise<readonly PersonSource[]>,
+  reads: LibrarianReads = LIVE_READS,
 ): Promise<LibrarianContext> {
-  const doc = editorFor(paneId)?.getSelection?.()?.doc ?? "";
+  await reads.flush(noteId);
+  const [note, listing] = await Promise.all([reads.note(noteId, model), reads.listing(model)]);
   const { rules } = useLibrarianRules.getState();
   return {
-    title: noteTitle(doc),
-    doc,
-    areas,
-    tags: await currentTags(noteId),
-    people: peopleAreas(rules),
-    filing: rules.filing,
+    title: note.title,
+    doc: note.body,
+    areas: libraryAreas(listing.folderIds),
+    tags: approvedTags(note),
+    people: peopleAreas(rules).map(personText),
+    filing: rules.filing.map(personText),
     rules,
-    known: await knownPeople(model, listing),
+    known: approvedPeopleNotes(listing.people),
   };
 }
 
@@ -206,7 +219,7 @@ const newTurnId = () => crypto.randomUUID();
  * proposes) joins after it. A chat closed meanwhile simply drops the reply. */
 export async function sendToLibrarian(
   chatId: string,
-  message: { text: string; highlight: Anchor | null },
+  message: { text: PersonText; highlight: Anchor | null },
   model: ChatModelInfo,
   context: (model: ChatModelInfo) => Promise<LibrarianContext>,
   refusal: () => Promise<string | null>,

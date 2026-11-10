@@ -6,25 +6,21 @@
 // one in a secure place refuses the whole handoff, and the rest become paths an
 // outside agent can open, missing ones named as missing.
 
+import { approvedHandoff, approvedNote } from "../ai/approvedRead";
 import { looksSecret } from "../ai/guard";
 import { refineHandoff } from "../ai/handToAiRefine";
 import { qualifiedArtifactId } from "../ai/imageLinks";
 import type { Host } from "../ai/types";
 import { resolveWikiEmbed } from "../editor/fileEmbeds";
 import { flushNote } from "../editor/model";
-import {
-  type AttachmentLink,
-  type AttachmentPlace,
-  attachmentLinks,
-  buildHandToAiPrompt,
-} from "../lib/handToAi";
+import { type AttachmentLink, type AttachmentPlace, attachmentLinks } from "../lib/handToAi";
 import { secureByName } from "../lib/librarianRules";
+import type { ApprovedText } from "../lib/promptText";
 import {
   corpusAbs,
   corpusFileStat,
   corpusFrontmatter,
   corpusNotePath,
-  corpusReadAiVersioned,
   isTauri,
   rootIdOf,
   splitRootId,
@@ -35,12 +31,11 @@ import { useLibrarianRules } from "../state/librarianRules";
 import type { Note } from "../types";
 import { imageSrcToRel } from "./imageRepair";
 import { notesService } from "./notes";
-import { createWebAiCorpus } from "./webAiCorpus";
 
 export type HandToAi =
   /** `paths`: every path the Attachments list names (found and missing); a
    * refined prompt must keep them all */
-  | { kind: "ready"; title: string; prompt: string; paths: string[] }
+  | { kind: "ready"; title: string; prompt: ApprovedText; paths: string[] }
   | { kind: "secure"; title: string }
   | { kind: "secureAttachment"; title: string }
   | { kind: "secret"; title: string }
@@ -216,15 +211,6 @@ async function placesOf(
  * Mac's local-model registry gets the remote rules. */
 const HANDOFF_READER = { id: "hand-to-ai", endpoint: "" };
 
-/** The note's words through the AI read gate, judged and returned in one
- * read: Rust's corpus_read_ai in the Mac app (its editor copy, without
- * frontmatter), the web AI corpus over the same notes on Rotli Web. */
-async function gatedBody(noteId: string): Promise<string> {
-  if (!isTauri()) return (await createWebAiCorpus(() => notesService).read(noteId)).body;
-  const read = await corpusReadAiVersioned(noteId, HANDOFF_READER, { withEditor: true });
-  return read.editor ?? read.body;
-}
-
 export async function handToAiFor(
   noteId: string,
   locate: LocateAttachment = locateAttachment,
@@ -233,14 +219,16 @@ export async function handToAiFor(
   await flushNote(noteId);
   const note = await notesService.getNote(noteId);
   if (!note) throw new Error("Rotli couldn’t find this note.");
-  const title = note.title || "Untitled";
-  if (await isSecure(note)) return { kind: "secure", title };
-  if (looksSecret(note.body)) return { kind: "secret", title };
-  // the words that leave are the words the read gate judged, in one read: an
-  // earlier read can hold an older, secure version with no secure flag (second
-  // review of pull request 267)
-  const body = await gatedBody(noteId).catch(() => null);
-  if (body === null) return { kind: "secure", title };
+  const shown = note.title || "Untitled";
+  if (await isSecure(note)) return { kind: "secure", title: shown };
+  if (looksSecret(note.body)) return { kind: "secret", title: shown };
+  // the title and words that leave are the gate's, from one read (corpus_read_ai
+  // in the Mac app, the web AI corpus on Rotli Web): an earlier read can hold
+  // an older, secure version with no secure flag (reviews of pull request 267)
+  const approved = await approvedNote(noteId, HANDOFF_READER, { browserFallback: true }).catch(() => null);
+  if (approved === null) return { kind: "secure", title: shown };
+  const title = approved.title || "Untitled";
+  const body = approved.body;
   if (looksSecret(body)) return { kind: "secret", title };
   if (!body.trim()) return { kind: "empty", title };
   const links = attachmentLinks(body);
@@ -275,7 +263,7 @@ export async function handToAiFor(
   return {
     kind: "ready",
     title,
-    prompt: buildHandToAiPrompt({ title, body: body, attachments }),
+    prompt: approvedHandoff(approved, attachments),
     paths,
   };
 }

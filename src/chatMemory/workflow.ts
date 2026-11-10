@@ -1,16 +1,15 @@
-import {
-  extractChatNotes,
-  fallbackChatNotes,
-  mergeChatMemory,
-  sanitizeChatNotes,
-  type MemoryTurn,
-} from "./model";
+import type { ApprovedText } from "../lib/promptText";
+import { fallbackChatNotes, mergeChatMemory, sanitizeChatNotes, type MemoryTurn } from "./model";
 
 export interface ChatMemoryNote {
   id: string;
   stem: string;
   body: string;
   revision: string;
+  /** Its "Conversation notes" section as the gated read for the chat's model
+   * returned it (the body and revision above come from that same read); the
+   * only part of the note a model is given. Null for a note just created. */
+  notes: ApprovedText | null;
   /** May the chat's model rewrite this note (src/lib/aiEditPolicy.ts)? */
   aiEditable: boolean;
 }
@@ -29,7 +28,7 @@ export interface ChatMemoryRepository {
  * notes from the conversation so far. Null (or a throw) falls back safely. */
 export type ComposeChatNotes = (context: {
   turns: readonly MemoryTurn[];
-  currentNotes: string | null;
+  currentNotes: ApprovedText | null;
 }) => Promise<string | null>;
 
 export interface SyncChatMemoryInput {
@@ -59,15 +58,15 @@ export async function syncChatMemory(
   // chat-made note beside it (2026-09-29). `attachedTo` stays on the person's
   // note, so the note still lists this chat.
   let separate = false;
-  let seedNotes: string | null = null;
+  let seedNotes: ApprovedText | null = null;
   if (note && !note.aiEditable) {
-    seedNotes = extractChatNotes(note.body);
+    seedNotes = note.notes;
     const own = await repository.findMemoryNote();
     if (own && !own.aiEditable) return null; // the person turned it off there too
     note = own;
     separate = !own;
   }
-  const currentNotes = note ? extractChatNotes(note.body) : seedNotes;
+  const currentNotes = note ? note.notes : seedNotes;
 
   let notes: string | null = null;
   if (input.composeNotes) {

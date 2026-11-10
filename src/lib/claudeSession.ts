@@ -5,6 +5,8 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 
+import type { PromptText } from "./promptText";
+
 /** One Rotli tool as Claude sees it (an MCP tool on the in-process server). */
 export interface NativeToolSpec {
   name: string;
@@ -20,8 +22,9 @@ export interface NativeToolCall {
 
 export interface NativeSessionReq {
   model: string;
-  systemPrompt: string;
-  userText: string;
+  /** Only `PromptText` (lib/promptText.ts) reaches a model. */
+  systemPrompt: PromptText;
+  userText: PromptText;
   tools: NativeToolSpec[];
   maxTurns: number;
   reasoningEffort?: string;
@@ -33,7 +36,7 @@ export interface NativeSessionReq {
  * text. Resolves with the final answer, rejects with the error to show. */
 export type NativeSession = (
   req: NativeSessionReq,
-  onToolCall: (call: NativeToolCall) => Promise<string>,
+  onToolCall: (call: NativeToolCall) => Promise<PromptText>,
 ) => Promise<string>;
 
 /** The desktop session for one chat turn. `requestId` is the id the composer's

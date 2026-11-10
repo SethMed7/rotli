@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import { approved } from "../lib/promptText.fixtures";
 import type { FrontmatterView } from "../lib/tauri";
 import { type InlineAiDeps, askAtCursor, insertAtCursor } from "./inlineAi";
 
@@ -28,11 +29,8 @@ function deps(over: { verdict?: AiBodyEdit; body?: string; readError?: string; r
     read: async () => {
       calls.push("read");
       if (over.readError) throw new Error(over.readError);
-      return {
-        body: `---\nid: n\n---\n\n${over.body ?? DOC}`,
-        editor: over.body ?? DOC,
-        revision: revisions.shift() ?? "r-last",
-      };
+      // the editor body the gate approved (frontmatter is not part of it)
+      return { body: approved(over.body ?? DOC), revision: revisions.shift() ?? "r-last" };
     },
     insert: async (_id, body, text, _model, revision) => {
       calls.push("insert");

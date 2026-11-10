@@ -9,6 +9,15 @@
 // caller's job — only the final answer is written to the chat file.
 
 import { LAUNCH_FEATURES, PLATFORM, type Platform } from "../lib/featurePolicy";
+import {
+  externalText,
+  fixed,
+  modelText,
+  type PromptText,
+  prompt,
+  promptJson,
+  reshape,
+} from "../lib/promptText";
 import { artifactClarification } from "./artifactIntent";
 import { type Budget, budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
@@ -52,7 +61,9 @@ const BOARD_TOOLS: ToolName[] = ["draw_board"];
 // (an image prompt ships to a remote engine exactly like a web query)
 const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
 
-export const DUPLICATE_CALL_RESULT = "(already requested above — use that result, or give your final answer)";
+export const DUPLICATE_CALL_RESULT = fixed(
+  "(already requested above — use that result, or give your final answer)",
+);
 
 /** The tools a turn may call — one rule for every transport (the JSON loop
  * here and Claude's native protocol in nativeLoop.ts). */
@@ -79,15 +90,17 @@ export function allowedTools(
 export function egressBlock(
   tool: ToolName,
   args: Record<string, unknown>,
-  knowledge: string,
+  knowledge: PromptText,
   scratch: ScratchStep[],
-): string | null {
+): PromptText | null {
   if (!EGRESS_TOOLS.includes(tool)) return null;
   const text = JSON.stringify(args);
   if (looksSecret(text))
-    return "blocked: that input looks like it contains a secret — it wasn't sent off-device.";
+    return fixed("blocked: that input looks like it contains a secret — it wasn't sent off-device.");
   if (containsPrivateDataOverlap(text, privateScratch(knowledge, scratch))) {
-    return "blocked: that off-device action repeats private text retrieved from your vault. Rephrase without private prose or perform the network action yourself.";
+    return fixed(
+      "blocked: that off-device action repeats private text retrieved from your vault. Rephrase without private prose or perform the network action yourself.",
+    );
   }
   return null;
 }
@@ -96,12 +109,12 @@ export const READING_ATTACHED = "reading the attached note…";
 
 /** The knowledge map, or "" when it can't be built — the model then runs
  * without an index rather than not at all. */
-export async function loadKnowledge(host: Host, maxChars: number): Promise<string> {
+export async function loadKnowledge(host: Host, maxChars: number): Promise<PromptText> {
   try {
     return await host.knowledgeMap(maxChars);
   } catch (e) {
     console.warn("knowledgeMap failed — the model runs without a knowledge index", e);
-    return "";
+    return prompt``;
   }
 }
 
@@ -109,13 +122,14 @@ export async function loadKnowledge(host: Host, maxChars: number): Promise<strin
  * which independently enforces local vs remote access and secure-note
  * permission before returning any bytes; a refusal becomes the step's result. */
 export async function readAttached(host: Host, noteId: string): Promise<ScratchStep> {
-  let result: string;
+  let result: PromptText;
   try {
-    result = await host.readNote(noteId);
+    result = prompt`${await host.readNote(noteId)}`;
   } catch (e) {
-    result = `error: ${errMsg(e, "couldn't read the attached note")}`;
+    result = prompt`error: ${externalText(errMsg(e, "couldn't read the attached note"))}`;
   }
-  return { action: `read_note ${JSON.stringify({ id: noteId })}`, result };
+  // the id is the chat's own attachment, not text from the note
+  return { action: prompt`read_note ${promptJson({ id: externalText(noteId) })}`, result };
 }
 
 /** Run one tool; a thrown failure becomes the result the model reads. */
@@ -124,11 +138,11 @@ export async function runToolSafely(
   tool: ToolName,
   args: Record<string, unknown>,
   budget: Budget,
-): Promise<string> {
+): Promise<PromptText> {
   try {
     return await runTool(host, tool, args, budget);
   } catch (e) {
-    return `error: ${errMsg(e, "tool failed")}`;
+    return prompt`error: ${externalText(errMsg(e, "tool failed"))}`;
   }
 }
 
@@ -202,7 +216,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   for (let step = 1; step <= maxSteps; step++) {
     yield { type: "status", text: step === 1 ? "thinking…" : `thinking… (step ${step})` };
 
-    const prompt = adapter.renderPrompt({
+    const rendered = adapter.renderPrompt({
       offeredTools: allowed,
       web: input.web,
       knowledge,
@@ -223,8 +237,8 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     const imgs = input.images;
     const message =
       imgs && imgs.length > 0
-        ? { role: "user" as const, content: prompt, images: imgs }
-        : { role: "user" as const, content: prompt };
+        ? { role: "user" as const, content: rendered, images: imgs }
+        : { role: "user" as const, content: rendered };
 
     let raw: string;
     let extractor: FinalExtractor | null;
@@ -265,9 +279,9 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       if (groundingIssue) {
         consecutiveBad += 1;
         scratch.push({
-          action: "final answer citation check",
-          ...(parsed.thought ? { thought: parsed.thought } : {}),
-          result: `error: ${groundingIssue} Revise the final answer using only the supplied evidence. Do not call research_web again; the evidence is already available.`,
+          action: fixed("final answer citation check"),
+          ...(parsed.thought ? { thought: modelText(parsed.thought) } : {}),
+          result: prompt`error: ${externalText(groundingIssue)} Revise the final answer using only the supplied evidence. Do not call research_web again; the evidence is already available.`,
           remainingSteps: Math.max(0, maxSteps - step),
         });
         if (consecutiveBad >= 2) break;
@@ -284,14 +298,16 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       // UNPARSEABLE reply gets the JSON-shape nudge (the maintainer, 2026-06-30 — audit).
       const baseResult =
         parsed.kind === "invalid"
-          ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.`
-          : 'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.';
+          ? prompt`error: ${modelText(parsed.reason)}. Reply with ONE JSON object: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.`
+          : fixed(
+              'error: your reply was not one valid JSON object. Reply with exactly one: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.',
+            );
       const routeHint =
         sourceRoute === "external" && !researchAttempted
           ? ' This is a public/external fact question: call research_web next, not a note tool. Keep JSON strings valid; omit quotation marks inside "thought" rather than leaving them unescaped.'
           : "";
-      const result = `${baseResult}${routeHint}`;
-      scratch.push({ action: raw.slice(0, 160), result });
+      const result = prompt`${baseResult}${routeHint}`;
+      scratch.push({ action: modelText(raw.slice(0, 160)), result });
       if (consecutiveBad >= 2) break; // confused model → stop burning steps, force a final
       continue;
     }
@@ -299,7 +315,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     // re-issuing the same call (or retrying a blocked one) is exactly as stuck
     // as an unparseable reply — before this, those steps never counted and the
     // loop burned its whole budget before forcing a final.
-    const sig = `${parsed.tool} ${JSON.stringify(parsed.args)}`;
+    const sig = modelText(`${parsed.tool} ${JSON.stringify(parsed.args)}`);
     if (scratch.some((s) => s.action === sig)) {
       consecutiveBad += 1;
       scratch.push({
@@ -318,9 +334,10 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     if (sourceRoute === "external" && !researchAttempted && NOTE_SEARCH_TOOLS.includes(parsed.tool)) {
       scratch.push({
         action: sig,
-        ...(parsed.thought ? { thought: parsed.thought } : {}),
-        result:
+        ...(parsed.thought ? { thought: modelText(parsed.thought) } : {}),
+        result: fixed(
           "routing correction: this asks for public/external facts, so note search was not run. Call research_web next and answer only from its evidence.",
+        ),
         remainingSteps: Math.max(0, maxSteps - step),
       });
       continue;
@@ -341,14 +358,18 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     let result = await runToolSafely(host, parsed.tool, parsed.args, budget);
     if (parsed.tool === "research_web") {
       researchAttempted = true;
-      const numbered = renumberResearchEvidence(result, nextWebSourceNumber);
-      result = numbered.observation;
-      nextWebSourceNumber = numbered.nextNumber;
+      let nextNumber = nextWebSourceNumber;
+      result = reshape(result, (text) => {
+        const numbered = renumberResearchEvidence(text, nextWebSourceNumber);
+        nextNumber = numbered.nextNumber;
+        return numbered.observation;
+      });
+      nextWebSourceNumber = nextNumber;
       for (const source of researchEvidenceRecords(result)) webEvidence.set(source.sourceId, source.text);
     }
     scratch.push({
       action: sig,
-      ...(parsed.thought ? { thought: parsed.thought } : {}),
+      ...(parsed.thought ? { thought: modelText(parsed.thought) } : {}),
       result,
       remainingSteps: Math.max(0, maxSteps - step),
     });
@@ -376,7 +397,7 @@ async function* forceFinal(
   useStream: boolean,
   webEvidence: ReadonlyMap<string, string>,
 ): AsyncGenerator<AgentEvent, string, void> {
-  const prompt = adapterFor(input.model).renderForceFinal({
+  const rendered = adapterFor(input.model).renderForceFinal({
     history: input.history,
     userText: input.userText,
     scratch,
@@ -387,8 +408,8 @@ async function* forceFinal(
     // passes it) and the turn's images
     const message =
       input.images && input.images.length > 0
-        ? { role: "user" as const, content: prompt, images: input.images }
-        : { role: "user" as const, content: prompt };
+        ? { role: "user" as const, content: rendered, images: input.images }
+        : { role: "user" as const, content: rendered };
     const out = yield* generate(host, { messages: [message] }, useStream, true);
     if (out.extractor && out.extractor.mode === "final") {
       return groundForcedFinal(out.extractor.finalText, webEvidence);
@@ -426,7 +447,7 @@ function groundForcedFinal(answer: string, webEvidence: ReadonlyMap<string, stri
  * researched the web, then couldn't open the page its own search returned
  * (live eval 2026-08-03). The secret-pattern guard (looksSecret) still covers
  * every arg regardless, and note/memory reads stay private here. */
-function privateScratch(knowledge: string, scratch: ScratchStep[]): string[] {
+function privateScratch(knowledge: PromptText, scratch: ScratchStep[]): string[] {
   const fromWeb = (action: string): boolean => WEB_TOOLS.some((tool) => action.startsWith(tool));
   return [knowledge, ...scratch.filter((s) => !fromWeb(s.action)).map((s) => s.result)];
 }

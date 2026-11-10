@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { VaultAction } from "../lib/librarianPeople";
 import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
+import { model } from "../lib/promptText.fixtures";
 import type { KeepDeps } from "../services/librarianPeople";
 import { closeLibrarianChat, startLibrarianChat, useLibrarianBar } from "../state/librarianBar";
 import { answerAsk, settleVault } from "./librarianKeep";
@@ -41,7 +42,7 @@ beforeEach(() => {
         id: "t1",
         role: "librarian",
         text: "Adding Ana; Sam has a note.",
-        raw: "",
+        raw: model(""),
         actions: [],
         vault: VAULT,
       },
