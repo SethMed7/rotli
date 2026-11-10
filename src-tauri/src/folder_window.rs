@@ -71,7 +71,7 @@ pub(crate) fn close(app: &AppHandle, label: &str) {
     let app = app.clone();
     let label = label.to_string();
     std::thread::spawn(move || {
-        if let Err(detail) = crate::flush_windows(&app, std::slice::from_ref(&label)) {
+        if let Err(detail) = crate::flush_windows(&app, std::slice::from_ref(&label), &format!("close {label}")) {
             if detail != crate::quit_flush::JOINED {
                 let _ = app.emit_to(label.as_str(), "rotli:open-notice", detail);
             }

@@ -19,12 +19,17 @@
 //! answer and before the last window's answer arrives (bounded by
 //! `check_max`, milliseconds when no window is hung) and the exit itself.
 //!
-//! One attempt at a time: a request while one is live joins it, waits for it
-//! to end, and does nothing of its own (`JOINED`). Every attempt ends with one
-//! "rotli:save-attempt-ended" event to every window it asked anything.
+//! One attempt at a time. A request with the same intent as the live attempt
+//! (a second Cmd-Q during a quit, a second close of the same folder window)
+//! joins it, waits for it to end, and does nothing of its own (`JOINED`). A
+//! request with another intent, or none, waits for the live attempt to end and
+//! then runs as its own attempt: a folder window closing must never swallow a
+//! quit (tenth review of pull request 267). Every attempt ends with one
+//! "rotli:save-attempt-ended" event to every window it asked anything, and its
+//! live mark is cleared on the way out even if something panics.
 
 use std::collections::{BTreeSet, HashSet};
-use std::sync::{Condvar, Mutex};
+use std::sync::{Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde_json::json;
@@ -45,6 +50,15 @@ pub(crate) trait Windows {
     fn live(&self) -> Vec<String>;
 }
 
+/// Which windows an attempt asks.
+pub(crate) enum Scope<'a> {
+    /// Every window that exists when the attempt starts, and every one that
+    /// exists by phase 2 (quit, restart, vault switch).
+    All,
+    /// Just these (a folder window closing).
+    Only(&'a [String]),
+}
+
 pub(crate) struct QuitFlush {
     pub(crate) status: Mutex<QuitFlushStatus>,
     pub(crate) cv: Condvar,
@@ -61,6 +75,10 @@ pub(crate) struct QuitFlushStatus {
     /// 1 while windows flush, 2 while they answer the immediate question.
     pub(crate) phase: u8,
     pub(crate) live: bool,
+    /// What the live attempt is for; a request with the same intent joins it.
+    pub(crate) intent: Option<String>,
+    /// Requests waiting for the live attempt to end (joined or queued).
+    pub(crate) waiting: usize,
     /// The windows that still owe this phase an answer, BY LABEL: every
     /// window hears every event, so a count let an idle panel's repeat acks
     /// release a window still serializing a workbook (audit 2026-10-12).
@@ -91,35 +109,55 @@ impl QuitFlush {
         Self { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new(), flush_max, check_max }
     }
 
+    /// The status, even after a panic elsewhere poisoned it: the attempt's
+    /// state stays meaningful (every write to it is a whole field).
+    fn lock(&self) -> MutexGuard<'_, QuitFlushStatus> {
+        self.status.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     /// One window's answer to a phase.
     pub(crate) fn answer(&self, attempt_id: u64, phase: u8, label: &str, ok: bool, error: Option<String>) {
-        let mut status = self.status.lock().unwrap();
+        let mut status = self.lock();
         if status.ack(attempt_id, phase, label, ok, error) {
             self.cv.notify_all();
         }
     }
 
-    /// The two-phase attempt over `labels` (and, with `ask_new`, every window
-    /// that exists by phase 2). Ok: nothing is unsaved anywhere it asked, and
-    /// the caller acts at once. Err: the reason, or `JOINED`.
-    pub(crate) fn attempt(&self, windows: &dyn Windows, labels: &[String], ask_new: bool) -> Result<(), String> {
+    /// The two-phase attempt over `scope`. Ok: nothing is unsaved anywhere it
+    /// asked, and the caller acts at once. Err: the reason, or `JOINED` when a
+    /// live attempt had the same `intent` (`None` never joins).
+    pub(crate) fn attempt(&self, windows: &dyn Windows, scope: Scope, intent: Option<&str>) -> Result<(), String> {
         let attempt_id = {
-            let mut status = self.status.lock().unwrap();
-            if status.live {
-                let joined = status.attempt_id;
-                while status.live && status.attempt_id == joined {
-                    status = self.cv.wait(status).unwrap();
+            let mut status = self.lock();
+            while status.live {
+                status.waiting += 1;
+                self.cv.notify_all();
+                if intent.is_some() && status.intent.as_deref() == intent {
+                    let joined = status.attempt_id;
+                    while status.live && status.attempt_id == joined {
+                        status = self.cv.wait(status).unwrap_or_else(|poisoned| poisoned.into_inner());
+                    }
+                    status.waiting -= 1;
+                    return Err(JOINED.into());
                 }
-                return Err(JOINED.into());
+                while status.live {
+                    status = self.cv.wait(status).unwrap_or_else(|poisoned| poisoned.into_inner());
+                }
+                status.waiting -= 1;
             }
             status.attempt_id = status.attempt_id.wrapping_add(1).max(1);
             status.live = true;
+            status.intent = intent.map(str::to_string);
             status.attempt_id
         };
-        let mut participants: BTreeSet<String> = labels.iter().cloned().collect();
+        let _live = EndOnDrop(self);
+        let mut participants: BTreeSet<String> = match scope {
+            Scope::All => windows.live().into_iter().collect(),
+            Scope::Only(labels) => labels.iter().cloned().collect(),
+        };
         let mut result = self.phase(windows, attempt_id, 1, &participants.iter().cloned().collect::<Vec<_>>());
         if result.is_ok() {
-            if ask_new {
+            if matches!(scope, Scope::All) {
                 participants.extend(windows.live());
             }
             result = self.phase(windows, attempt_id, 2, &participants.iter().cloned().collect::<Vec<_>>());
@@ -131,11 +169,6 @@ impl QuitFlush {
                 json!({ "attemptId": attempt_id, "finished": result.is_ok(), "detail": result.as_ref().err() }),
             );
         }
-        let mut status = self.status.lock().unwrap();
-        status.live = false;
-        status.phase = 0;
-        status.pending.clear();
-        self.cv.notify_all();
         result
     }
 
@@ -144,7 +177,7 @@ impl QuitFlush {
             return Ok(());
         }
         {
-            let mut status = self.status.lock().unwrap();
+            let mut status = self.lock();
             status.phase = phase;
             status.pending = labels.iter().cloned().collect();
             status.failed = false;
@@ -158,13 +191,13 @@ impl QuitFlush {
         }
         let bound = if phase == 1 { self.flush_max } else { self.check_max };
         let deadline = Instant::now() + bound;
-        let mut status = self.status.lock().unwrap();
+        let mut status = self.lock();
         while !status.pending.is_empty() {
             let now = Instant::now();
             if now >= deadline {
                 break;
             }
-            status = self.cv.wait_timeout(status, deadline - now).unwrap().0;
+            status = self.cv.wait_timeout(status, deadline - now).unwrap_or_else(|poisoned| poisoned.into_inner()).0;
         }
         if !status.pending.is_empty() {
             let mut silent: Vec<&String> = status.pending.iter().collect();
@@ -181,6 +214,21 @@ impl QuitFlush {
             return Err(format!("Rotli did not quit: {reasons}. Your files remain open."));
         }
         Ok(())
+    }
+}
+
+/// Ends the live attempt however `attempt` leaves (a panic in a window's
+/// emit included), so no later request waits for ever.
+struct EndOnDrop<'a>(&'a QuitFlush);
+
+impl Drop for EndOnDrop<'_> {
+    fn drop(&mut self) {
+        let mut status = self.0.lock();
+        status.live = false;
+        status.intent = None;
+        status.phase = 0;
+        status.pending.clear();
+        self.0.cv.notify_all();
     }
 }
 

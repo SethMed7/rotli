@@ -177,8 +177,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two steps and never locks the editors: every window saves; then, only
   when every window has, each is asked at once whether anything is unsaved
   right now, and any yes keeps Rotli open, naming the note. All no, and
-  Rotli quits at once. A second quit while one is deciding joins it. A
-  vault switch and closing a folder window go the same way. What's left:
+  Rotli quits at once. A second quit while one is deciding joins it;
+  a quit pressed while a folder window is closing waits for the close and
+  then quits, rather than being dropped. A vault switch and closing a
+  folder window go the same way. What's left:
   words typed in a window after it answered and before the last window
   answers (at most 2 seconds, milliseconds unless a window hangs). This
   happens in 1.9.1.

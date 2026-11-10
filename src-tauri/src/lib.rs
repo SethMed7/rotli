@@ -81,7 +81,7 @@ mod workspace_documents;
 use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
 use std::time::{Duration, Instant};
 
-use quit_flush::QuitFlush;
+use quit_flush::{QuitFlush, Scope};
 use summon::{LastBlurHide, SummonIntent};
 
 use tauri::image::Image;
@@ -536,12 +536,18 @@ fn webview_labels(app: &AppHandle) -> Vec<String> {
     labels
 }
 
-/// Quit (or restart, or switch vaults), but let every live webview save first,
-/// in the two phases of quit_flush.rs. A refusal is shown in main; a request
-/// that joined a live attempt shows nothing of its own.
+/// Switch vaults (or import, or anything else that replaces what the windows
+/// show), but let every live webview save first, in the two phases of
+/// quit_flush.rs. A refusal is shown in main. It never joins another attempt:
+/// it waits for one to end and then runs its own.
 fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
-    let labels = webview_labels(app);
-    app.state::<QuitFlush>().attempt(&AppWindows(app), &labels, true).inspect_err(|detail| {
+    flush_all(app, None)
+}
+
+/// The attempt over every live webview, for `intent` (a quit or restart joins
+/// a live attempt with the same intent and then shows nothing of its own).
+fn flush_all(app: &AppHandle, intent: Option<&str>) -> Result<(), String> {
+    app.state::<QuitFlush>().attempt(&AppWindows(app), Scope::All, intent).inspect_err(|detail| {
         if detail != quit_flush::JOINED {
             SummonIntent::ShowMain.perform(app);
             let _ = app.emit_to("main", "rotli:quit-flush-failed", detail);
@@ -549,15 +555,16 @@ fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
     })
 }
 
-/// The same attempt over just `labels` (a folder window closing).
-fn flush_windows(app: &AppHandle, labels: &[String]) -> Result<(), String> {
-    app.state::<QuitFlush>().attempt(&AppWindows(app), labels, false)
+/// The same attempt over just `labels` (a folder window closing, `intent`
+/// naming it, so a second close of the same window joins the first).
+fn flush_windows(app: &AppHandle, labels: &[String], intent: &str) -> Result<(), String> {
+    app.state::<QuitFlush>().attempt(&AppWindows(app), Scope::Only(labels), Some(intent))
 }
 
 fn graceful_shutdown(app: &AppHandle, restart: bool) {
     let handle = app.clone();
     std::thread::spawn(move || {
-        if flush_webviews_before_shutdown(&handle).is_ok() {
+        if flush_all(&handle, Some(if restart { "restart" } else { "quit" })).is_ok() {
             if restart {
                 if let Err(error) = relaunch_app(&handle) {
                     SummonIntent::ShowMain.perform(&handle);

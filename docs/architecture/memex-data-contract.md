@@ -223,8 +223,12 @@ second user-visible product or storage location.
   answers at once, from its buffers with no flushing, whether anything is
   unsaved or outstanding (bounded 2 seconds); any yes refuses, naming the
   note, and all no lets the host act at once, with nothing awaited between
-  the last answer and the exit. One attempt runs at a time (a second request
-  joins it); each ends with one event to every window it asked. Vault
+  the last answer and the exit. One attempt runs at a time: a request with the
+  same intent (a second quit, a second close of the same folder window)
+  joins it and does nothing of its own; any other request (a quit during a
+  folder-window close, a vault switch) waits for it to end and then runs as
+  its own attempt. Each ends with one event to every window it asked, and
+  ends even if something panics. Vault
   switches and folder-window closes use the same attempt. What remains:
   words typed in a window after its own phase-2 answer and before the last
   answer arrives (at most the 2-second bound; milliseconds unless a window is
