@@ -147,6 +147,48 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
   exclusion, short-lived authorization, and macOS bookmark recovery after a
   move. Never point that native check at a live vault.
 
+### What quit guarantees, and what it doesn't
+
+Quit, restart, a vault switch and a folder-window close run one two-phase
+attempt (`src-tauri/src/quit_flush.rs`; the contract is in
+`docs/architecture/memex-data-contract.md`): every window flushes, then every
+window answers at once whether any note is unsaved, and any yes keeps Rotli
+open, naming the note. The coordinator's tests (`quit_flush_tests.rs`) and the
+explorer above cover that. Known gaps, each marked as already in 1.9.1 or new
+in pull request 267:
+
+- **Only notes are asked about (also in 1.9.1).** The phase-2 question covers
+  note buffers only (`src/editor/model.ts`, `quitReasons`). A workbook,
+  document, board or settings change made while or after its own flush ran
+  isn't seen (`src/sheets/session.ts`), so quit can go ahead with it unsaved.
+  The two-second bound on what remains describes note buffers only: a paste
+  or drop still completing, a window opened after the participants were
+  listed, and a vault switch's own work after the check are outside it.
+- **A deleted note in a Quick Note or folder window can't be resolved there
+  (new in pull request 267).** Copy the words / Discard live in the notice
+  in main's sidebar only, though the editor's message points at them
+  (`src/editor/editorSurface.tsx`), so quit keeps refusing from that window
+  until the file is restored.
+- **A conflict notice made while quitting can be lost (new in pull request
+  267).** It is saved by the ordinary 500 ms settings debounce, which the
+  exit can beat, and a notice made in a secondary window never reaches main's
+  settings writer (`src/state/persist.ts`). The copy itself is safe on disk.
+- **"Open the copy" clears the notice before the copy is open (new in pull
+  request 267).** A copy deleted or moved meanwhile loses its pointer
+  (`src/components/sidebar/goneNotesNotice.tsx`), and notices have no cap.
+
+What the explorer doesn't show here: its depth was lowered in the ninth
+review's round (to 7 to 11, from deeper runs), so three earlier witnesses now
+exceed the search and run only as replays in `saveSchedules.test.ts` (the
+14-move slow-write and undo schedule, the 11-move deleted-note schedule, and,
+in the bounded run, the 9-move restoration schedule). Its quit model has no
+window-opening move, no second quit or close request, and no second window
+holding notes (the coordinator's own tests cover those). And
+`bun run explore:at` gives old commits artificial phase-2 steps and bypasses
+c9601494's typing lock (`scripts/fixtures/explorer-shims.json`), so "8 of 8
+scenarios fail" on an old head counts scenarios, not eight separate
+regressions.
+
 ### Performance regressions
 
 `src/services/folderNotesCache.test.ts` counts document parses across indexing,
