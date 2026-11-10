@@ -1,0 +1,33 @@
+{
+  "about": "A file's protection mark (a chat's `secureContext: true`), as ONE grammar both sides implement: src/lib/frontmatterBlock.ts `protectionMark` and src-tauri/src/protection_mark.rs `marked`. src/lib/protectionMarks.test.ts and the Rust tests in protection_mark.rs (and corpus_write_lane_tests.rs, for a native note read) run every case below. Seventh review of pull request 267: TypeScript and Rust disagreed, so a protected chat written one way reopened unmarked on the other side. Where the grammar can't be sure, it says marked.",
+  "grammar": [
+    "1. Lines are split on \\n; one trailing \\r is dropped from each. One leading byte-order mark is ignored.",
+    "2. Blank (empty or whitespace-only) lines before the opening fence are skipped. The first other line, with trailing whitespace removed, must be `---`; otherwise the file has no block and is not marked.",
+    "3. The block is the lines after that fence up to the first line that, with trailing whitespace removed, is `---`. A block that never closes can't show the mark absent: marked.",
+    "4. A block line names the key when it has a colon and the text before the first colon, trimmed, is the key, at any indentation (an indented key may be a nested one; that is unsure, so it counts).",
+    "5. Its value is the text after that colon, trimmed, with one pair of surrounding quotes removed, compared case-insensitively. `false`, `no` and `off` are a clear no. Anything else (true, TRUE, yes, empty, unknown) marks.",
+    "6. Any line that marks marks the file, even when another line for the same key says no (duplicate keys)."
+  ],
+  "cases": [
+    { "name": "canonical", "contents": "---\ntitle: Private\nsecureContext: true\n---\n\n## Messages\n", "marked": true },
+    { "name": "canonical, no mark", "contents": "---\ntitle: Plain\n---\n\n## Messages\n", "marked": false },
+    { "name": "Windows line endings (CRLF)", "contents": "---\r\ntitle: Private\r\nsecureContext: true\r\n---\r\n\r\n## Messages\r\n", "marked": true },
+    { "name": "a byte-order mark before the fence", "contents": "﻿---\ntitle: Private\nsecureContext: true\n---\n\n## Messages\n", "marked": true },
+    { "name": "a leading blank line", "contents": "\n---\nsecureContext: true\n---\n\n## Messages\n", "marked": true },
+    { "name": "leading blank lines, no mark", "contents": "\n \n---\ntitle: Plain\n---\n", "marked": false },
+    { "name": "a block that never closes", "contents": "---\ntitle: Private\n\n## Messages\n**you** · now — hello\n", "marked": true },
+    { "name": "a space before the colon", "contents": "---\nsecureContext : true\n---\n", "marked": true },
+    { "name": "an indented key", "contents": "---\nmeta:\n  secureContext: true\n---\n", "marked": true },
+    { "name": "duplicate keys, the last says no", "contents": "---\nsecureContext: true\nsecureContext: false\n---\n", "marked": true },
+    { "name": "duplicate keys, the first says no", "contents": "---\nsecureContext: false\nsecureContext: true\n---\n", "marked": true },
+    { "name": "TRUE", "contents": "---\nsecureContext: TRUE\n---\n", "marked": true },
+    { "name": "a quoted true", "contents": "---\nsecureContext: \"true\"\n---\n", "marked": true },
+    { "name": "an empty value", "contents": "---\nsecureContext:\n---\n", "marked": true },
+    { "name": "a clear no", "contents": "---\nsecureContext: false\n---\n", "marked": false },
+    { "name": "a quoted no", "contents": "---\nsecureContext: 'No'\n---\n", "marked": false },
+    { "name": "trailing spaces on the fences", "contents": "---  \nsecureContext: true\n---\t\n", "marked": true },
+    { "name": "a commented-out line", "contents": "---\n# secureContext: true\n---\n", "marked": false },
+    { "name": "the words in the body, not the block", "contents": "---\ntitle: Plain\n---\n\nsecureContext: true\n", "marked": false },
+    { "name": "no block at all", "contents": "# Chat\n\nsecureContext: true\n", "marked": false }
+  ]
+}

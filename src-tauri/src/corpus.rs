@@ -3760,6 +3760,7 @@ impl CorpusStore {
                 .foreign
                 .iter()
                 .any(|l| secure_context_field(l) == Some(true))
+            || crate::protection_mark::marked(text, "secureContext")
             || looks_secure(body)
             || self.secure_by_name(&title_of(editor_body(body)), rel);
         if secure {
@@ -4899,7 +4900,10 @@ impl CorpusStore {
         // origin is a DISK-location fact (Archive/Trash); the wire folder_id is the
         // shelf-projected view — they can differ for a memex wiki note.
         let folder = project_folder(self.layout, &disk_folder, &fm);
+        // a chat's taint mark counts too, read by the grammar TypeScript
+        // shares (seventh review of pull request 267: it was left out)
         let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || crate::protection_mark::marked(text, "secureContext")
             || self.in_secure_home(rel)
             || looks_secure(body)
             || self.protected_by_name(&title_of(body), rel);

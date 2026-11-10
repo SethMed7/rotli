@@ -201,9 +201,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A protected chat saved with Windows line endings stays protected.** A
   chat marked as holding secure-note content lost that mark when another
   editor saved it with Windows line endings, so a remote model could continue
-  it, and Rotli couldn't mark such a chat. Every reader and writer of a chat
-  file's marks now reads both line endings, and a mark it can't read counts
-  as set. This happens in 1.9.1.
+  it, and Rotli couldn't mark such a chat. The Mac's two halves also read
+  the mark differently (a byte-order mark, an unclosed header, `key : true`,
+  an indented key). They now read it by one written rule, tested on both
+  sides with the same cases, and where the rule can't be sure, the chat
+  counts as marked. This happens in 1.9.1.
 - **Two notes saved with the same name at the same moment both survive.**
   Rotli used to let the later one replace the earlier when two agents (or an
   agent and the app) picked the same file name at once.

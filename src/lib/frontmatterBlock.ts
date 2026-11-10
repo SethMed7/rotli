@@ -20,7 +20,6 @@ export interface FrontmatterBlock {
 }
 
 const BLOCK = /^(﻿?)---(\r?\n)([\s\S]*?)\r?\n---/;
-const OPENING = /^﻿?---\r?\n/;
 
 /** The file's first frontmatter block, or null when it has none. */
 export function frontmatterBlock(contents: string): FrontmatterBlock | null {
@@ -48,11 +47,30 @@ export function afterFrontmatter(contents: string): string {
   return block ? contents.slice(block.end).replace(/^\r?\n/, "") : contents;
 }
 
-/** Does the file's first block mark it `key: true`? For protection marks:
- * an opening fence that never closes can't prove the mark absent, so it
- * counts as marked (fails closed). */
+/** Does the file carry `key` as a protection mark? The one grammar Rust
+ * shares (src-tauri/src/protection_mark.rs), written out with every case in
+ * scripts/fixtures/protection-marks.json; where it can't be sure, it says
+ * marked (seventh review of pull request 267: the two sides disagreed on a
+ * byte-order mark, an unclosed block, `key : true`, an indented key, TRUE). */
 export function protectionMark(contents: string, key: string): boolean {
-  const block = frontmatterBlock(contents);
-  if (!block) return OPENING.test(contents);
-  return new RegExp(`^${key}:\\s*true\\s*$`, "m").test(block.inner);
+  const lines = contents
+    .replace(/^\uFEFF/, "")
+    .split("\n")
+    .map((line) => line.replace(/\r$/, ""));
+  let at = 0;
+  while (at < lines.length && !lines[at]!.trim()) at += 1;
+  if (at >= lines.length || lines[at]!.trimEnd() !== "---") return false;
+  let found = false;
+  for (const line of lines.slice(at + 1)) {
+    if (line.trimEnd() === "---") return found;
+    const colon = line.indexOf(":");
+    if (colon < 0 || line.slice(0, colon).trim() !== key) continue;
+    const value = line
+      .slice(colon + 1)
+      .trim()
+      .replace(/^(["'])(.*)\1$/, "$2")
+      .toLowerCase();
+    if (!["false", "no", "off"].includes(value)) found = true;
+  }
+  return true; // a block that never closes can't show the mark absent
 }

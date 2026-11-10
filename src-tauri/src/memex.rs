@@ -915,14 +915,10 @@ fn chat_frontmatter_bounds(contents: &str) -> Option<(usize, usize, &'static str
     Some((start, closing, eol))
 }
 
+/// The chat's taint mark, by the grammar TypeScript shares
+/// (protection_mark.rs; seventh review of pull request 267).
 fn chat_secure_context(contents: &str) -> bool {
-    let Some((start, end, _)) = chat_frontmatter_bounds(contents) else {
-        return false;
-    };
-    contents[start..end].lines().any(|line| {
-        line.split_once(':')
-            .is_some_and(|(key, value)| key.trim() == "secureContext" && value.trim() == "true")
-    })
+    crate::protection_mark::marked(contents, "secureContext")
 }
 
 fn ensure_chat_secure_context(contents: &str) -> String {

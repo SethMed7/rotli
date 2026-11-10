@@ -204,6 +204,18 @@ fn a_read_carries_the_effective_protection_the_ipc_sends() {
     assert_eq!(wire["locked"], json!(false));
 }
 
+/// A native note read counts a chat's taint mark by the grammar TypeScript
+/// shares (seventh review of pull request 267: `doc_from_text` left it out).
+#[test]
+fn a_native_read_counts_a_chats_taint_mark_by_the_shared_grammar() {
+    let (dir, store) = bare();
+    let abs = dir.path().join("Inbox/chat.md");
+    for (name, contents, marked) in crate::protection_mark::fixture_cases() {
+        let doc = store.doc_from_text("chat", "Inbox/chat.md", &abs, &contents);
+        assert_eq!(doc.secure, marked, "{name}");
+    }
+}
+
 /// What the harness answers for one IPC command: the same store methods the
 /// Tauri commands call (corpus_read, corpus_write, corpus_create, corpus_list,
 /// corpus_move, corpus_delete, corpus_purge, corpus_set_secure), plus test-only steps:
