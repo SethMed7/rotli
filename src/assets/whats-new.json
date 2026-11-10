@@ -1,6 +1,10 @@
 {
   "1.10.0": [
     {
+      "title": "Your last words are saved",
+      "body": "Typing just before you close a tab, switch notes or quit is no longer lost when an earlier save was still finishing. Rotli now saves each note one change at a time."
+    },
+    {
       "title": "AI sees only what it may",
       "body": "Chat's search and note list now show a model only the version of a note Rotli just checked, and a note that is a hard link to a file elsewhere on your Mac is never read.",
       "platform": "mac"
