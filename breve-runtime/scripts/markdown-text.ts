@@ -13,7 +13,7 @@ const MD_ITALIC = /\*([^*\s](?:[^*]*[^*\s])?)\*/g;
 export const escapeHtml = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const NAMED_ENTITIES = new Map([["amp", "&"], ["lt", "<"], ["gt", ">"], ["quot", '"'], ["apos", "'"], ["nbsp", " "]]);
 
 /** HTML or XML text → plain text, for fetched pages and feed titles. One pass,
  * so each entity is read once: decoding `&amp;` and then `&lt;` in turn made
@@ -21,7 +21,7 @@ const NAMED_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quo
  * a character stay as written. */
 export const decodeHtmlEntities = (s: string): string =>
   s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
-    if (name[0] !== "#") return NAMED_ENTITIES[name] ?? whole;
+    if (name[0] !== "#") return NAMED_ENTITIES.get(name) ?? whole;
     const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
     return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
   });

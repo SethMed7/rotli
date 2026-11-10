@@ -56,6 +56,8 @@ describe("markdown-text — decodeHtmlEntities", () => {
 
   test("leaves anything it doesn't know, or that isn't a character, as written", () => {
     expect(decodeHtmlEntities("&rarr; &#xFFFFFFFF; &#0; & alone &;")).toBe("&rarr; &#xFFFFFFFF; &#0; & alone &;");
+    // names an object inherits are not entities
+    expect(decodeHtmlEntities("&constructor; &toString; &__proto__;")).toBe("&constructor; &toString; &__proto__;");
   });
 
   test("undoes escapeHtml", () => {

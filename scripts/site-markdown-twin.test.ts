@@ -71,11 +71,16 @@ describe("a page's Markdown twin", () => {
   });
 
   test("an unclosed tag full of empty attributes parses in linear time (CodeQL #9)", () => {
-    // CodeQL's witness: before the fix, each `""\t!=` doubled the work (20 took ~45 ms, 30 ~45 s)
+    // CodeQL's witness: before the fix each `""\t!=` doubled the work (20 took ~45 ms, 26 about a second)
     const hostile = (n: number) => `<p data-prose><-\t!=${'""\t!='.repeat(n)}`;
-    const started = performance.now();
-    for (const n of [30, 1_000, 20_000]) twin.pageMarkdown(hostile(n), "https://rotli.co/x/");
-    expect(performance.now() - started).toBeLessThan(1_000);
+    const timed = (n: number) => {
+      const started = performance.now();
+      twin.pageMarkdown(hostile(n), "https://rotli.co/x/");
+      return performance.now() - started;
+    };
+    // a size the old pattern still finishes, so a regression fails here instead of hanging
+    expect(timed(26)).toBeLessThan(500);
+    expect(timed(1_000) + timed(20_000)).toBeLessThan(1_000);
   });
 
   test("leaves out decoration: hidden things, companions, images, drawings, buttons, scripts", () => {
