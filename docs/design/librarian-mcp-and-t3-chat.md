@@ -3,7 +3,8 @@
 Status: proposal, 2026-11-07. **Nothing in this plan is deleted yet.** Every
 removal waits for the owner's approval of the table below. The first slice of
 the Librarian route is built behind an off-by-default setting (see "Built in
-this branch"). The shared protocol is
+this branch"), in **development builds only** (2026-11-09; see "Before this
+route leaves development builds"). The shared protocol is
 [`../architecture/vault-thread-protocol.md`](../architecture/vault-thread-protocol.md).
 
 The owner, 2026-11-07: "the librarian … make that a MCP route that … really
@@ -126,7 +127,12 @@ Owning code: `src-tauri/src/workspace_librarian.rs`. Skills:
 
 There is deliberately **no apply tool**. A person applies or dismisses a
 proposal: `rotli librarian apply|dismiss ID` now, a review list in Rotli next.
-An agent cannot approve its own proposal, however its host's approvals are set.
+No route tool approves a proposal, however the host's approvals are set. That
+is not the same as "an agent cannot approve": `rotli librarian apply` is an
+ordinary command, so an agent with a shell, directly or through a
+pseudo-terminal, can run it. The person's approval holds only while the host
+denies vault threads the shell and raw file tools (protocol §3.2), which Rotli
+can't enforce for a host that ignores it.
 
 ### Skills (five)
 
@@ -175,10 +181,12 @@ AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
   the Librarian on. It never follows Rotli's default vault (the first build
   did, so a thread in one vault could reach another; fixed after the
   2026-11-08 review).
-  It runs from **every build, stable included** (Tesven's controller found
-  the owner's stable Rotli.app refuses `rotli mcp`); the per-vault switch is the
-  opt-in. The full `rotli mcp` server and `rotli agent …` stay dev-only.
-  Takes effect on the owner's install only with the next release.
+  It runs in **development builds only**, like the full `rotli mcp` server
+  and `rotli agent …`. It was first built to run in every build, because
+  Tesven's controller found the owner's stable Rotli.app refuses `rotli mcp`.
+  After the 2026-11-09 review the owner kept it in development builds (see
+  below), so the stable app refuses it too, and `"librarianMcp": true` does
+  nothing there.
 - `rotli --version` (also `version`, `-V`) answers `{"version": …}` headlessly
   instead of launching the app, which hung for a host probing the binary.
 - The switch: `"librarianMcp": true` in the vault's `.rotli/settings.json`,
@@ -204,6 +212,66 @@ AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
    field (T3 thread id and last turn), the `chats.jsonl` ledger, Rotli's copy
    step over `t3ctl`, and the scheduled distil thread (after the T3 pairing
    and protocol §8 are approved).
+
+### Before this route leaves development builds
+
+An independent review on 2026-11-09 found eight problems in the route, each
+reproduced against a copy of the source. The owner's rule: **the route stays
+in development builds, behind the same gate as the rest of `rotli mcp`
+(`feature_policy::cli_gate`), until every finding below is fixed and an
+independent review has checked the fixes.** No automated reviewer ran on that
+pull request.
+
+Fixed in 1.10.0, because shipped features reached them too:
+
+- **#1 Search showed bytes the gate never judged.** Fixed for every AI lane:
+  the in-app chat's search and listing, the `rotli notes` CLI, and the route.
+- **#4 Hard-linked notes crossed the vault boundary.** Every note read and the
+  walk now refuse a file with more than one name.
+- **#5 A move went ahead after the note was locked.** The agent move checks
+  secure and locked again inside the note's lock.
+
+Still open, reachable only through the route:
+
+1. **#2 The index and log keep what a note said before it turned secure.**
+   `librarian_index` and `librarian_log` store titles and summaries the agent
+   wrote. When a note later turns secure, those lines stay in two public
+   pages, and search returns them. Fix: the route writes only note ids into
+   its pages and renders titles at read time through the gate, or rescans its
+   pages and drops lines about notes it may no longer read. Test: record a
+   note in both pages, mark it secure, and search the index and log for its
+   title and summary.
+2. **#3 Repeating a proposal returns one review hides.** Deduplication in
+   `propose` matches kind, note, folder, and target title, but not `targetId`
+   or current visibility, so a repeated `librarian_link` hands back an old
+   proposal (reason and target) that `librarian_review` would hide. Fix:
+   deduplicate on `targetId`, and return an existing proposal only when
+   `visible_pending` would show it. Test: link to A, make A secure, alias
+   public B with A's title, repeat the link.
+3. **#6 Consent follows copied or linked settings.** `enabled` reads
+   `.rotli/settings.json` through symlinks, and a vault folder copied by hand
+   keeps the switch. Fix: read the switch through the no-follow, single-link
+   sidecar path, and tie it to the vault's identity, or reset it when a new
+   folder is registered. Test: a settings symlink to another vault's enabled
+   settings, and a hand-made copy of an enabled vault, both stay off.
+4. **#7 Apply trusts the proposals file.** `decide` applies a link whose
+   target has since turned secure, and builds `[[target]]` from the stored
+   title, so an edited line can insert any Markdown. Proposals keep no source
+   revision. Fix: re-resolve `targetId` through the gate, refuse a target
+   that is no longer an exact readable title, validate stored fields as
+   strictly as the tool arguments, and record and check the note's revision.
+   Test: a secure target, an injected target line, and a note edited since
+   the proposal; each refuses and stays pending.
+5. **#8 The advertised tool limits aren't enforced.** The schemas say
+   `maxLength` and `additionalProperties: false`, but `handle_mcp_with`
+   doesn't validate arguments, so a 100,001-character capture and unknown
+   arguments are accepted. Fix: validate every call against its tool's
+   schema (lengths, types, required, no extra keys) before it runs, for both
+   servers. Test: one over-length and one undeclared argument per tool.
+6. **Approval relies on the host.** See "Tools (nine)": an agent with a
+   shell can run `rotli librarian apply`. Before stable, either make the
+   person's apply something an agent process can't do alone (the Rotli
+   review list in Settings), or say so wherever the route is offered.
 
 ## Your chats land in your vault
 
@@ -470,8 +538,9 @@ your Mac".
    threads, or move to Tesven.
 3. **The organizer (#11)**: keep the on-device daemon as a no-network option,
    or retire it in favour of the Librarian route.
-4. **The Librarian route in stable builds**: built that way in this branch
-   (opt-in per vault). Confirm, or say to put it back behind the dev gate.
+4. **The Librarian route in stable builds**: decided 2026-11-09. It stays in
+   development builds until the findings in "Before this route leaves
+   development builds" are fixed and reviewed.
 5. **Memex vault config**: apply option A (the vault's `.mcp.json` and
    `.claude/settings.json`, and `"librarianMcp": true` in its
    `.rotli/settings.json`) and/or option B (a `vault-claude`

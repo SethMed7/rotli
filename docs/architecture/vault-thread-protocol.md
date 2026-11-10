@@ -19,7 +19,7 @@ Keywords MUST, SHOULD, MAY are used in their RFC 2119 sense.
 - **Place** — where a thread lives: **no project**, or **a vault**.
 - **Host app** — Rotli or Tesven, whichever starts or shows the thread.
 - **Librarian route** — the opt-in MCP server `rotli-librarian`
-  (`rotli mcp --librarian`, every build, opt-in per vault), contract in
+  (`rotli mcp --librarian`, development builds only, opt-in per vault), contract in
   [`agent-workspace.md`](agent-workspace.md#the-librarian-route).
 
 ## 1. Versioning
@@ -145,12 +145,15 @@ Which runtime mode (validated 2026-11-08):
 
 ### 3.2 Option A: files a host app writes into the vault (Claude provider)
 
-The route is `rotli mcp --librarian`. It runs from **every Rotli build,
-stable included**, and refuses every call until the vault opts in
-(`"librarianMcp": true` in `<vault>/.rotli/settings.json`). The full
-`rotli mcp` workspace server stays development-builds-only. A Rotli build
-older than this route answers `rotli mcp --librarian` with "available only in
-development builds"; the host app MUST show that as "update Rotli", not retry.
+The route is `rotli mcp --librarian`. It runs in **development builds only**,
+like the full `rotli mcp` workspace server, until the review findings in
+[`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)
+are fixed and reviewed (2026-11-09). There it refuses every call until the
+vault opts in (`"librarianMcp": true` in `<vault>/.rotli/settings.json`). A public build of
+Rotli, and any build older than the route, answers `rotli mcp --librarian`
+with "MCP and agent integrations are available only in development builds";
+the host app MUST show that plainly (the route needs a development build of
+Rotli for now), not retry.
 `rotli --version` answers `{"version": "…"}` headlessly, so a host can check
 before it writes anything.
 

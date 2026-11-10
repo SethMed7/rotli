@@ -371,7 +371,8 @@ cold because search now uses an index.
 - **Same-user replacement races on the Librarian route.** Another process
   running as the person can swap a folder or file under the vault between a
   check and the open that follows it; the stated trust model excludes it.
-  `rotli mcp --librarian` narrows what is cheap to narrow: the proposals file
+  The route runs in development builds only; its open review findings are
+  listed in `docs/design/librarian-mcp-and-t3-chat.md`. `rotli mcp --librarian` narrows what is cheap to narrow: the proposals file
   is opened one folder at a time with `openat` and `O_NOFOLLOW`, then checked
   on its descriptor (regular file, one link), and each call refuses when the
   bound vault folder's device and inode no longer match the ones recorded at
