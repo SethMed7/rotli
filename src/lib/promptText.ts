@@ -14,10 +14,14 @@
 // - `ModelText`: what a model wrote (replies, its own earlier turns);
 // - `ExternalText`: what isn't a note: web pages, Rotli's own status lines.
 //
-// The constructors below are importable only by the modules check:architecture
-// names, and a cast to any of these types outside this file (or, for
-// ApprovedText, outside ai/approvedRead.ts) fails the same check. The brands
-// are types only: nothing here changes a string at runtime.
+// check:prompt-brands (scripts/) reads the code with the TypeScript compiler
+// and refuses what the types alone can't: a cast or a type guard that makes a
+// brand, an `any` flowing into one, `prompt` called rather than used as a tag,
+// `fixed` on anything but a literal, and an open constructor used by a module
+// not listed for it. Together they make the model-bound paths enumerable and
+// stop accidental misuse; they are not a proof against code written on
+// purpose to get around them (fourth review). The brands are types only:
+// nothing here changes a string at runtime.
 
 declare const promptBrand: unique symbol;
 declare const approvedBrand: unique symbol;
@@ -55,11 +59,14 @@ export type Approved<T> = { readonly [K in keyof T]: ApprovedField<T[K]> };
 
 /** A piece the compiler accepts: a prompt part, a number or flag, or a string
  * whose type is a literal written in this source code. A widened `string`
- * (anything read at runtime: a note, a cache, the UI index) is `never`. */
+ * (anything read at runtime: a note, a cache, the UI index) is `never`, and
+ * so is a template pattern such as `note: ${string}` (a template written
+ * around runtime text; fourth review): only a type with no open part is a
+ * literal, which `{} extends Record<T, 1>` tells apart. */
 type Piece<T> = T extends PromptPart | number | boolean | null | undefined
   ? T
   : T extends string
-    ? string extends T
+    ? {} extends Record<T, 1>
       ? never
       : T
     : never;

@@ -45,6 +45,11 @@ describe("what a model request may be built from", () => {
     fixed(fromANote);
     // @ts-expect-error nor a JSON field
     promptJson({ title: fromANote });
+    // @ts-expect-error nor a template written around it, nested in the tag
+    const nested = prompt`Note: ${`raw ${fromANote}`}`;
+    expect(String(nested)).toContain(fromANote);
+    // @ts-expect-error or in a JSON field
+    promptJson({ title: `raw ${fromANote}` });
     // @ts-expect-error nor ApprovedText: only ai/approvedRead.ts makes that
     const forged: ApprovedText = fromANote;
     expect(forged === fromANote).toBe(true);

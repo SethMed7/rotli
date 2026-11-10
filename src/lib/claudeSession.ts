@@ -5,7 +5,7 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 
-import type { PromptText } from "./promptText";
+import { type PromptText, externalText, prompt } from "./promptText";
 
 /** One Rotli tool as Claude sees it (an MCP tool on the in-process server). */
 export interface NativeToolSpec {
@@ -47,9 +47,16 @@ export function claudeSession(requestId: string): NativeSession {
     channel.onmessage = (raw) => {
       const call = parseToolCall(raw);
       if (!call) return;
+      // a tool that threw answers with its error line, typed like every other
+      // result: Rotli's own words, never a note's (fourth review)
       void onToolCall(call)
-        .catch((e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`)
-        .then((result) => invoke("claude_session_tool_result", { requestId, callId: call.callId, result }))
+        .catch(
+          (e: unknown): PromptText =>
+            prompt`error: ${externalText(e instanceof Error ? e.message : String(e))}`,
+        )
+        .then((result: PromptText) =>
+          invoke("claude_session_tool_result", { requestId, callId: call.callId, result }),
+        )
         .catch(() => undefined); // the turn already ended; nothing is waiting
     };
     return invoke<string>("claude_session_run", {
