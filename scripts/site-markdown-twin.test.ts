@@ -59,6 +59,25 @@ describe("a page's Markdown twin", () => {
     );
   });
 
+  test("a backslash before a pipe in a cell can't end the cell (CodeQL #10)", () => {
+    const md = twin.pageMarkdown(
+      page(
+        String.raw`<table><tr><th>Pattern</th><th>Means</th></tr><tr><td>a|b, c\|d, e\\|f</td><td>end</td></tr></table>`,
+      ),
+      "https://rotli.co/privacy/",
+    );
+    // 0 backslashes -> 1, 1 -> 3, 2 -> 5: the last escapes the pipe, the pairs read back as the text's own
+    expect(md).toContain(String.raw`| a\|b, c\\\|d, e\\\\\|f | end |`);
+  });
+
+  test("an unclosed tag full of empty attributes parses in linear time (CodeQL #9)", () => {
+    // CodeQL's witness: before the fix, each `""\t!=` doubled the work (20 took ~45 ms, 30 ~45 s)
+    const hostile = (n: number) => `<p data-prose><-\t!=${'""\t!='.repeat(n)}`;
+    const started = performance.now();
+    for (const n of [30, 1_000, 20_000]) twin.pageMarkdown(hostile(n), "https://rotli.co/x/");
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   test("leaves out decoration: hidden things, companions, images, drawings, buttons, scripts", () => {
     const md = twin.pageMarkdown(
       page(`<p>Kept.</p><img class="spot" alt="A quokka"><div class="spot"><p>Companion</p></div>
