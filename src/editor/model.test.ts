@@ -12,6 +12,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { notesService } from "../services/notes";
+import { bufferLines } from "./buffers";
 import { flushNoteAfterPaint } from "./flushAfterPaint";
 import {
   unsavedDrafts,
@@ -567,4 +568,14 @@ describe("flushNote's contract", () => {
     await flushNote("again");
     expect(documentSaveError("again")).toBeNull();
   });
+});
+
+test("a buffer's lines are a frozen, read-only view: changing one means going through the model", () => {
+  ensureDocument("frozen-view", "# A\n\nwords", "r0");
+  const lines = bufferLines("frozen-view");
+  expect(Object.isFrozen(lines)).toBe(true);
+  expect(() => {
+    (lines as string[])[0] = "# B";
+  }).toThrow();
+  evictDocument("frozen-view");
 });

@@ -205,7 +205,7 @@ function subscribeDocument(noteId: string, fn: () => void): () => void {
 
 /** Live lines for a note; undefined until the buffer exists (callers fall
  * back to the query body — identical content until the first edit). */
-export function useDocumentLines(noteId: string): string[] | undefined {
+export function useDocumentLines(noteId: string): readonly string[] | undefined {
   const watch = useCallback((fn: () => void) => subscribeDocument(noteId, fn), [noteId]);
   return useSyncExternalStore(watch, () => bufferLines(noteId));
 }

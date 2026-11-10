@@ -427,7 +427,7 @@ function promptTextModule(checker, specifier, root) {
   return !!declaration && relative(root, declaration.getSourceFile().fileName) === PROMPT_TEXT;
 }
 
-function compilerOptions(root) {
+export function compilerOptions(root) {
   const config = ts.getParsedCommandLineOfConfigFile(
     join(root, "tsconfig.json"),
     {},

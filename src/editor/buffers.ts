@@ -17,7 +17,9 @@ import { setDirty, setSaveError } from "./saveStatus";
 import { taskSignature } from "./taskState";
 import { forgetProtection } from "./unsavedDrafts";
 
-const docs = new Map<string, string[]>();
+// Frozen, and handed out read-only: a buffer changes only by being replaced
+// here (seventh review: `bufferLines(id)![0] = …` slipped past check:owners).
+const docs = new Map<string, readonly string[]>();
 const revisions = new Map<string, string>();
 // The editor body that produced `revisions[noteId]`. Rotli-managed moves and
 // metadata writes change the complete-file revision without changing this
@@ -40,7 +42,7 @@ export interface DiskVersion {
 }
 
 export const hasBuffer = (noteId: string): boolean => docs.has(noteId);
-export const bufferLines = (noteId: string): string[] | undefined => docs.get(noteId);
+export const bufferLines = (noteId: string): readonly string[] | undefined => docs.get(noteId);
 export const bufferText = (noteId: string): string | undefined => docs.get(noteId)?.join("\n");
 export const revisionOf = (noteId: string): string | undefined => revisions.get(noteId);
 export const baselineOf = (noteId: string): string | undefined => persistedBodies.get(noteId);
@@ -60,9 +62,9 @@ function notify(noteId: string): void {
 
 /** Make a buffer that doesn't exist yet: from disk (saved), or a Command-T
  * draft with no file (`disk` omitted). No-op when the note already has one. */
-export function seed(noteId: string, lines: string[], disk?: DiskVersion): void {
+export function seed(noteId: string, lines: readonly string[], disk?: DiskVersion): void {
   if (docs.has(noteId)) return;
-  docs.set(noteId, lines);
+  docs.set(noteId, Object.freeze(lines));
   taskSigs.set(noteId, taskSignature(lines));
   if (disk) {
     revisions.set(noteId, disk.revision);
@@ -76,9 +78,9 @@ export function seed(noteId: string, lines: string[], disk?: DiskVersion): void 
 }
 
 /** The person (or an editor command) changed the text. */
-export function edit(noteId: string, lines: string[]): void {
+export function edit(noteId: string, lines: readonly string[]): void {
   if (!docs.has(noteId)) return;
-  docs.set(noteId, lines);
+  docs.set(noteId, Object.freeze(lines));
   bumpGeneration(noteId);
   refreshDirty(noteId);
   notify(noteId);
@@ -95,7 +97,7 @@ export function edit(noteId: string, lines: string[]): void {
 export function adopt(
   noteId: string,
   generation: number,
-  change: { disk?: DiskVersion; lines?: string[]; saved: boolean },
+  change: { disk?: DiskVersion; lines?: readonly string[]; saved: boolean },
 ): boolean {
   if (!docs.has(noteId) || editGeneration(noteId) !== generation) return false;
   if (change.disk) {
@@ -109,7 +111,7 @@ export function adopt(
       change.lines.every((l, i) => l === docs.get(noteId)![i])
     );
   if (replaced) {
-    docs.set(noteId, change.lines!);
+    docs.set(noteId, Object.freeze(change.lines!));
     taskSigs.set(noteId, taskSignature(change.lines!));
     bumpGeneration(noteId);
   }

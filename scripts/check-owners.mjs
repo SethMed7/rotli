@@ -5,9 +5,13 @@
 //
 // 1. An editor buffer is replaced, or declared saved, only by its owner:
 //    inside src/editor/buffers.ts, `docs.set(` only in `seed`, `edit` and
-//    `adopt`, and `recordSaved(` only in `seed` and `adopt`; and no other
-//    module imports the generation ledger's writers (`recordSaved`,
-//    `bumpGeneration`).
+//    `adopt`, and `recordSaved(` only in `seed` and `adopt`. Across src/,
+//    by resolved symbol (so a renamed or namespace import is the same
+//    symbol; seventh review), the generation ledger's writers and the saved
+//    dot's `setDirty` are used only by buffers.ts, and the buffer's own
+//    writers (`adopt`, `recordLanded`, `seed`, `edit`, `forget`, …) only by
+//    model.ts and saveQueue.ts. The buffer's read-only view (`bufferLines`)
+//    is never cast to something writable.
 // 2. A turn's protection travels with the turn: no writer asks the
 //    conversation again. `markedConversation` is gone for good; the
 //    Librarian's settlement (librarianKeep.ts) never reads a conversation's
@@ -22,9 +26,11 @@
 // Reads source with the TypeScript compiler's parser (syntax, not text).
 
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import ts from "typescript6";
+
+import { compilerOptions } from "./check-prompt-brands.mjs";
 
 const isTestSide = (path) => /\.(test|fixtures|lane)\.tsx?$/.test(path);
 
@@ -82,17 +88,6 @@ export function ownerFailures(files) {
         )
           fail(node, "a note is declared saved outside buffers.ts's `adopt`");
       }
-      if (
-        ts.isImportDeclaration(node) &&
-        node.moduleSpecifier.text.endsWith("saveGenerations") &&
-        path !== "src/editor/buffers.ts"
-      ) {
-        const names = node.importClause?.namedBindings;
-        if (names && ts.isNamedImports(names))
-          for (const name of names.elements)
-            if (["recordSaved", "bumpGeneration"].includes((name.propertyName ?? name.name).text))
-              fail(name, `imports ${name.name.text}: only buffers.ts moves a note's generations`);
-      }
       // 2. a turn's protection
       if (ts.isIdentifier(node) && node.text === "markedConversation")
         fail(node, "a writer asks the conversation whether it is marked; use the turn's own protection");
@@ -132,6 +127,87 @@ export function ownerFailures(files) {
   return failures;
 }
 
+/** The writers of a note's saved state, by the file that declares them: who
+ * may use each (besides the file itself), and what using it does. */
+export const WRITERS = {
+  "src/editor/saveGenerations.ts": {
+    names: ["bumpGeneration", "recordSaved", "forgetEdits"],
+    users: ["src/editor/buffers.ts"],
+    does: "moves a note's edit generations; only buffers.ts does",
+  },
+  "src/editor/saveStatus.ts": {
+    names: ["setDirty"],
+    users: ["src/editor/buffers.ts"],
+    does: "sets a note's saved dot; it is derived in buffers.ts",
+  },
+  "src/editor/buffers.ts": {
+    names: ["adopt", "recordLanded", "seed", "edit", "forget", "forgetPending", "setTaskSignature"],
+    users: ["src/editor/model.ts", "src/editor/saveQueue.ts"],
+    does: "replaces a buffer or moves its disk facts; only model.ts and saveQueue.ts do",
+  },
+};
+
+/** Rule 1 across src/, by resolved symbol, in `program` (`only`: paths to check). */
+export function symbolFailures(program, root, only) {
+  const checker = program.getTypeChecker();
+  const failures = new Set();
+  for (const file of program.getSourceFiles()) {
+    const path = relative(root, file.fileName);
+    if (!path.startsWith("src/") || isTestSide(path) || (only && !only.has(path))) continue;
+    const at = (node) => `${path}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`;
+    const resolved = (node) => {
+      let symbol = checker.getSymbolAtLocation(node);
+      if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+      const declaration = symbol?.declarations?.[0];
+      return declaration
+        ? { name: symbol.name, from: relative(root, declaration.getSourceFile().fileName) }
+        : null;
+    };
+    ts.forEachChild(file, function walk(node) {
+      if (ts.isIdentifier(node)) {
+        const target = resolved(node);
+        const rule = target && WRITERS[target.from];
+        if (rule && rule.names.includes(target.name) && target.from !== path && !rule.users.includes(path))
+          failures.add(`${at(node)}: uses ${target.name}, which ${rule.does}`);
+      }
+      if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
+        let inner = node.expression;
+        while (ts.isParenthesizedExpression(inner) || ts.isNonNullExpression(inner)) inner = inner.expression;
+        const callee = ts.isCallExpression(inner) ? resolved(inner.expression) : null;
+        if (callee?.name === "bufferLines" && callee.from === "src/editor/buffers.ts")
+          failures.add(`${at(node)}: casts the buffer's read-only view; change a buffer through model.ts`);
+      }
+      ts.forEachChild(node, walk);
+    });
+  }
+  return [...failures];
+}
+
+/** Rule 1 by symbol, over the whole app. */
+export function projectSymbolFailures(root) {
+  const config = compilerOptions(root);
+  return symbolFailures(ts.createProgram(config.fileNames, config.options), root);
+}
+
+/** Rule 1 by symbol for in-memory sources (paths relative to `root`) against
+ * the real project they import: what the fixture tests use. */
+export function sourceSymbolFailures(root, sources) {
+  const config = compilerOptions(root);
+  const virtual = new Map(Object.entries(sources).map(([path, text]) => [resolve(root, path), text]));
+  const host = ts.createCompilerHost(config.options);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (name, language, ...rest) =>
+    virtual.has(resolve(name))
+      ? ts.createSourceFile(name, virtual.get(resolve(name)), language, true)
+      : getSourceFile(name, language, ...rest);
+  const fileExists = host.fileExists.bind(host);
+  host.fileExists = (name) => virtual.has(resolve(name)) || fileExists(name);
+  const readFile = host.readFile.bind(host);
+  host.readFile = (name) => virtual.get(resolve(name)) ?? readFile(name);
+  const program = ts.createProgram([...virtual.keys()], config.options, host);
+  return symbolFailures(program, root, new Set(Object.keys(sources)));
+}
+
 function sourceFiles(root, dir = "src", out = {}) {
   for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
     const path = `${dir}/${entry.name}`;
@@ -143,7 +219,7 @@ function sourceFiles(root, dir = "src", out = {}) {
 
 if (import.meta.main) {
   const root = process.cwd();
-  const failures = ownerFailures(sourceFiles(root));
+  const failures = [...ownerFailures(sourceFiles(root)), ...projectSymbolFailures(root)];
   if (failures.length) {
     console.error(
       `check:owners failed:\n${failures.map((f) => `  - ${relative(root, join(root, f))}`).join("\n")}`,
