@@ -864,6 +864,8 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
 /// them silently re-enabled the Brain on a vault the user explicitly chose raw
 /// (pressure-test). A destination that already has settings keeps them: its
 /// own prior choices outrank this flow's. Never touches any other file.
+/// The Librarian route's opt-in (`librarianMcp`) belongs to the one vault the
+/// person turned it on for, so it is left behind.
 pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
     let src = current.join(".rotli").join("settings.json");
     let dst_dir = new_root.join(".rotli");
@@ -872,10 +874,20 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
-    fs::copy(&src, &dst)
-        .map_err(|e| format!("carry settings: {e}"))
-        .map(|_| ())
+    let raw = fs::read_to_string(&src).map_err(|e| format!("carry settings: {e}"))?;
+    let carried = match serde_json::from_str::<serde_json::Value>(&raw) {
+        Ok(serde_json::Value::Object(mut settings)) if settings.contains_key(LIBRARIAN_MCP_SETTING) => {
+            settings.remove(LIBRARIAN_MCP_SETTING);
+            serde_json::to_string(&settings).map_err(|e| format!("carry settings: {e}"))?
+        }
+        _ => raw,
+    };
+    fs::write(&dst, carried).map_err(|e| format!("carry settings: {e}"))
 }
+
+/// The per-vault switch for the Librarian agent route (`rotli mcp
+/// --librarian`, workspace_librarian.rs) in `.rotli/settings.json`.
+pub(crate) const LIBRARIAN_MCP_SETTING: &str = "librarianMcp";
 
 fn upsert_brain_config(
     cfg: &mut CorpusConfig,
@@ -11642,6 +11654,29 @@ mod tests {
         let bare = tmp.path().join("bare");
         fs::create_dir_all(&bare).unwrap();
         carry_settings(&bare, &fresh).unwrap();
+    }
+
+    /// The Librarian route is turned on per vault (`librarianMcp`). A vault
+    /// created, adopted, or imported from one that had it on must start with
+    /// it off; every other choice still rides along.
+    #[test]
+    fn carry_settings_never_carries_the_librarian_opt_in() {
+        let tmp = TempDir::new().unwrap();
+        let old = tmp.path().join("old");
+        let fresh = tmp.path().join("fresh");
+        fs::create_dir_all(old.join(".rotli")).unwrap();
+        fs::create_dir_all(&fresh).unwrap();
+        fs::write(
+            old.join(".rotli/settings.json"),
+            r#"{"brainEnabled":false,"librarianMcp":true,"librarianRules":{"secureKeywords":["bank"]}}"#,
+        )
+        .unwrap();
+        carry_settings(&old, &fresh).unwrap();
+        let carried: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(fresh.join(".rotli/settings.json")).unwrap()).unwrap();
+        assert_eq!(carried.get(LIBRARIAN_MCP_SETTING), None, "the opt-in stays with its vault");
+        assert_eq!(carried["brainEnabled"], serde_json::json!(false));
+        assert_eq!(carried["librarianRules"]["secureKeywords"][0], "bank", "secure keywords still ride along");
     }
 
     /// The Tasks projection (decision 2026-07-25): open checkboxes only, fenced

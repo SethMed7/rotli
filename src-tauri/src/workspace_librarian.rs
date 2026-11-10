@@ -66,7 +66,7 @@ pub(super) const LOG: &str = "librarian_log";
 pub(super) const REVIEW: &str = "librarian_review";
 /// The skill `librarian_guide` returns when none is named.
 pub(super) const FIRST_SKILL: &str = "keep-the-wiki";
-pub(super) const SETTING: &str = "librarianMcp";
+pub(super) const SETTING: &str = crate::corpus::LIBRARIAN_MCP_SETTING;
 const INDEX_TITLE: &str = "Librarian index";
 const LOG_TITLE: &str = "Librarian log";
 const PROPOSALS: &str = ".rotli/librarian/proposals.jsonl";
@@ -196,10 +196,12 @@ fn guide(skill: Option<&str>) -> Result<Value, String> {
 
 /// The Librarian route is reachable from every build, stable included: it is
 /// already opt-in per vault (`librarianMcp`), and agent hosts on a stable
-/// install need it. The full workspace server and `rotli agent …` stay behind
-/// the development-build gate.
+/// install need it. The full workspace server, its `rotli mcp config`, and
+/// `rotli agent …` stay behind the development-build gate.
 pub(super) fn skips_agent_gate(args: &[String]) -> bool {
-    args.first().map(String::as_str) == Some("mcp") && args.iter().any(|arg| arg == "--librarian")
+    args.first().map(String::as_str) == Some("mcp")
+        && args.get(1).map(String::as_str) != Some("config")
+        && args.iter().any(|arg| arg == "--librarian")
 }
 
 /// `rotli mcp --librarian [--vault PATH]`: bind once, then serve stdio.
@@ -250,7 +252,7 @@ fn require_on(root: &Path) -> Result<(), String> {
     if enabled(root) {
         Ok(())
     } else {
-        Err("The Librarian is off for this vault. The person turns it on in Rotli (Settings → Librarian → Let agents keep this vault).".into())
+        Err(r#"The Librarian is off for this vault. The person turns it on by setting "librarianMcp": true in the vault's .rotli/settings.json."#.into())
     }
 }
 

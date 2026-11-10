@@ -231,9 +231,13 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   another folder, or a link, now stands at that path. `--root` is refused here.
 - **Off by default.** Every call except `librarian_guide` refuses unless the
   vault's `.rotli/settings.json` holds `"librarianMcp": true` (anything else,
-  missing or malformed, is off). Rust only reads that file. Unlike the rest of
+  missing or malformed, is off). Rust only reads that file, except that a
+  vault created, adopted, or brought in as a copy starts with the switch off:
+  `carry_settings` copies the other settings across and leaves this one behind.
+  The refusal names the switch. Unlike the rest of
   MCP, the route runs from stable builds too: the per-vault switch is its
-  opt-in (`skips_agent_gate`).
+  opt-in (`skips_agent_gate`). `rotli mcp config`, which sets up the full
+  workspace server, stays gated even with `--librarian`.
 - **Nine tools:** `librarian_guide`, `librarian_search`, `librarian_read`,
   `librarian_capture`, `librarian_file`, `librarian_link`, `librarian_index`,
   `librarian_log`, `librarian_review`. Behaviour lives in five skills compiled

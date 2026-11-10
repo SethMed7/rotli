@@ -71,7 +71,10 @@ fn the_route_is_off_until_the_vault_turns_it_on() {
         (CAPTURE, json!({"title":"T","body":"b"})),
         (REVIEW, json!({})),
     ] {
-        assert!(refusal(&mcp(&temp, name, args)).contains("The Librarian is off"), "{name}");
+        let refused = refusal(&mcp(&temp, name, args));
+        assert!(refused.contains("The Librarian is off"), "{name}");
+        // the refusal names the switch that exists today, not a Settings page that doesn't
+        assert!(refused.contains(r#""librarianMcp": true"#) && !refused.contains("Settings →"), "{refused}");
     }
     // the skills are static help text, readable before the switch is on
     let guide = ok(mcp(&temp, GUIDE, json!({})));
@@ -106,6 +109,9 @@ fn only_the_librarian_route_skips_the_development_build_gate() {
     assert!(skips_agent_gate(&args(&["mcp", "--librarian"])));
     assert!(!skips_agent_gate(&args(&["mcp"])));
     assert!(!skips_agent_gate(&args(&["mcp", "config"])));
+    // `mcp config` prints the full workspace server's setup, which stays gated
+    assert!(!skips_agent_gate(&args(&["mcp", "config", "--librarian"])));
+    assert!(skips_agent_gate(&args(&["mcp", "--vault", "/v", "--librarian"])));
     assert!(!skips_agent_gate(&args(&["agent", "--librarian"])));
 }
 
