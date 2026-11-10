@@ -40,6 +40,7 @@ import { deriveSecureReview } from "../services/secureReview";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { ChevronRight, GearGlyph } from "./glyphs";
+import { LibrarianSettingsNotice } from "./librarianSettingsNotice";
 
 /** The status strip's plain words for the trust rung + organizing model. */
 const TRUST_WORDS: Record<string, string> = {
@@ -576,6 +577,7 @@ export function ActivitySurface() {
       {brainOn && status?.modelOffline && (
         <p className="brain-hint act-pad">Paused — local model offline. {status.queued} waiting.</p>
       )}
+      {brainOn && <LibrarianSettingsNotice error={status?.lastError} />}
       {/* the secure-review confirm lane (feature B, decision 2026-07-22): the
           detector PROPOSES, the user disposes — nothing is ever auto-marked
           from here. "Not sensitive" is remembered for that exact content.

@@ -78,6 +78,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "fileHeaderMarks.tsx": "FileSurface header status marks: Beta, or why editing is off",
   "emptyState.tsx": "shared empty-state primitive",
   "fileNotice.tsx": "application-shell transient notice for Finder drops and pastes that landed out of sight",
+  "librarianSettingsNotice.tsx": "Librarian Activity: what to do when the vault's settings can't be read",
   "glyphs.tsx": "shared first-party glyph registry",
   "noteGlyph.tsx": "shared row mark for a note, board, canvas, or file (split from glyphs.tsx)",
   "hotkeyBadges.tsx": "shared shortcut badge overlay",

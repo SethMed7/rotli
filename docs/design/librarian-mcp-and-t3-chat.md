@@ -262,12 +262,13 @@ Still open, reachable only through the route:
    deduplicate on `targetId`, and return an existing proposal only when
    `visible_pending` would show it. Test: link to A, make A secure, alias
    public B with A's title, repeat the link.
-3. **#6 Consent follows copied or linked settings.** `enabled` reads
-   `.rotli/settings.json` through symlinks, and a vault folder copied by hand
-   keeps the switch. Fix: read the switch through the no-follow, single-link
-   sidecar path, and tie it to the vault's identity, or reset it when a new
-   folder is registered. Test: a settings symlink to another vault's enabled
-   settings, and a hand-made copy of an enabled vault, both stay off.
+3. **#6 Consent follows a copied vault's settings.** Linked settings are now
+   covered: `enabled` reads `.rotli/settings.json` through the checked
+   reader (`fsutil::read_own_sidecar`: no symlink, no hard link), and a
+   settings file it can't read that way counts as off. Still open: a vault
+   folder copied by hand keeps the switch. Fix: tie the switch to the
+   vault's identity, or reset it when a new folder is registered. Test: a
+   hand-made copy of an enabled vault stays off.
 4. **#7 Apply trusts the proposals file.** `decide` applies a link whose
    target has since turned secure, and builds `[[target]]` from the stored
    title, so an edited line can insert any Markdown. Proposals keep no source

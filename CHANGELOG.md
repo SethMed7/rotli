@@ -41,8 +41,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/ai`, Hand to AI, chat titles, hybrid presets, a chat's conversation
   notes, and the Librarian build their prompts from text the read check
   returned for the model that will read it, and the Librarian's background
-  filing from notes its own, stricter check cleared. Rotli's build now
-  checks this for every prompt.
+  filing from notes its own, stricter check cleared. Rotli's build checks
+  how these prompts are put together, which catches a note's text taken the
+  wrong way by mistake. It is a guard against mistakes, not a proof against
+  code written on purpose to get around it.
+- **A conversation that used something only an on-device model may read
+  stays on-device.** An on-device Librarian could read a secure person's
+  name and say it; switched to a remote model, the next message carried that
+  reply to it. Now, once anything the read check passed only for an
+  on-device model goes into a Librarian conversation, sending it to a remote
+  model is refused, with nothing sent: "This conversation includes notes
+  only an on-device model can read. Start a new one to use …", and one
+  button starts the new one. "Open in Chat" carries the same mark into the
+  chat it opens, and a chat marks itself the same way whenever any of its
+  reads was on-device only. A note that was public when it was read and is
+  made secure later isn't taken back out of a conversation.
+- **A model is sent a note as you last saved it.** The Librarian could
+  answer about the version before your last few keystrokes while that save
+  was still on its way, and a passage you had just highlighted silently
+  dropped out of its request. The Librarian, `/ai`, Hand to AI, a chat
+  attached to a note, and a chat's conversation notes now wait for the save
+  in progress. If it failed, or the note still differs from what was saved,
+  nothing is sent, and you see the save's error or "Still saving. Try again
+  in a moment." A highlighted passage that isn't in the saved note is a
+  refusal that says so.
 - **Rotli Web reads and edits a note for a model in one read.** Its check
   and the words or the edit a model gets came from two separate reads, so a
   note made secure in between could reach the model.
@@ -71,7 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Helper served it to Rotli Web. Rotli now opens a file in your vault only
   when it has no other name, checked on the file it actually opened. The
   same check covers what Rotli keeps in your vault: its settings, its
-  history, and its lists of views and chat folders. One exception: an image
+  history, and its lists of views and chat folders, and a hard link in place
+  of your settings is never copied into the vault when a save replaces it.
+  Where Rotli only checks whether something exists or is switched on (a
+  vault's users file, the Librarian route's switch, AI file grants), a file
+  it can't read this way counts as absent or off. One exception: an image
   shown inside a note is checked just before the view loads it, so a file
   swapped for a hard link at that instant can still be shown. Such files are
   left out of lists and search, and Rotli never changes them.
@@ -84,8 +110,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the browser can't tell a hard link apart, so connect it through Rotli
   Helper for this check.
 - **The Librarian stops when it can't read your rules.** If your vault's
-  settings can't be read, it doesn't classify, organise or file anything and
-  says so, instead of working without your filing rules and secure keywords.
+  settings can't be read, it doesn't classify, organise or file anything,
+  instead of working without your filing rules and secure keywords.
+  Librarian Activity says so, says where the settings file is, and says
+  that changing any setting saves a new one, keeping the unreadable file
+  beside it.
 - **A note locked or made secure while a change waits is left alone.** An
   agent's move or edit, the Librarian's filing, and its field writes check
   the note again at the moment they act, not only before waiting their turn.
