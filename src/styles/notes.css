@@ -2310,6 +2310,23 @@
 /* — editor chassis (r2 padding; the body/marks/raw-line/format-bar styles
      live in editor.css, phase 1b; the r4 statpill was superseded by the r5
      header-inline status) — */
+/* An open note that has a hard link (src/editor/hardLinkedNote.tsx): the
+   sidebar notice's words, centred in the pane, quiet. */
+.hard-linked-note {
+  max-width: 440px;
+  margin: 72px auto 0;
+  padding: 0 24px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.hard-linked-note-text {
+  margin: 0 0 6px;
+  color: var(--text);
+}
+.hard-linked-note-help {
+  margin: 0;
+}
 .editor {
   flex: 1;
   background: var(--surface);
@@ -2536,6 +2553,51 @@
    Librarian · Settings split one quiet row under the System rows — */
 /* the footer sits OUTSIDE the System zone since the fronts landed (2026-08-01):
    it shows under Home and Chat alike, so it owns its own inset + hairline */
+/* The vault's notice for files Rotli left out because they have a hard link
+   (src/components/skippedFilesNotice.tsx): quiet text on the sidebar's own
+   ground, a hairline above, no badge or alarm colour. */
+.skipped-notice {
+  flex: 0 0 auto;
+  margin: 0 12px;
+  padding: 10px 2px 4px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.skipped-notice-text,
+.skipped-notice-help {
+  margin: 0;
+}
+.skipped-notice-toggle {
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.skipped-notice-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+.skipped-notice-list {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.skipped-notice-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 .sb-foot {
   flex: 0 0 auto;
   position: relative;

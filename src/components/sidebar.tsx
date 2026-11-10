@@ -46,6 +46,7 @@ import { SidebarHome } from "./sidebar/sidebarHome";
 import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
 import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
+import { SkippedFilesNotice } from "./sidebar/skippedFilesNotice";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
 import { useConnectVault } from "./sidebar/useConnectVault";
@@ -480,6 +481,7 @@ export function Sidebar() {
       {/* the player sits right above the footer (2026-09-28): a tab's media,
           and the ambient track when Ambient audio is on */}
       <MediaPlayer />
+      <SkippedFilesNotice />
       <SidebarFooter />
     </aside>
   );

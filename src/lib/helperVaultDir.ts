@@ -29,6 +29,7 @@ import {
   normalizeVaultPath as normalize,
   parentPath as parentOf,
 } from "../services/vaultDir";
+import type { SkippedFile } from "../types";
 import { bytesFromBase64, bytesToBase64 } from "./base64Bytes";
 
 export type HelperCall = (cmd: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -42,6 +43,10 @@ interface Entry {
 interface WalkEntry extends Entry {
   path: string;
 }
+
+/** A Helper that knows the `skipped` option answers `{ entries, skipped }`;
+ * an older one answers the bare array. */
+type WalkAnswer = WalkEntry[] | { entries: WalkEntry[]; skipped: SkippedFile[] };
 
 /** A mutation not yet acknowledged by the helper, kept so an outage that
  * outlives the tab can hand it to the next boot. */
@@ -90,6 +95,8 @@ function isConflict(error: unknown): boolean {
 export class HelperVaultDir implements VaultDir {
   private entries = new Map<string, Entry>();
   private walkedAt = 0;
+  /** What the last walk left out (a hard-linked file), to tell the person. */
+  private skippedFiles: SkippedFile[] = [];
   private walking: Promise<void> | null = null;
   /** Bumped by every local mutation: a walk that raced one is discarded. */
   private mutations = 0;
@@ -187,12 +194,18 @@ export class HelperVaultDir implements VaultDir {
 
   private async walk(): Promise<void> {
     const before = this.mutations;
-    const listed = await this.request<WalkEntry[]>("vault_walk", { path: "" });
+    const answer = await this.request<WalkAnswer>("vault_walk", { path: "", skipped: true });
     // a local write landed while the walk was out: its view may predate it
     if (this.mutations !== before) return this.walk();
+    const listed = Array.isArray(answer) ? answer : answer.entries;
     const next = new Map<string, Entry>();
     for (const e of listed) next.set(e.path, { kind: e.kind, lastModified: e.lastModified, size: e.size });
     this.entries = next;
+    this.skippedFiles = Array.isArray(answer)
+      ? []
+      : answer.skipped
+          .filter((file) => file.reason === "hardLink")
+          .map(({ path, reason }) => ({ path, reason }));
     this.walkedAt = Date.now();
   }
 
@@ -208,6 +221,11 @@ export class HelperVaultDir implements VaultDir {
   }
 
   // ── VaultDir ───────────────────────────────────────────────────────────────
+
+  async skipped(): Promise<SkippedFile[]> {
+    await this.fresh();
+    return [...this.skippedFiles];
+  }
 
   async list(path: string): Promise<VaultDirEntry[]> {
     await this.fresh();

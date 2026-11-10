@@ -18,7 +18,7 @@ import {
   isTauri,
 } from "../lib/tauri";
 import type { NoteCreationPolicy } from "../security/secureNotes";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { snippetOf, titleOf } from "./derive";
 import {
   DEST,
@@ -123,6 +123,11 @@ export class FsNotesService implements NotesService {
   async listAll(): Promise<NoteSummary[]> {
     const { notes } = await corpusList();
     return [...notes]; // the payload may be shared with other callers
+  }
+
+  /** What the same walk left out (a hard-linked file), from the same listing. */
+  async listSkipped(): Promise<SkippedFile[]> {
+    return [...((await corpusList()).skipped ?? [])];
   }
 
   /** FULL-TEXT search — Rust walks + reads + matches (corpus_search), same

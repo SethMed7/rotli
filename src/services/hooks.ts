@@ -8,6 +8,7 @@ import { looksSecret } from "../ai/guard";
 import { bodyLinkTargets } from "../graph/linkTargets";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isCanvasPath } from "../lib/fileKind";
+import { hardLinked } from "../lib/hardLinks";
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
   corpusFileStat,
@@ -20,7 +21,7 @@ import {
 } from "../lib/tauri";
 import { secureRepairScan } from "../lib/vaultRepair";
 import { useUiStore } from "../state/ui";
-import type { Note, NoteSummary, SearchHit } from "../types";
+import type { Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
@@ -47,6 +48,7 @@ export const keys = {
   // 2026-07). null can never collide with a folder id (ids are strings).
   notes: (folderId?: string) => ["notes", folderId ?? null] as const,
   note: (id: string) => ["note", id] as const,
+  skipped: ["skipped-files"] as const,
   memexRoots: ["memex-root-markers"] as const,
   journal: ["journal"] as const,
   organizer: ["organizer-status"] as const,
@@ -295,6 +297,19 @@ export function useLiveNoteSearch(query: string): {
   return { hits: result.data, state: "settled" };
 }
 
+/** The files the vault's listing left out because they have a hard link
+ * (empty where the host can't tell). invalidateNotes refetches it with the
+ * notes, so every vault change keeps it current. */
+export function useSkippedFiles(): SkippedFile[] {
+  return (
+    useQuery({
+      queryKey: keys.skipped,
+      queryFn: async () => hardLinked(await (notesService.listSkipped?.() ?? Promise.resolve([]))),
+    }).data ?? NO_SKIPPED
+  );
+}
+const NO_SKIPPED: SkippedFile[] = [];
+
 export function useNote(id: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: keys.note(id),
@@ -329,6 +344,7 @@ export async function invalidateNotes(): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["notes"] }),
     queryClient.invalidateQueries({ queryKey: ["note"] }),
+    queryClient.invalidateQueries({ queryKey: keys.skipped }),
     // a body edit can add/complete checkboxes — the Tasks projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
     // …and add or drop a wikilink — the Graph's Links projection re-derives

@@ -24,7 +24,7 @@ import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import {
   DEST,
@@ -107,6 +107,9 @@ export class FolderNotesService implements NotesService {
   private imported = false;
 
   constructor(private readonly dir: VaultDir) {}
+
+  /** The files the vault's host left out because they have a hard link. */
+  listSkipped = async (): Promise<SkippedFile[]> => (this.dir.skipped ? this.dir.skipped() : []);
 
   /** The memex-root marker set used by the All-Notes chats/ exclusion. A memex
    * vault's default root is the bare "" marker; a plain folder has none. */

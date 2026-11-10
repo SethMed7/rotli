@@ -11,6 +11,7 @@ import { useNoteMenu } from "../components/useNoteMenu";
 import { dispatch } from "../keys/registry";
 import { relativeLabel } from "../lib/dateLabels";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { isHardLinkRefusal } from "../lib/hardLinks";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
 import {
@@ -41,6 +42,7 @@ import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
+import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
@@ -154,7 +156,10 @@ export function EditorSurface({
     }),
     [noteId, pendingCreatedAt],
   );
-  const storedNote = useNote(noteId, { enabled: !pending }).data;
+  const stored = useNote(noteId, { enabled: !pending });
+  const storedNote = stored.data;
+  // a note that has (or came to have) a hard link is not shown, even from cache
+  const hardLinked = !pending && isHardLinkRefusal(stored.error);
   const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
@@ -386,6 +391,13 @@ export function EditorSurface({
     return () => ro.disconnect();
   }, [formatBarVisible, noteReady]);
 
+  if (hardLinked) {
+    return (
+      <div className="editor" ref={rootRef}>
+        <HardLinkedNote />
+      </div>
+    );
+  }
   if (!note) return <div className="editor" ref={rootRef} />;
 
   const fontSize = focusMode ? FOCUS_SIZE : style.size;

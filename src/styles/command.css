@@ -100,6 +100,16 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
+/* files left out because they have a hard link: one quiet line under the
+   results (src/lib/hardLinks.ts) */
+.pal-skipped {
+  margin: 0;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
 .pal-foot {
   display: flex;
   gap: 16px;

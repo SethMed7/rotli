@@ -14,7 +14,13 @@ import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { useTransientPopover } from "../lib/popover";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
-import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
+import {
+  useFolders,
+  useNoteIndex,
+  useNoteSearch,
+  useSearchableNotes,
+  useSkippedFiles,
+} from "../services/hooks";
 import { isTitleHit } from "../services/search";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
@@ -26,6 +32,7 @@ import { Icon } from "./icon";
 import { MatchText } from "./matchText";
 import { glyphForNote } from "./noteGlyph";
 import { paletteMatchScore, rankSearchGroups, searchActionLabel } from "./paletteModel";
+import { SearchSkippedLine } from "./sidebar/skippedFilesNotice";
 
 function actionIcon(id: string): ReactNode {
   if (id === "notes.new" || id === "tabs.new") return <PlusGlyph size={15} />;
@@ -56,6 +63,8 @@ interface Group {
 
 export function Palette({ onClose, breveActive = false }: { onClose: () => void; breveActive?: boolean }) {
   const [query, setQuery] = useState("");
+  // files left out because they have a hard link: said once, under the results
+  const skipped = useSkippedFiles();
   const [index, setIndex] = useState(0);
   const palRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -404,6 +413,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           ))}
           {flat.length === 0 && <div className="pal-empty">Nothing matches — try different words?</div>}
         </div>
+        <SearchSkippedLine query={query} count={skipped.length} />
         <div className="pal-foot">
           <span>
             <kbd>↑</kbd>
