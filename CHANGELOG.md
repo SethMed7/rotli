@@ -166,15 +166,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the words stay in memory until the save lands. Quitting waits up to 12
   seconds (inside the Mac's own 15) for the saves still out; if one hasn't
   finished, Rotli stays open and names the note and what is outstanding. The
-  Mac keeps no copy of unsaved words outside memory, so a force quit still
-  loses what hadn't been saved; Rotli Web keeps a recovery copy.
+  Mac keeps no copy of unsaved words outside memory, so a force quit loses
+  everything typed since the last save that landed; Rotli Web keeps a
+  recovery copy.
+- **Quit can't go ahead with words you just typed.** A note that finished
+  saving early kept taking typing while another window or a workbook was
+  still saving, and quit went ahead with those words unsaved. From the
+  moment you quit until Rotli has finished or stayed open, the editors take
+  no typing ("Finishing saving…"), and quit goes ahead only when a last
+  check, after everything has saved, finds nothing unsaved in any note. This
+  happens in 1.9.1.
+- **A late read can't put older words back.** If a note's file was read
+  just before your newest save landed and that read answered afterwards,
+  the editor took the older words and showed them as saved. Each read now
+  carries when it started, and one older than what the editor already has is
+  dropped. This happens in 1.9.1.
 - **Words typed while Rotli copies aside a conflict are kept.** When another
   app changed a note you had unsaved edits in, quitting keeps your version as
   a copy beside it. Anything typed while that copy was being made was
   dropped, and the note looked saved. It's now part of the note's saves: the
   newer words go into that same copy (never a second one), and the note is
-  read again before it takes the other app's version. This happens in
-  1.9.1.
+  read again before it takes the other app's version. A notice in the
+  sidebar now says where your words went and opens the copy; before, nothing
+  did. This happens in 1.9.1.
 - **A slow save is waited for, never raced.** A disk that stopped answering
   left every later save of that note waiting, and every quit ran into its
   15-second limit. An earlier fix in this release tried again beside the
@@ -184,21 +198,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expected, keeps your words and stays unsaved, and nothing else goes out
   for it until the disk answers; then your newest words are saved on top.
   While that save is out, quitting is refused after 12 seconds, naming the
-  note. If the disk never answers, the only way out today is a force quit,
-  which loses that note's unsaved words on the Mac.
+  note. If the disk never answers, that note stays unsaved for the rest of
+  the session: copy its text out before you quit, because the only way out
+  is a force quit, which loses its unsaved words on the Mac.
 - **A save whose answer was lost isn't mistaken for another app's edit.**
   When a save landed but its answer didn't come back, Rotli could later
   take its own words on disk for someone else's change: merge your newer
   words away, or make a conflict copy of your own text. It now remembers
   such a save's words and builds on them, and doesn't merge while it can't
-  tell. A conflict copy whose answer was lost is looked for before another
-  is made, so each conflict gets one copy.
-- **A note deleted while it had unsaved words asks what to do.** Its saves
-  failed with no way out, and Rotli couldn't quit. A notice in the sidebar
-  now offers to keep the words as a new note in your Inbox (secure and
-  locked when the deleted note was) or to discard them; either lets Rotli
-  quit, and anything typed while the new note is being made goes into it.
-  This happens in 1.9.1.
+  tell. Each conflict gets one copy: its id is written into the copy, and a
+  create whose answer was lost is asked again with that id, which gives back
+  the copy it made (protection checked) instead of another. A create also
+  answers with exactly what it wrote, so another writer's change right after
+  it can't be taken for Rotli's.
+- **A note deleted while it had unsaved words says so.** Its saves failed
+  with no way out. Now its words stay in its editor, a notice in the
+  sidebar says the file is gone and offers to copy the words or discard
+  them, and quit names the note until they are discarded. This happens in
+  1.9.1.
 - **A secure note's conflict copy stays secure on the Mac.** The copy Rotli
   keeps of your version when another app changed the note was created as an
   ordinary note, because the Mac's note read didn't say the note was secure.
