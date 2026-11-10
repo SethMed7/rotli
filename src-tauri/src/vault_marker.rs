@@ -53,7 +53,7 @@ const COMPANIONS: [&str; 3] = ["users.json", "memex.local.json", "identities.loc
 fn marker_at(path: &Path) -> bool {
     let regular = fs::symlink_metadata(path).map(|m| m.file_type().is_file()).unwrap_or(false);
     regular
-        // raw read: the vault's marker file
+        // raw read (identity): the vault's marker file
         && fs::read_to_string(path)
             .ok()
             .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
@@ -114,16 +114,16 @@ pub(crate) fn heal(root: &Path) -> Result<(), String> {
         // the sweep made the folder for our files; leave it only if it holds others
         let _ = fs::remove_dir(&dir);
     } else if restore_from_backup {
-        // raw read: the vault's marker and its backup
+        // raw read (identity): the vault's marker and its backup
         let text = fs::read_to_string(root.join(BACKUP)).map_err(|e| format!("read marker backup: {e}"))?;
         crate::fsutil::atomic_write(&root.join(MARKER), &text, ".memex-json-")?;
     }
     if !marker_at(&root.join(MARKER)) {
         return Ok(());
     }
-    // raw read: the vault's marker and its backup
+    // raw read (identity): the vault's marker and its backup
     let text = fs::read_to_string(root.join(MARKER)).map_err(|e| format!("read {MARKER}: {e}"))?;
-    // raw read: the vault's marker and its backup
+    // raw read (identity): the vault's marker and its backup
     if fs::read_to_string(root.join(BACKUP)).ok().as_deref() != Some(text.as_str()) {
         fs::create_dir_all(root.join(".rotli")).map_err(|e| format!("create .rotli: {e}"))?;
         crate::fsutil::atomic_write(&root.join(BACKUP), &text, ".memex-json-")?;

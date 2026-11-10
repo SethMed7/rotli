@@ -54,7 +54,7 @@ fn default_models() -> Vec<ChatModel> {
 fn read_models() -> Option<Vec<ChatModel>> {
     let home = std::env::var("HOME").ok()?;
     let path = std::path::Path::new(&home).join(".memex/ai/registry.json");
-    // raw read: app config outside any vault
+    // raw read (outside-vault): app config outside any vault
     let raw = std::fs::read_to_string(path).ok()?;
     let reg: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let providers = reg.get("providers")?;

@@ -133,7 +133,7 @@ fn looks_complete(dir: &Path) -> bool {
 // ── registry read/write (splice one entry, never clobber the rest) ────────────
 
 fn read_registry() -> Result<serde_json::Value, String> {
-    // raw read: the shared on-device model registry outside any vault
+    // raw read (outside-vault): the shared on-device model registry outside any vault
     let raw = std::fs::read_to_string(registry_path())
         .map_err(|e| format!("can't read the memex-ai registry: {e}"))?;
     serde_json::from_str(&raw).map_err(|e| format!("the registry isn't valid JSON: {e}"))

@@ -331,7 +331,7 @@ mod tests {
         let vault = tempfile::TempDir::new().unwrap();
         let abs = vault.path().join("Docs/linked.docx");
         let _outside = crate::fsutil::hard_link_outside(&abs, b"PK outside the vault");
-        assert!(document_contents_gate(&abs).unwrap_err().contains("of its own"));
+        assert!(document_contents_gate(&abs).unwrap_err().contains("hard link"));
     }
 
     fn request(tool: &str, root: &Path, read_only: bool) -> BridgeRequest {

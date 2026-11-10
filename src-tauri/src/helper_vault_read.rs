@@ -15,31 +15,48 @@ use super::{joined, millis, parse_rel, resolve, skipped_dir, stat_json, Refusal,
 /// Never listed or walked: a link (symlink or junction), or a file with a
 /// second name, whose hard link can be a file outside the vault.
 fn skipped_entry(metadata: &fs::Metadata) -> bool {
-    crate::containment::is_link_like(metadata) || (metadata.is_file() && !crate::fsutil::has_one_name(metadata))
+    crate::containment::is_link_like(metadata) || hard_linked(metadata)
+}
+
+fn hard_linked(metadata: &fs::Metadata) -> bool {
+    metadata.is_file() && !crate::fsutil::has_one_name(metadata)
 }
 
 /// Every file and directory beneath `rel`, one call: what the page's notes
-/// service would otherwise ask for one `stat` at a time.
-pub(super) fn walk(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
+/// service would otherwise ask for one `stat` at a time. With `with_skipped`
+/// (third review of pull request 267, #5) the answer is `{ entries, skipped }`
+/// and names each hard-linked file left out, so Rotli Web can tell the person;
+/// without it, the bare array an older page expects.
+pub(super) fn walk(root: &Path, rel: &[String], with_skipped: bool) -> Result<Value, Refusal> {
     let start = resolve(root, rel)?;
     let mut out = Vec::new();
+    let mut skipped = Vec::new();
     if fs::symlink_metadata(&start).is_ok_and(|m| m.is_dir()) {
-        walk_into(&start, &joined(rel), &mut out)?;
+        walk_into(&start, &joined(rel), &mut out, &mut skipped)?;
     }
-    Ok(Value::Array(out))
+    if !with_skipped {
+        return Ok(Value::Array(out));
+    }
+    let skipped = skipped.into_iter().map(|path| json!({ "path": path, "reason": "hardLink" })).collect();
+    Ok(json!({ "entries": out, "skipped": Value::Array(skipped) }))
 }
 
-fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refusal> {
+fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>, skipped: &mut Vec<String>) -> Result<(), Refusal> {
     let Ok(entries) = fs::read_dir(dir) else { return Ok(()) };
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         // file_type() does not follow links: a symlink is neither, and skipped;
         // a Windows junction can report as a directory, so check the reparse bit too
         let Ok(kind) = entry.file_type() else { continue };
-        if fs::symlink_metadata(entry.path()).map_or(true, |m| skipped_entry(&m)) {
-            continue;
-        }
         let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
+        match fs::symlink_metadata(entry.path()) {
+            Ok(metadata) if hard_linked(&metadata) && !name.starts_with('.') => {
+                skipped.push(path);
+                continue;
+            }
+            Ok(metadata) if !skipped_entry(&metadata) => {}
+            _ => continue,
+        }
         if kind.is_dir() {
             if skipped_dir(&name) {
                 continue;
@@ -49,7 +66,7 @@ fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refus
             if out.len() > MAX_WALK_ENTRIES {
                 return Err((413, "This folder holds too many files to be a notes vault.".into()));
             }
-            walk_into(&entry.path(), &path, out)?;
+            walk_into(&entry.path(), &path, out, skipped)?;
         } else if kind.is_file() {
             let metadata = entry.metadata().map_err(|e| (500, e.to_string()))?;
             out.push(json!({ "path": path, "kind": "file", "lastModified": millis(metadata.modified()), "size": metadata.len() }));

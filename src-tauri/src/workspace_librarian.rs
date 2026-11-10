@@ -233,9 +233,10 @@ pub(super) fn bind_vault(vault: Option<&str>, cwd: &Path, targets: Vec<RootTarge
 /// of `rotli mcp`, is development-only (`feature_policy::cli_gate`).
 pub(super) fn enabled(root: &Path) -> bool {
     crate::feature_policy::agents_enabled()
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        && fs::read_to_string(root.join(".rotli/settings.json"))
+        // unreadable (a hard link included) reads as off
+        && crate::fsutil::read_own_sidecar(&root.join(".rotli/settings.json"))
         .ok()
+        .flatten()
         .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
         .and_then(|settings| settings.get(SETTING).and_then(Value::as_bool))
         == Some(true)

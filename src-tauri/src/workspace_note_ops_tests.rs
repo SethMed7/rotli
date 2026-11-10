@@ -71,7 +71,7 @@ fn trash_moves_an_ai_made_note_and_refuses_people_locks_and_stale_reads() {
     let rel = ws.store.resolve_note_rel(&note.id).unwrap();
     assert!(rel.starts_with("Trash/"), "soft delete, not gone: {rel}");
     assert!(ws.store.root().join(&rel).exists());
-    let rows = ws.store.ai_journal_rows();
+    let rows = ws.store.ai_journal_rows().unwrap();
     assert_eq!(rows.last().unwrap().action, TRASH);
     assert!(rows.last().unwrap().content_free);
 
@@ -110,7 +110,7 @@ fn trash_decides_on_the_note_as_it_is_at_the_move() {
         assert!(err.contains(refusal), "{title}: {err}");
         assert_eq!(ws.store.resolve_note_rel(&note.id).unwrap(), rel, "{title} never moved");
     }
-    assert!(!ws.store.ai_journal_rows().iter().any(|row| row.action == TRASH));
+    assert!(!ws.store.ai_journal_rows().unwrap().iter().any(|row| row.action == TRASH));
 }
 
 /// The race itself: another writer holds the note's lock while the agent's
@@ -198,7 +198,7 @@ fn a_secure_notes_edits_are_journaled_without_their_text_and_its_history_is_refu
         .write_for_ai_if_revision(&secure.id, "# Vault\n\nnew words\n", true, &revision)
         .unwrap();
 
-    let row = ws.store.ai_journal_rows().pop().unwrap();
+    let row = ws.store.ai_journal_rows().unwrap().pop().unwrap();
     let chat = AiEditor::chat(true);
     assert_eq!((row.actor.as_str(), row.lane.as_str()), (chat.actor, chat.lane));
     assert!(row.content_free);
@@ -266,7 +266,7 @@ fn an_accepted_insertion_lands_in_a_person_written_note_and_nowhere_it_was_refus
 
     insert(&mut ws, &note.id, &after, inserted, true).unwrap();
     assert_eq!(body_of(&mut ws, &note.id), after);
-    let row = ws.store.ai_journal_rows().pop().unwrap();
+    let row = ws.store.ai_journal_rows().unwrap().pop().unwrap();
     let inline = AiEditor::inline(true);
     assert_eq!((row.actor.as_str(), row.lane.as_str()), (inline.actor, inline.lane));
     assert_eq!(row.status, APPLIED);

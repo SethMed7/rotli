@@ -200,7 +200,7 @@ fn detect_one(root: &Path) -> DetectedMemex {
     let kind: String;
 
     if memex_path.exists() {
-        // raw read: a vault's memex.json identity, read to detect the layout
+        // raw read (identity): a vault's memex.json identity, read to detect the layout
         match fs::read_to_string(&memex_path)
             .ok()
             .and_then(|t| serde_json::from_str::<Value>(&t).ok())
@@ -229,8 +229,9 @@ fn detect_one(root: &Path) -> DetectedMemex {
     let users = root.join("users.json");
     let has_users_json = users.exists();
     let users_json = if has_users_json {
-        // raw read: a vault's memex.json identity, read to detect the layout
-        fs::read_to_string(&users).ok()
+        // what users.json says reaches the person's view: the checked open
+        // (a hard link to a file elsewhere reads as no users file)
+        crate::fsutil::read_own_sidecar(&users).ok().flatten()
     } else {
         None
     };
@@ -316,7 +317,7 @@ fn registry_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 
 pub fn read_registry(app: &tauri::AppHandle) -> InstanceRegistry {
     registry_file(app)
-        // raw read: app config outside any vault
+        // raw read (outside-vault): app config outside any vault
         .and_then(|f| fs::read_to_string(f).ok())
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_default()
@@ -326,7 +327,7 @@ pub fn read_registry(app: &tauri::AppHandle) -> InstanceRegistry {
 
 fn stamp_rotli(memex_path: &Path) -> Result<(), String> {
     with_file_lock(memex_path, || {
-        // raw read: a vault's memex.json, rewritten as config
+        // raw read (identity): a vault's memex.json, rewritten as config
         let raw = fs::read_to_string(memex_path).map_err(|e| e.to_string())?;
         let mut v: Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
         if !v.get("apps").map(|a| a.is_object()).unwrap_or(false) {
@@ -958,12 +959,7 @@ fn ensure_chat_secure_context(contents: &str) -> String {
 /// file and the list is simply flat again). Fixed relative path, so there is
 /// no traversal surface. Absent reads as "" — TS owns the shape.
 fn read_chat_folders_at(root: &Path) -> Result<crate::fsutil::VersionedText, String> {
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    let contents = match fs::read_to_string(root.join(".rotli/chat-folders.json")) {
-        Ok(contents) => contents,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(e) => return Err(format!("read chat folders: {e}")),
-    };
+    let contents = crate::fsutil::read_own_sidecar(&root.join(".rotli/chat-folders.json"))?.unwrap_or_default();
     Ok(crate::fsutil::versioned_text(contents))
 }
 
@@ -994,12 +990,7 @@ fn write_chat_folders_at(
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("chat-folders.json");
     with_file_lock(&path, || {
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        let current = match fs::read(&path) {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(error) => return Err(format!("read chat folders: {error}")),
-        };
+        let current = crate::fsutil::read_own_sidecar(&path)?.unwrap_or_default().into_bytes();
         crate::fsutil::compare_revision(expected_revision, &current)?;
         atomic_write(&path, contents)?;
         Ok(crate::fsutil::revision(contents.as_bytes()))
@@ -1181,8 +1172,8 @@ fn write_note_at_with_suppress(
         let path = dir.join(&file_name);
         if secure {
             let ignore = root.join(".gitignore");
-            // raw read: the vault's .gitignore, extended for a secure note
-            let existing = fs::read_to_string(&ignore).unwrap_or_default();
+            // a .gitignore that can't be read is never replaced by one line
+            let existing = crate::fsutil::read_own_sidecar(&ignore)?.unwrap_or_default();
             if !existing.lines().any(|line| line.trim() == rel) {
                 let mut next = existing;
                 if !next.is_empty() && !next.ends_with('\n') {
@@ -1223,16 +1214,14 @@ fn assert_note_creation_writable(rel: &str, raw_root: bool) -> Result<(), String
 /// settings preserve the established ON default; a genuine I/O error refuses
 /// the write because guessing could put a note in the wrong physical lane.
 fn librarian_enabled_at(root: &Path) -> Result<bool, String> {
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    match fs::read_to_string(root.join(".rotli/settings.json")) {
-        Ok(settings) => Ok(serde_json::from_str::<Value>(&settings)
+    match crate::fsutil::read_own_sidecar(&root.join(".rotli/settings.json"))
+        .map_err(|error| format!("read Librarian setting before note creation: {error}"))?
+    {
+        Some(settings) => Ok(serde_json::from_str::<Value>(&settings)
             .ok()
             .and_then(|value| value.get("brainEnabled").and_then(Value::as_bool))
             .unwrap_or(true)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(true),
-        Err(error) => Err(format!(
-            "read Librarian setting before note creation: {error}"
-        )),
+        None => Ok(true),
     }
 }
 

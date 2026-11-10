@@ -243,17 +243,15 @@ impl CorpusStore {
         })
     }
 
-    /// Every row, oldest first; unreadable lines are skipped.
-    pub(crate) fn ai_journal_rows(&self) -> Vec<AiEditRow> {
-        let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/{AI_EDIT_JOURNAL}")) else {
-            return Vec::new();
-        };
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        std::fs::read_to_string(path)
+    /// Every row, oldest first; unreadable lines are skipped. A journal that
+    /// can't be read (a hard link included) is an error, not an empty history.
+    pub(crate) fn ai_journal_rows(&self) -> Result<Vec<AiEditRow>, String> {
+        let path = self.guard_rel(&format!("{DOT_DIR}/{AI_EDIT_JOURNAL}"))?;
+        Ok(crate::fsutil::read_own_sidecar(&path)?
             .unwrap_or_default()
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
-            .collect()
+            .collect())
     }
 }
 

@@ -557,3 +557,21 @@ fn a_hard_link_to_a_file_outside_the_vault_is_never_served() {
         assert!(listed.contains("plain.md") && !listed.contains("linked.md"), "{verb}: {listed}");
     }
 }
+
+/// Third review of pull request 267, #5: a hard-linked file is still never
+/// listed or read, but a walk that asks for it names it, with the reason, so
+/// Rotli Web can tell the person. An older page's plain walk is unchanged.
+#[cfg(unix)]
+#[test]
+fn a_walk_names_the_hard_linked_files_it_left_out() {
+    let (vault, _config, served) = serving();
+    fs::create_dir_all(vault.path().join("wiki")).unwrap();
+    fs::write(vault.path().join("wiki/own.md"), "# Own\n").unwrap();
+    let _outside = crate::fsutil::hard_link_outside(&vault.path().join("wiki/linked.md"), OUTSIDE_NOTE.as_bytes());
+    let plain = call(&served, "vault_walk", json!({ "path": "" })).unwrap();
+    assert!(plain.as_array().unwrap().iter().all(|e| e["path"] != "wiki/linked.md"), "{plain}");
+    let walked = call(&served, "vault_walk", json!({ "path": "", "skipped": true })).unwrap();
+    assert!(walked["entries"].as_array().unwrap().iter().any(|e| e["path"] == "wiki/own.md"), "{walked}");
+    assert_eq!(walked["skipped"], json!([{ "path": "wiki/linked.md", "reason": "hardLink" }]));
+    assert!(!walked.to_string().contains(OUTSIDE_WORDS));
+}

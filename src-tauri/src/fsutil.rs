@@ -203,8 +203,13 @@ pub(crate) fn open_own_file(path: &Path) -> std::io::Result<std::fs::File> {
         options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
     let file = options.open(path)?;
-    if !has_one_name(&file.metadata()?) {
-        return Err(std::io::Error::other("not a plain file of its own (a hard link or special file)"));
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(std::io::Error::other("not a plain file (a special file or a folder)"));
+    }
+    if !has_one_name(&metadata) {
+        // the app's notices recognise these words (src/lib/hardLinks.ts)
+        return Err(std::io::Error::other("this file has a hard link, so Rotli doesn't open it"));
     }
     Ok(file)
 }
@@ -223,6 +228,22 @@ pub(crate) fn read_own_text(path: &Path) -> std::io::Result<String> {
     let mut text = String::new();
     open_own_file(path)?.read_to_string(&mut text)?;
     Ok(text)
+}
+
+/// A vault sidecar's text (`.rotli/settings.json`, a journal, a manifest)
+/// through the checked open: `None` when it doesn't exist; any other failure,
+/// a hard link included, is an error for the caller to pass on, never an
+/// empty default (third review of pull request 267, 2026-11-09). The error
+/// names the file, not its folder.
+pub(crate) fn read_own_sidecar(path: &Path) -> Result<Option<String>, String> {
+    match read_own_text(path) {
+        Ok(text) => Ok(Some(text)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => {
+            let name = path.file_name().map_or_else(|| "a sidecar".into(), |n| n.to_string_lossy());
+            Err(format!("read {name}: {error}"))
+        }
+    }
 }
 
 /// `open_own_file`, read whole as bytes (a sheet, a document, an attachment).

@@ -5,13 +5,18 @@ use std::path::Path;
 use serde::{de::DeserializeOwned, Serialize};
 use super::MAX_TEXT_BYTES;
 
+/// A Breve file in the vault (a brief, the watchlist, its config) through the
+/// checked open: no symlink, no hard link, no special file, and bounded. (An
+/// earlier marker called these files "outside any vault"; they are not.)
 pub(super) fn read_text(path: &Path) -> Option<String> {
-    let meta = fs::symlink_metadata(path).ok()?;
-    if meta.file_type().is_symlink() || !meta.is_file() || meta.len() > MAX_TEXT_BYTES {
+    use std::io::Read;
+    let file = crate::fsutil::open_own_file(path).ok()?;
+    if file.metadata().ok()?.len() > MAX_TEXT_BYTES {
         return None;
     }
-    // raw read: a Breve library file outside any vault
-    fs::read_to_string(path).ok()
+    let mut text = String::new();
+    file.take(MAX_TEXT_BYTES).read_to_string(&mut text).ok()?;
+    Some(text)
 }
 
 pub(crate) fn read_json<T: DeserializeOwned>(path: &Path) -> Option<T> {

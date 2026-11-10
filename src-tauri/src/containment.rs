@@ -169,7 +169,7 @@ fn open_beneath(root: &Path, relative: &Path, mode: Sidecar) -> Result<Option<fs
         }
         resolve_beneath(root, relative)?;
     }
-    // raw read: the sidecar opener itself, which checks one link on its descriptor
+    // the sidecar opener itself (non-Unix builds only): which checks one link on its descriptor
     let mut options = fs::OpenOptions::new();
     match mode {
         Sidecar::Read => options.read(true),

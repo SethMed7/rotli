@@ -557,7 +557,7 @@ fn openai_bearer(base: &str) -> Option<String> {
 fn read_api_key() -> Option<String> {
     let home = std::env::var("HOME").ok()?;
     let path = std::path::Path::new(&home).join(".memex/ai/.api-key");
-    // raw read: a key file in app data
+    // raw read (outside-vault): the local model's key file in ~/.memex/ai
     let key = std::fs::read_to_string(path).ok()?.trim().to_string();
     (!key.is_empty()).then_some(key)
 }

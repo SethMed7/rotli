@@ -27,7 +27,7 @@ pub(crate) fn new_token() -> String {
 pub(crate) fn load_or_create_token(dir: &Path, reset: bool) -> Result<String, String> {
     let path = dir.join("token");
     if !reset {
-        // raw read: the Helper's pairing token in app data
+        // raw read (outside-vault): the Helper's pairing token in app data
         if let Ok(existing) = std::fs::read_to_string(&path) {
             let existing = existing.trim().to_string();
             // a truncated or hand-edited file is replaced, never trusted short
@@ -53,7 +53,7 @@ pub(crate) fn ensure_private_dir(dir: &Path) -> Result<(), String> {
 
 /// Write a file created owner-only (0600) — the token, the vault config.
 pub(crate) fn write_private(path: &Path, token: &str) -> Result<(), String> {
-    // raw read: creates the Helper's private token file
+    // raw read (outside-vault): creates the Helper's private token file
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     // created private — never world-readable for even an instant

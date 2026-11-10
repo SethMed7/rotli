@@ -47,7 +47,7 @@ pub(crate) fn read_codex_cache(path: &Path) -> Result<Vec<DiscoveredModel>, Stri
     if size > MAX_CODEX_CACHE_BYTES {
         return Err("codex model cache is unexpectedly large".into());
     }
-    // raw read: a provider's model cache outside any vault
+    // raw read (outside-vault): a provider's model cache outside any vault
     let text = std::fs::read_to_string(path).map_err(|e| format!("couldn't read codex model cache: {e}"))?;
     parse_codex_cache(&text)
 }

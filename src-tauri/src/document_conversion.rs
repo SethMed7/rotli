@@ -120,7 +120,7 @@ pub(crate) fn export_markdown_pdf_bytes_themed(
             format!("themed PDF renderer: {}", detail.chars().take(300).collect::<String>())
         });
     }
-    // raw read: the renderer's output in a private temp folder
+    // raw read (private-output): the renderer's output in a private temp folder
     let bytes = fs::read(&output).map_err(|error| format!("read rendered PDF: {error}"))?;
     if !bytes.starts_with(b"%PDF-") {
         return Err("the themed PDF renderer did not produce a valid PDF copy".into());
@@ -266,7 +266,7 @@ pub(crate) fn convert_document_bytes(source: &Path, ext: &str) -> Result<Vec<u8>
             format!("The macOS document converter failed: {detail}")
         });
     }
-    // raw read: the converter's output in a private temp folder
+    // raw read (private-output): the converter's output in a private temp folder
     let bytes = fs::read(&output).map_err(|error| format!("read converted DOCX: {error}"))?;
     if !bytes.starts_with(b"PK") {
         return Err("The local converter did not produce a valid DOCX package.".into());

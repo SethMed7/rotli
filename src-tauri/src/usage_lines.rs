@@ -28,7 +28,7 @@ pub(crate) fn read_jsonl_segment(
     mut on_line: impl FnMut(&[u8]),
     mut on_oversized: impl FnMut(),
 ) -> Result<bool, ()> {
-    // raw read: a provider's usage log outside any vault
+    // raw read (outside-vault): a provider's usage log outside any vault
     let mut file = File::open(path).map_err(|_| ())?;
     file.seek(SeekFrom::Start(offset)).map_err(|_| ())?;
     let mut reader = BufReader::new(file.take(byte_count));

@@ -94,7 +94,7 @@ fn token_path() -> Result<PathBuf, String> {
 
 fn installed_version() -> Option<String> {
     let path = current_dir().ok()?.join(RELEASE_RECORD);
-    // raw read: a provider's install record outside any vault
+    // raw read (outside-vault): a provider's install record outside any vault
     let record: ReleaseRecord = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
     Some(record.version)
 }

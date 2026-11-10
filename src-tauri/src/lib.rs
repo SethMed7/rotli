@@ -1075,13 +1075,12 @@ struct BrainRootView {
 /// `CorpusStore::brain_enabled`: missing file/field ⇒ on; a real IO error ⇒
 /// off (fail closed on the consent boundary).
 fn root_brain_enabled(root: &std::path::Path) -> bool {
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    match std::fs::read_to_string(root.join(".rotli").join("settings.json")) {
-        Ok(s) => serde_json::from_str::<serde_json::Value>(&s)
+    match crate::fsutil::read_own_sidecar(&root.join(".rotli").join("settings.json")) {
+        Ok(Some(s)) => serde_json::from_str::<serde_json::Value>(&s)
             .ok()
             .and_then(|v| v.get("brainEnabled").and_then(serde_json::Value::as_bool))
             .unwrap_or(true),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => true,
+        Ok(None) => true,
         Err(_) => false,
     }
 }
@@ -1700,9 +1699,8 @@ fn write_new_vault_settings(
     let dot = root.join(".rotli");
     std::fs::create_dir_all(&dot).map_err(|e| format!("create {}: {e}", dot.display()))?;
     let path = dot.join("settings.json");
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    let mut value = std::fs::read_to_string(&path)
-        .ok()
+    // an unreadable file (a hard link included) is not overwritten with defaults
+    let mut value = crate::fsutil::read_own_sidecar(&path)?
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .filter(serde_json::Value::is_object)
         .unwrap_or_else(|| serde_json::json!({ "v": 1 }));
@@ -2239,6 +2237,8 @@ pub fn run() {
             corpus::corpus_readable_ids,
             corpus::corpus_search_ai,
             corpus::corpus_notes_ai,
+            corpus::ai_rows::corpus_files_ai,
+            corpus::ai_rows::corpus_librarian_ai,
             corpus::corpus_write_ai,
             corpus::ai_edit::corpus_insert_ai,
             corpus::corpus_write,

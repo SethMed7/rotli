@@ -299,9 +299,11 @@ impl Workspace {
         let mut kept = Vec::with_capacity(notes.len());
         for meta in notes {
             // a note's row is built from the one read the gate approved
+            // and a board's or a file's from its path, in its own lane
             let shown = match meta.kind {
                 NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
-                _ => self.remote_meta_visible(&meta).then_some(meta),
+                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false),
+                _ => None,
             };
             kept.extend(shown);
         }
@@ -311,6 +313,9 @@ impl Workspace {
         let mut list = CorpusList {
             notes: kept,
             folders,
+            // an agent's listing names no file the person's own notice names
+            // (a hard-linked file's path may sit in a secure home)
+            skipped: Vec::new(),
         };
         list.notes.truncate(limit.min(500));
         list.notes = list
@@ -360,12 +365,8 @@ impl Workspace {
             if meta.kind != NoteKind::Note {
                 continue;
             }
-            let text = match self.store.read_for_ai(&meta.id, false) {
-                Ok(text) => text,
-                Err(_) => continue,
-            };
-            // the row's title and snippet come from the bytes the gate judged
-            let Some(meta) = self.store.note_row_for_ai(&meta.id, false) else { continue };
+            // the row and the text it is matched on: one read the gate judged
+            let Some((meta, text)) = self.store.note_for_ai(&meta.id, false) else { continue };
             let rel = self.store.resolve_note_rel(&meta.id)?;
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             let frontmatter = frontmatter.unwrap_or_default();
@@ -1243,7 +1244,7 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
 }
 
 fn read_config(path: &Path) -> Option<CorpusConfig> {
-    fs::read_to_string(path)  // raw read: app config outside any vault
+    fs::read_to_string(path)  // raw read (outside-vault): app config outside any vault
         .ok()
         .and_then(|raw| serde_json::from_str::<CorpusConfig>(&raw).ok())
 }
@@ -1818,10 +1819,8 @@ pub(crate) fn workspace_take_open_request(
         .default_root_path()?
         .join(DOT_DIR)
         .join(OPEN_REQUEST_FILE);
-    let raw = match fs::read_to_string(&path) {  // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        Ok(raw) => raw,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("read open request: {error}")),
+    let Some(raw) = crate::fsutil::read_own_sidecar(&path).map_err(|error| format!("read open request: {error}"))? else {
+        return Ok(None);
     };
     let request = serde_json::from_str::<WorkspaceOpenRequest>(&raw)
         .map_err(|error| format!("invalid open request: {error}"))?;
@@ -2219,7 +2218,7 @@ fn input_text(args: &[String], direct_name: &str) -> Result<String, String> {
         return Ok(value.to_string());
     }
     if let Some(path) = option(args, &format!("{direct_name}-file")) {
-        return fs::read_to_string(path).map_err(|error| format!("read {path}: {error}"));  // raw read: a `--body-file` the person names on the command line
+        return fs::read_to_string(path).map_err(|error| format!("read {path}: {error}"));  // raw read (import): a `--body-file` the person names on the command line
     }
     if flag(args, "--stdin") {
         let mut value = String::new();
@@ -3058,6 +3057,9 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
 #[path = "workspace_secure_reference_tests.rs"]
 mod secure_reference_tests;
 
+#[cfg(test)]
+#[path = "workspace_ai_lane_tests.rs"]
+mod ai_lane_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

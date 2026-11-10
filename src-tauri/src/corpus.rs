@@ -363,7 +363,7 @@ fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 }
 
 fn read_config_path(path: &Path) -> Option<CorpusConfig> {
-    // raw read: app config outside any vault
+    // raw read (outside-vault): app config outside any vault
     fs::read_to_string(path)
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -546,7 +546,7 @@ pub fn seed_demo_memex(root: &Path) -> Result<(), String> {
 /// A memex marked demo-only in its own config (`memex.json` `demo: true`) — hidden
 /// from onboarding/detection; only opened while demo mode is on.
 pub fn is_demo_memex(root: &Path) -> bool {
-    // raw read: a vault's memex.json demo flag
+    // raw read (identity): a vault's memex.json demo flag
     fs::read_to_string(root.join("memex.json"))
         .ok()
         .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
@@ -582,8 +582,8 @@ pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
 fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
     let demo = demo_root(app)?;
     let stamp = demo.join(DOT_DIR).join("demo-seed-version");
-    // raw read: the demo seed stamp in app data
-    let current = fs::read_to_string(&stamp).ok();
+    // the stamp is in the demo vault's .rotli: the checked open
+    let current = crate::fsutil::read_own_sidecar(&stamp).ok().flatten();
     if !is_memex_root(&demo) || current.as_deref() != Some(DEMO_SEED_VERSION) {
         let _ = seed_demo_memex(&demo);
         if let Some(p) = stamp.parent() {
@@ -702,7 +702,7 @@ struct LegacyInstance {
 }
 
 fn read_txt_pointer(config_dir: &Path, name: &str) -> Option<PathBuf> {
-    // raw read: app config outside any vault
+    // raw read (outside-vault): app config outside any vault
     let raw = fs::read_to_string(config_dir.join(name)).ok()?;
     let t = raw.trim();
     if t.is_empty() {
@@ -767,7 +767,7 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
 /// via memexId.
 fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
     let read_roots = || {
-        // raw read: app config outside any vault
+        // raw read (outside-vault): app config outside any vault
         fs::read_to_string(config_dir.join("corpus-roots.json"))
             .ok()
             .and_then(|t| serde_json::from_str::<RootRegistry>(&t).ok())
@@ -808,7 +808,7 @@ fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
         }
     }
 
-    // raw read: app config outside any vault
+    // raw read (outside-vault): app config outside any vault
     let legacy: LegacyInstances = fs::read_to_string(config_dir.join("memex-instances.json"))
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -880,8 +880,7 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     fs::create_dir_all(&dst_dir).map_err(|e| format!("create {}: {e}", dst_dir.display()))?;
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    let raw = fs::read_to_string(&src).map_err(|e| format!("carry settings: {e}"))?;
+    let raw = crate::fsutil::read_own_text(&src).map_err(|e| format!("carry settings: {e}"))?;
     let carried = match serde_json::from_str::<serde_json::Value>(&raw) {
         Ok(serde_json::Value::Object(mut settings)) if settings.contains_key(LIBRARIAN_MCP_SETTING) => {
             settings.remove(LIBRARIAN_MCP_SETTING);
@@ -2249,6 +2248,28 @@ pub struct FolderMeta {
 pub struct CorpusList {
     pub folders: Vec<FolderMeta>,
     pub notes: Vec<NoteMeta>,
+    /// The files the walk left out, and why (third review of pull request
+    /// 267, 2026-11-09). A hard-linked file was dropped silently; now the
+    /// listing says so, and the app tells the person. Rotli never repairs one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skipped: Vec<SkippedFile>,
+}
+
+/// One file a listing left out.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedFile {
+    /// Its path, relative to the vault (root-prefixed like a folder id).
+    pub path: String,
+    pub reason: SkipReason,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SkipReason {
+    /// The file has another name too (a hard link): it may be a file outside
+    /// the vault, so Rotli doesn't open it.
+    HardLink,
 }
 
 /// What Settings → Storage shows: the REAL corpus, not a mock. Root with the
@@ -4180,8 +4201,8 @@ impl CorpusStore {
         let Ok(path) = self.guard_rel(&format!("{DOT_DIR}/index.json")) else {
             return;
         };
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        if let Ok(text) = fs::read_to_string(&path) {
+        // an unreadable index (a hard link included) is rebuilt by the next walk
+        if let Ok(Some(text)) = crate::fsutil::read_own_sidecar(&path) {
             if let Ok(file) = serde_json::from_str::<IndexFile>(&text) {
                 self.index = file.notes;
             }
@@ -4420,6 +4441,7 @@ impl CorpusStore {
             list: CorpusList {
                 folders: walked.folders,
                 notes: walked.notes,
+                skipped: walked.skipped,
             },
             reference: walked.reference,
             texts: walked.texts,
@@ -5398,6 +5420,10 @@ impl CorpusStore {
     /// edits and Breve's managed writes, which are vault features, not Brain
     /// features (pressure-test 2026-07-26 — the broad placement broke both).
     fn brain_gate(&self) -> Result<(), String> {
+        // settings that can't be read say so, rather than "off"
+        if !self.adopted && self.dot_read("settings").is_err() {
+            return Err(crate::librarian_rules::SETTINGS_UNREADABLE.into());
+        }
         if !self.brain_enabled() {
             return Err("This vault's Librarian is off — nothing files or enriches it.".into());
         }
@@ -5537,8 +5563,10 @@ impl CorpusStore {
         // another area (never one it invents)
         let map = crate::librarian_map::LibrarianMap::at(&self.root);
         let people = crate::librarian_rules::PEOPLE_AREA;
+        // filing follows the person's rules, so it refuses without them
+        let rules = self.librarian_rules()?;
         let area = if area.contains('/') {
-            crate::librarian_rules::people_group_area(&area, &self.librarian_rules())
+            crate::librarian_rules::people_group_area(&area, &rules)
                 .or_else(|| {
                     let top = area.split('/').next().unwrap_or_default();
                     (!top.eq_ignore_ascii_case(people))
@@ -5608,8 +5636,7 @@ impl CorpusStore {
     /// Read the whole brain journal (`""` when none yet).
     pub fn journal_read(&self) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        Ok(fs::read_to_string(path).unwrap_or_default())
+        Ok(crate::fsutil::read_own_sidecar(&path)?.unwrap_or_default())
     }
 
     /// Prune resolved journal entries older than `keep_days` (0 = all of them).
@@ -5624,8 +5651,7 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/brain-journal.jsonl"))?;
         crate::fsutil::with_file_lock(&path, || {
-            // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-            let text = fs::read_to_string(&path).unwrap_or_default();
+            let text = crate::fsutil::read_own_sidecar(&path)?.unwrap_or_default();
             if text.is_empty() {
                 return Ok(0);
             }
@@ -5829,8 +5855,7 @@ impl CorpusStore {
         }
 
         let manifest_path = self.root.join(DOT_DIR).join("views.json");
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        let previous_manifest = fs::read_to_string(&manifest_path).ok();
+        let previous_manifest = crate::fsutil::read_own_sidecar(&manifest_path)?;
         let mut written: Vec<(PathBuf, String, String)> = Vec::new();
         for (path, tag) in &prepared {
             let result = self.lock_note_at(path, Authority::Person).and_then(|_held| {
@@ -6424,12 +6449,9 @@ impl CorpusStore {
     /// so removing the shelved Glass feature never deletes user data.
     pub fn dot_read(&self, which: &str) -> Result<String, String> {
         let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {which}: {e}")),
-        }
+        Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {which}: {e}"))?
+            .unwrap_or_else(|| "{}".into()))
     }
 
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
@@ -6613,6 +6635,7 @@ struct WalkPlan {
 struct Walked {
     generation: u64,
     index: HashMap<String, String>,
+    skipped: Vec<SkippedFile>,
     folders: Vec<FolderMeta>,
     dir_folders: Vec<FolderMeta>,
     notes: Vec<NoteMeta>,
@@ -6628,6 +6651,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
     let mut reference: Vec<NoteMeta> = Vec::new();
     let mut texts: HashMap<String, CachedNoteText> = HashMap::new();
     let mut index: HashMap<String, String> = HashMap::new();
+    let mut skipped: Vec<SkippedFile> = Vec::new();
     walk(
         plan.layout,
         &plan.root,
@@ -6639,6 +6663,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
         &mut notes,
         &mut reference,
         &mut texts,
+        &mut skipped,
     )?;
     // shelf-projection (v3.5): notes re-homed onto a shelf path need that shelf
     // folder (+ ancestors) to exist in the tree. A no-op for the local corpus.
@@ -6657,6 +6682,7 @@ fn run_walk(plan: WalkPlan) -> Result<Walked, String> {
     Ok(Walked {
         generation: plan.generation,
         index,
+        skipped,
         folders,
         dir_folders,
         notes,
@@ -6693,6 +6719,7 @@ fn walk(
     notes: &mut Vec<NoteMeta>,
     reference: &mut Vec<NoteMeta>,
     texts: &mut HashMap<String, CachedNoteText>,
+    skipped: &mut Vec<SkippedFile>,
 ) -> Result<(), String> {
     let dir = if prefix.is_empty() {
         root.to_path_buf()
@@ -6725,17 +6752,19 @@ fn walk(
         if kind.is_dir() && is_skipped_dir(&name) {
             continue;
         }
-        // a file with a second name can be a file outside the vault: never
-        // listed, so no board, file, or note row points at one
-        if kind.is_file() && !fs::symlink_metadata(entry.path()).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
-            continue;
-        }
         // The scope gate (Increment 3): in Memex layout only wiki/ + chats/ are
         // surfaced in the Notes tree; every control file is Hidden, so
         // memex-vault's root docs never appear as notes. A Hidden DIRECTORY is
         // not descended into. LegacyRotli surfaces all.
         let surface = surfaced(layout, &rel);
         if surface == Surface::Hidden {
+            continue;
+        }
+        // a file with a second name can be a file outside the vault: never
+        // listed, so no board, file, or note row points at one; the listing
+        // says it left it out, so the person is told (third review)
+        if kind.is_file() && !fs::symlink_metadata(entry.path()).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
+            skipped.push(SkippedFile { path: rel, reason: SkipReason::HardLink });
             continue;
         }
         // The REFERENCE lane (2026-08-01): identity/ personality/ history/
@@ -6746,7 +6775,7 @@ fn walk(
         if surface == Surface::Reference {
             if kind.is_dir() {
                 walk(
-                    layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
+                    layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts, skipped,
                 )?;
             } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
                 let abs = entry.path();
@@ -6801,7 +6830,7 @@ fn walk(
                 });
             }
             walk(
-                layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts,
+                layout, root, &rel, only, reverse, new_index, folders, notes, reference, texts, skipped,
             )?;
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".md") {
             let abs = entry.path();
@@ -6850,52 +6879,61 @@ fn walk(
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
             // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
             // title = the file stem. They live next to `.md` notes in the tree.
-            let abs = entry.path();
-            let (file_created, file_updated) = file_stamps(&abs);
-            notes.push(NoteMeta {
-                id: rel.clone(),
-                title: board_title(&rel),
-                snippet: String::new(),
-                body_empty: false,
-                aliases: Vec::new(),
-                folder_id: prefix.to_string(),
-                disk_folder_id: prefix.to_string(),
-                created_at: file_created,
-                updated_at: file_updated,
-                pinned: false,
-                origin: None,
-                kind: NoteKind::Board,
-            });
+            notes.push(board_row(&rel, prefix, &entry.path()));
         } else if kind.is_file() && !files::is_withheld_canvas(&rel) {
             // Any OTHER file (image, pdf, txt, …): surfaced read-only so a folder
             // like Storage shows what's actually in it. id == its relative path,
             // title = the filename WITH its extension (so "photo.png" reads true)
             // — except a JSON Canvas, named like a board without its extension.
-            let abs = entry.path();
-            let (file_created, file_updated) = file_stamps(&abs);
-            notes.push(NoteMeta {
-                id: rel.clone(),
-                title: if is_canvas_path(&rel) {
-                    board_title(&rel)
-                } else {
-                    name
-                },
-                snippet: String::new(),
-                body_empty: false,
-                aliases: Vec::new(),
-                // a memex storage/ binary re-homes to the Storage destination; a
-                // plain-corpus file stays in its own folder.
-                folder_id: project_folder(layout, prefix, &Frontmatter::default()),
-                disk_folder_id: prefix.to_string(),
-                created_at: file_created,
-                updated_at: file_updated,
-                pinned: false,
-                origin: None,
-                kind: NoteKind::File,
-            });
+            notes.push(file_row(layout, &rel, name, prefix, &entry.path()));
         }
     }
     Ok(())
+}
+
+/// A board's row, from its path alone (a board has no frontmatter; its id is
+/// its relative path and its title its file stem). The walk and the AI
+/// listing's board lane both build it here.
+pub(crate) fn board_row(rel: &str, prefix: &str, abs: &Path) -> NoteMeta {
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: board_title(rel),
+        snippet: String::new(),
+        body_empty: false,
+        aliases: Vec::new(),
+        folder_id: prefix.to_string(),
+        disk_folder_id: prefix.to_string(),
+        created_at: file_created,
+        updated_at: file_updated,
+        pinned: false,
+        origin: None,
+        kind: NoteKind::Board,
+    }
+}
+
+/// Any other surfaced file's row, from its path alone: id = its relative path,
+/// title = the filename WITH its extension (so "photo.png" reads true), except
+/// a JSON Canvas, named like a board. The walk and the AI listing's file lane
+/// both build it here.
+pub(crate) fn file_row(layout: Layout, rel: &str, name: String, prefix: &str, abs: &Path) -> NoteMeta {
+    let (file_created, file_updated) = file_stamps(abs);
+    NoteMeta {
+        id: rel.to_string(),
+        title: if is_canvas_path(rel) { board_title(rel) } else { name },
+        snippet: String::new(),
+        body_empty: false,
+        aliases: Vec::new(),
+        // a memex storage/ binary re-homes to the Storage destination; a
+        // plain-corpus file stays in its own folder.
+        folder_id: project_folder(layout, prefix, &Frontmatter::default()),
+        disk_folder_id: prefix.to_string(),
+        created_at: file_created,
+        updated_at: file_updated,
+        pinned: false,
+        origin: None,
+        kind: NoteKind::File,
+    }
 }
 
 /// A board's display title = its filename without the `.excalidraw` extension.
@@ -7560,7 +7598,9 @@ fn notes_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<NoteM
     let mut permitted = Vec::new();
     for meta in listed.notes.into_iter().chain(reference) {
         let (root, rel) = split_root_id(&meta.id);
-        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.note_row_for_ai(&rel, model_is_local))) {
+        // a board or a file keeps its own lane (third review, 2026-11-09:
+        // building every row as a note turned boards into notes)
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.row_for_ai(&rel, model_is_local))) {
             shown.id = meta.id;
             permitted.push(shown);
         }
@@ -8716,22 +8756,16 @@ pub fn corpus_settings_read(
     file: String,
 ) -> Result<String, String> {
     if let Some(path) = dev_machine_dot_path(&app, &file) {
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        return match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {file}: {e}")),
-        };
+        return Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {file}: {e}"))?
+            .unwrap_or_else(|| "{}".into()));
     }
     // settings/viewstate live in the DEFAULT root's `.rotli/` — except in
     // demo mode, where per-machine chrome stays with the user's real corpus (#3).
     if let Some(path) = demo_machine_dot_path(&app, &file) {
-        // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-        return match fs::read_to_string(&path) {
-            Ok(s) => Ok(s),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
-            Err(e) => Err(format!("read {file}: {e}")),
-        };
+        return Ok(crate::fsutil::read_own_sidecar(&path)
+            .map_err(|e| format!("read {file}: {e}"))?
+            .unwrap_or_else(|| "{}".into()));
     }
     let default_id = state
         .0
@@ -8884,12 +8918,9 @@ pub(crate) use files::is_canvas_path;
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
 
-/// The prompt-injection evals — a fully cooperating, fully compromised caller
-/// driven against the real gates. Kept in its own file because it is a
-/// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]
-mod ai_rows;
+pub mod ai_rows;
 /// The note lock and the authority checked inside it.
 #[path = "corpus_note_lock.rs"]
 mod note_lock;
@@ -8903,6 +8934,9 @@ pub(crate) use ai_edit::AiWrite;
 #[path = "corpus_ai_journal.rs"]
 pub(crate) mod ai_journal;
 
+/// The prompt-injection evals — a fully cooperating, fully compromised caller
+/// driven against the real gates. Kept in its own file because it is a
+/// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
 #[cfg(test)]
 #[path = "injection_evals.rs"]
 mod injection_evals;

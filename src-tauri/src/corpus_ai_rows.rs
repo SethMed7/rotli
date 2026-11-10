@@ -13,9 +13,10 @@
 use std::path::PathBuf;
 
 use super::{
-    editor_body, ensure_backing_folders, leading_snippet, note_row, parse_document, reference_row,
-    search_match, searchable_metadata, surfaced, CorpusStore, FolderMeta, NoteMeta, SearchHit,
-    SearchMatch, Surface,
+    corpus_list_inner, split_root_id, CorpusState, NoteKind, DEFAULT_ROOT_ID,
+    board_row, editor_body, ensure_backing_folders, file_row, leading_snippet, note_row,
+    parse_document, reference_row, search_match, searchable_metadata, surfaced, CorpusStore,
+    FolderMeta, NoteMeta, SearchHit, SearchMatch, Surface,
 };
 
 /// One note's text exactly as the AI read gate approved it, and where it
@@ -56,11 +57,44 @@ impl CorpusStore {
         Parsed { row, body: body.to_string(), metadata }
     }
 
+    /// The listing row an AI lane may show for `id`, in its own lane: a
+    /// Markdown note from one approved read; a board or any other file from
+    /// its path alone, once the AI file policy allows it (the bytes are read
+    /// later, through `read_file_bytes_for_ai`). None when refused.
+    pub(crate) fn row_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<NoteMeta> {
+        if id.to_ascii_lowercase().ends_with(".md") || !id.contains('.') {
+            return self.note_row_for_ai(id, model_is_local);
+        }
+        let abs = self.file_for_ai(id, model_is_local).ok()?;
+        if !std::fs::symlink_metadata(&abs).is_ok_and(|m| crate::fsutil::has_one_name(&m)) {
+            return None;
+        }
+        let (prefix, name) = id.rsplit_once('/').unwrap_or(("", id));
+        Some(if id.to_ascii_lowercase().ends_with(".excalidraw") {
+            // a board's scene is judged like a note's text (a secret-shaped
+            // scene keeps even its name from a remote model)
+            let scene = crate::fsutil::read_own_text(&abs).ok()?;
+            self.judge_for_ai(id, &scene, model_is_local).ok()?;
+            board_row(id, prefix, &abs)
+        } else {
+            file_row(self.layout, id, name.to_string(), prefix, &abs)
+        })
+    }
+
     /// The listing row an AI lane may show for note `id`, or None when the
     /// gate refuses it.
     pub(crate) fn note_row_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<NoteMeta> {
         let snapshot = self.approved(id, model_is_local)?;
         Some(self.parse_approved(snapshot).row)
+    }
+
+    /// Note `id`'s row and the very text the gate approved, from one read
+    /// (a query matches on the text and shows the row: two reads let them
+    /// disagree; third review, 2026-11-09).
+    pub(crate) fn note_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<(NoteMeta, String)> {
+        let snapshot = self.approved(id, model_is_local)?;
+        let text = snapshot.text.clone();
+        Some((self.parse_approved(snapshot).row, text))
     }
 
     /// The search hit an AI lane may show for note `id` and `query`. A note the
@@ -115,4 +149,89 @@ impl CorpusStore {
         folders.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(folders)
     }
+}
+
+/// The files (not notes, not boards) a model may name, each from its path in
+/// the AI file lane: what the chat's file tools resolve a name against. The
+/// person's own listing showed a model the names of files in a secure home
+/// (third review, 2026-11-09). No file is read here.
+#[tauri::command]
+pub fn corpus_files_ai(
+    state: tauri::State<'_, CorpusState>,
+    model_id: String,
+    endpoint: String,
+) -> Result<Vec<NoteMeta>, String> {
+    files_ai_inner(&state, crate::chat::model_is_local(&model_id, &endpoint))
+}
+
+pub(crate) fn files_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<Vec<NoteMeta>, String> {
+    let mut permitted = Vec::new();
+    for meta in corpus_list_inner(state, false)?.notes.into_iter().filter(|m| m.kind == NoteKind::File) {
+        let (root, rel) = split_root_id(&meta.id);
+        if let Ok(Some(mut shown)) = state.route(&root, |s| Ok(s.row_for_ai(&rel, model_is_local))) {
+            shown.id = meta.id;
+            permitted.push(shown);
+        }
+    }
+    Ok(permitted)
+}
+
+/// What the Librarian's prompt is built from, besides the open note: the
+/// vault's directories (its areas; walked folders only, no shelf synthesized
+/// from a note) and its People notes, each row from one approved read.
+#[derive(serde::Serialize)]
+pub struct LibrarianListing {
+    pub(crate) folders: Vec<FolderMeta>,
+    pub(crate) people: Vec<NoteMeta>,
+}
+
+/// Is `folder` wiki/People or under it (any case), as librarianPeople.ts
+/// `peopleNotes` reads it?
+fn in_people(folder: &str) -> bool {
+    let lower = folder.to_ascii_lowercase();
+    lower == "wiki/people" || lower.starts_with("wiki/people/")
+}
+
+impl CorpusStore {
+    /// Proportional on purpose (third review, 2026-11-09): the People list
+    /// had come from the whole gated listing, every note read on every send.
+    /// Only the notes the walk last saw under wiki/People are read now, each
+    /// through the gate for this model; a note moved there since the walk is
+    /// simply not listed yet.
+    pub(crate) fn librarian_listing(&mut self, model_is_local: bool) -> Result<LibrarianListing, String> {
+        self.ensure_walked()?;
+        let cache = self.list_cache.as_ref().expect("ensure_walked fills the cache");
+        let folders = cache.dir_folders.clone();
+        let candidates: Vec<String> = cache
+            .list
+            .notes
+            .iter()
+            .filter(|m| m.kind == NoteKind::Note && in_people(&m.disk_folder_id))
+            .map(|m| m.id.clone())
+            .collect();
+        let people = candidates.iter().filter_map(|id| self.note_row_for_ai(id, model_is_local)).collect();
+        Ok(LibrarianListing { folders, people })
+    }
+}
+
+/// The Librarian's areas and People notes for one model (the vault's own
+/// root; a connected brain has no People list of its own here).
+#[tauri::command]
+pub async fn corpus_librarian_ai(
+    app: tauri::AppHandle,
+    model_id: String,
+    endpoint: String,
+) -> Result<LibrarianListing, String> {
+    let model_is_local = crate::chat::model_is_local(&model_id, &endpoint);
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<CorpusState>();
+        librarian_ai_inner(&state, model_is_local)
+    })
+    .await
+    .map_err(|e| format!("librarian listing worker failed ({e})"))?
+}
+
+pub(crate) fn librarian_ai_inner(state: &CorpusState, model_is_local: bool) -> Result<LibrarianListing, String> {
+    state.route(DEFAULT_ROOT_ID, |store| store.librarian_listing(model_is_local))
 }

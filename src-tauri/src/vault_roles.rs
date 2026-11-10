@@ -150,7 +150,7 @@ fn usable_name(name: &str) -> bool {
 }
 
 fn read_marker(root: &Path) -> Option<Value> {
-    // raw read: the vault's role marker
+    // raw read (identity): the vault's role marker
     let text = fs::read_to_string(root.join(MARKER)).ok()?;
     let value = serde_json::from_str::<Value>(&text).ok()?;
     let id = value.get("id").and_then(Value::as_str)?;
@@ -252,7 +252,7 @@ pub(crate) fn release_in_place(root: &Path) -> Result<bool, String> {
     }
     fs::remove_file(root.join(MARKER)).map_err(|e| format!("remove {MARKER}: {e}"))?;
     let backup = root.join(".rotli").join(MARKER);
-    // raw read: the vault marker's backup
+    // raw read (identity): the vault marker's backup
     let ours = fs::read_to_string(&backup)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
@@ -293,12 +293,10 @@ fn mark(root: &Path, in_place: bool) -> Result<Marked, String> {
 pub(crate) fn seed_librarian(root: &Path) -> Result<(), String> {
     let dir = root.join(".rotli");
     let path = dir.join("settings.json");
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view
-    let mut settings = match fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str::<Value>(&text)
+    let mut settings = match crate::fsutil::read_own_sidecar(&path).map_err(|e| format!("read the copy's settings: {e}"))? {
+        Some(text) => serde_json::from_str::<Value>(&text)
             .map_err(|e| format!("read the copy's settings: {e}"))?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::json!({}),
-        Err(e) => return Err(format!("read the copy's settings: {e}")),
+        None => serde_json::json!({}),
     };
     let Some(object) = settings.as_object_mut() else {
         return Err("the copy's settings are not an object".into());

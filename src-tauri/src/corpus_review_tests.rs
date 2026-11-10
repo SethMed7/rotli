@@ -111,16 +111,22 @@ fn a_hard_link_to_a_file_outside_the_vault_is_never_read() {
     fs::remove_file(&abs).unwrap();
     fs::hard_link(&outside, &abs).unwrap();
     store.suppress.bump();
-    assert!(store.read(&n.id).is_err(), "the editor's read refuses it");
+    // with the words the open note's notice recognises (src/lib/hardLinks.ts)
+    let refused = store.read(&n.id).unwrap_err();
+    assert!(refused.contains("has a hard link"), "the editor's read refuses it: {refused}");
     assert!(store.read_for_ai(&n.id, false).is_err(), "the AI read gate refuses it");
     assert!(store.read_doc_for_ai(&n.id, true).is_err(), "the agent read refuses it");
 
     // a fresh hard link is never walked: not listed, not searched
     fs::hard_link(&outside, store.abs("Inbox/linked.md")).unwrap();
     store.suppress.bump();
-    let listed = store.list().unwrap().notes;
-    assert!(!listed.iter().any(|m| m.title == "Ledger"), "{listed:?}");
+    let list = store.list().unwrap();
+    assert!(!list.notes.iter().any(|m| m.title == "Ledger"), "{:?}", list.notes);
     assert!(store.search("beyond", 10, false).unwrap().is_empty());
+    // the open note and the fresh link are both named, for the notice and
+    // the line under search results
+    let named: Vec<&str> = list.skipped.iter().map(|f| f.path.as_str()).collect();
+    assert!(named.contains(&rel.as_str()) && named.contains(&"Inbox/linked.md"), "{named:?}");
     assert_eq!(fs::read_to_string(&outside).unwrap(), OUTSIDE_NOTE);
 }
 
@@ -237,6 +243,12 @@ fn the_apps_ai_rows_carry_no_field_from_the_cached_version() {
 /// cached row into what a model sees): the AI row builders take no cached
 /// row, and neither they nor the lanes that hand AI rows out build one with
 /// struct-update syntax (`..hit`) from another row.
+///
+/// A syntax tripwire, not the proof (third review): it reads source text, so
+/// a copy written field by field would pass it. The behaviour is proven by
+/// the fixtures above that put a private value in every content-derived field
+/// of the cached version and assert none reaches any AI answer
+/// (`the_apps_ai_rows_carry_no_field_from_the_cached_version`).
 #[test]
 fn no_cached_row_reaches_an_ai_row() {
     fn code(text: &str) -> Vec<&str> {
@@ -282,8 +294,12 @@ fn hard_linked_files_are_neither_listed_nor_handed_to_the_webview() {
     let _board = crate::fsutil::hard_link_outside(&store.abs("Inbox/linked.excalidraw"), b"{}");
     let _image = crate::fsutil::hard_link_outside(&store.abs("Storage/linked.png"), b"\x89PNG");
     store.suppress.bump();
-    let listed = serde_json::to_string(&store.list().unwrap()).unwrap();
-    assert!(!listed.contains("linked."), "{listed}");
+    let list = store.list().unwrap();
+    assert!(list.notes.iter().all(|row| !row.id.contains("linked.")), "{list:?}");
+    // third review #5: left out, and said so, with the reason
+    let mut skipped: Vec<(&str, SkipReason)> = list.skipped.iter().map(|f| (f.path.as_str(), f.reason)).collect();
+    skipped.sort_by_key(|(path, _)| *path);
+    assert_eq!(skipped, vec![("Inbox/linked.excalidraw", SkipReason::HardLink), ("Storage/linked.png", SkipReason::HardLink)]);
     assert!(store.webview_path("Storage/linked.png").is_err());
     fs::write(store.abs("Storage/own.png"), b"\x89PNG").unwrap();
     assert!(store.webview_path("Storage/own.png").is_ok());
@@ -421,4 +437,91 @@ fn a_page_the_route_wrote_stays_an_ordinary_searchable_note() {
     let hits = store.search("harbor opens", 10, false).unwrap();
     assert!(hits.iter().any(|h| h.id == page.id), "searchable");
     assert!(store.note_row_for_ai(&page.id, false).is_some(), "readable by AI lanes as a public note");
+}
+
+/// Third review #4: the chat's AI listing keeps a board and a file in their
+/// own lanes (its rebuild that week built every row as a note), for a remote
+/// and an on-device model; a board's row comes from its path, not its scene.
+#[test]
+fn the_ai_listing_keeps_boards_and_files_in_their_lanes() {
+    let (_dir, mut store) = bare();
+    let note = store.create("Inbox", "# Harbor plan\n\nharbor opens at nine\n").unwrap();
+    fs::write(store.abs("Inbox/Harbor sketch.excalidraw"), "{\"type\":\"excalidraw\",\"elements\":[]}").unwrap();
+    fs::create_dir_all(store.abs("Storage")).unwrap();
+    fs::write(store.abs("Storage/harbor.csv"), "berth,time\n1,nine\n").unwrap();
+    store.suppress.bump();
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    let mine = corpus_list_inner(&state, false).unwrap().notes;
+    for local in [false, true] {
+        let rows = notes_ai_inner(&state, local).unwrap();
+        let row = |id: &str| rows.iter().find(|r| r.id == id).unwrap_or_else(|| panic!("{id} missing: {rows:?}"));
+        assert_eq!(row(&note.id).kind, NoteKind::Note);
+        assert_eq!(row("Inbox/Harbor sketch.excalidraw").kind, NoteKind::Board);
+        assert_eq!(row("Inbox/Harbor sketch.excalidraw").title, "Harbor sketch");
+        assert_eq!(row("Storage/harbor.csv").kind, NoteKind::File);
+        // each row is what the person's own listing shows for it
+        for shown in &rows {
+            let own = mine.iter().find(|m| m.id == shown.id).unwrap();
+            assert_eq!((&own.title, own.kind, &own.folder_id), (&shown.title, shown.kind, &shown.folder_id));
+        }
+    }
+}
+
+/// Third review, Part 3: the Librarian's People list reads only the People
+/// notes, each through the gate for the model; its areas are the vault's
+/// directories, never a shelf synthesized from a (secure) note.
+#[test]
+fn the_librarian_listing_reads_only_people_notes_through_the_gate() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("brain");
+    fs::create_dir_all(&root).unwrap();
+    alternating_memex(&root); // a secure note in Projects whose shelf is PRIVATE
+    fs::create_dir_all(root.join("wiki/People/Work")).unwrap();
+    fs::write(root.join("wiki/People/Work/ana.md"), "# Ana\n\nworks on the harbor\n").unwrap();
+    fs::write(root.join("wiki/People/bob.md"), "---\nsecure: true\n---\n\n# Bob\n\nprivate\n").unwrap();
+    let mut store = CorpusStore::open(root).unwrap();
+    store.os_trash = false;
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    let remote = ai_rows::librarian_ai_inner(&state, false).unwrap();
+    let people: Vec<&str> = remote.people.iter().map(|row| row.title.as_str()).collect();
+    assert_eq!(people, vec!["Ana"]);
+    let local = ai_rows::librarian_ai_inner(&state, true).unwrap();
+    let mut people: Vec<&str> = local.people.iter().map(|row| row.title.as_str()).collect();
+    people.sort_unstable();
+    assert_eq!(people, vec!["Ana", "Bob"], "an on-device model may read a secure note");
+    let json = serde_json::to_string(&remote).unwrap();
+    assert!(remote.folders.iter().any(|folder| folder.id.ends_with("People/Work")), "{json}");
+    assert_nothing_private(&json);
+}
+
+/// Third review, Part 3 (search after an edit, as the CHANGELOG states it): a
+/// save made in Rotli is seen by the very next AI search; a change made
+/// outside Rotli is seen once the file watcher fires (after 300 ms of quiet,
+/// `corpus_watch::DEBOUNCE`; here, the bump it makes), and until then no
+/// search answers with words the note no longer has.
+#[test]
+fn an_ai_search_sees_an_in_app_save_at_once_and_an_outside_edit_after_the_watcher() {
+    let (_dir, mut store) = bare();
+    let n = store.create("Inbox", "# Ferry timetable\n\nboats at noon\n").unwrap();
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+    let rel = store.resolve_note_rel(&n.id).unwrap();
+    let abs = store.abs(&rel);
+    registry.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
+    let state = CorpusState(Mutex::new(registry));
+    assert_eq!(search_ai_inner(&state, "noon", None, None, false).unwrap().len(), 1);
+
+    state.route(DEFAULT_ROOT_ID, |s| s.write(&n.id, "# Ferry timetable\n\nboats at dusk\n")).unwrap();
+    assert_eq!(search_ai_inner(&state, "dusk", None, None, false).unwrap().len(), 1, "an in-app save, at once");
+    assert!(search_ai_inner(&state, "noon", None, None, false).unwrap().is_empty());
+
+    let text = fs::read_to_string(&abs).unwrap().replace("dusk", "midnight");
+    fs::write(&abs, text).unwrap();
+    // before the watcher fires: the old words are no longer answered for
+    assert!(search_ai_inner(&state, "dusk", None, None, false).unwrap().is_empty());
+    state.route(DEFAULT_ROOT_ID, |s| { s.suppress.bump(); Ok(()) }).unwrap();
+    assert_eq!(search_ai_inner(&state, "midnight", None, None, false).unwrap().len(), 1, "after the watcher");
 }

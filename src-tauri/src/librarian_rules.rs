@@ -82,6 +82,23 @@ fn strings(v: Option<&Value>, max_items: usize, max_len: usize) -> Vec<String> {
     out
 }
 
+/// What classification, organising and filing say when the vault's settings
+/// can't be read or parsed (third review of pull request 267, 2026-11-09):
+/// they refuse, never act on empty rules or empty secure keywords.
+pub(crate) const SETTINGS_UNREADABLE: &str =
+    "Rotli couldn’t read this vault’s settings, so the Librarian didn’t classify, organize or file anything. Your notes haven’t changed.";
+
+/// The rules from settings that must hold them: a JSON object whose
+/// `librarianRules`, when present, is an object. Anything else is
+/// SETTINGS_UNREADABLE (missing settings are `"{}"` upstream: the defaults).
+pub(crate) fn checked_rules(settings_json: &str) -> Result<LibrarianRules, String> {
+    let value: Value = serde_json::from_str(settings_json).map_err(|_| SETTINGS_UNREADABLE.to_string())?;
+    if !value.is_object() || value.get("librarianRules").is_some_and(|rules| !rules.is_object()) {
+        return Err(SETTINGS_UNREADABLE.into());
+    }
+    Ok(parse_rules(settings_json))
+}
+
 /// The rules out of the whole settings.json text.
 pub(crate) fn parse_rules(settings_json: &str) -> LibrarianRules {
     let v: Value = serde_json::from_str(settings_json).unwrap_or(Value::Null);
@@ -142,28 +159,32 @@ pub(crate) fn classifiable_secure_keywords(settings_json: &str) -> Result<Vec<St
 
 /// The vault's secure keywords, read from `<root>/.rotli/settings.json` and
 /// cached against the file's modification time: the organizer snapshots many
-/// notes per cycle, and the settings file changes rarely.
-pub(crate) fn secure_keywords(root: &Path) -> Vec<String> {
+/// notes per cycle, and the settings file changes rarely. No settings file is
+/// no keywords; settings that can't be read or parsed (a hard link included)
+/// are SETTINGS_UNREADABLE, and the caller treats every name as secure.
+pub(crate) fn secure_keywords(root: &Path) -> Result<Vec<String>, String> {
     type Cached = Option<(PathBuf, SystemTime, Vec<String>)>;
     static CACHE: Mutex<Cached> = Mutex::new(None);
     let path = root.join(crate::corpus::DOT_DIR).join("settings.json");
-    let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) else {
-        return Vec::new(); // no settings file ⇒ no keywords
+    let modified = match std::fs::symlink_metadata(&path).and_then(|m| m.modified()) {
+        Ok(modified) => modified,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(_) => return Err(SETTINGS_UNREADABLE.into()),
     };
     let mut cache = CACHE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some((at, when, keywords)) = cache.as_ref() {
         if *at == path && *when == modified {
-            return keywords.clone();
+            return Ok(keywords.clone());
         }
     }
-    // raw read: Rotli's own vault sidecar; its bytes never reach a model or the person's view (failing closed here would drop secure keywords)
-    let keywords = std::fs::read_to_string(&path)
-        .map(|text| parse_rules(&text).secure_keywords)
-        .unwrap_or_default();
+    let text = crate::fsutil::read_own_sidecar(&path)
+        .map_err(|_| SETTINGS_UNREADABLE.to_string())?
+        .unwrap_or_else(|| "{}".into());
+    let keywords = classifiable_secure_keywords(&text).map_err(|_| SETTINGS_UNREADABLE.to_string())?;
     *cache = Some((path, modified, keywords.clone()));
-    keywords
+    Ok(keywords)
 }
 
 /// The ways a name is cut into lowercased words. A note is secure when ANY of

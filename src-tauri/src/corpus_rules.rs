@@ -12,12 +12,14 @@ use super::{
 };
 
 impl CorpusStore {
-    /// The Librarian rules (librarian_rules.rs) from this vault's settings —
-    /// the defaults when the file is missing or unreadable.
-    pub(crate) fn librarian_rules(&self) -> crate::librarian_rules::LibrarianRules {
-        self.dot_read("settings")
-            .map(|settings| crate::librarian_rules::parse_rules(&settings))
-            .unwrap_or_default()
+    /// The Librarian rules (librarian_rules.rs) from this vault's settings:
+    /// the defaults when the file is missing; SETTINGS_UNREADABLE when it
+    /// can't be read or parsed (filing refuses; never empty rules).
+    pub(crate) fn librarian_rules(&self) -> Result<crate::librarian_rules::LibrarianRules, String> {
+        let settings = self
+            .dot_read("settings")
+            .map_err(|_| crate::librarian_rules::SETTINGS_UNREADABLE.to_string())?;
+        crate::librarian_rules::checked_rules(&settings)
     }
 
     /// Missing settings mean the documented empty keyword list. An unreadable
