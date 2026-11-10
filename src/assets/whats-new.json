@@ -1,4 +1,24 @@
 {
+  "1.10.0": [
+    {
+      "title": "AI sees only what it may",
+      "body": "Chat's search and note list now show a model only the version of a note Rotli just checked, and a note that is a hard link to a file elsewhere on your Mac is never read.",
+      "platform": "mac"
+    },
+    {
+      "title": "Easier by keyboard and screen reader",
+      "body": "Tabs move with the arrow keys, Home and End, controls have real names and roles, and dialogs keep focus inside until you close them."
+    },
+    {
+      "title": "Pins stick on Rotli Web",
+      "body": "Pin to top now saves to your connected folder and survives a reload. Only the pin changes, never your words.",
+      "platform": "web"
+    },
+    {
+      "title": "Quicker with big vaults",
+      "body": "Large Main lists update only the rows that changed when you switch notes, and Rotli Web does less repeated work opening and searching your folder."
+    }
+  ],
   "1.9.1": [
     {
       "title": "Rotli fits in the Dock",
