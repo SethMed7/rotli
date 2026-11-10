@@ -163,7 +163,10 @@ agents, locked notes refuse edits, and every update needs a fresh revision.
 ```
 
 The MCP server, `rotli agent …` commands, and remote agents are development
-builds only for now. The [agent workspace contract](docs/architecture/agent-workspace.md)
+builds only for now. The exception is the Librarian route,
+`rotli mcp --librarian`: a small, opt-in tool set an agent host can use to
+keep one vault organised, off until that vault's `.rotli/settings.json` says
+`"librarianMcp": true`. The [agent workspace contract](docs/architecture/agent-workspace.md)
 has the details.
 
 ## Build it
