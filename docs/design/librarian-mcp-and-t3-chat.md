@@ -230,8 +230,11 @@ docs/architecture/egress-threat-model.md, rows 16b–16f):
   listing, folders) is built only from the one approved read, in the app,
   the `rotli notes` CLI, Rotli Web, and the route.
 - **#4 Hard-linked notes crossed the vault boundary.** Every read of a vault
-  file's contents goes through the checked open, and `check:vault-reads`
-  fails the build on any other read.
+  file's contents by Rust code built for macOS goes through the checked open,
+  and `check:vault-reads` fails the build on any other read outside five
+  marked categories. One residual: the webview's asset path is checked by
+  path just before the view reads it, not on the descriptor it reads
+  (egress threat model row 16c).
 - **#5 A move went ahead after the note was locked.** Every note mutation
   takes its lock through `lock_note` with an `Authority`, checked inside the
   lock.

@@ -46,29 +46,73 @@ describe("web AI corpus", () => {
   // notes service's summaries, and the verdict from a separate read of the
   // note. A summary still holding a secure version's words rode out on the
   // approval of the public version.
-  test("rows show only the note read the verdict judged", async () => {
+  // Third review: the source-text guard ("no row is spread from a summary or
+  // a hit") went when the source-shape ceiling did; this test replaces it.
+  // The stale summary and hit carry a private value in EVERY field derived
+  // from the note's content, and none may appear anywhere in the answer.
+  // scripts/check-web-ai-rows-mutation.mjs applies the reviewer's spread
+  // (`{ ...summary, title, snippet }`) to a scratch copy and expects this
+  // test to fail there.
+  test("rows show only the note read the verdict judged, in every field", async () => {
     const svc = new InMemoryNotesService();
     const note = await svc.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
-    const canary = "canary-7Q4";
-    const staleCopy = <T extends { id: string; title: string; snippet: string }>(row: T): T =>
+    const canary = "PRIVATE-CANARY-7Q4";
+    const stamp = 936835200000; // 1999-09-09, the secure version's dates
+    const staleRow = <T extends { id: string }>(row: T): T =>
       row.id === note.id
-        ? { ...row, title: `Harbor ${canary} plan`, snippet: `harbor code ${canary} opens at nine` }
+        ? {
+            ...row,
+            title: `Harbor ${canary} plan`,
+            snippet: `harbor code ${canary} opens at nine`,
+            aliases: [`harbor-${canary}`],
+            folderId: `Projects/${canary}`,
+            diskFolderId: `Projects/${canary}`,
+            createdAt: stamp,
+            updatedAt: stamp,
+            pinned: true,
+            bodyEmpty: true,
+            matchStart: 9,
+            matchLen: canary.length,
+            spans: [[9, canary.length]],
+          }
         : row;
-    const staleList = (await svc.listNotes()).map(staleCopy);
-    const staleHits = (await svc.searchNotes("harbor", 10)).map(staleCopy);
+    const staleList = (await svc.listNotes()).map(staleRow);
+    const staleHits = (await svc.searchNotes("harbor", 10)).map(staleRow);
     const stale = Object.assign(Object.create(svc) as InMemoryNotesService, {
       listNotes: async () => staleList,
       searchNotes: async () => staleHits,
     });
     const corpus = createWebAiCorpus(() => stale);
+    const nothingPrivate = (answer: unknown) => {
+      const json = JSON.stringify(answer);
+      expect(json).not.toContain(canary);
+      expect(json).not.toContain(String(stamp));
+    };
     const listed = await corpus.list();
     expect(listed.map((n) => n.title)).toEqual(["Harbor plan"]);
-    expect(JSON.stringify(listed)).not.toContain(canary);
+    nothingPrivate(listed);
+    expect(listed[0]?.pinned).toBe(false);
+    expect(listed[0]?.bodyEmpty).not.toBe(true);
     const hits = await corpus.search("harbor", 10);
     expect(hits.map((h) => h.title)).toEqual(["Harbor plan"]);
-    expect(JSON.stringify(hits)).not.toContain(canary);
+    nothingPrivate(hits);
     // a hit the current note no longer matches is dropped
     expect(await corpus.search(canary, 10)).toEqual([]);
+  });
+
+  // third review of pull request 267, #4: a vault that mixes a note, a board
+  // and a file. Rotli Web's AI lane leaves boards and files out (as the
+  // agent workspace does); none of them comes back as a note.
+  test("a mixed vault lists and finds only its notes, as notes", async () => {
+    const svc = new InMemoryNotesService();
+    const note = await svc.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine");
+    Object.assign(svc.seedFile("Inbox/Harbor sketch.excalidraw", "Inbox"), { kind: "board", body: "harbor" });
+    Object.assign(svc.seedFile("storage/harbor.csv"), { body: "berth,time\n1,harbor" });
+    const corpus = createWebAiCorpus(() => svc);
+    const listed = await corpus.list();
+    expect(listed.map((n) => [n.id, n.kind ?? "note"])).toEqual([[note.id, "note"]]);
+    const hits = await corpus.search("harbor", 10);
+    expect(hits.map((h) => [h.id, h.kind])).toEqual([[note.id, "note"]]);
   });
 
   test("search answers only with readable notes", async () => {

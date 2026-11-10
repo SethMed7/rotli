@@ -32,29 +32,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dates from a cache and then checked the note's current file, so a note
   that was secure a moment earlier could pass as its new, public version
   while the result still showed the secure version. Each result is now built
-  from the one read the check approved. Right after an ordinary edit, until
-  Rotli's search index catches up, a model's search can rank a note
-  differently, and can miss a note that matches only its new text, metadata,
-  or alias, or only by a near-spelling.
+  from the one read the check approved. A model's search finds a note by its
+  new words as soon as Rotli has seen the change: at once after you save in
+  Rotli, and after a change made in another app once Rotli's file watcher
+  picks it up (300 ms after the changes stop). Until then it doesn't answer
+  with words the note no longer has.
+- **Every prompt takes a note's text only from the read check.** The chat,
+  `/ai`, Hand to AI, chat titles, hybrid presets, a chat's conversation
+  notes, and the Librarian build their prompts from text the read check
+  returned for the model that will read it, and the Librarian's background
+  filing from notes its own, stricter check cleared. Rotli's build now
+  checks this for every prompt.
 - **Rotli Web reads and edits a note for a model in one read.** Its check
   and the words or the edit a model gets came from two separate reads, so a
   note made secure in between could reach the model.
-- **The Librarian is told only about People notes a model may read.** It
-  listed People notes from the app's own note list, which in the Mac app
-  doesn't know which notes are secure, so a secure person's name could
-  reach the Librarian's model. It now asks for the list the read check
-  allows, every time you send.
-- **Hand to AI sends only the words the read check approved.** The handoff
-  takes the note's words from the same read that checks it.
-- **Rotli doesn't read a vault file through a hard link.** A hard link in
-  your vault to a file somewhere else on your Mac looked like an ordinary
-  note, sheet, document, board, image, attachment, or chat transcript, so
-  opening it, the chat and the Librarian, document conversion, and search
-  could read that outside file, and Rotli Helper served it to Rotli Web.
-  These are now read only when the file has no other name, and such files
-  are left out of lists and search. Rotli's own settings files aren't part
-  of this check, and a folder Rotli Web opens directly in the browser can't
-  tell a hard link apart, so connect it through Rotli Helper for this check.
+- **The Librarian sees only what the read check allows.** It listed People
+  notes from the app's own note list, which in the Mac app doesn't know which
+  notes are secure, so a secure person's name could reach the Librarian's
+  model, and it took the open note from the editor rather than from the read
+  that checked it. Every time you send, the note, its tags, and the passage
+  you highlighted now come from the read check for the Librarian's model;
+  your areas come from your vault's folders, never from a note; and your
+  People notes come from the read check, which reads only your People notes
+  to list them.
+- **Hand to AI sends only the title and words the read check approved.** The
+  handoff takes the note's title and words from the same read that checks
+  it.
+- **A chat's conversation notes stay out of a secure note.** The notes a
+  chat keeps in the note it's attached to (or in its own note) were read
+  without the read check, so a note made secure during a reply could have
+  its notes sent to the chat's model. They're now read through the check for
+  that model, and a note it refuses is neither sent nor updated.
+- **Rotli doesn't read a vault file through a hard link, and says which it
+  left alone.** A hard link in your vault to a file somewhere else on your
+  Mac looked like an ordinary note, sheet, document, board, image,
+  attachment, or chat transcript, so opening it, the chat and the Librarian,
+  document conversion, and search could read that outside file, and Rotli
+  Helper served it to Rotli Web. Rotli now opens a file in your vault only
+  when it has no other name, checked on the file it actually opened. The
+  same check covers what Rotli keeps in your vault: its settings, its
+  history, and its lists of views and chat folders. One exception: an image
+  shown inside a note is checked just before the view loads it, so a file
+  swapped for a hard link at that instant can still be shown. Such files are
+  left out of lists and search, and Rotli never changes them.
+- **A calm notice names the files Rotli left alone.** When a file in your
+  vault has a hard link, a note at the foot of the sidebar says how many
+  weren't opened and lists them, search says so under its results, and a
+  note that gets a hard link while it's open shows the same notice in its
+  place. To use one, make an independent copy (in Finder, Duplicate). Rotli
+  Web shows the same through Rotli Helper; a folder Rotli Web opens directly
+  in the browser can't tell a hard link apart, so connect it through Rotli
+  Helper for this check.
+- **The Librarian stops when it can't read your rules.** If your vault's
+  settings can't be read, it doesn't classify, organise or file anything and
+  says so, instead of working without your filing rules and secure keywords.
 - **A note locked or made secure while a change waits is left alone.** An
   agent's move or edit, the Librarian's filing, and its field writes check
   the note again at the moment they act, not only before waiting their turn.
