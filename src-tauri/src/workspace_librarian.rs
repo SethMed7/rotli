@@ -194,16 +194,6 @@ fn guide(skill: Option<&str>) -> Result<Value, String> {
     Ok(json!({ "skill": name, "markdown": text, "skills": SKILLS.iter().map(|(n, _)| *n).collect::<Vec<_>>() }))
 }
 
-/// The Librarian route is reachable from every build, stable included: it is
-/// already opt-in per vault (`librarianMcp`), and agent hosts on a stable
-/// install need it. The full workspace server, its `rotli mcp config`, and
-/// `rotli agent …` stay behind the development-build gate.
-pub(super) fn skips_agent_gate(args: &[String]) -> bool {
-    args.first().map(String::as_str) == Some("mcp")
-        && args.get(1).map(String::as_str) != Some("config")
-        && args.iter().any(|arg| arg == "--librarian")
-}
-
 /// `rotli mcp --librarian [--vault PATH]`: bind once, then serve stdio.
 pub(super) fn serve(args: &[String]) -> Result<(), String> {
     if option(args, "--root").is_some() {
@@ -239,9 +229,11 @@ pub(super) fn bind_vault(vault: Option<&str>, cwd: &Path, targets: Vec<RootTarge
 
 /// The opt-in switch. Rotli's frontend owns `.rotli/settings.json` and keeps
 /// unknown keys, so Rust only reads it. Missing, malformed, or anything other
-/// than `true` is off.
+/// than `true` is off, and so is every public build: the route, like the rest
+/// of `rotli mcp`, is development-only (`feature_policy::cli_gate`).
 pub(super) fn enabled(root: &Path) -> bool {
-    fs::read_to_string(root.join(".rotli/settings.json"))
+    crate::feature_policy::agents_enabled()
+        && fs::read_to_string(root.join(".rotli/settings.json"))
         .ok()
         .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
         .and_then(|settings| settings.get(SETTING).and_then(Value::as_bool))

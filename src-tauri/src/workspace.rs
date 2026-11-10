@@ -1878,9 +1878,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
     if matches!(command, "version" | "--version" | "-V") {
         return Ok(json!({ "version": env!("CARGO_PKG_VERSION") }));
     }
-    if matches!(command, "mcp" | "agent") && !librarian::skips_agent_gate(args) {
-        crate::feature_policy::require_agents()?;
-    }
+    crate::feature_policy::cli_gate(command)?;
     if command == "mcp" {
         if args.get(1).map(String::as_str) == Some("config") {
             return mcp_config();
@@ -3049,6 +3047,12 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
         "deepLink": result.deep_link,
         "page": { "offset": offset, "nextOffset": if end < chars.len() { Some(end) } else { None }, "totalChars": chars.len() }
     }))
+}
+
+/// The Librarian route's per-vault switch, for the public-build gate test.
+#[cfg(test)]
+pub(crate) fn librarian_switch_on(root: &Path) -> bool {
+    librarian::enabled(root)
 }
 
 #[cfg(test)]

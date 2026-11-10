@@ -33,9 +33,11 @@ rotli mcp                                                        # stdio MCP ser
 rotli mcp --http 127.0.0.1:43110 --token TOKEN                   # authenticated loopback HTTP
 rotli mcp config                                                 # same as agent config
 rotli mcp --librarian [--vault PATH]                            # opt-in Librarian route for one vault (default: the current folder)
-rotli --version                                                 # version, without opening the app
 rotli librarian status|proposals [--root ID]                    # is it on; what waits on you
 rotli librarian apply|dismiss PROPOSAL_ID [--root ID]           # your decision on one proposal
+rotli --version                                                 # version, without opening the app
+
+`rotli agent`, `rotli mcp`, and `rotli librarian` are development builds only.
 
 Note bodies are text/markdown without YAML frontmatter; Rotli owns frontmatter.
 Every update requires the revision returned by read. Notes created in a Rotli vault

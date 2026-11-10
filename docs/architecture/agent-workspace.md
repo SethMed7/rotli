@@ -5,9 +5,12 @@
 > only** until refined. Stable builds refuse them with
 > "MCP and agent integrations are available only in development builds" and
 > hide their Settings surface. The plain JSON CLI (`rotli notes …`,
-> `rotli views …`, `rotli main …`, and the rest) is not gated, and neither is
-> the opt-in Librarian route (`rotli mcp --librarian`, 2026-11-07).
-> `rotli --version` answers headlessly.
+> `rotli views …`, `rotli main …`, and the rest) is not gated. The Librarian
+> route (`rotli mcp --librarian` and `rotli librarian …`) is gated with the rest
+> of MCP (2026-11-09): it stays in development builds until the review findings
+> in [`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)
+> are fixed and reviewed. `feature_policy::cli_gate` decides it once for every
+> agent command. `rotli --version` answers headlessly.
 
 Rotli exposes one headless workspace application service through the packaged
 CLI, local stdio MCP, authenticated loopback HTTP, and the opt-in remote relay
@@ -234,10 +237,10 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   missing or malformed, is off). Rust only reads that file, except that a
   vault created, adopted, or brought in as a copy starts with the switch off:
   `carry_settings` copies the other settings across and leaves this one behind.
-  The refusal names the switch. Unlike the rest of
-  MCP, the route runs from stable builds too: the per-vault switch is its
-  opt-in (`skips_agent_gate`). `rotli mcp config`, which sets up the full
-  workspace server, stays gated even with `--librarian`.
+  The refusal names the switch. Like the rest of MCP, the route runs only in
+  development builds: `cli_gate` refuses `rotli mcp --librarian`, `rotli mcp
+  config`, and every `rotli librarian …` command in a public build, and the
+  switch itself reads as off there, so `"librarianMcp": true` does nothing.
 - **Nine tools:** `librarian_guide`, `librarian_search`, `librarian_read`,
   `librarian_capture`, `librarian_file`, `librarian_link`, `librarian_index`,
   `librarian_log`, `librarian_review`. Behaviour lives in five skills compiled
