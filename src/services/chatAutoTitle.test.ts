@@ -5,6 +5,7 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import * as liveHost from "../ai/host";
+import { person } from "../lib/promptText.fixtures";
 import type { ChatModelInfo } from "../lib/tauri";
 import type { MemexInstance } from "../memex/config";
 import * as liveService from "../memex/service";
@@ -57,7 +58,7 @@ const run = (over: { existing?: string; typed?: string; secure?: boolean } = {})
     over.existing,
     "help-me-plan-the-q3",
     model,
-    "help me plan the Q3 launch for the partner portal",
+    person("help me plan the Q3 launch for the partner portal"),
     "help me plan the Q3",
     over.typed ?? "",
     over.secure ?? false,

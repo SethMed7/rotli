@@ -759,7 +759,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           ))}
         {/* the view switcher wears Finder's icons (the maintainer, 2026-07-28: "the
             proper icons people are used to"); the words live in the tooltips */}
-        <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>
+        <div className="file-mode-tabs" role="group" aria-label="View" style={{ marginLeft: "auto" }}>
           {(
             [
               ["folders", "Icons", GridViewGlyph],
@@ -774,6 +774,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               className={mode === m ? "fsh-tab vicon on" : "fsh-tab vicon"}
               title={label}
               aria-label={`${label} view`}
+              aria-pressed={mode === m}
               onClick={() => setMode(m)}
             >
               <ViewGlyph size={15} />

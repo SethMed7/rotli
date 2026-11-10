@@ -29,6 +29,9 @@ export const isBodyHit = (rank: number): boolean => rank === RANK_BODY || rank =
  * strictly 1:1 (Rust `to_lowercase().next()`), so a char offset in the folded
  * text equals the offset in the original. */
 function fold(s: string): string[] {
+  // ASCII has one code unit per point and no contextual case mapping. Keep
+  // Rust's per-code-point rule for every other string (not whole-string lower).
+  if (/^\p{ASCII}*$/u.test(s)) return s.toLowerCase().split("");
   return [...s].map((c) => [...c.toLowerCase()][0] ?? c);
 }
 

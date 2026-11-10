@@ -54,6 +54,7 @@ fn registry_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 
 fn read_registry(app: &tauri::AppHandle) -> VaultLocationRegistry {
     registry_file(app)
+        // raw read (outside-vault): app config outside any vault
         .and_then(|path| fs::read_to_string(path).ok())
         .and_then(|body| serde_json::from_str::<VaultLocationRegistry>(&body).ok())
         .filter(|registry| registry.version == LOCATION_VERSION)
@@ -70,6 +71,7 @@ fn write_registry(app: &tauri::AppHandle, registry: &VaultLocationRegistry) -> R
 }
 
 fn memex_id_at(path: &Path) -> Option<String> {
+    // raw read (identity): a vault's memex.json identity
     fs::read_to_string(path.join("memex.json"))
         .ok()
         .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())

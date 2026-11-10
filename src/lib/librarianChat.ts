@@ -4,8 +4,8 @@
 // organizes (tags, marked passages, filing). Every reply can say something and
 // propose actions (the same tag / mark / file grammar as the bar), and a
 // request that belongs in Chat comes back flagged, so the person is offered
-// "Take this to Chat". The person can also tell it how things are ("Kunal and
-// Dhaval are work people"): then the reply carries vault actions too — rules,
+// "Take this to Chat". The person can also tell it how things are ("Ana and
+// Leo are work people"): then the reply carries vault actions too — rules,
 // People groups, new people, and questions about people it already has
 // (librarianPeople.ts). The pure half: the messages a turn sends, and a reply
 // split into what is said, what is proposed, and whether it belongs in Chat.
@@ -21,15 +21,28 @@ import {
 } from "./librarianActions";
 import { parseVaultActions, type PersonNote, type VaultAction } from "./librarianPeople";
 import type { LibrarianRules } from "./librarianRules";
+import {
+  type Approved,
+  type ApprovedText,
+  type ModelText,
+  type PersonText,
+  type PromptText,
+  fixed,
+  joinPrompt,
+  NO_TEXT,
+  personText,
+  prompt,
+  reshape,
+} from "./promptText";
 
 /** One turn: what the person asked (with the passage highlighted then), or
  * what the Librarian replied (its raw reply is what later turns send back). */
 export type LibrarianTurn =
-  | { role: "user"; text: string; highlight: Anchor | null }
+  | { role: "user"; text: PersonText; highlight: Anchor | null }
   | {
       role: "librarian";
       text: string;
-      raw: string;
+      raw: ModelText;
       actions: LibrarianAction[];
       /** What it keeps in the vault besides the note (rules, people). */
       vault?: VaultAction[];
@@ -37,23 +50,29 @@ export type LibrarianTurn =
     };
 
 /** The note as it is now: read fresh for every turn, so an edit between turns
- * is what the Librarian sees. */
+ * is what the Librarian sees. Everything from the vault is `ApprovedText`, from
+ * the gated read for the Librarian's model (editor/librarianSession.ts); the
+ * rules are the person's own settings. */
 export interface LibrarianContext {
-  title: string;
-  doc: string;
-  areas: readonly string[];
-  tags: readonly string[];
+  title: ApprovedText;
+  doc: ApprovedText;
+  areas: readonly ApprovedText[];
+  tags: readonly ApprovedText[];
   /** Where a note about a person goes (the Librarian rules' People groups). */
-  people: readonly string[];
+  people: readonly PersonText[];
   /** The person's own filing rules, plain sentences. */
-  filing: readonly string[];
+  filing: readonly PersonText[];
   /** The whole rules, which a statement may add to. */
   rules: LibrarianRules;
   /** The people the vault already has notes for. */
-  known: readonly PersonNote[];
+  known: readonly Approved<PersonNote>[];
+  /** Something here was readable only by an on-device model (the gate said
+   * so): the conversation stays on-device from this turn on. */
+  onDeviceOnly: boolean;
 }
 
-const SYSTEM = `You are the Librarian of a personal notes vault. You organize the note the person has open (its tags, pointers to its passages, and where it is filed) and you keep their People notes and filing rules. You never rewrite notes, and you are not a general assistant: the app has a separate Chat for that.
+const SYSTEM =
+  fixed(`You are the Librarian of a personal notes vault. You organize the note the person has open (its tags, pointers to its passages, and where it is filed) and you keep their People notes and filing rules. You never rewrite notes, and you are not a general assistant: the app has a separate Chat for that.
 Reply in one or two short sentences, then, when there is something to do, ONE JSON object: {"actions":[...]}. Use only these actions:
 - For the open note:
   - {"type":"tag","tags":["..."]}: short lowercase tags for the whole note.
@@ -66,30 +85,53 @@ Reply in one or two short sentences, then, when there is something to do, ONE JS
   Do not tag or file the open note for a statement about other people.
 - Act on what is clear. When you need to know which passage, which area, or who someone is, ask one short question about just that.
 - When the person asks for anything else (answering or explaining something, writing, research, a conversation), do not do it: say in one sentence that this belongs in Chat, and end with {"actions":[],"handoff":"chat"}.
-New people, groups and rules are added as soon as you reply. Changes to the open note and to people who already have notes wait until the person says yes.`;
+New people, groups and rules are added as soon as you reply. Changes to the open note and to people who already have notes wait until the person says yes.`);
 
-function noteContext(ctx: LibrarianContext): string {
-  return [
-    `Note title: ${ctx.title}`,
-    `Current tags: ${ctx.tags.join(", ") || "(none)"}`,
-    `Library areas: ${ctx.areas.join(", ") || "(none)"}`,
-    `People areas: ${ctx.people.join(", ")}`,
-    `People groups: ${ctx.rules.people.mode === "groups" ? ctx.rules.people.groups.join(", ") || "(none)" : "(one People list, no groups)"}`,
-    `People notes: ${ctx.known.map((person) => `${person.title} (${person.area})`).join(", ") || "(none yet)"}`,
-    ...(ctx.filing.length > 0
-      ? [
-          "The person's own filing rules (follow them when they apply):",
-          ...ctx.filing.map((rule) => `- ${rule}`),
-        ]
-      : []),
-    "",
-    "The note:",
-    ctx.doc.slice(0, EXCERPT_MAX),
-  ].join("\n");
+const listed = (items: readonly (ApprovedText | PersonText)[]): PromptText =>
+  items.length > 0 ? joinPrompt(items, ", ") : fixed("(none)");
+
+function noteContext(ctx: LibrarianContext): PromptText {
+  const groups =
+    ctx.rules.people.mode === "groups"
+      ? listed(ctx.rules.people.groups.map(personText))
+      : fixed("(one People list, no groups)");
+  const known =
+    ctx.known.length > 0
+      ? joinPrompt(
+          ctx.known.map((person) => prompt`${person.title} (${person.area})`),
+          ", ",
+        )
+      : fixed("(none yet)");
+  const filing =
+    ctx.filing.length > 0
+      ? prompt`The person's own filing rules (follow them when they apply):\n${joinPrompt(
+          ctx.filing.map((rule) => prompt`- ${rule}`),
+          "\n",
+        )}\n`
+      : NO_TEXT;
+  return prompt`Note title: ${ctx.title}
+Current tags: ${listed(ctx.tags)}
+Library areas: ${listed(ctx.areas)}
+People areas: ${joinPrompt(ctx.people, ", ")}
+People groups: ${groups}
+People notes: ${known}
+${filing}
+The note:
+${reshape(ctx.doc, (doc) => doc.slice(0, EXCERPT_MAX))}`;
 }
 
-function userContent(turn: Extract<LibrarianTurn, { role: "user" }>): string {
-  return turn.highlight ? `Highlighted passage: """${turn.highlight.exact}"""\n\n${turn.text}` : turn.text;
+/** A user turn: what they typed, after the passage they had highlighted when
+ * that passage is (still) in the note as approved for this send. The newest
+ * turn's passage must be (sendToLibrarian refuses otherwise); an earlier
+ * turn's passage that has since been edited away is said to be gone, never
+ * dropped silently. Only text from the approved note is sent. */
+function userContent(turn: Extract<LibrarianTurn, { role: "user" }>, doc: ApprovedText): PromptText {
+  const exact = turn.highlight?.exact ?? "";
+  const at = exact ? doc.indexOf(exact) : -1;
+  if (!exact) return prompt`${turn.text}`;
+  if (at < 0) return prompt`(The passage highlighted then is no longer in the note.)\n\n${turn.text}`;
+  const passage = reshape(doc, (text) => text.slice(at, at + exact.length));
+  return prompt`Highlighted passage: """${passage}"""\n\n${turn.text}`;
 }
 
 /** How much of the conversation a turn carries: the Librarian's asks are short,
@@ -104,13 +146,13 @@ export function librarianChatMessages(
   turns: readonly LibrarianTurn[],
 ): CompleteReq["messages"] {
   return [
-    { role: "system", content: `${SYSTEM}\n\n${noteContext(ctx)}` },
+    { role: "system", content: prompt`${SYSTEM}\n\n${noteContext(ctx)}` },
     ...turns
       .slice(-HISTORY_TURNS)
       .map((turn) =>
         turn.role === "user"
-          ? { role: "user" as const, content: userContent(turn) }
-          : { role: "assistant" as const, content: turn.raw },
+          ? { role: "user" as const, content: userContent(turn, ctx.doc) }
+          : { role: "assistant" as const, content: prompt`${turn.raw}` },
       ),
   ];
 }

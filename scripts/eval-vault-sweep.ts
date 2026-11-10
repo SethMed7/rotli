@@ -27,6 +27,7 @@ import { tmpdir } from "node:os";
 import { contextWindowFor } from "../src/ai/budget";
 import { runAgent } from "../src/ai/loop";
 import type { AgentEvent, ChatTurn, Host, NoteHit } from "../src/ai/types";
+import { approvedRow, brandHost, model, person } from "../src/lib/promptText.fixtures";
 import { buildModelMap, type ModelMapNote } from "../src/memex/modelMap";
 
 const ENDPOINT = "http://localhost:11435"; // loopback ONLY — mirrors DEFAULT_ENDPOINT in chat.rs
@@ -116,7 +117,8 @@ function makeCliHost(
     }
     return listCache.notes;
   };
-  return {
+  // the CLI answers plain strings; the brands are the real host's
+  return brandHost({
     async complete({ messages, formatJson }) {
       const prompt = messages.map((m) => m.content).join("\n\n");
       const body: Record<string, unknown> = {
@@ -151,12 +153,14 @@ function makeCliHost(
       return hits
         .filter((h) => h.kind === "note")
         .slice(0, limit)
-        .map((h): NoteHit => ({
-          id: h.id,
-          title: h.title,
-          snippet: h.snippet ?? "",
-          folder: h.folderId ?? "",
-        }));
+        .map((h): NoteHit =>
+          approvedRow({
+            id: h.id,
+            title: h.title,
+            snippet: h.snippet ?? "",
+            folder: h.folderId ?? "",
+          }),
+        );
     },
     async readNote(id) {
       const d = (await cliJson(cli, ["notes", "read", id])) as {
@@ -193,7 +197,7 @@ function makeCliHost(
       }));
       return buildModelMap(mapNotes, contextWindowFor(meta), maxChars);
     },
-  };
+  });
 }
 
 type Verdict = "correct" | "partial" | "wrong" | "leak";
@@ -247,10 +251,10 @@ async function runCase(
     final = "";
     const gen = runAgent(host, {
       history: [...history],
-      userText,
+      userText: person(userText),
       web: false,
       model: { id: modelId },
-      userName: "Avery",
+      userName: person("Avery"),
     });
     for await (const ev of gen as AsyncGenerator<AgentEvent>) {
       if (ev.type === "tool") {
@@ -259,7 +263,7 @@ async function runCase(
       }
       if (ev.type === "final") final = ev.text;
     }
-    history.push({ role: "user", text: userText }, { role: "assistant", text: final });
+    history.push({ role: "user", text: person(userText) }, { role: "assistant", text: model(final) });
   }
 
   const wallMs = Date.now() - t0;

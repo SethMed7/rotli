@@ -10,6 +10,289 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`rotli --version`** prints the version instead of opening the app.
+- **A Tesven app icon:** Rotli's white line quokka on Tesven's One Blue field,
+  in Settings → Appearance → App icon.
+- **The Librarian as an agent route, in development builds only.**
+  `rotli mcp --librarian` gives an agent host a small set of tools to keep one
+  vault organised: capture a source, propose where a note goes or what it
+  links to, keep a Librarian index and log. It is off by default even there,
+  and it isn't in the public app yet: like the rest of `rotli mcp`, a public
+  build refuses it, along with `rotli librarian …`, and ignores the vault's
+  `librarianMcp` switch. It stays that way until the problems a review found
+  in it are fixed.
+
+### Security
+
+- **A model sees only what the read check approved.** The in-app chat's
+  search and note list for models, on the Mac and on Rotli Web, and
+  `rotli notes search|list|query`, took a note's title, snippet, folder, and
+  dates from a cache and then checked the note's current file, so a note
+  that was secure a moment earlier could pass as its new, public version
+  while the result still showed the secure version. Each result is now built
+  from the one read the check approved. A model's search finds a note by its
+  new words as soon as Rotli has seen the change: at once after you save in
+  Rotli, and after a change made in another app once Rotli's file watcher
+  picks it up (300 ms after the changes stop). Until then it doesn't answer
+  with words the note no longer has.
+- **Every prompt takes a note's text only from the read check.** The chat,
+  `/ai`, Hand to AI, chat titles, hybrid presets, a chat's conversation
+  notes, and the Librarian build their prompts from text the read check
+  returned for the model that will read it, and the Librarian's background
+  filing from notes its own, stricter check cleared. Rotli's build checks
+  how these prompts are put together, which catches a note's text taken the
+  wrong way by mistake. It is a guard against mistakes, not a proof against
+  code written on purpose to get around it.
+- **A conversation that used something only an on-device model may read
+  stays on-device.** An on-device Librarian could read a secure person's
+  name and say it; switched to a remote model, the next message carried that
+  reply to it. Secure People are now left out of what the Librarian sees,
+  on-device or remote. If a reply would then make a note for someone who
+  already has a protected one, Rotli looks the name up on your Mac first,
+  by each note's own fresh read (their People note decides; with none, any
+  protected note by that name, since a note made secure leaves People for
+  the secure home), makes and changes nothing, and says
+  "That person’s note is protected, so the Librarian can’t change it". Leaving People out doesn't hide names: a
+  secure person's name can still reach the model through the note you ask
+  about (its words, tags and links) and through your own rules and groups.
+  Once anything else the read check passed only for an
+  on-device model goes into a Librarian conversation (the note it was asked
+  about), sending it to a remote model is refused, with nothing sent: "This
+  conversation includes notes only an on-device model can read. Start a new
+  one to use …", and one button starts the new one. "Open in Chat" carries
+  the same mark into the chat it opens, and a chat marks itself the same way
+  whenever any of its reads was on-device only.
+- **Nothing from such a conversation is written where a remote model could
+  read it.** A message's protection is settled when it's sent and read, and
+  every write it leads to goes by it, so closing or replacing the
+  conversation while a reply is on its way no longer lets that reply write
+  unprotected. A chat's conversation notes go only into a secure note (the
+  attached note when it's secure, or a new secure one), also when a note
+  turned secure after the message was sent, and otherwise aren't saved, with
+  one line saying so. The chat's note button makes a secure note; the chat's
+  own file, title included, is kept from remote models; and a marked
+  Librarian reply writes nothing (no rules, People notes or proposals), says
+  so, and offers a new conversation. A note that was public when it was
+  read and is made secure later isn't taken back out of a conversation.
+- **A model is sent a note as you last saved it.** The Librarian could
+  answer about the version before your last few keystrokes while that save
+  was still on its way, and a passage you had just highlighted silently
+  dropped out of its request. The Librarian, `/ai`, Hand to AI, a chat
+  attached to a note, and a chat's conversation notes now wait for the save
+  in progress. If it failed, or the note still differs from what was saved,
+  nothing is sent, and you see the save's error or "Still saving. Try again
+  in a moment." A highlighted passage that isn't in the saved note is a
+  refusal that says so.
+- **Rotli Web reads and edits a note for a model in one read.** Its check
+  and the words or the edit a model gets came from two separate reads, so a
+  note made secure in between could reach the model.
+- **The Librarian sees only what the read check allows.** It listed People
+  notes from the app's own note list, which in the Mac app doesn't know which
+  notes are secure, so a secure person's name could reach the Librarian's
+  model, and it took the open note from the editor rather than from the read
+  that checked it. Every time you send, the note, its tags, and the passage
+  you highlighted now come from the read check for the Librarian's model;
+  your areas come from your vault's folders, never from a note; and your
+  People notes come from the read check, which reads only your People notes
+  to list them.
+- **Hand to AI sends only the title and words the read check approved.** The
+  handoff takes the note's title and words from the same read that checks
+  it.
+- **A chat's conversation notes stay out of a secure note.** The notes a
+  chat keeps in the note it's attached to (or in its own note) were read
+  without the read check, so a note made secure during a reply could have
+  its notes sent to the chat's model. They're now read through the check for
+  that model, and a note it refuses is neither sent nor updated.
+- **Rotli doesn't read a vault file through a hard link, and says which it
+  left alone.** A hard link in your vault to a file somewhere else on your
+  Mac looked like an ordinary note, sheet, document, board, image,
+  attachment, or chat transcript, so opening it, the chat and the Librarian,
+  document conversion, and search could read that outside file, and Rotli
+  Helper served it to Rotli Web. Rotli now opens a file in your vault only
+  when it has no other name, checked on the file it actually opened. The
+  same check covers what Rotli keeps in your vault: its settings, its
+  history, and its lists of views and chat folders, and a hard link in place
+  of your settings is never copied into the vault when a save replaces it.
+  Where Rotli only checks whether something exists or is switched on (a
+  vault's users file, the Librarian route's switch, AI file grants), a file
+  it can't read this way counts as absent or off. One exception: an image
+  shown inside a note is checked just before the view loads it, so a file
+  swapped for a hard link at that instant can still be shown. Such files are
+  left out of lists and search, and Rotli never changes them.
+- **A calm notice names the files Rotli left alone.** When a file in your
+  vault has a hard link, a note at the foot of the sidebar says how many
+  weren't opened and lists them, search says so under its results, and a
+  note that gets a hard link while it's open shows the same notice in its
+  place. To use one, make an independent copy (in Finder, Duplicate). Rotli
+  Web shows the same through Rotli Helper; a folder Rotli Web opens directly
+  in the browser can't tell a hard link apart, so connect it through Rotli
+  Helper for this check.
+- **The Librarian stops when it can't read your rules.** If your vault's
+  settings can't be read, it doesn't classify, organise or file anything,
+  instead of working without your filing rules and secure keywords.
+  Librarian Activity says so, says where the settings file is, and says
+  what to do for the trouble it finds: a file that isn't valid settings is
+  replaced when you change any setting, with the old one kept beside it; a
+  file with a hard link needs an independent copy in its place; a file Rotli
+  can't open needs to be made readable. Rotli changes neither of the last
+  two.
+- **A note locked or made secure while a change waits is left alone.** An
+  agent's move or edit, the Librarian's filing, and its field writes check
+  the note again at the moment they act, not only before waiting their turn.
+- **Secure-note keywords match every spelling.** A keyword like "café" now
+  protects a title however its accented letters are typed or stored, and
+  full-width letters count as the plain ones. A name the earlier matching
+  caught is still caught: "bank™" and a "bank" with an accent mark added
+  after the k stay secure under the keyword "bank". Rotli and its agent
+  tools also read a file name's short id ending the same way, so they never
+  disagree on whether a note is secure.
+- **An agent's read can't be swapped mid-read.** Rotli checks a note and
+  hands an agent the very same bytes, so a note changed to secure at that
+  instant is never sent.
+
+### Fixed
+
+- **Typing while a save is on its way is no longer lost.** If you kept
+  typing while Rotli was still saving the note (a slow disk, or switching
+  away or quitting right after a pause), the second save could be refused,
+  and the note then looked saved with your last words missing from the file,
+  and Rotli quit without asking. This happens in 1.9.1, and in 1.8.0, the
+  oldest release checked. Rotli now saves a note one write at a time: a
+  later save waits for the one in progress, then saves your newest words, and
+  a note counts as saved only when the file holds your last change. A save
+  that fails keeps the note marked unsaved, shows why, keeps your words in
+  the note (on Rotli Web also in its recovery copy, for the next visit) and
+  tries again. Closing a tab starts its save right after the tab closes, and
+  the words stay in memory until the save lands. Quitting waits up to 12
+  seconds (inside the Mac's own 15) for the saves still out; if one hasn't
+  finished, Rotli stays open and names the note and what is outstanding. The
+  Mac keeps no copy of unsaved words outside memory, so a force quit loses
+  everything typed since the last save that landed; Rotli Web keeps a
+  recovery copy.
+- **Quit can't go ahead with words you just typed.** A note that finished
+  saving early kept taking typing while another window or a workbook was
+  still saving, and quit went ahead with those words unsaved. Quit now has
+  two steps and never locks the editors: every window saves; then, only
+  when every window has, each is asked at once whether anything is unsaved
+  right now, and any yes keeps Rotli open, naming the note. All no, and
+  Rotli quits at once. A second quit while one is deciding joins it;
+  a quit pressed while a folder window is closing waits for the close and
+  then quits, rather than being dropped. A vault switch and closing a
+  folder window go the same way. What's left:
+  words typed in a window after it answered and before the last window
+  answers (at most 2 seconds, milliseconds unless a window hangs). This
+  happens in 1.9.1.
+- **A late read can't put older words back.** If a note's file was read
+  just before your newest save landed and that read answered afterwards,
+  the editor took the older words and showed them as saved. Each read now
+  carries when it started, and one older than what the editor already has is
+  dropped. A read dropped or cancelled that may have seen something newer is
+  followed by one fresh read, and a save whose answer arrives after a newer
+  version was read takes that version in, and never puts its own older
+  words back over it, so a newer file is never left unread. This happens in
+  1.9.1.
+- **Words typed while Rotli copies aside a conflict are kept.** When another
+  app changed a note you had unsaved edits in, quitting keeps your version as
+  a copy beside it. Anything typed while that copy was being made was
+  dropped, and the note looked saved. It's now part of the note's saves: the
+  newer words go into that same copy (never a second one), and the note is
+  read again before it takes the other app's version. A notice in the
+  sidebar now names each copy and opens it, and stays (across a restart)
+  until you open the copy or dismiss it; before, nothing said where your
+  words went. This happens in 1.9.1.
+- **A slow save is waited for, never raced.** A disk that stopped answering
+  left every later save of that note waiting, and every quit ran into its
+  15-second limit. An earlier fix in this release tried again beside the
+  slow save, which let the old save land after Rotli had quit, over newer
+  words. Now Rotli sends one change per note at a time and waits for it:
+  after 8 seconds the note says, by name, that it is taking longer than
+  expected, keeps your words and stays unsaved, and nothing else goes out
+  for it until the disk answers; then your newest words are saved on top.
+  While that save is out, quitting is refused after 12 seconds, naming the
+  note. If the disk never answers, that note stays unsaved for the rest of
+  the session: copy its text out before you quit, because the only way out
+  is a force quit, which loses its unsaved words on the Mac.
+- **A save whose answer was lost isn't mistaken for another app's edit.**
+  When a save landed but its answer didn't come back, Rotli could later
+  take its own words on disk for someone else's change: merge your newer
+  words away, or make a conflict copy of your own text. It now remembers
+  such a save's words and builds on them, and doesn't merge while it can't
+  tell. Each conflict gets one copy: its id is written into the copy, and a
+  create whose answer was lost is asked again with that id, which gives back
+  the copy it made (protection checked) instead of another. A create also
+  answers with exactly what it wrote, so another writer's change right after
+  it can't be taken for Rotli's.
+- **A note deleted while it had unsaved words says so.** Its saves failed
+  with no way out, and once the file list refreshed the editor showed
+  nothing at all. Now its words stay in its editor, in every pane, still
+  editable; a notice in the sidebar says the file is gone and offers to copy
+  the words or discard them (which closes its panes); and quit names the
+  note until they are discarded. If the file comes back, the note saves
+  again and the notice clears. This happens in 1.9.1.
+- **A secure note's conflict copy stays secure on the Mac.** The copy Rotli
+  keeps of your version when another app changed the note was created as an
+  ordinary note, because the Mac's note read didn't say the note was secure.
+  The read now returns a note's protection with its words, and a locked
+  note's copy is created locked, in the same step. This happens in 1.9.1.
+- **A protected chat saved with Windows line endings stays protected.** A
+  chat marked as holding secure-note content lost that mark when another
+  editor saved it with Windows line endings, so a remote model could continue
+  it, and Rotli couldn't mark such a chat. The Mac's two halves also read
+  the mark differently (a byte-order mark, an unclosed header, `key : true`,
+  an indented key). They now read it by one written rule, tested on both
+  sides with the same cases, and where the rule can't be sure, the chat
+  counts as marked. Search, the PDF export check and the last check before
+  anything is sent to a remote model read it by the same rule. This happens
+  in 1.9.1.
+- **Two notes saved with the same name at the same moment both survive.**
+  Rotli used to let the later one replace the earlier when two agents (or an
+  agent and the app) picked the same file name at once.
+- **Web chats keep metadata from CRLF files.** Chats saved with Windows-style
+  line endings retain their title, pin, attached-note label, and model details.
+- **Long Web chats keep their place.** The chat list uses the newest reply even
+  when it is past the first 41 lines of a conversation. Sending a message still
+  leaves a chat in place until its reply arrives.
+- **Missing images stay selected.** Double-clicking a missing-image label
+  selects its image object without intermittently revealing Markdown source.
+- **Cleaner office and pane resizing.** Opening a document after a workbook
+  no longer triggers a cross-engine service error. Resizing split panes
+  applies their size limits outside observer delivery, avoiding a browser
+  resize-loop error. Closing a note with a Mermaid workspace also disposes
+  its separate editor root after the note finishes closing.
+- **Faster Web folders and large Main lists.** Rotli Web does less repeated
+  work when opening and searching your folder. Switching between notes also
+  keeps large Main lists more responsive on both platforms. In a very large
+  flat Main, focusing and opening a note now updates only the affected rows.
+- **A complete workspace outline for screen readers.** The workspace and
+  Settings have a top-level heading, and board controls no longer masquerade
+  as the page footer. Their visual layout stays the same.
+- **Search names what it searches.** The titlebar's search button reads
+  "Search notes and actions" (in Breve, "Search Rotli and actions"), the
+  same words the palette uses.
+- **Clearer keyboard and screen-reader navigation.** Notes have a named editor;
+  sidebar rows and tab controls expose valid roles and independent pin/close
+  actions. Tabs support arrow, Home and End navigation. Naming and Web dialogs
+  keep keyboard focus inside, and board menu/zoom controls have complete names.
+  Small labels remain readable over selected backgrounds and accent fills.
+  The App icon choices are a group of toggle buttons, and closing the tab
+  that has keyboard focus leaves the other tabs reachable with Tab.
+- **Pin to top works on Rotli Web.** Pinning a note now saves to your connected
+  folder and survives a reload. Unpinning works too. Only the note's pin line
+  changes, so its words and any dates written in it stay the same; a note
+  without its own dates shows the pin as its latest change, because a browser
+  can't keep a file's modified time.
+- **Chats in a copied vault list their real place on Rotli Web.** Each chat
+  in the list carries the path of the file it was read from, instead of
+  assuming the `chats/` folder an imported vault may not use.
+- **App icon choices explain where they work.** Rotli Web's Appearance settings
+  now say "In the Mac app" for the Dock icon, instead of offering choices that
+  do nothing there.
+- **Web settings no longer pretend to update or switch to Demo mode.** These
+  Mac-only actions now say where they work, without a placeholder app version,
+  a false "up to date" result, or a switch that does nothing.
+
 ## [1.9.1] - 2026-10-20
 
 ### Added

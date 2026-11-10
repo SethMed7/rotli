@@ -1,4 +1,5 @@
 import { splitRootId } from "../lib/corpusWireId";
+import { afterFrontmatter } from "../lib/frontmatterBlock";
 import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
 import { ALIGN_CLOSE, alignOpenTag } from "./alignedLine";
 import { applyBlockToggle, applyHeading } from "./commands";
@@ -87,7 +88,7 @@ export function pickerFence(
  * arrive frontmatter-free from every adapter; a stray leading fence is skipped
  * anyway, because frontmatter is Rotli's to own. */
 export function templateInsertion(body: string, hostIsEmpty: boolean, now: Date = new Date()): string {
-  let text = body.replace(/^\uFEFF?---\n[\s\S]*?\n---\n?/, "");
+  let text = afterFrontmatter(body);
   if (!hostIsEmpty) text = text.replace(/^\s*# [^\n]*(?:\n|$)/, "");
   // {{today}} and friends become the dates of the day the template is used
   return expandDateTokens(text.trim(), now);

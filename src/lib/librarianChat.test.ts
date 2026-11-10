@@ -9,22 +9,24 @@ import {
   type LibrarianTurn,
   splitLibrarianReply,
 } from "./librarianChat";
+import { approved, approvedRow, model, person } from "./promptText.fixtures";
 
 const NOTE =
   "# Maya Chen\n\nMet Maya at the design meetup. She runs research at Northwind.\n\nFollow up in March.";
 const CTX: LibrarianContext = {
-  title: "Maya Chen",
-  doc: NOTE,
-  areas: ["people", "projects"],
-  tags: ["q3"],
-  people: ["People/Family", "People/Friends"],
-  filing: ["Recipes go to Cooking"],
+  onDeviceOnly: false,
+  title: approved("Maya Chen"),
+  doc: approved(NOTE),
+  areas: [approved("people"), approved("projects")],
+  tags: [approved("q3")],
+  people: [person("People/Family"), person("People/Friends")],
+  filing: [person("Recipes go to Cooking")],
   rules: {
     secureKeywords: [],
     people: { mode: "groups", groups: ["Family", "Friends"] },
     filing: ["Recipes go to Cooking"],
   },
-  known: [{ id: "01MAYA", title: "Maya Chen", area: "people/friends" }],
+  known: [approvedRow({ id: "01MAYA", title: "Maya Chen", area: "people/friends" })],
 };
 const at = NOTE.indexOf("runs research");
 const HIGHLIGHT = anchorFromSelection(NOTE, at, at + "runs research".length);
@@ -32,63 +34,65 @@ const HIGHLIGHT = anchorFromSelection(NOTE, at, at + "runs research".length);
 describe("the messages a turn sends", () => {
   test("the rules and the note as it is now, then the conversation in order", () => {
     const turns: LibrarianTurn[] = [
-      { role: "user", text: "Who is this?", highlight: null },
-      { role: "librarian", text: "Someone you met.", raw: "Someone you met.", actions: [] },
-      { role: "user", text: "Mark her job", highlight: HIGHLIGHT },
+      { role: "user", text: person("Who is this?"), highlight: null },
+      { role: "librarian", text: "Someone you met.", raw: model("Someone you met."), actions: [] },
+      { role: "user", text: person("Mark her job"), highlight: HIGHLIGHT },
     ];
     const messages = librarianChatMessages(CTX, turns);
     expect(messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "user"]);
-    expect(messages[0]?.content).toContain("You never rewrite notes");
-    expect(messages[0]?.content).toContain("belongs in Chat");
-    expect(messages[0]?.content).toContain("Current tags: q3");
-    expect(messages[0]?.content).toContain("Library areas: people, projects");
-    expect(messages[0]?.content).toContain("She runs research at Northwind.");
+    expect<string | undefined>(messages[0]?.content).toContain("You never rewrite notes");
+    expect<string | undefined>(messages[0]?.content).toContain("belongs in Chat");
+    expect<string | undefined>(messages[0]?.content).toContain("Current tags: q3");
+    expect<string | undefined>(messages[0]?.content).toContain("Library areas: people, projects");
+    expect<string | undefined>(messages[0]?.content).toContain("She runs research at Northwind.");
     // the Librarian rules ride along: the People groups and the person's own filing rules
-    expect(messages[0]?.content).toContain("People areas: People/Family, People/Friends");
-    expect(messages[0]?.content).toContain(
+    expect<string | undefined>(messages[0]?.content).toContain("People areas: People/Family, People/Friends");
+    expect<string | undefined>(messages[0]?.content).toContain(
       "filing rules (follow them when they apply):\n- Recipes go to Cooking",
     );
     // a question about a highlight carries the passage with it
-    expect(messages[3]?.content).toBe('Highlighted passage: """runs research"""\n\nMark her job');
+    expect<string | undefined>(messages[3]?.content).toBe(
+      'Highlighted passage: """runs research"""\n\nMark her job',
+    );
     // the people the vault knows, so a statement about them asks instead of adding twice
-    expect(messages[0]?.content).toContain("People groups: Family, Friends");
-    expect(messages[0]?.content).toContain("People notes: Maya Chen (people/friends)");
-    expect(messages[0]?.content).toContain('{"type":"person"');
-    expect(messages[1]?.content).toBe("Who is this?");
+    expect<string | undefined>(messages[0]?.content).toContain("People groups: Family, Friends");
+    expect<string | undefined>(messages[0]?.content).toContain("People notes: Maya Chen (people/friends)");
+    expect<string | undefined>(messages[0]?.content).toContain('{"type":"person"');
+    expect<string | undefined>(messages[1]?.content).toBe("Who is this?");
   });
 
   test("a long conversation carries only its latest turns", () => {
     const turns: LibrarianTurn[] = Array.from({ length: HISTORY_TURNS + 5 }, (_, at) => ({
       role: "user" as const,
-      text: `message ${at}`,
+      text: person(`message ${at}`),
       highlight: null,
     }));
     const messages = librarianChatMessages(CTX, turns);
     expect(messages).toHaveLength(HISTORY_TURNS + 1);
-    expect(messages[1]?.content).toBe("message 5");
-    expect(messages.at(-1)?.content).toBe(`message ${HISTORY_TURNS + 4}`);
+    expect<string | undefined>(messages[1]?.content).toBe("message 5");
+    expect<string | undefined>(messages.at(-1)?.content).toBe(`message ${HISTORY_TURNS + 4}`);
   });
 
   test("the Librarian's own replies go back exactly as it sent them, JSON and all", () => {
-    const raw = 'Tagging it.\n{"actions":[{"type":"tag","tags":["person"]}]}';
+    const raw = model('Tagging it.\n{"actions":[{"type":"tag","tags":["person"]}]}');
     const turns: LibrarianTurn[] = [
-      { role: "user", text: "Tag it", highlight: null },
+      { role: "user", text: person("Tag it"), highlight: null },
       { role: "librarian", text: "Tagging it.", raw, actions: [{ type: "tag", tags: ["person"] }] },
-      { role: "user", text: "Thanks", highlight: null },
+      { role: "user", text: person("Thanks"), highlight: null },
     ];
-    expect(librarianChatMessages(CTX, turns)[2]?.content).toBe(raw);
+    expect<string | undefined>(librarianChatMessages(CTX, turns)[2]?.content).toBe(raw);
   });
 
   test("the newest question's passage is the one a proposed mark uses", () => {
     expect(latestHighlight([])).toBeNull();
     expect(
       latestHighlight([
-        { role: "user", text: "a", highlight: HIGHLIGHT },
-        { role: "librarian", text: "b", raw: "b", actions: [] },
-        { role: "user", text: "c", highlight: null },
+        { role: "user", text: person("a"), highlight: HIGHLIGHT },
+        { role: "librarian", text: "b", raw: model("b"), actions: [] },
+        { role: "user", text: person("c"), highlight: null },
       ]),
     ).toBeNull();
-    expect(latestHighlight([{ role: "user", text: "a", highlight: HIGHLIGHT }])).toEqual(HIGHLIGHT);
+    expect(latestHighlight([{ role: "user", text: person("a"), highlight: HIGHLIGHT }])).toEqual(HIGHLIGHT);
   });
 });
 

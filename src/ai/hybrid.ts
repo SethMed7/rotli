@@ -5,6 +5,16 @@
 // it with zero changes. Routing must never fail a turn: an unusable organizer
 // or an unparseable choice degrades to the first route.
 
+import {
+  type ModelText,
+  type PersonText,
+  type PromptText,
+  externalText,
+  joinPrompt,
+  modelText,
+  personText,
+  prompt,
+} from "../lib/promptText";
 import type { ChatModelInfo } from "../lib/tauri";
 import { runAgent } from "./loop";
 import { isSafeguardBlock, modelErrorText } from "./modelError";
@@ -20,9 +30,16 @@ export function presetFor(pickedId: string, presets: HybridPreset[]): HybridPres
 }
 
 /** The organizer's one-shot routing prompt — numbered routes, one JSON out. */
-export function routingPrompt(routes: { when: string; model: string }[], userText: string): string {
-  const listed = routes.map((r, i) => `${i + 1}. ${r.when || r.model}`).join("\n");
-  return `You route a user's message to the best-suited model. The routes:
+export function routingPrompt(
+  routes: { when: string; model: string }[],
+  userText: PersonText | ModelText,
+): PromptText {
+  // the routes are the person's own preset (Settings → AI Models)
+  const listed = joinPrompt(
+    routes.map((r, i) => prompt`${i + 1}. ${personText(r.when || r.model)}`),
+    "\n",
+  );
+  return prompt`You route a user's message to the best-suited model. The routes:
 ${listed}
 
 Reply with EXACTLY ONE JSON object and nothing else:
@@ -82,7 +99,7 @@ export async function* runHybrid(
 
   // 1) route — only worth a model call when there's a real choice to make
   let chosen = routes[0] as { when: string; model: ChatModelInfo };
-  let refined: string | undefined;
+  let refined: ModelText | undefined;
   const organizer = byId.get(preset.organizer);
   if (organizer && routes.length > 1) {
     yield { type: "status", text: `routing via ${organizer.label}…` };
@@ -96,7 +113,7 @@ export async function* runHybrid(
       const choice = parseRouteChoice(raw, routes.length);
       if (choice) {
         chosen = routes[choice.route - 1] ?? chosen;
-        refined = choice.refinedPrompt;
+        refined = choice.refinedPrompt === undefined ? undefined : modelText(choice.refinedPrompt);
       }
     } catch {
       // organizer down ≠ turn down — first route carries it
@@ -107,7 +124,7 @@ export async function* runHybrid(
   yield { type: "status", text: `→ ${chosen.model.label}` };
   const runOn = async function* (
     model: ChatModelInfo,
-    userText: string,
+    userText: PersonText | ModelText,
   ): AsyncGenerator<AgentEvent, { final: string; questioned: boolean }, void> {
     let final = "";
     try {
@@ -157,10 +174,14 @@ export async function* runHybrid(
 export async function suggestPresets(
   host: Host,
   candidates: ChatModelInfo[],
-  usage: string,
+  usage: PersonText,
 ): Promise<HybridPreset[]> {
-  const listed = candidates.map((m) => `- "${m.id}" — ${m.label}`).join("\n");
-  const prompt = `Design exactly 3 hybrid model presets for this user. A preset sends every message to an ORGANIZER model that routes it to one of 2-3 ROUTES (each a "when …" description + a model); an optional FALLBACK model catches failures. Prefer a small/fast organizer and match stronger models to harder routes.
+  // the catalog's own ids and labels, not note text
+  const listed = joinPrompt(
+    candidates.map((m) => prompt`- "${externalText(m.id)}" — ${externalText(m.label)}`),
+    "\n",
+  );
+  const request = prompt`Design exactly 3 hybrid model presets for this user. A preset sends every message to an ORGANIZER model that routes it to one of 2-3 ROUTES (each a "when …" description + a model); an optional FALLBACK model catches failures. Prefer a small/fast organizer and match stronger models to harder routes.
 
 Allowed model ids (use these EXACTLY, nothing else):
 ${listed}
@@ -169,7 +190,7 @@ What the user mostly does: ${usage}
 
 Reply with ONLY a JSON array of 3 presets, shaped:
 [{"name":"…","organizer":"<model id>","routes":[{"when":"…","model":"<model id>"}],"fallback":"<model id, optional>"}]`;
-  const raw = await host.complete({ messages: [{ role: "user", content: prompt }] });
+  const raw = await host.complete({ messages: [{ role: "user", content: request }] });
   return parseSuggestions(raw, new Set(candidates.map((m) => m.id)));
 }
 

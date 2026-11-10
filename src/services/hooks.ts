@@ -8,11 +8,14 @@ import { looksSecret } from "../ai/guard";
 import { bodyLinkTargets } from "../graph/linkTargets";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isCanvasPath } from "../lib/fileKind";
+import { hardLinked } from "../lib/hardLinks";
 import { replaceTitleLine } from "../lib/noteTitle";
+import { isSettingsUnreadable, settingsTrouble } from "../lib/settingsTrouble";
 import {
   corpusFileStat,
   corpusLinks,
   corpusMoveFileToSink,
+  corpusSettingsRead,
   corpusTasks,
   isTauri,
   organizerSecureHints,
@@ -20,13 +23,14 @@ import {
 } from "../lib/tauri";
 import { secureRepairScan } from "../lib/vaultRepair";
 import { useUiStore } from "../state/ui";
-import type { Note, NoteSummary, SearchHit } from "../types";
+import type { Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
+import { afterPublish, beforePublish, registerReadHooks, startRead, stampRead } from "./noteReads";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
 import { listWebLinks } from "./webLinks";
@@ -47,6 +51,7 @@ export const keys = {
   // 2026-07). null can never collide with a folder id (ids are strings).
   notes: (folderId?: string) => ["notes", folderId ?? null] as const,
   note: (id: string) => ["note", id] as const,
+  skipped: ["skipped-files"] as const,
   memexRoots: ["memex-root-markers"] as const,
   journal: ["journal"] as const,
   organizer: ["organizer-status"] as const,
@@ -295,10 +300,42 @@ export function useLiveNoteSearch(query: string): {
   return { hits: result.data, state: "settled" };
 }
 
+/** The files the vault's listing left out because they have a hard link
+ * (empty where the host can't tell). invalidateNotes refetches it with the
+ * notes, so every vault change keeps it current. */
+export function useSkippedFiles(): SkippedFile[] {
+  return (
+    useQuery({
+      queryKey: keys.skipped,
+      queryFn: async () => hardLinked(await (notesService.listSkipped?.() ?? Promise.resolve([]))),
+    }).data ?? NO_SKIPPED
+  );
+}
+const NO_SKIPPED: SkippedFile[] = [];
+
+/** A note read for the editor, numbered as it starts: an answer older than a
+ * save that lands meanwhile is dropped by the editor (noteReads.ts). Every
+ * query on a note's key uses it. */
+async function readNote(id: string): Promise<Note | null> {
+  const startedAt = startRead();
+  const note = await notesService.getNote(id);
+  return note && stampRead(note, startedAt);
+}
+
+// cancelling and reading again, for a publish (noteReads.ts)
+registerReadHooks({
+  cancel: (noteId) => {
+    const inFlight = queryClient.isFetching({ queryKey: keys.note(noteId) }) > 0;
+    void queryClient.cancelQueries({ queryKey: keys.note(noteId) });
+    return inFlight;
+  },
+  refresh: (noteId) => void queryClient.invalidateQueries({ queryKey: keys.note(noteId) }),
+});
+
 export function useNote(id: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: keys.note(id),
-    queryFn: () => notesService.getNote(id),
+    queryFn: () => readNote(id),
     enabled: options.enabled ?? true,
   });
 }
@@ -307,7 +344,7 @@ export function useNote(id: string, options: { enabled?: boolean } = {}) {
  * src/state/paneVaults.ts), from the same cached read the editor makes. */
 export function useUnlistedNoteTitles(ids: readonly string[]): ReadonlyMap<string, string> {
   return useQueries({
-    queries: ids.map((id) => ({ queryKey: keys.note(id), queryFn: () => notesService.getNote(id) })),
+    queries: ids.map((id) => ({ queryKey: keys.note(id), queryFn: () => readNote(id) })),
     combine: (results) => {
       const titles = new Map<string, string>();
       for (const result of results) if (result.data) titles.set(result.data.id, result.data.title);
@@ -329,6 +366,7 @@ export async function invalidateNotes(): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["notes"] }),
     queryClient.invalidateQueries({ queryKey: ["note"] }),
+    queryClient.invalidateQueries({ queryKey: keys.skipped }),
     // a body edit can add/complete checkboxes — the Tasks projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
     // …and add or drop a wikilink — the Graph's Links projection re-derives
@@ -350,6 +388,11 @@ export async function invalidateTasks(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
+/** What the note's cache entry holds now (the save queue asks whether a read
+ * newer than its write is waiting there for the editor). */
+export const cachedNote = (noteId: string): Note | undefined =>
+  queryClient.getQueryData<Note>(keys.note(noteId));
+
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.
  * invalidateNotes() here fanned into ~9 uncached full-vault walks per tick
  * (perf audit 2026-07-30, #1): with staleTime ∞, invalidating ["notes"]
@@ -365,7 +408,12 @@ export async function invalidateTasks(): Promise<void> {
 export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): Promise<void> {
   const { body: _body, ...summary } = note;
   const before = queryClient.getQueryData<Note>(keys.note(note.id));
-  queryClient.setQueryData(keys.note(note.id), note);
+  // a read still on its way may have read the file before this write: cancel
+  // it, publish the written note as the newest read, and if one was cancelled,
+  // read once more (the disk may hold something newer than either)
+  const cancelled = beforePublish(note.id);
+  queryClient.setQueryData(keys.note(note.id), stampRead(note));
+  afterPublish(note.id, cancelled);
   // the Graph and canvas cards read the Links projection. A save that makes
   // the note secure, or no longer secure, refetches it for an open Graph or
   // canvas now — secure notes fail closed (ROTLI review, PR 173). A save that
@@ -433,6 +481,17 @@ export function useJournal() {
  * 2026-07-30, finding 23). */
 export function useOrganizerStatus() {
   return useQuery({ queryKey: keys.organizer, queryFn: organizerStatus });
+}
+
+/** Which of the three settings troubles stopped the organizer (lib/settingsTrouble.ts):
+ * read once per distinct error, only while Activity shows the refusal. */
+export function useSettingsTrouble(error: string | null | undefined) {
+  return useQuery({
+    queryKey: ["settingsTrouble", error ?? ""],
+    queryFn: () => settingsTrouble(() => corpusSettingsRead("settings")),
+    enabled: isSettingsUnreadable(error),
+    staleTime: Infinity,
+  });
 }
 
 /** Legacy secure-intake notes awaiting the explicit repair (decision

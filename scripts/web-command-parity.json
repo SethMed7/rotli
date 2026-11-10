@@ -1,0 +1,620 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "notes",
+      "status": "web",
+      "reason": "The connected FolderNotesService implements note and folder reads, searches, edits, lifecycle, pinning, and reference resolution; no native IPC is sent.",
+      "sources": [
+        "src/services/folderNotes.ts",
+        "src/services/folderTrash.ts",
+        "src/services/folderNoteStamps.ts",
+        "src/services/notes.ts",
+        "src/services/folderMetadata.ts"
+      ],
+      "tests": [
+        "src/services/folderNotes.test.ts",
+        "src/services/folderTrash.test.ts",
+        "e2e/web/rotli-web.spec.ts",
+        "src/services/folderPinned.test.ts",
+        "e2e/web/rotli-web-metadata-files.spec.ts"
+      ],
+      "commands": [
+        "corpus_create",
+        "corpus_create_folder",
+        "corpus_delete",
+        "corpus_discard_blank",
+        "corpus_list",
+        "corpus_move",
+        "corpus_purge",
+        "corpus_read",
+        "corpus_resolve_ref",
+        "corpus_search",
+        "corpus_set_pinned",
+        "corpus_write"
+      ]
+    },
+    {
+      "id": "boards-and-canvas",
+      "status": "web",
+      "reason": "Boards have connected-folder editing and byte-backed import. JSON Canvas creation is available only in development builds on both shells.",
+      "sources": [
+        "src/services/folderBoards.ts",
+        "src/services/folderCanvases.ts",
+        "src/lib/featurePolicy.ts"
+      ],
+      "tests": [
+        "src/services/folderBoards.test.ts",
+        "src/services/folderCanvases.test.ts",
+        "e2e/web/rotli-web-boards.spec.ts"
+      ],
+      "commands": [
+        "corpus_create_board",
+        "corpus_create_canvas",
+        "corpus_import_board",
+        "corpus_read_board",
+        "corpus_rename_board",
+        "corpus_write_board"
+      ]
+    },
+    {
+      "id": "files",
+      "status": "web",
+      "reason": "Connected-folder adapters read, stat, import, create, rename, archive, restore, and revision-save supported files. Browser File bytes replace native absolute-path import grants.",
+      "sources": [
+        "src/services/webVaultIo.ts",
+        "src/services/folderFileIo.ts",
+        "src/services/folderManagedFiles.ts",
+        "src/services/folderFileRename.ts",
+        "src/services/webFiles.ts"
+      ],
+      "tests": [
+        "src/services/folderFileIo.test.ts",
+        "src/services/folderManagedFiles.test.ts",
+        "e2e/web/rotli-web-office.spec.ts"
+      ],
+      "commands": [
+        "corpus_create_image_asset",
+        "corpus_create_managed_file",
+        "corpus_file_bytes",
+        "corpus_file_stat",
+        "corpus_file_text",
+        "corpus_import_file",
+        "corpus_managed_file_creation_available",
+        "corpus_move_file_to_sink",
+        "corpus_new_file_bytes",
+        "corpus_pick_images",
+        "corpus_rename_managed_file",
+        "corpus_restore_file",
+        "corpus_write_file_bytes"
+      ]
+    },
+    {
+      "id": "metadata",
+      "status": "web",
+      "reason": "The web metadata and protection adapters preserve unknown fields and enforce revision and reserved-field rules; portable local-AI access does not grant a web on-device exception.",
+      "sources": [
+        "src/services/folderMetadata.ts",
+        "src/services/webVaultIo.ts"
+      ],
+      "tests": [
+        "src/services/webMetadataFiles.test.ts",
+        "e2e/web/rotli-web-metadata-files.spec.ts"
+      ],
+      "commands": [
+        "corpus_frontmatter",
+        "corpus_raw_frontmatter",
+        "corpus_set_ai_edit",
+        "corpus_set_field",
+        "corpus_set_local_ai_access",
+        "corpus_set_locked",
+        "corpus_set_secure",
+        "corpus_write_frontmatter_raw"
+      ]
+    },
+    {
+      "id": "settings-and-views",
+      "status": "web",
+      "reason": "The bound folder store handles app settings, vault settings, Main, and named views; the web app-settings sidecar stays separate from native machine preferences.",
+      "sources": [
+        "src/lib/folderVaultStore.ts",
+        "src/services/folderViewSync.ts",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "src/services/folderNotes.test.ts",
+        "e2e/web/rotli-web-note-stamps.spec.ts"
+      ],
+      "commands": [
+        "app_settings_read",
+        "app_settings_write",
+        "corpus_main_read",
+        "corpus_main_write",
+        "corpus_settings_read",
+        "corpus_settings_write",
+        "corpus_views_read",
+        "corpus_views_write"
+      ]
+    },
+    {
+      "id": "tasks-and-graph",
+      "status": "web",
+      "reason": "Tasks and link projections are computed from the connected notes. Graph remains development-only on both shells.",
+      "sources": [
+        "src/services/webTasks.ts",
+        "src/services/webLinks.ts",
+        "src/lib/featurePolicy.ts"
+      ],
+      "tests": [
+        "src/services/tasksView.test.ts",
+        "src/services/webLinks.test.ts",
+        "e2e/web/rotli-web-fresh-vault.spec.ts"
+      ],
+      "commands": [
+        "corpus_links_list",
+        "corpus_tasks",
+        "corpus_toggle_task"
+      ]
+    },
+    {
+      "id": "ai-note-policy",
+      "status": "web",
+      "reason": "The web AI corpus gates note retrieval and body writes over the connected notes service; every web model uses the remote secure-note rules.",
+      "sources": [
+        "src/services/webAiCorpus.ts",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "src/services/webAiCorpus.test.ts",
+        "e2e/web/rotli-web-privacy.spec.ts"
+      ],
+      "commands": [
+        "corpus_notes_ai",
+        "corpus_read_ai",
+        "corpus_readable_ids",
+        "corpus_search_ai",
+        "corpus_write_ai"
+      ]
+    },
+    {
+      "id": "chat-files",
+      "status": "web",
+      "reason": "The web memex bridge reads and writes conventional chat files, folder manifests, the vault contract, and new notes through the bound folder adapters.",
+      "sources": [
+        "src/services/webChats.ts",
+        "src/services/folderNotes.ts"
+      ],
+      "tests": [
+        "src/services/webChats.test.ts",
+        "src/services/webChatPaths.test.ts",
+        "e2e/web/rotli-web-folder-vault.spec.ts"
+      ],
+      "commands": [
+        "memex_archive_chat",
+        "memex_chat_folders",
+        "memex_delete_chat",
+        "memex_list_chats",
+        "memex_read_chat",
+        "memex_read_contract",
+        "memex_write_chat",
+        "memex_write_chat_folders",
+        "memex_write_note"
+      ]
+    },
+    {
+      "id": "helper-cli",
+      "status": "web",
+      "reason": "These commands run only through a paired Rotli Helper on loopback. Chat setup explains pairing; vault-bound completions and secure gates remain required. chat_models currently returns an empty on-device catalog; connected CLI models use cli_models.",
+      "sources": [
+        "src/lib/helperPairing.ts",
+        "src/services/helperLink.ts",
+        "src-tauri/src/helper.rs"
+      ],
+      "tests": [
+        "src/services/helperLink.test.ts",
+        "e2e/web/rotli-web-helper-vault.spec.ts"
+      ],
+      "commands": [
+        "chat_models",
+        "cli_cancel",
+        "cli_complete",
+        "cli_detect",
+        "cli_models",
+        "model_usage"
+      ]
+    },
+    {
+      "id": "web-vault-setup",
+      "status": "web",
+      "reason": "The web uses its own required folder connection, scaffolding, Welcome seeding, and bound-vault status instead of the native path picker and initialization commands.",
+      "sources": [
+        "src/services/vaultBinding.ts",
+        "src/services/vaultScaffold.ts",
+        "src/services/webNotes.ts",
+        "src/services/notes.ts"
+      ],
+      "tests": [
+        "src/services/webNotes.test.ts",
+        "e2e/web/rotli-web-fresh-vault.spec.ts"
+      ],
+      "commands": [
+        "corpus_choose_folder",
+        "corpus_init_memex",
+        "corpus_seed_welcome",
+        "corpus_status",
+        "memex_pick_folder"
+      ]
+    },
+    {
+      "id": "links-and-sharing",
+      "status": "web",
+      "reason": "Links open in an external browser tab. Web sharing uses the browser share capability or clipboard rather than the macOS share sheet.",
+      "sources": [
+        "src/lib/tauri.ts",
+        "src/services/thanksShare.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-board-links.spec.ts",
+        "e2e/web/rotli-web-tour.spec.ts"
+      ],
+      "commands": [
+        "open_url",
+        "share_text"
+      ]
+    },
+    {
+      "id": "librarian",
+      "status": "notice",
+      "reason": "Settings names the Librarian as available in Rotli for Mac and withholds runtime controls. Its filer, journal, secure review, and generated indexes have no web worker.",
+      "sources": [
+        "src/components/settingsSurface.tsx",
+        "src/lib/tauri.ts",
+        "src/lib/featurePolicy.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "corpus_file_note",
+        "corpus_filer_move",
+        "corpus_journal_append",
+        "corpus_journal_prune",
+        "corpus_journal_read",
+        "corpus_librarian_ai",
+        "corpus_note_path",
+        "corpus_secure_repair_apply",
+        "corpus_secure_repair_scan",
+        "corpus_set_ai_field",
+        "corpus_write_index",
+        "organizer_dismiss_secure",
+        "organizer_learn_field",
+        "organizer_run_once",
+        "organizer_secure_hints",
+        "organizer_set_brain",
+        "organizer_set_trust",
+        "organizer_set_visible",
+        "organizer_status",
+        "organizer_stop"
+      ]
+    },
+    {
+      "id": "local-models",
+      "status": "notice",
+      "reason": "AI Models says local models are available in Rotli for Mac; install, hardware, default, uninstall, queue, and local-completion controls are withheld on web.",
+      "sources": [
+        "src/components/settingsSurface.tsx",
+        "src/lib/featurePolicy.ts",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "chat_messages",
+        "chat_messages_stream",
+        "local_model_default",
+        "local_model_install",
+        "local_model_install_cancel",
+        "local_model_install_progress",
+        "local_model_set_default",
+        "local_model_uninstall",
+        "local_queue_cancel",
+        "local_queue_prioritize",
+        "local_queue_status",
+        "system_profile"
+      ]
+    },
+    {
+      "id": "office-conversion",
+      "status": "notice",
+      "reason": "Web office fallbacks explain local DOCX conversion in another app. Native PDF export and external-app actions are withheld; supported DOCX/XLSX/CSV editing remains available.",
+      "sources": [
+        "src/components/fileOffice/officeMount.tsx",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-metadata-files.spec.ts"
+      ],
+      "commands": [
+        "corpus_convert_document",
+        "corpus_export_note_pdf"
+      ]
+    },
+    {
+      "id": "vault-repair",
+      "status": "notice",
+      "reason": "The General settings vault-pass surface labels these repair and conversion passes In the Mac app; web never runs them against the connected folder.",
+      "sources": [
+        "src/components/settings/vaultPass.tsx",
+        "src/lib/vaultRepair.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-hotkeys.spec.ts"
+      ],
+      "commands": [
+        "corpus_vault_pass"
+      ]
+    },
+    {
+      "id": "secure-keyword-sweep",
+      "status": "notice",
+      "reason": "Web can retain the portable keyword rules, but Settings says protecting notes already named this way works in the Mac app.",
+      "sources": [
+        "src/components/settings/librarianRulesSettings.tsx"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-hotkeys.spec.ts"
+      ],
+      "commands": [
+        "corpus_secure_by_keywords"
+      ]
+    },
+    {
+      "id": "native-shell",
+      "status": "mac-only",
+      "reason": "Native windows, global shortcuts, Dock icons, quit/restart handshakes, and workspace mailboxes belong to the installed Mac shell; web does not expose their actions.",
+      "sources": [
+        "src/lib/tauri.ts",
+        "src/lib/featurePolicy.ts",
+        "src/keys/registry.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-ui-honesty.spec.ts",
+        "e2e/web/rotli-web-hotkeys.spec.ts"
+      ],
+      "commands": [
+        "finish_capture_window",
+        "hide_capture_window",
+        "hide_chat_window",
+        "hide_main_window",
+        "hide_quick_window",
+        "quit_check_done",
+        "quit_flush_done",
+        "restart_after_flush",
+        "set_dock_visible",
+        "set_hide_on_blur",
+        "set_summon_shortcut",
+        "show_chat_window",
+        "show_main_window",
+        "summon",
+        "toggle_main_window",
+        "toggle_quick_window",
+        "workspace_take_open_request"
+      ]
+    },
+    {
+      "id": "native-vault-registry",
+      "status": "mac-only",
+      "reason": "The installed shell owns linked-vault routes, copy/import decisions, raw folder windows, and native registry permissions. Web binds one folder through its own setup and does not expose this registry.",
+      "sources": [
+        "src/lib/finderBridge.ts",
+        "src/lib/tauri.ts",
+        "src/services/webNotes.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "corpus_add_folder",
+        "corpus_adopt_person_sinks",
+        "corpus_connect_brain",
+        "corpus_copy_vault",
+        "corpus_copy_vault_cancel",
+        "corpus_forget_brain",
+        "corpus_forget_folder",
+        "corpus_inspect_folder",
+        "corpus_list_config",
+        "corpus_list_root",
+        "corpus_overview",
+        "corpus_person_sinks",
+        "corpus_refresh_active_vault",
+        "corpus_refresh_vault",
+        "corpus_set_active_brain",
+        "corpus_set_brain_perms",
+        "corpus_switch_vault",
+        "folder_window_add_as_vault",
+        "folder_window_close",
+        "memex_detect",
+        "memex_validate"
+      ]
+    },
+    {
+      "id": "native-filesystem-integration",
+      "status": "mac-only",
+      "reason": "Finder, Quick Actions, absolute paths, native pasteboard file lists and rich-clipboard image inlining, and default-app launching are native-only commands. Web file reads and display use the bound VaultDir; web row menus omit Finder and external-app actions.",
+      "sources": [
+        "src/lib/finderBridge.ts",
+        "src/lib/tauri.ts",
+        "src/lib/clipboard.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-honest-labels.spec.ts"
+      ],
+      "commands": [
+        "clipboard_file_paths",
+        "clipboard_has_files",
+        "corpus_abs",
+        "corpus_image_data_url",
+        "corpus_open_file",
+        "corpus_open_file_with",
+        "corpus_open_with_apps",
+        "corpus_reveal",
+        "corpus_reveal_file",
+        "finder_quick_action_set",
+        "finder_quick_action_status",
+        "memex_reveal_chat"
+      ]
+    },
+    {
+      "id": "private-browser",
+      "status": "mac-only",
+      "reason": "Native nonpersistent child webviews and their media controls are desktop-only. The web New chooser explains that Browser is in the Mac app; private-browser actions are absent from web search.",
+      "sources": [
+        "src/lib/privateBrowser.ts",
+        "src/lib/tauri.ts",
+        "src/lib/featurePolicy.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-honest-labels.spec.ts",
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "pinned_site_close",
+        "pinned_site_forget",
+        "pinned_site_hide",
+        "pinned_site_open",
+        "pinned_site_set_bounds",
+        "pinned_sites_supported",
+        "private_browser_back",
+        "private_browser_close",
+        "private_browser_create",
+        "private_browser_forward",
+        "private_browser_media",
+        "private_browser_media_state",
+        "private_browser_navigate",
+        "private_browser_reload",
+        "private_browser_set_bounds",
+        "private_browser_set_visible"
+      ]
+    },
+    {
+      "id": "native-ai-tools",
+      "status": "mac-only",
+      "reason": "Native streaming sessions, image generation, local HTTP tools, managed AI file writes, and binary AI reads are not Helper commands. Web chat uses the connected CLI completion lane and its narrower tool set.",
+      "sources": [
+        "src/lib/helperPairing.ts",
+        "src/ai/host.ts",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "src/services/helperLink.test.ts",
+        "e2e/web/rotli-web-privacy.spec.ts"
+      ],
+      "commands": [
+        "antigravity_manage",
+        "claude_session_run",
+        "claude_session_tool_result",
+        "corpus_create_managed_file_ai",
+        "corpus_file_bytes_ai",
+        "corpus_file_text_ai",
+        "corpus_files_ai",
+        "corpus_insert_ai",
+        "corpus_write_file_ai",
+        "generate_image",
+        "memex_read",
+        "memex_rename_chat",
+        "web_fetch",
+        "web_search"
+      ]
+    },
+    {
+      "id": "native-credentials-and-agents",
+      "status": "mac-only",
+      "reason": "Keychain credentials, external-agent bridge replies, and the opt-in remote agent relay belong to the native host; web exposes neither Keychain nor the agent Settings capability.",
+      "sources": [
+        "src/lib/tauri.ts",
+        "src/lib/agentBridge.ts",
+        "src/lib/featurePolicy.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-hotkeys.spec.ts"
+      ],
+      "commands": [
+        "agent_bridge_ready",
+        "agent_bridge_reply",
+        "remote_agent_pair",
+        "remote_agent_start",
+        "remote_agent_status",
+        "remote_agent_stop",
+        "remote_agent_unpair",
+        "secret_delete",
+        "secret_exists",
+        "secret_store"
+      ]
+    },
+    {
+      "id": "breve",
+      "status": "mac-only",
+      "reason": "Breve runtime, scheduler, legacy takeover, delivery credentials, and delivery testing are native development-build capabilities; no web Breve controls are offered.",
+      "sources": [
+        "src/lib/featurePolicy.ts",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "e2e/web/rotli-web-hotkeys.spec.ts"
+      ],
+      "commands": [
+        "breve_backfill_watchlist",
+        "breve_brief_skill",
+        "breve_delivery_settings",
+        "breve_import_legacy",
+        "breve_remove_resend_key",
+        "breve_retire_legacy",
+        "breve_snapshot",
+        "breve_store_resend_key",
+        "breve_takeover",
+        "breve_test_email",
+        "breve_test_signal",
+        "breve_write_brief_skill",
+        "breve_write_config",
+        "breve_write_delivery_settings",
+        "breve_write_pdf_palette",
+        "breve_write_watchlist"
+      ]
+    },
+    {
+      "id": "dock-icon",
+      "status": "notice",
+      "reason": "Appearance labels App icon In the Mac app on web and omits the native Dock choices; desktop keeps every released choice and its saved selection.",
+      "sources": [
+        "src/components/settings/appIconSettings.tsx"
+      ],
+      "tests": [
+        "src/components/settings/appIconSettings.test.tsx",
+        "src/components/settingsSurface.test.tsx",
+        "e2e/appearance-look.spec.ts",
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "set_app_icon"
+      ]
+    },
+    {
+      "id": "demo-vault",
+      "status": "notice",
+      "reason": "General labels Demo mode In the Mac app on web and omits its native vault switch. The installed shell owns the isolated demo corpus and relaunch.",
+      "sources": [
+        "src/components/settingsSurface.tsx",
+        "src/lib/tauri.ts"
+      ],
+      "tests": [
+        "src/components/settingsSurface.test.tsx",
+        "e2e/web/rotli-web-ui-honesty.spec.ts"
+      ],
+      "commands": [
+        "demo_mode",
+        "set_demo_mode"
+      ]
+    }
+  ]
+}

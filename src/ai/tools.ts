@@ -3,6 +3,18 @@
 // folder (an area), ranked by title/folder/snippet overlap. Small corpus ⇒ a linear
 // scan beats any index.
 
+import {
+  fixed,
+  type ModelText,
+  modelText,
+  type PromptPart,
+  type PromptText,
+  prompt,
+  joinPrompt,
+  promptJson,
+  reshape,
+  type Approved,
+} from "../lib/promptText";
 import type { CorpusNoteMeta } from "../lib/tauri";
 import { isChatArtifactKind, offeredArtifactKinds } from "./artifacts";
 export { buildIndex } from "../memex/modelMap";
@@ -10,8 +22,9 @@ import type { Budget } from "./budget";
 import { markdownImageSource } from "./imageLinks";
 import type { Host, NoteHit, ScratchStep, ToolName, WebEvidenceSource } from "./types";
 
-export function truncate(s: string, max: number): string {
-  return s.length <= max ? s : `${s.slice(0, max)}…`;
+/** Cut a piece to `max` characters, keeping what it is. */
+export function truncate<T extends PromptPart>(text: T, max: number): T {
+  return reshape(text, (s) => (s.length <= max ? s : `${s.slice(0, max)}…`));
 }
 
 /** Read one model-supplied tool argument as text. The model fills these in, so
@@ -35,16 +48,16 @@ function argText(value: unknown): string {
 export function stripLeadingFrontmatter(body: string): string {
   // fence lines tolerate trailing spaces — gemma emits "--- \n" (live eval
   // 2026-07-30, the frontmatter-leak case)
-  const m = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+  const m = body.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n)?/);
   if (!m) return body;
   // strip ONLY a block that reads as metadata (key: value lines, plus yaml
   // list/continuation lines) — a body OPENING with a thematic break must not
   // lose real prose sitting between two --- lines (Greptile PR #19)
-  const lines = (m[1] ?? "").split("\n").filter((line) => line.trim() !== "");
+  const lines = (m[1] ?? "").split(/\r?\n/).filter((line) => line.trim() !== "");
   const metadataish =
     lines.length > 0 && lines.every((line) => /^([A-Za-z_][\w-]*[ \t]*:|[ \t]|-)/.test(line));
   if (!metadataish) return body;
-  return body.slice(m[0].length).replace(/^\n+/, "");
+  return body.slice(m[0].length).replace(/^(?:\r?\n)+/, "");
 }
 
 /** Frame the `links:` line inside a READ note's metadata fence. That one line
@@ -56,8 +69,12 @@ export function stripLeadingFrontmatter(body: string): string {
  * prompts teach the rule. The line keeps its `key: value` shape, so a model
  * that echoes the fence back into update_note still hits
  * stripLeadingFrontmatter — no annotation can reach a note's body. */
-export function frameLinksMetadata(body: string): string {
-  const fence = body.match(/^---[ \t]*\n([\s\S]*?)\n---[ \t]*\n?/);
+export function frameLinksMetadata<T extends PromptPart>(value: T): T {
+  return reshape(value, frameLinks);
+}
+
+function frameLinks(body: string): string {
+  const fence = body.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n)?/);
   if (!fence) return body;
   const block = fence[1] ?? "";
   const framed = block.replace(
@@ -74,14 +91,21 @@ export function frameLinksMetadata(body: string): string {
  * "…" read as end-of-content and the model presented partial lists as complete
  * (the 2026-07-29 people-list failure); the marker names what was cut so the
  * model can qualify its answer, and the prompts teach it to. */
-export function truncateBody(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return `${s.slice(0, max)}\n[…truncated — the remaining ${s.length - max} characters were not shown]`;
+export function truncateBody<T extends PromptPart>(text: T, max: number): T {
+  return reshape(text, (s) =>
+    s.length <= max
+      ? s
+      : `${s.slice(0, max)}\n[…truncated — the remaining ${s.length - max} characters were not shown]`,
+  );
 }
 
 /** Keyword-rank the corpus for a query — title (×3) + folder/area (×2) + snippet (×1).
  * Boards/files are skipped (they aren't readable text for the model). */
-export function rankNotes(notes: CorpusNoteMeta[], query: string, limit: number): NoteHit[] {
+export function rankNotes(
+  notes: readonly Approved<CorpusNoteMeta>[],
+  query: string,
+  limit: number,
+): NoteHit[] {
   const tokens = query
     .toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -101,7 +125,7 @@ export function rankNotes(notes: CorpusNoteMeta[], query: string, limit: number)
     }
     if (score > 0) {
       scored.push({
-        hit: { id: n.id, title: n.title, snippet: n.snippet, folder: n.folderId || "" },
+        hit: { id: n.id, title: n.title, snippet: n.snippet, folder: n.folderId },
         score,
       });
     }
@@ -126,14 +150,18 @@ export function folderQuery(query: string): boolean {
  * doesn't contain the word "people". Asked for a roster the model could reach
  * only the two index notes sitting beside them, and answered out of one's
  * metadata (2026-08-01). Boards/files are skipped for parity with rankNotes. */
-export function folderHits(notes: CorpusNoteMeta[], query: string, limit: number): NoteHit[] {
+export function folderHits(
+  notes: readonly Approved<CorpusNoteMeta>[],
+  query: string,
+  limit: number,
+): NoteHit[] {
   if (!folderQuery(query)) return [];
   const q = query.trim().toLowerCase();
   return notes
     .filter((n) => n.kind !== "board" && n.kind !== "file" && (n.folderId || "").toLowerCase().includes(q))
     .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
     .slice(0, limit)
-    .map((n) => ({ id: n.id, title: n.title, snippet: n.snippet, folder: n.folderId || "" }));
+    .map((n) => ({ id: n.id, title: n.title, snippet: n.snippet, folder: n.folderId }));
 }
 
 /** Merge folder matches into full-text hits: TITLE hits (rank 0) first, then
@@ -184,13 +212,13 @@ export function pruneScratch(scratch: ScratchStep[], maxChars: number): ScratchS
       const over = total - maxChars;
       const keep = Math.max(60, cur.thought.length - over);
       total -= cur.thought.length - keep;
-      cur.thought = `${cur.thought.slice(0, keep)}…(trimmed)`;
+      cur.thought = modelText(`${cur.thought.slice(0, keep)}…(trimmed)`);
     }
     if (cur.result.length > 60) {
       const over = total - maxChars;
       const keep = Math.max(40, cur.result.length - over);
       total -= cur.result.length - keep;
-      cur.result = `${cur.result.slice(0, keep)}…(trimmed)`;
+      cur.result = reshape(cur.result, (text) => `${text.slice(0, keep)}…(trimmed)`);
     }
   }
   return out;
@@ -270,31 +298,27 @@ function webHost(url: string): string {
  * buried in its prompt — observations are where it is actually looking. So a
  * zero-hit search carries a compact title index with it (same budgeted map
  * the prompt uses, smaller cap). Map failure degrades to the plain miss. */
-async function emptySearchObservation(host: Host, query: string): Promise<string> {
+async function emptySearchObservation(host: Host, query: ModelText): Promise<PromptText> {
   // Harvest-only budget: generous so AREA entries survive the map's own
   // truncation (we discard the note titles and render just names+counts,
   // so the observation stays small regardless).
   const MAP_CHARS = 8000;
-  const index = await host.knowledgeMap(MAP_CHARS).catch(() => "");
-  const base = `no matching notes for "${query}" — the search needs a word the note actually contains.`;
-  if (!index.trim()) return `${base} Try one different, distinctive word.`;
+  const index = await host.knowledgeMap(MAP_CHARS).catch(() => prompt``);
+  const base = prompt`no matching notes for "${query}" — the search needs a word the note actually contains.`;
+  if (!index.trim()) return prompt`${base} Try one different, distinctive word.`;
   // Area names are COMPLETE at any vault size (a title list truncates and the
   // needed title loses the lottery — measured: a 700-char map dropped the
   // personality lane entirely). Search matches folder names too, so "pick the
   // area, search its one word" always lands; the area's generated index then
   // leads the hits (role:"area-index").
-  const areas = areaLines(index);
+  const areas = reshape(index, areaLines);
   if (areas) {
     // Directive-first: a small model reads "no matching notes" as terminal and
     // apologizes even with the roll-call attached. Lead with the required next
     // action and a literal example step; the miss is a clause, not the verdict.
-    return (
-      `DO NOT answer "not found" yet — the word "${query}" appears in no note, but the answer is likely FILED under an area below. ` +
-      `REQUIRED NEXT STEP: pick the area that would hold it and search that area's word (folder names match), like {"tool":"search_notes","args":{"query":"personality"}}. ` +
-      `The vault's areas:\n${areas}`
-    );
+    return prompt`DO NOT answer "not found" yet — the word "${query}" appears in no note, but the answer is likely FILED under an area below. REQUIRED NEXT STEP: pick the area that would hold it and search that area's word (folder names match), like {"tool":"search_notes","args":{"query":"personality"}}. The vault's areas:\n${areas}`;
   }
-  return `${base} These note titles exist — pick the one whose TITLE fits the question and search that exact title word:\n${index}`;
+  return prompt`${base} These note titles exist — pick the one whose TITLE fits the question and search that exact title word:\n${index}`;
 }
 
 /** "personality (1 · Preferences) · wiki/people (13 · people) · …" from the
@@ -331,14 +355,14 @@ export async function runTool(
   tool: ToolName,
   args: Record<string, unknown>,
   budget: Budget,
-): Promise<string> {
+): Promise<PromptText> {
   switch (tool) {
     case "ask_user":
       // answered by the chat itself (nativeLoop.ts), never through the Host
-      return "error: ask_user is answered in the chat, not here.";
+      return fixed("error: ask_user is answered in the chat, not here.");
     case "search_memory": {
       const q = argText(args.query).trim();
-      if (q === "") return 'error: search_memory needs a non-empty "query".';
+      if (q === "") return fixed('error: search_memory needs a non-empty "query".');
       const hits = host.searchMemory
         ? await host.searchMemory(q, budget.maxHits)
         : (await host.searchNotes(q, budget.maxHits)).map((hit) => ({
@@ -354,26 +378,24 @@ export async function runTool(
         (a, b) => Number(b.role === "area-index") - Number(a.role === "area-index"),
       );
       return ordered.length
-        ? JSON.stringify(
-            ordered.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })),
-          )
-        : emptySearchObservation(host, q);
+        ? promptJson(ordered.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })))
+        : emptySearchObservation(host, modelText(q));
     }
     case "read_memory": {
       const id = argText(args.id).trim();
-      if (!id) return 'error: read_memory needs an "id" from search_memory.';
+      if (!id) return fixed('error: read_memory needs an "id" from search_memory.');
       const body = host.readMemory
         ? await host.readMemory(id)
         : id.startsWith("chat:")
-          ? "error: this host cannot read prior chats."
+          ? fixed("error: this host cannot read prior chats.")
           : await host.readNote(id);
-      return truncateBody(frameLinksMetadata(body), budget.readNoteChars);
+      return prompt`${truncateBody(frameLinksMetadata(body), budget.readNoteChars)}`;
     }
     case "search_notes": {
       const q = argText(args.query).trim();
-      if (q === "") return 'error: search_notes needs a non-empty "query".';
+      if (q === "") return fixed('error: search_notes needs a non-empty "query".');
       const hits = await host.searchNotes(q, budget.maxHits);
-      if (hits.length === 0) return emptySearchObservation(host, q);
+      if (hits.length === 0) return emptySearchObservation(host, modelText(q));
       // an area's generated index leads its equals: it is the best first read
       // for any question ABOUT that area, and the alternative — a hand-written
       // README with the friendlier title — often names nothing at all.
@@ -388,21 +410,21 @@ export async function runTool(
         // name the roster where the model is choosing what to read — the
         // `role:"area-index"` shape docs/design/local-model-retrieval-notes.md
         // §4.1 specified; both prompts say what the role means
-        ...(isAreaIndex(h.title, h.folder) ? { role: "area-index" } : {}),
+        ...(isAreaIndex(h.title, h.folder) ? { role: "area-index" as const } : {}),
         snippet: truncate(h.snippet, budget.snippetChars),
       }));
-      return JSON.stringify(trimmed);
+      return promptJson(trimmed);
     }
     case "read_note": {
       const id = argText(args.id).trim();
-      if (id === "") return 'error: read_note needs an "id" from search_notes or the index.';
-      return truncateBody(frameLinksMetadata(await host.readNote(id)), budget.readNoteChars);
+      if (id === "") return fixed('error: read_note needs an "id" from search_notes or the index.');
+      return prompt`${truncateBody(frameLinksMetadata(await host.readNote(id)), budget.readNoteChars)}`;
     }
     case "create_note": {
       const title = argText(args.title).trim();
       const body = argText(args.body ?? args.text ?? args.content).trim();
       if (title === "" && body === "") {
-        return 'error: create_note needs a "title" and a markdown "body".';
+        return fixed('error: create_note needs a "title" and a markdown "body".');
       }
       return host.createNote(title, body);
     }
@@ -410,58 +432,61 @@ export async function runTool(
       const title = argText(args.title).trim();
       const body = argText(args.body ?? args.text ?? args.content).trim();
       if (title === "" && body === "") {
-        return 'error: create_document needs a "title" and document "body".';
+        return fixed('error: create_document needs a "title" and document "body".');
       }
-      if (!host.createDocument) return "error: this host cannot create Word documents.";
+      if (!host.createDocument) return fixed("error: this host cannot create Word documents.");
       return host.createDocument(title, body);
     }
     case "edit_document": {
       const file = argText(args.file ?? args.query ?? args.name).trim();
       const actions = Array.isArray(args.actions) ? (args.actions as unknown[]) : null;
-      if (file === "" || !actions) return 'error: edit_document needs a "file" name and an "actions" list.';
-      if (!host.editDocument) return "error: this host cannot edit Word documents.";
+      if (file === "" || !actions)
+        return fixed('error: edit_document needs a "file" name and an "actions" list.');
+      if (!host.editDocument) return fixed("error: this host cannot edit Word documents.");
       return host.editDocument(file, actions);
     }
     case "update_note": {
       const id = argText(args.id).trim();
       const body = argText(args.body ?? args.text ?? args.content).trim();
       if (id === "" || body === "") {
-        return 'error: update_note needs an "id" and the COMPLETE new markdown "body" (it replaces the whole note — read_note first).';
+        return fixed(
+          'error: update_note needs an "id" and the COMPLETE new markdown "body" (it replaces the whole note — read_note first).',
+        );
       }
-      if (!host.updateNote) return "error: this host cannot edit notes.";
+      if (!host.updateNote) return fixed("error: this host cannot edit notes.");
       return host.updateNote(id, body);
     }
     case "open_note": {
       const id = argText(args.id).trim();
-      if (id === "") return 'error: open_note needs an "id" from search_notes or the index.';
-      if (!host.openNote) return "error: this host cannot open notes on screen.";
+      if (id === "") return fixed('error: open_note needs an "id" from search_notes or the index.');
+      if (!host.openNote) return fixed("error: this host cannot open notes on screen.");
       return host.openNote(id);
     }
     case "read_file": {
       const q = argText(args.query ?? args.name ?? args.file).trim();
-      if (q === "") return 'error: read_file needs a "query" — the filename (e.g. report.csv).';
-      return truncateBody(await host.readFile(q), budget.readNoteChars * 2);
+      if (q === "") return fixed('error: read_file needs a "query" — the filename (e.g. report.csv).');
+      return prompt`${truncateBody(await host.readFile(q), budget.readNoteChars * 2)}`;
     }
     case "web_search": {
       const q = argText(args.query).trim();
-      if (q === "") return 'error: web_search needs a "query".';
+      if (q === "") return fixed('error: web_search needs a "query".');
       const hits = await host.webSearch(q, budget.maxHits);
-      if (hits.length === 0) return "no web results.";
+      if (hits.length === 0) return fixed("no web results.");
       const trimmed = hits.map((h, index) => ({
-        sourceId: `S${index + 1}`,
+        sourceId: prompt`S${index + 1}`,
         provider: h.provider,
         title: h.title,
         url: h.url,
         snippet: truncate(h.snippet, budget.snippetChars),
       }));
-      return JSON.stringify(trimmed);
+      return promptJson(trimmed);
     }
     case "research_web": {
       const q = argText(args.query).trim();
-      if (q === "") return 'error: research_web needs a "query".';
+      if (q === "") return fixed('error: research_web needs a "query".');
       const hits = await host.webSearch(q, budget.maxHits);
       if (hits.length === 0) {
-        return JSON.stringify({
+        return promptJson({
           kind: "web_research",
           evidenceAvailable: false,
           sources: [],
@@ -474,10 +499,12 @@ export async function runTool(
       const sources = await Promise.all(
         selected.map(async (hit, index): Promise<WebEvidenceSource | null> => {
           try {
-            const page = truncateBody(await host.webFetch(hit.url, pageChars), pageChars).trim();
+            const page = reshape(truncateBody(await host.webFetch(hit.url, pageChars), pageChars), (text) =>
+              text.trim(),
+            );
             if (!page) return null;
             return {
-              sourceId: `S${index + 1}`,
+              sourceId: prompt`S${index + 1}`,
               provider: hit.provider,
               title: hit.title,
               url: hit.url,
@@ -490,7 +517,7 @@ export async function runTool(
         }),
       );
       const evidence = sources.filter((source): source is WebEvidenceSource => source !== null);
-      return JSON.stringify({
+      return promptJson({
         kind: "web_research",
         provider: hits[0]?.provider,
         evidenceAvailable: evidence.length > 0,
@@ -503,16 +530,16 @@ export async function runTool(
     }
     case "web_fetch": {
       const url = argText(args.url).trim();
-      if (url === "") return 'error: web_fetch needs a "url".';
-      return truncate(await host.webFetch(url, budget.webFetchChars), budget.webFetchChars);
+      if (url === "") return fixed('error: web_fetch needs a "url".');
+      return prompt`${truncate(await host.webFetch(url, budget.webFetchChars), budget.webFetchChars)}`;
     }
     case "generate_image": {
-      const prompt = argText(args.prompt).trim();
-      if (prompt === "") return 'error: generate_image needs a "prompt" describing the image.';
-      const rel = await host.generateImage(prompt);
+      const request = argText(args.prompt).trim();
+      if (request === "") return fixed('error: generate_image needs a "prompt" describing the image.');
+      const rel = await host.generateImage(request);
       if (/^(?:error|blocked):/i.test(rel.trim())) return rel;
-      const source = markdownImageSource(rel);
-      return `saved image: ${rel}. It is available in this chat's Artifacts and remains closed until the user clicks it. If create_document runs later in this same turn, Rotli embeds the generated image in that Word document. For a Markdown note, copy this exact embed without shortening it: ![describe the image](${source})`;
+      const source = reshape(rel, markdownImageSource);
+      return prompt`saved image: ${rel}. It is available in this chat's Artifacts and remains closed until the user clicks it. If create_document runs later in this same turn, Rotli embeds the generated image in that Word document. For a Markdown note, copy this exact embed without shortening it: ![describe the image](${source})`;
     }
     case "create_artifact": {
       const kind = argText(args.kind).trim().toLowerCase();
@@ -520,20 +547,25 @@ export async function runTool(
       const content = argText(args.content ?? args.body ?? args.csv).trim();
       const offered = offeredArtifactKinds();
       if (!isChatArtifactKind(kind) || !offered.includes(kind)) {
-        return `error: create_artifact needs a supported kind: ${offered.map((k) => `"${k}"`).join(", ")}.`;
+        return prompt`error: create_artifact needs a supported kind: ${joinPrompt(
+          offered.map((k) => prompt`"${k}"`),
+          ", ",
+        )}.`;
       }
       if (title === "" || content === "") {
-        return 'error: create_artifact needs a non-empty "title" and "content".';
+        return fixed('error: create_artifact needs a non-empty "title" and "content".');
       }
-      if (!host.createArtifact) return "error: this host cannot create work files.";
+      if (!host.createArtifact) return fixed("error: this host cannot create work files.");
       return host.createArtifact(kind, title, content);
     }
     case "draw_board": {
       const source = argText(args.mermaid ?? args.code ?? args.definition).trim();
       if (source === "") {
-        return 'error: draw_board needs "mermaid" — Mermaid flowchart source (e.g. "flowchart TD\\n  A --> B").';
+        return fixed(
+          'error: draw_board needs "mermaid" — Mermaid flowchart source (e.g. "flowchart TD\\n  A --> B").',
+        );
       }
-      if (!host.drawBoard) return "error: this host cannot draw boards.";
+      if (!host.drawBoard) return fixed("error: this host cannot draw boards.");
       return host.drawBoard(argText(args.title).trim(), source);
     }
   }

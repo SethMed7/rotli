@@ -21,7 +21,10 @@ The macOS app icon family (the bundle `icon.icns`, the Dock variants in
 `src-tauri/icons/variants/`, and the Settings thumbnails in
 `../assets/appIcons/`) is generated from `_logo.svg` by
 `bun scripts/build-app-icons.mjs`, which owns the tile palettes and Apple's
-824-on-1024 grid. Regenerate; never edit those PNGs by hand.
+824-on-1024 grid. Regenerate; never edit those PNGs by hand. Most variants
+are a flat tile and an ink; the Tesven variant takes Tesven's One Blue field
+and n=5 squircle from Tesven's brand kit and keeps Rotli's own line quokka,
+in white, so it reads as Rotli in Tesven's colours.
 
 The chat buddy may use Line, Cocoa, Fern, Ocean, Iris, Berry, Amber, or a custom
 hue for its body, plus black or white ink. Glasses, a bucket hat, and goggles

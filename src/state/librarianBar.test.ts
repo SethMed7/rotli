@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
+import { person } from "../lib/promptText.fixtures";
 import {
   type ChatTurn,
   closeLibrarianChat,
@@ -12,7 +13,12 @@ import {
 
 const reply = (text: string, extra: Partial<ChatTurn> = {}): ChatTurn =>
   ({ id: crypto.randomUUID(), role: "librarian", text, raw: text, actions: [], ...extra }) as ChatTurn;
-const asked = (text: string): ChatTurn => ({ id: crypto.randomUUID(), role: "user", text, highlight: null });
+const asked = (text: string): ChatTurn => ({
+  id: crypto.randomUUID(),
+  role: "user",
+  text: person(text),
+  highlight: null,
+});
 
 const chat = (turns: ChatTurn[], status: LibrarianChat["status"] = "idle"): LibrarianChat => ({
   id: "c1",

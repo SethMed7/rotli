@@ -3467,6 +3467,7 @@ dependencies = [
  "percent-encoding",
  "quick-xml",
  "regex",
+ "rustix",
  "security-framework",
  "serde",
  "serde_json",
@@ -3483,6 +3484,7 @@ dependencies = [
  "time",
  "trash",
  "ulid",
+ "unicode-normalization",
  "ureq",
  "uuid",
 ]

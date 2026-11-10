@@ -478,7 +478,7 @@ struct NoteSnapshot {
 
 fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let abs = root.join(rel);
-    let text = std::fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
+    let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
     let mtime_age = std::fs::metadata(&abs)
         .and_then(|m| m.modified())
         .ok()
@@ -509,12 +509,10 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let title = corpus::title_of(body);
     // the Librarian rules: a secure keyword in the note's name protects it too
     // (name only — never the body, never a model)
+    // settings that can't be read can't show a name is public: secure
     if !secure
-        && crate::librarian_rules::secure_by_name(
-            &title,
-            rel,
-            &crate::librarian_rules::secure_keywords(root),
-        )
+        && crate::librarian_rules::secure_keywords(root)
+            .map_or(true, |keywords| crate::librarian_rules::secure_by_name(&title, rel, &keywords))
     {
         secure = true;
     }
@@ -612,10 +610,13 @@ fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
     names
         .into_iter()
         .map(|name| {
-            let desc = std::fs::read_to_string(root.join(map.index_rel(&name)))
+            // the index is a note like any other: a locked, secure or
+            // secret-shaped one gives no description (third review, 2026-11-09)
+            let desc = snapshot_note(root, &map.index_rel(&name))
                 .ok()
-                .and_then(|t| {
-                    let (_, body) = corpus::parse_document(&t);
+                .and_then(|snapshot| {
+                    let cleared = prompt::clear(&snapshot)?;
+                    let body = &cleared.note().body;
                     // skip headings, the generated-file marker (`<!-- … -->`),
                     // and table rows — only human/model PROSE is a description
                     body.lines()
@@ -632,41 +633,6 @@ fn area_vocab(root: &Path, nested: bool) -> Vec<(String, String)> {
             (name, desc)
         })
         .collect()
-}
-
-/// Job A prompt — single-shot, JSON-instructed, meant for temp 0. The body is
-/// truncated to a budget; classify needs the gist, not the whole document.
-/// `filing` is the person's own rules (plain sentences), followed when they apply.
-fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)], filing: &[String]) -> String {
-    let mut p = String::from(
-        "You file notes in a personal knowledge base. Pick the ONE best area for this note. \
-         An `Area/Folder` entry is a folder inside that area: pick the most specific one that fits.\n\nAreas:\n",
-    );
-    for (name, desc) in vocab {
-        if desc.is_empty() {
-            p.push_str(&format!("- {name}\n"));
-        } else {
-            p.push_str(&format!("- {name}: {desc}\n"));
-        }
-    }
-    p.push_str(&crate::librarian_rules::filing_prompt(filing));
-    p.push_str(
-        "\nAnswer with ONLY a JSON object, no prose:\n{\"area\": \"<one area name above, or none>\", \"confidence\": <number 0 to 1>}\n",
-    );
-    if let Some(tags) = s
-        .fields
-        .get("tags")
-        .filter(|t| !t.is_empty() && t.as_str() != "[]")
-    {
-        p.push_str(&format!("\nExisting tags: {tags}\n"));
-    }
-    let body: String = s.body.chars().take(BODY_BUDGET).collect();
-    p.push_str(&format!(
-        "\nNote title: {}\n\nNote body:\n{}\n",
-        s.title,
-        body.trim()
-    ));
-    p
 }
 
 struct ClassifyOut {
@@ -715,7 +681,7 @@ fn list_peers(root: &Path) -> Vec<(String, String)> {
     let mut peers: Vec<(String, String)> = LibrarianMap::at(root)
         .candidates(root)
         .into_iter()
-        .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| !s.secure && !s.locked))
+        .filter(|rel| snapshot_note(root, rel).is_ok_and(|s| prompt::clear(&s).is_some()))
         .map(|rel| {
             let stem = rel
                 .rsplit('/')
@@ -773,34 +739,6 @@ fn rank_note_candidates(
     // deterministic order: score desc, then stem — re-runs are byte-stable
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)));
     scored.into_iter().take(n).map(|(_, s)| s.clone()).collect()
-}
-
-/// Job B prompt — single-shot, JSON-instructed, temp 0. Links are constrained
-/// to the pre-ranked candidate list (the model never invents a note).
-fn enrich_prompt(s: &NoteSnapshot, candidates: &[String]) -> String {
-    let mut p = String::from(
-        "You annotate notes in a personal knowledge base. Write a one-line summary, \
-         a few short lowercase topic tags, and pick genuinely related notes ONLY \
-         from the candidate list (an empty list is fine).\n",
-    );
-    if candidates.is_empty() {
-        p.push_str("\nRelated-note candidates: none.\n");
-    } else {
-        p.push_str("\nRelated-note candidates:\n");
-        for c in candidates {
-            p.push_str(&format!("- {c}\n"));
-        }
-    }
-    p.push_str(
-        "\nAnswer with ONLY a JSON object, no prose:\n{\"summary\": \"<one line>\", \"tags\": [\"<tag>\", ...], \"links\": [\"<candidate>\", ...]}\n",
-    );
-    let body: String = s.body.chars().take(BODY_BUDGET).collect();
-    p.push_str(&format!(
-        "\nNote title: {}\n\nNote body:\n{}\n",
-        s.title,
-        body.trim()
-    ));
-    p
 }
 
 struct EnrichOut {
@@ -1175,10 +1113,14 @@ pub(crate) fn plan_wait(
 /// re-adopting the stale file here would clobber a fresh downgrade (Off →
 /// wake → read old "organize" → keep applying). The flushed file converges to
 /// the same value, so "unchanged file ⇒ in-memory wins" is always safe.
-fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner) -> Knobs {
-    let settings = corpus_state
-        .route(root_id, |s| s.dot_read("settings"))
-        .unwrap_or_else(|_| "{}".into());
+///
+/// Settings that can't be read or parsed are SETTINGS_UNREADABLE: the cycle
+/// refuses rather than classify, organize or file on empty rules (third
+/// review of pull request 267, 2026-11-09).
+fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner) -> Result<Knobs, String> {
+    let unreadable = || crate::librarian_rules::SETTINGS_UNREADABLE.to_string();
+    let settings = corpus_state.route(root_id, |s| s.dot_read("settings")).map_err(|_| unreadable())?;
+    crate::librarian_rules::checked_rules(&settings)?;
     let knobs = parse_knobs(&settings);
     if let Some(t) = knobs.trust {
         let mut seen = inner.settings_trust.lock().unwrap();
@@ -1198,7 +1140,7 @@ fn read_knobs(corpus_state: &CorpusState, root_id: &str, inner: &OrganizerInner)
                 .store(!knobs.brain_enabled, Ordering::SeqCst);
         }
     }
-    knobs
+    Ok(knobs)
 }
 
 #[derive(Default, Debug)]
@@ -1256,11 +1198,11 @@ pub(crate) fn run_cycle(
     root: &Path,
     inner: &OrganizerInner,
     gates: &dyn Fn() -> bool,
-    transport: &dyn Fn(&str) -> Result<String, String>,
+    transport: &dyn prompt::ModelTransport,
 ) -> Result<CycleReport, String> {
     let mut report = CycleReport::default();
     let model_label = inner.model_label.lock().unwrap().clone();
-    let knobs = read_knobs(corpus_state, root_id, inner);
+    let knobs = read_knobs(corpus_state, root_id, inner)?;
     if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.route(root_id, |s| Ok(s.librarian_writes())).unwrap_or(false) {
         // a RAW vault (vault-vs-brain, 2026-07-26) or a folder opened in place (2026-10-13)
         // has no Brain — harder off than Trust::Off: the queue and review hints drain so
@@ -1376,9 +1318,12 @@ pub(crate) fn run_cycle(
             });
             // no areas yet ⇒ nothing to classify into — Enrich still runs below
             if !vocab.is_empty() {
-                let prompt = classify_prompt(&snap, vocab, &knobs.rules.filing);
+                // skip_reason refused a locked or secure note above; `clear`
+                // is the type that proves it (organizer_prompt.rs)
+                let Some(cleared) = prompt::clear(&snap) else { continue };
+                let request = prompt::classify(&cleared, vocab, &knobs.rules.filing);
                 // the model call — NO lock held (chat must never wait on the daemon)
-                let raw = match transport(&prompt) {
+                let raw = match transport.send(&request) {
                     Ok(r) => r,
                     Err(e) => {
                         // model down: requeue this note, keep the rest for after
@@ -1449,7 +1394,7 @@ pub(crate) fn run_cycle(
 
                         // the write window — one short route(); re-check the note first
                         let outcome = corpus_state.route(root_id, |s| {
-                            let fresh = std::fs::read_to_string(root.join(&rel))
+                            let fresh = crate::fsutil::read_own_text(&root.join(&rel))
                                 .map_err(|e| e.to_string())?;
                             let (_, fresh_body) = corpus::parse_document(&fresh);
                             if fnv1a64(fresh_body.as_bytes()) != snap.body_hash {
@@ -1591,9 +1536,10 @@ pub(crate) fn run_cycle(
             .cloned()
             .collect();
         let candidates = rank_note_candidates(&snap.title, &snap.body, &others, LINK_CANDIDATES);
-        let prompt = enrich_prompt(&snap, &candidates);
+        let Some(cleared) = prompt::clear(&snap) else { continue };
+        let request = prompt::enrich(&cleared, &candidates);
         // the model call — again NO lock held
-        let raw = match transport(&prompt) {
+        let raw = match transport.send(&request) {
             Ok(r) => r,
             Err(e) => {
                 report.model_offline = true;
@@ -1622,7 +1568,7 @@ pub(crate) fn run_cycle(
 
         // the write window — one short route(); re-check the note first
         let outcome = corpus_state.route(root_id, |s| {
-            let fresh = std::fs::read_to_string(root.join(&rel)).map_err(|e| e.to_string())?;
+            let fresh = crate::fsutil::read_own_text(&root.join(&rel)).map_err(|e| e.to_string())?;
             let (fresh_fm, fresh_body) = corpus::parse_document(&fresh);
             if fnv1a64(fresh_body.as_bytes()) != snap.body_hash {
                 return Ok(EnrichOutcome::Requeue); // edited under us — re-evaluate (§4.8)
@@ -1730,7 +1676,7 @@ fn refresh_indexes(
         }
         let body = render_index(&area, &members);
         let rel = map.index_rel(&area);
-        let disk = std::fs::read_to_string(root.join(&rel)).unwrap_or_default();
+        let disk = crate::fsutil::read_own_text(&root.join(&rel)).unwrap_or_default();
         if body == disk {
             // fixed point — record it (this is also how a FRONTEND approval
             // settles: the approved body is already on disk, we just catch up).
@@ -2089,7 +2035,17 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 inner.sweep_at.lock().unwrap().take();
                 continue;
             };
-            let knobs = read_knobs(&corpus_state, &root_id, inner);
+            let knobs = match read_knobs(&corpus_state, &root_id, inner) {
+                Ok(knobs) => knobs,
+                Err(error) => {
+                    // fail closed: nothing is classified, organized or filed
+                    // until the settings read again (checked like a closed gate)
+                    inner.status.lock().unwrap().last_error = Some(error);
+                    inner.run_now.cancel();
+                    gate_retry = RetryAt::after(GATE_RECHECK);
+                    continue;
+                }
+            };
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
             if inner.brain_off.load(Ordering::SeqCst) || !corpus_state.default_librarian_writes().unwrap_or(false) {
                 // RAW vault or a folder opened in place (2026-10-13): consume every wake
@@ -2438,8 +2394,17 @@ pub fn organizer_learn_field(
 pub mod secure;
 #[path = "organizer_coverage.rs"]
 mod coverage;
+/// The organizer's model prompts and the one way to make one.
+#[path = "organizer_prompt.rs"]
+pub(crate) mod prompt;
 #[path = "organizer_wake.rs"]
 mod wake;
+#[cfg(all(test, unix))]
+#[path = "organizer_hard_link_tests.rs"]
+mod hard_link_tests;
+#[cfg(all(test, unix))]
+#[path = "organizer_settings_tests.rs"]
+mod settings_tests;
 #[cfg(test)]
 #[path = "organizer_coverage_tests.rs"]
 mod coverage_tests;
@@ -3787,14 +3752,14 @@ mod tests {
         // debounced — the file still says "organize" when the worker wakes.
         let (_dir, _root, state, handle) = seed_brain();
         write_settings(&state, "{\"organizerTrust\":\"organize\"}");
-        read_knobs(&state, "default", &handle.0);
+        read_knobs(&state, "default", &handle.0).unwrap();
         assert_eq!(
             *handle.0.trust.lock().unwrap(),
             Trust::Organize,
             "startup seed adopted"
         );
         handle.set_trust(Trust::Off);
-        read_knobs(&state, "default", &handle.0);
+        read_knobs(&state, "default", &handle.0).unwrap();
         assert_eq!(
             *handle.0.trust.lock().unwrap(),
             Trust::Off,
@@ -3802,11 +3767,11 @@ mod tests {
         );
         // the debounced flush lands with the same value — still Off
         write_settings(&state, "{\"organizerTrust\":\"off\"}");
-        read_knobs(&state, "default", &handle.0);
+        read_knobs(&state, "default", &handle.0).unwrap();
         assert_eq!(*handle.0.trust.lock().unwrap(), Trust::Off);
         // an ACTUAL settings change (external edit) is adopted
         write_settings(&state, "{\"organizerTrust\":\"tidy\"}");
-        read_knobs(&state, "default", &handle.0);
+        read_knobs(&state, "default", &handle.0).unwrap();
         assert_eq!(*handle.0.trust.lock().unwrap(), Trust::Tidy);
     }
 

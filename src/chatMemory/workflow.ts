@@ -1,23 +1,26 @@
-import {
-  extractChatNotes,
-  fallbackChatNotes,
-  mergeChatMemory,
-  sanitizeChatNotes,
-  type MemoryTurn,
-} from "./model";
+import type { ApprovedText } from "../lib/promptText";
+import { fallbackChatNotes, mergeChatMemory, sanitizeChatNotes, type MemoryTurn } from "./model";
 
 export interface ChatMemoryNote {
   id: string;
   stem: string;
   body: string;
   revision: string;
+  /** Its "Conversation notes" section as the gated read for the chat's model
+   * returned it (the body and revision above come from that same read); the
+   * only part of the note a model is given. Null for a note just created. */
+  notes: ApprovedText | null;
+  /** The note is protected: the gate passes it only to an on-device model
+   * (secure), or it was just created secure. */
+  secure?: boolean;
   /** May the chat's model rewrite this note (src/lib/aiEditPolicy.ts)? */
   aiEditable: boolean;
 }
 
 export interface ChatMemoryRepository {
   findByStem(stem: string): Promise<ChatMemoryNote | null>;
-  create(body: string): Promise<ChatMemoryNote>;
+  /** `secure`: create it the way the app creates secure notes. */
+  create(body: string, opts?: { secure?: boolean }): Promise<ChatMemoryNote>;
   update(id: string, body: string, expectedRevision: string): Promise<void>;
   attach(stem: string): Promise<void>;
   /** The chat's own notes note, kept apart from a person's attached note. */
@@ -29,8 +32,13 @@ export interface ChatMemoryRepository {
  * notes from the conversation so far. Null (or a throw) falls back safely. */
 export type ComposeChatNotes = (context: {
   turns: readonly MemoryTurn[];
-  currentNotes: string | null;
+  currentNotes: ApprovedText | null;
 }) => Promise<string | null>;
+
+/** What a marked conversation's memory says when it has nowhere protected to
+ * go (fifth review of pull request 267). */
+export const MEMORY_NOT_PROTECTED =
+  "This chat’s notes weren’t saved: it includes notes only an on-device model can read, and there’s no protected note to keep them in.";
 
 export interface SyncChatMemoryInput {
   title: string;
@@ -38,6 +46,10 @@ export interface SyncChatMemoryInput {
   attachedStem?: string;
   turns: readonly MemoryTurn[];
   composeNotes?: ComposeChatNotes;
+  /** The conversation carries the on-device-only mark: write only to a
+   * protected note (the secure attachment, or a memory note created secure);
+   * never to an unprotected one. */
+  protectedOnly?: boolean;
 }
 
 /** Ensure every persisted chat has one note carrying real conversation NOTES
@@ -49,6 +61,10 @@ export async function syncChatMemory(
   input: SyncChatMemoryInput,
 ): Promise<ChatMemoryNote | null> {
   let note = input.attachedStem ? await repository.findByStem(input.attachedStem) : null;
+  // protection accumulates from every read in this pass before anything is
+  // composed or written: a note made secure since the send counts (sixth
+  // review of pull request 267, F6)
+  let marked = input.protectedOnly === true || note?.secure === true;
   // A chat that points at a note this listing cannot reach (deleted, or a
   // cold vault) gets NO new note: minting one beside the pointer made a fresh
   // duplicate every turn and never attached it (2026-09-17). The pointer
@@ -59,15 +75,20 @@ export async function syncChatMemory(
   // chat-made note beside it (2026-09-29). `attachedTo` stays on the person's
   // note, so the note still lists this chat.
   let separate = false;
-  let seedNotes: string | null = null;
+  let seedNotes: ApprovedText | null = null;
   if (note && !note.aiEditable) {
-    seedNotes = extractChatNotes(note.body);
+    seedNotes = note.notes;
     const own = await repository.findMemoryNote();
     if (own && !own.aiEditable) return null; // the person turned it off there too
+    marked ||= own?.secure === true;
     note = own;
     separate = !own;
   }
-  const currentNotes = note ? extractChatNotes(note.body) : seedNotes;
+  // a marked conversation writes only where it stays protected: the note it
+  // would update must itself be secure (a new one is created secure, below),
+  // and nothing is composed when there's nowhere protected to put it
+  if (marked && note && note.secure !== true) throw new Error(MEMORY_NOT_PROTECTED);
+  const currentNotes = note ? note.notes : seedNotes;
 
   let notes: string | null = null;
   if (input.composeNotes) {
@@ -81,7 +102,7 @@ export async function syncChatMemory(
 
   if (!note) {
     const body = mergeChatMemory("", input.title, input.chatSlug, content);
-    note = await repository.create(body);
+    note = await repository.create(body, marked ? { secure: true } : undefined);
     if (separate) {
       await repository.setMemoryNote(note.stem);
       return note;

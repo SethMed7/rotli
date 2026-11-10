@@ -6,6 +6,7 @@
 
 import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
+import { frontmatterBlock } from "../lib/frontmatterBlock";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { lastReplyMs } from "../memex/chatRecency";
@@ -20,7 +21,7 @@ const removedKey = (bin: "trash" | "archive", slug: string) => `chat-${bin}:${sl
 const INDEX_RETRIES = 4;
 
 function frontmatterField(contents: string, name: string): string {
-  const block = contents.startsWith("---\n") ? contents.slice(4, contents.indexOf("\n---", 4)) : "";
+  const block = frontmatterBlock(contents)?.inner ?? "";
   const line = block.split("\n").find((l) => l.startsWith(`${name}:`));
   return line ? line.slice(name.length + 1).trim() : "";
 }
@@ -211,7 +212,9 @@ export class FolderChatStore implements ChatStore {
           const fileTime = stat?.lastModified ?? 0;
           const modified =
             fileTime > EPOCH_MS_FLOOR ? fileTime : Date.parse(frontmatterField(head, "updated")) || fileTime;
-          return summarize(slug, head, modified);
+          // Metadata has a bounded header; the newest reply can be anywhere
+          // in the transcript we already read, beyond that header window.
+          return { ...summarize(slug, head, modified), path, repliedMs: lastReplyMs(text) };
         }),
     );
     return rows;

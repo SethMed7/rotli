@@ -32,7 +32,7 @@ import {
   WITHHELD_VOICE_STUB_ID,
   WITHHELD_VOICE_STUB_SOURCE,
 } from "./scripts/build-policy.ts";
-import { devHelperServer } from "./scripts/dev-helper-server";
+import { devHelperServer } from "./scripts/dev-helper-server.ts";
 import { launchFeatures } from "./src/lib/featurePolicy.ts";
 
 const host = process.env.TAURI_DEV_HOST;

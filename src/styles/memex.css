@@ -1877,6 +1877,13 @@
   opacity: 0.5;
 }
 /* shared band inset — replaces the old per-element inline padding */
+/* the settings refusal in Librarian Activity (librarianSettingsNotice.tsx) */
+.act-settings-line {
+  margin: 0;
+}
+.act-settings-line + .act-settings-line {
+  margin-top: 4px;
+}
 .act-pad {
   padding: 0 22px 8px;
 }

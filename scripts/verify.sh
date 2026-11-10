@@ -27,6 +27,19 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
 LANES=("$@")
 [ ${#LANES[@]} -eq 0 ] && LANES=(secrets quality e2e rust)
 
+# Validate the whole request before installs or checks: a typo must never
+# produce a green result for an empty (or only partially requested) run.
+for requested in "${LANES[@]}"; do
+  case "$requested" in
+    secrets|quality|e2e|rust) ;;
+    *)
+      printf '✗ unknown verify lane: %s\n' "$requested" >&2
+      echo 'Usage: bun run verify [secrets|quality|e2e|rust ...]' >&2
+      exit 1
+      ;;
+  esac
+done
+
 wants() {
   local lane="$1"
   for requested in "${LANES[@]}"; do [ "$requested" = "$lane" ] && return 0; done
@@ -95,10 +108,8 @@ if wants e2e; then
     echo "  run: bunx playwright install chromium"
     exit 1
   fi
-  # a stale `vite dev` on 1420 would make Playwright prove the wrong build
-  if lsof -nP -iTCP:1420 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "  ⚠ something already listens on :1420 — Playwright will reuse it (reuseExistingServer); stop it to prove THIS tree"
-  fi
+  # Both Playwright configs refuse existing servers. Select free ports with
+  # ROTLI_E2E_PORT / ROTLI_WEB_E2E_PORT when testing beside another checkout.
   bun run test:e2e
 
   step "e2e — Rotli Web (build:web + vite preview under /app/)"
@@ -111,6 +122,11 @@ if wants rust; then
 
   step "rust — cargo test"
   cargo test --manifest-path src-tauri/Cargo.toml
+
+  # the TypeScript save queue against the production Rust store, headless
+  # (src/editor/realWriteLane.lane.ts; the test binary is built just above)
+  step "rust — the editor's save queue on the real write lane"
+  bun run test:write-lane
 fi
 
 printf '\n\033[1m✓ verify passed\033[0m — lanes: %s\n' "${LANES[*]}"

@@ -6,19 +6,17 @@
 // one in a secure place refuses the whole handoff, and the rest become paths an
 // outside agent can open, missing ones named as missing.
 
+import { approvedHandoff, approvedNote } from "../ai/approvedRead";
 import { looksSecret } from "../ai/guard";
 import { refineHandoff } from "../ai/handToAiRefine";
 import { qualifiedArtifactId } from "../ai/imageLinks";
 import type { Host } from "../ai/types";
 import { resolveWikiEmbed } from "../editor/fileEmbeds";
 import { flushNote } from "../editor/model";
-import {
-  type AttachmentLink,
-  type AttachmentPlace,
-  attachmentLinks,
-  buildHandToAiPrompt,
-} from "../lib/handToAi";
+import { savedVersionMismatch } from "../editor/savedVersion";
+import { type AttachmentLink, type AttachmentPlace, attachmentLinks } from "../lib/handToAi";
 import { secureByName } from "../lib/librarianRules";
+import type { ApprovedText } from "../lib/promptText";
 import {
   corpusAbs,
   corpusFileStat,
@@ -38,7 +36,7 @@ import { notesService } from "./notes";
 export type HandToAi =
   /** `paths`: every path the Attachments list names (found and missing); a
    * refined prompt must keep them all */
-  | { kind: "ready"; title: string; prompt: string; paths: string[] }
+  | { kind: "ready"; title: string; prompt: ApprovedText; paths: string[] }
   | { kind: "secure"; title: string }
   | { kind: "secureAttachment"; title: string }
   | { kind: "secret"; title: string }
@@ -210,29 +208,47 @@ async function placesOf(
   return new Map(places);
 }
 
+/** A handoff is read as a remote model would read it: anything not on this
+ * Mac's local-model registry gets the remote rules. */
+const HANDOFF_READER = { id: "hand-to-ai", endpoint: "" };
+
 export async function handToAiFor(
   noteId: string,
   locate: LocateAttachment = locateAttachment,
 ): Promise<HandToAi> {
-  // the last keystrokes may still sit in the editor's 400ms save window
+  // the last keystrokes may still sit in the editor's 400ms save window, or
+  // a save may be out: wait for it (a failed save throws its own words)
   await flushNote(noteId);
   const note = await notesService.getNote(noteId);
   if (!note) throw new Error("Rotli couldn’t find this note.");
-  const title = note.title || "Untitled";
-  if (await isSecure(note)) return { kind: "secure", title };
-  if (looksSecret(note.body)) return { kind: "secret", title };
-  if (!note.body.trim()) return { kind: "empty", title };
-  const links = attachmentLinks(note.body);
+  const shown = note.title || "Untitled";
+  if (await isSecure(note)) return { kind: "secure", title: shown };
+  if (looksSecret(note.body)) return { kind: "secret", title: shown };
+  // the title and words that leave are the gate's, from one read (corpus_read_ai
+  // in the Mac app, the web AI corpus on Rotli Web): an earlier read can hold
+  // an older, secure version with no secure flag (reviews of pull request 267)
+  const approved = await approvedNote(noteId, HANDOFF_READER, { browserFallback: true }).catch(() => null);
+  // the handoff reads as a remote-class reader, so the gate never marks it
+  // on-device only; if it ever did, it would not leave Rotli
+  if (approved === null || approved.onDeviceOnly) return { kind: "secure", title: shown };
+  // what leaves must be the version the editor just saved, or nothing does
+  const unsaved = savedVersionMismatch(noteId, approved);
+  if (unsaved) throw new Error(unsaved);
+  const title = approved.title || "Untitled";
+  const body = approved.body;
+  if (looksSecret(body)) return { kind: "secret", title };
+  if (!body.trim()) return { kind: "empty", title };
+  const links = attachmentLinks(body);
   const { secureKeywords } = useLibrarianRules.getState().rules;
   const folder = note.diskFolderId ?? note.folderId;
   // an Obsidian ![[file]] names a file the Refined model can open by that name:
   // resolve it as the editor does, and refuse when it is a secure file
-  for (const [, target = ""] of note.body.matchAll(/!\[\[([^\]|#\n]+)/g)) {
+  for (const [, target = ""] of body.matchAll(/!\[\[([^\]|#\n]+)/g)) {
     const id = await resolveWikiEmbed(target.trim(), rootIdOf(note.id), folder).catch(() => null);
     if (id && attachmentIsSecure(splitRootId(id).rel, secureKeywords))
       return { kind: "secureAttachment", title };
   }
-  const embedded = embeddedFileReferences(note.body);
+  const embedded = embeddedFileReferences(body);
   for (const { source, rootId } of embedded) {
     const rel = attachmentRel(source);
     if (!rel) continue;
@@ -254,7 +270,7 @@ export async function handToAiFor(
   return {
     kind: "ready",
     title,
-    prompt: buildHandToAiPrompt({ title, body: note.body, attachments }),
+    prompt: approvedHandoff(approved, attachments),
     paths,
   };
 }

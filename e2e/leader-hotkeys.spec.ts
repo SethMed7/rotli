@@ -75,7 +75,7 @@ test("⌘⇧W opens the numbered view menu; ⌘number switches view, even from t
   await switcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Work");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(switcher).toHaveAccessibleName(/Current view: Work/);
 
   await page.keyboard.press("Meta+Shift+W");

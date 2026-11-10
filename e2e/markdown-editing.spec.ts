@@ -974,14 +974,17 @@ test("arrowing into an image selects the rendered image", async ({ page }) => {
 
 test("double-clicking a rendered image keeps it selected instead of exposing source", async ({ page }) => {
   await gotoApp(page);
-  await page.keyboard.press("Meta+T");
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText("![](storage:double-click-selection.png)\nAfter");
 
   const image = page.locator(".rotli-img");
   await expect(image).toHaveCount(1);
-  await image.dblclick();
+  // This fixture has no image bytes: exercise the actual missing-file label,
+  // whose native word selection must not race CodeMirror's object selection.
+  await expect(image).toHaveClass(/missing/);
+  await image.locator(".rotli-img-missing").dblclick();
   await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
   await expect(editor).not.toContainText("![](storage:double-click-selection.png)");
 });

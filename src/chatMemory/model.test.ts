@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { approved, model, person } from "../lib/promptText.fixtures";
 import {
   CHAT_MEMORY_END,
   CHAT_MEMORY_START,
@@ -73,8 +74,8 @@ describe("chat notes model", () => {
 
   test("the fallback digest is topics, never a speaker transcript", () => {
     const notes = fallbackChatNotes([
-      { speaker: "you", text: "can we whitelabel fluidpay?" },
-      { speaker: "rotli", text: "yes — here's how." },
+      { speaker: "you", text: person("can we whitelabel fluidpay?") },
+      { speaker: "rotli", text: model("yes — here's how.") },
     ]);
     expect(notes).toContain("### Topics discussed");
     expect(notes).toContain("- can we whitelabel fluidpay?");
@@ -83,9 +84,9 @@ describe("chat notes model", () => {
   });
 
   test("the notes prompt carries current notes and the compacted conversation", () => {
-    const prompt = buildChatNotesPrompt("- existing point", [
-      { speaker: "you", text: "hello" },
-      { speaker: "rotli", text: "hi" },
+    const prompt = buildChatNotesPrompt(approved("- existing point"), [
+      { speaker: "you", text: person("hello") },
+      { speaker: "rotli", text: model("hi") },
     ]);
     expect(prompt).toContain("- existing point");
     expect(prompt).toContain("User: hello");

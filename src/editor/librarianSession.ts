@@ -5,32 +5,41 @@
 // state/librarianBar.ts, so it outlives the bar that started it.
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
+import {
+  type ApprovedNote,
+  approvedLibrarianListing,
+  approvedNote,
+  approvedPeopleNotes,
+  approvedTags,
+} from "../ai/approvedRead";
+import { modelIsOnDevice } from "../ai/guard";
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
 import { mergedModels } from "../ai/models";
 import type { Host } from "../ai/types";
 import { type Anchor, anchorFromSelection, type LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianContext } from "../lib/librarianChat";
-import { type PersonNote, peopleNotes } from "../lib/librarianPeople";
 import { peopleAreas } from "../lib/librarianRules";
+import { type PersonText, personText } from "../lib/promptText";
 import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
 import { type FolderRoles, folderRoles } from "../services/destinations";
-import { useNoteIndex } from "../services/hooks";
 import {
   applyLibrarian,
   converseLibrarian,
-  currentTags,
   LIBRARIAN_REFUSALS,
   librarianRefusal,
 } from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
 import {
   type ChatTurn,
+  type LibrarianChat,
+  startLibrarianChat,
   type ProposalState,
+  type TurnProtection,
   updateLibrarianChat,
   updateLibrarianTurn,
   useLibrarianBar,
@@ -40,7 +49,9 @@ import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
-import { settleVault } from "./librarianKeep";
+import { refuseWrite, settleVault } from "./librarianKeep";
+import { flushNote } from "./model";
+import { savedVersionMismatch } from "./savedVersion";
 
 /** Escape inside the bar or the chat (not in the portaled model picker, whose
  * own Escape closes only its list): claim it and run `then`. */
@@ -74,18 +85,20 @@ export function noteTitle(doc: string): string {
 
 /** The Library's areas: the top-level folders under wiki/, minus its lanes.
  * In a copy (a role map), the person's own top-level folders, minus the inbox
- * and Rotli's folders (librarian_map.rs owns the full rule; Rust enforces it). */
-export function libraryAreas(
-  folderIds: readonly string[],
+ * and Rotli's folders (librarian_map.rs owns the full rule; Rust enforces it).
+ * Generic so an approved folder id stays approved: an area is an id or the
+ * part of one after `wiki/`. */
+export function libraryAreas<T extends string>(
+  folderIds: readonly T[],
   roles: FolderRoles | null = folderRoles(),
-): string[] {
+): T[] {
   if (roles) {
     const rotli = [roles.inbox, roles.archive, roles.trash, roles.chats, roles.storage];
     return folderIds.filter((id) => !id.includes("/") && !id.startsWith(".") && !rotli.includes(id));
   }
   return folderIds
-    .map((id) => /^wiki\/([^/]+)$/.exec(id)?.[1])
-    .filter((name): name is string => !!name && !name.startsWith("_"));
+    .filter((id) => /^wiki\/[^/]+$/.test(id) && !id.startsWith("wiki/_"))
+    .map((id) => id.slice("wiki/".length) as T);
 }
 
 /** The models the person has connected (grouped the way the chat's picker
@@ -109,13 +122,6 @@ export function useLibrarianModels() {
       ? (groups.local.find((m) => m.localDefault) ?? groups.local[0])?.id
       : librarianModelFor(organizerModel, organizerModelId, providerDefaults, lanes.lanes);
   return { groups, models, preferred };
-}
-
-/** The people the vault already has notes for (what a statement is checked
- * against, so someone known is asked about rather than added twice). */
-export function usePeopleNotes(): PersonNote[] {
-  const index = useNoteIndex();
-  return useMemo(() => peopleNotes(index.values()), [index]);
 }
 
 export interface Passage {
@@ -155,25 +161,80 @@ export function usePassage(paneId: string, paint = true): Passage {
   };
 }
 
-/** The note as it is right now, for a turn. */
+/** What a turn's context is read through: the gated reads for the
+ * Librarian's model (ai/approvedRead.ts). Injected for tests. */
+export interface LibrarianReads {
+  note: (noteId: string, model: ChatModelInfo) => Promise<ApprovedNote>;
+  listing: typeof approvedLibrarianListing;
+  flush: (noteId: string) => Promise<void>;
+  /** Is the approved read the version the editor just saved? (null if so) */
+  saved?: (noteId: string, read: { revision: string; body: string }) => string | null;
+}
+
+const LIVE_READS: LibrarianReads = {
+  note: approvedNote,
+  listing: approvedLibrarianListing,
+  flush: flushNote,
+  saved: savedVersionMismatch,
+};
+
+/** The note as it is right now, for a turn: saved, then read through the AI
+ * read gate for `model`, its words, title and tags from that one read. Never
+ * the editor's copy, and never the UI note index (third review of pull
+ * request 267). The areas and People notes come from the Librarian's own
+ * gated listing, which reads only People notes. */
 export async function librarianContext(
   noteId: string,
-  paneId: string,
-  areas: readonly string[],
-  known: readonly PersonNote[] = [],
+  model: ChatModelInfo,
+  reads: LibrarianReads = LIVE_READS,
 ): Promise<LibrarianContext> {
-  const doc = editorFor(paneId)?.getSelection?.()?.doc ?? "";
+  // waits for a save in flight, and fails with a failed save's own words
+  await reads.flush(noteId);
+  const [note, listing] = await Promise.all([reads.note(noteId, model), reads.listing(model)]);
+  // what the gate approved must be what the editor just saved, or nothing goes
+  const unsaved = reads.saved?.(noteId, note) ?? null;
+  if (unsaved) throw new Error(unsaved);
   const { rules } = useLibrarianRules.getState();
   return {
-    title: noteTitle(doc),
-    doc,
-    areas,
-    tags: await currentTags(noteId),
-    people: peopleAreas(rules),
-    filing: rules.filing,
+    title: note.title,
+    doc: note.body,
+    areas: libraryAreas(listing.folderIds),
+    tags: approvedTags(note),
+    people: peopleAreas(rules).map(personText),
+    filing: rules.filing.map(personText),
     rules,
-    known,
+    // secure People never reach the Librarian, on-device or remote (sixth
+    // review of pull request 267): listing People can't mark a conversation;
+    // only the note it was asked about can
+    known: approvedPeopleNotes(listing.people.filter((person) => person.onDeviceOnly !== true)),
+    onDeviceOnly: note.onDeviceOnly,
   };
+}
+
+/** What a send says when a conversation holds on-device-only text and the
+ * model picked is remote (fourth review of pull request 267). */
+export function onDeviceOnlyRefusal(modelLabel: string): string {
+  return `This conversation includes notes only an on-device model can read. Start a new one to use ${modelLabel}.`;
+}
+
+/** A highlighted passage that isn't in the note as saved is never dropped. */
+export const PASSAGE_NOT_SAVED =
+  "The passage you highlighted isn't in the note as saved, so nothing was sent. Try again in a moment.";
+
+/** The one action the refusal offers: a new conversation about the same note
+ * with `modelId`, the refused message back in its composer. */
+export function startOver(chat: LibrarianChat, modelId: string, draft: string): void {
+  startLibrarianChat({
+    id: crypto.randomUUID(),
+    paneId: chat.paneId,
+    noteId: chat.noteId,
+    modelId,
+    turns: [],
+    status: "idle",
+    error: null,
+    minimized: false,
+    ...(draft ? { draft } : {}),
+  });
 }
 
 export type HostFor = (model: ChatModelInfo) => Pick<Host, "complete">;
@@ -189,9 +250,15 @@ export function refusalNow(noteId: string, paneId: string): Promise<string | nul
 }
 
 /** Remote lanes never see secure content: `sendToLibrarian` re-runs the
- * refusal (secure, secure by name, locked) before every model call, so no
- * secure note reaches this host; the flag is a backstop. */
-export const tauriHostFor: HostFor = (model) => makeTauriHost(model, { isSecureContext: () => false });
+ * refusal (secure, secure by name, locked) before every model call, and
+ * refuses a remote model for an on-device-only conversation; the host's own
+ * refusal of a remote call for such a conversation is the backstop. */
+export const tauriHostFor: HostFor = (model) =>
+  makeTauriHost(model, { isSecureContext: () => useLibrarianBar.getState().chat?.onDeviceOnly === true });
+
+/** How a send ended: sent (or stopped by a refusal shown in the chat), or
+ * refused because the conversation is on-device only and the model isn't. */
+export type SendOutcome = "sent" | "stopped" | "onDeviceOnly";
 
 const newTurnId = () => crypto.randomUUID();
 
@@ -200,27 +267,58 @@ const newTurnId = () => crypto.randomUUID();
  * proposes) joins after it. A chat closed meanwhile simply drops the reply. */
 export async function sendToLibrarian(
   chatId: string,
-  message: { text: string; highlight: Anchor | null },
+  message: { text: PersonText; highlight: Anchor | null },
   model: ChatModelInfo,
-  context: () => Promise<LibrarianContext>,
+  context: (model: ChatModelInfo) => Promise<LibrarianContext>,
   refusal: () => Promise<string | null>,
   hostFor: HostFor = tauriHostFor,
-): Promise<void> {
+): Promise<SendOutcome> {
   const chat = useLibrarianBar.getState().chat;
-  if (chat?.id !== chatId || chat.status === "thinking") return;
-  const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...message }];
-  updateLibrarianChat(chatId, () => ({ turns, status: "thinking", error: null, modelId: model.id }));
+  if (chat?.id !== chatId || chat.status === "thinking") return "stopped";
+  // a conversation that has held on-device-only text never reaches a remote
+  // model: refused before anything is read or sent (fourth review)
+  if (chat.onDeviceOnly === true && !modelIsOnDevice(model)) {
+    // the question is kept in the conversation itself, exactly as typed, not
+    // in whichever composer sent it (the bar closes as it sends)
+    updateLibrarianChat(chatId, () => ({
+      error: onDeviceOnlyRefusal(model.label),
+      restartWith: model.id,
+      draft: message.text,
+    }));
+    return "onDeviceOnly";
+  }
+  const asked = { ...message, text: personText(message.text.trim()) };
+  const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...asked }];
+  updateLibrarianChat(chatId, () => ({
+    turns,
+    status: "thinking",
+    error: null,
+    restartWith: null,
+    modelId: model.id,
+  }));
   try {
     // asked again on every send, before any prompt exists (fail closed)
     const refused = await refusal().catch(() => LIBRARIAN_REFUSALS.locked);
     if (refused) {
       updateLibrarianChat(chatId, () => ({ status: "idle", error: refused }));
-      return;
+      return "stopped";
     }
-    const reply = await converseLibrarian(await context(), turns, hostFor(model));
+    const ctx = await context(model);
+    // the turn's protection, captured once from what it read: every write
+    // of this turn goes by it (sixth review)
+    const protection: TurnProtection = Object.freeze({
+      onDeviceOnly: chat.onDeviceOnly === true || ctx.onDeviceOnly,
+    });
+    // marked before the model is asked: the mark outlives a failed call
+    if (ctx.onDeviceOnly) updateLibrarianChat(chatId, () => ({ onDeviceOnly: true }));
+    if (message.highlight && !ctx.doc.includes(message.highlight.exact)) {
+      updateLibrarianChat(chatId, () => ({ status: "idle", error: PASSAGE_NOT_SAVED }));
+      return "stopped";
+    }
+    const reply = await converseLibrarian(ctx, turns, hostFor(model));
     if (reply.kind === "secret") {
       updateLibrarianChat(chatId, () => ({ status: "idle", error: LIBRARIAN_REFUSALS.secret }));
-      return;
+      return "stopped";
     }
     const answer: ChatTurn = {
       id: newTurnId(),
@@ -234,6 +332,7 @@ export async function sendToLibrarian(
             : "I don’t have an answer for that. Try asking another way."),
       raw: reply.raw,
       actions: reply.actions,
+      protection,
       ...(reply.handoff && { handoff: true }),
       ...(reply.actions.length > 0 && {
         proposal: { kind: "open" as const, picked: reply.actions.map(() => true) },
@@ -241,13 +340,32 @@ export async function sendToLibrarian(
       ...(reply.vault.length > 0 && { vault: reply.vault }),
     };
     updateLibrarianChat(chatId, (now) => ({ turns: [...now.turns, answer], status: "idle" }));
-    await settleVault(chatId, answer.id, reply.vault, model.id);
+    // closed or replaced while the reply was on its way: nothing is kept
+    if (useLibrarianBar.getState().chat?.id !== chatId) return "stopped";
+    await settleVault(chatId, answer.id, reply.vault, model.id, protection);
+    return "sent";
   } catch (error) {
     updateLibrarianChat(chatId, () => ({
       status: "idle",
       error: error instanceof Error ? error.message : String(error),
     }));
+    return "stopped";
   }
+}
+
+/** Send what a composer holds, as typed: blank asks nothing, the refusal
+ * keeps the words exactly (sixth review, F10), and the turn trims them. */
+export function sendTyped(
+  chatId: string,
+  typed: string,
+  highlight: Anchor | null,
+  model: ChatModelInfo,
+  context: (model: ChatModelInfo) => Promise<LibrarianContext>,
+  refusal: () => Promise<string | null>,
+  hostFor: HostFor = tauriHostFor,
+): Promise<SendOutcome> {
+  if (!typed.trim()) return Promise.resolve("stopped");
+  return sendToLibrarian(chatId, { text: personText(typed), highlight }, model, context, refusal, hostFor);
 }
 
 /** Apply the picked proposals of one reply. The note's words are never
@@ -259,8 +377,15 @@ export async function applyProposal(
   note: { id: string; title: string; model: string },
   apply: typeof applyLibrarian = applyLibrarian,
 ): Promise<void> {
+  const chat = useLibrarianBar.getState().chat;
+  const turn = chat?.id === chatId ? chat.turns.find((t) => t.id === turnId) : undefined;
+  if (!turn) return; // closed or replaced: nothing is applied
+  // a marked turn's proposals would write into the open note, which is never
+  // secure (the Librarian refuses secure notes): its own protection says no,
+  // and a turn without one counts as marked
+  if (turn.protection?.onDeviceOnly !== false) return refuseWrite(chatId);
   const setProposal = (proposal: ProposalState) => updateLibrarianTurn(chatId, turnId, () => ({ proposal }));
-  const before = useLibrarianBar.getState().chat?.turns.find((turn) => turn.id === turnId)?.proposal;
+  const before = turn.proposal;
   setProposal({ kind: "applying" });
   try {
     const count = await apply(actions, note);
@@ -285,10 +410,14 @@ export function chatDraft(message: { text: string; highlight: Anchor | null } | 
 
 /** The Librarian only organizes; anything else belongs in Chat. Open a new
  * chat about this note, in a new tab, with the question already typed (sent
- * only when the person sends it). */
+ * only when the person sends it). A conversation that held on-device-only
+ * text hands over that mark: the new chat is born secure-context, so it too
+ * never continues on a remote model (fourth review). */
 export async function takeToChat(
   noteId: string,
   message: { text: string; highlight: Anchor | null } | null,
+  /** The conversation's own mark, from the caller that holds it. */
+  onDeviceOnly: boolean,
   open: typeof openChatForNoteId = openChatForNoteId,
 ): Promise<boolean> {
   const tabsNow = () => {
@@ -296,7 +425,7 @@ export async function takeToChat(
     return findLeaf(panes.root, panes.focusedPaneId)?.tabs ?? [];
   };
   const before = new Set(tabsNow().map((tab) => tab.id));
-  if (!(await open(noteId, { create: true }))) return false;
+  if (!(await open(noteId, { create: true, ...(onDeviceOnly ? { secureContext: true } : {}) }))) return false;
   // the draft goes to the chat tab this just opened; if a detached chat window
   // took the chat instead, there is no new tab here and nothing is typed
   const opened = tabsNow().find((tab) => !before.has(tab.id) && tab.surfaceKind === "chat");

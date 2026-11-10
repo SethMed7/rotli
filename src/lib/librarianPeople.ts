@@ -1,6 +1,6 @@
 // The Librarian keeps the vault, not just the open note (the owner,
-// 2026-09-28: "/librarian Whenever I mention Kunal or Dhaval those are work
-// people…"). When the person *tells* it something, a reply can carry vault
+// 2026-09-28, with a sentence like "/librarian Whenever I mention Ana or Leo
+// those are work people…"). When the person *tells* it something, a reply can carry vault
 // actions besides the note's tag / mark / file:
 //
 // - `rule`: a filing sentence added to the Librarian rules;
@@ -43,9 +43,13 @@ export interface KeptLine {
 
 export const PERSON_LIMITS = { name: 80, about: 280, perReply: 20, listed: 200 } as const;
 
+/** What a People row needs: a gated AI listing row or a note summary. */
+export type PersonSource = Pick<NoteSummary, "id" | "title" | "folderId" | "updatedAt"> &
+  Partial<Pick<NoteSummary, "diskFolderId" | "secure" | "kind">>;
+
 /** The People notes in a note list: files under wiki/People (any case), not
  * secure, newest first, at most PERSON_LIMITS.listed of them. */
-export function peopleNotes(notes: Iterable<NoteSummary>): PersonNote[] {
+export function peopleNotes(notes: Iterable<PersonSource>): PersonNote[] {
   const found: (PersonNote & { at: number })[] = [];
   const seen = new Set<string>();
   for (const note of notes) {
@@ -61,7 +65,8 @@ export function peopleNotes(notes: Iterable<NoteSummary>): PersonNote[] {
     .map(({ id, title, area }) => ({ id, title, area }));
 }
 
-const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** Two names for the same thing (a person, a group, a rule), ignoring case and edge spaces. */
+export const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** One plain name: no path, no line break, not too long. */
 function personName(value: unknown): string | null {

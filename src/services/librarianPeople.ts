@@ -9,16 +9,18 @@
 // touches only its metadata and where it's filed, never its words.
 
 import type { LibrarianAction } from "../lib/librarianActions";
-import { type KeptLine, personBody, type VaultAction } from "../lib/librarianPeople";
+import { type KeptLine, personBody, same, type VaultAction } from "../lib/librarianPeople";
 import type { LibrarianRules } from "../lib/librarianRules";
 import { corpusNotePath } from "../lib/tauri";
 import { useLibrarianRules } from "../state/librarianRules";
 import { flushSettingsNow } from "../state/persist";
+import type { Note, NoteSummary } from "../types";
 import type { BrainAction } from "./brainJournal";
 import { logAction } from "./brainJournalStore";
 import { createRoutedNote } from "./createNote";
 import { invalidateJournal } from "./hooks";
 import { applyLibrarian } from "./librarianBar";
+import { notesService } from "./notes";
 
 export interface KeepDeps {
   rules: () => LibrarianRules;
@@ -29,7 +31,44 @@ export interface KeepDeps {
   log: (action: Omit<BrainAction, "id" | "ts" | "status">) => Promise<unknown>;
   apply: (actions: LibrarianAction[], note: { id: string; title: string; model: string }) => Promise<number>;
   refresh: () => Promise<void>;
+  /** Is there already a People note with this name, read locally (never sent
+   * to a model): "protected", "plain", or null when there is none. */
+  existingPerson: (name: string) => Promise<"protected" | "plain" | null>;
 }
+
+/** What the person is told when a reply would make a note for someone whose
+ * existing note is protected (and so never listed for the Librarian). */
+export const PROTECTED_PERSON = "That person’s note is protected, so the Librarian can’t change it";
+
+/** Rust's `in_people` (corpus_ai_rows.rs): the folders the Librarian's People are read from. */
+const inPeople = (folder: string) => {
+  const lower = folder.toLowerCase();
+  return lower === "wiki/people" || lower.startsWith("wiki/people/");
+};
+
+/** Look for someone who already has a note, by name, locally, by each
+ * note's own fresh read (a listing's summary can be out of date; a read that
+ * can't say counts as protected). A People note by that name decides: one is
+ * protected, or they are plain. With none in People, a protected note by that
+ * name anywhere answers "protected": a note made secure leaves People for the
+ * secure home (Rust keeps where it came from), and the look-up fails closed.
+ * Ninth review: a namesake outside People no longer blocks a person who has an
+ * ordinary People note, and a summary saying unprotected no longer overrides
+ * a read saying protected. */
+export async function existingPersonIn(
+  name: string,
+  notes: readonly NoteSummary[],
+  read: (id: string) => Promise<Note | null>,
+): Promise<"protected" | "plain" | null> {
+  const named = notes.filter((note) => (note.kind ?? "note") === "note" && same(note.title, name));
+  const isProtected = async (note: NoteSummary) => (await read(note.id))?.secure !== false;
+  const people = named.filter((note) => inPeople(note.diskFolderId ?? note.folderId));
+  for (const note of people.length > 0 ? people : named) if (await isProtected(note)) return "protected";
+  return people.length > 0 ? "plain" : null;
+}
+
+const existingPerson = async (name: string) =>
+  existingPersonIn(name, await notesService.listAll(), (id) => notesService.getNote(id));
 
 export const liveKeepDeps: KeepDeps = {
   rules: () => useLibrarianRules.getState().rules,
@@ -48,6 +87,7 @@ export const liveKeepDeps: KeepDeps = {
   log: logAction,
   apply: (actions, note) => applyLibrarian(actions, note),
   refresh: invalidateJournal,
+  existingPerson,
 };
 
 const why = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -85,6 +125,18 @@ export async function keepVault(
   }
   for (const action of actions) {
     if (action.type !== "person") continue;
+    // Secure People are never listed for the Librarian (sixth review), so a
+    // reply can name one as someone new. Look first, locally: a protected
+    // person's note is neither changed nor duplicated (seventh review).
+    const existing = await deps.existingPerson(action.name).catch(() => "protected" as const);
+    if (existing === "protected") {
+      lines.push({ text: PROTECTED_PERSON });
+      continue;
+    }
+    if (existing === "plain") {
+      lines.push({ text: `${action.name} already has a note, so no new one was made` });
+      continue;
+    }
     try {
       const id = await deps.createNote(personBody(action));
       const rel = await deps.notePath(id);

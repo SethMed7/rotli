@@ -6,17 +6,15 @@
 // again (a Librarian write may have moved its revision), and Rust's
 // corpus_insert_ai checks the write is that answer and nothing else.
 
+import { approvedNote } from "../ai/approvedRead";
 import { type InlineVerdict, askInline } from "../ai/inlineAi";
 import type { Host } from "../ai/types";
-import { flushNote, reloadDocumentIfClean } from "../editor/model";
+import { adoptWrittenText, flushNote } from "../editor/model";
+import { STILL_SAVING } from "../editor/savedVersion";
 import { consentedInsertRefusal } from "../lib/aiEditPolicy";
 import { corpusInsertAi } from "../lib/aiInsert";
-import {
-  type ChatModelInfo,
-  type FrontmatterView,
-  corpusFrontmatter,
-  corpusReadAiVersioned,
-} from "../lib/tauri";
+import { type ApprovedText, personText, reshape } from "../lib/promptText";
+import { type ChatModelInfo, type FrontmatterView, corpusFrontmatter } from "../lib/tauri";
 import { invalidateNotes } from "./hooks";
 
 type Model = Pick<ChatModelInfo, "id" | "endpoint">;
@@ -24,8 +22,8 @@ type Model = Pick<ChatModelInfo, "id" | "endpoint">;
 export interface InlineAiDeps {
   flush: (noteId: string) => Promise<void>;
   frontmatter: (noteId: string) => Promise<FrontmatterView | null>;
-  /** The AI read gate for this model: the file, its revision, and the editor body. */
-  read: (noteId: string, model: Model) => Promise<{ revision: string; editor?: string }>;
+  /** The AI read gate for this model: its revision and the editor body it approved. */
+  read: (noteId: string, model: Model) => Promise<{ revision: string; body: ApprovedText }>;
   insert: (
     noteId: string,
     body: string,
@@ -40,15 +38,14 @@ export interface InlineAiDeps {
 export const INLINE_AI_DEPS: InlineAiDeps = {
   flush: flushNote,
   frontmatter: corpusFrontmatter,
-  read: (noteId, model) => corpusReadAiVersioned(noteId, model, { withEditor: true }),
+  read: approvedNote,
   insert: corpusInsertAi,
   adopt: (noteId, body, revision) => {
-    reloadDocumentIfClean(noteId, body, revision);
+    adoptWrittenText(noteId, body, revision);
     void invalidateNotes();
   },
 };
 
-const STILL_SAVING = "The note is still saving. Try again in a moment.";
 const PROTECTION_UNREADABLE = "This note’s protection couldn’t be read, so nothing was sent or written.";
 
 function reasonOf(error: unknown): string {
@@ -64,24 +61,26 @@ async function refusalFor(deps: InlineAiDeps, noteId: string): Promise<string | 
 }
 
 /** The note as the read gate returns it for this model — the only text a
- * model may see — when it still matches what the editor shows. */
+ * model may see — when it still matches what the editor shows. The request is
+ * built from that approved read, never from the editor's copy. */
 async function gatedRead(
   deps: InlineAiDeps,
   noteId: string,
   model: Model,
   docText: string,
-): Promise<{ ok: true; revision: string } | { ok: false; reason: string }> {
-  await deps.flush(noteId);
-  let read: { revision: string; editor?: string };
+): Promise<{ ok: true; revision: string; body: ApprovedText } | { ok: false; reason: string }> {
+  let read: { revision: string; body: ApprovedText };
   try {
+    // a failed save is said in its own words; nothing is read or sent
+    await deps.flush(noteId);
     read = await deps.read(noteId, model);
   } catch (error) {
     return { ok: false, reason: reasonOf(error) };
   }
   // the editor must show exactly what the gate let this model read (the
   // editor reads a CRLF note with LF line endings)
-  const gated = read.editor?.replace(/\r\n/g, "\n");
-  return gated === docText ? { ok: true, revision: read.revision } : { ok: false, reason: STILL_SAVING };
+  const body = reshape(read.body, (text) => text.replace(/\r\n/g, "\n"));
+  return body === docText ? { ok: true, revision: read.revision, body } : { ok: false, reason: STILL_SAVING };
 }
 
 /** Ask the model for a passage at `at` in the note's text. Nothing is written. */
@@ -98,7 +97,9 @@ export async function askAtCursor(
   if (refusal) return { ok: false, reason: refusal };
   const read = await gatedRead(deps, noteId, model, docText);
   if (!read.ok) return read;
-  return askInline(host, ask, docText.slice(0, at), docText.slice(at));
+  const before = reshape(read.body, (text) => text.slice(0, at));
+  const after = reshape(read.body, (text) => text.slice(at));
+  return askInline(host, personText(ask), before, after);
 }
 
 /** Write the accepted passage at `at`. `text` is exactly what the person saw. */

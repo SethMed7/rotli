@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import { approved } from "../lib/promptText.fixtures";
 import type { FrontmatterView } from "../lib/tauri";
 import { type InlineAiDeps, askAtCursor, insertAtCursor } from "./inlineAi";
 
@@ -28,11 +29,8 @@ function deps(over: { verdict?: AiBodyEdit; body?: string; readError?: string; r
     read: async () => {
       calls.push("read");
       if (over.readError) throw new Error(over.readError);
-      return {
-        body: `---\nid: n\n---\n\n${over.body ?? DOC}`,
-        editor: over.body ?? DOC,
-        revision: revisions.shift() ?? "r-last",
-      };
+      // the editor body the gate approved (frontmatter is not part of it)
+      return { body: approved(over.body ?? DOC), revision: revisions.shift() ?? "r-last" };
     },
     insert: async (_id, body, text, _model, revision) => {
       calls.push("insert");
@@ -95,7 +93,26 @@ describe("asking — the gates before any model runs", () => {
   test("a note still saving is not guessed at", async () => {
     const { d } = deps({ body: `${DOC} (older)` });
     const h = host();
-    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toMatchObject({ ok: false });
+    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toEqual({
+      ok: false,
+      reason: "Still saving. Try again in a moment.",
+    });
+    expect(h.sent).toHaveLength(0);
+  });
+
+  // fourth review of pull request 267 (#2): a save that failed is said in its
+  // own words; nothing is read or sent
+  test("a failed save is the refusal, in its own words", async () => {
+    const { d, calls } = deps();
+    d.flush = async () => {
+      throw new Error("The disk is full.");
+    };
+    const h = host();
+    expect(await askAtCursor(d, h.host, MODEL, "n", "x", DOC, AT)).toEqual({
+      ok: false,
+      reason: "The disk is full.",
+    });
+    expect(calls).not.toContain("read");
     expect(h.sent).toHaveLength(0);
   });
 });

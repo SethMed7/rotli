@@ -5,6 +5,8 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 
+import { type PromptText, externalText, prompt } from "./promptText";
+
 /** One Rotli tool as Claude sees it (an MCP tool on the in-process server). */
 export interface NativeToolSpec {
   name: string;
@@ -20,8 +22,9 @@ export interface NativeToolCall {
 
 export interface NativeSessionReq {
   model: string;
-  systemPrompt: string;
-  userText: string;
+  /** Only `PromptText` (lib/promptText.ts) reaches a model. */
+  systemPrompt: PromptText;
+  userText: PromptText;
   tools: NativeToolSpec[];
   maxTurns: number;
   reasoningEffort?: string;
@@ -33,7 +36,7 @@ export interface NativeSessionReq {
  * text. Resolves with the final answer, rejects with the error to show. */
 export type NativeSession = (
   req: NativeSessionReq,
-  onToolCall: (call: NativeToolCall) => Promise<string>,
+  onToolCall: (call: NativeToolCall) => Promise<PromptText>,
 ) => Promise<string>;
 
 /** The desktop session for one chat turn. `requestId` is the id the composer's
@@ -44,9 +47,16 @@ export function claudeSession(requestId: string): NativeSession {
     channel.onmessage = (raw) => {
       const call = parseToolCall(raw);
       if (!call) return;
+      // a tool that threw answers with its error line, typed like every other
+      // result: Rotli's own words, never a note's (fourth review)
       void onToolCall(call)
-        .catch((e: unknown) => `error: ${e instanceof Error ? e.message : String(e)}`)
-        .then((result) => invoke("claude_session_tool_result", { requestId, callId: call.callId, result }))
+        .catch(
+          (e: unknown): PromptText =>
+            prompt`error: ${externalText(e instanceof Error ? e.message : String(e))}`,
+        )
+        .then((result: PromptText) =>
+          invoke("claude_session_tool_result", { requestId, callId: call.callId, result }),
+        )
         .catch(() => undefined); // the turn already ended; nothing is waiting
     };
     return invoke<string>("claude_session_run", {

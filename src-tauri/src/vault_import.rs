@@ -163,6 +163,7 @@ pub(crate) fn verify(source: &Path, destination: &Path, plan: &CopyPlan) -> Vec<
             None => problems.push(format!("missing: {}", rel.display())),
             Some(got) if got != len => problems.push(format!("different size: {}", rel.display())),
             Some(_) if rel.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("md")) => {
+                // raw read (import): compares the person's chosen source folder with its copy
                 let same = match (fs::read(source.join(rel)), fs::read(destination.join(rel))) {
                     (Ok(a), Ok(b)) => crate::fsutil::revision(&a) == crate::fsutil::revision(&b),
                     _ => false,

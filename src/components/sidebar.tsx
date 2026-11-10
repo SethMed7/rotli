@@ -39,6 +39,7 @@ import { useUiStore } from "../state/ui";
 import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
+import { GoneNotesNotice } from "./sidebar/goneNotesNotice";
 import { MediaPlayer } from "./sidebar/mediaPlayer";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
@@ -46,6 +47,7 @@ import { SidebarHome } from "./sidebar/sidebarHome";
 import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
 import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
+import { SkippedFilesNotice } from "./sidebar/skippedFilesNotice";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
 import { useConnectVault } from "./sidebar/useConnectVault";
@@ -480,6 +482,8 @@ export function Sidebar() {
       {/* the player sits right above the footer (2026-09-28): a tab's media,
           and the ambient track when Ambient audio is on */}
       <MediaPlayer />
+      <SkippedFilesNotice />
+      <GoneNotesNotice />
       <SidebarFooter />
     </aside>
   );

@@ -9,7 +9,6 @@ import {
   LocaleType,
   RedoCommand,
   UndoCommand,
-  createUniver,
   merge,
   type IDocumentData,
   type ICustomRange,
@@ -42,6 +41,7 @@ import {
 import UniverPresetDocsCoreEnUS from "@univerjs/preset-docs-core/locales/en-US";
 import "@univerjs/preset-docs-core/lib/index.css";
 import "@univerjs/preset-docs-hyper-link/lib/index.css";
+import { createDocumentEngine, createDocumentModel } from "./bootstrap";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
 import { pauseRenderWhileHidden } from "../../lib/pauseWhileHidden";
 import { documentTableSource } from "./tableSource";
@@ -68,25 +68,6 @@ import type {
   DocumentTableCell,
   EditableDocument,
 } from "../model";
-
-interface FDocumentLike {
-  getSnapshot(): IDocumentData;
-}
-
-interface CommandLike {
-  id: string;
-  type?: number;
-  params?: {
-    rowCount?: number;
-    colCount?: number;
-  };
-}
-
-interface UniverApiLike {
-  createUniverDoc(data: Partial<IDocumentData>): FDocumentLike;
-  executeCommand?(id: string, params: object): Promise<boolean> | boolean;
-  onCommandExecuted?(callback: (command: CommandLike) => void): { dispose?: () => void } | void;
-}
 
 export interface DocumentEngineHandle {
   ready: Promise<void>;
@@ -408,7 +389,7 @@ export function mountDocumentEditor(
     ...snapshot.settings,
     zoomRatio: documentFitZoom(host.clientWidth, host.clientHeight),
   };
-  const { univer, univerAPI } = createUniver({
+  const univer = createDocumentEngine({
     locale: LocaleType.EN_US,
     locales: { [LocaleType.EN_US]: merge({}, UniverPresetDocsCoreEnUS, UniverPresetDocsHyperLinkEnUS) },
     theme: documentUniverTheme(),
@@ -426,8 +407,7 @@ export function mountDocumentEditor(
       UniverDocsHyperLinkPreset(),
     ],
   });
-  const api = univerAPI as unknown as UniverApiLike;
-  const editor = api.createUniverDoc(snapshot);
+  const editor = createDocumentModel(univer, snapshot);
   const injector = univer.__getInjector();
   const commandService = injector.get(ICommandService);
   const selectionManager = injector.get(DocSelectionManagerService);
@@ -626,7 +606,7 @@ export function mountDocumentEditor(
     const zoomRatio = documentFitZoom(host.clientWidth, host.clientHeight);
     if (!force && Math.abs(zoomRatio - lastZoom) < 0.01) return;
     lastZoom = zoomRatio;
-    void api.executeCommand?.(SetDocZoomRatioOperation.id, {
+    void commandService.executeCommand(SetDocZoomRatioOperation.id, {
       unitId: model.id,
       zoomRatio,
     });
@@ -700,7 +680,7 @@ export function mountDocumentEditor(
     ready,
     save: () => snapshotToDocument(editor.getSnapshot(), model),
     onDirty: (callback) =>
-      api.onCommandExecuted?.((command) => {
+      commandService.onCommandExecuted((command) => {
         if (isDocumentContentMutation(command)) callback();
       }),
     runCommand: (id) => void commandService.executeCommand(id),

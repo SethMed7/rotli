@@ -14,7 +14,7 @@ export async function gotoApp(page: Page): Promise<void> {
   // served under its sub-path (bun run dev:web), so a shell fix is proved on
   // both twins with one spec.
   await page.goto(process.env.ROTLI_E2E_APP_PATH ?? "/");
-  await page.getByRole("tablist").waitFor();
+  await page.locator(".tabstrip").first().waitFor();
 }
 
 /** Set Appearance → Theme button to All 14 through the real control, so a

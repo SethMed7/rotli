@@ -22,7 +22,6 @@ import {
   describeLibrarianAction,
   type LibrarianAction,
 } from "../lib/librarianActions";
-import { useFolders } from "../services/hooks";
 import { type applyLibrarian, LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import {
   type ChatTurn,
@@ -44,16 +43,15 @@ import {
   clip,
   type HostFor,
   librarianContext,
-  libraryAreas,
   noteTitle,
   onEscapeHere,
   refusalNow,
-  sendToLibrarian,
+  sendTyped,
+  startOver,
   takeToChat,
   tauriHostFor,
   useLibrarianModels,
   usePassage,
-  usePeopleNotes,
 } from "./librarianSession";
 
 /** Quick asks that keep the Librarian to its job. */
@@ -138,12 +136,13 @@ export function ChatPanel({
   const refusal = useRefusal(noteId, paneId, chat.turns.length);
   // undefined while the check runs: nothing is sendable until it is known
   const blocked = refusal !== null;
-  const folders = useFolders();
   const { groups, models } = useLibrarianModels();
-  const known = usePeopleNotes();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
-  const [draft, setDraft] = useState("");
+  // the composer's words live in the conversation, not in this component: a
+  // refused question survives the bar closing, and a restart starts with it
+  const draft = chat.draft ?? "";
+  const setDraft = (text: string) => updateLibrarianChat(chat.id, () => ({ draft: text }));
   const log = useRef<HTMLOListElement | null>(null);
   const box = useRef<HTMLTextAreaElement | null>(null);
   const thinking = chat.status === "thinking";
@@ -160,21 +159,25 @@ export function ChatPanel({
   useEscapeCloses(() => setMinimized(true));
 
   const send = (typed = draft) => {
-    const text = typed.trim();
-    if (!text || !model || thinking || blocked) return;
+    if (!typed.trim() || !model || thinking || blocked) return;
     if (typed === draft) setDraft("");
-    const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
-    void sendToLibrarian(
+    // as typed: a refusal keeps the words exactly (sendTyped trims the turn)
+    void sendTyped(
       chat.id,
-      { text, highlight: passage.anchor() },
+      typed,
+      passage.anchor(),
       model,
-      () => librarianContext(noteId, paneId, areas, known),
+      (model) => librarianContext(noteId, model),
       () => refusalNow(noteId, paneId),
       hostFor,
     );
   };
 
-  const pick = (id: string) => updateLibrarianChat(chat.id, () => ({ modelId: id }));
+  const pick = (id: string) =>
+    updateLibrarianChat(chat.id, () => ({
+      modelId: id,
+      ...(chat.restartWith ? { restartWith: null, error: null } : {}),
+    }));
   // the question a reply answered: what "Take this to Chat" carries over
   const askedBefore = (index: number) =>
     chat.turns
@@ -184,7 +187,7 @@ export function ChatPanel({
   const lastAsked = askedBefore(chat.turns.length);
   const toChat = (asked: ChatTurn | null, from?: string) => {
     const message = asked?.role === "user" ? { text: asked.text, highlight: asked.highlight } : null;
-    void takeToChat(noteId, message).then((opened) => {
+    void takeToChat(noteId, message, chat.onDeviceOnly === true).then((opened) => {
       if (opened && from) updateLibrarianTurn(chat.id, from, () => ({ handedOff: true }));
     });
   };
@@ -279,6 +282,15 @@ export function ChatPanel({
         <p className="libbar-note err libchat-error" role="alert">
           {chat.error}
         </p>
+      )}
+      {chat.restartWith && (
+        <button
+          type="button"
+          className="libbar-link libchat-restart"
+          onClick={() => startOver(chat, chat.restartWith ?? chat.modelId, draft)}
+        >
+          Start a new conversation
+        </button>
       )}
 
       <form
