@@ -124,3 +124,82 @@ describe("the web AI write", () => {
     expect((await svc.getNote(off.id))?.body).toBe("# Off\n\ny");
   });
 });
+
+// Second review of PR #267 (#2): Rotli Web's read gave its verdict on one
+// getNote answer and returned the body of another. Every web AI entry point
+// now decides and answers from one read. This fake answers getNote with the
+// public note and its secure version in turn, from either phase.
+describe("every web AI entry point decides and answers from one read", () => {
+  const CANARY = "PRIVATE-CANARY-7Q4";
+  async function alternating(startSecure: boolean) {
+    const svc = new InMemoryNotesService();
+    const note = await svc.createNote("Inbox", "# Harbor plan\n\nharbor opens at nine", {
+      createdBy: "chat",
+    });
+    const plain = (await svc.getNote(note.id))!;
+    const secret = {
+      ...plain,
+      secure: true,
+      title: `Harbor ${CANARY} plan`,
+      body: `# Harbor ${CANARY} plan\n\n${CANARY}`,
+    };
+    let secureNext = startSecure;
+    let lastAnswerSecure = false;
+    const writes: { body: string; onSecure: boolean }[] = [];
+    const fake = Object.assign(Object.create(svc) as InMemoryNotesService, {
+      getNote: async (id: string) => {
+        if (id !== note.id) return svc.getNote(id);
+        lastAnswerSecure = secureNext;
+        secureNext = !secureNext;
+        return lastAnswerSecure ? secret : plain;
+      },
+      updateNote: async (id: string, body: string, revision: string) => {
+        writes.push({ body, onSecure: lastAnswerSecure });
+        return svc.updateNote(id, body, revision);
+      },
+    });
+    return { corpus: createWebAiCorpus(() => fake), id: note.id, revision: plain.revision, writes };
+  }
+
+  test("the corpus has exactly the entry points this test covers", async () => {
+    const { corpus } = await alternating(false);
+    expect(Object.keys(corpus).sort()).toEqual([
+      "frontmatter",
+      "list",
+      "read",
+      "readableIds",
+      "search",
+      "write",
+    ]);
+  });
+
+  for (const startSecure of [false, true]) {
+    test(`no answer carries the secure version (first answer ${startSecure ? "secure" : "public"})`, async () => {
+      const calls: ((c: Awaited<ReturnType<typeof alternating>>) => Promise<unknown>)[] = [
+        ({ corpus, id }) => corpus.read(id),
+        ({ corpus }) => corpus.list(),
+        ({ corpus }) => corpus.search("harbor", 10),
+        ({ corpus, id }) => corpus.readableIds([id]),
+        ({ corpus, id }) => corpus.frontmatter(id),
+      ];
+      for (const call of calls) {
+        // a fresh fake per entry point, so each starts in the phase under test
+        const answer = await call(await alternating(startSecure)).catch(() => null);
+        expect(JSON.stringify(answer) ?? "").not.toContain(CANARY);
+      }
+    });
+
+    test(`a write never lands on the version it judged secure (first answer ${startSecure ? "secure" : "public"})`, async () => {
+      const { corpus, id, revision, writes } = await alternating(startSecure);
+      await corpus.write(id, "# Harbor plan\n\nharbor opens at ten", revision).catch(() => undefined);
+      // the one read that decided is the answer the write rode on; a write
+      // decided on a public read but landing after a secure answer is the bug
+      expect(writes.filter((w) => w.onSecure)).toEqual([]);
+    });
+  }
+});
+
+test("no web AI row is spread from a summary or a hit", async () => {
+  const source = await Bun.file(new URL("./webAiCorpus.ts", import.meta.url)).text();
+  expect(source).not.toMatch(/\.\.\.(hit|row|summary|n|h)\b/);
+});

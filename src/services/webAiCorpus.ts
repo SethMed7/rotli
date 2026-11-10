@@ -36,26 +36,39 @@ function meta(note: NoteSummary): CorpusNoteMeta {
   };
 }
 
-/** The web's answer to the Rust read gate, over one notes service. */
+/** The web's answer to the Rust read gate, over one notes service.
+ *
+ * Every entry point decides AND answers from ONE `getNote` read (review of PR
+ * #267, twice): a verdict on one answer and a body, row, or write from
+ * another let a note that turned secure in between reach a model. A row is
+ * built only from that judged note, never spread from a summary or a hit. */
 export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
   const secureNote = (note: Note): boolean =>
-    note.secure === true || secureByLocation(note) || looksSecret(note.body);
-  const secure = async (id: string): Promise<boolean> => {
-    const note = await notes().getNote(id);
-    if (!note) return true; // unknowable = withheld
-    if (note.kind && note.kind !== "note") return false;
-    return secureNote(note);
-  };
-  // One read decides AND supplies what a model sees of a note: a list or
-  // search row from the service's summaries could still hold an older,
-  // secure version's title and snippet (review 2026-11-09).
+    (!note.kind || note.kind === "note") &&
+    (note.secure === true || secureByLocation(note) || looksSecret(note.body));
+  /** The one read: the note when a model may see it, else null. */
   const judged = async (id: string): Promise<Note | null> => {
     const note = await notes().getNote(id);
     return note && !secureNote(note) ? note : null;
   };
-  const readableOnly = async <T extends { id: string }>(items: T[]): Promise<T[]> => {
-    const verdicts = await Promise.all(items.map((item) => secure(item.id)));
-    return items.filter((_, index) => !verdicts[index]);
+  /** The one read for an entry point that must say why it refuses. */
+  const readable = async (id: string): Promise<Note> => {
+    const note = await notes().getNote(id);
+    if (!note) throw new Error("unknown note");
+    if (secureNote(note)) throw new Error("This note is secure and never leaves this computer.");
+    return note;
+  };
+  const hitOf = (note: Note, query: string): SearchHit | null => {
+    const match = searchMatch(query, note.title, note.body, note.snippet);
+    if (!match) return null;
+    return {
+      id: note.id,
+      title: note.title,
+      folderId: note.folderId,
+      kind: "note",
+      updatedAt: note.updatedAt,
+      ...match,
+    };
   };
   return {
     async list(): Promise<CorpusNoteMeta[]> {
@@ -66,27 +79,26 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
     async search(query: string, limit: number | undefined): Promise<SearchHit[]> {
       const hits = (await notes().searchNotes(query, limit)).filter((h) => h.kind === "note");
       const read = await Promise.all(hits.map((h) => judged(h.id)));
-      return hits.flatMap((hit, index) => {
-        const note = read[index];
-        const match = note && searchMatch(query, note.title, note.body, note.snippet);
-        return note && match ? [{ ...hit, title: note.title, folderId: note.folderId, ...match }] : [];
+      return read.flatMap((note) => {
+        const hit = note && hitOf(note, query);
+        return hit ? [hit] : [];
       });
     },
     async read(id: string): Promise<{ body: string; revision: string }> {
-      if (await secure(id)) throw new Error("This note is secure and never leaves this computer.");
-      const note = await notes().getNote(id);
-      if (!note) throw new Error("unknown note");
+      const note = await readable(id);
       return { body: note.body, revision: note.revision };
     },
     async readableIds(ids: string[]): Promise<string[]> {
-      return (await readableOnly(ids.map((id) => ({ id })))).map((item) => item.id);
+      const read = await Promise.all(ids.map((id) => judged(id)));
+      return ids.filter((_, index) => read[index] !== null);
     },
     async write(id: string, body: string, expectedRevision: string): Promise<CorpusWriteResult> {
       // the web twin of corpus_write_ai: read gate, then who may rewrite the
-      // text (locked, the grant, provenance), then no secret into an open note
-      if (await secure(id)) throw new Error("This note is secure and never leaves this computer.");
-      const note = await notes().getNote(id);
-      if (!note) throw new Error("unknown note");
+      // text (locked, the grant, provenance), then no secret into an open note;
+      // all on the one read whose revision the write must still match
+      const note = await readable(id);
+      if (note.revision !== expectedRevision)
+        throw new Error("The note changed since it was read. Read it again before editing.");
       const refusal = bodyEditRefusal(
         note.locked === true ? "locked" : (note.aiBodyEdit ?? "person-written"),
       );
@@ -99,13 +111,12 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
     async frontmatter(id: string): Promise<FrontmatterView | null> {
       const note = await notes().getNote(id);
       if (!note) return null;
-      const isSecure = await secure(id);
       return {
         id: note.id,
         created: new Date(note.createdAt).toISOString(),
         updated: new Date(note.updatedAt).toISOString(),
         locked: note.locked === true,
-        secure: isSecure,
+        secure: secureNote(note),
         localAiAllowed: false,
         pinned: note.pinned,
         // an adapter that doesn't read provenance answers fail-closed
