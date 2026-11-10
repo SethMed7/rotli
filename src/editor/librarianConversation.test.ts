@@ -209,6 +209,7 @@ describe("a conversation that held on-device-only text", () => {
       log: async () => {},
       apply: async () => (written.push("update"), 1),
       refresh: async () => {},
+      existingPerson: async () => null,
     };
     const reply = useLibrarianBar.getState().chat!.turns[1]!;
     const vault: VaultAction[] = [

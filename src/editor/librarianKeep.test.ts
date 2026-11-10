@@ -25,6 +25,7 @@ const deps: KeepDeps = {
     return actions.length;
   },
   refresh: async () => {},
+  existingPerson: async () => null,
 };
 
 const turn = () => useLibrarianBar.getState().chat!.turns[0]!;

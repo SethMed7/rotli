@@ -49,7 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays on-device.** An on-device Librarian could read a secure person's
   name and say it; switched to a remote model, the next message carried that
   reply to it. Secure People are now left out of what the Librarian sees,
-  on-device or remote. Once anything else the read check passed only for an
+  on-device or remote. If a reply would then make a note for someone who
+  already has a protected one, Rotli looks the name up on your Mac first,
+  makes and changes nothing, and says "That person’s note is protected, so
+  the Librarian can’t change it". Leaving People out doesn't hide names: a
+  secure person's name can still reach the model through the note you ask
+  about (its words, tags and links) and through your own rules and groups.
+  Once anything else the read check passed only for an
   on-device model goes into a Librarian conversation (the note it was asked
   about), sending it to a remote model is refused, with nothing sent: "This
   conversation includes notes only an on-device model can read. Start a new

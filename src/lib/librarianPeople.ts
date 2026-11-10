@@ -65,7 +65,8 @@ export function peopleNotes(notes: Iterable<PersonSource>): PersonNote[] {
     .map(({ id, title, area }) => ({ id, title, area }));
 }
 
-const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** Two names for the same thing (a person, a group, a rule), ignoring case and edge spaces. */
+export const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** One plain name: no path, no line break, not too long. */
 function personName(value: unknown): string | null {

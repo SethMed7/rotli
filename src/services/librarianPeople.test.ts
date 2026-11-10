@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { VaultAction } from "../lib/librarianPeople";
 import { DEFAULT_LIBRARIAN_RULES, type LibrarianRules } from "../lib/librarianRules";
-import { answerUpdate, type KeepDeps, keepVault } from "./librarianPeople";
+import { answerUpdate, type KeepDeps, keepVault, PROTECTED_PERSON } from "./librarianPeople";
 
 function fakeKeep(over: Partial<KeepDeps> = {}) {
   const steps: string[] = [];
@@ -32,6 +32,7 @@ function fakeKeep(over: Partial<KeepDeps> = {}) {
     refresh: async () => {
       steps.push("refresh");
     },
+    existingPerson: async () => null,
     ...over,
   };
   return { deps, steps, rules: () => rules };
@@ -92,5 +93,39 @@ describe("keeping what the person said", () => {
     const update = vault[3] as Extract<VaultAction, { type: "update" }>;
     expect(await answerUpdate(update, "m", keep.deps)).toBe(1);
     expect(keep.steps).toEqual(['apply 01SAM [{"type":"file","area":"People/Work","create":true}]']);
+  });
+});
+
+// Seventh review of pull request 267 (finding 6): secure People are left out
+// of the Librarian's listing, so a reply asking to tag or file one comes back
+// as someone new. Rotli looks the name up locally before making a note.
+describe("a reply that names someone who already has a note", () => {
+  const ana: VaultAction[] = [
+    { type: "person", name: "Ana", area: "People/Work", about: "Works at Northwind.", tags: ["northwind"] },
+  ];
+
+  test("a protected person: nothing is made or changed, and the person is told why", async () => {
+    const keep = fakeKeep({ existingPerson: async (name) => (name === "Ana" ? "protected" : null) });
+    const lines = await keepVault(ana, "claude-opus", keep.deps);
+    expect(lines.map((line) => line.text)).toEqual([PROTECTED_PERSON]);
+    expect(keep.steps.filter((step) => step.startsWith("create") || step.startsWith("apply"))).toEqual([]);
+  });
+
+  test("a look-up that fails counts as protected: nothing is made", async () => {
+    const keep = fakeKeep({
+      existingPerson: async () => {
+        throw new Error("the vault couldn't be listed");
+      },
+    });
+    const lines = await keepVault(ana, "claude-opus", keep.deps);
+    expect(lines.map((line) => line.text)).toEqual([PROTECTED_PERSON]);
+    expect(keep.steps.some((step) => step.startsWith("create"))).toBe(false);
+  });
+
+  test("an unprotected person who already has a note isn't made twice", async () => {
+    const keep = fakeKeep({ existingPerson: async () => "plain" });
+    const lines = await keepVault(ana, "claude-opus", keep.deps);
+    expect(lines.map((line) => line.text)).toEqual(["Ana already has a note, so no new one was made"]);
+    expect(keep.steps.some((step) => step.startsWith("create"))).toBe(false);
   });
 });
