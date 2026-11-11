@@ -123,11 +123,8 @@ function universeFolderIds(): (string | undefined)[] {
   ];
 }
 
-function useNoteUniverse(enabled = true): {
-  lists: (NoteSummary[] | undefined)[];
-  complete: boolean;
-  error: unknown;
-} {
+type NoteUniverse = { lists: (NoteSummary[] | undefined)[]; complete: boolean; error: unknown };
+function useNoteUniverse(enabled = true): NoteUniverse {
   // Whether the active root's chats/ means transcripts. Consulted only for the
   // All-Notes view's chats/ exclusion.
   const memexQ = useQuery({
@@ -159,8 +156,7 @@ function useNoteUniverse(enabled = true): {
     );
   }, [raw, memex]);
   const complete = corpus.isSuccess && memexQ.isSuccess;
-  // a listing that failed never completes: callers that wait on `complete`
-  // need the reason, or they wait forever
+  // a failed listing never completes; `error` says why, so no caller waits forever
   return { lists, complete, error: corpus.error ?? memexQ.error ?? null };
 }
 
@@ -225,8 +221,7 @@ export function useMainGcIds(): Set<string> | undefined {
 export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {}): {
   notes: NoteSummary[];
   ready: boolean;
-  /** Why the listing failed (it then never becomes ready), or null. */
-  error: unknown;
+  error: unknown; // why the listing failed (it then never becomes ready), or null
 } {
   const { lists, complete, error } = useNoteUniverse(enabled);
   // which roots' chats/ means transcripts — session-static, like the roots list.
