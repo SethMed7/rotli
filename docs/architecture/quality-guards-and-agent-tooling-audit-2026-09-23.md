@@ -69,7 +69,7 @@ Full `bun run verify` (Playwright + cargo test) was not run for this audit.
 | G1 | Turn on the rules already at zero: `typescript/restrict-template-expressions`, `no-base-to-string`, `require-array-sort-compare`, `restrict-plus-operands`, `no-redundant-type-constituents` | 0 | one PR, S |
 | G1b | `import/no-self-import` (0) — needs the `import` plugin, and because `plugins` replaces defaults and `correctness` is an error, enabling it turns on every import-plugin correctness rule; count that category first | 0 + unmeasured | S |
 | G2 | `react/iframe-missing-sandbox`, `preserve-caught-error`, `no-unmodified-loop-condition` | 3 / 2 / 1 | S |
-| G3 | `check:ipc` reverse direction: every registered handler has a caller, with a grandfather list; then delete or wire the seven | 7 | S–M |
+| G3 | `check:ipc` reverse direction: every registered handler has a caller, with a grandfather list; then delete or wire the seven. **Done 2026-11-11** for the guard and `memex_read`. The remaining seven are on `UNCALLED_BASELINE`: `generate_image` was found as well, and it is uncalled because `src/ai/host.ts` answers "unavailable". | 7 | S–M |
 | G4 | CHANGELOG guard in `scripts/ci-scope.ts`: a `src/` or `src-tauri/` diff must touch `[Unreleased]` (opt-out label for internal-only changes) | — | S |
 | G5 | Auto-tighten ratchets: a green run rewrites ceilings to current values (or fail when slack > N lines) | 1,021 lines slack | S |
 | G6 | Linux CI lane: `cargo check` → `cargo clippy -D warnings` | unknown | S (+ fixes) |

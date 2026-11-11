@@ -380,7 +380,7 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// Resolve a webview-supplied `root` against the REGISTERED roots — the corpus +
 /// connected brains + added folders in corpus.json. Every root-taking memex_*
 /// command runs this FIRST, so the frontend can never point them at an arbitrary
-/// path (`memex_read(root: "/", …)` used to read any file on disk; a crafted
+/// path (a since-removed `memex_read(root: "/", …)` read any file on disk; a crafted
 /// write root could plant chats/ inside a curated tree).
 /// pub(crate): provider.rs validates the image-assets root through the same gate.
 pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
@@ -490,15 +490,6 @@ pub fn memex_read_contract(app: tauri::AppHandle, root: String) -> Result<Contra
         users_json: rd("users.json"),
         identities_json: rd("identities.local.json"),
     })
-}
-
-/// Read any spine file (rotli reads everything; writes are the gated part).
-/// The ROOT must be registered (#20) — the rel-only jail wasn't enough when the
-/// root itself came from the webview.
-#[tauri::command]
-pub fn memex_read(app: tauri::AppHandle, root: String, rel: String) -> Result<String, String> {
-    let root = registered_root(&app, &root)?;
-    read_at(&root, &rel)
 }
 
 #[derive(Serialize)]

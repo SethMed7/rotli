@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A dialog's unavailable button looks unavailable.** Create board, Rename,
   and the other name dialogs fade their button and drop the pointer while
   there's nothing to submit or a save is running.
+### Security
+
+- **Removed `memex_read`**, an app command nothing in Rotli called. It could
+  read any file in a registered vault, secure notes included. `check:ipc`
+  now fails when a registered command has no caller, so unused surface
+  doesn't build up again.
 
 ## [1.10.0] - 2026-11-10
 
