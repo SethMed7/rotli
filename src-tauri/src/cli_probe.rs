@@ -23,10 +23,11 @@ const STDOUT_LIMIT: u64 = 1 << 20;
 const EXITED_READ_GRACE: Duration = Duration::from_millis(250);
 
 /// Run `bin args`, capturing stdout. None when it can't start, or is still
-/// running at `deadline`; on Unix it is then killed with everything it started,
+/// running at `deadline`. On Unix it is then killed with everything it started,
 /// so a wrapper script can't leave the real CLI behind (Settings re-checks about
-/// once a minute; on Windows only the direct child is killed). Stdout is drained on a thread, so a chatty CLI can't block
-/// on a full pipe. A process the CLI left holding stdout costs only the output.
+/// once a minute); on Windows only the direct child is killed. Stdout is drained
+/// on a thread, so a chatty CLI can't block on a full pipe, and a process the
+/// CLI left holding stdout costs only the output.
 pub(crate) fn probe(bin: &Path, args: &[&str], deadline: Duration) -> Option<Output> {
     let mut command = Command::new(bin);
     command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
