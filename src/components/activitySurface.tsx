@@ -39,8 +39,8 @@ import { deriveSecureReview } from "../services/secureReview";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { ChevronRight, GearGlyph } from "./glyphs";
-import { LibrarianIntro } from "./librarianIntro";
 import { ActivitySettingsNotice } from "./librarianSettingsNotice";
+import { LibrarianIntro } from "./onboarding/librarianIntro";
 
 /** The status strip's plain words for the trust rung + organizing model. */
 const TRUST_WORDS: Record<string, string> = {

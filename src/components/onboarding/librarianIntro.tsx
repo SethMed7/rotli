@@ -3,8 +3,8 @@
 
 import { useEffect, useRef } from "react";
 
-import { containDialogFocus } from "../lib/dialogFocus";
-import { useTransientPopover } from "../lib/popover";
+import { containDialogFocus } from "../../lib/dialogFocus";
+import { useTransientPopover } from "../../lib/popover";
 
 /** The first-visit explainer — everything the Librarian may and may NOT do,
  * in one card. Re-openable any time from the header's help button. */
