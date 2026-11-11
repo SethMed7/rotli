@@ -6,6 +6,8 @@
 
 import type { Text } from "@codemirror/state";
 
+import { memoPerDoc } from "./docMemo";
+
 export type LangKey =
   | "math"
   | "mermaid"
@@ -58,16 +60,7 @@ const FENCE_CLOSE = /^```\s*$/;
  * used to scan the same doc several times (livePreview, blockRender, the
  * keymap, scanTables, auto-pair — system audit 2026-09-01 §1). The answer is
  * shared, so it is readonly. */
-const fenceScans = new WeakMap<Text, readonly FenceBlock[]>();
-
-export function scanFences(doc: Text): readonly FenceBlock[] {
-  let blocks = fenceScans.get(doc);
-  if (!blocks) {
-    blocks = walkFences(doc);
-    fenceScans.set(doc, blocks);
-  }
-  return blocks;
-}
+export const scanFences = memoPerDoc(walkFences);
 
 function walkFences(doc: Text): FenceBlock[] {
   const blocks: FenceBlock[] = [];

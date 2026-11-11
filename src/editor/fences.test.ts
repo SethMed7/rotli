@@ -144,24 +144,9 @@ test("document and workbook embeds are withheld only where the build lacks them"
   }
 });
 
-describe("one scan per document", () => {
-  const source = ["# Plan", "", "```js", "const a = 1;", "```", "", "| a | b |", "|---|---|", "| 1 | 2 |"];
-
-  test("asking again about the same document reuses the answer", () => {
-    // a keystroke used to scan the same doc in livePreview, blockRender, the
-    // keymap, auto-pair, and scanTables, each from scratch
-    const doc = Text.of(source);
-    expect(scanFences(doc)).toBe(scanFences(doc));
-    expect(scanTables(doc)).toBe(scanTables(doc));
-  });
-
-  test("an edit is a new document, scanned fresh", () => {
-    const doc = Text.of(source);
-    const before = scanFences(doc);
-    const edited = doc.replace(0, 0, Text.of(["```", "x", "```", ""]));
-    const after = scanFences(edited);
-    expect(after).not.toBe(before);
-    expect(after.map((fence) => fence.from)).toEqual([0, ...before.map((fence) => fence.from + 10)]);
-    expect(scanTables(edited)[0]?.from).toBe((scanTables(doc)[0]?.from ?? 0) + 10);
-  });
+test("one keystroke's consumers share one fence scan and one table scan", () => {
+  // memoPerDoc (docMemo.test.ts) is what makes these the same answer
+  const note = doc("```js", "x", "```", "", "| a |", "|---|", "| 1 |");
+  expect(scanFences(note)).toBe(scanFences(note));
+  expect(scanTables(note)).toBe(scanTables(note));
 });
