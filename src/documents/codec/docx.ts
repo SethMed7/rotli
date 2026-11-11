@@ -14,6 +14,7 @@ import type {
   EditableDocument,
 } from "../model";
 import type { DecodedDocument, DocumentEditorCodec } from "../ports";
+import { canonicalJson } from "./canonicalJson";
 import {
   HYPERLINK,
   HYPERLINK_RUN_STYLE,
@@ -329,18 +330,6 @@ function paragraphXml(
   const open = /^<w:p\b[^>]*>/i.exec(originalXml ?? "")?.[0] ?? "<w:p>";
   const kept = preservedParagraphObjects(originalXml);
   return `${open}${props ? `<w:pPr>${props}</w:pPr>` : ""}${kept.before}${linkedRunsXml(runs, parts.links, (run, index) => runXml(run, originalRuns[index]))}${kept.after}</w:p>`;
-}
-
-/** JSON with object keys sorted. The decoder and the editor build the same
- * run style with keys in different orders, and that must not read as an edit:
- * a false "changed" sends an untouched paragraph down the rewrite path, which
- * refuses unsupported inline content and blocks the whole save. */
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, (_key, inner: unknown) =>
-    inner && typeof inner === "object" && !Array.isArray(inner)
-      ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-      : inner,
-  );
 }
 
 function sameParagraph(left: DocumentParagraph, right: DocumentParagraph): boolean {
