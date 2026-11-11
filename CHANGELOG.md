@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   math, chart, or other rendered block failed to load (offline, or after a
   Rotli Web update), the block stayed blank as if still loading. It now shows
   the reason and asks you to reload.
+- **Settings → Connections can't get stuck on "checking…".** Rotli asks each
+  installed AI app for its version and whether you're signed in. An app that
+  waited for input or hung kept that check running forever. It now gets fifteen
+  seconds, then counts as not signed in.
+- **Breve's watchlist can't overwrite an edit made at the same moment**
+  (development builds). Breve now waits for any other save to that note
+  before it merges its changes in, and its writes survive a crash.
 
 ## [1.10.0] - 2026-11-10
 

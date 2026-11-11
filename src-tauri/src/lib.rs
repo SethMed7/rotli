@@ -54,6 +54,7 @@ mod private_browser_media;
 mod quick_window;
 mod vault_marker;
 mod vault_roles;
+mod cli_probe;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
