@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A Word document no longer refuses to save over a paragraph you didn't
   touch.** Rotli could read a styled paragraph with content it can't rewrite
   as edited, and block the whole save.
-- **Long text files show to the end.** On the Mac a `.log` or `.txt` file was
+- **Long text files aren't silently cut.** On the Mac a `.log` or `.txt` file was
   silently cut at 200 KB. It now shows up to 2 MB, and says when that's only
   the start of the file.
 
