@@ -197,8 +197,18 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       .catch(() => {});
 
     if (kind === "text") {
-      corpusFileText(fileId)
-        .then((t) => !cancelled && setText(t))
+      // the whole file or an honest refusal: with no cap the read stopped at
+      // 200 KB and showed a long log as if that were all of it
+      corpusFileStat(fileId)
+        .catch(() => null)
+        .then((s) => {
+          if (cancelled) return;
+          if (s && s.len > READ_MAX_BYTES) {
+            setTooLarge(true);
+            return;
+          }
+          return corpusFileText(fileId, READ_MAX_BYTES).then((t) => !cancelled && setText(t));
+        })
         .catch(fail);
     } else if (kind === "html") {
       // both modes render the SAME full text (Preview = srcdoc, Code = <pre>),
@@ -400,7 +410,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     (kind === "audio" || kind === "video" || kind === "image" || kind === "pdf" || kind === "other") &&
     !url &&
     !err;
-  const loadingText = kind === "text" && text === null && !err;
+  const loadingText = kind === "text" && text === null && !err && !tooLarge;
   // Preview needs the text (srcdoc) AND the asset URL (its <base>); Code just the text
   const loadingHtml =
     kind === "html" && !err && !tooLarge && (text === null || (htmlMode === "preview" && !url));
@@ -646,7 +656,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {!err && kind === "html" && tooLarge && (
+        {!err && (kind === "html" || kind === "text") && tooLarge && (
           <p className="file-loading">This file is too large to view in Rotli.</p>
         )}
 
