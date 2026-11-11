@@ -14,6 +14,7 @@ import type {
   EditableDocument,
 } from "../model";
 import type { DecodedDocument, DocumentEditorCodec } from "../ports";
+import { canonicalJson } from "./canonicalJson";
 import {
   HYPERLINK,
   HYPERLINK_RUN_STYLE,
@@ -332,7 +333,7 @@ function paragraphXml(
 }
 
 function sameParagraph(left: DocumentParagraph, right: DocumentParagraph): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return canonicalJson(left) === canonicalJson(right);
 }
 
 function cellProperties(cell: DocumentTableCell, originalXml?: string): string {

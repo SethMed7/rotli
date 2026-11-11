@@ -7,6 +7,7 @@
 import type { Text } from "@codemirror/state";
 
 import { clamp } from "../lib/clamp";
+import { memoPerDoc } from "./docMemo";
 import { lineInFence, scanFences } from "./fences";
 
 export type Align = "left" | "right" | "center" | "";
@@ -74,8 +75,12 @@ export function splitRow(s: string): string[] {
 /** All GFM tables in the doc, in order. Fenced code is OPAQUE: a pipe-table
  * example inside ANY ``` fence is the user's code, never a live widget whose
  * chips would rewrite it (#13, audit 2026-07) — so a header line inside a
- * fence can't start a table. */
-export function scanTables(doc: Text): TableBlock[] {
+ * fence can't start a table. Memoized per document, like scanFences:
+ * livePreview, tableRender, textAlign, and the keymap all ask on the same
+ * keystroke. */
+export const scanTables = memoPerDoc(walkTables);
+
+function walkTables(doc: Text): TableBlock[] {
   const out: TableBlock[] = [];
   const fences = scanFences(doc);
   const total = doc.lines;
@@ -117,7 +122,7 @@ export function scanTables(doc: Text): TableBlock[] {
 }
 
 /** True when a line (by its `from` offset) sits inside any detected table. */
-export function lineInTable(lineFrom: number, tables: TableBlock[]): boolean {
+export function lineInTable(lineFrom: number, tables: readonly TableBlock[]): boolean {
   return tables.some((t) => lineFrom >= t.from && lineFrom <= t.to);
 }
 

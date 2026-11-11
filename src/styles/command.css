@@ -3230,7 +3230,7 @@
   color: var(--text);
   cursor: pointer;
 }
-.rename-btn:hover {
+.rename-btn:hover:not(:disabled) {
   background: var(--hov);
 }
 .rename-btn.primary {
@@ -3238,8 +3238,14 @@
   color: var(--on-accent);
   border-color: transparent;
 }
-.rename-btn.primary:hover {
+.rename-btn.primary:hover:not(:disabled) {
   background: var(--accent-text);
+}
+/* a dialog that is saving, or has nothing to submit yet, says so (the
+   .ghostbtn treatment): no hover, no pointer, visibly unavailable */
+.rename-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 /* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
    read and edit a prompt; the prompt box scrolls, never the card */

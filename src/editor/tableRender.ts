@@ -699,7 +699,7 @@ class TableWidget extends WidgetType {
 
 const rawLine = Decoration.line({ class: "rotli-table-rawline" });
 
-function build(state: EditorState, tables: TableBlock[], raw: readonly number[]): DecorationSet {
+function build(state: EditorState, tables: readonly TableBlock[], raw: readonly number[]): DecorationSet {
   const decos: Range<Decoration>[] = [];
   const sel = revealRange(state);
   // width identity: header signature + occurrence among same-header tables,
@@ -741,7 +741,7 @@ function build(state: EditorState, tables: TableBlock[], raw: readonly number[])
 
 interface TableFieldValue {
   deco: DecorationSet;
-  tables: TableBlock[];
+  tables: readonly TableBlock[];
   /** Table start offsets the `</>` hatch turned whole-raw — pruned as soon as
    * the caret leaves the table, so render always comes back on its own. */
   raw: number[];

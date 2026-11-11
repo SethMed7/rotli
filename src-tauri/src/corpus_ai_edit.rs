@@ -51,6 +51,7 @@ impl CorpusStore {
             let mut fm = fm.unwrap_or_default();
             fm.foreign.retain(|l| ai_edit_field(l).is_none());
             fm.foreign.push(format!("ai_edit: {allowed}"));
+            self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }

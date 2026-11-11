@@ -65,7 +65,7 @@ pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
     if !endpoint_is_local(endpoint) {
         return false;
     }
-    crate::chat_registry::models()
+    crate::chat_registry::models_for_identity()
         .iter()
         .any(|model| {
             model.id == model_id
@@ -77,7 +77,7 @@ pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
 /// Whether an id belongs to a registered on-device chat model. Breve uses this
 /// to normalize legacy remote model policy without trusting a webview label.
 pub(crate) fn is_registered_local_model_id(model_id: &str) -> bool {
-    crate::chat_registry::models()
+    crate::chat_registry::models_for_identity()
         .iter()
         .any(|model| {
             model.id == model_id

@@ -522,6 +522,25 @@ describe("DOCX editor codec", () => {
     ]);
   });
 
+  test("an untouched paragraph whose style keys come back in another order still saves", async () => {
+    // the decoder writes bold before font, the editor font before bold; on a
+    // paragraph holding content Rotli can't rewrite, a false "changed" blocked the save
+    const zip = await JSZip.loadAsync(await linkedDocx("javascript:alert(1)"), { base64: true });
+    const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+    zip.file(
+      "word/document.xml",
+      xml.replace(
+        '<w:r><w:t xml:space="preserve">Read </w:t></w:r>',
+        '<w:r><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">Read </w:t></w:r>',
+      ),
+    );
+    const decoded = await decodeDocx(await zip.generateAsync({ type: "base64" }), "storage/rotli/links.docx");
+    const run = linkedParagraph(decoded.document).runs[0]!;
+    expect(run.style).toEqual({ bold: true, fontFamily: "Arial" });
+    run.style = { fontFamily: "Arial", bold: true };
+    await expect(encodeDocx(decoded.source, decoded.document)).resolves.toBeDefined();
+  });
+
   test("a link to anything but the web or mail is no link, and its paragraph stays unedited", async () => {
     const decoded = await decodeDocx(await linkedDocx("javascript:alert(1)"), "storage/rotli/links.docx");
     const first = linkedParagraph(decoded.document);
