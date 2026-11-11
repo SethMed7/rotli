@@ -7,21 +7,26 @@ import { useSyncExternalStore } from "react";
 
 import type { AccentColor, SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
 
-export type DataTheme =
-  | "light"
-  | "dark"
-  | "paper"
-  | "charcoal"
-  | "ocean-light"
-  | "ocean-dark"
-  | "grove-light"
-  | "grove-dark"
-  | "iris-light"
-  | "iris-dark"
-  | "blossom-light"
-  | "blossom-dark"
-  | "midnight-light"
-  | "midnight-dark";
+/** Every `data-theme` value, in one list (public/theme-boot.js's pattern is
+ * pinned to exactly these by theme.test.ts). */
+export const DATA_THEMES = [
+  "light",
+  "dark",
+  "paper",
+  "charcoal",
+  "ocean-light",
+  "ocean-dark",
+  "grove-light",
+  "grove-dark",
+  "iris-light",
+  "iris-dark",
+  "blossom-light",
+  "blossom-dark",
+  "midnight-light",
+  "midnight-dark",
+] as const;
+
+export type DataTheme = (typeof DATA_THEMES)[number];
 
 export const DARK_DATA_THEMES: readonly DataTheme[] = [
   "dark",
@@ -99,8 +104,32 @@ export function resolveThemeSetting(
   return resolveTheme(family, mode);
 }
 
+/** Where the last applied theme waits for the next launch. public/theme-boot.js
+ * reads the same key before the first paint, so a dark-theme window never
+ * shows index.html's light ground while settings hydrate. */
+export const LAST_THEME_KEY = "rotli:last-data-theme";
+
+let rememberThemes = false;
+
+/** Turn the launch cache on where settings are durable (the Mac app, Rotli
+ * Web). The in-memory browser twin restarts at its default on every load, so
+ * a remembered theme there would paint one theme and then switch. */
+export function rememberAppliedTheme(on: boolean): void {
+  rememberThemes = on;
+  if (on) writeLastTheme(readDataTheme());
+}
+
+function writeLastTheme(value: string): void {
+  try {
+    window.localStorage.setItem(LAST_THEME_KEY, value);
+  } catch {
+    // storage refused (private mode, quota): the next launch paints light first
+  }
+}
+
 function setDataTheme(value: DataTheme): void {
   document.documentElement.dataset.theme = value;
+  if (rememberThemes) writeLastTheme(value);
 }
 
 export function applySyntaxPalette(value: SyntaxPalette): void {

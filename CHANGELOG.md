@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Dark themes no longer open on a light flash.** Rotli used to paint its
+  light ground while it read your settings, then switch. Each window now
+  starts in the theme it last showed, on the Mac and on Rotli Web.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added

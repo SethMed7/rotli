@@ -272,9 +272,13 @@ consistently across placements, and Mermaid/JSXGraph re-theme through a
   their time-of-day pose to the idle preference; onboarding skip reset only
   part of the quokka; the accessory hue slider showed under Line; the flatness
   e2e covered four of twelve environments.
-- Open, ranked: (1) a light-ground flash on launch for dark-theme users
-  (`index.html` pins `data-theme="light"` and the main window is visible before
-  hydration); (2) native chrome never follows the app theme (no
+- **FIXED (2026-11-11)**: the light-ground flash on launch for dark-theme
+  users (`index.html` pins `data-theme="light"` and the main window is visible
+  before hydration). `public/theme-boot.js` applies the theme the last launch
+  remembered (`LAST_THEME_KEY`, written only where settings are durable)
+  before the first paint; e2e `theme-launch.spec.ts`. The native webview's own
+  ground before the HTML loads is still the system default.
+- Open, ranked: (2) native chrome never follows the app theme (no
   `setTheme`/`NSAppearance`, so traffic-light glyphs track the OS, not the
   theme); (3) Excalidraw's board theme reads `matchMedia` once and misses an OS
   flip in System mode (copy the `blockRender` observer); (4) Dock icons exist
