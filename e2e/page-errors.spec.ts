@@ -6,8 +6,9 @@ import { test } from "@playwright/test";
 import { gotoApp } from "./support";
 
 test("an uncaught error in the page fails the test that opened it", async ({ page }) => {
-  test.fail();
   await gotoApp(page);
+  // only from here on: a failure to boot must not count as the guard working
+  test.fail();
   await page.evaluate(() =>
     setTimeout(() => {
       throw new Error("deliberate uncaught error");
