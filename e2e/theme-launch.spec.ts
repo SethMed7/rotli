@@ -54,3 +54,24 @@ test("with nothing remembered, or something that isn't a theme, launch stays on 
   // the in-memory twin isn't durable, so it never writes the key itself
   expect(await page.evaluate(() => window.localStorage.getItem("rotli.lastDataTheme"))).toBe("not-a-theme");
 });
+
+test("with the System setting, the OS appearance at launch picks the theme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.addInitScript(() => {
+    // last launch ran in dark mode; the Mac has since switched to light
+    window.localStorage.setItem("rotli.lastDataTheme", "ocean-dark");
+    window.localStorage.setItem("rotli.lastSystemThemes", "ocean-light ocean-dark");
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        (window as unknown as { firstTheme: string }).firstTheme =
+          document.documentElement.dataset.theme ?? "";
+      },
+      { once: true },
+    );
+  });
+  await gotoApp(page);
+  expect(await page.evaluate(() => (window as unknown as { firstTheme: string }).firstTheme)).toBe(
+    "ocean-light",
+  );
+});

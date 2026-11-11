@@ -108,20 +108,27 @@ export function resolveThemeSetting(
  * reads the same key before the first paint, so a dark-theme window never
  * shows index.html's light ground while settings hydrate. */
 export const LAST_THEME_KEY = "rotli.lastDataTheme";
+/** With the System setting, the family's light and dark themes ("ocean-light
+ * ocean-dark"): the boot script picks by the OS appearance at launch, which
+ * may have changed since the theme above was applied. Absent otherwise. */
+export const LAST_SYSTEM_PAIR_KEY = "rotli.lastSystemThemes";
 
 let rememberThemes = false;
 
 /** Turn the launch cache on where settings are durable (the Mac app, Rotli
  * Web). The in-memory browser twin restarts at its default on every load, so
- * a remembered theme there would paint one theme and then switch. */
+ * a remembered theme there would paint one theme and then switch. Turned on
+ * after hydration and before the first render, so the app's first applyTheme
+ * is the first write. */
 export function rememberAppliedTheme(on: boolean): void {
   rememberThemes = on;
-  if (on) writeLastTheme(readDataTheme());
 }
 
-function writeLastTheme(value: string): void {
+function remember(key: string, value: string | null): void {
+  if (!rememberThemes) return;
   try {
-    window.localStorage.setItem(LAST_THEME_KEY, value);
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
   } catch {
     // storage refused (private mode, quota): the next launch paints light first
   }
@@ -129,7 +136,7 @@ function writeLastTheme(value: string): void {
 
 function setDataTheme(value: DataTheme): void {
   document.documentElement.dataset.theme = value;
-  if (rememberThemes) writeLastTheme(value);
+  remember(LAST_THEME_KEY, value);
 }
 
 export function applySyntaxPalette(value: SyntaxPalette): void {
@@ -155,6 +162,10 @@ function detachSystemListener(): void {
  * last "system" listener must not survive a root unmount. */
 export function applyTheme(setting: ThemeSetting, family: ThemeFamily): () => void {
   detachSystemListener();
+  remember(
+    LAST_SYSTEM_PAIR_KEY,
+    setting === "system" ? `${resolveTheme(family, "light")} ${resolveTheme(family, "dark")}` : null,
+  );
   if (setting === "system") {
     const forOs = (dark: boolean) => resolveThemeSetting(setting, family, dark);
     media = window.matchMedia("(prefers-color-scheme: dark)"); // the listener needs the object
