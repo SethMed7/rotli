@@ -88,8 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breve's watchlist can't overwrite an edit made at the same moment**
   (development builds). Breve now waits for any other save to that note
   before it merges its changes in, and its writes survive a crash.
-### Fixed
-
 - **An `.xlsm` embedded in a note can't lose its macros.** The embed offered
   editing and saved through a format that drops them. It now opens view-only,
   like the full sheet tab.
