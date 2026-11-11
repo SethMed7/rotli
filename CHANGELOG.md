@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A diagram or formula that can't load says so.** If the code that draws a
   math, chart, or other rendered block failed to load (offline, or after a
   Rotli Web update), the block stayed blank as if still loading. It now shows
-  the reason.
+  the reason and asks you to reload.
 
 ## [1.10.0] - 2026-11-10
 

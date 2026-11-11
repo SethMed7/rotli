@@ -189,7 +189,7 @@ function LibrarianIntro({
           <button type="button" className="ghostbtn" onClick={() => onOpenSettings("security")}>
             Security &amp; privacy
           </button>
-          <button type="button" className="ghostbtn primary lib-intro-ok" onClick={onClose}>
+          <button type="button" className="ghostbtn primary lib-intro-ok" autoFocus onClick={onClose}>
             Got it
           </button>
         </div>

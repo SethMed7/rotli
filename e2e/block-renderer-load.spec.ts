@@ -16,6 +16,6 @@ test("a math block whose renderer won't load shows why, and the note stays edita
   await page.getByText("Before").click();
 
   const block = page.locator(".rotli-render-block[data-lang='math']");
-  await expect(block.locator(".rotli-render-error")).toContainText("couldn’t load the renderer");
+  await expect(block.locator(".rotli-render-error")).toContainText("Reload Rotli to try again");
   await expect(editor).toContainText("After");
 });
