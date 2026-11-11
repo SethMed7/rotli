@@ -22,6 +22,7 @@ import { clamp } from "../lib/clamp";
 import { PLATFORM } from "../lib/featurePolicy";
 import { extOf, fileName, managedFileNote } from "../lib/fileKind";
 import { kindOf, OPEN_WITH_BY_KIND } from "../lib/fileSurfaceKinds";
+import { formatBytes } from "../lib/formatBytes";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
@@ -82,6 +83,8 @@ export function zoomStep(scale: number, dir: 1 | -1): number {
 // SheetJS a truncated zip (cryptic parse error), showing a silently cut CSV,
 // or a Code view whose source ends mid-tag while Preview looks complete.
 const READ_MAX_BYTES = 8_000_000;
+/** One <pre> this long stays responsive; past it the view says it's the start. */
+const TEXT_VIEW_BYTES = 2_000_000;
 
 /** Build the html Preview srcdoc: the raw file text with a <base> injected so
  * relative URLs keep resolving against the file's asset URL (what the old
@@ -118,6 +121,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const ext = extOf(name);
   const [url, setUrl] = useState("");
   const [text, setText] = useState<string | null>(null);
+  const [textCutOf, setTextCutOf] = useState<number | null>(null);
   const [tables, setTables] = useState<SheetTable[] | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
   // null = probing; the probe decides editable vs read-only viewer for sheets
@@ -173,6 +177,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     };
     setUrl("");
     setText(null);
+    setTextCutOf(null);
     setTables(null);
     setActiveSheet(0);
     setStat(null);
@@ -197,17 +202,14 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       .catch(() => {});
 
     if (kind === "text") {
-      // the whole file or an honest refusal: with no cap the read stopped at
-      // 200 KB and showed a long log as if that were all of it
+      // with no cap the read stopped at 200 KB and showed a long log as if
+      // that were all of it: read a named amount, and say when it isn't all
       corpusFileStat(fileId)
         .catch(() => null)
         .then((s) => {
           if (cancelled) return;
-          if (s && s.len > READ_MAX_BYTES) {
-            setTooLarge(true);
-            return;
-          }
-          return corpusFileText(fileId, READ_MAX_BYTES).then((t) => !cancelled && setText(t));
+          if (s && s.len > TEXT_VIEW_BYTES) setTextCutOf(s.len);
+          return corpusFileText(fileId, TEXT_VIEW_BYTES).then((t) => !cancelled && setText(t));
         })
         .catch(fail);
     } else if (kind === "html") {
@@ -410,7 +412,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     (kind === "audio" || kind === "video" || kind === "image" || kind === "pdf" || kind === "other") &&
     !url &&
     !err;
-  const loadingText = kind === "text" && text === null && !err && !tooLarge;
+  const loadingText = kind === "text" && text === null && !err;
   // Preview needs the text (srcdoc) AND the asset URL (its <base>); Code just the text
   const loadingHtml =
     kind === "html" && !err && !tooLarge && (text === null || (htmlMode === "preview" && !url));
@@ -615,7 +617,14 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           />
         )}
         {!err && kind === "text" && text !== null && (
-          <pre className="file-text">{text || "(empty file)"}</pre>
+          <>
+            {textCutOf !== null && (
+              <p className="file-loading">
+                Showing the first {formatBytes(TEXT_VIEW_BYTES)} of {formatBytes(textCutOf)}.
+              </p>
+            )}
+            <pre className="file-text">{text || "(empty file)"}</pre>
+          </>
         )}
 
         {(kind === "document" || kind === "sheet") && (
@@ -652,7 +661,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
-        {!err && (kind === "html" || kind === "text") && tooLarge && (
+        {!err && kind === "html" && tooLarge && (
           <p className="file-loading">This file is too large to view in Rotli.</p>
         )}
 
