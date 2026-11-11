@@ -5,12 +5,20 @@
  * or half-written day. An empty distillation never replaces a day already
  * written; the stub is only for a day that has nothing yet.
  */
-import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
 
 export function writeFileAtomic(path: string, text: string): void {
   const tmp = `${path}.${process.pid}.tmp`;
   try {
-    writeFileSync(tmp, text);
+    // on disk before the rename: after a power loss the rename can survive
+    // while unsynced data doesn't, which would leave an empty day
+    const file = openSync(tmp, "w");
+    try {
+      writeSync(file, text);
+      fsyncSync(file);
+    } finally {
+      closeSync(file);
+    }
     renameSync(tmp, path);
   } catch (error) {
     rmSync(tmp, { force: true });
@@ -19,7 +27,11 @@ export function writeFileAtomic(path: string, text: string): void {
 }
 
 /** Write the day's record. Returns what happened, for the run's log line. */
-export function writeDailyRecord(outPath: string, markdown: string, stub: string): "written" | "kept" | "stub" {
+export function writeDailyRecord(
+  outPath: string,
+  markdown: string,
+  stub: string,
+): "written" | "kept" | "stub" {
   const body = markdown.trim();
   if (body) {
     writeFileAtomic(outPath, `${body}\n`);
