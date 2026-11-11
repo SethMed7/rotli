@@ -22,7 +22,12 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
   const { noteFor, resolveLink, noteIdAt, notePathFor } = useCanvasNotes(paths);
 
   if (state.status === "loading") return <p className="file-loading">Opening canvas…</p>;
-  if (state.status === "error") return <p className="file-err jc-error">⚠ {state.error}</p>;
+  if (state.status === "error")
+    return (
+      <p className="file-err jc-error" role="alert">
+        ⚠ {state.error}
+      </p>
+    );
   return (
     <div className="jc-host">
       {!state.writable && !state.saveError && (

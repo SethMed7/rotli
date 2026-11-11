@@ -129,14 +129,18 @@ export function PreviewModal() {
       text !== null ? (
         <pre className="pv-text">{text}</pre>
       ) : (
-        <p className="pv-wait">{failed ? "Couldn’t read the chat." : "Loading…"}</p>
+        <p key={failed ? "failed" : "loading"} className="pv-wait" role={failed ? "alert" : "status"}>
+          {failed ? "Couldn’t read the chat." : "Loading…"}
+        </p>
       );
   } else if (!isFile) {
     body =
       text !== null ? (
         <MarkdownPeek body={text} />
       ) : (
-        <p className="pv-wait">{failed ? "Couldn’t read the note." : "Loading…"}</p>
+        <p key={failed ? "failed" : "loading"} className="pv-wait" role={failed ? "alert" : "status"}>
+          {failed ? "Couldn’t read the note." : "Loading…"}
+        </p>
       );
   } else if (fkind === "image" && url) {
     body = <img className="pv-media" src={url} alt={name} draggable={false} />;

@@ -567,7 +567,7 @@ export function ActivitySurface() {
           Last run: {live.summary}
         </p>
       )}
-      {err && <p className="file-err act-pad">⚠ {err}</p>}
+      {err && <p className="file-err act-pad" role="alert">{`⚠ ${err}`}</p>}
       {note && (
         <p className="brain-hint act-pad" role="status">
           {note}

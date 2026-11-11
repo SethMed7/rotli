@@ -393,7 +393,13 @@ Ranked (canonical pattern in parentheses):
 12. No `--font-mono` token; 37 monospace stacks in four spellings.
 13. No toast system; 25 bespoke inline error classes; `role="alert"`
     coverage uneven (missing in `renameDialog`, `quickNote`, `captureCard`,
-    `previewModal`, `tabStrip`, `paneTree`).
+    `previewModal`, `tabStrip`, `paneTree`). **The `role="alert"` half was
+    FIXED on 2026-11-11.** The Quick Note error, the preview's "Couldn't read",
+    and four `.file-err` lines (file, tasks, activity, canvas) are now live
+    regions. `scripts/error-announcements.test.ts` fails any `…-err`/`…-error` element
+    without a role. `renameDialog` already announced through `NameFieldDialog`,
+    and `captureCard`, `tabStrip` and `paneTree` no longer render an error
+    line.
 14. Context menus cannot show shortcuts (`MenuSpec` has no chord field) while
     the palette and slash menu always do.
 15. 24 empty-state families; the shared `EmptyState` has one caller.

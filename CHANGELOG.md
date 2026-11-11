@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Errors are announced to screen readers.** A Quick Note that couldn't
+  save, a preview that couldn't read its note or chat, and errors on the
+  file, Tasks, and Activity pages now speak up when they appear, instead of
+  showing only on screen.
+- **A dialog's unavailable button looks unavailable.** Create board, Rename,
+  and the other name dialogs fade their button and drop the pointer while
+  there's nothing to submit or a save is running.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added

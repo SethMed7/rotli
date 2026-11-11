@@ -544,7 +544,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         onKeyDown={kind === "image" ? onImageKeyDown : undefined}
         onMouseDown={kind === "image" ? (e) => e.currentTarget.focus() : undefined}
       >
-        {err && <p className="file-err">⚠ {err}</p>}
+        {err && (
+          <p className="file-err" role="alert">
+            ⚠ {err}
+          </p>
+        )}
         {(loadingMedia || loadingText || loadingHtml || loadingSheet || loadingDocument) && (
           <p className="file-loading">Loading…</p>
         )}

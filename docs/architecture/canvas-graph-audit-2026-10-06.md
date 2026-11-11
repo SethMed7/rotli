@@ -229,7 +229,8 @@ truth), lose work, or ship a development feature into stable builds.
   - `"nodes": null` and a missing `edges` key are rewritten as `[]`.
   - A colon in a folder name lands a web canvas in the wrong folder (not
     confirmed).
-- Setup: `.rename-btn` has no disabled style.
+- Setup: `.rename-btn` has no disabled style. **Fixed 2026-11-11**: faded, no
+  pointer, no hover (e2e `new-item-chooser.spec.ts`).
 - Docs:
   - The `noteGlyph.tsx` comment still says the Excalidraw logo is used for
     canvases.
