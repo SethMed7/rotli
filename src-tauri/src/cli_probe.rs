@@ -94,8 +94,7 @@ mod tests {
         // long enough for the script to write its pid on a loaded test machine
         assert!(probe(&hangs, &["auth", "status"], Duration::from_secs(2)).is_none());
         assert!(started.elapsed() < Duration::from_secs(6), "{:?}", started.elapsed());
-        // raw read (private-output): this test's own temp file
-        let descendant: i32 = std::fs::read_to_string(&pidfile).unwrap().trim().parse().unwrap();
+        let descendant: i32 = crate::fsutil::read_own_text(&pidfile).unwrap().trim().parse().unwrap();
         let gone_by = Instant::now() + Duration::from_secs(3);
         while alive(descendant) && Instant::now() < gone_by {
             std::thread::sleep(Duration::from_millis(20));
