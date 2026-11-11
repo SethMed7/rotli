@@ -156,6 +156,15 @@ export class ResultReasonWidget extends WidgetType {
   }
 }
 
+/** Set a choice control's accessible name in place; the control is the root
+ * or, with a list marker, the button inside the wrapper. */
+function relabel(dom: HTMLElement, label: string): boolean {
+  const button = dom instanceof HTMLButtonElement ? dom : dom.querySelector("button");
+  if (!button) return false;
+  button.setAttribute("aria-label", label);
+  return true;
+}
+
 /** The document as a LineSource: a group edit reads only the lines it walks,
  * never the whole note as one string. */
 export function docLines(doc: Text): LineSource {
@@ -178,6 +187,13 @@ export class ChoiceWidget extends WidgetType {
   }
   eq(other: ChoiceWidget) {
     return other.selected === this.selected && other.marker === this.marker && other.label === this.label;
+  }
+  /** Typing in the option changes only its name: patch the label in place
+   * instead of rebuilding the control on every keystroke. */
+  updateDOM(dom: HTMLElement, _view: EditorView, from: WidgetType) {
+    if (!(from instanceof ChoiceWidget) || from.selected !== this.selected || from.marker !== this.marker)
+      return false;
+    return relabel(dom, this.label || "Select option");
   }
   toDOM(view: EditorView) {
     const btn = document.createElement("button");
@@ -251,6 +267,18 @@ export class ChoiceControlWidget extends WidgetType {
       other.marker === this.marker &&
       other.label === this.label
     );
+  }
+
+  /** Only the option's name changed (typing in it): patch it in place. */
+  updateDOM(dom: HTMLElement, _view: EditorView, from: WidgetType) {
+    if (
+      !(from instanceof ChoiceControlWidget) ||
+      from.kind !== this.kind ||
+      from.selected !== this.selected ||
+      from.marker !== this.marker
+    )
+      return false;
+    return relabel(dom, this.label || (this.kind === "radio" ? "Choose option" : "Toggle option"));
   }
 
   toDOM(view: EditorView) {

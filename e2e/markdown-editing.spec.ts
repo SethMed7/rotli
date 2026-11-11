@@ -603,9 +603,11 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   await page.keyboard.press("Space");
   await page.keyboard.type("Release decision");
 
-  const truth = page.getByRole("button", { name: "True" });
-  const draw = page.getByRole("button", { name: "Draw" });
-  const falsity = page.getByRole("button", { name: "False" });
+  // scoped to the editor: while the new note's title settles, its Main row is
+  // briefly named by the raw line ("[True:green][x Draw:…") and matched too
+  const truth = editor.getByRole("button", { name: "True" });
+  const draw = editor.getByRole("button", { name: "Draw" });
+  const falsity = editor.getByRole("button", { name: "False" });
   await expect(truth).toHaveAttribute("aria-pressed", "false");
   await expect(draw).toHaveAttribute("aria-pressed", "false");
   await expect(falsity).toHaveAttribute("aria-pressed", "false");
@@ -634,6 +636,24 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   await expect(editor).toContainText(
     "- [True:green][Draw:#E3B341][x False:red] Release decision — needs review",
   );
+});
+
+test("typing in a choice option renames its control in place, without rebuilding it", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("- [#] Red\n- [#] Blue");
+  const red = editor.getByRole("radio", { name: "Red", exact: true });
+  await expect(red).toBeVisible();
+  await red.evaluate((element) => element.setAttribute("data-probe", "kept"));
+  // the caret is at the end of "Blue"; go up to the end of "Red" and type
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("End");
+  await page.keyboard.type("dish");
+  const renamed = editor.getByRole("radio", { name: "Reddish", exact: true });
+  await expect(renamed).toBeVisible();
+  await expect(renamed).toHaveAttribute("data-probe", "kept");
 });
 
 test("hash choices and switches stay interactive while inline code stays literal", async ({ page }) => {
