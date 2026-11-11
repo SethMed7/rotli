@@ -71,7 +71,7 @@ fn a_secure_create_waits_for_whoever_holds_the_gitignore() {
 /// #10: pinning and locking are Rotli's own writes, so the watcher must not
 /// echo them back as an external change (a full-vault refresh each time).
 #[test]
-fn pin_and_lock_writes_are_marked_as_rotlis_own() {
+fn pin_lock_and_ai_edit_writes_are_marked_as_rotlis_own() {
     let (_dir, mut store) = bare();
     let note = store.create("Inbox", "# Plan\n\nbody\n").unwrap();
     let rel = store.resolve_note_rel(&note.id).unwrap();
@@ -85,4 +85,8 @@ fn pin_and_lock_writes_are_marked_as_rotlis_own() {
     fresh(&mut store);
     store.set_locked(&note.id, true).unwrap();
     assert!(store.suppress.contains(&path), "set_locked");
+
+    fresh(&mut store);
+    store.set_ai_edit(&note.id, true).unwrap();
+    assert!(store.suppress.contains(&path), "set_ai_edit");
 }
