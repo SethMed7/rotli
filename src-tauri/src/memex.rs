@@ -601,10 +601,13 @@ pub struct ChatSummary {
 }
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
+/// ASYNC + spawn_blocking: it reads every chat's frontmatter and tail, which
+/// held the main thread in a long history (system audit 2026-09-02).
 #[tauri::command]
-pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
-    let root = registered_root(&app, &root)?;
-    list_chats_at(&root)
+pub async fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_chats_at(&registered_root(&app, &root)?))
+        .await
+        .map_err(|error| format!("list chats: {error}"))?
 }
 
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
