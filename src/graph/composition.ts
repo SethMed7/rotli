@@ -24,7 +24,8 @@ export function graphInputsReady<T>(
 export function graphError(...failures: unknown[]): string | null {
   const failure = failures.find((cause) => cause !== null && cause !== undefined);
   if (failure === undefined) return null;
-  return failure instanceof Error ? failure.message : String(failure);
+  if (failure instanceof Error) return failure.message;
+  return typeof failure === "string" ? failure : "an unexpected error";
 }
 
 export function useVaultGraph(): { graph: Graph | null; error: string | null } {
