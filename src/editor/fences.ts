@@ -52,8 +52,24 @@ const FENCE_CLOSE = /^```\s*$/;
  * their code alone (they used to markdown-style it and rewrite pipe-table
  * examples inside it — #13, audit 2026-07). An unterminated fence is skipped
  * (treated as plain text) so a half-typed block never blanks the editor. Cheap
- * line-regex walk; callers cache by doc. */
-export function scanFences(doc: Text): FenceBlock[] {
+ * line-regex walk.
+ *
+ * Memoized per document: a CodeMirror `Text` never changes, and one keystroke
+ * used to scan the same doc several times (livePreview, blockRender, the
+ * keymap, scanTables, auto-pair — system audit 2026-09-01 §1). The answer is
+ * shared, so it is readonly. */
+const fenceScans = new WeakMap<Text, readonly FenceBlock[]>();
+
+export function scanFences(doc: Text): readonly FenceBlock[] {
+  let blocks = fenceScans.get(doc);
+  if (!blocks) {
+    blocks = walkFences(doc);
+    fenceScans.set(doc, blocks);
+  }
+  return blocks;
+}
+
+function walkFences(doc: Text): FenceBlock[] {
   const blocks: FenceBlock[] = [];
   const lines = doc.lines;
   let n = 1;
@@ -86,7 +102,7 @@ export function scanFences(doc: Text): FenceBlock[] {
 
 /** True when a line (by its start pos) sits inside any of the fenced ranges —
  * the open ```lang line, the inner body, or the closing ``` line. */
-export function lineInFence(lineFrom: number, fences: FenceBlock[]): boolean {
+export function lineInFence(lineFrom: number, fences: readonly FenceBlock[]): boolean {
   return fences.some((f) => lineFrom >= f.from && lineFrom <= f.to);
 }
 

@@ -74,9 +74,13 @@ caret was not in a table, and `tabIndent` runs its own `scanFences`.
   (`cmKeymap.ts`), removing one table scan and one nested fence scan from
   every Tab, Enter, and arrow on ordinary lines. Guarded by
   `cmKeymap.test.ts` (“Tab outside a table”).
-- Open: share one fence scan per document change (a `StateField` consumed by
-  `livePreview`, `tableRender`, `blockRender`, and the keymap), and stop the
-  toString/split/join round trip in `setDocumentText`. Note the uncommitted
+- **FIXED (2026-11-11)**: one fence scan and one table scan per document.
+  `scanFences` and `scanTables` are memoized per immutable CodeMirror `Text`
+  (a `WeakMap`), so livePreview, tableRender, blockRender, the keymap,
+  auto-pair and textAlign share one answer per edit, which is readonly. On a
+  24,000-line note this went from ~35 ms to ~14 ms per keystroke for the five
+  scans one keystroke made.
+- Open: stop the toString/split/join round trip in `setDocumentText`. Note the uncommitted
   `parseBlock` gained two regexes at the head of its chain
   (`render.tsx:75-93`) that `scanTaskProgress` now pays on every line.
 

@@ -75,7 +75,20 @@ export function splitRow(s: string): string[] {
  * example inside ANY ``` fence is the user's code, never a live widget whose
  * chips would rewrite it (#13, audit 2026-07) — so a header line inside a
  * fence can't start a table. */
-export function scanTables(doc: Text): TableBlock[] {
+export function scanTables(doc: Text): readonly TableBlock[] {
+  let tables = tableScans.get(doc);
+  if (!tables) {
+    tables = walkTables(doc);
+    tableScans.set(doc, tables);
+  }
+  return tables;
+}
+
+/** Memoized per document, like scanFences: livePreview, tableRender,
+ * textAlign, and the keymap all ask on the same keystroke. */
+const tableScans = new WeakMap<Text, readonly TableBlock[]>();
+
+function walkTables(doc: Text): TableBlock[] {
   const out: TableBlock[] = [];
   const fences = scanFences(doc);
   const total = doc.lines;
@@ -117,7 +130,7 @@ export function scanTables(doc: Text): TableBlock[] {
 }
 
 /** True when a line (by its `from` offset) sits inside any detected table. */
-export function lineInTable(lineFrom: number, tables: TableBlock[]): boolean {
+export function lineInTable(lineFrom: number, tables: readonly TableBlock[]): boolean {
   return tables.some((t) => lineFrom >= t.from && lineFrom <= t.to);
 }
 

@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Typing in a long note does less work.** Each keystroke used to look for
+  code blocks and tables up to five times over the whole note. It now looks
+  once and shares the answer. A 24,000-line note went from about 35 ms to
+  14 ms of that work per keystroke.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
