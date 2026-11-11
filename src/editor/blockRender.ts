@@ -86,6 +86,12 @@ interface RenderCtx {
 
 type StaticLangKey = Exclude<LangKey, "board" | "sheet" | "document">;
 
+/** A block whose renderer couldn't be loaded, in words. */
+function rendererFailed(lang: string, error: unknown): string {
+  const reason = error instanceof Error ? error.message : "it didn’t load";
+  return `${lang}: couldn’t load the renderer — ${reason}. Reopen the note to try again.`;
+}
+
 function errorBox(message: string): HTMLElement {
   const box = document.createElement("div");
   box.className = "rotli-render-error";
@@ -523,7 +529,12 @@ class RenderBlockWidget extends WidgetType {
             openChartForm(container, this.code);
           }
         })
-        .catch(() => {});
+        // the renderer's code didn't load (offline, or a stale chunk after a
+        // web deploy): say so instead of leaving the block blank. Not cached,
+        // so the next render tries again.
+        .catch((error: unknown) => {
+          if (!this.destroyed) mountRendered(errorBox(rendererFailed(this.lang, error)));
+        });
     } else {
       if (!UNCACHED.has(this.lang)) cacheSet(key, out);
       mountRendered(out);
@@ -717,7 +728,9 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
         }
         card.appendChild(el);
       })
-      .catch(() => {});
+      .catch((error: unknown) => {
+        if (card.isConnected) card.appendChild(errorBox(rendererFailed(lang, error)));
+      });
   } else {
     card.appendChild(out);
   }

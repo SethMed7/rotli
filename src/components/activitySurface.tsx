@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { filedStamp, LIBRARIAN_LABELS } from "../ai/librarianLane";
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
+import { containDialogFocus } from "../lib/dialogFocus";
 import { corpusSetSecure } from "../lib/noteProtection";
 import { useTransientPopover } from "../lib/popover";
 import {
@@ -116,7 +117,7 @@ function LibrarianIntro({
   const cardRef = useRef<HTMLDivElement>(null);
   useTransientPopover([cardRef], true, onClose);
   return (
-    <div className="lib-intro-overlay">
+    <div className="lib-intro-overlay" onKeyDown={containDialogFocus}>
       <div
         className="lib-intro"
         ref={cardRef}
