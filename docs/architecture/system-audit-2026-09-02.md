@@ -370,6 +370,12 @@ Ranked (canonical pattern in parentheses):
    this session. Fix the references and add a `check:design-system` rule.
 2. **No focus trap in any of ~14 dialogs**; only five carry `aria-modal`.
    (`boardNameDialog.tsx` is the model; put one trap in `lib/popover.ts`.)
+   **2026-11-11:** every `aria-modal` dialog now traps Tab:
+   `lib/dialogFocus.ts` `containDialogFocus` was added to the preview, the
+   Librarian intro, the vault-needed and reconnecting cards
+   (`mermaidWorkspace` has its own trap). `scripts/dialog-focus.test.ts`
+   fails a new modal without one. Dialogs without `aria-modal` are still
+   open.
 3. **Chat delete is destructive with no confirmation**
    (`sidebarChat.tsx:319-323`, `:566-568`) while Home's equivalent drills to
    a confirm (`sidebarHome.tsx:327`).

@@ -8,6 +8,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { longDateLabel } from "../lib/dateLabels";
+import { containDialogFocus } from "../lib/dialogFocus";
 import { extOf, fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
 import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
@@ -173,7 +174,14 @@ export function PreviewModal() {
 
   return (
     <div className="pv-scrim">
-      <div className="pvw" ref={cardRef} role="dialog" aria-modal="true" aria-label={`Preview: ${name}`}>
+      <div
+        className="pvw"
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Preview: ${name}`}
+        onKeyDown={containDialogFocus}
+      >
         <header className="pv-head">
           {glyphForNote(item, { size: 15 })}
           <span className="pv-title">{name || "Empty note"}</span>

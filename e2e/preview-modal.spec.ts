@@ -39,3 +39,21 @@ test("Open escalates from the peek to the real surface", async ({ page }) => {
   await expect(page.locator(".pvw")).toHaveCount(0);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Groceries");
 });
+
+test("Tab stays inside the peek instead of walking into the page behind it", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".frow", { hasText: "Assets" }).first().click();
+  await page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Preview" }).click();
+  const modal = page.locator(".pvw");
+  await expect(modal.locator(".pv-open")).toBeFocused();
+  // past the last control (close) and back round to the first (Open), both ways
+  for (let i = 0; i < 6; i += 1) {
+    await page.keyboard.press("Tab");
+    expect(await modal.evaluate((card) => card.contains(document.activeElement))).toBe(true);
+  }
+  for (let i = 0; i < 6; i += 1) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await modal.evaluate((card) => card.contains(document.activeElement))).toBe(true);
+  }
+});

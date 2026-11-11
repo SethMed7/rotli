@@ -86,6 +86,12 @@ interface RenderCtx {
 
 type StaticLangKey = Exclude<LangKey, "board" | "sheet" | "document">;
 
+/** A block whose renderer couldn't be loaded, in words. */
+function rendererFailed(lang: string, error: unknown): string {
+  const reason = error instanceof Error ? error.message : "it didn’t load";
+  return `${lang}: couldn’t load the renderer — ${reason}. Reload Rotli to try again.`;
+}
+
 function errorBox(message: string): HTMLElement {
   const box = document.createElement("div");
   box.className = "rotli-render-error";
@@ -98,16 +104,26 @@ let jsxgraphCssReady: Promise<void> | null = null;
 
 async function loadKatex() {
   katexCssReady ??= import("katex/dist/katex.min.css").then(() => undefined);
-  const [{ default: katex }] = await Promise.all([import("katex"), katexCssReady]);
-  return katex;
+  try {
+    const [{ default: katex }] = await Promise.all([import("katex"), katexCssReady]);
+    return katex;
+  } catch (error) {
+    katexCssReady = null; // not remembered here, so a reload can recover
+    throw error;
+  }
 }
 
 async function loadJsxgraph() {
   // jsxgraph's package "exports" map hides ./distrib/* — import the stylesheet by
   // a filesystem-relative path so Vite resolves it directly (bypassing exports).
   jsxgraphCssReady ??= import("../../node_modules/jsxgraph/distrib/jsxgraph.css").then(() => undefined);
-  const [{ default: JXG }] = await Promise.all([import("jsxgraph"), jsxgraphCssReady]);
-  return JXG;
+  try {
+    const [{ default: JXG }] = await Promise.all([import("jsxgraph"), jsxgraphCssReady]);
+    return JXG;
+  } catch (error) {
+    jsxgraphCssReady = null; // not remembered here, so a reload can recover
+    throw error;
+  }
 }
 
 // ——— the renderer registry — one function per language, shared infra ————
@@ -511,8 +527,8 @@ class RenderBlockWidget extends WidgetType {
 
     const out = RENDERERS[this.lang](this.code, ctx);
     if (out instanceof Promise) {
-      out
-        .then((el) => {
+      out.then(
+        (el) => {
           if (this.destroyed) {
             destroyChartBlocks(el); // widget gone — free what it mounted, never touch its DOM
             return;
@@ -522,8 +538,16 @@ class RenderBlockWidget extends WidgetType {
           if (this.lang === "chart" && takeChartEdit(this.code)) {
             openChartForm(container, this.code);
           }
-        })
-        .catch(() => {});
+        },
+        // the renderer's code didn't load (offline, or a stale chunk after a
+        // web deploy): say so instead of leaving the block blank. Only the
+        // load: a throw while mounting isn't a failed load. Browsers remember
+        // a failed dynamic import until the page reloads, so the message asks
+        // for that.
+        (error: unknown) => {
+          if (!this.destroyed) mountRendered(errorBox(rendererFailed(this.lang, error)));
+        },
+      );
     } else {
       if (!UNCACHED.has(this.lang)) cacheSet(key, out);
       mountRendered(out);
@@ -709,15 +733,18 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
   };
   const out = RENDERERS[lang](code, ctx);
   if (out instanceof Promise) {
-    out
-      .then((el) => {
+    out.then(
+      (el) => {
         if (!card.isConnected) {
           freeIfBoard(el.querySelector<HTMLElement>(".rotli-render-jsxgraph"));
           return;
         }
         card.appendChild(el);
-      })
-      .catch(() => {});
+      },
+      (error: unknown) => {
+        if (card.isConnected) card.appendChild(errorBox(rendererFailed(lang, error)));
+      },
+    );
   } else {
     card.appendChild(out);
   }
