@@ -767,10 +767,10 @@ interface BlockState {
   deco: DecorationSet;
   /** Cached fence scan — recomputed only when the doc changes (a selection or a
    * theme flip reuses it, so caret moves don't re-walk the whole doc). */
-  fences: FenceBlock[];
+  fences: readonly FenceBlock[];
 }
 
-function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
+function buildFrom(state: EditorState, fences: readonly FenceBlock[]): BlockState {
   const decos: Range<Decoration>[] = [];
   const sel = revealRange(state);
   const sig = themeSignature();
