@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Breve's daily digest can't be lost to a crash or an empty rerun**
+  (development builds, where Breve runs). The day's record used to be written
+  in place, so a crash mid-write left an empty day. A second run whose model
+  returned nothing replaced the morning's digest with an empty template. The
+  record now lands whole or not at all, and an empty run keeps what's there.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
