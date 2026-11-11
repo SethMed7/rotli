@@ -3,8 +3,9 @@
 
 import { useRef } from "react";
 
-import { containDialogFocus, useDialogFocus } from "../../lib/dialogFocus";
+import { containDialogFocus } from "../../lib/dialogFocus";
 import { useTransientPopover } from "../../lib/popover";
+import { useDialogFocus } from "../webDialogFrame";
 
 /** The first-visit explainer — everything the Librarian may and may NOT do,
  * in one card. Re-openable any time from the header's help button. */
