@@ -10,7 +10,7 @@ import { gotoApp } from "./support";
 
 test("the theme the last launch applied paints first, before the app mounts", async ({ page }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("rotli:last-data-theme", "midnight-dark");
+    window.localStorage.setItem("rotli.lastDataTheme", "midnight-dark");
     // what the page looks like as soon as the head has run, before React
     document.addEventListener(
       "DOMContentLoaded",
@@ -37,7 +37,7 @@ test("with nothing remembered, or something that isn't a theme, launch stays on 
 }) => {
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("seeded")) {
-      window.localStorage.setItem("rotli:last-data-theme", "not-a-theme");
+      window.localStorage.setItem("rotli.lastDataTheme", "not-a-theme");
       sessionStorage.setItem("seeded", "1");
     }
     document.addEventListener(
@@ -52,5 +52,5 @@ test("with nothing remembered, or something that isn't a theme, launch stays on 
   await gotoApp(page);
   expect(await page.evaluate(() => (window as unknown as { firstTheme: string }).firstTheme)).toBe("light");
   // the in-memory twin isn't durable, so it never writes the key itself
-  expect(await page.evaluate(() => window.localStorage.getItem("rotli:last-data-theme"))).toBe("not-a-theme");
+  expect(await page.evaluate(() => window.localStorage.getItem("rotli.lastDataTheme"))).toBe("not-a-theme");
 });

@@ -6,7 +6,7 @@
 // pinned to DATA_THEMES by src/state/theme.test.ts.
 (function () {
   try {
-    var theme = window.localStorage.getItem("rotli:last-data-theme");
+    var theme = window.localStorage.getItem("rotli.lastDataTheme");
     if (theme && /^(light|dark|paper|charcoal|(ocean|grove|iris|blossom|midnight)-(light|dark))$/.test(theme)) {
       document.documentElement.setAttribute("data-theme", theme);
     }

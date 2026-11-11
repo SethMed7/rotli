@@ -107,7 +107,7 @@ export function resolveThemeSetting(
 /** Where the last applied theme waits for the next launch. public/theme-boot.js
  * reads the same key before the first paint, so a dark-theme window never
  * shows index.html's light ground while settings hydrate. */
-export const LAST_THEME_KEY = "rotli:last-data-theme";
+export const LAST_THEME_KEY = "rotli.lastDataTheme";
 
 let rememberThemes = false;
 
