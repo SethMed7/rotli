@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 
 import { DATA_THEMES, LAST_THEME_KEY, applyTheme, rememberAppliedTheme } from "./theme";
 
@@ -19,7 +20,7 @@ function bootWith(stored: string | null, storage: "ok" | "throws" = "ok"): strin
   const fakeDocument = {
     documentElement: { setAttribute: (name: string, value: string) => attributes.set(name, value) },
   };
-  new Function("window", "document", BOOT)(fakeWindow, fakeDocument);
+  runInNewContext(BOOT, { window: fakeWindow, document: fakeDocument });
   return attributes.get("data-theme")!;
 }
 

@@ -36,9 +36,9 @@ test("with nothing remembered, or something that isn't a theme, launch stays on 
   page,
 }) => {
   await page.addInitScript(() => {
-    if (!sessionStorage.getItem("seeded")) {
+    if (!window.sessionStorage.getItem("seeded")) {
       window.localStorage.setItem("rotli.lastDataTheme", "not-a-theme");
-      sessionStorage.setItem("seeded", "1");
+      window.sessionStorage.setItem("seeded", "1");
     }
     document.addEventListener(
       "DOMContentLoaded",
