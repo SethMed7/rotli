@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dark themes no longer open on a light flash.** Rotli used to paint its
   light ground while it read your settings, then switch. Each window now
   starts in the theme it last showed, on the Mac and on Rotli Web.
+- **Choice lists name their options to screen readers.** A `( )` or `[#]`
+  option used to be read as "Select option" or "Choose option", and a `[##]`
+  box as "Toggle option". Each is now read as a radio or checkbox named by
+  its own text. Picking an option in a long note no longer copies the whole
+  note to find its group.
 
 ## [1.10.0] - 2026-11-10
 

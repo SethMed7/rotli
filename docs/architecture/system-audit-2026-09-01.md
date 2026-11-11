@@ -130,9 +130,13 @@ a monochrome theme — and the yes-label `color-mix` has no contrast entry.
 - **FIXED**: slash commands work inside a result’s ` — reason`
   (`slashSpanAtCaret` in `slashMenu.tsx`): the trailing `/query` token is the
   command and its block lands on a continuation line beneath the row.
-- Open: per-theme `--failure` in `themes.css`, contrast entries, `role="radio"`
-  semantics and option text in choice labels, slash entries for both grammars,
-  `ChoiceWidget.select` stringifying the whole document per click.
+- **FIXED (2026-11-11)**: choice controls announce as `role="radio"` (the
+  `( )` grammar used `aria-pressed`) named by their option's text
+  (`optionLabel`, Markdown emphasis stripped), and `[##]` checkboxes likewise;
+  a group edit reads its lines through `docLines` instead of stringifying the
+  whole note per click (`choiceState.test.ts`, e2e in `markdown-editing.spec.ts`).
+- Open: per-theme `--failure` in `themes.css`, contrast entries, slash entries
+  for both grammars.
 
 ## 5. Drag and drop, images, video
 

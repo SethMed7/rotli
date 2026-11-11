@@ -1,6 +1,7 @@
 // Portable choice and toggle grammar. The file remains readable in any plain
 // Markdown editor; Rotli only supplies a richer render and source-safe writes.
 
+import type { LineSource } from "./choiceState";
 import { resultOptionOf, type ResultOption } from "./resultState";
 
 export type ChoiceControlKind = "radio" | "multi";
@@ -105,27 +106,26 @@ export function setChoiceControlSelected(line: string, selected: boolean): strin
 }
 
 /** Select one adjacent, same-indent `[#]` option and clear its siblings. */
-export function selectChoiceControlGroup(
-  lines: readonly string[],
-  targetIndex: number,
-): ControlEdit[] | null {
-  const target = lines[targetIndex] === undefined ? null : parseChoiceControlLine(lines[targetIndex] ?? "");
+export function selectChoiceControlGroup(lines: LineSource, targetIndex: number): ControlEdit[] | null {
+  if (targetIndex < 0) return null;
+  const targetLine = lines.at(targetIndex);
+  const target = targetLine === undefined ? null : parseChoiceControlLine(targetLine);
   if (!target || target.kind !== "radio") return null;
   let start = targetIndex;
   while (start > 0) {
-    const previous = parseChoiceControlLine(lines[start - 1] ?? "");
+    const previous = parseChoiceControlLine(lines.at(start - 1) ?? "");
     if (previous?.kind !== "radio" || previous.indent !== target.indent) break;
     start--;
   }
   let end = targetIndex;
   while (end + 1 < lines.length) {
-    const next = parseChoiceControlLine(lines[end + 1] ?? "");
+    const next = parseChoiceControlLine(lines.at(end + 1) ?? "");
     if (next?.kind !== "radio" || next.indent !== target.indent) break;
     end++;
   }
   const edits: ControlEdit[] = [];
   for (let index = start; index <= end; index++) {
-    const line = lines[index] ?? "";
+    const line = lines.at(index) ?? "";
     const next = setChoiceControlSelected(line, index === targetIndex);
     if (next !== null && next !== line) edits.push({ index, line: next });
   }
