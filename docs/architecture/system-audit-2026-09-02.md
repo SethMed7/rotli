@@ -508,7 +508,11 @@ Ranked:
    job under the file lock. Two concurrent secure creates (Quick Note +
    capture, or a second process) can lose an ignore line, which is exactly
    what `gitignore_add` was written to prevent. Fix: call `gitignore_add`.
-2. **Breve's daily digest truncates in place** (`daily-log.ts:85,117,120`)
+2. **FIXED (2026-11-11), the temp + rename half
+   (`breve-runtime/scripts/daily-record.ts`, `test-daily-record.ts`). An
+   empty distillation also no longer puts the stub over a day already
+   written. Routing the write through Rust is still open.** Breve's daily
+   digest truncates in place (`daily-log.ts:85,117,120`)
    into `history/`, which the contract declares never writable by any lane.
    A crash mid-write leaves an empty day. Fix: temp + rename, and long-term
    route through Rust.

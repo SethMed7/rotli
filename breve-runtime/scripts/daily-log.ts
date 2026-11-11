@@ -13,13 +13,14 @@
  *   bun scripts/daily-log.ts [YYYY-MM-DD] [--dry] [--no-prune]
  *     (default date: today, Breve's timezone · --dry: gather + report, write/prune nothing)
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { historyPath } from "./config";
 import { BRIEFS } from "./paths";
 import { loadSettings, effectiveTz, todayIn } from "./timectx";
 import { localGenerate } from "./llm";
 import { shouldPruneBriefFile } from "./brief-retention";
+import { writeDailyRecord } from "./daily-record";
 
 const BREVE = join(import.meta.dir, "..");
 const DRY = process.argv.includes("--dry");
@@ -82,8 +83,8 @@ if (DRY) {
 
 mkdirSync(dir, { recursive: true });
 if (sources.length === 0) {
-  if (!existsSync(outPath)) writeFileSync(outPath, STUB);
-  console.log(`${existsSync(outPath) ? "✓ daily exists" : "✓ wrote stub"}: ${outPath}${sources.length ? "" : " (no Breve sources to distill yet)"}`);
+  const done = writeDailyRecord(outPath, "", STUB);
+  console.log(`${done === "kept" ? "✓ daily exists" : "✓ wrote stub"}: ${outPath} (no Breve sources to distill yet)`);
   process.exit(0);
 }
 
@@ -114,9 +115,13 @@ ${sources.join("\n\n")}
 try {
   let markdown = (await localGenerate({ prompt, think: false, options: { num_predict: 2048 } })).trim();
   markdown = markdown.replace(/^```(?:markdown|md)?\s*/i, "").replace(/\s*```$/, "").trim();
-  writeFileSync(outPath, markdown ? `${markdown}\n` : STUB);
-  console.log(`✓ daily written locally: ${outPath}`);
+  const done = writeDailyRecord(outPath, markdown, STUB);
+  console.log(
+    done === "written"
+      ? `✓ daily written locally: ${outPath}`
+      : `the model returned nothing — ${done === "kept" ? "kept the day already written" : "wrote a stub"} at ${outPath}`,
+  );
 } catch (error) {
-  if (!existsSync(outPath)) writeFileSync(outPath, STUB);
-  console.log(`local distillation unavailable — kept stub at ${outPath}: ${String(error).slice(0, 160)}`);
+  writeDailyRecord(outPath, "", STUB);
+  console.log(`local distillation unavailable — kept ${outPath} as it was (or a stub): ${String(error).slice(0, 160)}`);
 }
