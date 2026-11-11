@@ -34,7 +34,22 @@ pub struct ChatModel {
 
 /// What the store declares, or the built-in default so the picker is never empty.
 pub(crate) fn models() -> Vec<ChatModel> {
-    read_models().unwrap_or_else(default_models)
+    read_registry()
+        // which mlx model the shared server is PINNED to (its launchd env) — the
+        // default for no-model callers; every registered mlx model serves on demand
+        .and_then(|raw| parse_models(&raw, crate::localmodel::local_model_default().as_deref()))
+        .unwrap_or_else(default_models)
+}
+
+/// The same models for an identity check (is this id a registered on-device
+/// model at this endpoint?), without asking launchd which one the shared
+/// server is pinned to: that PlistBuddy subprocess ran on every AI note read,
+/// on the main thread (system audit 2026-09-02 §2 #2), and `local_default` is
+/// the only field it decides. Never use these for that badge.
+pub(crate) fn models_for_identity() -> Vec<ChatModel> {
+    read_registry()
+        .and_then(|raw| parse_models(&raw, None))
+        .unwrap_or_else(default_models)
 }
 
 fn default_models() -> Vec<ChatModel> {
@@ -51,18 +66,19 @@ fn default_models() -> Vec<ChatModel> {
     }]
 }
 
-fn read_models() -> Option<Vec<ChatModel>> {
+fn read_registry() -> Option<String> {
     let home = std::env::var("HOME").ok()?;
     let path = std::path::Path::new(&home).join(".memex/ai/registry.json");
     // raw read (outside-vault): app config outside any vault
-    let raw = std::fs::read_to_string(path).ok()?;
-    let reg: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    std::fs::read_to_string(path).ok()
+}
+
+/// The registry's chat models. `default_mlx` is the model the shared mlx
+/// server is pinned to, when known; it decides only `local_default`.
+fn parse_models(raw: &str, default_mlx: Option<&str>) -> Option<Vec<ChatModel>> {
+    let reg: serde_json::Value = serde_json::from_str(raw).ok()?;
     let providers = reg.get("providers")?;
     let models = reg.get("models")?.as_array()?;
-
-    // which mlx model the shared server is PINNED to (its launchd env) — the
-    // default for no-model callers; every registered mlx model serves on demand
-    let default_mlx = crate::localmodel::local_model_default();
 
     let mut out: Vec<ChatModel> = Vec::new();
     let mut picked_default = false;
@@ -112,7 +128,7 @@ fn read_models() -> Option<Vec<ChatModel>> {
         // NOT a usability gate — server 0.3 swaps to any requested mlx model)
         let model_path = m.get("path").and_then(|v| v.as_str());
         let local_default = if provider == "mlx" {
-            match (model_path, default_mlx.as_deref()) {
+            match (model_path, default_mlx) {
                 (Some(p), Some(a)) => same_model_path(p, a),
                 // no plist yet (fresh setup / no launchd) → trust the registry default
                 (Some(_), None) => is_default,
@@ -170,6 +186,51 @@ fn provider_human(provider: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const REGISTRY: &str = r#"{
+      "providers": {
+        "mlx": { "endpoint": "http://127.0.0.1:8080/v1", "api": "openai (mlx_lm.server)", "default": true },
+        "ollama": { "endpoint": "http://127.0.0.1:11434", "api": "ollama-generate (/api/generate)" }
+      },
+      "models": [
+        { "id": "gemma", "kind": "llm-chat", "provider": "mlx", "path": "/models/gemma" },
+        { "id": "qwen", "kind": "llm-chat", "provider": "mlx", "path": "/models/qwen", "vision": true },
+        { "id": "llama", "kind": "llm-chat", "provider": "ollama" },
+        { "id": "embedder", "kind": "embedding", "provider": "mlx" }
+      ]
+    }"#;
+
+    fn identity(models: &[ChatModel]) -> Vec<(String, String, String, String)> {
+        models
+            .iter()
+            .map(|m| (m.id.clone(), m.provider.clone(), m.endpoint.clone(), m.api.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn identity_checks_get_the_same_models_without_asking_which_one_is_pinned() {
+        let pinned = parse_models(REGISTRY, Some("/models/qwen")).unwrap();
+        let unasked = parse_models(REGISTRY, None).unwrap();
+        // ids, providers, endpoints, and wire shapes don't depend on the pin
+        assert_eq!(identity(&pinned), identity(&unasked));
+        assert_eq!(
+            identity(&pinned).iter().map(|m| m.0.as_str()).collect::<Vec<_>>(),
+            ["gemma", "qwen", "llama"],
+            "chat models only, in registry order"
+        );
+        // the pin decides only the local-default badge
+        let badge = |models: &[ChatModel]| models.iter().map(|m| m.local_default).collect::<Vec<_>>();
+        assert_eq!(badge(&pinned), [false, true, false]);
+        assert_eq!(badge(&unasked), [true, false, false], "unknown pin: the registry default stands in");
+        assert_eq!(pinned[2].endpoint, "http://127.0.0.1:11434");
+        assert_eq!(pinned[2].api, "generate");
+    }
+
+    #[test]
+    fn a_registry_that_isnt_json_or_lists_no_chat_model_yields_none() {
+        assert!(parse_models("not json", None).is_none());
+        assert!(parse_models(r#"{"providers":{},"models":[{"id":"e","kind":"embedding"}]}"#, None).is_none());
+    }
 
     #[test]
     fn the_fallback_model_is_not_reported_as_installed() {

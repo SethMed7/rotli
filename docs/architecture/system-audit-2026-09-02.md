@@ -253,7 +253,8 @@ Ranked:
    `:1036-1043`). `chatSurface.tsx:1651` gates model resolution on it, so a
    hung `claude auth status` leaves the picker unresolved indefinitely. Fix:
    the same watchdog as `run_registered` (~5 s) plus `Stdio::null()`.
-2. **Every AI note read/write spawns PlistBuddy on the main thread.**
+2. **FIXED (2026-11-11), `chat_registry::models_for_identity`: identity checks
+   skip the pinned-model lookup.** **Every AI note read/write spawns PlistBuddy on the main thread.**
    `corpus_read_ai`/`corpus_write_ai` (`corpus.rs:8268/8358`, sync) →
    `model_is_local` → `read_models` → `local_model_default`
    (`localmodel.rs:202-213`). Every `read_note` tool step pays a subprocess

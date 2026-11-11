@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Chat reads your notes without an extra step on each one.** Every note an
+  AI read used to start a small system tool on the app's main thread to
+  answer a question it didn't need answered. It no longer does.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
