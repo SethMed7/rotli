@@ -3298,6 +3298,7 @@ impl CorpusStore {
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
@@ -3319,6 +3320,7 @@ impl CorpusStore {
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.pinned = Some(pinned);
+            self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
@@ -3699,6 +3701,7 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
     }
@@ -4796,6 +4799,11 @@ impl CorpusStore {
     ) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
+        self.writable(&rel)?;
+        // the read, the check, and the write under the note's lock, like every
+        // other body write: a CLI/MCP edit landing between them was lost
+        // (system audit 2026-09-02 §6 #3)
+        let _held = self.lock_note(&rel, None, Authority::Person)?;
         let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, raw) = parse_document(&text);
         let body = match &fm {
@@ -4818,15 +4826,15 @@ impl CorpusStore {
         if body.ends_with('\n') {
             new_body.push('\n');
         }
-        // write() resolves through the ID index — hand it the note's stable id
-        // (the frontmatter ULID when it has one; the rel doubles as the id for
-        // a frontmatter-less legacy file).
+        // the note's stable id (the frontmatter ULID when it has one; the rel
+        // doubles as the id for a frontmatter-less legacy file), written at
+        // the rel already locked rather than re-resolved through the index
         let wire_id = fm
             .as_ref()
             .and_then(|f| f.id.clone())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| rel.clone());
-        self.write(&wire_id, &new_body).map(|_| ())
+        self.write_resolved(&wire_id, &new_body, rel).map(|_| ())
     }
 
     /// Resolve an id through the index; on a miss (stale index, external
@@ -9008,6 +9016,10 @@ pub(crate) mod review_tests;
 #[cfg(test)]
 #[path = "corpus_write_lane_tests.rs"]
 mod write_lane_tests;
+
+#[cfg(test)]
+#[path = "corpus_write_race_tests.rs"]
+mod write_race_tests;
 
 #[cfg(test)]
 mod tests {

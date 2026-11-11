@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   box as "Toggle option". Each is now read as a radio or checkbox named by
   its own text. Picking an option in a long note no longer copies the whole
   note to find its group.
+- **Ticking a task on the Tasks page can't overwrite another edit.** The
+  check-off read the note, then wrote it back without holding the note, so a
+  change landing in between (from `rotli` on the command line or an agent)
+  was lost. It now holds the note like every other save.
+- **A new secure note can't knock another one out of `.gitignore`.** Creating
+  one could race marking another note secure, and drop that note's ignore
+  line, leaving it committable.
+- **Pinning, locking, and the local-AI switch no longer set off a full
+  refresh**, as if another app had changed the note.
 
 ## [1.10.0] - 2026-11-10
 

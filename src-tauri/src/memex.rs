@@ -1119,7 +1119,7 @@ pub fn memex_write_note(
 }
 
 #[cfg(test)]
-fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
+pub(crate) fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
     write_note_at_with_suppress(root, stem, contents, None)
 }
 
@@ -1168,17 +1168,25 @@ fn write_note_at_with_suppress(
         let path = dir.join(&file_name);
         if secure {
             let ignore = root.join(".gitignore");
-            // a .gitignore that can't be read is never replaced by one line
-            let existing = crate::fsutil::read_own_sidecar(&ignore)?.unwrap_or_default();
-            if !existing.lines().any(|line| line.trim() == rel) {
+            // under the .gitignore's own lock, the one gitignore_add (set_secure)
+            // takes: the create lock above is per lane, so without it a secure
+            // create racing another writer could drop that writer's ignore line
+            // and leave a secure note committable (system audit 2026-09-02 §6 #1).
+            // Innermost lock, so it can't deadlock with the create lock.
+            with_file_lock(&ignore, || {
+                // a .gitignore that can't be read is never replaced by one line
+                let existing = crate::fsutil::read_own_sidecar(&ignore)?.unwrap_or_default();
+                if existing.lines().any(|line| line.trim() == rel) {
+                    return Ok(());
+                }
                 let mut next = existing;
                 if !next.is_empty() && !next.ends_with('\n') {
                     next.push('\n');
                 }
                 next.push_str(&rel);
                 next.push('\n');
-                atomic_write(&ignore, &next)?;
-            }
+                atomic_write(&ignore, &next)
+            })?;
         }
         // Invalidate the registered CorpusStore's warm walk cache before the
         // bytes land. The same mark suppresses the watcher echo, exactly as a
