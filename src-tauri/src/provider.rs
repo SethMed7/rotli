@@ -792,18 +792,11 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
             "cursor" => &["status"],
             _ => unreachable!(),
         };
+        // a probe that hangs past the deadline counts as not signed in
         let authenticated = bin
             .as_ref()
-            .and_then(|b| {
-                Command::new(b)
-                    .args(auth_args)
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .ok()
-            })
-            .map(|status| status.success())
-            .unwrap_or(false);
+            .and_then(|b| crate::cli_probe::probe(b, auth_args, crate::cli_probe::PROBE_DEADLINE))
+            .is_some_and(|out| out.status.success());
         return Ok(CliDetect {
             installed: bin.is_some(),
             version,
@@ -814,7 +807,7 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
 }
 
 fn version_of(bin: &PathBuf, args: &[&str]) -> Option<String> {
-    let out = Command::new(bin).args(args).output().ok()?;
+    let out = crate::cli_probe::probe(bin, args, crate::cli_probe::PROBE_DEADLINE)?;
     if !out.status.success() {
         return None;
     }

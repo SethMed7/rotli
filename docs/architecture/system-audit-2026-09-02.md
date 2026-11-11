@@ -249,7 +249,8 @@ Map (provider → client → auth → streaming → UI):
 
 Ranked:
 
-1. **`cli_detect` has no timeout and inherits stdin** (`provider.rs:1023-1065`,
+1. **FIXED (2026-11-11), `cli_probe.rs`: stdin closed, killed at 5 s.**
+   **`cli_detect` has no timeout and inherits stdin** (`provider.rs:1023-1065`,
    `:1036-1043`). `chatSurface.tsx:1651` gates model resolution on it, so a
    hung `claude auth status` leaves the picker unresolved indefinitely. Fix:
    the same watchdog as `run_registered` (~5 s) plus `Stdio::null()`.
@@ -518,7 +519,10 @@ Ranked:
 4. **Board and sheet/DOCX saves revision-check without a file lock**
    (`corpus.rs:6144`, `3309`); a 500 ms board autosave racing an MCP board
    apply can lose one.
-5. **Breve writes real Library notes through a second, weaker `write_atomic`**
+5. **Partly FIXED (2026-11-11): `write_atomic` is now the shared fsutil
+   writer (folder synced), and the watchlist merge runs under the note's
+   lock (`breve_watchlist_lock_tests.rs`). The watcher mark is still
+   missing.** **Breve writes real Library notes through a second, weaker `write_atomic`**
    (`breve.rs:461`): no directory fsync, no lock, no watcher mark, so every
    Breve write echoes as an “external change” and a user editing the
    watchlist note has no mutual exclusion with Breve.
