@@ -42,5 +42,8 @@ export function useVaultGraph(): { graph: Graph | null; error: string | null } {
     return buildGraph(linkable, links.data);
   }, [links.data, loaded, searchable, archived, chats]);
   // a list that failed to REFRESH stays on screen; only one that never came is an error
-  return { graph, error: graphError(links.error, notesError, archived ? null : archivedQuery.error) };
+  return {
+    graph,
+    error: graphError(links.data ? null : links.error, notesError, archived ? null : archivedQuery.error),
+  };
 }
