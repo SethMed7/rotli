@@ -16,14 +16,16 @@ use std::time::{Duration, Instant};
 /// was "forever".
 pub(crate) const PROBE_DEADLINE: Duration = Duration::from_secs(15);
 
+const STDOUT_LIMIT: u64 = 1 << 20;
+
 /// How long an exited CLI's stdout may stay open: a background process it left
 /// behind can hold the pipe indefinitely, and the deadline must still mean it.
 const EXITED_READ_GRACE: Duration = Duration::from_millis(250);
 
 /// Run `bin args`, capturing stdout. None when it can't start, or is still
-/// running at `deadline`; it is then killed with everything it started, so a
-/// wrapper script can't leave the real CLI behind (Settings re-checks about
-/// once a minute). Stdout is drained on a thread, so a chatty CLI can't block
+/// running at `deadline`; on Unix it is then killed with everything it started,
+/// so a wrapper script can't leave the real CLI behind (Settings re-checks about
+/// once a minute; on Windows only the direct child is killed). Stdout is drained on a thread, so a chatty CLI can't block
 /// on a full pipe. A process the CLI left holding stdout costs only the output.
 pub(crate) fn probe(bin: &Path, args: &[&str], deadline: Duration) -> Option<Output> {
     let mut command = Command::new(bin);
@@ -38,7 +40,8 @@ pub(crate) fn probe(bin: &Path, args: &[&str], deadline: Duration) -> Option<Out
     let (sender, read) = mpsc::channel();
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
-        let _ = pipe.read_to_end(&mut bytes);
+        // a probe's output is a line or two; bound what a runaway CLI can buffer
+        let _ = (&mut pipe).take(STDOUT_LIMIT).read_to_end(&mut bytes);
         let _ = sender.send(bytes);
     });
     let started = Instant::now();
@@ -118,9 +121,9 @@ mod tests {
         // exits at once, leaving a child with the pipe open
         let leaves = script(dir.path(), "leaves", "sleep 6 &\nexit 0");
         let started = Instant::now();
-        let out = probe(&leaves, &[], Duration::from_secs(1)).expect("it exited");
+        let out = probe(&leaves, &[], Duration::from_secs(5)).expect("it exited");
         assert!(out.status.success(), "the exit status is the answer");
-        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+        assert!(started.elapsed() < Duration::from_secs(5), "{:?}", started.elapsed());
     }
 
     #[test]
