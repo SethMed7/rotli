@@ -123,7 +123,11 @@ function universeFolderIds(): (string | undefined)[] {
   ];
 }
 
-function useNoteUniverse(enabled = true): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
+function useNoteUniverse(enabled = true): {
+  lists: (NoteSummary[] | undefined)[];
+  complete: boolean;
+  error: unknown;
+} {
   // Whether the active root's chats/ means transcripts. Consulted only for the
   // All-Notes view's chats/ exclusion.
   const memexQ = useQuery({
@@ -155,7 +159,9 @@ function useNoteUniverse(enabled = true): { lists: (NoteSummary[] | undefined)[]
     );
   }, [raw, memex]);
   const complete = corpus.isSuccess && memexQ.isSuccess;
-  return { lists, complete };
+  // a listing that failed never completes: callers that wait on `complete`
+  // need the reason, or they wait forever
+  return { lists, complete, error: corpus.error ?? memexQ.error ?? null };
 }
 
 /** The vault's chat transcripts (`chats/**`, `vault:chats/**`) — outside every
@@ -219,8 +225,10 @@ export function useMainGcIds(): Set<string> | undefined {
 export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {}): {
   notes: NoteSummary[];
   ready: boolean;
+  /** Why the listing failed (it then never becomes ready), or null. */
+  error: unknown;
 } {
-  const { lists, complete } = useNoteUniverse(enabled);
+  const { lists, complete, error } = useNoteUniverse(enabled);
   // which roots' chats/ means transcripts — session-static, like the roots list.
   // Browser twin: the one seeded memex is the Vault brain (mirrors notes.ts).
   const memexQ = useQuery({
@@ -246,7 +254,7 @@ export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {
       }
     return [...seen.values()];
   }, [lists, memex]);
-  return { notes, ready: complete };
+  return { notes, ready: complete, error };
 }
 
 /** A value that settles `ms` after its source stops changing. */

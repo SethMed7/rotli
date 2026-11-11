@@ -18,10 +18,20 @@ export function graphInputsReady<T>(
   return links !== undefined && links !== null && notesReady && archived !== undefined;
 }
 
+/** The first failure among the Graph's inputs, as words, or null. The graph
+ * waits for all of them (graphInputsReady), so a list that failed must be
+ * reported, or the view would say Loading… forever. */
+export function graphError(...failures: unknown[]): string | null {
+  const failure = failures.find((cause) => cause !== null && cause !== undefined);
+  if (failure === undefined) return null;
+  return failure instanceof Error ? failure.message : String(failure);
+}
+
 export function useVaultGraph(): { graph: Graph | null; error: string | null } {
   const links = useNoteLinks();
-  const { notes: searchable, ready } = useSearchableNotes();
-  const archived = useNotes(DEST.archive).data;
+  const { notes: searchable, ready, error: notesError } = useSearchableNotes();
+  const archivedQuery = useNotes(DEST.archive);
+  const archived = archivedQuery.data;
   const chats = useChatTranscripts();
   const graph = useMemo(() => {
     // titles come from the note lists, not the projection: building before
@@ -30,10 +40,5 @@ export function useVaultGraph(): { graph: Graph | null; error: string | null } {
     const linkable = [...searchable, ...(archived ?? []).filter((note) => note.kind !== "file"), ...chats];
     return buildGraph(linkable, links.data);
   }, [links.data, ready, searchable, archived, chats]);
-  const error = links.error
-    ? links.error instanceof Error
-      ? links.error.message
-      : String(links.error)
-    : null;
-  return { graph, error };
+  return { graph, error: graphError(links.error, notesError, archivedQuery.error) };
 }
