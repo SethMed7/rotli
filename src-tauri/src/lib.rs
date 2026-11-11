@@ -2308,7 +2308,6 @@ pub fn run() {
             workspace::workspace_take_open_request,
             memex::memex_detect,
             memex::memex_read_contract,
-            memex::memex_read,
             memex::memex_read_chat,
             memex::memex_list_chats,
             memex::memex_chat_folders,

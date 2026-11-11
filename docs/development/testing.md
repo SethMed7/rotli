@@ -311,8 +311,10 @@ tests are additional verify phases.
   build globals exempt; type-likes PascalCase; no I-prefixed interfaces) —
   the former typescript-eslint `naming-convention` rule, which oxlint does not
   implement.
-- `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned,
-  and requires multi-segment snake_case command names.
+- `check:ipc` keeps TypeScript invocations and registered Rust handlers aligned
+  in both directions. Every invoked command must be registered. A registered
+  command with no caller in `src/` fails unless it is on `UNCALLED_BASELINE`,
+  which may only shrink. Command names must be multi-segment snake_case.
 - `check:web-parity` keeps the native registry and explicit web availability
   inventory exhaustive in both directions; it rejects missing, stale, duplicate,
   invalid, or unexplained decisions and missing implementation/test references.

@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Removed `memex_read`**, an app command nothing in Rotli called. It could
+  read any file in a registered vault, secure notes included. `check:ipc`
+  now fails when a registered command has no caller, so unused surface
+  doesn't build up again.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
