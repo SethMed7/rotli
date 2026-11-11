@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of links at once instead of after a pause, stays crisp after moving to a
   display with another scale, and follows a new primary color without being
   reopened.
+- **Dark themes no longer open on a light flash.** Rotli used to paint its
+  light ground while it read your settings, then switch. Each window now
+  starts in the theme it last showed, on the Mac and on Rotli Web.
 
 ## [1.10.0] - 2026-11-10
 

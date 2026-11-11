@@ -7,21 +7,26 @@ import { useSyncExternalStore } from "react";
 
 import type { AccentColor, SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
 
-export type DataTheme =
-  | "light"
-  | "dark"
-  | "paper"
-  | "charcoal"
-  | "ocean-light"
-  | "ocean-dark"
-  | "grove-light"
-  | "grove-dark"
-  | "iris-light"
-  | "iris-dark"
-  | "blossom-light"
-  | "blossom-dark"
-  | "midnight-light"
-  | "midnight-dark";
+/** Every `data-theme` value, in one list (public/theme-boot.js's pattern is
+ * pinned to exactly these by theme.test.ts). */
+export const DATA_THEMES = [
+  "light",
+  "dark",
+  "paper",
+  "charcoal",
+  "ocean-light",
+  "ocean-dark",
+  "grove-light",
+  "grove-dark",
+  "iris-light",
+  "iris-dark",
+  "blossom-light",
+  "blossom-dark",
+  "midnight-light",
+  "midnight-dark",
+] as const;
+
+export type DataTheme = (typeof DATA_THEMES)[number];
 
 export const DARK_DATA_THEMES: readonly DataTheme[] = [
   "dark",
@@ -99,8 +104,39 @@ export function resolveThemeSetting(
   return resolveTheme(family, mode);
 }
 
+/** Where the last applied theme waits for the next launch. public/theme-boot.js
+ * reads the same key before the first paint, so a dark-theme window never
+ * shows index.html's light ground while settings hydrate. */
+export const LAST_THEME_KEY = "rotli.lastDataTheme";
+/** With the System setting, the family's light and dark themes ("ocean-light
+ * ocean-dark"): the boot script picks by the OS appearance at launch, which
+ * may have changed since the theme above was applied. Absent otherwise. */
+export const LAST_SYSTEM_PAIR_KEY = "rotli.lastSystemThemes";
+
+let rememberThemes = false;
+
+/** Turn the launch cache on where settings are durable (the Mac app, Rotli
+ * Web). The in-memory browser twin restarts at its default on every load, so
+ * a remembered theme there would paint one theme and then switch. Turned on
+ * after hydration and before the first render, so the app's first applyTheme
+ * is the first write. */
+export function rememberAppliedTheme(on: boolean): void {
+  rememberThemes = on;
+}
+
+function remember(key: string, value: string | null): void {
+  if (!rememberThemes) return;
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+  } catch {
+    // storage refused (private mode, quota): the next launch paints light first
+  }
+}
+
 function setDataTheme(value: DataTheme): void {
   document.documentElement.dataset.theme = value;
+  remember(LAST_THEME_KEY, value);
 }
 
 export function applySyntaxPalette(value: SyntaxPalette): void {
@@ -126,6 +162,10 @@ function detachSystemListener(): void {
  * last "system" listener must not survive a root unmount. */
 export function applyTheme(setting: ThemeSetting, family: ThemeFamily): () => void {
   detachSystemListener();
+  remember(
+    LAST_SYSTEM_PAIR_KEY,
+    setting === "system" ? `${resolveTheme(family, "light")} ${resolveTheme(family, "dark")}` : null,
+  );
   if (setting === "system") {
     const forOs = (dark: boolean) => resolveThemeSetting(setting, family, dark);
     media = window.matchMedia("(prefers-color-scheme: dark)"); // the listener needs the object
