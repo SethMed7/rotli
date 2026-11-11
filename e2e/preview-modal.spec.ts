@@ -57,3 +57,26 @@ test("Tab stays inside the peek instead of walking into the page behind it", asy
     expect(await modal.evaluate((card) => card.contains(document.activeElement))).toBe(true);
   }
 });
+
+test("Tab reaches a previewed PDF and comes back, never the page behind", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".frow", { hasText: "Assets" }).first().click();
+  await page.locator(".system-browser .fdr-tile", { hasText: "Groceries" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Preview" }).click();
+  const modal = page.locator(".pvw");
+  await expect(modal.locator(".pv-open")).toBeFocused();
+  // the twin has no PDF fixture: the body's frame, as a PDF preview renders it
+  await modal.locator(".pv-body").evaluate((body) => {
+    const frame = document.createElement("iframe");
+    frame.className = "pv-frame";
+    frame.srcdoc = "<p>page</p>";
+    body.replaceChildren(frame);
+  });
+  await modal.locator("iframe").waitFor();
+  await page.keyboard.press("Tab"); // the close button
+  await expect(modal.locator(".pv-x")).toBeFocused();
+  await page.keyboard.press("Tab"); // into the frame
+  await expect(modal.locator("iframe")).toBeFocused();
+  await page.keyboard.press("Tab"); // out of it, and back round to Open
+  await expect(modal.locator(".pv-open")).toBeFocused();
+});

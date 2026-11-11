@@ -194,6 +194,8 @@ export function PreviewModal() {
           </button>
         </header>
         <div className="pv-body">{body}</div>
+        {/* where Tab lands leaving a PDF or a player, which the trap can't see */}
+        <span tabIndex={0} data-focus-end="" onFocus={() => openBtnRef.current?.focus()} />
       </div>
     </div>
   );
