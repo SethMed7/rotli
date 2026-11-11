@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Removed `memex_read`**, an app command nothing in Rotli called. It could
+  read any file in a registered vault, secure notes included. `check:ipc`
+  now fails when a registered command has no caller, so unused surface
+  doesn't build up again.
+
+### Changed
+
+- **Typing in a long note does less work.** Each keystroke used to look for
+  code blocks and tables up to five times over the whole note. It now looks
+  once and shares the answer. A 24,000-line note went from about 35 ms to
+  14 ms of that work per keystroke.
+- **Chat reads your notes without an extra step on each one.** Every note an
+  AI read used to start a small system tool on the app's main thread to
+  answer a question it didn't need answered. It no longer does.
+
 ### Fixed
 
 - **A canvas that isn't UTF-8 text is refused instead of quietly changed**
@@ -51,23 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A dialog's unavailable button looks unavailable.** Create board, Rename,
   and the other name dialogs fade their button and drop the pointer while
   there's nothing to submit or a save is running.
-### Security
-
-- **Removed `memex_read`**, an app command nothing in Rotli called. It could
-  read any file in a registered vault, secure notes included. `check:ipc`
-  now fails when a registered command has no caller, so unused surface
-  doesn't build up again.
 - **A board, sheet, or Word document can't be overwritten by a save that was
   already out of date.** When Rotli's autosave and another writer (an agent
   editing the board, or the command line) saved the same file at the same
   moment, one save could replace the other unseen. They now take turns, and
   the late one reports the conflict.
-### Changed
-
-- **Typing in a long note does less work.** Each keystroke used to look for
-  code blocks and tables up to five times over the whole note. It now looks
-  once and shares the answer. A 24,000-line note went from about 35 ms to
-  14 ms of that work per keystroke.
 - **Tab stays inside a dialog.** In the preview, the Librarian's
   introduction and the vault cards, Tab used to walk out into the page
   behind. It now cycles through the dialog's own controls, like Rotli's
@@ -83,11 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breve's watchlist can't overwrite an edit made at the same moment**
   (development builds). Breve now waits for any other save to that note
   before it merges its changes in, and its writes survive a crash.
-### Changed
-
-- **Chat reads your notes without an extra step on each one.** Every note an
-  AI read used to start a small system tool on the app's main thread to
-  answer a question it didn't need answered. It no longer does.
 
 ## [1.10.0] - 2026-11-10
 
