@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A board, sheet, or Word document can't be overwritten by a save that was
+  already out of date.** When Rotli's autosave and another writer (an agent
+  editing the board, or the command line) saved the same file at the same
+  moment, one save could replace the other unseen. They now take turns, and
+  the late one reports the conflict.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
