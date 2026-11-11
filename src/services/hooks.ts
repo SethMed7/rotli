@@ -123,8 +123,7 @@ function universeFolderIds(): (string | undefined)[] {
   ];
 }
 
-type NoteUniverse = { lists: (NoteSummary[] | undefined)[]; complete: boolean; error: unknown };
-function useNoteUniverse(enabled = true): NoteUniverse {
+function useNoteUniverse(enabled = true) {
   // Whether the active root's chats/ means transcripts. Consulted only for the
   // All-Notes view's chats/ exclusion.
   const memexQ = useQuery({
@@ -156,8 +155,9 @@ function useNoteUniverse(enabled = true): NoteUniverse {
     );
   }, [raw, memex]);
   const complete = corpus.isSuccess && memexQ.isSuccess;
-  // a failed listing never completes; `error` says why, so no caller waits forever
-  return { lists, complete, error: corpus.error ?? memexQ.error ?? null };
+  // a failed background refetch keeps `loaded`; `error` is a list that never arrived
+  const loaded = raw !== undefined && memex !== undefined;
+  return { lists, complete, loaded, error: loaded ? null : (corpus.error ?? memexQ.error ?? null) };
 }
 
 /** The vault's chat transcripts (`chats/**`, `vault:chats/**`) — outside every
@@ -221,9 +221,10 @@ export function useMainGcIds(): Set<string> | undefined {
 export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {}): {
   notes: NoteSummary[];
   ready: boolean;
-  error: unknown; // why the listing failed (it then never becomes ready), or null
+  loaded: boolean; // the lists are here, even if the latest refetch failed
+  error: unknown; // why they never arrived, or null
 } {
-  const { lists, complete, error } = useNoteUniverse(enabled);
+  const { lists, complete, loaded, error } = useNoteUniverse(enabled);
   // which roots' chats/ means transcripts — session-static, like the roots list.
   // Browser twin: the one seeded memex is the Vault brain (mirrors notes.ts).
   const memexQ = useQuery({
@@ -249,7 +250,7 @@ export function useSearchableNotes({ enabled = true }: { enabled?: boolean } = {
       }
     return [...seen.values()];
   }, [lists, memex]);
-  return { notes, ready: complete, error };
+  return { notes, ready: complete, loaded, error };
 }
 
 /** A value that settles `ms` after its source stops changing. */

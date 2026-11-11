@@ -30,16 +30,17 @@ export function graphError(...failures: unknown[]): string | null {
 
 export function useVaultGraph(): { graph: Graph | null; error: string | null } {
   const links = useNoteLinks();
-  const { notes: searchable, ready, error: notesError } = useSearchableNotes();
+  const { notes: searchable, loaded, error: notesError } = useSearchableNotes();
   const archivedQuery = useNotes(DEST.archive);
   const archived = archivedQuery.data;
   const chats = useChatTranscripts();
   const graph = useMemo(() => {
     // titles come from the note lists, not the projection: building before
     // they load drew a first frame of "Untitled" dots (canvas-graph audit, P2)
-    if (!graphInputsReady(links.data, ready, archived)) return null;
+    if (!graphInputsReady(links.data, loaded, archived)) return null;
     const linkable = [...searchable, ...(archived ?? []).filter((note) => note.kind !== "file"), ...chats];
     return buildGraph(linkable, links.data);
-  }, [links.data, ready, searchable, archived, chats]);
-  return { graph, error: graphError(links.error, notesError, archivedQuery.error) };
+  }, [links.data, loaded, searchable, archived, chats]);
+  // a list that failed to REFRESH stays on screen; only one that never came is an error
+  return { graph, error: graphError(links.error, notesError, archived ? null : archivedQuery.error) };
 }
