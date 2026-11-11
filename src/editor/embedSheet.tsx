@@ -19,7 +19,7 @@ import {
   mountSheet,
   workbookToModel,
 } from "../sheets/engine";
-import { SHEET_EDIT_MAX_BYTES, sheetFormatEditable } from "../sheets/kinds";
+import { SHEET_EDIT_MAX_BYTES, sheetFormatEditable, sheetReadOnlyReason } from "../sheets/kinds";
 import {
   deleteParked,
   getParked,
@@ -41,6 +41,10 @@ function modeOf(fileId: string): SheetFileMode {
 }
 
 export function SheetEmbed({ fileId }: { fileId: string }) {
+  // a format Rotli can't save says why, like the tab does (#53)
+  const formatReason = sheetFormatEditable(extOf(fileId))
+    ? null
+    : sheetReadOnlyReason({ writable: true }, extOf(fileId));
   const hostRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [readOnly, setReadOnly] = useState(false);
@@ -251,7 +255,11 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
       {status === "ready" && tabOpen && (
         <div className="rotli-embed-viewonly">Open in its tab — the embed is view-only meanwhile.</div>
       )}
-      {status === "ready" && readOnly && !tabOpen && <span className="rotli-embed-readonly">Read-only</span>}
+      {status === "ready" && readOnly && !tabOpen && (
+        <span className="rotli-embed-readonly" title={formatReason?.title}>
+          {formatReason?.label ?? "Read-only"}
+        </span>
+      )}
       {saveErr && (
         <div className="rotli-embed-saveerr" role="alert">
           ⚠ This sheet isn’t saving — {saveErr}

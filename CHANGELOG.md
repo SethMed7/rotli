@@ -95,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   touch.** Rotli could read a styled paragraph with content it can't rewrite
   as edited, and block the whole save.
 - **Long text files show to the end.** On the Mac a `.log` or `.txt` file was
-  silently cut at 200 KB; it now shows whole, or says it's too large.
+  silently cut at 200 KB. It now shows up to 2 MB, and says when that's only
+  the start of the file.
 
 ## [1.10.0] - 2026-11-10
 
