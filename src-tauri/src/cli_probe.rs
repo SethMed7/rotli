@@ -4,8 +4,10 @@
 //! hung left the lane "checking…" forever and held a blocking thread (system
 //! audit 2026-09-02 §2 #1).
 
+use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
+use std::process::{Child, Command, Output, Stdio};
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 /// Generous on purpose. A probe that times out reads as "not signed in", and
@@ -14,28 +16,55 @@ use std::time::{Duration, Instant};
 /// was "forever".
 pub(crate) const PROBE_DEADLINE: Duration = Duration::from_secs(15);
 
+/// How long an exited CLI's stdout may stay open: a background process it left
+/// behind can hold the pipe indefinitely, and the deadline must still mean it.
+const EXITED_READ_GRACE: Duration = Duration::from_millis(250);
+
 /// Run `bin args`, capturing stdout. None when it can't start, or is still
-/// running at `deadline` (it is then killed and reaped).
+/// running at `deadline`; it is then killed with everything it started, so a
+/// wrapper script can't leave the real CLI behind (Settings re-checks about
+/// once a minute). Stdout is drained on a thread, so a chatty CLI can't block
+/// on a full pipe. A process the CLI left holding stdout costs only the output.
 pub(crate) fn probe(bin: &Path, args: &[&str], deadline: Duration) -> Option<Output> {
-    let mut child = Command::new(bin)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
+    let mut command = Command::new(bin);
+    command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    let mut child = command.spawn().ok()?;
+    let mut pipe = child.stdout.take()?;
+    let (sender, read) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = pipe.read_to_end(&mut bytes);
+        let _ = sender.send(bytes);
+    });
     let started = Instant::now();
     loop {
         match child.try_wait() {
-            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(Some(status)) => {
+                let stdout = read.recv_timeout(EXITED_READ_GRACE).unwrap_or_default();
+                return Some(Output { status, stdout, stderr: Vec::new() });
+            }
             Ok(None) if started.elapsed() < deadline => std::thread::sleep(Duration::from_millis(20)),
             _ => {
-                let _ = child.kill();
-                let _ = child.wait();
+                kill_tree(&mut child);
                 return None;
             }
         }
     }
+}
+
+fn kill_tree(child: &mut Child) {
+    #[cfg(unix)]
+    // SAFETY: killpg only sends a signal; the group is the one this child leads
+    unsafe {
+        libc::killpg(child.id() as libc::pid_t, libc::SIGKILL);
+    }
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 #[cfg(all(test, unix))]
@@ -50,22 +79,55 @@ mod tests {
         path
     }
 
-    #[test]
-    fn a_cli_that_hangs_is_killed_at_the_deadline() {
-        let dir = tempfile::tempdir().unwrap();
-        let hangs = script(dir.path(), "hangs", "sleep 30");
-        let started = Instant::now();
-        assert!(probe(&hangs, &["auth", "status"], Duration::from_millis(300)).is_none());
-        assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+    fn alive(pid: i32) -> bool {
+        // SAFETY: signal 0 only asks whether the process exists
+        unsafe { libc::kill(pid, 0) == 0 }
     }
 
     #[test]
-    fn a_cli_waiting_on_stdin_sees_it_closed_instead_of_hanging() {
+    fn a_cli_that_hangs_is_killed_at_the_deadline_with_what_it_started() {
         let dir = tempfile::tempdir().unwrap();
-        // `read` returns at once on a closed stdin; on an inherited one it waits
-        let asks = script(dir.path(), "asks", "read answer; echo got:$answer");
+        let pidfile = dir.path().join("pid");
+        // the shape of an npm shim: a wrapper waiting on the real process
+        let hangs = script(dir.path(), "hangs", &format!("sleep 47 &\necho $! > '{}'\nwait", pidfile.display()));
+        let started = Instant::now();
+        assert!(probe(&hangs, &["auth", "status"], Duration::from_millis(300)).is_none());
+        assert!(started.elapsed() < Duration::from_secs(3), "{:?}", started.elapsed());
+        let descendant: i32 = std::fs::read_to_string(&pidfile).unwrap().trim().parse().unwrap();
+        let gone_by = Instant::now() + Duration::from_secs(3);
+        while alive(descendant) && Instant::now() < gone_by {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!alive(descendant), "the process the wrapper started outlived the probe");
+    }
+
+    #[test]
+    fn stdin_is_the_null_device() {
+        let dir = tempfile::tempdir().unwrap();
+        // says what fd 0 really is, so it can't pass on a test runner whose
+        // own stdin happens to be closed
+        let asks = script(dir.path(), "asks", "[ /dev/fd/0 -ef /dev/null ] && echo null || echo other");
         let out = probe(&asks, &[], Duration::from_secs(3)).expect("finished");
-        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "got:");
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "null");
+    }
+
+    #[test]
+    fn a_process_left_holding_stdout_cant_outlast_the_deadline() {
+        let dir = tempfile::tempdir().unwrap();
+        // exits at once, leaving a child with the pipe open
+        let leaves = script(dir.path(), "leaves", "sleep 6 &\nexit 0");
+        let started = Instant::now();
+        let out = probe(&leaves, &[], Duration::from_secs(1)).expect("it exited");
+        assert!(out.status.success(), "the exit status is the answer");
+        assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn a_chatty_cli_doesnt_fill_the_pipe_and_time_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let chatty = script(dir.path(), "chatty", "yes 0123456789 | sed 20000q");
+        let out = probe(&chatty, &[], Duration::from_secs(3)).expect("finished");
+        assert_eq!(out.stdout.len(), 20000 * 11);
     }
 
     #[test]
