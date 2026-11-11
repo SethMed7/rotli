@@ -19,7 +19,7 @@ import {
   mountSheet,
   workbookToModel,
 } from "../sheets/engine";
-import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
+import { SHEET_EDIT_MAX_BYTES, sheetFormatEditable } from "../sheets/kinds";
 import {
   deleteParked,
   getParked,
@@ -80,7 +80,9 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
           if (!cancelled) setStatus("error");
           return;
         }
-        const writable = stat.writable && !tabOpen;
+        // a format Rotli can't write faithfully stays view-only here too: saving
+        // an .xlsm through the xlsx codec would drop its macros
+        const writable = stat.writable && !tabOpen && sheetFormatEditable(extOf(fileId));
         if (!cancelled) setReadOnly(!writable);
 
         // A parked session (this embed or a tab dismissed mid-debounce) is

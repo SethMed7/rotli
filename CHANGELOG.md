@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An `.xlsm` embedded in a note can't lose its macros.** The embed offered
+  editing and saved through a format that drops them. It now opens view-only,
+  like the full sheet tab.
+- **A Word document no longer refuses to save over a paragraph you didn't
+  touch.** Rotli could read a styled paragraph with content it can't rewrite
+  as edited, and block the whole save.
+- **Long text files show to the end.** On the Mac a `.log` or `.txt` file was
+  silently cut at 200 KB; it now shows whole, or says it's too large.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
