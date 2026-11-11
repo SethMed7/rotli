@@ -1,9 +1,9 @@
 // The Librarian's introduction: what it may and may not do, and where files go.
 // Split from activitySurface.tsx (its size ceiling) when it gained focus handling.
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
-import { containDialogFocus } from "../../lib/dialogFocus";
+import { containDialogFocus, useDialogFocus } from "../../lib/dialogFocus";
 import { useTransientPopover } from "../../lib/popover";
 
 /** The first-visit explainer — everything the Librarian may and may NOT do,
@@ -18,13 +18,7 @@ export function LibrarianIntro({
   const cardRef = useRef<HTMLDivElement>(null);
   const gotItRef = useRef<HTMLButtonElement>(null);
   useTransientPopover([cardRef], true, onClose);
-  // focus lands on Got it, and returns to whatever had it when this closes
-  // (DESIGN.md's focus law), the way the preview does
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    gotItRef.current?.focus();
-    return () => opener?.focus();
-  }, []);
+  useDialogFocus(gotItRef);
   return (
     <div className="lib-intro-overlay" onKeyDown={containDialogFocus}>
       <div

@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { type KeyboardEvent, type RefObject, useEffect } from "react";
 
 /** Keep Tab within a modal's enabled, visible controls, including while busy. */
 export function containDialogFocus(event: KeyboardEvent<HTMLElement>): void {
@@ -25,4 +25,14 @@ export function containDialogFocus(event: KeyboardEvent<HTMLElement>): void {
     event.preventDefault();
     first.focus();
   }
+}
+
+/** Move focus to `target` when a dialog opens, and back to whatever had it when
+ * the dialog goes away (DESIGN.md's focus law). */
+export function useDialogFocus(target: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    target.current?.focus();
+    return () => opener?.focus();
+  }, [target]);
 }

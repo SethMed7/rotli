@@ -3,9 +3,9 @@
 // close it, actions along the bottom. The connect-a-folder and chat-on-the-web
 // dialogs are two instances; the frame is told once.
 
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useRef } from "react";
 
-import { containDialogFocus } from "../lib/dialogFocus";
+import { containDialogFocus, useDialogFocus } from "../lib/dialogFocus";
 
 export function WebDialogFrame({
   id,
@@ -27,11 +27,7 @@ export function WebDialogFrame({
   // Focus moves into the card on opening so Escape reaches its handler, and
   // returns to whatever opened it when the card goes away.
   const card = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    card.current?.focus();
-    return () => opener?.focus();
-  }, []);
+  useDialogFocus(card);
   return (
     <div className="rename-overlay" onMouseDown={busy ? undefined : onClose}>
       <div
