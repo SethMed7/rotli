@@ -502,7 +502,7 @@ Every write lane, with the shape it produces:
 
 Ranked:
 
-1. **Unlocked read-modify-write of `.gitignore` for a secure note**
+1. **FIXED (2026-11-11). Unlocked read-modify-write of `.gitignore` for a secure note**
    (`memex.rs:1204-1215`). `memex_write_note` inlines its own append under
    only a directory lock while `corpus.rs:3717 gitignore_add` does the same
    job under the file lock. Two concurrent secure creates (Quick Note +
@@ -512,7 +512,7 @@ Ranked:
    into `history/`, which the contract declares never writable by any lane.
    A crash mid-write leaves an empty day. Fix: temp + rename, and long-term
    route through Rust.
-3. **`toggle_task` writes through the only unlocked body-write entry**
+3. **FIXED (2026-11-11). `toggle_task` writes through the only unlocked body-write entry**
    (`corpus.rs:4979` → `5083`); a CLI/MCP patch between its read and write
    is silently discarded.
 4. **Board and sheet/DOCX saves revision-check without a file lock**
@@ -536,7 +536,8 @@ Ranked:
 9. **Any internal write invalidates the whole walk cache** (`corpus.rs:2526
    mark()` → `bump()`), so the next list/search/⌘K re-walks and re-hashes
    the vault. With #7 that is often within the same second.
-10. Three flag writers skip `suppress.mark` (`set_locked:3562`,
+10. **FIXED (2026-11-11), the `suppress.mark` half; all three tests are in
+    `corpus_write_race_tests.rs`.** Three flag writers skip `suppress.mark` (`set_locked:3562`,
     `set_pinned:3583`, `set_local_ai_access:4034`) and fire a spurious
     external-change refresh; `create_with_policy:6019` stamps RFC3339 on a
     Memex-layout vault where `write_resolved` uses `YYYY-MM-DD`.
