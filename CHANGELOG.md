@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Graph** (development builds) no longer flashes "Untitled" dots
+  before the note titles load, opens the notes around a note with thousands
+  of links at once instead of after a pause, stays crisp after moving to a
+  display with another scale, and follows a new primary color without being
+  reopened.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
