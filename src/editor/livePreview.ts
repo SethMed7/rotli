@@ -31,7 +31,7 @@ import { resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { ALIGN_CLOSE, parseAlignedLine } from "./alignedLine";
 import { ChoiceAlignWidget } from "./choiceAlignWidget";
-import { selectChoiceGroup } from "./choiceState";
+import { optionLabel } from "./choiceState";
 import { choiceGroupAlign, isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
@@ -56,7 +56,13 @@ import { widestOrdinalInRun } from "./listNumbers";
 import { revealRange } from "./readingReveal";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
-import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
+import {
+  ChoiceControlWidget,
+  ChoiceWidget,
+  ResultReasonWidget,
+  ResultWidget,
+  ToggleWidget,
+} from "./resultWidget";
 import { lineInTable, scanTables } from "./tables";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
 import { CheckboxWidget } from "./taskWidget";
@@ -298,68 +304,6 @@ class NumberWidget extends WidgetType {
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
-  }
-}
-
-/** One radio-style option backed by `( )` / `(x)`. Adjacent same-indent choice
- * rows are the group, so selecting one rewrites that group atomically. */
-class ChoiceWidget extends WidgetType {
-  constructor(
-    readonly selected: boolean,
-    readonly marker: string | null = null,
-  ) {
-    super();
-  }
-  eq(other: ChoiceWidget) {
-    return other.selected === this.selected && other.marker === this.marker;
-  }
-  toDOM(view: EditorView) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `rotli-choice${this.selected ? " is-selected" : ""}`;
-    btn.setAttribute("aria-pressed", String(this.selected));
-    btn.setAttribute("aria-label", this.selected ? "Selected option" : "Select option");
-    btn.title = this.selected ? "Selected option" : "Select option";
-
-    const select = () => {
-      const pos = view.posAtDOM(btn);
-      const target = view.state.doc.lineAt(pos);
-      const lines = view.state.doc.toString().split("\n");
-      const planned = selectChoiceGroup(lines, target.number - 1);
-      if (!planned || planned.length === 0) return;
-      const changes = planned.map((edit) => {
-        const line = view.state.doc.line(edit.index + 1);
-        return { from: line.from, to: line.to, insert: edit.line };
-      });
-      view.dispatch({ changes, userEvent: "input" });
-    };
-
-    btn.addEventListener("keydown", (event) => {
-      // A focused embedded choice stays in normal Tab order. A text caret on
-      // the line still delegates Tab to Rotli's line-indent command.
-      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
-    });
-    btn.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return; // a right/middle press must not select
-      event.preventDefault();
-      select();
-    });
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (event.detail === 0) select();
-    });
-
-    if (!this.marker) return btn;
-    const wrap = document.createElement("span");
-    const num = document.createElement("span");
-    num.className = "rotli-marker num";
-    num.textContent = this.marker;
-    num.setAttribute("aria-hidden", "true");
-    wrap.append(num, btn);
-    return wrap;
-  }
-  ignoreEvent() {
-    return false;
   }
 }
 
@@ -1077,8 +1021,9 @@ function build(view: EditorView): {
                   block.choiceVariant,
                   block.choiceSelected ?? false,
                   block.marker ?? null,
+                  optionLabel(content),
                 )
-              : new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
+              : new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null, optionLabel(content)),
             decos,
             atomics,
           );

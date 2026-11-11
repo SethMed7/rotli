@@ -646,13 +646,17 @@ test("hash choices and switches stay interactive while inline code stays literal
   );
   await page.locator(".ed-date").click();
 
-  const radios = page.getByRole("radio", { name: "Choose option" });
+  // each control is named by its option, not a generic "Choose option"
+  await expect(editor.getByRole("radio", { name: "Red", exact: true })).toBeVisible();
+  await expect(editor.getByRole("radio", { name: "Blue", exact: true })).toBeVisible();
+  const radios = editor.getByRole("radio", { name: /^(Red|Blue)$/ });
   await expect(radios).toHaveCount(2);
   await radios.nth(1).click();
   await expect(radios.nth(0)).toHaveAttribute("aria-checked", "false");
   await expect(radios.nth(1)).toHaveAttribute("aria-checked", "true");
 
-  const multis = page.getByRole("checkbox", { name: "Toggle option" });
+  await expect(page.getByRole("checkbox", { name: "Email", exact: true })).toBeVisible();
+  const multis = page.getByRole("checkbox", { name: /^(Email|SMS)$/ });
   await expect(multis).toHaveCount(2);
   await multis.nth(0).click();
   await multis.nth(1).click();
@@ -885,16 +889,24 @@ test("() creates a tab-navigable Markdown multiple-choice group", async ({ page 
   await page.keyboard.press("Tab");
   await expect(choices.nth(1)).toBeFocused();
 
+  // the legacy ( ) grammar is a radio group too, named by each option
+  await expect(page.getByRole("radio", { name: "Blue", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
   await choices.nth(1).click();
-  await expect(choices.nth(0)).toHaveAttribute("aria-pressed", "false");
-  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "true");
-  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "false");
+  await expect(choices.nth(0)).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("radio", { name: "Blue", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(choices.nth(2)).toHaveAttribute("aria-checked", "false");
   await expect(page.locator(".rotli-choice-text--selected")).toContainText("Blue");
   await expect(page.locator(".rotli-choice-text--selected")).toHaveCSS("font-weight", "700");
 
   await choices.nth(2).click();
-  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "false");
-  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(choices.nth(1)).toHaveAttribute("aria-checked", "false");
+  await expect(choices.nth(2)).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".rotli-choice-text--selected")).toContainText("Green");
 
   await page.getByRole("button", { name: "Aa" }).click();

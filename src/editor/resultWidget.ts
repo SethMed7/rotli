@@ -2,8 +2,10 @@
 // pass/fail semantics; labeled adjacent boxes share the same exclusive write
 // policy while preserving every user-authored label and color suffix.
 
+import type { Text } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
 
+import { type LineSource, selectChoiceGroup } from "./choiceState";
 import {
   type ChoiceControlKind,
   selectChoiceControlGroup,
@@ -154,6 +156,81 @@ export class ResultReasonWidget extends WidgetType {
   }
 }
 
+/** The document as a LineSource: a group edit reads only the lines it walks,
+ * never the whole note as one string. */
+export function docLines(doc: Text): LineSource {
+  return {
+    length: doc.lines,
+    at: (index) => (index >= 0 && index < doc.lines ? doc.line(index + 1).text : undefined),
+  };
+}
+
+/** One radio-style option backed by `( )` / `(x)`. Adjacent same-indent choice
+ * rows are the group, so selecting one rewrites that group atomically. */
+export class ChoiceWidget extends WidgetType {
+  constructor(
+    readonly selected: boolean,
+    readonly marker: string | null = null,
+    /** The option's text (optionLabel), so a screen reader names it. */
+    readonly label = "",
+  ) {
+    super();
+  }
+  eq(other: ChoiceWidget) {
+    return other.selected === this.selected && other.marker === this.marker && other.label === this.label;
+  }
+  toDOM(view: EditorView) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `rotli-choice${this.selected ? " is-selected" : ""}`;
+    // one option of an exclusive group: a radio that names its option, the
+    // way the newer [#] controls are announced
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", String(this.selected));
+    btn.setAttribute("aria-label", this.label || "Select option");
+    btn.title = this.selected ? "Selected option" : "Select option";
+
+    const select = () => {
+      const pos = view.posAtDOM(btn);
+      const target = view.state.doc.lineAt(pos);
+      const planned = selectChoiceGroup(docLines(view.state.doc), target.number - 1);
+      if (!planned || planned.length === 0) return;
+      const changes = planned.map((edit) => {
+        const line = view.state.doc.line(edit.index + 1);
+        return { from: line.from, to: line.to, insert: edit.line };
+      });
+      view.dispatch({ changes, userEvent: "input" });
+    };
+
+    btn.addEventListener("keydown", (event) => {
+      // A focused embedded choice stays in normal Tab order. A text caret on
+      // the line still delegates Tab to Rotli's line-indent command.
+      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
+    });
+    btn.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return; // a right/middle press must not select
+      event.preventDefault();
+      select();
+    });
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (event.detail === 0) select();
+    });
+
+    if (!this.marker) return btn;
+    const wrap = document.createElement("span");
+    const num = document.createElement("span");
+    num.className = "rotli-marker num";
+    num.textContent = this.marker;
+    num.setAttribute("aria-hidden", "true");
+    wrap.append(num, btn);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
 /** New `[#]` radio and `[##]` multi-select controls. Legacy `( )` continues
  * through its original widget so old notes never rewrite themselves. */
 export class ChoiceControlWidget extends WidgetType {
@@ -161,12 +238,19 @@ export class ChoiceControlWidget extends WidgetType {
     readonly kind: ChoiceControlKind,
     readonly selected: boolean,
     readonly marker: string | null = null,
+    /** The option's text (optionLabel), so a screen reader names it. */
+    readonly label = "",
   ) {
     super();
   }
 
   eq(other: ChoiceControlWidget) {
-    return other.kind === this.kind && other.selected === this.selected && other.marker === this.marker;
+    return (
+      other.kind === this.kind &&
+      other.selected === this.selected &&
+      other.marker === this.marker &&
+      other.label === this.label
+    );
   }
 
   toDOM(view: EditorView) {
@@ -176,19 +260,17 @@ export class ChoiceControlWidget extends WidgetType {
     btn.dataset.controlKind = this.kind;
     btn.setAttribute("role", this.kind === "radio" ? "radio" : "checkbox");
     btn.setAttribute("aria-checked", String(this.selected));
-    btn.setAttribute("aria-label", this.kind === "radio" ? "Choose option" : "Toggle option");
+    btn.setAttribute("aria-label", this.label || (this.kind === "radio" ? "Choose option" : "Toggle option"));
 
     const activate = (restoreFocus: boolean) => {
       const pos = view.posAtDOM(btn);
       const target = view.state.doc.lineAt(pos);
       const changes =
         this.kind === "radio"
-          ? (selectChoiceControlGroup(view.state.doc.toString().split("\n"), target.number - 1) ?? []).map(
-              (edit) => {
-                const line = view.state.doc.line(edit.index + 1);
-                return { from: line.from, to: line.to, insert: edit.line };
-              },
-            )
+          ? (selectChoiceControlGroup(docLines(view.state.doc), target.number - 1) ?? []).map((edit) => {
+              const line = view.state.doc.line(edit.index + 1);
+              return { from: line.from, to: line.to, insert: edit.line };
+            })
           : (() => {
               const next = setChoiceControlSelected(target.text, !this.selected);
               return next ? [{ from: target.from, to: target.to, insert: next }] : [];
