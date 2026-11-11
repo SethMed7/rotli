@@ -525,7 +525,7 @@ Ranked:
 3. **FIXED (2026-11-11). `toggle_task` writes through the only unlocked body-write entry**
    (`corpus.rs:4979` → `5083`); a CLI/MCP patch between its read and write
    is silently discarded.
-4. **Board and sheet/DOCX saves revision-check without a file lock**
+4. **FIXED (2026-11-11), `corpus_save_lock_tests.rs`. Board and sheet/DOCX saves revision-check without a file lock**
    (`corpus.rs:6144`, `3309`); a 500 ms board autosave racing an MCP board
    apply can lose one.
 5. **Breve writes real Library notes through a second, weaker `write_atomic`**

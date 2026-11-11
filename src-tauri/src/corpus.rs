@@ -3024,6 +3024,11 @@ impl CorpusStore {
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
         }
+        // the revision check and the write under one lock, so a save from
+        // another process (the CLI, an agent) can't land between them and be
+        // overwritten (system audit 2026-09-02 §6 #4). Callers apply their own
+        // lane's gate first; the lock is for exclusion.
+        let _held = self.lock_note(rel, None, Authority::Person)?;
         let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         self.write_file_bytes(rel, bytes, bak)?;
@@ -6199,6 +6204,10 @@ impl CorpusStore {
         }
         self.writable(id)?;
         let abs = self.guard_rel(id)?;
+        // one lock over check and write: the app's autosave and an agent's
+        // rotli_apply_board (another process) were both revision-checked but
+        // could interleave and lose one (system audit 2026-09-02 §6 #4)
+        let _held = self.lock_note(id, None, Authority::Person)?;
         let current = crate::fsutil::read_own_bytes(&abs).map_err(|e| format!("read {id}: {e}"))?;
         crate::fsutil::compare_revision(expected_revision, &current)?;
         let meta = self.write_board(id, body)?;
@@ -9020,6 +9029,10 @@ mod write_lane_tests;
 #[cfg(test)]
 #[path = "corpus_write_race_tests.rs"]
 mod write_race_tests;
+
+#[cfg(test)]
+#[path = "corpus_save_lock_tests.rs"]
+mod save_lock_tests;
 
 #[cfg(test)]
 mod tests {
