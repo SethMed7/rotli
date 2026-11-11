@@ -806,7 +806,7 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     Err(format!("unknown provider \"{provider}\""))
 }
 
-fn version_of(bin: &PathBuf, args: &[&str]) -> Option<String> {
+fn version_of(bin: &std::path::Path, args: &[&str]) -> Option<String> {
     let out = crate::cli_probe::probe(bin, args, crate::cli_probe::PROBE_DEADLINE)?;
     if !out.status.success() {
         return None;
