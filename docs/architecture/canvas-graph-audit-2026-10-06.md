@@ -69,7 +69,6 @@ Still open, all P2:
   - the default-vault-only Links projection on the Mac;
   - "Show in graph" for archived notes.
 - Canvas:
-  - bad UTF-8 is mangled on save on the Mac;
   - `nodes: null` is rewritten as `[]`;
   - a colon in a web folder name.
 
@@ -225,7 +224,10 @@ truth), lose work, or ship a development feature into stable builds.
   - The Mac's Links projection reads only the default vault.
 - Canvas:
   - A note edited elsewhere stays stale on its card.
-  - Bad UTF-8 in a canvas is mangled on save on the Mac.
+  - **Fixed (2026-11-11):** bad UTF-8 in a canvas was mangled on save on the
+    Mac — and on the web, whose `readText` decodes just as lossily. Both
+    lanes now read raw bytes and decode strictly; a canvas that isn't UTF-8
+    (or starts with a byte-order mark) is refused, never opened.
   - `"nodes": null` and a missing `edges` key are rewritten as `[]`.
   - A colon in a folder name lands a web canvas in the wrong folder (not
     confirmed).

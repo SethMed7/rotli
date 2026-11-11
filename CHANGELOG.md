@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A canvas that isn't UTF-8 text is refused instead of quietly changed**
+  (development builds, where canvases live). Rotli used to decode it loosely,
+  so the first save after any edit rewrote the bytes it couldn't read as
+  replacement characters. It now says the file isn't UTF-8 and leaves it as
+  it is, on the Mac and on Rotli Web.
+
 ## [1.10.0] - 2026-11-10
 
 ### Added
