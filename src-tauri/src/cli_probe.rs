@@ -8,8 +8,11 @@ use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-/// Long enough for a cold CLI start, short enough that Settings answers.
-pub(crate) const PROBE_DEADLINE: Duration = Duration::from_secs(5);
+/// Generous on purpose. A probe that times out reads as "not signed in", and
+/// the lane stays hidden until the next check (a minute later), so a slow cold
+/// start of several Node CLIs at once must not trip it. The bug this bounds
+/// was "forever".
+pub(crate) const PROBE_DEADLINE: Duration = Duration::from_secs(15);
 
 /// Run `bin args`, capturing stdout. None when it can't start, or is still
 /// running at `deadline` (it is then killed and reaped).

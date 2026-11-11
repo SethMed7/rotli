@@ -249,7 +249,7 @@ Map (provider → client → auth → streaming → UI):
 
 Ranked:
 
-1. **FIXED (2026-11-11), `cli_probe.rs`: stdin closed, killed at 5 s.**
+1. **FIXED (2026-11-11), `cli_probe.rs`: stdin closed, killed at 15 s.**
    **`cli_detect` has no timeout and inherits stdin** (`provider.rs:1023-1065`,
    `:1036-1043`). `chatSurface.tsx:1651` gates model resolution on it, so a
    hung `claude auth status` leaves the picker unresolved indefinitely. Fix:
