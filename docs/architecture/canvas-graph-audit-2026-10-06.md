@@ -63,9 +63,6 @@ not done.
 Still open, all P2:
 
 - Graph:
-  - display-scale and accent repaint;
-  - `neighborhood()` on hub notes;
-  - the "Untitled" first frame;
   - the default-vault-only Links projection on the Mac;
   - "Show in graph" for archived notes.
 - Canvas:
@@ -214,11 +211,13 @@ truth), lose work, or ship a development feature into stable builds.
 ## P2 — nits
 
 - Graph:
-  - A move to another display with a different scale isn't redrawn.
-  - Changing the accent doesn't repaint a mounted graph.
-  - The literal `30` duplicates `LABEL_ALL_UP_TO`.
-  - `neighborhood()` is quadratic on hub notes.
-  - The first frame can show "Untitled" dots.
+  - **Fixed (2026-11-11):** a move to another display with a different scale
+    wasn't redrawn (the renderer now watches the resolution query); changing
+    the accent didn't repaint a mounted graph (it repaints on theme or accent
+    and re-reads tokens at the next frame); the literal `30` duplicated
+    `LABEL_ALL_UP_TO`; `neighborhood()` was quadratic on hub notes (a 20,000
+    link hub took ~700 ms); the first frame could show "Untitled" dots (the
+    graph waits for the note lists that title it).
 - Mac and web scope:
   - `chats/` is skipped on the web but not on the Mac in a plain vault.
   - The Mac's Links projection reads only the default vault.
@@ -238,6 +237,9 @@ truth), lose work, or ship a development feature into stable builds.
   - The design doc says Rotli Web has no graph spec.
   - The design doc has a stale `folderNotes` line.
 - "Show in graph" is hidden for archived notes, which are still Graph nodes.
+  (Re-checked 2026-11-11: not a bug. Archived notes are not Graph nodes —
+  `corpus_links.rs` and `webLinks.ts` both leave Archive out, and a Rust test
+  pins "archived notes leave the graph" — so hiding the item is correct.)
 
 ## Checked and fine
 
