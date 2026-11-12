@@ -259,55 +259,50 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   development builds: `cli_gate` refuses `rotli mcp --librarian`, `rotli mcp
   config`, and every `rotli librarian …` command in a public build, and the
   switch itself reads as off there, so `"librarianMcp": true` does nothing.
-- **Nine tools:** `librarian_guide`, `librarian_search`, `librarian_read`,
+- **Ten tools:** `librarian_guide`, `librarian_search`, `librarian_read`,
   `librarian_capture`, `librarian_file`, `librarian_link`, `librarian_index`,
-  `librarian_log`, `librarian_review`. Behaviour lives in five skills compiled
+  `librarian_log`, `librarian_index_read`, `librarian_review`. Behaviour lives in five skills compiled
   from `src-tauri/librarian-skills/*/SKILL.md` and served by `librarian_guide`.
 - **Reads** use the remote read gate exactly as `rotli_read_note` and
   `rotli_search` do; secure notes are never listed, read, or proposable. A
   read judges and returns the same bytes (`read_doc_for_ai`): one read of the
   file, gated, with the revision of exactly what was returned.
 - **Creates** use the remote-agent create seam in intake: a capture carries
-  `created_by: agent`, the two pages `created_by: librarian` plus
-  `librarian_page: index` or `librarian_page: log`. A new note's
+  `created_by: agent`. A new note's
   file name is claimed without replacing anything, so two captures that pick
   the same name at once both survive.
-- **Rewrites** are limited to the Librarian's own pages, "Librarian index"
-  and "Librarian log", through `write_for_remote_agent_if_revision`. Its own
-  means the `created_by: librarian` stamp and the `librarian_page` marker,
-  each in the one spelling Rust writes (`key: value` at the start of a line;
-  `frontmatter_keys.rs` `canonical_field`, which `created_by_field` uses too),
-  never the title, so a person may retitle either page and it stays the
-  Librarian's. `.rotli/librarian/pages.jsonl` records the page's id as a
-  hint for a positive id only, checked against the page every time; with no
-  usable record the route reads every note's frontmatter, adopts the oldest
-  page marked that way that an agent can read, and records it (every call
-  looks while no page exists). `created_by: librarian` alone is not enough: Rotli's
-  in-app Librarian stamps the People notes it makes the same way, and a
-  person may be called "Librarian index". `librarian_page` is a Rotli-reserved
-  key that only this route's page creation writes: agents never write
-  frontmatter, the metadata editor refuses reserved keys, the raw editor
-  restores them (`RAW_IMMUTABLE_KEYS`) and drops any other spelling of them
-  it didn't already hold (indented, quoted, a list item, `? key`, `key :`,
-  inside a `{flow: map}`), and no other create path sets it. A
-  note that only shares the title, carries it as an alias, or lacks the
-  marker is never touched, and the Librarian makes its own page instead.
-  `librarian_index` writes the heading back to "Librarian index".
-  Pages made before the marker existed (unreleased builds only) are left
-  alone and replaced by new ones. Before every call, and in every write to
-  them, the route removes each line of both pages with a `[[link]]` to a note
-  an agent may not read; a link counts against every note it could open, as
-  the editor resolves links (`corpus_links.rs` `wikilink_names` and
-  `link_key`, parity-pinned to `wikilink.ts`: id, title or alias trimmed and
-  case aside, `.md` in any case, a path id, a path's last segment), so a
-  public namesake can't keep a secure
-  note's line. A line that names a note without linking it can't be found
-  this way (the `index-and-log` skill requires links), and lines go only when
-  the route next runs (review 2026-11-09, #2). A page whose marker line was
-  removed by editing its file directly is an ordinary note again, and its
-  lines stay. Rust's note selectors compare titles and aliases through the
-  same `link_key`; unlike the editor they don't resolve path ids or a
-  path's last segment.
+- **The index and log are not notes** (Seth's redesign, 2026-11-12, after
+  three independent reviews of PR #295). The route keeps them in two JSONL
+  sidecars it alone creates and writes, `.rotli/librarian/index.jsonl`
+  (`{id, summary}`; a later line for a note wins, `summary` absent removes
+  it) and `.rotli/librarian/log.jsonl` (`{at, text, ids}`), opened through
+  `containment::open_sidecar` like the proposals file. `librarian_index`
+  takes `{entries: [{id, summary}], remove?: [id]}` and `librarian_log`
+  takes `{entry, ids?}`; every id must be a note the agent can read now or
+  the whole call is refused, and summaries and log text are one line that
+  passes `secret::blocked_for_remote`. `librarian_index_read {logLines?}`
+  renders them: an index entry while its note is readable through
+  `read_for_ai`, a log line while every note it names is, each note under
+  its live title (no title is stored), and stored text checked again on
+  render so a hand-edited row shows nothing it couldn't have been written
+  with. A note that turns secure drops out of the rendering; nothing is
+  rewritten. Captures and proposals log themselves by id. `.rotli/` is
+  outside the walk, so the sidecars are never listed, searched, placed in
+  Main, or read as notes by any lane. Residual: a log line that names a note
+  in plain words instead of by id stays shown (the `index-and-log` skill
+  says to pass ids). "Librarian index" and "Librarian log" notes an earlier
+  development build wrote stay in the vault as ordinary notes; the route no
+  longer reads or writes them, and the `librarian_page` key they carry is
+  an ordinary key now.
+- **Keys only Rust writes are read in Rust's spelling only.** `created_by`,
+  `ai_edit` and `local_ai_allowed` are read through `frontmatter_keys.rs`
+  `canonical_field` (`key: value` at the start of a line), in Rust and in
+  `aiEditPolicy.ts`; the raw metadata editor keeps a typed indented or
+  quoted spelling as the person wrote it, and no reader takes it for Rotli's
+  stamp. A source test fails on a new Rust reader that doesn't use the
+  shared parser. Rust's note selectors compare titles and aliases through
+  `corpus_links.rs` `link_key`, which trims JavaScript's whitespace set
+  (U+FEFF included) and is parity-pinned to `wikilink.ts` `linkKey`.
 - **Proposals:** `librarian_file` and `librarian_link` append to
   `.rotli/librarian/proposals.jsonl` (JSON per line, `id`, `ts`, `kind`,
   `note`, `noteTitle`, `folder` or `target` with `targetId`, `reason`,

@@ -1356,9 +1356,7 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
 /// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
 /// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
-/// `librarian_page` marks the Librarian route's own index and log
-/// (workspace_librarian.rs); only that route's page creation writes it.
-const RESERVED_KEYS: [&str; 15] = [
+const RESERVED_KEYS: [&str; 14] = [
     "id",
     "created",
     "updated",
@@ -1373,14 +1371,7 @@ const RESERVED_KEYS: [&str; 15] = [
     "view_tag",
     "created_by",
     "ai_edit",
-    "librarian_page",
 ];
-
-/// The frontmatter line that marks one of the Librarian route's own pages
-/// (`index` or `log`).
-pub(crate) fn librarian_page_line(page: &str) -> String {
-    format!("librarian_page: {page}")
-}
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
@@ -1432,9 +1423,9 @@ pub(crate) fn secure_context_field(line: &str) -> Option<bool> {
 
 /// Explicit permission for a loopback-local model to read a secure note.
 /// Absence and malformed values fail closed. Remote models ignore this flag.
+/// Read only in the spelling Rust writes (frontmatter_keys.rs).
 pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "local_ai_allowed").then(|| v.trim() == "true")
+    crate::frontmatter_keys::canonical_field(line).filter(|(k, _)| *k == "local_ai_allowed").map(|(_, v)| v == "true")
 }
 
 /// Physical home to restore when secure protection is removed. This is a
@@ -1569,7 +1560,7 @@ pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "id",
     "created",
     "owner",
@@ -1577,7 +1568,6 @@ pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
     "view_tag",
     "created_by",
     "ai_edit",
-    "librarian_page",
 ];
 
 pub use crate::frontmatter_keys::merge_raw_frontmatter;
@@ -4057,21 +4047,7 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
     ) -> Result<NoteMeta, String> {
-        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent, None)
-    }
-
-    /// The same seam for the Librarian route's own index or log: stamped
-    /// `created_by: librarian` and marked `librarian_page: <page>`, the
-    /// reserved line that alone tells its pages from any other note.
-    pub(crate) fn create_librarian_page(
-        &mut self,
-        folder_id: &str,
-        body: &str,
-        page: &str,
-    ) -> Result<NoteMeta, String> {
-        let marker = librarian_page_line(page);
-        let creator = crate::ai_edit_policy::Creator::Librarian;
-        self.create_remote(folder_id, body, creator, Some(&marker))
+        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent)
     }
 
     fn create_remote(
@@ -4079,7 +4055,6 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
         creator: crate::ai_edit_policy::Creator,
-        marker: Option<&str>,
     ) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "add files to")?;
         if looks_secure(body) {
@@ -4087,7 +4062,7 @@ impl CorpusStore {
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create_marked(folder_id, body, false, Some(creator), marker.as_slice())
+        self.create_marked(folder_id, body, false, Some(creator), &[])
             .map(|(meta, _)| meta)
     }
 

@@ -61,8 +61,7 @@ pub(crate) fn created_by_field(line: &str) -> Option<&str> {
 /// The value of an `ai_edit:` line, if this is one. Only a literal `true`
 /// grants; a malformed value refuses.
 pub(crate) fn ai_edit_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "ai_edit").then(|| v.trim() == "true")
+    crate::frontmatter_keys::canonical_field(line).filter(|(k, _)| *k == "ai_edit").map(|(_, v)| v == "true")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

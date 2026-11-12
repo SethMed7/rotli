@@ -492,6 +492,19 @@
       "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
       "value": [
         {
+          "fields": [
+            "  created_by: agent"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "\"ai_edit\": true",
+            "  ai_edit: true"
+          ],
+          "verdict": "person-written"
+        },
+        {
           "fields": [],
           "verdict": "person-written"
         },
@@ -761,20 +774,13 @@
       ]
     },
     "wikilinkNavigation": {
-      "sourceOfTruth": "behavioral: src/editor/wikilink.ts wikilinkTargetOf + linkKey ↔ src-tauri/src/corpus_links.rs wikilink_target_of + link_key (the Librarian route's withdrawal and Rust note selectors compare links exactly as the editor navigates them)",
+      "sourceOfTruth": "behavioral: src/editor/wikilink.ts linkKey ↔ src-tauri/src/corpus_links.rs link_key (Rust note selectors compare titles and aliases exactly as the editor navigates: JavaScript's trim set, U+FEFF included and U+0085 kept, then lower-case)",
       "value": {
-        "targets": [
-          { "inner": "Harbor plan", "target": "Harbor plan" },
-          { "inner": " Harbor plan ", "target": "Harbor plan" },
-          { "inner": "Harbor plan.md", "target": "Harbor plan" },
-          { "inner": "Harbor plan.MD#Heading|Alias", "target": "Harbor plan" },
-          { "inner": "Inbox/harbor-record.Md", "target": "Inbox/harbor-record" },
-          { "inner": "opaque.md", "target": "opaque" },
-          { "inner": "École#Vie|é", "target": "École" },
-          { "inner": "|label only", "target": "" }
-        ],
         "keys": [
           { "label": " Dock project ", "key": "dock project" },
+          { "label": "\ufeffDock project\ufeff", "key": "dock project" },
+          { "label": "\u00a0\u3000Dock project\u2028", "key": "dock project" },
+          { "label": "\u0085Dock project", "key": "\u0085dock project" },
           { "label": "ÉCOLE", "key": "école" },
           { "label": "Harbor Plan", "key": "harbor plan" },
           { "label": "opaque.md", "key": "opaque.md" }
@@ -942,8 +948,7 @@
         "local_ai_allowed",
         "view_tag",
         "created_by",
-        "ai_edit",
-        "librarian_page"
+        "ai_edit"
       ]
     },
     "managedFileRules": {

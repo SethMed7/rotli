@@ -13,47 +13,8 @@ use super::super::{RootTarget, Workspace, DEFAULT_ROOT_ID, MAIN_ROOT};
 use super::tests::{body_of, make_secure, mcp, ok, public_build, turn_on};
 use super::*;
 
-/// One of the Librarian's own pages as it sits on disk.
-fn page_on_disk(ws: &mut Workspace, title: &str) -> String {
-    let notes = ws.store.list().unwrap().notes;
-    let id = notes.into_iter().find(|meta| meta.title == title).unwrap().id;
-    let rel = ws.store.resolve_note_rel(&id).unwrap();
-    fs::read_to_string(ws.store.root().join(rel)).unwrap()
-}
-
 pub(super) fn hits(temp: &TempDir, query: &str) -> usize {
     ok(mcp(temp, SEARCH, json!({ "query": query })))["items"].as_array().unwrap().len()
-}
-
-/// #2: what the index and log said about a note stops being public once the
-/// note turns secure: searched through the route, and at rest on disk.
-#[test]
-fn the_index_and_log_drop_lines_about_a_note_that_turned_secure() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let harbor = ok(mcp(&temp, CAPTURE, json!({"title":"Harbor plan","body":"Moorings for the east dock."})));
-    let harbor = harbor["id"].as_str().unwrap().to_string();
-    let mut ws = test_workspace(&temp);
-    ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
-    ok(mcp(&temp, FILE, json!({"id": harbor, "folder":"projects","reason":"It belongs with projects."})));
-    ok(mcp(&temp, INDEX, json!({"body":"## Projects\n- [[Harbor plan]] — quayside marigold moorings.\n- [[Dock notes]] — the dock work."})));
-    ok(mcp(&temp, LOG, json!({"entry":"Summarised [[harbor plan|the harbour]] as quayside marigold"})));
-    ok(mcp(&temp, LOG, json!({"entry":"Wharfage notes are in [[Inbox/Harbor plan]]"})));
-    assert_eq!(hits(&temp, "quayside"), 2, "both pages say it before");
-
-    make_secure(&mut ws, &harbor);
-    for word in ["quayside", "marigold", "Harbor", "harbour", "Wharfage"] {
-        assert_eq!(hits(&temp, word), 0, "{word}");
-    }
-    let (index, log) = (page_on_disk(&mut ws, "Librarian index"), page_on_disk(&mut ws, "Librarian log"));
-    for page in [&index, &log] {
-        assert!(!page.to_lowercase().contains("harbo") && !page.contains("quayside"), "{page}");
-    }
-    assert!(index.contains("- [[Dock notes]] — the dock work."), "other lines stay: {index}");
-    // a new index naming the secure note keeps the line out too
-    ok(mcp(&temp, INDEX, json!({"body":"- [[Harbor plan]] — quayside\n- [[Dock notes]] — dock"})));
-    assert!(!page_on_disk(&mut ws, "Librarian index").contains("quayside"));
 }
 
 /// The person gives another public note the title "Ana Ruiz" as an alias.
@@ -297,46 +258,6 @@ fn the_person_commands_say_what_approval_cannot_guarantee() {
     assert_eq!(run(&["librarian", "off"]).unwrap()["enabled"], false);
     let help = crate::workspace_help::CLI_HELP;
     assert!(help.contains("rotli librarian on|off") && help.contains("agent with a shell"), "{help}");
-}
-
-/// Independent review of PR #295 (P1a, P1b): a line linking a secure note by
-/// its id, or with an upper-case `.MD`, is withdrawn like any other spelling.
-#[test]
-fn withdrawal_matches_note_ids_and_any_extension_case() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    for spelling in ["id", "Harbor plan.MD", "Harbor plan.Md", "Harbor plan#heading|alias", "a/b/Harbor plan"] {
-        let temp = TempDir::new().unwrap();
-        turn_on(&temp);
-        let mut ws = test_workspace(&temp);
-        let harbor = ws.create_note("Harbor plan", "Mooring work", MAIN_ROOT).unwrap();
-        let target = if spelling == "id" { harbor.id.clone() } else { spelling.to_string() };
-        ok(mcp(&temp, INDEX, json!({"body": format!("- [[{target}]] — quayside marigold\n- [[Elsewhere]] — kept")})));
-        make_secure(&mut ws, &harbor.id);
-        assert_eq!(hits(&temp, "quayside"), 0, "{spelling}");
-        let index = page_on_disk(&mut ws, "Librarian index");
-        assert!(!index.contains("quayside") && index.contains("[[Elsewhere]]"), "{spelling}: {index}");
-    }
-}
-
-/// Independent review of PR #295 (P1c): the index is the Librarian's by its
-/// recorded id and marker, so a person renaming its heading doesn't hide it
-/// from cleanup, and the Librarian keeps writing that same page.
-#[test]
-fn a_renamed_index_is_still_the_librarians_and_still_cleaned() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let mut ws = test_workspace(&temp);
-    let harbor = ws.create_note("Harbor plan", "Mooring work", MAIN_ROOT).unwrap();
-    let index = ok(mcp(&temp, INDEX, json!({"body":"- [[Harbor plan]] — quayside marigold"})));
-    let index = index["id"].as_str().unwrap().to_string();
-    let rel = ws.store.resolve_note_rel(&index).unwrap();
-    let path = ws.store.root().join(rel);
-    fs::write(&path, fs::read_to_string(&path).unwrap().replace("# Librarian index", "# My index")).unwrap();
-    make_secure(&mut ws, &harbor.id);
-    assert_eq!(hits(&temp, "quayside"), 0, "the renamed page is cleaned too");
-    let again = ok(mcp(&temp, INDEX, json!({"body":"- [[Elsewhere]] — kept"})));
-    assert_eq!(again["id"], index, "the Librarian rewrites the page it made, whatever its title now");
 }
 
 /// Independent review of PR #295 (P2): the note title a proposal shows is the

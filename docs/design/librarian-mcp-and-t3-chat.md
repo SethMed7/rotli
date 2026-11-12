@@ -39,7 +39,7 @@ history. Concretely, three things, and nothing that runs a model for chat:
    ownership, and journals. Unchanged:
    [`memex-data-contract.md`](../architecture/memex-data-contract.md).
 3. **The Librarian MCP.** An opt-in route (`rotli mcp --librarian`) any agent
-   host can switch on: T3 Code threads, Tesven's Roo, Claude Code, Codex. Nine
+   host can switch on: T3 Code threads, Tesven's Roo, Claude Code, Codex. Ten
    tools, five skills, four guards. It replaces the Librarian bar's and the
    organizer's own model calls as the way a vault "stays organized".
 
@@ -111,7 +111,7 @@ Owning code: `src-tauri/src/workspace_librarian.rs`. Skills:
 `src-tauri/librarian-skills/*/SKILL.md` (compiled in, served by
 `librarian_guide`). Contract: [`agent-workspace.md`](../architecture/agent-workspace.md#the-librarian-route).
 
-### Tools (nine)
+### Tools (ten)
 
 | Tool | Does | Writes? |
 |---|---|---|
@@ -121,8 +121,9 @@ Owning code: `src-tauri/src/workspace_librarian.rs`. Skills:
 | `librarian_capture {title, body, source?}` | Raw source in: a new note in intake, logged | creates |
 | `librarian_file {id, folder, reason}` | **Proposes** a move | proposal only |
 | `librarian_link {id, target, reason}` | **Proposes** one `[[wikilink]]` | proposal only |
-| `librarian_index {body}` | Rewrites the "Librarian index" page (its own) | its own page |
-| `librarian_log {entry}` | Appends a dated line to "Librarian log" (its own) | its own page |
+| `librarian_index {entries, remove?}` | Sets each note's one-line summary in the index, by note id | Rotli's sidecar |
+| `librarian_log {entry, ids?}` | Appends a line to the log, with the ids of the notes it concerns | Rotli's sidecar |
+| `librarian_index_read {logLines?}` | The index and newest log lines, rendered through the gate now | no |
 | `librarian_review` | Lists pending proposals so it never repeats one | no |
 
 There is deliberately **no apply tool**. A person applies or dismisses a
@@ -148,18 +149,19 @@ use Claude Code's skill format, so they can also be copied into a vault's
 1. **Secure notes never leave the Mac.** Every read and search goes through
    the remote read gate (`read_for_ai`): secure flag, secure folders, keyword
    names, the secret detector. Proposals need a readable note, so a secure
-   note can't even be proposed. Reasons, sources and log lines pass
-   `secret::blocked_for_remote`.
+   note can't even be proposed. The index and log name notes by id and are
+   rendered through the same gate each time they are read. Reasons, sources,
+   summaries and log lines pass `secret::blocked_for_remote`.
 2. **No hand-written frontmatter.** Bodies starting with frontmatter are
    refused (`validate_editor_markdown`).
 3. **Writes only through Rotli's write path.** Creates use
-   `create_for_remote_agent`; page rewrites use
+   `create_for_remote_agent`; an applied link uses
    `write_for_remote_agent_if_revision` (revision-checked, journaled, locked
    and person-written refusals); applied moves use `move_for_remote_agent`.
    Keeping the agent's *own* file tools off the vault is host config; see the
    protocol, §3.
-4. **Proposals, not rewrites.** The Librarian creates notes and rewrites only
-   its two pages. Applying a link to a note the person wrote still needs their
+4. **Proposals, not rewrites.** The Librarian creates notes and keeps its index
+   and log outside the vault; it rewrites no note. Applying a link to a note the person wrote still needs their
    "Let AI edit the text" grant, so the old "the Librarian never rewrites"
    holds even after approval.
 
@@ -170,10 +172,12 @@ does the thinking; Rotli only holds the line.
 ### Works on any Obsidian-style vault
 
 The route needs only a registered Rotli root: a Rotli vault (`wiki/_inbox`
-intake) or any connected Markdown folder (`Inbox` intake). Index and log are
-ordinary notes titled "Librarian index" and "Librarian log". Proposals live in
-the vault's `.rotli/librarian/proposals.jsonl`, a deletable sidecar like the
-AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
+intake) or any connected Markdown folder (`Inbox` intake). The index, the log
+and the proposals live in the vault's `.rotli/librarian/` (`index.jsonl`,
+`log.jsonl`, `proposals.jsonl`), deletable sidecars like the AI edit journal,
+which the walk skips like the rest of `.rotli/`. "Librarian index" and
+"Librarian log" notes an earlier development build wrote stay in the vault as
+ordinary notes; the route no longer reads or writes them. Nothing depends on the memex's `STRUCTURE.md`.
 
 ### Built in this branch
 
@@ -199,10 +203,12 @@ AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
 - `rotli librarian status|on|off|proposals|apply|dismiss`.
 - Tests: `src-tauri/src/workspace_librarian_tests.rs` (off by default,
   tool set has no approve, capture, secure omission, file and link proposals
-  and their apply, person-written refusal, index and log; and from the
-  2026-11-08 review: vault binding, symlinked proposals refused, review
-  hides proposals on notes that turned secure, own pages by title and
-  stamp, concurrent captures, and one gated read).
+  and their apply, person-written refusal; and from the 2026-11-08 review:
+  vault binding, symlinked proposals refused, review hides proposals on
+  notes that turned secure, concurrent captures, and one gated read);
+  `workspace_librarian_index_tests.rs` (the index and log, rendered through
+  the gate); `workspace_librarian_review_tests.rs` and
+  `workspace_librarian_tool_limits_tests.rs` (the 2026-11-09 findings).
 
 ### Next slices (after approval)
 
@@ -248,41 +254,45 @@ independent review the owner's rule asks for. The route stays in development
 builds until that review has checked these fixes:
 
 1. **#2 The index and log kept what a note said before it turned secure.**
-   Every route call now first removes, from both of the Librarian's pages,
-   each line with a `[[link]]` to a note an agent may no longer read, and
-   neither `librarian_index` nor `librarian_log` writes such a line back. A
-   link counts against every note it could open, compared exactly as the
-   editor navigates (`corpus_links.rs` `wikilink_names` and `link_key`,
-   pinned to `wikilink.ts` by parity.json `wikilinkNavigation`: id, title or
-   alias trimmed and case aside, `.md` in any case, a path id, a path's last
-   segment), so a public note sharing the name doesn't keep the line alive.
-   The two pages are the Librarian's only by `created_by: librarian` and
-   `librarian_page`, each in the one spelling Rust writes
-   (`frontmatter_keys.rs`), never by title, so a page a person retitled is
-   still cleaned. No metadata edit can mint either key in any spelling (the
-   raw editor drops indented, quoted, list, `? key` and flow-map forms of
-   every Rust-owned key it didn't already hold), and no agent tool or
-   `rotli notes` command writes frontmatter, so discovery never adopts a
-   note the route didn't make. `pages.jsonl` is a hint for a positive id
-   only: a null, missing or unverifiable entry falls back to discovery.
-   Tests: `the_index_and_log_drop_lines_about_a_note_that_turned_secure`
-   (route search and the page bytes on disk); from the independent reviews of
-   PR #295: `withdrawal_matches_note_ids_and_any_extension_case`,
-   `a_renamed_index_is_still_the_librarians_and_still_cleaned`,
-   `a_forged_marker_never_makes_a_persons_note_the_index`,
-   `no_agent_or_cli_path_can_write_the_page_keys`,
-   `a_negative_or_unusable_page_record_never_disables_withdrawal`,
-   `withdrawal_resolves_links_as_navigation_does`; and the class guards
-   `no_spelling_of_a_rust_owned_key_can_be_minted_through_the_metadata_editor`
-   and `the_keys_rust_owns_are_read_only_through_the_shared_parser`. Limits,
-   documented: a page whose `librarian_page` line was removed by editing the
-   file directly (the raw editor restores it; no agent path can remove it)
-   is an ordinary note again, and its lines stay. A line that names a note
-   in plain words without a link stays (the `index-and-log` skill now requires
-   links), and the lines go only when the route next runs, so until then the
-   pages still show them to other lanes. Pages a development build left in a
-   vault are still ordinary notes in a public build
-   (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`).
+   **Redesigned** (Seth, 2026-11-12) after three independent reviews of PR
+   #295 found that pages kept as vault notes, recognised by markers and
+   holding text about other notes, couldn't be made safe: each hardening
+   (withdrawing lines, recognising pages by Rust-written markers, a stricter
+   metadata merger) opened the next gap. The index and log are no longer
+   notes. Rotli keeps them in its own sidecars, `.rotli/librarian/index.jsonl`
+   (`{id, summary}`) and `.rotli/librarian/log.jsonl` (`{at, text, ids}`),
+   created and written only by the route. `librarian_index_read` renders them
+   now: an entry shows only while every note it names is readable through
+   `read_for_ai`, under that note's live title, so a note that turns secure
+   simply drops out and nothing is rewritten. Writes name notes by id and
+   refuse an id the agent can't read; summaries and log text pass
+   `secret::blocked_for_remote` on write and again on render, so a hand-edited
+   row shows nothing it couldn't have been written with. `.rotli/` is outside
+   the walk, so neither file is ever listed, searched, or read as a note.
+   Page discovery, `pages.jsonl`, the marker checks, withdrawal, the
+   whole-vault frontmatter scan, and the `librarian_page` key are gone. The
+   raw metadata merger is dev's again (the stricter one deleted values that
+   merely contained a key's name); instead every reader of a key only Rust
+   writes (`created_by`, `ai_edit`, `local_ai_allowed`) takes only the
+   spelling Rust writes (`frontmatter_keys.rs` `canonical_field`, and the
+   TypeScript twin in `aiEditPolicy.ts`), so a typed `  created_by: agent`
+   grants nothing. Tests: `workspace_librarian_index_tests.rs`
+   (`an_entry_for_a_note_that_turns_secure_drops_out_of_the_rendering`,
+   `titles_come_from_the_live_note_and_are_never_stored`,
+   `a_write_refuses_an_id_the_agent_cannot_read`,
+   `a_forged_sidecar_row_never_renders_a_secure_note_or_unchecked_text`,
+   `nothing_under_rotli_librarian_is_searchable_or_listed`,
+   `an_index_note_from_an_earlier_build_is_left_alone`), and in
+   `frontmatter_keys.rs` `the_metadata_editor_never_drops_a_value_that_mentions_a_key`
+   (Codex's summary repro), `readers_of_rust_owned_keys_take_only_rusts_spelling`,
+   and the guard `the_keys_rust_owns_are_read_only_through_the_shared_parser`.
+   Limits, documented: a log line that names a note in plain words instead of
+   passing its id stays shown (the `index-and-log` skill says to pass ids and
+   never write titles). "Librarian index" and "Librarian log" notes an earlier
+   development build wrote stay in the vault as ordinary notes, listed,
+   searched and readable by AI lanes like any public note
+   (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); delete them
+   by hand if they mention notes that are secure now.
 2. **#3 Repeating a proposal returned one review hides.** A repeat must match
    kind, note, folder, `targetId`, the target's title, and the note's
    revision, and is returned only when `librarian_review` would show it, so a
@@ -440,7 +450,7 @@ threads already distilled up to their latest turn.
   - Transcripts are Rotli's own append-only copies of T3 data.
   - Summaries are new notes.
   - Links and moves that touch a person's pages are proposals.
-  - The index and log are the Librarian's own pages.
+  - The index and log are the Librarian's own sidecars, outside the notes.
 - **Secure notes never go to a model.** The copy step uses no model; secure
   transcripts are refused at `librarian_read`.
 - **Writes only through Rotli.** The copy uses Rotli's write path; the

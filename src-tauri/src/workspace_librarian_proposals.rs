@@ -86,7 +86,7 @@ pub(super) fn propose(ws: &mut Workspace, kind: &str, id: &str, value: &str, rea
         ts: now_millis(),
         kind: kind.into(),
         note: note.note.id.clone(),
-        note_title: title.clone(),
+        note_title: title,
         folder,
         target,
         target_id,
@@ -105,12 +105,13 @@ pub(super) fn propose(ws: &mut Workspace, kind: &str, id: &str, value: &str, rea
         return Ok(existing);
     }
     append_proposal(&ws.root.path, &proposal)?;
-    let what = match (&proposal.folder, &proposal.target) {
-        (Some(folder), _) => format!("proposed filing [[{title}]] in {folder}"),
-        (_, Some(target)) => format!("proposed linking [[{title}]] → [[{target}]]"),
-        _ => String::new(),
+    // the log names the notes by id; their titles are rendered live
+    let (what, ids) = match (&proposal.folder, &proposal.target_id) {
+        (Some(folder), _) => (format!("Proposed filing in {folder}"), vec![proposal.note.clone()]),
+        (_, Some(target)) => ("Proposed a link".to_string(), vec![proposal.note.clone(), ws.wire(target)]),
+        _ => (String::new(), Vec::new()),
     };
-    let _ = append_log(ws, &what);
+    let _ = append_log(ws, &what, &ids);
     Ok(proposal)
 }
 

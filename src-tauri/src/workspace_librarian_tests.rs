@@ -111,7 +111,7 @@ fn the_tool_set_is_small_and_has_no_way_to_approve() {
     if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let listed: Vec<String> = (SERVER.tools)().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
-    assert_eq!(listed, [GUIDE, SEARCH, READ, CAPTURE, FILE, LINK, INDEX, LOG, REVIEW]);
+    assert_eq!(listed, [GUIDE, SEARCH, READ, CAPTURE, FILE, LINK, INDEX, LOG, INDEX_READ, REVIEW]);
     assert!(!listed.iter().any(|name| name.contains("apply") || name.contains("approve")));
     let init = request(&temp, "initialize", json!({}));
     assert_eq!(init.pointer("/serverInfo/name").and_then(Value::as_str), Some(SERVER.name));
@@ -129,8 +129,9 @@ fn capture_files_a_raw_source_in_intake_and_logs_it() {
     let mut ws = test_workspace(&temp);
     let body = body_of(&mut ws, note["id"].as_str().unwrap());
     assert!(body.contains("Ana said the tiers are fine.") && body.ends_with("Source: conversation\n"), "{body}");
-    let log_id = ws.resolve_note_selector("Librarian log").unwrap();
-    assert!(body_of(&mut ws, &log_id).contains("capture · [[Pricing call]]"));
+    let pages = ok(mcp(&temp, INDEX_READ, json!({})));
+    assert_eq!(pages["log"][0]["text"], "Captured a new source");
+    assert_eq!(pages["log"][0]["notes"][0]["title"], "Pricing call", "the title is the live note's: {pages}");
 
     let fm = mcp(&temp, CAPTURE, json!({"title":"Sneaky","body":"---\nsecure: false\n---\nx"}));
     assert!(refusal(&fm).contains("frontmatter"), "{fm}");
@@ -210,26 +211,6 @@ fn a_link_on_a_persons_note_waits_for_their_grant() {
     let dismissed = decide(&mut ws, &on_person.id, false).unwrap();
     assert_eq!(dismissed["status"], "dismissed");
     assert!(pending(temp.path()).is_empty());
-}
-
-#[test]
-fn the_index_and_log_are_the_only_pages_it_rewrites() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    ok(mcp(&temp, INDEX, json!({"body":"## Projects\n- [[Launch plan]] — the plan."})));
-    ok(mcp(&temp, INDEX, json!({"body":"## People\n- [[Ana Ruiz]] — design."})));
-    let mut ws = test_workspace(&temp);
-    let index = ws.resolve_note_selector("Librarian index").unwrap();
-    assert_eq!(body_of(&mut ws, &index), "# Librarian index\n\n## People\n- [[Ana Ruiz]] — design.\n");
-
-    ok(mcp(&temp, LOG, json!({"entry":"Left recipes in intake"})));
-    ok(mcp(&temp, LOG, json!({"entry":"Second line"})));
-    let mut ws = test_workspace(&temp);
-    let log = ws.resolve_note_selector("Librarian log").unwrap();
-    let text = body_of(&mut ws, &log);
-    assert_eq!(text.matches("\n- ").count(), 2, "{text}");
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry":"two\nlines"}))).contains("one line"));
 }
 
 /// Found by a real Claude Code session (2026-11-08): MCP's `structuredContent`
@@ -359,29 +340,6 @@ fn review_drops_proposals_whose_notes_turned_secure() {
     assert_eq!(ok(review.clone())["items"].as_array().unwrap().len(), 0, "{review}");
     assert!(!review.to_string().contains("Harbor") && !review.to_string().contains("Ana"), "{review}");
     assert_eq!(pending(temp.path()).len(), 2, "the person still sees both");
-}
-
-/// Audit 2026-11-08 (finding 6): the index and log are the Librarian's own
-/// pages by exact title and its stamp, never a note that merely shares the
-/// title or carries it as an alias.
-#[test]
-fn own_pages_are_matched_by_exact_title_and_the_librarians_stamp() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let mut ws = test_workspace(&temp);
-    let same_title = ws.create_note("Librarian index", "an agent's own list", MAIN_ROOT).unwrap();
-    let aliased = ws.create_note("Librarian log", "reading notes", MAIN_ROOT).unwrap();
-    ws.rename_note(&aliased.id, "Reading list", None).unwrap();
-
-    let index = ok(mcp(&temp, INDEX, json!({"body":"## Projects"})));
-    ok(mcp(&temp, LOG, json!({"entry":"Tidied intake"})));
-    assert_ne!(index["id"], json!(same_title.id));
-    assert!(body_of(&mut ws, &same_title.id).contains("an agent's own list"));
-    assert!(body_of(&mut ws, &aliased.id).contains("reading notes"));
-    assert!(!body_of(&mut ws, &aliased.id).contains("Tidied intake"));
-    let again = ok(mcp(&temp, INDEX, json!({"body":"## People"})));
-    assert_eq!(again["id"], index["id"], "the Librarian keeps rewriting the page it made");
 }
 
 /// Audit 2026-11-08 (finding 7): two captures that pick the same file name at
@@ -539,30 +497,6 @@ fn a_vault_folder_replaced_after_binding_is_refused() {
     make(&path);
     let why = refusal(&call_bound(Some(bound), "tools/call", capture));
     assert!(why.contains("replaced"), "{why}");
-}
-
-/// Audit round 2 (finding 4): the People creator stamps a person's note
-/// `created_by: librarian` too, and a person can be called "Librarian index".
-/// The index and log are found by a page marker only this route writes.
-#[test]
-fn a_people_note_named_like_the_index_is_never_rewritten() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let mut ws = test_workspace(&temp);
-    let intake = ws.store.layout().intake_dir().to_string();
-    // what corpus_create does for src/services/librarianPeople.ts
-    let person = ws.store.create_as(&intake, "# Librarian index\n\nMet at the library.", false, Some(Creator::Librarian)).unwrap();
-    let index = ok(mcp(&temp, INDEX, json!({"body":"## Projects"})));
-    assert_ne!(index["id"], json!(person.id));
-    assert!(body_of(&mut ws, &person.id).contains("Met at the library."));
-    let again = ok(mcp(&temp, INDEX, json!({"body":"## People"})));
-    assert_eq!(again["id"], index["id"]);
-
-    // the marker is Rotli's: the raw metadata editor can neither add nor change it
-    let original = "---\nid: 01J\ncreated_by: librarian\n---\n\n# Librarian index\n";
-    let merged = crate::corpus::merge_raw_frontmatter(original, "id: 01J\ncreated_by: librarian\nlibrarian_page: index\n").unwrap();
-    assert!(!merged.contains("librarian_page"), "{merged}");
 }
 
 /// Audit round 2 (finding 5): a link proposal is checked against the exact

@@ -23,11 +23,20 @@ function field(line: string, key: string): string | null {
   return line.slice(colon + 1).trim();
 }
 
+/** The value of `key: value` only in the spelling Rust writes its own keys:
+ * the key at the start of the line, unquoted, no space before the colon
+ * (src-tauri/src/frontmatter_keys.rs canonical_field). A person can type an
+ * indented `  created_by: agent` into the raw editor, which keeps it as typed;
+ * it is not Rust's stamp. */
+function canonicalField(line: string, key: string): string | null {
+  return line.startsWith(`${key}:`) ? line.slice(key.length + 1).trim() : null;
+}
+
 export function bodyEdit(foreign: readonly string[]): AiBodyEdit {
   if (foreign.some((line) => field(line, "locked") === "true")) return "locked";
-  const grant = foreign.map((line) => field(line, "ai_edit")).find((value) => value !== null);
+  const grant = foreign.map((line) => canonicalField(line, "ai_edit")).find((value) => value !== null);
   if (grant !== undefined && grant !== null) return grant === "true" ? "allowed" : "revoked";
-  const creator = foreign.map((line) => field(line, "created_by")).find((value) => value !== null);
+  const creator = foreign.map((line) => canonicalField(line, "created_by")).find((value) => value !== null);
   return creator && (AI_CREATORS as readonly string[]).includes(creator) ? "allowed" : "person-written";
 }
 

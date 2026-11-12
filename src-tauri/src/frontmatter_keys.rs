@@ -1,12 +1,15 @@
-//! One way to read a frontmatter line's key, for every reader and writer that
-//! must agree on the keys Rust owns (the raw metadata editor's merger, the
-//! Librarian route's page ownership, `created_by`). The independent review of
-//! PR #295 found the merger and the ownership reader disagreeing: the merger
-//! let an indented `  librarian_page: index` through as "some other key", and
-//! the reader trimmed it into the real one, so a person's note became the
-//! Librarian's index. Rust writes each of its keys in exactly one spelling,
-//! `key: value` at the start of a line; YAML allows many more, and every one
-//! of them still names the key.
+//! How Rust reads a key only Rust writes (`created_by`, `ai_edit`,
+//! `local_ai_allowed`): in the one spelling Rust writes, `key: value` at the
+//! start of a line, and no other. YAML (and a hand edit) allows many more
+//! spellings of a key (indented, quoted, a list item, `? key`); the raw
+//! metadata editor keeps such lines as the person typed them, because an
+//! indented line may be a nested key or a block scalar's text, so a reader
+//! that trimmed would take a person's typed `  created_by: librarian` for
+//! Rust's stamp (second independent review of PR #295).
+//!
+//! Also home to the raw metadata editor's merger, moved here unchanged from
+//! corpus.rs (it is dev's: the third review of PR #295 found a stricter merger
+//! deleting values that merely contained a key's name).
 
 use crate::corpus::{parse_document, raw_frontmatter_block, RAW_IMMUTABLE_KEYS};
 
@@ -68,36 +71,6 @@ pub(crate) fn frontmatter_key(line: &str) -> Option<FrontmatterKey> {
     Some(FrontmatterKey { name, canonical })
 }
 
-/// The keys a line sets inside a `{flow: mapping}`, in any quoting.
-fn flow_keys(line: &str) -> Vec<String> {
-    let mut keys = Vec::new();
-    for (at, c) in line.char_indices() {
-        if c != '{' && c != ',' {
-            continue;
-        }
-        let rest = line[at + 1..].trim_start();
-        let (name, after) = match rest.chars().next() {
-            Some(quote @ ('"' | '\'')) => match rest[1..].find(quote) {
-                Some(close) => (&rest[1..close + 1], &rest[close + 2..]),
-                None => continue,
-            },
-            _ => {
-                let end = rest.find(|ch: char| !(ch.is_alphanumeric() || ch == '_' || ch == '-')).unwrap_or(rest.len());
-                (&rest[..end], &rest[end..])
-            }
-        };
-        if !name.is_empty() && after.trim_start().starts_with(':') {
-            keys.push(name.to_string());
-        }
-    }
-    keys
-}
-
-/// Whether a frontmatter line names `key` in any spelling, block or flow.
-pub(crate) fn frontmatter_names_key(line: &str, key: &str) -> bool {
-    frontmatter_key(line).is_some_and(|k| k.name == key) || flow_keys(line).iter().any(|k| k == key)
-}
-
 /// `(key, value)` of a line spelled the way Rust writes its own keys, and
 /// None for every other spelling, so a reader of a Rust-owned key never
 /// accepts a form the metadata editor could have let through.
@@ -151,10 +124,11 @@ pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, 
 
     // reserved provenance: the output's id/owner/created lines must be EXACTLY
     // the original's — present ↔ present (same bytes), absent ↔ absent.
-    // Reserved-key match is the CANONICAL spelling, as parse_fields reads it:
-    // an INDENTED `  created:` under a nested map is a foreign line to the
-    // codec and is never deleted or replaced (2026-07-01 review).
-    let is_key = |line: &str, key: &str| frontmatter_key(line).is_some_and(|k| k.canonical && k.name == key);
+    // Reserved-key match mirrors parse_fields EXACTLY (UNtrimmed key): an
+    // INDENTED `  created:` under a nested map is a foreign line to the codec,
+    // so it must be foreign here too — field_key's trim misclassified it as
+    // the top-level reserved line and deleted/replaced it (2026-07-01 review).
+    let is_key = |line: &str, key: &str| line.split_once(':').is_some_and(|(k, _)| k == key);
     let mut restore: Vec<&str> = Vec::new();
     for key in RAW_IMMUTABLE_KEYS {
         let orig = orig_lines.iter().copied().find(|l| is_key(l, key));
@@ -183,15 +157,6 @@ pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, 
     for line in restore.into_iter().rev() {
         lines.insert(0, line.to_string());
     }
-    // any OTHER spelling of a reserved key (indented, quoted, a list item,
-    // `? key`, `key :`, inside a {flow: map}) can't be minted either: a line
-    // the file already had survives byte for byte, and a new one goes. A
-    // reader that trims, or a YAML parser, would take it for the real key
-    // (independent review of PR #295: a forged `  librarian_page: index`).
-    lines.retain(|line| {
-        orig_lines.contains(&line.as_str())
-            || !RAW_IMMUTABLE_KEYS.iter().any(|key| frontmatter_names_key(line, key) && !is_key(line, key))
-    });
 
     // an emptied block: with nothing reserved to restore the fences go too
     if lines.is_empty() {
@@ -221,30 +186,58 @@ mod tests {
         let key = |line: &str| frontmatter_key(line).map(|k| (k.name, k.canonical));
         assert_eq!(key("created_by: librarian"), Some(("created_by".into(), true)));
         assert_eq!(key("created_by:"), Some(("created_by".into(), true)));
-        for spelling in ["  created_by: x", "\tcreated_by: x", "\"created_by\": x", "'created_by': x", "- created_by: x", "? created_by", "created_by : x", "-  - created_by: x"] {
+        for spelling in ["  created_by: x", "\tcreated_by: x", "\"created_by\": x", "'created_by': x", "- created_by: x", "? created_by", "created_by : x"] {
             assert_eq!(key(spelling), Some(("created_by".into(), false)), "{spelling:?}");
         }
         for not_a_key in ["- plain item", "# created_by: comment", "continued prose", ""] {
             assert_eq!(key(not_a_key), None, "{not_a_key:?}");
         }
-        assert!(frontmatter_names_key("x: {a: 1, created_by: librarian}", "created_by"));
-        assert!(frontmatter_names_key("x: {'librarian_page': index}", "librarian_page"));
-        assert!(!frontmatter_names_key("tags: [created_by]", "created_by"));
         assert_eq!(canonical_field("created_by: librarian"), Some(("created_by", "librarian")));
         assert_eq!(canonical_field("  created_by: librarian"), None);
         assert_eq!(canonical_field("\"created_by\": librarian"), None);
     }
 
-    /// The guard for the class the second review of PR #295 found: a reader
-    /// of a key only Rust writes must read it the one way the metadata editor
-    /// protects it. Every production file that names `created_by` or
-    /// `librarian_page` as a key is listed here, and each reader goes through
-    /// `canonical_field`. A new reader fails this test until it does too.
+    /// The readers of keys only Rust writes take no other spelling: a person
+    /// can type any of these into the raw editor, which keeps them as typed.
+    #[test]
+    fn readers_of_rust_owned_keys_take_only_rusts_spelling() {
+        for spelling in ["  {k}: true", "\"{k}\": true", "- {k}: true", "{k} : true"] {
+            let line = |k: &str| spelling.replace("{k}", k);
+            assert_eq!(crate::ai_edit_policy::created_by_field(&line("created_by")), None, "{spelling}");
+            assert_eq!(crate::ai_edit_policy::ai_edit_field(&line("ai_edit")), None, "{spelling}");
+            assert_eq!(crate::corpus::local_ai_allowed_field(&line("local_ai_allowed")), None, "{spelling}");
+        }
+        assert_eq!(crate::ai_edit_policy::created_by_field("created_by: agent"), Some("agent"));
+        assert_eq!(crate::ai_edit_policy::ai_edit_field("ai_edit: true"), Some(true));
+        assert_eq!(crate::corpus::local_ai_allowed_field("local_ai_allowed: false"), Some(false));
+    }
+
+    /// Third independent review of PR #295: a stricter merger read a quoted
+    /// value as a mapping and deleted a person's whole summary. The merger is
+    /// dev's again; a value that merely contains a key's name is kept byte for
+    /// byte, and so is a block scalar's indented text.
+    #[test]
+    fn the_metadata_editor_never_drops_a_value_that_mentions_a_key() {
+        let original = "---\nid: 01J\n---\n\n# Diary\n\nprose\n";
+        for line in [
+            "summary: \"Discuss {created_by: librarian} next week\"",
+            "notes: [created: soon, owner: me]",
+            "plan: |\n  created_by: nobody, this is prose\n  ai_edit: also prose",
+        ] {
+            let merged = merge_raw_frontmatter(original, &format!("id: 01J\n{line}\n")).unwrap();
+            assert!(merged.contains(line), "{line:?} was altered:\n{merged}");
+        }
+    }
+
+    /// The guard for the class: a production reader of a key only Rust writes
+    /// goes through `canonical_field`. A new file that names one of these keys
+    /// fails this test until it does too (the key lists in corpus.rs read
+    /// nothing, but corpus.rs reads `local_ai_allowed` through it as well).
     #[test]
     fn the_keys_rust_owns_are_read_only_through_the_shared_parser() {
-        const LISTS_ONLY: &str = "corpus.rs";
-        const READERS: [&str; 2] = ["ai_edit_policy.rs", "workspace_librarian_pages.rs"];
+        const KEYS: [&str; 3] = ["\"created_by\"", "\"ai_edit\"", "\"local_ai_allowed\""];
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
+        let mut readers = Vec::new();
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -254,14 +247,12 @@ mod tests {
             let text = std::fs::read_to_string(&path).unwrap();
             // everything above the file's test module (a `#[cfg(test)]` item higher up is still production)
             let production = text.split(concat!("#[cfg(test)]\n", "mod tests")).next().unwrap_or_default();
-            if !production.contains("\"created_by\"") && !production.contains("\"librarian_page\"") {
-                continue;
+            if KEYS.iter().any(|key| production.contains(key)) {
+                assert!(production.contains("canonical_field"), "{name} reads a key only Rust writes without frontmatter_keys::canonical_field");
+                readers.push(name);
             }
-            if name == LISTS_ONLY {
-                continue; // RESERVED_KEYS and RAW_IMMUTABLE_KEYS name them; they read nothing
-            }
-            assert!(READERS.contains(&name.as_str()), "{name} reads a key only Rust writes; read it with frontmatter_keys::canonical_field and add it here");
-            assert!(production.contains("canonical_field"), "{name} reads a key only Rust writes without canonical_field");
         }
+        readers.sort();
+        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
     }
 }

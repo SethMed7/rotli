@@ -195,6 +195,7 @@ agent's own file tools off for this folder:
       "mcp__rotli-librarian__librarian_guide",
       "mcp__rotli-librarian__librarian_search",
       "mcp__rotli-librarian__librarian_read",
+      "mcp__rotli-librarian__librarian_index_read",
       "mcp__rotli-librarian__librarian_review"
     ]
   }

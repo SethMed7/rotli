@@ -13,13 +13,12 @@
 //! - reads and searches use the remote read gate, so secure notes never appear;
 //! - writes use the remote-agent write seam (no frontmatter, revisions, secure
 //!   and locked refusals, person-written notes need the person's grant);
-//! - the Librarian creates notes and rewrites only its own two pages (index and
-//!   log). Moving or editing anything else is a proposal in
+//! - the Librarian creates notes, and keeps its index and log in Rotli's own
+//!   sidecars, rendered through the read gate each time they are read
+//!   (workspace_librarian_index.rs). Moving or editing a note is a proposal in
 //!   `.rotli/librarian/proposals.jsonl` that only a person applies, from Rotli or
 //!   `rotli librarian apply ID`. No MCP tool applies a proposal; apply checks
-//!   the stored row again (workspace_librarian_proposals.rs);
-//! - lines of its own pages about notes that turned secure are withdrawn
-//!   before every call (workspace_librarian_pages.rs).
+//!   the stored row again (workspace_librarian_proposals.rs).
 //!
 //! What it can't do: tell the person's `rotli librarian apply` from an agent's.
 //! See [`APPROVAL_LIMIT`].
@@ -39,12 +38,12 @@ use super::{
     run_mcp, McpServer, RootTarget, Workspace, MAIN_ROOT,
 };
 
-#[path = "workspace_librarian_pages.rs"]
-mod pages;
+#[path = "workspace_librarian_index.rs"]
+mod index;
 #[path = "workspace_librarian_proposals.rs"]
 mod proposals;
 
-use pages::{append_log, withdraw_from_own_pages, write_index};
+use index::append_log;
 use proposals::{decide, pending, propose, visible_pending};
 #[cfg(test)]
 use proposals::{all_proposals, append_proposal, with_related, Proposal};
@@ -80,12 +79,11 @@ pub(super) const FILE: &str = "librarian_file";
 pub(super) const LINK: &str = "librarian_link";
 pub(super) const INDEX: &str = "librarian_index";
 pub(super) const LOG: &str = "librarian_log";
+pub(super) const INDEX_READ: &str = "librarian_index_read";
 pub(super) const REVIEW: &str = "librarian_review";
 /// The skill `librarian_guide` returns when none is named.
 pub(super) const FIRST_SKILL: &str = "keep-the-wiki";
 pub(super) const SETTING: &str = crate::corpus::LIBRARIAN_MCP_SETTING;
-const INDEX_TITLE: &str = "Librarian index";
-const LOG_TITLE: &str = "Librarian log";
 const PROPOSALS: &str = ".rotli/librarian/proposals.jsonl";
 /// Where `rotli librarian on|off` records the folder the person meant.
 const CONSENT: &str = ".rotli/librarian-consent.jsonl";
@@ -104,6 +102,7 @@ fn tools() -> Vec<Value> {
     let tool = super::tool;
     let obj = |props: Value, required: Value| json!({"type":"object","properties":props,"required":required,"additionalProperties":false});
     let reason = json!({"type":"string","maxLength":MAX_REASON,"description":"One sentence the person will read when deciding."});
+    let id = || json!({"type":"string","maxLength":1024});
     vec![
         tool(GUIDE, "Return a Librarian skill: how to keep this vault. Call with no skill first for keep-the-wiki, which names the others.", obj(json!({"skill":{"type":"string","enum":SKILLS.iter().map(|(n, _)| *n).collect::<Vec<_>>()}}), json!([])), true),
         tool(SEARCH, "Full-text search the notes an agent may read. Secure notes are omitted.", obj(json!({"query":{"type":"string","maxLength":500},"limit":{"type":"integer","minimum":1,"maximum":50}}), json!(["query"])), true),
@@ -111,8 +110,9 @@ fn tools() -> Vec<Value> {
         tool(CAPTURE, "Bring one raw source into the vault's intake folder as a new note, then log it. Keep the source's words; never pass frontmatter.", obj(json!({"title":{"type":"string","maxLength":200},"body":{"type":"string","maxLength":100000},"source":{"type":"string","maxLength":MAX_TARGET}}), json!(["title","body"])), false),
         tool(FILE, "Propose moving a note to a vault folder. Nothing moves until the person approves it in Rotli.", obj(json!({"id":{"type":"string","maxLength":1024},"folder":{"type":"string","maxLength":MAX_TARGET},"reason":reason}), json!(["id","folder","reason"])), false),
         tool(LINK, "Propose adding one [[wikilink]] to a note, pointing at an existing page by exact title. Nothing changes until the person approves it in Rotli.", obj(json!({"id":{"type":"string","maxLength":1024},"target":{"type":"string","maxLength":MAX_TARGET},"reason":reason}), json!(["id","target","reason"])), false),
-        tool(INDEX, "Rewrite the whole body of the Librarian index page, the one index the Librarian owns. Created on first use.", obj(json!({"body":{"type":"string","maxLength":100000}}), json!(["body"])), false),
-        tool(LOG, "Append one dated line to the Librarian log page. Created on first use.", obj(json!({"entry":{"type":"string","maxLength":MAX_REASON}}), json!(["entry"])), false),
+        tool(INDEX, "Set the one-line summary the Librarian index keeps for each note, by note id (and remove notes from it). The index lives in Rotli, not in the vault; read it with librarian_index_read.", obj(json!({"entries":{"type":"array","maxItems":200,"items":{"type":"object","properties":{"id":id(),"summary":{"type":"string","maxLength":MAX_REASON}},"required":["id","summary"],"additionalProperties":false}},"remove":{"type":"array","maxItems":200,"items":id()}}), json!(["entries"])), false),
+        tool(LOG, "Append one line to the Librarian log, with the ids of the notes it concerns. Name notes by id, never by title in the text.", obj(json!({"entry":{"type":"string","maxLength":MAX_REASON},"ids":{"type":"array","maxItems":20,"items":id()}}), json!(["entry"])), false),
+        tool(INDEX_READ, "Read the Librarian index and the newest log lines as they stand now: each entry under its note's current title, and only while every note it names is one you may read.", obj(json!({"logLines":{"type":"integer","minimum":0,"maximum":200}}), json!([])), true),
         tool(REVIEW, "List proposals still waiting on the person, so you never repeat one. Approving is the person's, in Rotli; there is no tool for it.", obj(json!({}), json!([])), true),
     ]
 }
@@ -130,7 +130,7 @@ fn call(name: &str, args: &Value) -> Result<Value, String> {
     }
     let mut ws = Workspace::open_target(bound.target)?;
     require_on(&ws.root.path)?;
-    withdraw_from_own_pages(&mut ws)?;
+    let list = |key: &str| args.get(key).and_then(Value::as_array).cloned().unwrap_or_default();
     match name {
         SEARCH => json_value(ws.search_remote(arg_required(args, "query")?, arg_usize(args, "limit", 20).min(50))?),
         READ => {
@@ -140,11 +140,13 @@ fn call(name: &str, args: &Value) -> Result<Value, String> {
         CAPTURE => capture(&mut ws, arg_required(args, "title")?, arg_required(args, "body")?, arg_string(args, "source")),
         FILE => json_value(propose(&mut ws, "file", arg_required(args, "id")?, arg_required(args, "folder")?, arg_required(args, "reason")?)?),
         LINK => json_value(propose(&mut ws, "link", arg_required(args, "id")?, arg_required(args, "target")?, arg_required(args, "reason")?)?),
-        INDEX => write_index(&mut ws, arg_required(args, "body")?),
+        INDEX => index::write_index(&mut ws, &list("entries"), &list("remove")),
         LOG => {
-            append_log(&mut ws, arg_required(args, "entry")?)?;
+            let ids: Vec<String> = list("ids").iter().filter_map(|id| id.as_str().map(str::to_string)).collect();
+            append_log(&mut ws, arg_required(args, "entry")?, &ids)?;
             Ok(json!({ "logged": true }))
         }
+        INDEX_READ => index::render(&mut ws, arg_usize(args, "logLines", index::LOG_LINES)),
         _ => json_value(visible_pending(&mut ws)),
     }
 }
@@ -276,7 +278,7 @@ pub(super) fn capture(ws: &mut Workspace, title: &str, body: &str, source: Optio
         body.push_str(&format!("\n\nSource: {}\n", one_line(source, MAX_TARGET, "source")?));
     }
     let meta = ws.create_note(title, &body, MAIN_ROOT)?;
-    let _ = append_log(ws, &format!("capture · [[{}]]", meta.title));
+    let _ = append_log(ws, "Captured a new source", std::slice::from_ref(&meta.id));
     json_value(meta)
 }
 
@@ -326,5 +328,5 @@ mod tool_limits_tests;
 mod review_tests;
 
 #[cfg(test)]
-#[path = "workspace_librarian_ownership_tests.rs"]
-mod ownership_tests;
+#[path = "workspace_librarian_index_tests.rs"]
+mod index_tests;

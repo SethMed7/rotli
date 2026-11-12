@@ -22,22 +22,20 @@ builds.
   went through. A number out of range is now refused instead of quietly
   capped, and so is a whole-number setting written as a decimal (`1.0`) or
   arguments sent as `null`.
-- **The Librarian's index and log forget a note that turns secure.** Lines
-  that link to a note an agent may no longer read are removed from both pages
-  the next time the Librarian runs, and aren't written back, however the link
-  is spelled (by title, an alias written with spaces, note id, an id ending
-  in `.md`, or file name): they match exactly as clicking the link would.
-  Retitling either page doesn't stop this, and a missing or edited record of
-  which notes the pages are doesn't either.
-- **The Librarian can't take over your notes.** It recognises its index and
-  log only by markers Rotli writes itself, in the one form Rotli writes them.
-  Before, typing an indented copy of those markers into a note's metadata let
-  the Librarian treat that note as its index and replace its text.
-- **The metadata editor keeps Rotli's own keys Rotli's.** Typing `id`,
-  `created`, `owner`, `created_by` or another key Rotli owns in a different
-  form (indented, quoted, as a list item, or inside `{…}`) no longer adds it;
-  lines a note already had are kept exactly as they were. An indented
-  `created_by` is no longer read as who made a note.
+- **The Librarian's index and log no longer live in your notes.** Rotli keeps
+  them itself, beside the vault, and the Librarian names notes in them only
+  by id. Each time they are read, an entry shows only while the note it is
+  about is one the agent may read, under that note's current title, so a note
+  you make secure simply disappears from them; nothing has to be cleaned up.
+  The index and log never show up in search, in Main, or to any AI as notes.
+  "Librarian index" and "Librarian log" notes an earlier development build
+  wrote stay in your vault as ordinary notes; delete them if you no longer
+  want them, especially if they mention notes that are secure now.
+- **An indented copy of Rotli's own markers grants nothing.** Who made a note
+  (`created_by`) and the "Let AI edit" grant (`ai_edit`), and the on-device
+  permission (`local_ai_allowed`), are read only in the form Rotli writes
+  them. Typing an indented or quoted copy into a note's metadata no longer
+  makes the note count as AI-made or AI-editable.
 - **A copied vault starts with the Librarian off.** Turning the route on now
   takes `rotli librarian on` in the vault as well as the setting, and that
   consent belongs to the folder: a copy of the vault, wherever it is put,
@@ -56,6 +54,9 @@ builds.
 
 ### Changed
 
+- **`rotli notes` and agent tools find a note by title or alias the way a
+  `[[link]]` does:** spaces around an alias (an invisible byte-order mark
+  included) and letter case, accented letters too, don't matter.
 - **Approving is yours, but Rotli says plainly what that relies on.**
   `rotli librarian apply` is an ordinary command, so an agent with a shell
   could run it too. `rotli librarian status`, the command help and the setup

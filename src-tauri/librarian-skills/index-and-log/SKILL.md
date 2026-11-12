@@ -1,36 +1,51 @@
 ---
 name: index-and-log
-description: Keep the vault's Librarian index and Librarian log pages — the two pages the Librarian owns and may rewrite.
+description: Keep the Librarian index (a one-line summary per note) and the Librarian log (what you did, and to which notes). Both live in Rotli, not in the vault, and every note is named by id.
 ---
 
 # Index and log
 
-These two pages are yours. Rotli creates them on first use, marked as made by
-an agent, so you may rewrite them. You may not rewrite any other page.
+The index and the log are yours, and they are not notes. Rotli keeps them
+beside the vault and shows them through `librarian_index_read`, which renders
+them as they stand now: each note under its current title, and only the
+entries about notes you may still read. You never write a note's title into
+either; Rotli fills it in when it renders.
 
-## librarian_index {body}
+## librarian_index {entries, remove?}
 
-Replaces the whole body of "Librarian index". Shape:
+Sets the one-line summary the index keeps for each note:
 
-```markdown
-## Projects
-- [[Payments launch]] — the Q3 launch plan and its decisions.
-
-## People
-- [[Ana Ruiz]] — design lead, Northwind.
+```json
+{"entries": [
+  {"id": "01J…", "summary": "the Q3 launch plan and its decisions"},
+  {"id": "01K…", "summary": "design lead, Northwind"}
+]}
 ```
 
-- One line per page: a wikilink and a one-line summary.
-- Name every note with its `[[wikilink]]`, never by its title in plain words.
-  When a note turns secure, Rotli removes every line of both pages that links
-  to it; a line that names it without a link can't be found and stays.
-- Group by the vault's own areas. Keep it under about 300 lines; link to area
-  pages instead of listing everything in a large vault.
-- Only pages you can read appear. Never mention that anything was withheld.
+- One entry per note, by the note's id from `librarian_search` or
+  `librarian_read`. Writing an id again replaces its summary; `remove` takes
+  notes out of the index.
+- Every id must be a note you can read now, or the whole call is refused.
+- The summary is one line about that note. Don't name other notes in it; give
+  each its own entry.
+- Keep it to the wiki's main pages: a few hundred entries at most.
 
-## librarian_log {entry}
+## librarian_log {entry, ids?}
 
-Appends one dated line to "Librarian log". Use it for decisions worth
-remembering ("Left 4 recipe notes in intake: no Cooking area yet"). Captures
-and proposals already log themselves. Link any note an entry is about, as in
-the index.
+Appends one line to the log, with the ids of the notes it concerns:
+
+```json
+{"entry": "Left these recipe notes in intake: no Cooking area yet", "ids": ["01J…", "01K…"]}
+```
+
+- Always pass the ids of the notes a line is about, and never write their
+  titles in the text. A line is shown only while every note it names is one
+  you may read; a title written into the text can't be taken back when its
+  note turns secure.
+- Captures and proposals already log themselves.
+
+## librarian_index_read {logLines?}
+
+Returns the index and the newest log lines. Read it before you refresh the
+index, so you add what's missing instead of repeating what's there. What you
+can't see isn't there for you: never mention that anything was withheld.

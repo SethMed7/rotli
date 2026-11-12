@@ -17,11 +17,12 @@ not to write it for them.
 2. **The wiki.** Curated pages, one idea or entity per page, linked with
    `[[wikilinks]]`. Pages live in the vault's own folders (`projects/`,
    `people/`, `reference/` …), whatever the vault already uses.
-3. **The index.** One page, "Librarian index", that lists the wiki's main pages
-   by area with a one-line summary each. You own it and rewrite it with
-   `librarian_index`.
-4. **The log.** One page, "Librarian log", one dated line per thing you did.
-   Captures and proposals log themselves; add anything else with `librarian_log`.
+3. **The index.** A one-line summary for each of the wiki's main pages, kept
+   by note id in Rotli (not a note in the vault). Set it with
+   `librarian_index`; read it with `librarian_index_read`.
+4. **The log.** One dated line per thing you did, with the ids of the notes it
+   concerns. Captures and proposals log themselves; add anything else with
+   `librarian_log`.
 
 ## The loop
 
