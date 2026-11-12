@@ -486,6 +486,17 @@ Additive to v1. Rationale: the plan's "Your chats land in your vault".
   config home; copying images or attachments (v1 keeps a link); capturing a
   place the person turned off.
 
+## 5c. Notes a host app writes (added 2026-11-11)
+
+Additive to v1. A host app MAY create and update ordinary notes in a vault the
+person chose for threads, only through Rotli's `notes` command line or its MCP
+(never by writing files itself), only under its own folder (`<App>/…`, e.g.
+`Tesven/Bots/<name>/` for Tesven's bot handoff notes), and only with the agent
+stamp Rotli adds. It never edits, moves or deletes a note outside that folder,
+and never one the person has since edited (Rotli's revision check refuses it;
+the host keeps its own copy and tries again only as a new note). Turning the
+setup off (§3.6) leaves these notes in place: they are the person's.
+
 ## 6. Conformance tests (each host, disposable vault only)
 
 1. Set up a synthetic vault with a secure note, a locked note, and a
