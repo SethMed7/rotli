@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 
-import { appVersion, checkForUpdate, downloadAndInstallUpdate, isTauri } from "../../lib/tauri";
+import { checkForUpdateNow, installUpdateAndRelaunch, installedVersion } from "../../services/updateCheck";
 import { useUiStore } from "../../state/ui";
 
 export type CheckState =
@@ -22,9 +22,8 @@ export type CheckState =
 export function useAppVersion(): string | null {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
-    if (!isTauri()) return;
     let alive = true;
-    void appVersion()
+    void installedVersion()
       .then((v) => {
         if (alive && v) setVersion(v);
       })
@@ -74,7 +73,7 @@ export function SettingsNavUpdates() {
 
   const check = () => {
     setState({ kind: "checking" });
-    void checkForUpdate()
+    void checkForUpdateNow()
       .then((status) => {
         if (status.available) {
           const v = status.version ?? null;
@@ -96,7 +95,7 @@ export function SettingsNavUpdates() {
     setState({ kind: "installing", pct: 0 });
     // resolves only if the relaunch doesn't happen (it normally does); on any
     // error, say so and stay on the current build
-    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch((err: unknown) => {
+    void installUpdateAndRelaunch((pct) => setState({ kind: "installing", pct })).catch((err: unknown) => {
       setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
     });
   };
