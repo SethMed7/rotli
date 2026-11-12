@@ -38,7 +38,7 @@ describe("theme presentation", () => {
 
   test("offers only canonical companion and long-chat navigator treatments", () => {
     expect(QUOKKA_STYLES).toEqual(["line", "cocoa", "green", "ocean", "iris", "berry", "amber", "custom"]);
-    expect(CHAT_NAVIGATOR_STYLES).toEqual(["lines", "dots", "paws", "ears"]);
+    expect(CHAT_NAVIGATOR_STYLES).toEqual(["lines", "dots", "paws", "ears", "hexes"]);
   });
 });
 

@@ -48,7 +48,7 @@ export type AccentColor = (typeof ACCENT_COLORS)[number];
 
 /** Quiet long-chat landmarks. Every treatment opens the same accessible prompt
  * overview; this preference changes only the small trail beside the thread. */
-export const CHAT_NAVIGATOR_STYLES = ["lines", "dots", "paws", "ears"] as const;
+export const CHAT_NAVIGATOR_STYLES = ["lines", "dots", "paws", "ears", "hexes"] as const;
 export type ChatNavigatorStyle = (typeof CHAT_NAVIGATOR_STYLES)[number];
 export { SIDEBAR_REVEALS, SIDEBAR_SIDES, type SidebarReveal, type SidebarSide } from "./sidebarPlacement";
 
