@@ -34,10 +34,13 @@ rotli mcp --http 127.0.0.1:43110 --token TOKEN                   # authenticated
 rotli mcp config                                                 # same as agent config
 rotli mcp --librarian [--vault PATH]                            # opt-in Librarian route for one vault (default: the current folder)
 rotli librarian status|proposals [--root ID]                    # is it on; what waits on you
+rotli librarian on|off [--root ID]                              # your consent, for this vault folder only (a copy starts off)
 rotli librarian apply|dismiss PROPOSAL_ID [--root ID]           # your decision on one proposal
 rotli --version                                                 # version, without opening the app
 
 `rotli agent`, `rotli mcp`, and `rotli librarian` are development builds only.
+`rotli librarian apply` is an ordinary command: an agent with a shell or a terminal
+can run it as you. Keep the shell and raw file tools off in vault threads.
 
 Note bodies are text/markdown without YAML frontmatter; Rotli owns frontmatter.
 Every update requires the revision returned by read. Notes created in a Rotli vault

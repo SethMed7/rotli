@@ -507,11 +507,11 @@ impl Workspace {
             .into_iter()
             .filter(|note| {
                 note.kind == NoteKind::Note
-                    && (note.title.eq_ignore_ascii_case(selector)
+                    && (crate::corpus::links::link_key(&note.title) == crate::corpus::links::link_key(selector)
                         || note
                             .aliases
                             .iter()
-                            .any(|alias| alias.eq_ignore_ascii_case(selector_stem)))
+                            .any(|alias| crate::corpus::links::link_key(alias) == crate::corpus::links::link_key(selector_stem)))
                     && self.store.read_for_ai(&note.id, false).is_ok()
             })
             .map(|note| note.id)
@@ -2641,7 +2641,7 @@ fn handle_mcp_with(request: &Value, server: &McpServer) -> Option<Value> {
                 .pointer("/params/arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-            let result = (server.call)(name, &arguments);
+            let result = crate::mcp_arguments::check(&(server.tools)(), name, &arguments).and_then(|()| (server.call)(name, &arguments));
             Some(mcp_success(
                 id,
                 match result {

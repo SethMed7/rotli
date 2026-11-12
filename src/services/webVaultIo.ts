@@ -2,6 +2,7 @@
 import { looksSecret } from "../ai/guard";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
+import { localAiAllowedOverride } from "../lib/frontmatterKeys";
 import type { FrontmatterView } from "../lib/tauri";
 import { registerWebVaultIo } from "../lib/webAiSeam";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
@@ -103,13 +104,9 @@ export const webVaultIo = {
       const settings = JSON.parse(await dir.readText(".rotli/settings.json")) as { secureLocalAi?: boolean };
       localAiAllowed = settings.secureLocalAi !== false;
     }
-    const override = fields
-      .find((line) => line.split(":", 1)[0]?.trim() === "local_ai_allowed")
-      ?.split(":")
-      .slice(1)
-      .join(":")
-      .trim();
-    if (override === "true" || override === "false") localAiAllowed = override === "true";
+    // fails closed both ways, as Rust does (frontmatterKeys.ts)
+    const override = localAiAllowedOverride(fields);
+    if (override !== null) localAiAllowed = override;
     const locked = !!fm && isLockedFrontmatter(fm);
     return {
       id: fm?.id || id,

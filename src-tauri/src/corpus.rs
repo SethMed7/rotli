@@ -1356,9 +1356,7 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
 /// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
 /// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
-/// `librarian_page` marks the Librarian route's own index and log
-/// (workspace_librarian.rs); only that route's page creation writes it.
-const RESERVED_KEYS: [&str; 15] = [
+const RESERVED_KEYS: [&str; 14] = [
     "id",
     "created",
     "updated",
@@ -1373,14 +1371,7 @@ const RESERVED_KEYS: [&str; 15] = [
     "view_tag",
     "created_by",
     "ai_edit",
-    "librarian_page",
 ];
-
-/// The frontmatter line that marks one of the Librarian route's own pages
-/// (`index` or `log`).
-pub(crate) fn librarian_page_line(page: &str) -> String {
-    format!("librarian_page: {page}")
-}
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
@@ -1432,9 +1423,10 @@ pub(crate) fn secure_context_field(line: &str) -> Option<bool> {
 
 /// Explicit permission for a loopback-local model to read a secure note.
 /// Absence and malformed values fail closed. Remote models ignore this flag.
+/// Any spelling counts here, so a setter clears them all; the permission is
+/// decided by `frontmatter_keys::local_ai_allowed` (deny in any spelling).
 pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "local_ai_allowed").then(|| v.trim() == "true")
+    crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "local_ai_allowed").map(|(_, v)| v == "true")
 }
 
 /// Physical home to restore when secure protection is removed. This is a
@@ -1569,7 +1561,7 @@ pub(crate) const DOCX_PACKAGE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm"];
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
+pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 7] = [
     "id",
     "created",
     "owner",
@@ -1577,105 +1569,9 @@ pub(crate) const RAW_IMMUTABLE_KEYS: [&str; 8] = [
     "view_tag",
     "created_by",
     "ai_edit",
-    "librarian_page",
 ];
 
-/// Rebuild a document from a user-typed raw frontmatter block (the "Show file
-/// metadata" editor). The submitted text is taken VERBATIM — line order,
-/// spacing, everything — with exactly one correction: the reserved provenance
-/// lines (id/owner/created/local permission/view tag) must match the ORIGINAL file exactly (changed →
-/// restored, dropped → re-inserted at the top, invented → removed). The body
-/// is byte-exact from disk; only the block between the fences is rebuilt.
-/// Tolerant input: with or without the `---` fences, surrounding blank noise
-/// trimmed. A bare `---` line INSIDE the block is refused — it would silently
-/// truncate the frontmatter on the next parse.
-pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, String> {
-    let (_, body) = parse_document(original);
-    let orig_block = raw_frontmatter_block(original);
-    // the original block's lines, fences stripped, VERBATIM (never re-serialized
-    // through Frontmatter — a hand-formatted `id:  x` line survives untouched)
-    let orig_lines: Vec<&str> = if orig_block.is_empty() {
-        Vec::new()
-    } else {
-        let mut v: Vec<&str> = orig_block.lines().collect();
-        v.remove(0); // opening ---
-        v.pop(); // closing ---
-        v
-    };
-
-    // unfence the submitted text (the UI shows the fences; a bare key list is
-    // accepted too). Blank lines INSIDE the block are kept verbatim.
-    let mut lines: Vec<String> = submitted.lines().map(str::to_string).collect();
-    while lines.first().is_some_and(|l| l.trim().is_empty()) {
-        lines.remove(0);
-    }
-    while lines.last().is_some_and(|l| l.trim().is_empty()) {
-        lines.pop();
-    }
-    if lines.first().is_some_and(|l| l.trim() == "---") {
-        lines.remove(0);
-        if lines.last().is_some_and(|l| l.trim() == "---") {
-            lines.pop();
-        }
-    }
-    if lines.iter().any(|l| l.trim() == "---") {
-        return Err("the metadata block can't contain a bare --- line".into());
-    }
-
-    // reserved provenance: the output's id/owner/created lines must be EXACTLY
-    // the original's — present ↔ present (same bytes), absent ↔ absent.
-    // Reserved-key match mirrors parse_fields EXACTLY (UNtrimmed key): an
-    // INDENTED `  created:` under a nested map is a foreign line to the codec,
-    // so it must be foreign here too — field_key's trim misclassified it as
-    // the top-level reserved line and deleted/replaced it (2026-07-01 review).
-    let is_key = |line: &str, key: &str| line.split_once(':').is_some_and(|(k, _)| k == key);
-    let mut restore: Vec<&str> = Vec::new();
-    for key in RAW_IMMUTABLE_KEYS {
-        let orig = orig_lines.iter().copied().find(|l| is_key(l, key));
-        let typed = lines.iter().position(|l| is_key(l, key));
-        match (orig, typed) {
-            (Some(o), Some(i)) => {
-                lines[i] = o.to_string();
-                // duplicates beyond the first are dropped (keep the restored one)
-                let mut seen = 0usize;
-                lines.retain(|l| {
-                    if is_key(l, key) {
-                        seen += 1;
-                        seen == 1
-                    } else {
-                        true
-                    }
-                });
-            }
-            // dropped → collect, re-inserted at the top in id/created/owner order
-            (Some(o), None) => restore.push(o),
-            // invented → a user can't mint provenance; the line goes
-            (None, Some(_)) => lines.retain(|l| !is_key(l, key)),
-            (None, None) => {}
-        }
-    }
-    for line in restore.into_iter().rev() {
-        lines.insert(0, line.to_string());
-    }
-
-    // an emptied block: with nothing reserved to restore the fences go too
-    if lines.is_empty() {
-        return Ok(if orig_block.is_empty() {
-            original.to_string()
-        } else {
-            body.to_string()
-        });
-    }
-    let mut out = String::with_capacity(body.len() + submitted.len() + 16);
-    out.push_str("---\n");
-    for l in &lines {
-        out.push_str(l);
-        out.push('\n');
-    }
-    out.push_str("---\n");
-    out.push_str(body);
-    Ok(out)
-}
+pub use crate::frontmatter_keys::merge_raw_frontmatter;
 
 // ─── shelf-projection (v3.5) ─────────────────────────────────────────────────
 // The disk is the AI's strict structure; the user's VIEW groups notes by their
@@ -3378,7 +3274,7 @@ impl CorpusStore {
         Ok(raw_frontmatter_block(&text).to_string())
     }
 
-    fn raw_frontmatter_versioned(
+    pub(crate) fn raw_frontmatter_versioned(
         &mut self,
         id_or_rel: &str,
     ) -> Result<crate::fsutil::VersionedText, String> {
@@ -3871,10 +3767,7 @@ impl CorpusStore {
     /// the note's explicit `local_ai_allowed` bit wins, else the vault knob.
     /// Never consulted for a remote model — remote is refused unconditionally.
     fn secure_readable_locally(&self, fm: &Frontmatter) -> bool {
-        match fm.foreign.iter().find_map(|l| local_ai_allowed_field(l)) {
-            Some(explicit) => explicit,
-            None => self.secure_local_ai(),
-        }
+        crate::frontmatter_keys::local_ai_allowed(&fm.foreign).unwrap_or_else(|| self.secure_local_ai())
     }
 
     /// The vault-wide default for secure ⇄ on-device visibility, read from the
@@ -4152,21 +4045,7 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
     ) -> Result<NoteMeta, String> {
-        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent, None)
-    }
-
-    /// The same seam for the Librarian route's own index or log: stamped
-    /// `created_by: librarian` and marked `librarian_page: <page>`, the
-    /// reserved line that alone tells its pages from any other note.
-    pub(crate) fn create_librarian_page(
-        &mut self,
-        folder_id: &str,
-        body: &str,
-        page: &str,
-    ) -> Result<NoteMeta, String> {
-        let marker = librarian_page_line(page);
-        let creator = crate::ai_edit_policy::Creator::Librarian;
-        self.create_remote(folder_id, body, creator, Some(&marker))
+        self.create_remote(folder_id, body, crate::ai_edit_policy::Creator::Agent)
     }
 
     fn create_remote(
@@ -4174,7 +4053,6 @@ impl CorpusStore {
         folder_id: &str,
         body: &str,
         creator: crate::ai_edit_policy::Creator,
-        marker: Option<&str>,
     ) -> Result<NoteMeta, String> {
         raw::refuse_in_raw(self, "add files to")?;
         if looks_secure(body) {
@@ -4182,7 +4060,7 @@ impl CorpusStore {
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create_marked(folder_id, body, false, Some(creator), marker.as_slice())
+        self.create_marked(folder_id, body, false, Some(creator), &[])
             .map(|(meta, _)| meta)
     }
 

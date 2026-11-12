@@ -34,7 +34,7 @@ pub(crate) fn with_top_level_line(text: &str, key: &str, value: Option<&str>) ->
         lines.remove(0); // opening ---
         lines.pop(); // closing ---
     }
-    let is_key = |line: &str| line.split_once(':').is_some_and(|(k, _)| k == key);
+    let is_key = |line: &str| crate::frontmatter_keys::canonical_field(line).is_some_and(|(k, _)| k == key);
     let at = lines.iter().position(|line| is_key(line));
     lines.retain(|line| !is_key(line));
     if let Some(value) = value {
