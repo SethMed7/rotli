@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Vault threads spec §5c (2026-11-11):** a host app such as Tesven may create notes in a
+  vault the person chose for threads, only through Rotli's `notes` command line or MCP and
+  only under its own folder (Tesven's bot handoffs go in `Tesven/Bots/<name>/`). Additive,
+  so the protocol stays `vault-threads/1`.
+
 ## [1.9.2] - 2026-11-11
 
 ### Added
