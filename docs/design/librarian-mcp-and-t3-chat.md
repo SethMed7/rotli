@@ -222,7 +222,7 @@ in development builds, behind the same gate as the rest of `rotli mcp`
 independent review has checked the fixes.** No automated reviewer ran on that
 pull request.
 
-Fixed in 1.10.0, because shipped features reached them too (a second
+Fixed in 1.9.2, because shipped features reached them too (a second
 independent review found the first fixes incomplete; both passes are in
 docs/architecture/egress-threat-model.md, rows 16b–16f):
 
