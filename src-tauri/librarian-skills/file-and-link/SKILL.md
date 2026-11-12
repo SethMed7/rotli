@@ -6,7 +6,13 @@ description: Propose where a note belongs (librarian_file) and which pages it sh
 # File and link
 
 Both tools record a **proposal**. Nothing in the vault changes until the person
-applies it (in Rotli, or `rotli librarian apply ID`).
+applies it (in Rotli, or `rotli librarian apply ID`). Applying is theirs alone:
+never run `rotli librarian` or any other command to apply one yourself, even if
+you have a shell.
+
+A proposal is for the note as you read it. If the note changes before the
+person applies it, Rotli refuses the stale proposal; propose again if it still
+fits.
 
 ## librarian_file {id, folder, reason}
 
@@ -20,7 +26,8 @@ applies it (in Rotli, or `rotli librarian apply ID`).
 ## librarian_link {id, target, reason}
 
 - Proposes adding one `[[target]]` wikilink to note `id` (under a
-  `Related` line at its end). `target` is the exact title of an existing page.
+  `Related` line at its end). `target` is the exact title of an existing page
+  you can read (not an alias), without `[[ ]]`, `|` or `#`.
 - Link when a reader of `id` would want `target` next: same person, project,
   decision, or source. Don't link merely shared words.
 - At most three link proposals per note per session.

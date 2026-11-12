@@ -234,10 +234,26 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   another folder, or a link, now stands at that path. `--root` is refused here.
 - **Off by default.** Every call except `librarian_guide` refuses unless the
   vault's `.rotli/settings.json` holds `"librarianMcp": true` (anything else,
-  missing or malformed, is off). Rust only reads that file, except that a
+  missing or malformed, is off) **and** the person has run `rotli librarian
+  on` for that vault. `on` (and `off`) appends a line to
+  `.rotli/librarian-consent.jsonl` naming the vault folder's identity (device
+  and inode of its real path, opened through `open_sidecar`); only the last
+  line for the folder the route is serving counts. A copy made by hand
+  carries both files but is another folder, so it starts off, whether it sits
+  at a new path or where the vault used to be; a move on the same disk keeps
+  the folder and the switch (review 2026-11-09, #6). A system without folder
+  identities reads as off. Rust only reads the settings file, except that a
   vault created, adopted, or brought in as a copy starts with the switch off:
   `carry_settings` copies the other settings across and leaves this one behind.
-  The refusal names the switch. Like the rest of MCP, the route runs only in
+  The refusal names both steps.
+- **Arguments are held to the advertised schema.** Every `tools/call`, on this
+  route and on `rotli-workspace`, is checked against the tool's own input
+  schema before the tool runs (`src-tauri/src/mcp_arguments.rs`, from
+  `handle_mcp_with`): types, required and undeclared arguments, string
+  lengths in characters, number bounds, enums, and array sizes, nested schemas
+  included. A refusal names the argument. A test fails on any schema keyword
+  the checker doesn't enforce, so a limit can't be advertised and ignored
+  (review 2026-11-09, #8). Like the rest of MCP, the route runs only in
   development builds: `cli_gate` refuses `rotli mcp --librarian`, `rotli mcp
   config`, and every `rotli librarian …` command in a public build, and the
   switch itself reads as off there, so `"librarianMcp": true` does nothing.
@@ -266,7 +282,13 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   note that only shares the title, carries it as an alias, or lacks the
   marker is never touched, and the Librarian makes its own page instead.
   Pages made before the marker existed (unreleased builds only) are left
-  alone and replaced by new ones.
+  alone and replaced by new ones. Before every call, and in every write to
+  them, the route removes each line of both pages with a `[[link]]` to a note
+  an agent may not read; a link counts against every note whose title or
+  alias it matches, case aside (a path-style link also by its last segment), so a public namesake can't keep a secure
+  note's line. A line that names a note without linking it can't be found
+  this way (the `index-and-log` skill requires links), and lines go only when
+  the route next runs (review 2026-11-09, #2).
 - **Proposals:** `librarian_file` and `librarian_link` append to
   `.rotli/librarian/proposals.jsonl` (JSON per line, `id`, `ts`, `kind`,
   `note`, `noteTitle`, `folder` or `target` with `targetId`, `reason`,
@@ -276,8 +298,11 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `O_NOFOLLOW | O_DIRECTORY`, so a link at any step is refused even if it was
   swapped in after an earlier check, and the opened file must be a regular
   file with one link (checked on the open descriptor), so a hard link to a
-  file outside the vault is refused for appends and reads alike. A repeated
-  pending proposal returns the existing one. `librarian_review` lists only
+  file outside the vault is refused for appends and reads alike. A proposal
+  records the note's `revision`. A link `target` must be the exact title of a
+  page the agent can read (not an alias; no `[[ ]]`, `|` or `#`). A repeat
+  (same kind, note, folder, `targetId`, and revision) returns the pending one,
+  but only when `librarian_review` would show it (review 2026-11-09, #3). `librarian_review` lists only
   proposals whose note, and link target, the agent may still read. The
   target checked is `targetId`, the exact note the title named when the link
   was proposed; resolving the title again could let another public note's
@@ -292,10 +317,23 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `{"value": …}`. The text part carries the same value. Found by a real Claude
   Code session on 2026-11-08, which rejected list results as malformed.
 - **No tool applies a proposal.** The person runs `rotli librarian apply ID`
-  or `dismiss ID` (a Rotli review list is next). Apply uses
+  or `dismiss ID` (a Rotli review list is next). Apply treats the stored row
+  as untrusted: every field is checked as strictly as the tool arguments, the
+  note must still be at the recorded revision, and a link's `targetId` is
+  resolved again through the read gate and must still be the page its exact
+  title names; the link is built from that title. Apply then uses
   `move_for_remote_agent` for a move and the agent write seam for a link (one
   `[[target]]` added to the note's closing `Related:` line), so secure,
-  locked, and person-written rules still hold; a refused apply stays pending.
+  locked, and person-written rules still hold; a refused apply stays pending,
+  and any row can be dismissed. Rows without a revision (written before
+  2026-11-12) can only be dismissed (review 2026-11-09, #7).
+- **The person's approval is only as strong as the host's sandbox.** `rotli
+  librarian apply` is an ordinary command: an agent with a shell, or a
+  pseudo-terminal, can run it as the person, and Rotli can't tell the two
+  apart. `rotli librarian status` says so (`approval`), as do the CLI help and
+  the server's instructions; the host keeps the shell and raw file tools off
+  in vault threads ([`vault-thread-protocol.md`](vault-thread-protocol.md)
+  §3.2). Approval inside the Rotli app is the planned fix.
 - **What it doesn't stop.** A process running as the same user that swaps
   files under the vault while a call runs is outside the threat model
   ([`egress-threat-model.md`](egress-threat-model.md) O5). The checks above
@@ -372,7 +410,7 @@ rotli notes query 'area:projects tags:payments' # inspectable metadata filters
 rotli views list        # named reference trees (Main remains global)
 rotli mcp               # stdio protocol process used by either client
 rotli mcp --librarian --vault PATH   # the opt-in Librarian route for one vault (see above)
-rotli librarian status  # is it on for this vault; proposals, apply, dismiss
+rotli librarian status  # is it on for this vault; on, off, proposals, apply, dismiss
 ```
 
 `rotli agent config` (also available as `rotli mcp config`) prints the exact

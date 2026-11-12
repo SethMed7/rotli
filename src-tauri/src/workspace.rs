@@ -2641,7 +2641,7 @@ fn handle_mcp_with(request: &Value, server: &McpServer) -> Option<Value> {
                 .pointer("/params/arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-            let result = (server.call)(name, &arguments);
+            let result = crate::mcp_arguments::check(&(server.tools)(), name, &arguments).and_then(|()| (server.call)(name, &arguments));
             Some(mcp_success(
                 id,
                 match result {

@@ -17,7 +17,7 @@ use super::*;
 use crate::ai_edit_policy::Creator;
 
 /// The route's behaviour exists only in development builds.
-fn public_build() -> bool {
+pub(super) fn public_build() -> bool {
     !crate::feature_policy::agents_enabled()
 }
 
@@ -28,17 +28,18 @@ fn a_public_build_ignores_the_vault_switch() {
     assert_eq!(enabled(temp.path()), !public_build(), "the switch does nothing in a public build");
 }
 
-fn turn_on(temp: &TempDir) {
+pub(super) fn turn_on(temp: &TempDir) {
     fs::create_dir_all(temp.path().join(".rotli")).unwrap();
     fs::write(temp.path().join(".rotli/settings.json"), r#"{"theme":"grove","librarianMcp":true}"#).unwrap();
+    record_consent(temp.path(), true).unwrap();
 }
 
-fn target(id: &str, temp: &TempDir, is_default: bool) -> RootTarget {
+pub(super) fn target(id: &str, temp: &TempDir, is_default: bool) -> RootTarget {
     RootTarget { id: id.into(), label: id.into(), path: temp.path().to_path_buf(), read_only: false, is_default }
 }
 
 /// One call to a Librarian server bound to `bound` (as `serve` binds it at start).
-fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
+pub(super) fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
     let request = json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params });
     BOUND.with(|value| *value.borrow_mut() = bound);
     let response = handle_mcp_with(&request, &SERVER).unwrap();
@@ -46,29 +47,29 @@ fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
     response["result"].clone()
 }
 
-fn request(temp: &TempDir, method: &str, params: Value) -> Value {
+pub(super) fn request(temp: &TempDir, method: &str, params: Value) -> Value {
     let target = target(DEFAULT_ROOT_ID, temp, true);
     let identity = crate::containment::folder_identity(&target.path);
     call_bound(Some(Bound { target, identity }), method, params)
 }
 
-fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
+pub(super) fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
     request(temp, "tools/call", json!({ "name": name, "arguments": arguments }))
 }
 
 /// The refusal a failed call carries, all its text parts joined.
-fn refusal(result: &Value) -> String {
+pub(super) fn refusal(result: &Value) -> String {
     assert!(result.get("isError").and_then(Value::as_bool).unwrap_or(false), "expected a refusal: {result}");
     let parts = result.get("content").and_then(Value::as_array).cloned().unwrap_or_default();
     parts.iter().filter_map(|part| part.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join(" ")
 }
 
-fn ok(result: Value) -> Value {
+pub(super) fn ok(result: Value) -> Value {
     assert_eq!(result["isError"], false, "{result}");
     result["structuredContent"].clone()
 }
 
-fn body_of(ws: &mut Workspace, id: &str) -> String {
+pub(super) fn body_of(ws: &mut Workspace, id: &str) -> String {
     let local = ws.local_id(id).unwrap();
     ws.read_note(&local).unwrap().note.body
 }
@@ -99,6 +100,8 @@ fn the_route_is_off_until_the_vault_turns_it_on() {
         fs::write(temp.path().join(".rotli/settings.json"), off).unwrap();
         assert!(!enabled(temp.path()), "{off}");
     }
+    fs::write(temp.path().join(".rotli/settings.json"), r#"{"librarianMcp":true}"#).unwrap();
+    assert!(!enabled(temp.path()), "the setting alone is not the person's consent for this folder");
     turn_on(&temp);
     assert!(enabled(temp.path()));
 }
@@ -260,7 +263,7 @@ fn related_lines_grow_without_touching_prose() {
 }
 
 /// The person makes a note secure after the agent has seen it.
-fn make_secure(ws: &mut Workspace, id: &str) {
+pub(super) fn make_secure(ws: &mut Workspace, id: &str) {
     let rel = ws.store.resolve_note_rel(id).unwrap();
     let path = ws.store.root().join(rel);
     let text = fs::read_to_string(&path).unwrap();
@@ -502,6 +505,7 @@ fn proposals_refuse_a_linked_rotli_folder() {
         folder: Some("projects".into()),
         target: None,
         target_id: None,
+        revision: None,
         reason: "r".into(),
         status: "pending".into(),
     };
@@ -521,6 +525,7 @@ fn a_vault_folder_replaced_after_binding_is_refused() {
     let make = |path: &std::path::Path| {
         fs::create_dir_all(path.join(".rotli")).unwrap();
         fs::write(path.join(".rotli/settings.json"), r#"{"librarianMcp":true}"#).unwrap();
+        record_consent(path, true).unwrap();
         let root = RootTarget { id: DEFAULT_ROOT_ID.into(), label: "v".into(), path: fs::canonicalize(path).unwrap(), read_only: false, is_default: true };
         Workspace::open_target(root.clone()).unwrap();
         root
@@ -580,12 +585,7 @@ fn review_checks_the_exact_page_a_link_was_proposed_for() {
     assert_eq!(ok(mcp(&temp, REVIEW, json!({})))["items"].as_array().unwrap().len(), 2);
 
     make_secure(&mut ws, &ana.id);
-    // the person gives another public note Ana's title as an alias
-    let stand_in = ws.create_note("Ana R", "a different Ana", MAIN_ROOT).unwrap();
-    let rel = ws.store.resolve_note_rel(&stand_in.id).unwrap();
-    let path = ws.store.root().join(rel);
-    let text = fs::read_to_string(&path).unwrap();
-    fs::write(&path, text.replacen("aliases: []", r#"aliases: ["Ana Ruiz"]"#, 1)).unwrap();
+    super::review_tests::alias_ana_on_a_stand_in(&mut ws);
     assert!(ws.resolve_note_selector("Ana Ruiz").is_ok(), "the alias alone would resolve");
     let review = mcp(&temp, REVIEW, json!({}));
     assert_eq!(ok(review.clone())["items"].as_array().unwrap().len(), 0, "{review}");

@@ -10,6 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+These fix the Librarian agent route, which still runs only in development
+builds.
+
+- **Agent tools now enforce their own limits.** Every tool an agent calls,
+  through the Librarian route or the full Rotli MCP server, is checked against
+  the limits it advertises before it runs: no unknown arguments, no text over
+  its length limit, and numbers in range. Before, a 100,001-character capture
+  went through. A number out of range is now refused instead of quietly
+  capped.
+- **The Librarian's index and log forget a note that turns secure.** Lines
+  that link to a note an agent may no longer read are removed from both pages
+  the next time the Librarian runs, and aren't written back.
+- **A copied vault starts with the Librarian off.** Turning the route on now
+  takes `rotli librarian on` in the vault as well as the setting, and that
+  consent belongs to the folder: a copy of the vault, wherever it is put,
+  starts off. Moving the vault keeps it on. Run `rotli librarian on` once in
+  each vault that already uses the route.
+- **Applying a proposal checks it again.** `rotli librarian apply` refuses a
+  link to a page that has since turned secure, a proposal whose note changed
+  after it was made, and a proposals file edited to say something the tools
+  would never accept. A refused proposal stays waiting, and you can still
+  dismiss it. Proposals made before this change can only be dismissed.
+- **A repeated proposal no longer brings back one you can't see.** Asking for
+  the same link again returns the waiting proposal only if it is still about
+  pages the agent can read.
+
+### Changed
+
+- **Approving is yours, but Rotli says plainly what that relies on.**
+  `rotli librarian apply` is an ordinary command, so an agent with a shell
+  could run it too. `rotli librarian status`, the command help and the setup
+  docs now say so; keep the shell off in vault threads.
+
 ## [1.9.3] - 2026-11-12
 
 ### Added

@@ -938,7 +938,10 @@ const FEATURES: Feature[] = [
     icon: ICON.agent,
     body: ['The same rules as the app: secure notes stay out of reach, locked notes refuse edits, and every AI edit is recorded.'],
     use: [],
-    limits: ['Development builds only, the Librarian route (rotli mcp --librarian) included.'],
+    limits: [
+      'Development builds only, the Librarian route (rotli mcp --librarian) included.',
+      'Approving a Librarian proposal is an ordinary command; an agent with a shell could run it too.',
+    ],
     links: [DEVELOPERS],
     roadmap: 'agents-mcp',
   },

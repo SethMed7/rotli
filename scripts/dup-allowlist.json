@@ -269,6 +269,15 @@
         "src/editor/realWriteLane.lane.ts"
       ],
       "reason": "The real-lane harness: the TypeScript side sends the Tauri command names the app's native adapter uses (`corpus_delete`, `corpus_purge`), and the Rust side answers them with the same store methods. Shared command names are the protocol, not copied logic."
+    },
+    {
+      "id": "mcp-schema-keywords",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/mcp_arguments.rs",
+        "src-tauri/src/workspace_documents.rs"
+      ],
+      "reason": "Not a mirror: mcp_arguments.rs is the checker that enforces JSON Schema keywords (minItems, minLength, …) on every MCP tool call, and workspace_documents.rs declares a tool schema using those keywords. A checker and the schemas it checks necessarily name the same keywords; a test fails on any keyword the checker doesn't enforce."
     }
   ]
 }

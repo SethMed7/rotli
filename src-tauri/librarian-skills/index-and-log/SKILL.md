@@ -21,6 +21,9 @@ Replaces the whole body of "Librarian index". Shape:
 ```
 
 - One line per page: a wikilink and a one-line summary.
+- Name every note with its `[[wikilink]]`, never by its title in plain words.
+  When a note turns secure, Rotli removes every line of both pages that links
+  to it; a line that names it without a link can't be found and stays.
 - Group by the vault's own areas. Keep it under about 300 lines; link to area
   pages instead of listing everything in a large vault.
 - Only pages you can read appear. Never mention that anything was withheld.
@@ -29,4 +32,5 @@ Replaces the whole body of "Librarian index". Shape:
 
 Appends one dated line to "Librarian log". Use it for decisions worth
 remembering ("Left 4 recipe notes in intake: no Cooking area yet"). Captures
-and proposals already log themselves.
+and proposals already log themselves. Link any note an entry is about, as in
+the index.
