@@ -53,11 +53,21 @@ export function ChatBuddyStudio() {
       <h4 className="sethead" id="appearance-quokka-title">
         Chat buddy
       </h4>
-      <p className="lead">
-        A quokka keeps you company in every chat and picks its own expression as the conversation goes.
-        Decorate it here; the compact product mark always stays its original line drawing.
-      </p>
-      <section className="quokka-studio" aria-labelledby="appearance-quokka-title">
+      {locked ? (
+        <p className="lead" data-testid="chat-buddy-locked">
+          A quokka keeps you company in every chat and picks its own expression as the conversation goes.
+          Tesven keeps the original line quokka. Your look comes back in other themes.
+        </p>
+      ) : (
+        <p className="lead">
+          A quokka keeps you company in every chat and picks its own expression as the conversation goes.
+          Decorate it here; the compact product mark always stays its original line drawing.
+        </p>
+      )}
+      <section
+        className={locked ? "quokka-studio locked" : "quokka-studio"}
+        aria-labelledby="appearance-quokka-title"
+      >
         <div className="quokka-studio-preview" data-testid="chat-buddy-preview">
           <Character name="chat" size={148} />
           {locked ? (
@@ -79,11 +89,7 @@ export function ChatBuddyStudio() {
           )}
         </div>
 
-        {locked ? (
-          <p className="setnote quokka-studio-locked" data-testid="chat-buddy-locked">
-            Tesven keeps the original line quokka. Your look comes back in other themes.
-          </p>
-        ) : (
+        {!locked && (
           <div className="quokka-studio-controls">
             <fieldset>
               <legend>Body color</legend>

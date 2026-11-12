@@ -57,7 +57,7 @@ test("Tesven locks the line quokka (navy by day, white by night) and leaving it 
   await page.locator(".famcard", { hasText: "Tesven" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "tesven-light");
   await expect(page.getByTestId("chat-buddy-locked")).toHaveText(
-    "Tesven keeps the original line quokka. Your look comes back in other themes.",
+    "A quokka keeps you company in every chat and picks its own expression as the conversation goes. Tesven keeps the original line quokka. Your look comes back in other themes.",
   );
   // the controls are gone, not disabled
   await expect(page.getByRole("radiogroup", { name: "Quokka body color" })).toHaveCount(0);
