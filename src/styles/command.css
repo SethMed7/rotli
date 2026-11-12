@@ -2217,6 +2217,25 @@
   color: var(--accent-text);
   opacity: 1;
 }
+.navigator-sample.hexes {
+  gap: 1px;
+}
+.navigator-sample.hexes i {
+  width: 10px;
+  height: 9px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: currentColor;
+  opacity: 0.46;
+}
+.navigator-sample.hexes i:nth-child(even) {
+  transform: translateX(3px);
+}
+.navigator-sample.hexes i:nth-child(odd) {
+  transform: translateX(-3px);
+}
+.navigator-sample.hexes i.active {
+  opacity: 1;
+}
 .navigator-sample.paws i {
   position: relative;
   width: 8px;

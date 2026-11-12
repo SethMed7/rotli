@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A hexagon trail for long chats in Tesven.** In Tesven, Settings →
+  Appearance → Conversation navigator offers Hex trail, a small honeycomb of
+  hexagons beside the conversation, in place of the quokka trail and little
+  ears. If you'd picked either of those, Tesven shows the hexagons; switch to
+  another theme and your pawprints or ears are back.
+
 ## [1.9.3] - 2026-11-12
 
 ### Added
