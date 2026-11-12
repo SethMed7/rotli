@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { SettingsNavUpdates, shownState, statusLine } from "./updatesNav";
+import { type CheckState, SettingsNavUpdates, shownState, statusLine } from "./updatesNav";
 
 test("with no update known, the menu foot offers a check and invents no version", () => {
   const html = renderToStaticMarkup(<SettingsNavUpdates />);
@@ -12,10 +12,10 @@ test("with no update known, the menu foot offers a check and invents no version"
 });
 
 test("an update the background check found replaces an idle or up-to-date footer", () => {
-  const found = { kind: "available", version: "1.10.1" };
+  const found: CheckState = { kind: "available", version: "1.10.1" };
   expect(shownState({ kind: "idle" }, true, "1.10.1")).toEqual(found);
   expect(shownState({ kind: "current" }, true, "1.10.1")).toEqual(found);
-  expect(statusLine(found as never)).toBe("Update available: v1.10.1");
+  expect(statusLine(found)).toBe("Update available: v1.10.1");
   expect(statusLine({ kind: "available", version: null })).toBe("Update available");
 });
 
