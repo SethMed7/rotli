@@ -1,5 +1,5 @@
 {
-  "1.10.0": [
+  "1.9.2": [
     {
       "title": "Your last words are saved",
       "body": "Typing just before you close a tab, switch notes or quit is no longer lost when an earlier save was still finishing. Rotli now saves each note one change at a time."
@@ -10,22 +10,21 @@
       "platform": "mac"
     },
     {
-      "title": "Files Rotli leaves alone, named",
-      "body": "When a file in your vault has a hard link, Rotli doesn't open it, and now a quiet note at the foot of the sidebar says which. Search mentions them too, and your files stay as they are on disk.",
-      "platform": "mac"
+      "title": "Dark themes open dark",
+      "body": "Rotli no longer flashes its light ground while it starts. Each window opens in the theme it last showed."
     },
     {
       "title": "Easier by keyboard and screen reader",
-      "body": "Tabs move with the arrow keys, Home and End, controls have real names and roles, and dialogs keep focus inside until you close them."
+      "body": "Tabs move with the arrow keys, Home and End, controls and choice lists have real names and roles, errors are read aloud, and Tab stays inside every dialog until you close it."
     },
     {
-      "title": "Pins stick on Rotli Web",
-      "body": "Pin to top now saves to your connected folder and survives a reload. Only the pin changes, never your words.",
-      "platform": "web"
+      "title": "Quicker with big vaults and long notes",
+      "body": "Large Main lists update only the rows that changed when you switch notes, typing in a very long note does less work per keystroke, and Rotli Web does less repeated work opening and searching your folder."
     },
     {
-      "title": "Quicker with big vaults",
-      "body": "Large Main lists update only the rows that changed when you switch notes, and Rotli Web does less repeated work opening and searching your folder."
+      "title": "Updates at the foot of Settings",
+      "body": "Your version, Check for updates and Install & relaunch now sit at the bottom of the Settings menu, one click from every page.",
+      "platform": "mac"
     }
   ],
   "1.9.1": [
