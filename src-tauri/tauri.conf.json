@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "rotli",
+        "title": "Rotli",
         "width": 980,
         "height": 640,
         "minWidth": 720,
@@ -106,6 +106,7 @@
     },
     "macOS": {
       "entitlements": "entitlements.plist",
+      "infoPlist": "Info.production.plist",
       "minimumSystemVersion": "11.0"
     },
     "fileAssociations": [

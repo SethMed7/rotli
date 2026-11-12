@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offering its controls. Your own look isn't changed: it comes back as soon as
   you switch to another theme.
 
+### Fixed
+
+- **The Dock, the app menu and the window list say "Rotli",** not "rotli".
+
 ## [1.9.2] - 2026-11-11
 
 ### Added
