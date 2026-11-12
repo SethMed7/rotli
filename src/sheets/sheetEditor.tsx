@@ -82,7 +82,7 @@ export default function SheetEditor({
   const [saving, setSaving] = useState(false);
   const [draftWarning, setDraftWarning] = useState(false);
   const [themeMode, setThemeMode] = useState<SheetThemeMode>(() => themeModeMemo.get(fileId) ?? "themed");
-  const appTheme = useDataTheme(); // live across all fourteen environments
+  const appTheme = useDataTheme(); // live across every environment
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
 
   const wbRef = useRef<Workbook | null>(null);

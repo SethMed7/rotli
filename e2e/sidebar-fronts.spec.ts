@@ -117,6 +117,8 @@ test("the switcher reads from semantic tokens in every environment", async ({ pa
     "Blossom Dark",
     "Moonlight",
     "Midnight",
+    "Tesven Light",
+    "Tesven Dark",
   ] as const) {
     await expect(themeButton).toHaveAccessibleName(new RegExp(`^Theme — ${theme} · `));
 

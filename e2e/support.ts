@@ -34,13 +34,13 @@ export async function gotoApp(page: Page): Promise<void> {
   await page.locator(".tabstrip").first().waitFor();
 }
 
-/** Set Appearance → Theme button to All 14 through the real control, so a
+/** Set Appearance → Theme button to All 16 through the real control, so a
  * spec can walk every environment with the titlebar sun (its default flips
  * light and dark inside one family), then come back to the notes. */
 export async function cycleEveryTheme(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  await page.getByRole("button", { name: "All 16", exact: true }).click();
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
 }
 

@@ -2,7 +2,9 @@
 // person decorates it here (body color, lines, accessory and its hue) and
 // watches it change live. Its pose is never a choice: Chat picks the
 // expression for the moment (chat/chatBuddyModel.ts), shown below as a strip
-// wearing the same decoration.
+// wearing the same decoration. A theme that locks the quokka (Tesven: see
+// brand/quokka.ts quokkaThemeLock) shows the locked preview and one line
+// instead of the controls; the stored look is never touched.
 
 import type { CSSProperties } from "react";
 
@@ -13,7 +15,9 @@ import {
   type QuokkaLineColor,
   quokkaAccessoryColor,
   quokkaCustomColor,
+  quokkaThemeLock,
 } from "../../brand/quokka";
+import { useDataTheme } from "../../state/theme";
 import { useUiStore } from "../../state/ui";
 import { Character, type CharacterName } from "../character";
 
@@ -43,145 +47,165 @@ export function ChatBuddyStudio() {
   const setQuokkaAccessory = useUiStore((s) => s.setQuokkaAccessory);
   const quokkaAccessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
   const setQuokkaAccessoryHue = useUiStore((s) => s.setQuokkaAccessoryHue);
+  const locked = quokkaThemeLock(useDataTheme()) !== null;
   return (
     <>
       <h4 className="sethead" id="appearance-quokka-title">
         Chat buddy
       </h4>
-      <p className="lead">
-        A quokka keeps you company in every chat and picks its own expression as the conversation goes.
-        Decorate it here; the compact product mark always stays its original line drawing.
-      </p>
-      <section className="quokka-studio" aria-labelledby="appearance-quokka-title">
+      {locked ? (
+        <p className="lead" data-testid="chat-buddy-locked">
+          A quokka keeps you company in every chat and picks its own expression as the conversation goes.
+          Tesven keeps the original line quokka. Your look comes back in other themes.
+        </p>
+      ) : (
+        <p className="lead">
+          A quokka keeps you company in every chat and picks its own expression as the conversation goes.
+          Decorate it here; the compact product mark always stays its original line drawing.
+        </p>
+      )}
+      <section
+        className={locked ? "quokka-studio locked" : "quokka-studio"}
+        aria-labelledby="appearance-quokka-title"
+      >
         <div className="quokka-studio-preview" data-testid="chat-buddy-preview">
           <Character name="chat" size={148} />
-          <span>
-            <strong>
-              {QUOKKA_STYLE_PRESENTATIONS.find((choice) => choice.style === quokkaStyle)?.label ?? "Cocoa"}
-            </strong>
-            <small>
-              {QUOKKA_ACCESSORY_PRESENTATIONS.find((choice) => choice.accessory === quokkaAccessory)
-                ?.description ?? "Just the quokka"}{" "}
-              · {QUOKKA_LINE_COLOR_LABEL[quokkaLineColor]} lines
-            </small>
-          </span>
+          {locked ? (
+            <span>
+              <strong>Line</strong>
+              <small>Original drawing</small>
+            </span>
+          ) : (
+            <span>
+              <strong>
+                {QUOKKA_STYLE_PRESENTATIONS.find((choice) => choice.style === quokkaStyle)?.label ?? "Cocoa"}
+              </strong>
+              <small>
+                {QUOKKA_ACCESSORY_PRESENTATIONS.find((choice) => choice.accessory === quokkaAccessory)
+                  ?.description ?? "Just the quokka"}{" "}
+                · {QUOKKA_LINE_COLOR_LABEL[quokkaLineColor]} lines
+              </small>
+            </span>
+          )}
         </div>
 
-        <div className="quokka-studio-controls">
-          <fieldset>
-            <legend>Body color</legend>
-            <div className="quokka-swatches" role="radiogroup" aria-label="Quokka body color">
-              {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={quokkaStyle === choice.style}
-                  aria-label={`${choice.label}: ${choice.description}`}
-                  className={
-                    quokkaStyle === choice.style
-                      ? `quokka-swatch ${choice.style} sel`
-                      : `quokka-swatch ${choice.style}`
-                  }
-                  key={choice.style}
+        {!locked && (
+          <div className="quokka-studio-controls">
+            <fieldset>
+              <legend>Body color</legend>
+              <div className="quokka-swatches" role="radiogroup" aria-label="Quokka body color">
+                {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={quokkaStyle === choice.style}
+                    aria-label={`${choice.label}: ${choice.description}`}
+                    className={
+                      quokkaStyle === choice.style
+                        ? `quokka-swatch ${choice.style} sel`
+                        : `quokka-swatch ${choice.style}`
+                    }
+                    key={choice.style}
+                    style={
+                      choice.style === "line"
+                        ? undefined
+                        : ({
+                            "--quokka-choice-color": choice.color ?? quokkaCustomColor(quokkaCustomHue),
+                          } as CSSProperties)
+                    }
+                    onClick={() => setQuokkaStyle(choice.style)}
+                  >
+                    <span aria-hidden="true" />
+                    <small>{choice.label}</small>
+                  </button>
+                ))}
+              </div>
+              {quokkaStyle === "custom" && (
+                <label
+                  className="quokka-custom-hue"
+                  style={{ "--quokka-custom-color": quokkaCustomColor(quokkaCustomHue) } as CSSProperties}
+                >
+                  <span>Hue {quokkaCustomHue}°</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="359"
+                    value={quokkaCustomHue}
+                    aria-label="Custom quokka body color hue"
+                    onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
+                  />
+                </label>
+              )}
+            </fieldset>
+
+            <fieldset>
+              <legend>Line color</legend>
+              <div className="quokka-line-colors" role="radiogroup" aria-label="Quokka line color">
+                {QUOKKA_LINE_COLORS.map((color) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={quokkaLineColor === color}
+                    className={
+                      quokkaLineColor === color
+                        ? `quokka-line-choice ${color} sel`
+                        : `quokka-line-choice ${color}`
+                    }
+                    key={color}
+                    onClick={() => setQuokkaLineColor(color)}
+                  >
+                    <span aria-hidden="true" />
+                    {QUOKKA_LINE_COLOR_LABEL[color]}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Accessory</legend>
+              <div className="quokka-accessories" role="radiogroup" aria-label="Quokka accessory">
+                {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={quokkaAccessory === choice.accessory}
+                    className={
+                      quokkaAccessory === choice.accessory ? "quokka-accessory sel" : "quokka-accessory"
+                    }
+                    key={choice.accessory}
+                    onClick={() => setQuokkaAccessory(choice.accessory)}
+                  >
+                    <Character name="base" size={48} accessory={choice.accessory} />
+                    <span>
+                      <strong>{choice.label}</strong>
+                      <small>{choice.description}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
+                <label
+                  className="quokka-accessory-hue"
                   style={
-                    choice.style === "line"
-                      ? undefined
-                      : ({
-                          "--quokka-choice-color": choice.color ?? quokkaCustomColor(quokkaCustomHue),
-                        } as CSSProperties)
+                    {
+                      "--quokka-accessory-color": quokkaAccessoryColor(quokkaAccessoryHue),
+                    } as CSSProperties
                   }
-                  onClick={() => setQuokkaStyle(choice.style)}
                 >
-                  <span aria-hidden="true" />
-                  <small>{choice.label}</small>
-                </button>
-              ))}
-            </div>
-            {quokkaStyle === "custom" && (
-              <label
-                className="quokka-custom-hue"
-                style={{ "--quokka-custom-color": quokkaCustomColor(quokkaCustomHue) } as CSSProperties}
-              >
-                <span>Hue {quokkaCustomHue}°</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="359"
-                  value={quokkaCustomHue}
-                  aria-label="Custom quokka body color hue"
-                  onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
-                />
-              </label>
-            )}
-          </fieldset>
-
-          <fieldset>
-            <legend>Line color</legend>
-            <div className="quokka-line-colors" role="radiogroup" aria-label="Quokka line color">
-              {QUOKKA_LINE_COLORS.map((color) => (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={quokkaLineColor === color}
-                  className={
-                    quokkaLineColor === color
-                      ? `quokka-line-choice ${color} sel`
-                      : `quokka-line-choice ${color}`
-                  }
-                  key={color}
-                  onClick={() => setQuokkaLineColor(color)}
-                >
-                  <span aria-hidden="true" />
-                  {QUOKKA_LINE_COLOR_LABEL[color]}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Accessory</legend>
-            <div className="quokka-accessories" role="radiogroup" aria-label="Quokka accessory">
-              {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={quokkaAccessory === choice.accessory}
-                  className={
-                    quokkaAccessory === choice.accessory ? "quokka-accessory sel" : "quokka-accessory"
-                  }
-                  key={choice.accessory}
-                  onClick={() => setQuokkaAccessory(choice.accessory)}
-                >
-                  <Character name="base" size={48} accessory={choice.accessory} />
-                  <span>
-                    <strong>{choice.label}</strong>
-                    <small>{choice.description}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
-            {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
-              <label
-                className="quokka-accessory-hue"
-                style={
-                  {
-                    "--quokka-accessory-color": quokkaAccessoryColor(quokkaAccessoryHue),
-                  } as CSSProperties
-                }
-              >
-                <span>Accessory hue {quokkaAccessoryHue}°</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="359"
-                  value={quokkaAccessoryHue}
-                  aria-label="Quokka accessory color hue"
-                  onChange={(event) => setQuokkaAccessoryHue(Number(event.currentTarget.value))}
-                />
-              </label>
-            )}
-          </fieldset>
-        </div>
+                  <span>Accessory hue {quokkaAccessoryHue}°</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="359"
+                    value={quokkaAccessoryHue}
+                    aria-label="Quokka accessory color hue"
+                    onChange={(event) => setQuokkaAccessoryHue(Number(event.currentTarget.value))}
+                  />
+                </label>
+              )}
+            </fieldset>
+          </div>
+        )}
       </section>
 
       <span className="setsubhead">Expressions it picks in Chat</span>

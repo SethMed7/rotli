@@ -755,7 +755,8 @@ body[data-surface="capture"] {
 :root[data-theme="grove-dark"] .sc-cloud,
 :root[data-theme="iris-dark"] .sc-cloud,
 :root[data-theme="blossom-dark"] .sc-cloud,
-:root[data-theme="midnight-dark"] .sc-cloud {
+:root[data-theme="midnight-dark"] .sc-cloud,
+:root[data-theme="tesven-dark"] .sc-cloud {
   fill: var(--tint);
 }
 .sc-sand { fill: var(--surface-2); }

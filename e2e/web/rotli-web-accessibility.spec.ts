@@ -15,7 +15,7 @@ test("web settings panes have no moderate or higher axe violations", async ({ pa
   await auditSettings(page, info, "web");
 });
 
-test("web note shell is accessible in all fourteen environments", async ({ page }, info) => {
+test("web note shell is accessible in all sixteen environments", async ({ page }, info) => {
   test.slow();
   await startWithVault(page);
   await auditThemes(page, info);

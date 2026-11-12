@@ -9,7 +9,7 @@
 import type { ReactNode } from "react";
 
 import type { ThemeFamily } from "../state/ui";
-import { cloud, star } from "./sceneParts";
+import { cloud, hex, star } from "./sceneParts";
 
 export interface PaneScene {
   /** A short name for the scene (tests, and the stage's data attribute). */
@@ -200,6 +200,33 @@ const midnight: PaneScene = {
   ),
 };
 
+/** Tesven: a hexagon sun over still water, plates resting on the line. */
+const tesven: PaneScene = {
+  name: "current",
+  art: (
+    <>
+      {hex(92, 66, 24, "sc-sun")}
+      {[
+        [300, 44],
+        [315, 52.7],
+        [330, 44],
+        [345, 52.7],
+        [315, 35.3],
+      ].map(([x, y]) => hex(x!, y!, 10, "sc-line"))}
+      {hex(345, 52.7, 4, "sc-accent-fill")}
+      <path className="sc-sea" d="M0 118h440v38H0z" />
+      <path className="sc-wave" d="M0 131h440M0 144h440" />
+      <g className="sc-bob">
+        {hex(290, 118, 13)}
+        {hex(316, 114, 13)}
+        {hex(342, 118, 13)}
+        {hex(316, 114, 5, "sc-accent-fill")}
+      </g>
+      <path className="sc-sand" d="M0 156h440v44H0z" />
+    </>
+  ),
+};
+
 export const PANE_SCENES: Record<ThemeFamily, PaneScene> = {
   warm,
   mono,
@@ -208,4 +235,5 @@ export const PANE_SCENES: Record<ThemeFamily, PaneScene> = {
   iris,
   blossom,
   midnight,
+  tesven,
 };

@@ -43,7 +43,7 @@ test("development Graph and canvas refusal have no moderate or higher axe violat
   await auditAccessibility(page, info, "canvas-creation-refusal");
 });
 
-test("desktop note shell is accessible in all fourteen environments", async ({ page }, info) => {
+test("desktop note shell is accessible in all sixteen environments", async ({ page }, info) => {
   test.slow();
   await gotoApp(page);
   await auditThemes(page, info);

@@ -855,7 +855,9 @@ type PreviewEnvironment =
   | "blossom-light"
   | "blossom-dark"
   | "midnight-light"
-  | "midnight-dark";
+  | "midnight-dark"
+  | "tesven-light"
+  | "tesven-dark";
 
 function previewEnvironment(family: ThemeFamily, mode: "light" | "dark"): PreviewEnvironment {
   if (family === "warm") return mode === "light" ? "warm-light" : "warm-dark";

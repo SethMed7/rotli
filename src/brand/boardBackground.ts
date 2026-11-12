@@ -1,7 +1,7 @@
 // A board's canvas background (2026-09-27). Unless the person chose a color
 // for a board, its canvas follows the app: with "Match theme" (the default)
 // the canvas is transparent over the theme's ground, so it is the theme's own
-// color in all fourteen environments and changes with them; Excalidraw's dark
+// color in every environment and changes with them; Excalidraw's dark
 // filter inverts a painted color, but it has nothing to invert on transparent.
 // With "White" an unchosen board stays light, like paper, in every theme.
 // Only a chosen color is written to the file; no color, Excalidraw's default

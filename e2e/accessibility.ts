@@ -92,7 +92,7 @@ export async function auditWorkspace(page: Page, info: TestInfo): Promise<void> 
 export async function auditThemes(page: Page, info: TestInfo): Promise<void> {
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  await page.getByRole("button", { name: "All 16", exact: true }).click();
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
   for (const { label } of SOLID_THEMES) {

@@ -74,7 +74,7 @@ test("every major web surface opens without a console error or a failed request"
   await page.setViewportSize({ width: 640, height: 820 });
   await row("All notes").click();
   await page.setViewportSize({ width: 1280, height: 820 });
-  for (let step = 0; step < 14; step += 1) {
+  for (let step = 0; step < 16; step += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
     if (/Dark/.test(themeNow(await toggle.getAttribute("aria-label")))) break;
     await toggle.click();

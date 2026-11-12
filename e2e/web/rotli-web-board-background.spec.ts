@@ -45,7 +45,7 @@ function canvasLook(page: Page) {
 }
 
 async function darkTheme(page: Page): Promise<void> {
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 16; i += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
     if (/Dark|Charcoal|Midnight/.test(themeNow(await toggle.getAttribute("aria-label")))) return;
     await toggle.click();

@@ -67,7 +67,8 @@
 :root[data-theme="grove-light"],
 :root[data-theme="iris-light"],
 :root[data-theme="blossom-light"],
-:root[data-theme="midnight-light"] {
+:root[data-theme="midnight-light"],
+:root[data-theme="tesven-light"] {
   --failure: #9f3d3d;
 }
 :root[data-theme="charcoal"],
@@ -75,7 +76,8 @@
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-dark"],
 :root[data-theme="blossom-dark"],
-:root[data-theme="midnight-dark"] {
+:root[data-theme="midnight-dark"],
+:root[data-theme="tesven-dark"] {
   --failure: #e58b8b;
 }
 

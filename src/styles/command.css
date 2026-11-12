@@ -1914,6 +1914,16 @@
   color: var(--text-muted);
   font-size: 10.5px;
 }
+/* Tesven locks the quokka (brand/quokka.ts quokkaThemeLock): no controls, so
+   the studio is just the preview, not a two-column card with an empty half */
+.quokka-studio.locked {
+  max-width: 210px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.quokka-studio.locked .quokka-studio-preview {
+  min-height: 0;
+  border-right: 0;
+}
 .quokka-studio-controls {
   display: flex;
   min-width: 0;

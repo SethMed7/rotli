@@ -99,12 +99,12 @@ Spreadsheets (XLSX and CSV) and Word documents are in **Beta**: they work and
 save in their own formats, and are still being finished. Mermaid diagram tabs
 and read-aloud are coming soon and are not in this release.
 
-## Seven families, light and dark
+## Eight families, light and dark
 
-The titlebar sun switches between paired light and dark environments in seven
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight**
-(Settings → Appearance can make it walk your own picks, or all fourteen). Every
-first run starts in Rotli Light; below is one environment from each family.
+The titlebar sun switches between paired light and dark environments in eight
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight · Tesven**
+(Settings → Appearance can make it walk your own picks, or all sixteen). Every
+first run starts in Rotli Light; below are six of them.
 
 <div align="center">
 <table>

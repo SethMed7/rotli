@@ -24,6 +24,8 @@ export const DATA_THEMES = [
   "blossom-dark",
   "midnight-light",
   "midnight-dark",
+  "tesven-light",
+  "tesven-dark",
 ] as const;
 
 export type DataTheme = (typeof DATA_THEMES)[number];
@@ -36,6 +38,7 @@ export const DARK_DATA_THEMES: readonly DataTheme[] = [
   "iris-dark",
   "blossom-dark",
   "midnight-dark",
+  "tesven-dark",
 ];
 
 export function isDarkDataTheme(theme: string | undefined): boolean {
@@ -78,7 +81,7 @@ export function useDataTheme(): string {
   return useSyncExternalStore(subscribeDataTheme, readDataTheme, () => "light");
 }
 
-/** Whether the applied theme is a dark environment, live across all fourteen. */
+/** Whether the applied theme is a dark environment, live across every environment. */
 export function useIsDarkTheme(): boolean {
   return isDarkDataTheme(useDataTheme());
 }
