@@ -29,6 +29,7 @@ describe("theme presentation", () => {
       "Iris",
       "Blossom",
       "Midnight",
+      "Tesven",
     ]);
     expect(
       new Set(THEME_FAMILY_PRESENTATIONS.flatMap(({ family }) => [`${family}:light`, `${family}:dark`])),

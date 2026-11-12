@@ -7,9 +7,12 @@ the token implementation; this file owns the product-level design rules.
 
 ## Environments and tokens
 
-Rotli ships seven complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
-Iris, Blossom, and Midnight. Each family owns a deliberately tuned light and dark
+Rotli ships eight complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
+Iris, Blossom, Midnight, and Tesven. Each family owns a deliberately tuned light and dark
 environment; Midnight's dark environment is the deepest neutral workspace.
+Tesven carries the Tesven kit's blues as flat tokens (mist and field blue by
+day, night swim after dark) with its own geometric scenery: hexagon plates,
+even seams, and a calm water line.
 Every product surface must work in every supported environment.
 
 Light, Dark, and System are a separate mode choice. System follows the OS within
@@ -50,6 +53,12 @@ stored values still render, pickers no longer offer them), and accessory hue
 are machine-level app settings that survive vault switches, previewed live in
 Settings → Appearance → Chat buddy. Each placement picks the pose that
 explains its moment while wearing that decoration. Setup's quokka stays plain.
+Tesven locks the full-body quokka to the plain Line drawing, with no body fill
+and no accessory, in white lines in Tesven Dark and ink navy in Tesven Light. The
+lock keys on the applied environment, overrides explicit preview props, and
+never writes the stored look, so leaving Tesven brings the person's decoration
+back. `quokkaThemeLock` in `src/brand/quokka.ts` is its one home. Chat buddy
+then shows the locked preview and one line instead of its controls.
 
 - Consume semantic color, typography, spacing, focus, and state roles exposed by
   the shared foundation. Fixed `--rotli-*` palette values are foundation inputs,

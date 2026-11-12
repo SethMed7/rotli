@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-11-12
+
+### Added
+
+- **Tesven, an eighth theme family.** Tesven Light ("Deep Current": mist,
+  white, and field blue) and Tesven Dark ("Night Swim": deep navy water with a
+  bright current accent) are crisper and bluer than Ocean, with their own
+  geometric scenery in Settings, the empty pane, the sidebar, and first run:
+  hexagon plates, even seams, and a calm water line. The titlebar sun's
+  "All" cycle now walks sixteen environments.
+- **Tesven keeps the original line quokka.** In Tesven the chat buddy and
+  every other full-body quokka is the plain Line drawing (white lines by night,
+  ink navy by day), and Settings → Appearance → Chat buddy says so instead of
+  offering its controls. Your own look isn't changed: it comes back as soon as
+  you switch to another theme.
+
+### Fixed
+
+- **The Dock, the app menu and the window list say "Rotli",** not "rotli".
+
 ## [1.9.2] - 2026-11-11
 
 ### Added

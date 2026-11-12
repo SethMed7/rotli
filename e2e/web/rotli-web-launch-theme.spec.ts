@@ -24,7 +24,7 @@ test("a dark theme chosen on Rotli Web is the first thing painted after a reload
   await startWithVault(page);
 
   let chosen = "";
-  for (let i = 0; i < 14 && !chosen; i += 1) {
+  for (let i = 0; i < 16 && !chosen; i += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
     if (/Dark|Charcoal|Midnight/.test(themeNow(await toggle.getAttribute("aria-label")))) {
       chosen = (await page.evaluate(() => document.documentElement.dataset.theme)) ?? "";

@@ -7,7 +7,7 @@
 // first render. Unknown values are ignored; the pattern is pinned to
 // DATA_THEMES by src/state/themeBoot.test.ts.
 (function () {
-  var THEME = /^(light|dark|paper|charcoal|(ocean|grove|iris|blossom|midnight)-(light|dark))$/;
+  var THEME = /^(light|dark|paper|charcoal|(ocean|grove|iris|blossom|midnight|tesven)-(light|dark))$/;
   try {
     var theme = window.localStorage.getItem("rotli.lastDataTheme");
     var pair = (window.localStorage.getItem("rotli.lastSystemThemes") || "").split(" ");

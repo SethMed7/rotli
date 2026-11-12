@@ -16,6 +16,7 @@ describe("Univer app-theme mapping", () => {
     expect(univerNeutralForTheme("iris-dark")).toBe("mono");
     expect(univerNeutralForTheme("blossom-dark")).toBe("mono");
     expect(univerNeutralForTheme("midnight-dark")).toBe("mono");
+    expect(univerNeutralForTheme("tesven-light")).toBe("mono");
   });
 
   test("the branded light/dark pair stays warm", () => {

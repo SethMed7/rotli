@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 
 import type { ThemeFamily } from "../../state/ui";
-import { cloud, star } from "../sceneParts";
+import { cloud, hex, star } from "../sceneParts";
 
 export interface SettingsBackdrop {
   sky: ReactNode;
@@ -172,6 +172,32 @@ export const SETTINGS_BACKDROPS: Record<ThemeFamily, SettingsBackdrop> = {
     horizon: (
       <>
         <path className="sc-far" d="M0 132c200-34 480-48 740-42s320 22 460 42z" />
+        {ground}
+      </>
+    ),
+  },
+  // Tesven: a hexagon sun over a honeycomb of seams, and a calm water line
+  // with hexagon plates resting on it. Straight, even lines; no gulls.
+  tesven: {
+    sky: (
+      <>
+        {hex(236, 62, 24, "sc-sun")}
+        {[
+          [110, 48],
+          [125, 56.7],
+          [140, 48],
+          [125, 39.3],
+          [155, 56.7],
+        ].map(([x, y]) => hex(x!, y!, 10, "sc-line"))}
+        {hex(140, 65.4, 4, "sc-accent-fill")}
+      </>
+    ),
+    horizon: (
+      <>
+        <path className="sc-sea" d="M0 96h1200v36H0z" />
+        <path className="sc-wave" d="M0 108h1200M0 120h1200" />
+        {[120, 150, 1010, 1040, 1070].map((x, i) => hex(x, 96 - (i % 2) * 4, 14))}
+        {hex(1040, 92, 5, "sc-accent-fill")}
         {ground}
       </>
     ),

@@ -24,6 +24,7 @@ banners and first run keep theirs.
 | Iris | An iris field at dusk, a crescent moon and fireflies |
 | Blossom | A blossom branch, a paper lantern, drifting petals |
 | Midnight | Stargazing from the hill, the telescope |
+| Tesven | Still water under a hexagon sun, plates resting on the line |
 
 The art lives in `src/components/paneEmptyScenes.tsx` as one SVG stage each
 (440×200, the ground line at y 170).
@@ -110,7 +111,8 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   rotlis popping out of the sides; better scenery like clouds or birds so it's
   fully alive"). `SkyLife` (`onboarding/onboardingSkyLife.tsx`) drifts clouds
   slowly across the page, and something crosses the upper sky: birds, a paper
-  plane for Paper & Charcoal, petals for Blossom, twinkling stars for Midnight.
+  plane for Paper & Charcoal, petals for Blossom, a trio of hexagon plates for
+  Tesven, twinkling stars for Midnight.
   It is masked to the side margins, so the setup card's column (a clear 1090px)
   never has anything behind its text. With Reduce motion on, each drifter
   stays still in its own spot. Settings shows the same sky in its side margins
