@@ -114,3 +114,33 @@ fn every_advertised_keyword_is_one_the_checker_enforces() {
         assert_eq!(tool["inputSchema"]["type"], "object", "{server} {name}");
     }
 }
+
+/// Independent review of PR #295 (P3): only missing arguments are an empty
+/// object; an explicit `null` is not an object and refuses.
+#[test]
+fn explicit_null_arguments_are_refused() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let _ = test_workspace(&temp);
+    assert!(refusal(&mcp(&temp, REVIEW, Value::Null)).contains("arguments must be a JSON object"));
+    assert!(refusal(&workspace_call(&temp, "rotli_status", Value::Null)).contains("arguments must be a JSON object"));
+    let missing = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": "rotli_status" } });
+    let response = handle_mcp_request_for_root(&missing, temp.path().to_path_buf(), false).unwrap();
+    assert_eq!(response["result"]["isError"], false, "missing arguments are still an empty object: {response}");
+}
+
+/// Independent review of PR #295 (P3): an `integer` argument is a JSON
+/// integer. `1.0` was accepted by the check and then ignored by the handler,
+/// which reads only whole numbers, so the default limit applied.
+#[test]
+fn an_integer_argument_refuses_a_fractional_number() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let _ = test_workspace(&temp);
+    for limit in [json!(1.0), json!(1.5)] {
+        assert!(refusal(&mcp(&temp, SEARCH, json!({"query":"x","limit": limit}))).contains("limit must be of type"), "{limit}");
+        assert!(refusal(&workspace_call(&temp, "rotli_search", json!({"query":"x","limit": limit}))).contains("limit must be of type"), "{limit}");
+    }
+}

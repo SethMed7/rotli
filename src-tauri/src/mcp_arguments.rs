@@ -34,13 +34,12 @@ pub(crate) const TYPES: &[&str] = &["object", "array", "string", "integer", "num
 
 /// Check `arguments` against the schema of the tool called `name` in `tools`.
 /// A name no tool has is left to the server, which answers "unknown tool".
-/// Missing arguments (JSON null) are an empty object, as MCP allows.
+/// The caller passes `{}` when a request has no `arguments`, as MCP allows;
+/// an explicit `null` is not an object and refuses.
 pub(crate) fn check(tools: &[Value], name: &str, arguments: &Value) -> Result<(), String> {
     let Some(schema) = tools.iter().find(|tool| tool["name"] == name).and_then(|tool| tool.get("inputSchema")) else {
         return Ok(());
     };
-    let empty = Value::Object(Default::default());
-    let arguments = if arguments.is_null() { &empty } else { arguments };
     if !arguments.is_object() {
         return Err(format!("{name}: arguments must be a JSON object"));
     }
@@ -64,7 +63,9 @@ fn check_value(schema: &Value, value: &Value, at: &str) -> Result<(), String> {
             Some("string") => value.is_string(),
             Some("boolean") => value.is_boolean(),
             Some("number") => value.is_number(),
-            Some("integer") => value.is_i64() || value.is_u64() || value.as_f64().is_some_and(|n| n.fract() == 0.0),
+            // a whole JSON number only: the handlers read `as_u64`, which a
+            // `1.0` fails, so accepting it here silently applied the default
+            Some("integer") => value.is_i64() || value.is_u64(),
             // a type this checker doesn't know refuses rather than passing unchecked
             _ => false,
         };
@@ -189,7 +190,7 @@ mod tests {
         },"required":["s"],"additionalProperties":false});
         let t = tools(schema);
         assert_eq!(check(&t, "t", &json!({"s":"abc"})), Ok(()));
-        assert_eq!(check(&t, "t", &json!({"s":"abc","n":5.0,"e":"b","b":true,"list":[{"x":"ok"}]})), Ok(()));
+        assert_eq!(check(&t, "t", &json!({"s":"abc","n":5,"e":"b","b":true,"list":[{"x":"ok"}]})), Ok(()));
         for (arguments, expected) in [
             (json!({}), "s is required"),
             (json!({"s":""}), "s must be at least 1 characters"),
@@ -198,6 +199,7 @@ mod tests {
             (json!({"s":"a","n":6}), "n must be at most 5"),
             (json!({"s":"a","n":0}), "n must be at least 1"),
             (json!({"s":"a","n":1.5}), "n must be of type"),
+            (json!({"s":"a","n":5.0}), "n must be of type"),
             (json!({"s":"a","n":"1"}), "n must be of type"),
             (json!({"s":"a","e":"c"}), "e must be one of"),
             (json!({"s":"a","b":"true"}), "b must be of type"),
@@ -221,7 +223,8 @@ mod tests {
     #[test]
     fn arguments_must_be_an_object_and_unknown_tools_pass_to_the_server() {
         let t = tools(json!({"type":"object","properties":{},"additionalProperties":false}));
-        assert_eq!(check(&t, "t", &Value::Null), Ok(()), "missing arguments are an empty object");
+        assert!(check(&t, "t", &Value::Null).unwrap_err().contains("arguments must be a JSON object"), "an explicit null refuses");
+        assert_eq!(check(&t, "t", &json!({})), Ok(()));
         assert!(check(&t, "t", &json!("x")).unwrap_err().contains("arguments must be a JSON object"));
         assert!(check(&t, "t", &json!([])).is_err());
         assert_eq!(check(&t, "other", &json!({"anything": 1})), Ok(()));

@@ -298,3 +298,81 @@ fn the_person_commands_say_what_approval_cannot_guarantee() {
     let help = crate::workspace_help::CLI_HELP;
     assert!(help.contains("rotli librarian on|off") && help.contains("agent with a shell"), "{help}");
 }
+
+/// Independent review of PR #295 (P1a, P1b): a line linking a secure note by
+/// its id, or with an upper-case `.MD`, is withdrawn like any other spelling.
+#[test]
+fn withdrawal_matches_note_ids_and_any_extension_case() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    for spelling in ["id", "Harbor plan.MD", "Harbor plan.Md", "Harbor plan#heading|alias", "a/b/Harbor plan"] {
+        let temp = TempDir::new().unwrap();
+        turn_on(&temp);
+        let mut ws = test_workspace(&temp);
+        let harbor = ws.create_note("Harbor plan", "Mooring work", MAIN_ROOT).unwrap();
+        let target = if spelling == "id" { harbor.id.clone() } else { spelling.to_string() };
+        ok(mcp(&temp, INDEX, json!({"body": format!("- [[{target}]] — quayside marigold\n- [[Elsewhere]] — kept")})));
+        make_secure(&mut ws, &harbor.id);
+        assert_eq!(hits(&temp, "quayside"), 0, "{spelling}");
+        let index = page_on_disk(&mut ws, "Librarian index");
+        assert!(!index.contains("quayside") && index.contains("[[Elsewhere]]"), "{spelling}: {index}");
+    }
+}
+
+/// Independent review of PR #295 (P1c): the index is the Librarian's by its
+/// recorded id and marker, so a person renaming its heading doesn't hide it
+/// from cleanup, and the Librarian keeps writing that same page.
+#[test]
+fn a_renamed_index_is_still_the_librarians_and_still_cleaned() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let harbor = ws.create_note("Harbor plan", "Mooring work", MAIN_ROOT).unwrap();
+    let index = ok(mcp(&temp, INDEX, json!({"body":"- [[Harbor plan]] — quayside marigold"})));
+    let index = index["id"].as_str().unwrap().to_string();
+    let rel = ws.store.resolve_note_rel(&index).unwrap();
+    let path = ws.store.root().join(rel);
+    fs::write(&path, fs::read_to_string(&path).unwrap().replace("# Librarian index", "# My index")).unwrap();
+    make_secure(&mut ws, &harbor.id);
+    assert_eq!(hits(&temp, "quayside"), 0, "the renamed page is cleaned too");
+    let again = ok(mcp(&temp, INDEX, json!({"body":"- [[Elsewhere]] — kept"})));
+    assert_eq!(again["id"], index, "the Librarian rewrites the page it made, whatever its title now");
+}
+
+/// Independent review of PR #295 (P2): the note title a proposal shows is the
+/// note's own, never a stored one: a row whose title was changed refuses.
+#[test]
+fn apply_refuses_a_proposal_whose_note_title_was_tampered() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let (_, summary) = ana_and_a_summary(&mut ws);
+    let rel = ws.store.resolve_note_rel(&summary).unwrap();
+    let original = propose(&mut ws, "file", &summary, "projects", "File the summary.").unwrap();
+    let mut row = serde_json::to_value(&original).unwrap();
+    row["noteTitle"] = json!("An unrelated decoy note");
+    plant(&temp, row);
+    let why = decide(&mut ws, &original.id, true).unwrap_err();
+    assert!(why.contains("title"), "{why}");
+    assert!(still_pending(&temp, &original.id));
+    assert_eq!(ws.store.resolve_note_rel(&summary).unwrap(), rel, "nothing moved");
+}
+
+/// Independent review of PR #295 (P2, rename): after the target page is
+/// renamed, a link to its new title is a new proposal, and it applies.
+#[test]
+fn a_link_to_a_renamed_target_is_a_new_proposal_that_applies() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let (ana, summary) = ana_and_a_summary(&mut ws);
+    let old = propose(&mut ws, "link", &summary, "Ana Ruiz", WHY).unwrap();
+    ws.rename_note(&ana, "Ana North", None).unwrap();
+    let renamed = propose(&mut ws, "link", &summary, "Ana North", WHY).unwrap();
+    assert_ne!(renamed.id, old.id);
+    assert_eq!(renamed.target.as_deref(), Some("Ana North"));
+    decide(&mut ws, &renamed.id, true).unwrap();
+    assert!(body_of(&mut ws, &summary).ends_with("Related: [[Ana North]]\n"));
+}

@@ -20,10 +20,13 @@ builds.
   the limits it advertises before it runs: no unknown arguments, no text over
   its length limit, and numbers in range. Before, a 100,001-character capture
   went through. A number out of range is now refused instead of quietly
-  capped.
+  capped, and so is a whole-number setting written as a decimal (`1.0`) or
+  arguments sent as `null`.
 - **The Librarian's index and log forget a note that turns secure.** Lines
   that link to a note an agent may no longer read are removed from both pages
-  the next time the Librarian runs, and aren't written back.
+  the next time the Librarian runs, and aren't written back, however the link
+  is spelled (by title, alias, note id or file name). Retitling either page
+  doesn't stop this: the Librarian knows its pages by id, not by title.
 - **A copied vault starts with the Librarian off.** Turning the route on now
   takes `rotli librarian on` in the vault as well as the setting, and that
   consent belongs to the folder: a copy of the vault, wherever it is put,
@@ -32,11 +35,13 @@ builds.
 - **Applying a proposal checks it again.** `rotli librarian apply` refuses a
   link to a page that has since turned secure, a proposal whose note changed
   after it was made, and a proposals file edited to say something the tools
-  would never accept. A refused proposal stays waiting, and you can still
+  would never accept, including one that names a different note than the one
+  it would move. A refused proposal stays waiting, and you can still
   dismiss it. Proposals made before this change can only be dismissed.
 - **A repeated proposal no longer brings back one you can't see.** Asking for
   the same link again returns the waiting proposal only if it is still about
-  pages the agent can read.
+  pages the agent can read, and a link to a page renamed since is a new
+  proposal that can be applied.
 
 ### Changed
 

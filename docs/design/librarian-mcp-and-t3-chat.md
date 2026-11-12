@@ -251,21 +251,28 @@ builds until that review has checked these fixes:
    Every route call now first removes, from both of the Librarian's pages,
    each line with a `[[link]]` to a note an agent may no longer read, and
    neither `librarian_index` nor `librarian_log` writes such a line back. A
-   link counts against every note it could name (title or alias, case aside),
-   so a public note sharing the name doesn't keep the line alive. Test:
+   link counts against every note it could name (id, title or alias, case
+   aside, `.md` in any case, a path's last segment), so a public note sharing
+   the name doesn't keep the line alive. The two pages are the Librarian's by
+   their recorded note id and Rotli-only marker, not their title, so a page a
+   person retitled is still cleaned. Tests:
    `the_index_and_log_drop_lines_about_a_note_that_turned_secure` (route search
-   and the page bytes on disk). Limits, documented: a line that names a note
+   and the page bytes on disk), and from the independent review of PR #295:
+   `withdrawal_matches_note_ids_and_any_extension_case`,
+   `a_renamed_index_is_still_the_librarians_and_still_cleaned`. Limits, documented: a line that names a note
    in plain words without a link stays (the `index-and-log` skill now requires
    links), and the lines go only when the route next runs, so until then the
    pages still show them to other lanes. Pages a development build left in a
    vault are still ordinary notes in a public build
    (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`).
 2. **#3 Repeating a proposal returned one review hides.** A repeat must match
-   kind, note, folder, `targetId`, and the note's revision, and is returned
-   only when `librarian_review` would show it. A link target must be the exact
-   title of a page the agent can read. Tests:
+   kind, note, folder, `targetId`, the target's title, and the note's
+   revision, and is returned only when `librarian_review` would show it, so a
+   link to a page renamed since is a new proposal that can apply. A link
+   target must be the exact title of a page the agent can read. Tests:
    `repeating_a_link_never_returns_a_proposal_review_hides`,
-   `a_pending_link_to_another_page_with_the_title_is_not_a_repeat`.
+   `a_pending_link_to_another_page_with_the_title_is_not_a_repeat`,
+   `a_link_to_a_renamed_target_is_a_new_proposal_that_applies`.
 3. **#6 Consent followed a copied vault's settings.** The switch is now
    `"librarianMcp": true` *and* the person's `rotli librarian on`, recorded in
    `.rotli/librarian-consent.jsonl` against the vault folder's identity
@@ -277,22 +284,30 @@ builds until that review has checked these fixes:
    revision, and apply refuses once the note has changed. Every stored field
    is checked as strictly as the tool arguments; the link target is resolved
    again through the read gate and must still be the exact readable title it
-   was proposed as; the link is built from that title. A refused apply stays
+   was proposed as; the link is built from that title. The stored note title
+   must be the note's own title as read through the gate, so a row can't
+   name a decoy while it moves another note. A refused apply stays
    pending, and a row that doesn't validate can still be dismissed. Rows from
    before this change carry no revision and can only be dismissed. Tests:
    `apply_refuses_a_link_whose_target_turned_secure`,
    `apply_refuses_an_injected_proposal_line`,
-   `apply_refuses_a_note_edited_since_the_proposal`.
+   `apply_refuses_a_note_edited_since_the_proposal`,
+   `apply_refuses_a_proposal_whose_note_title_was_tampered`.
 5. **#8 The advertised tool limits weren't enforced.** `handle_mcp_with`
    checks every `tools/call` against the tool's own input schema before the
    tool runs, for both servers (`mcp_arguments.rs`): types, required
    arguments, no undeclared ones, string lengths, number bounds, enums, and
-   array sizes, nested ones included. A test fails on any schema keyword the
-   checker doesn't enforce. Tests:
+   array sizes, nested ones included. An explicit `arguments: null` refuses
+   (only a missing `arguments` is `{}`), and an `integer` must be a whole JSON
+   number, so `1.0` refuses rather than slipping past the handlers, which
+   read whole numbers only. A test fails on any schema keyword the checker
+   doesn't enforce. Tests:
    `every_tool_on_both_servers_refuses_an_undeclared_argument`,
    `every_length_limit_on_both_servers_is_enforced`,
    `an_over_length_capture_writes_nothing`,
-   `types_bounds_and_enums_are_the_schemas`. Workspace tools whose schemas
+   `types_bounds_and_enums_are_the_schemas`,
+   `explicit_null_arguments_are_refused`,
+   `an_integer_argument_refuses_a_fractional_number`. Workspace tools whose schemas
    advertise no length limit still have none beyond the 256 KB request cap.
 6. **Approval relies on the host: documented, not closed.** `rotli librarian
    apply` is an ordinary command, and nothing a same-user process can do is

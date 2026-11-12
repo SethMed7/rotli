@@ -96,9 +96,10 @@ pub(super) fn propose(ws: &mut Workspace, kind: &str, id: &str, value: &str, rea
     };
     // a repeat is the same change to the same version of the note, aimed at
     // the same page, and only one `librarian_review` would still show
+    // the page's title is part of it: a page renamed since gets a new link
     let same = |p: &Proposal| {
-        (&p.kind, &p.note, &p.folder, &p.target_id, &p.revision)
-            == (&proposal.kind, &proposal.note, &proposal.folder, &proposal.target_id, &proposal.revision)
+        (&p.kind, &p.note, &p.folder, &p.target_id, &p.target, &p.revision)
+            == (&proposal.kind, &proposal.note, &proposal.folder, &proposal.target_id, &proposal.target, &proposal.revision)
     };
     if let Some(existing) = visible_pending(ws).into_iter().find(same) {
         return Ok(existing);
@@ -217,6 +218,11 @@ fn apply_proposal(ws: &mut Workspace, p: &Proposal) -> Result<(), String> {
     let current = ws.read_note(&local)?;
     if p.revision.as_deref() != Some(current.revision.as_str()) {
         return Err(format!("{} has changed since this was proposed; dismiss it and let the Librarian propose again", p.note_title));
+    }
+    // the title the person approved by is the note's own, read through the gate
+    let title = crate::corpus::title_of(&current.note.body);
+    if title != p.note_title {
+        return Err(format!("this proposal's note title {:?} isn't the note's title {title:?}; dismiss it", p.note_title));
     }
     match (&p.folder, &p.target, &p.target_id) {
         (Some(folder), _, _) => ws.move_note(&local, folder).map(|_| ()),

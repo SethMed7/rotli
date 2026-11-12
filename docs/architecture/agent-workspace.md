@@ -251,7 +251,9 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   schema before the tool runs (`src-tauri/src/mcp_arguments.rs`, from
   `handle_mcp_with`): types, required and undeclared arguments, string
   lengths in characters, number bounds, enums, and array sizes, nested schemas
-  included. A refusal names the argument. A test fails on any schema keyword
+  included. Only a missing `arguments` is `{}`; an explicit `null` refuses.
+  An `integer` is a whole JSON number (`1.0` refuses), which is what the
+  handlers read. A refusal names the argument. A test fails on any schema keyword
   the checker doesn't enforce, so a limit can't be advertised and ignored
   (review 2026-11-09, #8). Like the rest of MCP, the route runs only in
   development builds: `cli_gate` refuses `rotli mcp --librarian`, `rotli mcp
@@ -272,8 +274,11 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   the same name at once both survive.
 - **Rewrites** are limited to the Librarian's own pages, "Librarian index"
   and "Librarian log", through `write_for_remote_agent_if_revision`. Its own
-  means the exact title, the `created_by: librarian` stamp, and the
-  `librarian_page` marker. `created_by: librarian` alone is not enough: Rotli's
+  means the `created_by: librarian` stamp and the `librarian_page` marker,
+  found by the note id recorded in `.rotli/librarian/pages.jsonl` (a
+  deletable cache, checked against the page every time; without it the
+  oldest marked page is found once and recorded), never by title, so a
+  person may retitle either page and it stays the Librarian's. `created_by: librarian` alone is not enough: Rotli's
   in-app Librarian stamps the People notes it makes the same way, and a
   person may be called "Librarian index". `librarian_page` is a Rotli-reserved
   key that only this route's page creation writes: agents never write
@@ -281,11 +286,13 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   restores them (`RAW_IMMUTABLE_KEYS`), and no other create path sets it. A
   note that only shares the title, carries it as an alias, or lacks the
   marker is never touched, and the Librarian makes its own page instead.
+  `librarian_index` writes the heading back to "Librarian index".
   Pages made before the marker existed (unreleased builds only) are left
   alone and replaced by new ones. Before every call, and in every write to
   them, the route removes each line of both pages with a `[[link]]` to a note
-  an agent may not read; a link counts against every note whose title or
-  alias it matches, case aside (a path-style link also by its last segment), so a public namesake can't keep a secure
+  an agent may not read; a link counts against every note whose id, title or
+  alias it matches, case aside (`.md` stripped in any case; a path-style link
+  also by its last segment), so a public namesake can't keep a secure
   note's line. A line that names a note without linking it can't be found
   this way (the `index-and-log` skill requires links), and lines go only when
   the route next runs (review 2026-11-09, #2).
@@ -301,7 +308,7 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   file outside the vault is refused for appends and reads alike. A proposal
   records the note's `revision`. A link `target` must be the exact title of a
   page the agent can read (not an alias; no `[[ ]]`, `|` or `#`). A repeat
-  (same kind, note, folder, `targetId`, and revision) returns the pending one,
+  (same kind, note, folder, `targetId`, target title, and revision) returns the pending one,
   but only when `librarian_review` would show it (review 2026-11-09, #3). `librarian_review` lists only
   proposals whose note, and link target, the agent may still read. The
   target checked is `targetId`, the exact note the title named when the link
@@ -319,7 +326,8 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
 - **No tool applies a proposal.** The person runs `rotli librarian apply ID`
   or `dismiss ID` (a Rotli review list is next). Apply treats the stored row
   as untrusted: every field is checked as strictly as the tool arguments, the
-  note must still be at the recorded revision, and a link's `targetId` is
+  note must still be at the recorded revision and still carry the recorded
+  title (read through the gate), and a link's `targetId` is
   resolved again through the read gate and must still be the page its exact
   title names; the link is built from that title. Apply then uses
   `move_for_remote_agent` for a move and the agent write seam for a link (one

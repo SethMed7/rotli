@@ -5,45 +5,92 @@
 //! no write puts one back (review 2026-11-09, #2).
 
 use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
 
 use crate::ai_edit_policy::Creator;
+use crate::containment::{open_sidecar, Sidecar};
 use crate::corpus::NoteKind;
 
 use super::super::{note_markdown, validate_note_title, Workspace, MAIN_ROOT};
 use super::{one_line, INDEX_TITLE, LOG_TITLE, MAX_REASON};
 use serde_json::Value;
 
-/// The Librarian's own page with this title, if it has made one. Its own
-/// means the exact title AND the `librarian_page: index|log` marker that only
-/// this route's page creation writes: a Rotli-reserved key no agent, no
-/// metadata editor, and no other creator can set. Matching by selector also
-/// matched aliases; matching on `created_by: librarian` also matched the
-/// People notes Rotli's Librarian makes, which may be called "Librarian index".
-fn find_own_page(ws: &mut Workspace, title: &str, page: &str) -> Result<Option<String>, String> {
+/// Which note is the Librarian's index and which its log, by id: a person may
+/// retitle either page, and it stays the Librarian's (independent review of
+/// PR #295). A deletable cache; every entry is checked against the page.
+const PAGES: &str = ".rotli/librarian/pages.jsonl";
+
+/// One line of [`PAGES`]: `id: None` records that no such page exists yet.
+#[derive(Serialize, Deserialize)]
+struct PageRecord {
+    page: String,
+    id: Option<String>,
+}
+
+/// Whether note `id` is the Librarian's own `page`: the `created_by:
+/// librarian` stamp AND the `librarian_page: index|log` marker that only this
+/// route's page creation writes, a Rotli-reserved key no agent, no metadata
+/// editor, and no other creator can set. The stamp alone also matches the
+/// People notes Rotli's Librarian makes, which may be called "Librarian
+/// index"; a title or alias matches anything. A page an agent can't read is
+/// never its own.
+fn is_own(ws: &mut Workspace, id: &str, page: &str) -> bool {
     let (stamp, marker) = (Creator::Librarian.line(), crate::corpus::librarian_page_line(page));
+    let Ok(text) = ws.store.read_for_ai(id, false) else { return false };
+    let foreign = crate::corpus::parse_document(&text).0.map(|fm| fm.foreign).unwrap_or_default();
+    let has = |line: &str| foreign.iter().any(|l| l.trim() == line);
+    has(&stamp) && has(&marker)
+}
+
+/// The last record for `page`: None when there is none (or the file can't be
+/// opened safely), Some(None) when it records that no page exists.
+fn recorded(root: &Path, page: &str) -> Option<Option<String>> {
+    let mut text = String::new();
+    open_sidecar(root, Path::new(PAGES), Sidecar::Read).ok().flatten()?.read_to_string(&mut text).ok()?;
+    text.lines().filter_map(|line| serde_json::from_str::<PageRecord>(line).ok()).rfind(|r| r.page == page).map(|r| r.id)
+}
+
+/// Best effort: the record is a cache, and a file that can't be opened safely
+/// (a link) is left alone.
+fn record(root: &Path, page: &str, id: Option<&str>) {
+    let Ok(line) = serde_json::to_string(&PageRecord { page: page.into(), id: id.map(str::to_string) }) else { return };
+    if let Ok(Some(mut file)) = open_sidecar(root, Path::new(PAGES), Sidecar::Append) {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+/// The Librarian's own `page`, if it has made one: the recorded note when it
+/// still is that page, else the oldest note carrying the page's marker, found
+/// once by looking at every note and then recorded.
+fn find_own_page(ws: &mut Workspace, page: &str) -> Result<Option<String>, String> {
+    match recorded(&ws.root.path, page) {
+        Some(Some(id)) if is_own(ws, &id, page) => return Ok(Some(id)),
+        Some(None) => return Ok(None),
+        _ => {}
+    }
     let mut mine = Vec::new();
     for meta in ws.store.list()?.notes {
-        if meta.kind != NoteKind::Note || meta.title != title {
-            continue;
-        }
-        let Ok(text) = ws.store.read_for_ai(&meta.id, false) else { continue };
-        let foreign = crate::corpus::parse_document(&text).0.map(|fm| fm.foreign).unwrap_or_default();
-        let has = |line: &str| foreign.iter().any(|l| l.trim() == line);
-        if has(&stamp) && has(&marker) {
+        if meta.kind == NoteKind::Note && is_own(ws, &meta.id, page) {
             mine.push((meta.created_at, meta.id));
         }
     }
-    Ok(mine.into_iter().min().map(|(_, id)| id))
+    let found = mine.into_iter().min().map(|(_, id)| id);
+    record(&ws.root.path, page, found.as_deref());
+    Ok(found)
 }
 
 /// Find one of the Librarian's own pages, creating it on first use.
 fn own_page(ws: &mut Workspace, title: &str, page: &str) -> Result<String, String> {
-    if let Some(id) = find_own_page(ws, title, page)? {
+    if let Some(id) = find_own_page(ws, page)? {
         return Ok(id);
     }
     let markdown = note_markdown(validate_note_title(title)?, "")?;
     let intake = ws.store.layout().intake_dir();
     let meta = ws.store.create_librarian_page(intake, &markdown, page)?;
+    record(&ws.root.path, page, Some(&meta.id));
     if ws.root.is_default {
         ws.main_add(&meta.id, MAIN_ROOT)?;
     }
@@ -52,16 +99,17 @@ fn own_page(ws: &mut Workspace, title: &str, page: &str) -> Result<String, Strin
 
 /// Every `[[target]]` in one line, code spans included (their text shows all
 /// the same), as the lower-cased names the link resolves by: no `|label`,
-/// `#heading`, or `.md`, and for a path-style link (`[[projects/Plan]]`) its
-/// last segment as well, which is the note's file name.
+/// `#heading`, or `.md` in any case, and for a path-style link
+/// (`[[projects/Plan]]`) its last segment as well, which is the note's file
+/// name.
 fn link_names(line: &str) -> Vec<String> {
     let mut names = Vec::new();
     let mut rest = line;
     while let Some(start) = rest.find("[[") {
         let after = &rest[start + 2..];
         let Some(end) = after.find("]]") else { break };
-        let name = after[..end].split(['|', '#']).next().unwrap_or_default().trim();
-        let name = name.strip_suffix(".md").unwrap_or(name).to_lowercase();
+        let name = after[..end].split(['|', '#']).next().unwrap_or_default().trim().to_lowercase();
+        let name = name.strip_suffix(".md").unwrap_or(&name).to_string();
         if let Some((_, last)) = name.rsplit_once('/') {
             names.push(last.trim().to_string());
         }
@@ -72,8 +120,8 @@ fn link_names(line: &str) -> Vec<String> {
 }
 
 /// The body without every line that links to a note an agent may not read.
-/// A link names every note whose title or alias it matches (case aside, as
-/// links resolve), and one unreadable match is enough: a public note that
+/// A link names every note whose id, title or alias it matches (case aside,
+/// as links resolve), and one unreadable match is enough: a public note that
 /// shares the name must not keep a secure note's line alive. A link that names
 /// no note is left alone.
 pub(super) fn withdrawn(ws: &mut Workspace, body: &str) -> Result<String, String> {
@@ -82,7 +130,8 @@ pub(super) fn withdrawn(ws: &mut Workspace, body: &str) -> Result<String, String
         return Ok(body.to_string());
     }
     for meta in ws.store.list()?.notes {
-        let claims: Vec<String> = std::iter::once(meta.title.to_lowercase()).chain(meta.aliases.iter().map(|a| a.to_lowercase())).collect();
+        let names_of = [meta.id.to_lowercase(), meta.title.to_lowercase()];
+        let claims: Vec<String> = names_of.into_iter().chain(meta.aliases.iter().map(|a| a.to_lowercase())).collect();
         if !claims.iter().any(|name| names.get(name) == Some(&true)) {
             continue;
         }
@@ -108,7 +157,7 @@ pub(super) fn withdrawn(ws: &mut Workspace, body: &str) -> Result<String, String
 /// Rotli can't write refuses the call rather than serve the line.
 pub(super) fn withdraw_from_own_pages(ws: &mut Workspace) -> Result<(), String> {
     for (title, page) in [(INDEX_TITLE, "index"), (LOG_TITLE, "log")] {
-        let Some(id) = find_own_page(ws, title, page)? else { continue };
+        let Some(id) = find_own_page(ws, page)? else { continue };
         let Ok(current) = ws.read_note(&id) else { continue };
         let kept = withdrawn(ws, &current.note.body)?;
         if kept != current.note.body {
