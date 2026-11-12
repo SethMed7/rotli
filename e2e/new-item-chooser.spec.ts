@@ -115,7 +115,15 @@ test("an Excalidraw board asks for its name before creation", async ({ page }) =
   const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("textbox", { name: "Board name" })).toBeFocused();
-  await expect(dialog.getByRole("button", { name: "Create board" })).toBeDisabled();
+  const create = dialog.getByRole("button", { name: "Create board" });
+  await expect(create).toBeDisabled();
+  // and it looks unavailable: faded, no pointer (it used to look ready to click)
+  await expect(create).toHaveCSS("opacity", "0.5");
+  await expect(create).toHaveCSS("cursor", "default");
+  await dialog.getByRole("textbox", { name: "Board name" }).fill("Roadmap");
+  await expect(create).toBeEnabled();
+  await expect(create).toHaveCSS("opacity", "1");
+  await expect(create).toHaveCSS("cursor", "pointer");
 });
 
 // Sheets ship as Beta beside Documents (the owner, 2026-10-05): the chooser

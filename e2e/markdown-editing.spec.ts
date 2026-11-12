@@ -603,9 +603,11 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   await page.keyboard.press("Space");
   await page.keyboard.type("Release decision");
 
-  const truth = page.getByRole("button", { name: "True" });
-  const draw = page.getByRole("button", { name: "Draw" });
-  const falsity = page.getByRole("button", { name: "False" });
+  // scoped to the editor: while the new note's title settles, its Main row is
+  // briefly named by the raw line ("[True:green][x Draw:…") and matched too
+  const truth = editor.getByRole("button", { name: "True" });
+  const draw = editor.getByRole("button", { name: "Draw" });
+  const falsity = editor.getByRole("button", { name: "False" });
   await expect(truth).toHaveAttribute("aria-pressed", "false");
   await expect(draw).toHaveAttribute("aria-pressed", "false");
   await expect(falsity).toHaveAttribute("aria-pressed", "false");
@@ -636,6 +638,24 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   );
 });
 
+test("typing in a choice option renames its control in place, without rebuilding it", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("- [#] Red\n- [#] Blue");
+  const red = editor.getByRole("radio", { name: "Red", exact: true });
+  await expect(red).toBeVisible();
+  await red.evaluate((element) => element.setAttribute("data-probe", "kept"));
+  // the caret is at the end of "Blue"; go up to the end of "Red" and type
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("End");
+  await page.keyboard.type("dish");
+  const renamed = editor.getByRole("radio", { name: "Reddish", exact: true });
+  await expect(renamed).toBeVisible();
+  await expect(renamed).toHaveAttribute("data-probe", "kept");
+});
+
 test("hash choices and switches stay interactive while inline code stays literal", async ({ page }) => {
   await gotoApp(page);
   await page.getByRole("button", { name: /^New note in / }).click();
@@ -646,13 +666,17 @@ test("hash choices and switches stay interactive while inline code stays literal
   );
   await page.locator(".ed-date").click();
 
-  const radios = page.getByRole("radio", { name: "Choose option" });
+  // each control is named by its option, not a generic "Choose option"
+  await expect(editor.getByRole("radio", { name: "Red", exact: true })).toBeVisible();
+  await expect(editor.getByRole("radio", { name: "Blue", exact: true })).toBeVisible();
+  const radios = editor.getByRole("radio", { name: /^(Red|Blue)$/ });
   await expect(radios).toHaveCount(2);
   await radios.nth(1).click();
   await expect(radios.nth(0)).toHaveAttribute("aria-checked", "false");
   await expect(radios.nth(1)).toHaveAttribute("aria-checked", "true");
 
-  const multis = page.getByRole("checkbox", { name: "Toggle option" });
+  await expect(page.getByRole("checkbox", { name: "Email", exact: true })).toBeVisible();
+  const multis = page.getByRole("checkbox", { name: /^(Email|SMS)$/ });
   await expect(multis).toHaveCount(2);
   await multis.nth(0).click();
   await multis.nth(1).click();
@@ -885,16 +909,24 @@ test("() creates a tab-navigable Markdown multiple-choice group", async ({ page 
   await page.keyboard.press("Tab");
   await expect(choices.nth(1)).toBeFocused();
 
+  // the legacy ( ) grammar is a radio group too, named by each option
+  await expect(page.getByRole("radio", { name: "Blue", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
   await choices.nth(1).click();
-  await expect(choices.nth(0)).toHaveAttribute("aria-pressed", "false");
-  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "true");
-  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "false");
+  await expect(choices.nth(0)).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("radio", { name: "Blue", exact: true })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(choices.nth(2)).toHaveAttribute("aria-checked", "false");
   await expect(page.locator(".rotli-choice-text--selected")).toContainText("Blue");
   await expect(page.locator(".rotli-choice-text--selected")).toHaveCSS("font-weight", "700");
 
   await choices.nth(2).click();
-  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "false");
-  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(choices.nth(1)).toHaveAttribute("aria-checked", "false");
+  await expect(choices.nth(2)).toHaveAttribute("aria-checked", "true");
   await expect(page.locator(".rotli-choice-text--selected")).toContainText("Green");
 
   await page.getByRole("button", { name: "Aa" }).click();

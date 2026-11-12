@@ -54,6 +54,7 @@ mod private_browser_media;
 mod quick_window;
 mod vault_marker;
 mod vault_roles;
+mod cli_probe;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
@@ -2308,7 +2309,6 @@ pub fn run() {
             workspace::workspace_take_open_request,
             memex::memex_detect,
             memex::memex_read_contract,
-            memex::memex_read,
             memex::memex_read_chat,
             memex::memex_list_chats,
             memex::memex_chat_folders,

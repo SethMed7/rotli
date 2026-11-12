@@ -23,6 +23,7 @@
  */
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { decodeHtmlEntities } from "./markdown-text";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
@@ -128,12 +129,12 @@ export function redirectRejection(from: URL, location: string, firstHost: string
 
 function strip(html: string, maxChars: number): { title: string; text: string } {
   const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim() ?? "";
-  const text = html
+  const tagless = html
     .replace(/<(script|style|nav|header|footer|aside|form|noscript|svg)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/h[1-6]>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/<[^>]+>/g, " ");
+  const text = decodeHtmlEntities(tagless)
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s*\n[\s\n]*/g, "\n")
     .trim()

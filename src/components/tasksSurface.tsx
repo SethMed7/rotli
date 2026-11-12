@@ -95,7 +95,7 @@ export function TasksSurface() {
         />
       </header>
       {err && (
-        <p className="file-err" style={{ padding: "0 22px 8px" }}>
+        <p className="file-err" role="alert" style={{ padding: "0 22px 8px" }}>
           ⚠ {err}
         </p>
       )}

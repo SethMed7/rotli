@@ -588,6 +588,44 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow-y: auto;
+}
+/* the version and the update action, pinned to the foot of the menu so they
+   are one click from every pane (settings/updatesNav.tsx) */
+.set-nav-update {
+  margin-top: auto;
+  padding: 12px 9px 2px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.set-nav-update-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.set-nav-version {
+  color: var(--text-muted);
+}
+.set-nav-update-status {
+  color: var(--text-muted);
+}
+.set-nav-update.has-update .set-nav-update-status {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+.set-nav-update-err {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+.set-nav-update .ghostbtn {
+  max-width: 100%;
 }
 /* the Settings page is one scene (2026-09-29): a wash of the theme's sky
    at the top fading to the surface, the scenery (settings/settingsBanner.tsx
@@ -3230,7 +3268,7 @@
   color: var(--text);
   cursor: pointer;
 }
-.rename-btn:hover {
+.rename-btn:hover:not(:disabled) {
   background: var(--hov);
 }
 .rename-btn.primary {
@@ -3238,8 +3276,14 @@
   color: var(--on-accent);
   border-color: transparent;
 }
-.rename-btn.primary:hover {
+.rename-btn.primary:hover:not(:disabled) {
   background: var(--accent-text);
+}
+/* a dialog that is saving, or has nothing to submit yet, says so (the
+   .ghostbtn treatment): no hover, no pointer, visibly unavailable */
+.rename-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 /* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
    read and edit a prompt; the prompt box scrolls, never the card */

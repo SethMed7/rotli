@@ -243,3 +243,49 @@ test("unapplied diagram edits survive closing the note and reopening it", async 
   await expect(dialog.getByRole("button", { name: "Apply to note" })).toBeEnabled();
   expect(errors).toEqual([]);
 });
+
+// CodeQL #6 (js/xss-through-dom): the rendered SVG goes into innerHTML. That's
+// safe because Mermaid's strict level (set before every render, and not a key
+// a diagram's init directive may change) sanitizes labels and the SVG and
+// binds no click handlers. This renders the real Mermaid, inline and from the
+// workspace's source box, and proves none of the markup in a diagram runs.
+const HOSTILE = `%%{init: {"securityLevel": "loose"}}%%
+flowchart LR
+  A["<img src=x onerror=window.__mermaidRan=1>Image"] --> B["<script>window.__mermaidRan=2</script>Script"]
+  B --> C["<a href=javascript:window.__mermaidRan=3>Link</a>"]
+  click A href "javascript:window.__mermaidRan=4"`;
+
+async function expectInert(
+  page: import("@playwright/test").Page,
+  svg: import("@playwright/test").Locator,
+  label: string,
+) {
+  await expect(svg).toContainText(label);
+  // no script element, no on* handler, no javascript: URL anywhere in the SVG
+  const live = await svg.evaluate((root) =>
+    [root, ...root.querySelectorAll("*")].flatMap((el) => [
+      ...(el.localName === "script" ? ["<script>"] : []),
+      ...[...el.attributes]
+        .filter((a) => /^on/i.test(a.name) || /^\s*javascript:/i.test(a.value))
+        .map((a) => `${el.localName}[${a.name}]`),
+    ]),
+  );
+  expect(live).toEqual([]);
+  await page.waitForTimeout(300); // let a broken image's load fail, were its handler there
+  expect(await page.evaluate(() => (window as { __mermaidRan?: unknown }).__mermaidRan)).toBeUndefined();
+}
+
+test("markup inside a Mermaid diagram renders as text and never runs", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText(`# Hostile diagram\n\n\`\`\`mermaid\n${HOSTILE}\n\`\`\`\n\nAfter`);
+  await expectInert(page, page.locator(".rotli-mermaid-inline-stage svg"), "Script");
+
+  await page.locator(".rotli-render-mermaid-trigger").click();
+  const dialog = page.getByRole("dialog", { name: "Mermaid diagram" });
+  await dialog.getByRole("button", { name: "Code" }).click();
+  await dialog.getByLabel("Mermaid source").fill(HOSTILE.replace("Script", "Typed"));
+  await dialog.getByRole("button", { name: "View", exact: true }).click();
+  await expectInert(page, dialog.locator(".rotli-mermaid-diagram svg"), "Typed");
+});

@@ -128,7 +128,9 @@ separately from the perf backlog.
    `new Set([focusedNoteId])` while a Board is open. (Sonnet)
 
 Related lows: async block renderers swallow rejections so a broken mermaid
-renders blank ≡ loading (`blockRender.ts:441-453,748-758`;
+renders blank ≡ loading (**fixed 2026-11-11**: a renderer that fails to load
+shows its reason, both inline and in the overlay; e2e
+`block-renderer-load.spec.ts`) (`blockRender.ts:441-453,748-758`;
 `mermaidWorkspace.tsx:145-153` is the correct shape); finding 26's listener
 race.
 

@@ -521,7 +521,6 @@
         "corpus_insert_ai",
         "corpus_write_file_ai",
         "generate_image",
-        "memex_read",
         "memex_rename_chat",
         "web_fetch",
         "web_search"

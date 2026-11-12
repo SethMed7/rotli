@@ -122,6 +122,41 @@ describe("escaped pipes (GFM \\|) — paper-cut sweep 2026-07-27", () => {
     expect(reparse(t)).toEqual(t);
   });
 
+  // CodeQL #1 (2026-11-10): the serializer escaped `|` but not a backslash in
+  // front of it, so `\|` typed into a cell went out as `\\|` — an escaped
+  // backslash, then a real separator — and the cell split in two on the next
+  // edit, shifting the rest of the row a column right.
+  test("a backslash typed before a pipe can't split the cell", () => {
+    const t: TableShape = { header: ["a", "b"], align: ["", ""], rows: [["x \\| y", "z"]] };
+    const back = reparse(t);
+    expect(back.rows[0]?.length).toBe(2);
+    // the cell editor shows raw Markdown, where `\|` is GFM's escaped pipe
+    expect(back.rows[0]).toEqual(["x | y", "z"]);
+  });
+
+  test("a cell keeps its column count whatever backslashes and pipes it holds", () => {
+    const alphabet = ["\\", "|", "a", " "];
+    const cells: string[] = [];
+    const grow = (prefix: string) => {
+      if (prefix.trim()) cells.push(prefix.trim());
+      if (prefix.length < 6) for (const ch of alphabet) grow(prefix + ch);
+    };
+    grow("");
+    for (const cell of cells) {
+      const t: TableShape = { header: ["h", "k"], align: ["", ""], rows: [[cell, "end"]] };
+      const once = reparse(t);
+      expect({ cell, cols: once.rows[0]?.length, last: once.rows[0]?.[1] }).toEqual({
+        cell,
+        cols: 2,
+        last: "end",
+      });
+      // one round settles it: what parsed back serializes to the same text
+      expect(tableToText(once)).toBe(tableToText(reparse(once)));
+      // anything the parser itself produced comes back unchanged
+      expect(reparse(once)).toEqual(once);
+    }
+  });
+
   test("a pasted GFM table with \\| survives a row op without losing cells", () => {
     const doc = Text.of(["| cmd | desc |", "| --- | --- |", "| a \\| b | keepme |"]);
     const t = scanTables(doc)[0]!;

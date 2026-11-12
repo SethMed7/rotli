@@ -439,7 +439,11 @@ export function QuickNote() {
         </div>
       </header>
 
-      {err && <p className="quick-err">⚠ {err}</p>}
+      {err && (
+        <p className="quick-err" role="alert">
+          ⚠ {err}
+        </p>
+      )}
 
       {activeId ? (
         // key forces a clean remount per note AND per show (the nonce) — fresh

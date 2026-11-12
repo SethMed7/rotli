@@ -29,11 +29,26 @@ export const CANVAS_LOAD_REFUSAL = {
     "Your last changes to this canvas haven’t saved yet, so it won’t open over them. Rotli tries again when you reopen it and when you quit.",
   gone: "This canvas isn’t in the vault anymore.",
   tooLarge: "This canvas is too large to open.",
+  notText:
+    "This canvas isn’t UTF-8 text, so Rotli won’t open it — saving would change bytes you didn’t edit.",
 } as const;
+
+/** Strict UTF-8: a byte that isn't UTF-8 refuses the file instead of becoming
+ * U+FFFD (which the next save would write over the original byte), and a
+ * byte-order mark is kept as text so the file stays refused as not JSON rather
+ * than opening and losing the mark on save. */
+function decodeCanvasText(bytes: Uint8Array): string | null {
+  try {
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
 
 /** Read and parse a canvas, failing closed: with nowhere to hold a canvas it
  * refuses instead of showing a blank one; the whole file is read (a default
- * read cap would cut it short), and one too large to read is refused. */
+ * read cap would cut it short), one too large to read is refused, and so is
+ * one that isn't UTF-8. */
 export async function loadCanvasFile(
   fileId: string,
   io: CanvasFileIo | null = canvasFileIo(),
@@ -43,9 +58,11 @@ export async function loadCanvasFile(
   const stat = await io.stat(fileId);
   if (!stat) return refuse(CANVAS_LOAD_REFUSAL.gone);
   if (stat.len > CANVAS_MAX_BYTES) return refuse(CANVAS_LOAD_REFUSAL.tooLarge);
-  const text = await io.read(fileId, stat.len);
+  const bytes = await io.read(fileId, stat.len);
   // a file that went away between the look and the read is gone, never empty
-  if (text === null) return refuse(CANVAS_LOAD_REFUSAL.gone);
+  if (bytes === null) return refuse(CANVAS_LOAD_REFUSAL.gone);
+  const text = decodeCanvasText(bytes);
+  if (text === null) return refuse(CANVAS_LOAD_REFUSAL.notText);
   const parsed = parseCanvas(text);
   if (!parsed.ok) return refuse(parsed.error);
   return {

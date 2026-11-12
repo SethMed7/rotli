@@ -380,7 +380,7 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// Resolve a webview-supplied `root` against the REGISTERED roots — the corpus +
 /// connected brains + added folders in corpus.json. Every root-taking memex_*
 /// command runs this FIRST, so the frontend can never point them at an arbitrary
-/// path (`memex_read(root: "/", …)` used to read any file on disk; a crafted
+/// path (a since-removed `memex_read(root: "/", …)` read any file on disk; a crafted
 /// write root could plant chats/ inside a curated tree).
 /// pub(crate): provider.rs validates the image-assets root through the same gate.
 pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
@@ -492,15 +492,6 @@ pub fn memex_read_contract(app: tauri::AppHandle, root: String) -> Result<Contra
     })
 }
 
-/// Read any spine file (rotli reads everything; writes are the gated part).
-/// The ROOT must be registered (#20) — the rel-only jail wasn't enough when the
-/// root itself came from the webview.
-#[tauri::command]
-pub fn memex_read(app: tauri::AppHandle, root: String, rel: String) -> Result<String, String> {
-    let root = registered_root(&app, &root)?;
-    read_at(&root, &rel)
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VersionedChat {
@@ -601,10 +592,13 @@ pub struct ChatSummary {
 }
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
+/// ASYNC + spawn_blocking: it reads every chat's frontmatter and tail, which
+/// held the main thread in a long history (system audit 2026-09-02).
 #[tauri::command]
-pub fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
-    let root = registered_root(&app, &root)?;
-    list_chats_at(&root)
+pub async fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec<ChatSummary>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_chats_at(&registered_root(&app, &root)?))
+        .await
+        .map_err(|error| format!("list chats: {error}"))?
 }
 
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
@@ -1119,7 +1113,7 @@ pub fn memex_write_note(
 }
 
 #[cfg(test)]
-fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
+pub(crate) fn write_note_at(root: &Path, stem: &str, contents: &str) -> Result<String, String> {
     write_note_at_with_suppress(root, stem, contents, None)
 }
 
@@ -1168,17 +1162,25 @@ fn write_note_at_with_suppress(
         let path = dir.join(&file_name);
         if secure {
             let ignore = root.join(".gitignore");
-            // a .gitignore that can't be read is never replaced by one line
-            let existing = crate::fsutil::read_own_sidecar(&ignore)?.unwrap_or_default();
-            if !existing.lines().any(|line| line.trim() == rel) {
+            // under the .gitignore's own lock, the one gitignore_add (set_secure)
+            // takes: the create lock above is per lane, so without it a secure
+            // create racing another writer could drop that writer's ignore line
+            // and leave a secure note committable (system audit 2026-09-02 §6 #1).
+            // Innermost lock, so it can't deadlock with the create lock.
+            with_file_lock(&ignore, || {
+                // a .gitignore that can't be read is never replaced by one line
+                let existing = crate::fsutil::read_own_sidecar(&ignore)?.unwrap_or_default();
+                if existing.lines().any(|line| line.trim() == rel) {
+                    return Ok(());
+                }
                 let mut next = existing;
                 if !next.is_empty() && !next.ends_with('\n') {
                     next.push('\n');
                 }
                 next.push_str(&rel);
                 next.push('\n');
-                atomic_write(&ignore, &next)?;
-            }
+                atomic_write(&ignore, &next)
+            })?;
         }
         // Invalidate the registered CorpusStore's warm walk cache before the
         // bytes land. The same mark suppresses the watcher echo, exactly as a

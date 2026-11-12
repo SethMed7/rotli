@@ -66,7 +66,7 @@ central build-time flag, not a user-toggled setting or URL override.
    actual remote-context policy and avoids “never leaves your Mac.”
 2. **DOCX fidelity:** rechecked current `src/documents/codec/docx.ts`: numbered-list
    decoding assumes `numId === "2"`, encoding writes `numId="1"`, and
-   `sameParagraph` still uses JSON string equality. The current Univer preset
+   `sameParagraph` still uses JSON string equality (**fixed 2026-11-11**: key-order independent). The current Univer preset
    enables its general toolbar without a capability menu restriction. This
    supports carrying forward the [September 1 audit](system-audit-2026-09-01.md)
    as an unresolved launch concern; it is not a new live Word round-trip test.

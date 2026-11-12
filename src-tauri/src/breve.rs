@@ -132,6 +132,9 @@ pub struct BreveRoutine {
 pub(crate) mod breve_health;
 #[path = "breve_pdf.rs"]
 pub(crate) mod breve_pdf;
+#[cfg(test)]
+#[path = "breve_watchlist_lock_tests.rs"]
+mod watchlist_lock_tests;
 pub use breve_health::BreveRoutineHealth;
 pub(crate) use breve_health::{recent_notifications, routine_health, BREVE_NOTIFICATION_LIMIT};
 pub use breve_pdf::BrevePdfTheme;
@@ -1631,8 +1634,19 @@ pub async fn breve_write_watchlist(
 
 fn write_watchlist_at(root: &Path, markdown: &str) -> Result<BreveSnapshot, String> {
     let path = root.join(WATCHLIST_FILE);
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    }
+    // under the note's own lock, the one an editor or agent save takes, so a
+    // save landing mid read-merge-write isn't overwritten (audit 2026-09-02 §6 #5)
+    crate::fsutil::with_file_lock(&path, || merge_watchlist(&path, markdown))?;
+    let legacy = legacy_root();
+    Ok(snapshot_at(root, legacy.as_deref()))
+}
+
+fn merge_watchlist(path: &Path, markdown: &str) -> Result<(), String> {
     let body = strip_frontmatter(markdown);
-    let doc = if let Some(existing) = read_text(&path) {
+    let doc = if let Some(existing) = read_text(path) {
         if let Some(after_fence) = existing.strip_prefix("---\n") {
             // offsets into `existing`: 4 (opening fence) + match + 5 ("\n---\n")
             let front_end = after_fence.find("\n---\n").map(|at| at + 9);
@@ -1668,9 +1682,7 @@ fn write_watchlist_at(root: &Path, markdown: &str) -> Result<BreveSnapshot, Stri
             body,
         )
     };
-    write_atomic(&path, doc.as_bytes())?;
-    let legacy = legacy_root();
-    Ok(snapshot_at(root, legacy.as_deref()))
+    write_atomic(path, doc.as_bytes())
 }
 
 fn append_scheduler_event(root: &Path, routine: &str, message: &str) -> Result<(), String> {

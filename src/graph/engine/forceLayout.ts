@@ -14,6 +14,8 @@ import {
   forceY,
 } from "d3-force";
 
+import { LABEL_ALL_UP_TO } from "../model";
+
 export interface LayoutNode extends SimulationNodeDatum {
   id: string;
   r: number;
@@ -49,8 +51,8 @@ export function createLayout(
       "link",
       forceLink<LayoutNode, LayoutLink>(links)
         .id((node) => node.id)
-        // a small graph (most local graphs) gets room for every label
-        .distance(nodes.length <= 30 ? 110 : 64)
+        // a small graph (most local graphs) labels every note, so it gets room
+        .distance(nodes.length <= LABEL_ALL_UP_TO ? 110 : 64)
         .strength(0.6),
     )
     .force("charge", forceManyBody<LayoutNode>().strength(-140).distanceMax(480))

@@ -74,9 +74,13 @@ caret was not in a table, and `tabIndent` runs its own `scanFences`.
   (`cmKeymap.ts`), removing one table scan and one nested fence scan from
   every Tab, Enter, and arrow on ordinary lines. Guarded by
   `cmKeymap.test.ts` (“Tab outside a table”).
-- Open: share one fence scan per document change (a `StateField` consumed by
-  `livePreview`, `tableRender`, `blockRender`, and the keymap), and stop the
-  toString/split/join round trip in `setDocumentText`. Note the uncommitted
+- **FIXED (2026-11-11)**: one fence scan and one table scan per document.
+  `scanFences` and `scanTables` are memoized per immutable CodeMirror `Text`
+  (a `WeakMap`), so livePreview, tableRender, blockRender, the keymap,
+  auto-pair and textAlign share one answer per edit, which is readonly. On a
+  24,000-line note this went from ~35 ms to ~14 ms per keystroke for the five
+  scans one keystroke made.
+- Open: stop the toString/split/join round trip in `setDocumentText`. Note the uncommitted
   `parseBlock` gained two regexes at the head of its chain
   (`render.tsx:75-93`) that `scanTaskProgress` now pays on every line.
 
@@ -130,9 +134,13 @@ a monochrome theme — and the yes-label `color-mix` has no contrast entry.
 - **FIXED**: slash commands work inside a result’s ` — reason`
   (`slashSpanAtCaret` in `slashMenu.tsx`): the trailing `/query` token is the
   command and its block lands on a continuation line beneath the row.
-- Open: per-theme `--failure` in `themes.css`, contrast entries, `role="radio"`
-  semantics and option text in choice labels, slash entries for both grammars,
-  `ChoiceWidget.select` stringifying the whole document per click.
+- **FIXED (2026-11-11)**: choice controls announce as `role="radio"` (the
+  `( )` grammar used `aria-pressed`) named by their option's text
+  (`optionLabel`, Markdown emphasis stripped), and `[##]` checkboxes likewise;
+  a group edit reads its lines through `docLines` instead of stringifying the
+  whole note per click (`choiceState.test.ts`, e2e in `markdown-editing.spec.ts`).
+- Open: per-theme `--failure` in `themes.css`, contrast entries, slash entries
+  for both grammars.
 
 ## 5. Drag and drop, images, video
 
@@ -272,9 +280,13 @@ consistently across placements, and Mermaid/JSXGraph re-theme through a
   their time-of-day pose to the idle preference; onboarding skip reset only
   part of the quokka; the accessory hue slider showed under Line; the flatness
   e2e covered four of twelve environments.
-- Open, ranked: (1) a light-ground flash on launch for dark-theme users
-  (`index.html` pins `data-theme="light"` and the main window is visible before
-  hydration); (2) native chrome never follows the app theme (no
+- **FIXED (2026-11-11)**: the light-ground flash on launch for dark-theme
+  users (`index.html` pins `data-theme="light"` and the main window is visible
+  before hydration). `public/theme-boot.js` applies the theme the last launch
+  remembered (`LAST_THEME_KEY`, written only where settings are durable)
+  before the first paint; e2e `theme-launch.spec.ts`. The native webview's own
+  ground before the HTML loads is still the system default.
+- Open, ranked: (2) native chrome never follows the app theme (no
   `setTheme`/`NSAppearance`, so traffic-light glyphs track the OS, not the
   theme); (3) Excalidraw's board theme reads `matchMedia` once and misses an OS
   flip in System mode (copy the `blockRender` observer); (4) Dock icons exist

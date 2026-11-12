@@ -5,11 +5,13 @@ import ReactDOM from "react-dom/client";
 import App from "./app";
 import { PLATFORM } from "./lib/featurePolicy";
 import { attachIdleMotion } from "./lib/idleMotion";
+import { hasDurableCorpus } from "./lib/tauri";
 import { syncFolderRoles } from "./services/fsNotes";
 import { holdLibrarianOffInPlace } from "./services/librarianSwitch";
 import { hydrateWebVault } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
+import { rememberAppliedTheme } from "./state/theme";
 
 // Excalidraw otherwise fetches its fonts from a CDN (unpkg). For an offline
 // desktop app (Tauri, no network) point its asset path at the app origin so it
@@ -19,10 +21,11 @@ import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from
 // under /app/fonts (the site's own /fonts is a different folder).
 (window as unknown as { EXCALIDRAW_ASSET_PATH?: string }).EXCALIDRAW_ASSET_PATH = import.meta.env.BASE_URL;
 
-// Theme is owned by the ui store (explicit light/dark/system, default "light");
-// index.html pins data-theme="light" so first paint is deterministic. In the
-// Tauri shell, .rotli/settings.json is hydrated BEFORE the first render — the
-// restored theme paints first, never a light flash. The browser skips it all.
+// Theme is owned by the ui store (explicit light/dark/system, default "light").
+// index.html pins data-theme="light", then public/theme-boot.js swaps in the
+// theme the last launch applied before anything paints — hydration below
+// awaits disk reads, and the window is already visible meanwhile. The app
+// applies the hydrated setting on its first render either way.
 
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root element");
@@ -34,6 +37,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
   await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws
+  rememberAppliedTheme(hasDurableCorpus()); // the next launch paints this theme first
   holdLibrarianOffInPlace(); // a folder connected in place is never organized
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

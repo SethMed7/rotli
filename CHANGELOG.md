@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.10.0] - 2026-11-10
+## [1.9.2] - 2026-11-11
 
 ### Added
 
@@ -153,9 +153,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An agent's read can't be swapped mid-read.** Rotli checks a note and
   hands an agent the very same bytes, so a note changed to secure at that
   instant is never sent.
+- **Removed `memex_read`**, an app command nothing in Rotli called. It could
+  read any file in a registered vault, secure notes included. `check:ipc`
+  now fails when a registered command has no caller, so unused surface
+  doesn't build up again.
+
+### Changed
+
+- **Updates live at the foot of the Settings menu.** Your version, Check for
+  updates, and Install & relaunch now sit at the bottom of Settings' left
+  menu, one click from every page, instead of at the end of General. General
+  keeps the switch for checking automatically.
+- **Typing in a long note does less work.** Each keystroke used to look for
+  code blocks and tables up to five times over the whole note. It now looks
+  once and shares the answer. A 24,000-line note went from about 35 ms to
+  14 ms of that work per keystroke.
+- **Chat reads your notes without an extra step on each one.** Every note an
+  AI read used to start a small system tool on the app's main thread to
+  answer a question it didn't need answered. It no longer does.
 
 ### Fixed
 
+- **A table cell with a backslash right before a pipe stays one cell.**
+  Typing `\|` into a table cell wrote it back as `\\|`, and the next edit
+  to the table split the cell in two and moved the rest of the row one
+  column right. A `\|` you type is now kept as Markdown's escaped pipe.
+- **Breve's summaries, page watchers and creator alerts read entities
+  once.** A web page or video title that showed the text `&lt;` came
+  through as `<`, because `&amp;` was decoded before the rest.
 - **Typing while a save is on its way is no longer lost.** If you kept
   typing while Rotli was still saving the note (a slow disk, or switching
   away or quitting right after a pause), the second save could be refused,
@@ -294,6 +319,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web settings no longer pretend to update or switch to Demo mode.** These
   Mac-only actions now say where they work, without a placeholder app version,
   a false "up to date" result, or a switch that does nothing.
+- **A canvas that isn't UTF-8 text is refused instead of quietly changed**
+  (development builds, where canvases live). Rotli used to decode it loosely,
+  so the first save after any edit rewrote the bytes it couldn't read as
+  replacement characters. It now says the file isn't UTF-8 and leaves it as
+  it is, on the Mac and on Rotli Web.
+- **The Graph** (development builds) no longer flashes "Untitled" dots
+  before the note titles load, opens the notes around a note with thousands
+  of links at once instead of after a pause, stays crisp after moving to a
+  display with another scale, and follows a new primary color without being
+  reopened.
+- **Dark themes no longer open on a light flash.** Rotli used to paint its
+  light ground while it read your settings, then switch. Each window now
+  starts in the theme it last showed, on the Mac and on Rotli Web.
+- **Choice lists name their options to screen readers.** A `( )` or `[#]`
+  option used to be read as "Select option" or "Choose option", and a `[##]`
+  box as "Toggle option". Each is now read as a radio or checkbox named by
+  its own text. Picking an option in a long note no longer copies the whole
+  note to find its group.
+- **Ticking a task on the Tasks page can't overwrite another edit.** The
+  check-off read the note, then wrote it back without holding the note, so a
+  change landing in between (from `rotli` on the command line or an agent)
+  was lost. It now holds the note like every other save.
+- **A new secure note can't knock another one out of `.gitignore`.** Creating
+  one could race marking another note secure, and drop that note's ignore
+  line, leaving it committable.
+- **Pinning, locking, and the local-AI switch no longer set off a full
+  refresh**, as if another app had changed the note.
+- **Breve's daily digest can't be lost to a crash or an empty rerun**
+  (development builds, where Breve runs). The day's record used to be written
+  in place, so a crash mid-write left an empty day. A second run whose model
+  returned nothing replaced the morning's digest with an empty template. The
+  record now lands whole or not at all, and an empty run keeps what's there.
+- **Errors are announced to screen readers.** A Quick Note that couldn't
+  save, a preview that couldn't read its note or chat, and errors on the
+  file, Tasks, and Activity pages now speak up when they appear, instead of
+  showing only on screen.
+- **A dialog's unavailable button looks unavailable.** Create board, Rename,
+  and the other name dialogs fade their button and drop the pointer while
+  there's nothing to submit or a save is running.
+- **A board, sheet, or Word document can't be overwritten by a save that was
+  already out of date.** When Rotli's autosave and another writer (an agent
+  editing the board, or the command line) saved the same file at the same
+  moment, one save could replace the other unseen. They now take turns, and
+  the late one reports the conflict.
+- **Tab stays inside a dialog.** In the preview, the Librarian's
+  introduction and the vault cards, Tab used to walk out into the page
+  behind. It now cycles through the dialog's own controls, like Rotli's
+  other dialogs.
+- **A diagram or formula that can't load says so.** If the code that draws a
+  math, chart, or other rendered block failed to load (offline, or after a
+  Rotli Web update), the block stayed blank as if still loading. It now shows
+  the reason and asks you to reload.
+- **Settings → Connections can't get stuck on "checking…".** Rotli asks each
+  installed AI app for its version and whether you're signed in. An app that
+  waited for input or hung kept that check running forever. It now gets fifteen
+  seconds, then counts as not signed in.
+- **Breve's watchlist can't overwrite an edit made at the same moment**
+  (development builds). Breve now waits for any other save to that note
+  before it merges its changes in, and its writes survive a crash.
+- **An `.xlsm` embedded in a note can't lose its macros.** The embed offered
+  editing and saved through a format that drops them. It now opens view-only,
+  like the full sheet tab.
+- **A Word document no longer refuses to save over a paragraph you didn't
+  touch.** Rotli could read a styled paragraph with content it can't rewrite
+  as edited, and block the whole save.
+- **Long text files aren't silently cut.** On the Mac a `.log` or `.txt` file was
+  silently cut at 200 KB. It now shows up to 2 MB, and says when that's only
+  the start of the file.
 
 ## [1.9.1] - 2026-10-20
 
