@@ -251,15 +251,33 @@ builds until that review has checked these fixes:
    Every route call now first removes, from both of the Librarian's pages,
    each line with a `[[link]]` to a note an agent may no longer read, and
    neither `librarian_index` nor `librarian_log` writes such a line back. A
-   link counts against every note it could name (id, title or alias, case
-   aside, `.md` in any case, a path's last segment), so a public note sharing
-   the name doesn't keep the line alive. The two pages are the Librarian's by
-   their recorded note id and Rotli-only marker, not their title, so a page a
-   person retitled is still cleaned. Tests:
-   `the_index_and_log_drop_lines_about_a_note_that_turned_secure` (route search
-   and the page bytes on disk), and from the independent review of PR #295:
-   `withdrawal_matches_note_ids_and_any_extension_case`,
-   `a_renamed_index_is_still_the_librarians_and_still_cleaned`. Limits, documented: a line that names a note
+   link counts against every note it could open, compared exactly as the
+   editor navigates (`corpus_links.rs` `wikilink_names` and `link_key`,
+   pinned to `wikilink.ts` by parity.json `wikilinkNavigation`: id, title or
+   alias trimmed and case aside, `.md` in any case, a path id, a path's last
+   segment), so a public note sharing the name doesn't keep the line alive.
+   The two pages are the Librarian's only by `created_by: librarian` and
+   `librarian_page`, each in the one spelling Rust writes
+   (`frontmatter_keys.rs`), never by title, so a page a person retitled is
+   still cleaned. No metadata edit can mint either key in any spelling (the
+   raw editor drops indented, quoted, list, `? key` and flow-map forms of
+   every Rust-owned key it didn't already hold), and no agent tool or
+   `rotli notes` command writes frontmatter, so discovery never adopts a
+   note the route didn't make. `pages.jsonl` is a hint for a positive id
+   only: a null, missing or unverifiable entry falls back to discovery.
+   Tests: `the_index_and_log_drop_lines_about_a_note_that_turned_secure`
+   (route search and the page bytes on disk); from the independent reviews of
+   PR #295: `withdrawal_matches_note_ids_and_any_extension_case`,
+   `a_renamed_index_is_still_the_librarians_and_still_cleaned`,
+   `a_forged_marker_never_makes_a_persons_note_the_index`,
+   `no_agent_or_cli_path_can_write_the_page_keys`,
+   `a_negative_or_unusable_page_record_never_disables_withdrawal`,
+   `withdrawal_resolves_links_as_navigation_does`; and the class guards
+   `no_spelling_of_a_rust_owned_key_can_be_minted_through_the_metadata_editor`
+   and `the_keys_rust_owns_are_read_only_through_the_shared_parser`. Limits,
+   documented: a page whose `librarian_page` line was removed by editing the
+   file directly (the raw editor restores it; no agent path can remove it)
+   is an ordinary note again, and its lines stay. A line that names a note
    in plain words without a link stays (the `index-and-log` skill now requires
    links), and the lines go only when the route next runs, so until then the
    pages still show them to other lanes. Pages a development build left in a

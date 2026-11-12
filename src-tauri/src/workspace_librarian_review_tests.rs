@@ -21,7 +21,7 @@ fn page_on_disk(ws: &mut Workspace, title: &str) -> String {
     fs::read_to_string(ws.store.root().join(rel)).unwrap()
 }
 
-fn hits(temp: &TempDir, query: &str) -> usize {
+pub(super) fn hits(temp: &TempDir, query: &str) -> usize {
     ok(mcp(temp, SEARCH, json!({ "query": query })))["items"].as_array().unwrap().len()
 }
 

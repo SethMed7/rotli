@@ -507,11 +507,11 @@ impl Workspace {
             .into_iter()
             .filter(|note| {
                 note.kind == NoteKind::Note
-                    && (note.title.eq_ignore_ascii_case(selector)
+                    && (crate::corpus::links::link_key(&note.title) == crate::corpus::links::link_key(selector)
                         || note
                             .aliases
                             .iter()
-                            .any(|alias| alias.eq_ignore_ascii_case(selector_stem)))
+                            .any(|alias| crate::corpus::links::link_key(alias) == crate::corpus::links::link_key(selector_stem)))
                     && self.store.read_for_ai(&note.id, false).is_ok()
             })
             .map(|note| note.id)

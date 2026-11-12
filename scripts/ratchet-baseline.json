@@ -31,7 +31,7 @@
     "src-tauri/src/usage.rs": 941,
     "src-tauri/src/compute.rs": 1054,
     "src-tauri/src/organizer.rs": 5302,
-    "src-tauri/src/corpus.rs": 13696,
+    "src-tauri/src/corpus.rs": 13601,
     "src-tauri/src/workspace.rs": 3894,
     "src-tauri/src/routines.rs": 821,
     "src-tauri/src/web_search.rs": 849,

@@ -760,6 +760,27 @@
         { "wire": "Storage/café&co!*'.png", "folder": "Notes/Deep", "link": "../../Storage/caf%C3%A9%26co!*'.png" }
       ]
     },
+    "wikilinkNavigation": {
+      "sourceOfTruth": "behavioral: src/editor/wikilink.ts wikilinkTargetOf + linkKey ↔ src-tauri/src/corpus_links.rs wikilink_target_of + link_key (the Librarian route's withdrawal and Rust note selectors compare links exactly as the editor navigates them)",
+      "value": {
+        "targets": [
+          { "inner": "Harbor plan", "target": "Harbor plan" },
+          { "inner": " Harbor plan ", "target": "Harbor plan" },
+          { "inner": "Harbor plan.md", "target": "Harbor plan" },
+          { "inner": "Harbor plan.MD#Heading|Alias", "target": "Harbor plan" },
+          { "inner": "Inbox/harbor-record.Md", "target": "Inbox/harbor-record" },
+          { "inner": "opaque.md", "target": "opaque" },
+          { "inner": "École#Vie|é", "target": "École" },
+          { "inner": "|label only", "target": "" }
+        ],
+        "keys": [
+          { "label": " Dock project ", "key": "dock project" },
+          { "label": "ÉCOLE", "key": "école" },
+          { "label": "Harbor Plan", "key": "harbor plan" },
+          { "label": "opaque.md", "key": "opaque.md" }
+        ]
+      }
+    },
     "wikilinkTargets": {
       "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
       "value": [

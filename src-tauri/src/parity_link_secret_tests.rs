@@ -1,5 +1,6 @@
-// Parity for the link a new image gets and for what counts as secret-shaped
-// (split from parity_tests.rs at its size ceiling).
+// Parity for the link a new image gets, how a wikilink is read and compared,
+// and what counts as secret-shaped (split from parity_tests.rs at its size
+// ceiling).
 
 use super::entry;
 
@@ -21,5 +22,21 @@ fn note_image_link_fixtures_agree() {
         let folder = case["folder"].as_str().expect("folder is a string");
         let link = case["link"].as_str().expect("link is a string");
         assert_eq!(crate::corpus::link_convert::note_image_link(wire, folder), link, "{wire} from {folder}");
+    }
+}
+
+/// Navigation's link normalisation: the editor (wikilink.ts) and Rust
+/// (corpus_links.rs, used by the Librarian route's withdrawal and note
+/// selectors) read a link's target and compare names the same way.
+#[test]
+fn wikilink_navigation_fixtures_agree() {
+    let value = entry("wikilinkNavigation");
+    for case in value["targets"].as_array().unwrap() {
+        let inner = case["inner"].as_str().expect("inner is a string");
+        assert_eq!(crate::corpus::links::wikilink_target_of(inner), case["target"].as_str().unwrap(), "wikilink_target_of({inner:?})");
+    }
+    for case in value["keys"].as_array().unwrap() {
+        let label = case["label"].as_str().expect("label is a string");
+        assert_eq!(crate::corpus::links::link_key(label), case["key"].as_str().unwrap(), "link_key({label:?})");
     }
 }

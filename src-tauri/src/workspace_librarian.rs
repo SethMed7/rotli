@@ -324,3 +324,7 @@ mod tool_limits_tests;
 #[cfg(test)]
 #[path = "workspace_librarian_review_tests.rs"]
 mod review_tests;
+
+#[cfg(test)]
+#[path = "workspace_librarian_ownership_tests.rs"]
+mod ownership_tests;

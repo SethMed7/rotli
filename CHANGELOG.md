@@ -25,8 +25,19 @@ builds.
 - **The Librarian's index and log forget a note that turns secure.** Lines
   that link to a note an agent may no longer read are removed from both pages
   the next time the Librarian runs, and aren't written back, however the link
-  is spelled (by title, alias, note id or file name). Retitling either page
-  doesn't stop this: the Librarian knows its pages by id, not by title.
+  is spelled (by title, an alias written with spaces, note id, an id ending
+  in `.md`, or file name): they match exactly as clicking the link would.
+  Retitling either page doesn't stop this, and a missing or edited record of
+  which notes the pages are doesn't either.
+- **The Librarian can't take over your notes.** It recognises its index and
+  log only by markers Rotli writes itself, in the one form Rotli writes them.
+  Before, typing an indented copy of those markers into a note's metadata let
+  the Librarian treat that note as its index and replace its text.
+- **The metadata editor keeps Rotli's own keys Rotli's.** Typing `id`,
+  `created`, `owner`, `created_by` or another key Rotli owns in a different
+  form (indented, quoted, as a list item, or inside `{…}`) no longer adds it;
+  lines a note already had are kept exactly as they were. An indented
+  `created_by` is no longer read as who made a note.
 - **A copied vault starts with the Librarian off.** Turning the route on now
   takes `rotli librarian on` in the vault as well as the setting, and that
   consent belongs to the folder: a copy of the vault, wherever it is put,

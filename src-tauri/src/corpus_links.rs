@@ -134,6 +134,47 @@ fn is_file_target(inner: &str) -> bool {
         )
 }
 
+/// The case- and space-insensitive form a link and a note's names are
+/// compared in: wikilink.ts `linkKey` (trim, lower-case). Rust's note
+/// selectors and the Librarian route's withdrawal both compare through it;
+/// parity.json `wikilinkNavigation` keeps it in step with the editor.
+pub(crate) fn link_key(value: &str) -> String {
+    value.trim().to_lowercase()
+}
+
+/// The navigation target inside `[[…]]`: wikilink.ts `wikilinkTargetOf` — no
+/// `|label`, no `#heading`, and no trailing `.md` in any case.
+pub(crate) fn wikilink_target_of(inner: &str) -> String {
+    let target = inner.split('|').next().unwrap_or_default().split('#').next().unwrap_or_default().trim();
+    let cut = target.len().saturating_sub(3);
+    match target.get(cut..) {
+        Some(ext) if ext.eq_ignore_ascii_case(".md") => target[..cut].to_string(),
+        _ => target.to_string(),
+    }
+}
+
+/// Every name `[[inner]]` can open, as wikilink.ts `resolveWikilink` looks
+/// them up, each a [`link_key`]: the target itself (an id, title or alias),
+/// the path id `target.md` a note without a frontmatter id has, and a path's
+/// last segment. A superset: the editor opens one note only when one matches.
+pub(crate) fn wikilink_names(inner: &str) -> Vec<String> {
+    let target = wikilink_target_of(inner);
+    if target.is_empty() {
+        return Vec::new();
+    }
+    let mut names = vec![link_key(&target), link_key(&format!("{target}.md"))];
+    if let Some((_, last)) = target.rsplit_once('/') {
+        names.push(link_key(last));
+    }
+    names
+}
+
+/// Every name a note answers to in a link: its id, title and aliases, each a
+/// [`link_key`].
+pub(crate) fn note_link_names(id: &str, title: &str, aliases: &[String]) -> Vec<String> {
+    [id, title].into_iter().chain(aliases.iter().map(String::as_str)).map(link_key).filter(|name| !name.is_empty()).collect()
+}
+
 pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     // the open fence: it closes only on the same character, at least as long

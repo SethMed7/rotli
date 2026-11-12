@@ -275,27 +275,39 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
 - **Rewrites** are limited to the Librarian's own pages, "Librarian index"
   and "Librarian log", through `write_for_remote_agent_if_revision`. Its own
   means the `created_by: librarian` stamp and the `librarian_page` marker,
-  found by the note id recorded in `.rotli/librarian/pages.jsonl` (a
-  deletable cache, checked against the page every time; without it the
-  oldest marked page is found once and recorded), never by title, so a
-  person may retitle either page and it stays the Librarian's. `created_by: librarian` alone is not enough: Rotli's
+  each in the one spelling Rust writes (`key: value` at the start of a line;
+  `frontmatter_keys.rs` `canonical_field`, which `created_by_field` uses too),
+  never the title, so a person may retitle either page and it stays the
+  Librarian's. `.rotli/librarian/pages.jsonl` records the page's id as a
+  hint for a positive id only, checked against the page every time; with no
+  usable record the route reads every note's frontmatter, adopts the oldest
+  page marked that way that an agent can read, and records it (every call
+  looks while no page exists). `created_by: librarian` alone is not enough: Rotli's
   in-app Librarian stamps the People notes it makes the same way, and a
   person may be called "Librarian index". `librarian_page` is a Rotli-reserved
   key that only this route's page creation writes: agents never write
   frontmatter, the metadata editor refuses reserved keys, the raw editor
-  restores them (`RAW_IMMUTABLE_KEYS`), and no other create path sets it. A
+  restores them (`RAW_IMMUTABLE_KEYS`) and drops any other spelling of them
+  it didn't already hold (indented, quoted, a list item, `? key`, `key :`,
+  inside a `{flow: map}`), and no other create path sets it. A
   note that only shares the title, carries it as an alias, or lacks the
   marker is never touched, and the Librarian makes its own page instead.
   `librarian_index` writes the heading back to "Librarian index".
   Pages made before the marker existed (unreleased builds only) are left
   alone and replaced by new ones. Before every call, and in every write to
   them, the route removes each line of both pages with a `[[link]]` to a note
-  an agent may not read; a link counts against every note whose id, title or
-  alias it matches, case aside (`.md` stripped in any case; a path-style link
-  also by its last segment), so a public namesake can't keep a secure
+  an agent may not read; a link counts against every note it could open, as
+  the editor resolves links (`corpus_links.rs` `wikilink_names` and
+  `link_key`, parity-pinned to `wikilink.ts`: id, title or alias trimmed and
+  case aside, `.md` in any case, a path id, a path's last segment), so a
+  public namesake can't keep a secure
   note's line. A line that names a note without linking it can't be found
   this way (the `index-and-log` skill requires links), and lines go only when
-  the route next runs (review 2026-11-09, #2).
+  the route next runs (review 2026-11-09, #2). A page whose marker line was
+  removed by editing its file directly is an ordinary note again, and its
+  lines stay. Rust's note selectors compare titles and aliases through the
+  same `link_key`; unlike the editor they don't resolve path ids or a
+  path's last segment.
 - **Proposals:** `librarian_file` and `librarian_link` append to
   `.rotli/librarian/proposals.jsonl` (JSON per line, `id`, `ts`, `kind`,
   `note`, `noteTitle`, `folder` or `target` with `targetId`, `reason`,

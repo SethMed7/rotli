@@ -51,10 +51,11 @@ impl Creator {
     }
 }
 
-/// The value of a `created_by:` line, if this is one.
+/// The value of a `created_by:` line, if this is one, in the one spelling
+/// Rust writes (frontmatter_keys.rs): an indented or quoted `created_by` is
+/// not the note's creator.
 pub(crate) fn created_by_field(line: &str) -> Option<&str> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "created_by").then(|| v.trim())
+    crate::frontmatter_keys::canonical_field(line).filter(|(key, _)| *key == "created_by").map(|(_, value)| value)
 }
 
 /// The value of an `ai_edit:` line, if this is one. Only a literal `true`
