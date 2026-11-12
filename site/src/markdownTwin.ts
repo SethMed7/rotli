@@ -35,7 +35,10 @@ export function decodeEntities(text: string): string {
 export function parseHtml(html: string): HtmlNode {
   const root: HtmlNode = { tag: '#root', attrs: {}, children: [] };
   const stack: HtmlNode[] = [root];
-  const token = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/([a-z0-9-]+)\s*>|<([a-z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>|([^<]+)|</gi;
+  // Attribute names and unquoted values can't hold quotes or `=` (as in HTML), so each
+  // attribute splits only one way. With quotes allowed in both, `a=""` read as a quoted value
+  // or as a bare one, and an unclosed tag took exponential time to fail (CodeQL #9).
+  const token = /<!--[\s\S]*?-->|<!doctype[^>]*>|<\/([a-z0-9-]+)\s*>|<([a-z0-9-]+)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*(\/?)>|([^<]+)|</gi;
   let match: RegExpExecArray | null;
   while ((match = token.exec(html))) {
     const [whole, close, open, rawAttrs, selfClose, text] = match;
@@ -48,7 +51,7 @@ export function parseHtml(html: string): HtmlNode {
     } else if (open) {
       const node: HtmlNode = { tag: open.toLowerCase(), attrs: {}, children: [] };
       for (const [, key, , dq, sq, bare] of (rawAttrs ?? '').matchAll(
-        /([^\s=>/]+)(\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g,
+        /([^\s"'>/=]+)(\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g,
       )) {
         node.attrs[key.toLowerCase()] = decodeEntities(dq ?? sq ?? bare ?? '');
       }
@@ -116,6 +119,13 @@ export function inlineMarkdown(node: HtmlNode | string, base: string): string {
 
 const tidy = (line: string) => line.replace(/\s+/g, ' ').trim();
 
+/** A table cell's pipes, escaped so none can end the cell. A pipe after k backslashes goes out
+ * after 2k + 1: the last one escapes the pipe, and the pairs before it read back as the k
+ * backslashes the text had. Escaping only the pipe turned `\|` into `\\|`, an escaped backslash
+ * and then a real separator (CodeQL #10). Backslashes elsewhere are left alone: in a code span
+ * they are literal, so doubling them would change the code. */
+const escapeCellPipes = (text: string) => text.replace(/(\\*)\|/g, (_, run: string) => `${run}${run}\\|`);
+
 function tableMarkdown(table: HtmlNode, base: string): string[] {
   const rows: string[][] = [];
   const caption = findElement(table, (node) => node.tag === 'caption');
@@ -126,7 +136,7 @@ function tableMarkdown(table: HtmlNode, base: string): string[] {
         rows.push(
           child.children
             .filter((cell): cell is HtmlNode => typeof cell !== 'string' && (cell.tag === 'th' || cell.tag === 'td'))
-            .map((cell) => tidy(inlineMarkdown(cell, base)).replace(/\|/g, '\\|')),
+            .map((cell) => escapeCellPipes(tidy(inlineMarkdown(cell, base)))),
         );
       } else if (child.tag !== 'caption') collect(child);
     }

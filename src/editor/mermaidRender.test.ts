@@ -2,11 +2,16 @@ import { afterAll, expect, mock, test } from "bun:test";
 
 const liveMermaid = { ...(await import("mermaid")) };
 const rendered: string[] = [];
+const securityAtRender: unknown[] = [];
+let securityLevel: unknown;
 await mock.module("mermaid", () => ({
   default: {
-    initialize: () => {},
+    initialize: (config: { securityLevel?: unknown }) => {
+      securityLevel = config.securityLevel;
+    },
     render: async (_id: string, code: string) => {
       rendered.push(code);
+      securityAtRender.push(securityLevel);
       return { svg: "<svg></svg>" };
     },
   },
@@ -54,4 +59,22 @@ test("ordinary web diagrams and desktop image diagrams retain their renderer", a
     await renderMermaidElement(code, { dark: false, id: "test", platform });
     expect(rendered).toEqual([code]);
   }
+});
+
+// The rendered SVG goes into innerHTML. That is safe only because Mermaid's
+// "strict" level sanitizes every label and the whole SVG (DOMPurify) and turns
+// off click handlers, and a diagram's own init directive can't change it
+// (securityLevel is one of Mermaid's secure keys). Mermaid's config is global
+// and the board converter initializes it too, so the level is set again before
+// every render. e2e/mermaid-workspace.spec.ts renders a hostile diagram.
+test("every render sets Mermaid's strict security level before Mermaid reads the source", async () => {
+  securityAtRender.length = 0;
+  for (const code of [
+    "flowchart LR\nA --> B",
+    '%%{init: {"securityLevel": "loose"}}%%\nflowchart LR\nA --> B',
+  ]) {
+    securityLevel = "loose";
+    await renderMermaidElement(code, { dark: false, id: "test", platform: "desktop" });
+  }
+  expect(securityAtRender).toEqual(["strict", "strict"]);
 });
