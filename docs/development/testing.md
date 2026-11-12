@@ -206,7 +206,7 @@ Timing measurements are descriptive, not wall-clock assertions in CI.
 
 `e2e/accessibility.spec.ts` and `e2e/web/rotli-web-accessibility.spec.ts` run
 whole-document axe scans with synthetic vaults. They cover the note shell,
-Main, system views, search, the item chooser, settings, all fourteen theme
+Main, system views, search, the item chooser, settings, all sixteen theme
 environments, the development Graph, the Canvas creation refusal, and Web's
 live Excalidraw board. Moderate, serious and critical violations fail the lane; full
 JSON results are attached for review. Checks wait for fonts and finite
@@ -328,7 +328,7 @@ tests are additional verify phases.
 - `check:hex` bans raw color literals (hex and `rgb()`/`hsl()` functional forms)
   everywhere under `src/` outside the token-definition layer (`src/brand/`,
   `src/styles/themes.css`; `base.css` may hold functional state tokens).
-- `check:design-system` proves all fourteen theme environments define every required semantic token, that
+- `check:design-system` proves all sixteen theme environments define every required semantic token, that
   product CSS consumes semantic roles rather than literal or fixed-palette
   colors, that first-party CSS contains no glow/shadow/filter/backdrop effects,
   that class selectors stay kebab-case (BEM `--modifier` allowed), and that
@@ -394,7 +394,7 @@ option is gone, opens every note from the left menu, ticks a task and reads
 the state character through Aa → Raw markdown, proves Settings → Open welcome
 folder is idempotent, and asserts the checkbox/drag-handle overlap and the
 gutter geometry (every checkbox, marker, and control starts on the H1 edge,
-never in the margin) across fourteen environments and a 760px window.
+never in the margin) across sixteen environments and a 760px window.
 `e2e/named-views.spec.ts` deletes a non-active view from Main's picker.
 Screenshots are test artifacts. `bun scripts/capture-site.mjs http://localhost:1430`
 creates the reviewed site media separately at 3× density; the Welcome-folder

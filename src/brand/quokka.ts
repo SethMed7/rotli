@@ -368,6 +368,40 @@ export function quokkaHueFromLegacyColor(value: unknown): number {
   return Math.round((sector * 60 + 360) % 360);
 }
 
+/** The look a full-body quokka renders with. */
+export interface QuokkaLook {
+  style: QuokkaStyle;
+  accessory: QuokkaAccessory;
+  /** "navy" exists only under a theme lock: it is never stored or offered. */
+  line: QuokkaLineColor | "navy";
+  /** True when the applied theme, not the person, decided this look. */
+  locked: boolean;
+}
+
+/** Tesven keeps the original line quokka (the owner, 2026-11-12): no body
+ * fill, no accessory, white lines in Tesven Dark and the kit's ink navy in
+ * Tesven Light. Keyed on the APPLIED `data-theme`, so System mode follows the
+ * OS half, and it is the one place the rule lives. It never touches the
+ * stored look: leaving Tesven brings the person's own decoration back. */
+export function quokkaThemeLock(dataTheme: string | undefined): QuokkaLook | null {
+  if (!dataTheme?.startsWith("tesven-")) return null;
+  return {
+    style: "line",
+    accessory: "none",
+    line: dataTheme === "tesven-dark" ? "white" : "navy",
+    locked: true,
+  };
+}
+
+/** What a placement asked for, unless the applied theme locks the quokka.
+ * The lock wins over everything, explicit preview props included. */
+export function resolveQuokkaLook(
+  dataTheme: string | undefined,
+  wanted: Omit<QuokkaLook, "locked">,
+): QuokkaLook {
+  return quokkaThemeLock(dataTheme) ?? { ...wanted, locked: false };
+}
+
 export function quokkaFill(style: QuokkaStyle): string | null {
   if (style === "line") return null;
   if (style === "custom") return "var(--quokka-custom-color)";

@@ -59,6 +59,8 @@ const themeSelectors = {
   "blossom-dark": ':root[data-theme="blossom-dark"]',
   "midnight-light": ':root[data-theme="midnight-light"]',
   "midnight-dark": ':root[data-theme="midnight-dark"]',
+  "tesven-light": ':root[data-theme="tesven-light"]',
+  "tesven-dark": ':root[data-theme="tesven-dark"]',
 };
 
 for (const [theme, selector] of Object.entries(themeSelectors)) {
@@ -151,6 +153,8 @@ for (const label of [
   "Blossom Dark",
   "Moonlight",
   "Midnight",
+  "Tesven Light",
+  "Tesven Dark",
 ]) {
   if (!uiState.includes(`label: "${label}"`))
     violations.push(`themeChoices.ts: solid theme picker omits ${label}`);

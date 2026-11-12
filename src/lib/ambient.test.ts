@@ -96,6 +96,8 @@ describe("the ambient preference", () => {
     expect(trackForFamily("ocean")).toBe("tide");
     expect(trackForFamily("midnight")).toBe("lamplight");
     expect(trackForFamily("blossom")).toBe("linen");
+    // Tesven has no track of its own yet, so it plays the default, like Blossom
+    expect(trackForFamily("tesven")).toBe("linen");
     expect(ambientSrc("tide")).toBe("/ambient/tide.m4a");
     expect(ambientSrc("tide", "/app/")).toBe("/app/ambient/tide.m4a");
   });

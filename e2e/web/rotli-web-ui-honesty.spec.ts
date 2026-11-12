@@ -13,7 +13,7 @@ test("web Appearance explains the Dock-only icon in every environment and a narr
   await startWithVault(page);
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  await page.getByRole("button", { name: "All 16", exact: true }).click();
   const heading = page.getByRole("heading", { name: "App icon", exact: true });
   const notice = page.getByText("In the Mac app.", { exact: true });
   const themeButton = page.getByRole("button", { name: /^Theme —/ });

@@ -340,7 +340,7 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
 test("checkboxes and list markers align with the H1 in every environment and a narrow window", async ({
   page,
 }, testInfo) => {
-  // fourteen environment switches with a geometry probe and two screenshots
+  // sixteen environment switches with a geometry probe and two screenshots
   // each outgrow the default budget on the hosted runner
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -361,7 +361,7 @@ test("checkboxes and list markers align with the H1 in every environment and a n
       expect(row.left, `${label}: ${row.control}`).toBeLessThan(1);
     }
   };
-  for (let index = 0; index < 14; index++) {
+  for (let index = 0; index < 16; index++) {
     const label = themeNow(await theme.getAttribute("aria-label"));
     environments.add(label);
     await assertAligned(label);
@@ -372,7 +372,7 @@ test("checkboxes and list markers align with the H1 in every environment and a n
     }
     await theme.click();
   }
-  expect(environments.size).toBe(14);
+  expect(environments.size).toBe(16);
   await page.setViewportSize({ width: 760, height: 740 });
   await assertAligned("narrow");
   await expect(page.getByRole("checkbox", { name: "Not started", exact: true })).toBeInViewport();

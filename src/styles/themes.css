@@ -52,7 +52,8 @@
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-dark"],
 :root[data-theme="blossom-dark"],
-:root[data-theme="midnight-dark"] {
+:root[data-theme="midnight-dark"],
+:root[data-theme="tesven-dark"] {
   color-scheme: dark;
   --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
   --accent-custom-on: #161616;
@@ -92,6 +93,8 @@
   --swatch-blossom-dark: #1d1217;
   --swatch-midnight-light: #f0f2f5;
   --swatch-midnight-dark: #050607;
+  --swatch-tesven-light: #e8f3fc;
+  --swatch-tesven-dark: #0b1b2e;
   /* each environment's accent, for the lit theme orbs in setup (the site's
      orb picker, 2026-09-30) — Blossom included */
   --swatch-warm-light-accent: #c97e62;
@@ -108,12 +111,17 @@
   --swatch-blossom-dark-accent: #e89ab8;
   --swatch-midnight-light-accent: #364152;
   --swatch-midnight-dark-accent: #cfd5dc;
+  --swatch-tesven-light-accent: #1767a8;
+  --swatch-tesven-dark-accent: #6cc0f2;
 
   /* Character ink is deliberately independent from app text. "auto" follows
      the environment so the Line treatment never vanishes on a dark theme. */
   --quokka-line-auto: #111214;
   --quokka-line-black: #111214;
   --quokka-line-white: #ffffff;
+  /* Tesven's locked line quokka by day (brand/quokka.ts quokkaThemeLock):
+     the kit's ink navy. Never a stored choice. */
+  --quokka-line-navy: #0b2540;
   --quokka-custom-color: oklch(68% 0.12 225);
   --quokka-accessory-color: oklch(70% 0.15 38);
 }
@@ -245,6 +253,24 @@
   --preview-muted: #a4aab2;
   --preview-border: #20252b;
   --preview-selected: #191d22;
+}
+.preview-tesven-light {
+  --preview-ground: #e8f3fc;
+  --preview-sidebar: #d9ecfa;
+  --preview-surface: #ffffff;
+  --preview-text: #0b2540;
+  --preview-muted: #3b5874;
+  --preview-border: #b3d2ec;
+  --preview-selected: #c9e4f8;
+}
+.preview-tesven-dark {
+  --preview-ground: #0b1b2e;
+  --preview-sidebar: #0e2640;
+  --preview-surface: #0e3358;
+  --preview-text: #eaf4ff;
+  --preview-muted: #a8c4de;
+  --preview-border: #1e4a75;
+  --preview-selected: #123b63;
 }
 
 /* — MONO · paper (light) — */
@@ -525,6 +551,52 @@
   --scrim: rgba(0, 0, 0, 0.72);
 }
 
+/* — TESVEN · the Tesven kit, flat: mist and field blue by day ("Deep
+   Current"), night swim after dark. Crisper and more saturated than Ocean,
+   on cleaner surfaces. Kit hues kept; the app's surface steps are tuned
+   around the kit's Night Surface (#0e3358, here --surface-2) so every text
+   role clears 4.5:1 on ground, surface, surface-2, and tint. — */
+:root[data-theme="tesven-light"] {
+  --ground: #e8f3fc;
+  --surface: #ffffff;
+  --surface-2: #d9ecfa;
+  --tint: #c9e4f8;
+  --text: #0b2540;
+  --text-muted: #3b5874;
+  --border: #b3d2ec;
+  --accent: #1767a8;
+  --theme-accent-swatch: #1767a8;
+  --theme-on-accent: #ffffff;
+  --accent-text: #0f4c81;
+  --on-accent: #ffffff;
+  --success: #2d6e55;
+  --syntax-blue: #0f4c81;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(11, 37, 64, 0.07);
+  --act: rgba(11, 37, 64, 0.11);
+  --scrim: rgba(11, 27, 46, 0.44);
+}
+:root[data-theme="tesven-dark"] {
+  --ground: #0b1b2e;
+  --surface: #0e2640;
+  --surface-2: #0e3358;
+  --tint: #123b63;
+  --text: #eaf4ff;
+  --text-muted: #a8c4de;
+  --border: #1e4a75;
+  --accent: #6cc0f2;
+  --theme-accent-swatch: #6cc0f2;
+  --theme-on-accent: #0b1b2e;
+  --accent-text: #8acff5;
+  --on-accent: #0b1b2e;
+  --success: #8cc4a5;
+  --syntax-blue: #8acff5;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(234, 244, 255, 0.08);
+  --act: rgba(234, 244, 255, 0.13);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
 /* Non-warm themes use neutral icon ink; imagery remains warm by design. */
 :root[data-theme="paper"],
 :root[data-theme="charcoal"],
@@ -537,7 +609,9 @@
 :root[data-theme="blossom-light"],
 :root[data-theme="blossom-dark"],
 :root[data-theme="midnight-light"],
-:root[data-theme="midnight-dark"] {
+:root[data-theme="midnight-dark"],
+:root[data-theme="tesven-light"],
+:root[data-theme="tesven-dark"] {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
   /* warm-token leaks re-pointed: pass-result ink + Aa segment accent */
@@ -564,7 +638,9 @@
 :root[data-theme="blossom-light"],
 :root[data-theme="blossom-dark"],
 :root[data-theme="midnight-light"],
-:root[data-theme="midnight-dark"] {
+:root[data-theme="midnight-dark"],
+:root[data-theme="tesven-light"],
+:root[data-theme="tesven-dark"] {
   --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);
 }
 

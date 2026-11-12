@@ -104,7 +104,8 @@ by a Rust enum; every script evaluated in the page is a literal in that file:
 
 The six tracks of the studio's playlist (studio.rotli.co; composed in code, no
 samples, MIT), one per theme family: Linen (warm), Graphite (mono), Tide
-(ocean), Canopy (grove), Dusk (iris), Lamplight (midnight). They ship in
+(ocean), Canopy (grove), Dusk (iris), Lamplight (midnight). Blossom and
+Tesven have no track of their own and fall back to Linen. They ship in
 `public/ambient/` (about 7.5 MB) so they play offline and nothing is fetched.
 They are copied byte for byte from the studio's `sound/web/`; the studio
 records the placement in its `publish/placements.json`.

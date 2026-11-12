@@ -26,7 +26,7 @@ export function ThemeCycleSettings() {
         options={[
           ["family", "Light and dark"],
           ["picks", "My picks"],
-          ["all", "All 14"],
+          ["all", `All ${SOLID_THEMES.length}`],
         ]}
         onPick={(themeCycle) => setLook({ themeCycle })}
       />
@@ -53,7 +53,7 @@ export function ThemeCycleSettings() {
         {cycle === "family"
           ? "The sun in the title bar switches between this family’s light and dark."
           : cycle === "all"
-            ? "The sun in the title bar steps through all fourteen environments in order."
+            ? `The sun in the title bar steps through all ${SOLID_THEMES.length} environments in order.`
             : picks.length < 2
               ? "Pick two or more. Until then the sun switches between this family’s light and dark."
               : `The sun steps through your ${picks.length} picks in the order shown.`}

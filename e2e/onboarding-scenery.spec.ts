@@ -40,6 +40,8 @@ test("the chosen theme's scenery shows as it's picked and follows every screen a
   const themes = page.getByRole("radiogroup", { name: "Theme" });
   await themes.getByRole("radio", { name: /Ocean/ }).click();
   await expect(scenery(page)).toHaveAttribute("data-scenery", "ocean");
+  await themes.getByRole("radio", { name: /Tesven/ }).click();
+  await expect(scenery(page)).toHaveAttribute("data-scenery", "tesven");
   await themes.getByRole("radio", { name: /Midnight/ }).click();
   await expect(scenery(page)).toHaveAttribute("data-scenery", "midnight");
   await page.getByRole("button", { name: "Choose where notes live" }).click();
