@@ -1,4 +1,19 @@
 {
+  "1.9.3": [
+    {
+      "title": "Tesven, an eighth theme",
+      "body": "Mist and field blue by day, Night Swim after dark: a crisper, bluer family than Ocean, with its own hexagon scenery. Pick it in Settings → Appearance."
+    },
+    {
+      "title": "The original quokka, in Tesven",
+      "body": "In Tesven your chat buddy is always the plain line drawing, navy by day and white at night. Switch to any other theme and your own look comes back."
+    },
+    {
+      "title": "Rotli, with a capital R",
+      "body": "The Dock, the app menu and the window list now say Rotli.",
+      "platform": "mac"
+    }
+  ],
   "1.9.2": [
     {
       "title": "Your last words are saved",

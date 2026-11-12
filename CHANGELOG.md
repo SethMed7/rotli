@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.3] - 2026-11-12
+
 ### Added
 
 - **Tesven, an eighth theme family.** Tesven Light ("Deep Current": mist,
