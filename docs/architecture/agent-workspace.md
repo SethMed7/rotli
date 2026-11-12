@@ -278,29 +278,40 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   it) and `.rotli/librarian/log.jsonl` (`{at, text, ids}`), opened through
   `containment::open_sidecar` like the proposals file. `librarian_index`
   takes `{entries: [{id, summary}], remove?: [id]}` and `librarian_log`
-  takes `{entry, ids?}`; every id must be a note the agent can read now or
-  the whole call is refused, and summaries and log text are one line that
-  passes `secret::blocked_for_remote`. `librarian_index_read {logLines?}`
+  takes `{entry, ids?}`; every id must be a note the agent can read now that
+  carries that id in its own frontmatter (a note known only by its path
+  can't be followed: another file put at the path would inherit the id), or
+  the whole call is refused. Summaries and log text are one line that passes
+  `secret::blocked_for_remote` and names no note the agent can't read by
+  title or alias (spaces collapsed, case aside). `remove` takes only an
+  entry the index holds, for a note the agent may still read. Rows parse
+  strictly; a row with an unknown field is skipped. `librarian_index_read {logLines?}`
   renders them: an index entry while its note is readable through
-  `read_for_ai`, a log line while every note it names is, each note under
+  `read_for_ai` and still carries its id, a log line while every note it
+  names is, either only while its text names no note the agent can't read,
+  each note under
   its live title (no title is stored), and stored text checked again on
   render so a hand-edited row shows nothing it couldn't have been written
   with. A note that turns secure drops out of the rendering; nothing is
   rewritten. Captures and proposals log themselves by id. `.rotli/` is
   outside the walk, so the sidecars are never listed, searched, placed in
-  Main, or read as notes by any lane. Residual: a log line that names a note
-  in plain words instead of by id stays shown (the `index-and-log` skill
-  says to pass ids). "Librarian index" and "Librarian log" notes an earlier
+  Main, or read as notes by any lane. Residual: text that refers to a note in
+  other words than its title or an alias stays shown (the `index-and-log`
+  skill says to pass ids and never write titles). "Librarian index" and "Librarian log" notes an earlier
   development build wrote stay in the vault as ordinary notes; the route no
   longer reads or writes them, and the `librarian_page` key they carry is
   an ordinary key now.
-- **Keys only Rust writes are read in Rust's spelling only.** `created_by`,
-  `ai_edit` and `local_ai_allowed` are read through `frontmatter_keys.rs`
-  `canonical_field` (`key: value` at the start of a line), in Rust and in
-  `aiEditPolicy.ts`; the raw metadata editor keeps a typed indented or
-  quoted spelling as the person wrote it, and no reader takes it for Rotli's
-  stamp. A source test fails on a new Rust reader that doesn't use the
-  shared parser. Rust's note selectors compare titles and aliases through
+- **Keys only Rust writes fail closed both ways.** `created_by`, `ai_edit`
+  and `local_ai_allowed` are decided by `frontmatter_keys.rs` `owned_key`
+  (TypeScript: `frontmatterKeys.ts` `ownedKey`, used by `aiEditPolicy.ts` and
+  the web vault's reader): a line in any spelling (indented, quoted, a list
+  item, `? key`) whose value isn't a grant denies or restricts; only the
+  spelling Rust writes (`key: value` at the start of a line) grants; a
+  denial wins. Values trim with JavaScript's set on both sides. The raw
+  metadata editor keeps a typed line as the person wrote it, and the
+  person's setters clear every spelling of the key they set. Parity:
+  `aiBodyEditCases`, `localAiAllowedCases`. A source test fails on a new
+  Rust reader that doesn't use the shared module. Rust's note selectors compare titles and aliases through
   `corpus_links.rs` `link_key`, which trims JavaScript's whitespace set
   (U+FEFF included) and is parity-pinned to `wikilink.ts` `linkKey`.
 - **Proposals:** `librarian_file` and `librarian_link` append to

@@ -155,3 +155,91 @@ fn an_index_note_from_an_earlier_build_is_left_alone() {
     assert_eq!(fs::read_to_string(&path).unwrap(), before, "the old page is an ordinary note now");
     assert!(body_of(&mut ws, &old.id).contains("older words"));
 }
+
+/// Codex review of 7f542f5b (P1): a note with no Rotli id is known by its
+/// path, and a different file put at that path inherits the id, so an entry
+/// could follow the path to another note. Only a note carrying its own id in
+/// its frontmatter can be indexed or logged, and a row naming any other id
+/// never renders.
+#[test]
+fn only_a_note_with_its_own_id_can_be_indexed() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let intake = temp.path().join(ws.store.layout().intake_dir());
+    fs::write(intake.join("harbor-record.md"), "# Harbor plan\n\nMooring work\n").unwrap();
+    let pathed = ws.store.list().unwrap().notes.into_iter().find(|meta| meta.title == "Harbor plan").unwrap();
+    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": pathed.id, "summary": "moorings"}]}))).contains("Rotli id"));
+    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "x", "ids": [pathed.id]}))).contains("Rotli id"));
+    // a row naming a path id (forged, or written before this check) never renders
+    fs::create_dir_all(temp.path().join(".rotli/librarian")).unwrap();
+    fs::write(temp.path().join(".rotli/librarian/index.jsonl"), format!("{}\n", json!({"id": pathed.id, "summary": "moorings"}))).unwrap();
+    assert_eq!(pages(&temp)["index"], json!([]));
+}
+
+/// Codex review of 7f542f5b (P1): a summary or log line that names another
+/// note in plain words keeps that name public after the note turns secure.
+/// Any entry whose text contains the title or an alias of a note the agent
+/// can't read is hidden, and can't be written.
+#[test]
+fn an_entry_naming_a_note_that_is_now_secure_is_hidden() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    let cobalt = ws.create_note("Cobalt acquisition", "terms", MAIN_ROOT).unwrap();
+    ok(mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "See Cobalt acquisition"}]})));
+    ok(mcp(&temp, LOG, json!({"entry": "Compared with the COBALT  acquisition", "ids": [dock.id]})));
+    ok(mcp(&temp, LOG, json!({"entry": "Tidied intake", "ids": [dock.id]})));
+    make_secure(&mut ws, &cobalt.id);
+    let shown = pages(&temp);
+    assert_eq!(shown["index"], json!([]), "{shown}");
+    let log: Vec<&str> = shown["log"].as_array().unwrap().iter().map(|line| line["text"].as_str().unwrap()).collect();
+    assert_eq!(log, ["Tidied intake"], "{shown}");
+    assert!(!shown.to_string().to_lowercase().contains("cobalt"), "{shown}");
+    let why = refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Cobalt acquisition follow-up"}]})));
+    assert!(why.contains("by id"), "{why}");
+    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "about cobalt acquisition"}))).contains("by id"));
+}
+
+/// Codex review of 7f542f5b: a sidecar row with a field Rotli never writes
+/// is not one of Rotli's rows, and is skipped.
+#[test]
+fn a_sidecar_row_with_an_unknown_field_is_skipped() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    fs::create_dir_all(temp.path().join(".rotli/librarian")).unwrap();
+    fs::write(temp.path().join(".rotli/librarian/index.jsonl"), format!("{}\n", json!({"id": dock.id, "summary": "fine", "title": "Planted title"}))).unwrap();
+    fs::write(temp.path().join(".rotli/librarian/log.jsonl"), format!("{}\n", json!({"at": 0, "text": "fine", "ids": [dock.id], "notes": [{"title": "Planted"}]}))).unwrap();
+    let shown = pages(&temp);
+    assert_eq!((shown["index"].clone(), shown["log"].clone()), (json!([]), json!([])), "{shown}");
+}
+
+/// Codex review of 7f542f5b: `remove` names an entry already in the index
+/// and a note the agent may still read; it never writes a row for a secure or
+/// a missing note.
+#[test]
+fn remove_takes_only_an_entry_the_index_already_shows() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    let pier = ws.create_note("Pier notes", "more", MAIN_ROOT).unwrap();
+    let secure = ws.store.create_as("Secure notes", "# Bank login\n\nmarigold", true, None).unwrap();
+    ok(mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "dock"}, {"id": pier.id, "summary": "pier"}]})));
+    let rows = || sidecar(&temp, "index.jsonl").lines().count();
+    for id in [secure.id.clone(), "01NOSUCHNOTE".to_string()] {
+        assert!(mcp(&temp, INDEX, json!({"entries": [], "remove": [id]}))["isError"] == true);
+    }
+    make_secure(&mut ws, &pier.id);
+    assert!(mcp(&temp, INDEX, json!({"entries": [], "remove": [pier.id]}))["isError"] == true, "an entry whose note turned secure");
+    assert_eq!(rows(), 2, "no refused removal wrote a row");
+    ok(mcp(&temp, INDEX, json!({"entries": [], "remove": [dock.id]})));
+    assert_eq!(rows(), 3);
+}

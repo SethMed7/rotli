@@ -488,9 +488,78 @@
         "librarian"
       ]
     },
+    "localAiAllowedCases": {
+      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_keys.rs local_ai_allowed (via owned_key) ↔ src/lib/frontmatterKeys.ts localAiAllowed (the web vault's reader): only Rust's spelling grants, any spelling that says anything but true denies, values trimmed with JavaScript's set",
+      "value": [
+        { "fields": [], "says": "unset" },
+        { "fields": ["local_ai_allowed: true"], "says": "grant" },
+        { "fields": ["local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["  local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "  local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["\"local_ai_allowed\": false"], "says": "deny" },
+        { "fields": ["- local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["  local_ai_allowed: true"], "says": "unset" },
+        { "fields": ["local_ai_allowed: yes"], "says": "deny" },
+        { "fields": ["local_ai_allowed: \u0085true"], "says": "deny" },
+        { "fields": ["local_ai_allowed: \ufefftrue"], "says": "grant" }
+      ]
+    },
     "aiBodyEditCases": {
       "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
       "value": [
+        {
+          "fields": [
+            "created_by: agent",
+            "  ai_edit: false"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "\"ai_edit\": false"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "  ai_edit: no"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: \u0085true"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: \ufefftrue"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "  created_by: person"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: chat",
+            "- created_by: someone"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: \ufeffagent"
+          ],
+          "verdict": "allowed"
+        },
         {
           "fields": [
             "  created_by: agent"

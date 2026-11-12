@@ -51,6 +51,7 @@ import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
 import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
+import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
@@ -277,6 +278,16 @@ describe("parity.json ↔ TS constants", () => {
   test("noteImageLink", () => {
     for (const { wire, folder, link } of entries.noteImageLink.value) {
       expect({ wire, folder, link: noteImageLink(wire, folder) }).toEqual({ wire, folder, link });
+    }
+  });
+
+  test("localAiAllowedCases", () => {
+    const says = (value: boolean | null) => (value === null ? "unset" : value ? "grant" : "deny");
+    for (const c of entries.localAiAllowedCases.value) {
+      expect({ fields: c.fields, says: says(localAiAllowedOverride(c.fields)) }).toEqual({
+        fields: c.fields,
+        says: c.says,
+      });
     }
   });
 

@@ -1423,9 +1423,10 @@ pub(crate) fn secure_context_field(line: &str) -> Option<bool> {
 
 /// Explicit permission for a loopback-local model to read a secure note.
 /// Absence and malformed values fail closed. Remote models ignore this flag.
-/// Read only in the spelling Rust writes (frontmatter_keys.rs).
+/// Any spelling counts here, so a setter clears them all; the permission is
+/// decided by `frontmatter_keys::local_ai_allowed` (deny in any spelling).
 pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
-    crate::frontmatter_keys::canonical_field(line).filter(|(k, _)| *k == "local_ai_allowed").map(|(_, v)| v == "true")
+    crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "local_ai_allowed").map(|(_, v)| v == "true")
 }
 
 /// Physical home to restore when secure protection is removed. This is a
@@ -3766,10 +3767,7 @@ impl CorpusStore {
     /// the note's explicit `local_ai_allowed` bit wins, else the vault knob.
     /// Never consulted for a remote model — remote is refused unconditionally.
     fn secure_readable_locally(&self, fm: &Frontmatter) -> bool {
-        match fm.foreign.iter().find_map(|l| local_ai_allowed_field(l)) {
-            Some(explicit) => explicit,
-            None => self.secure_local_ai(),
-        }
+        crate::frontmatter_keys::local_ai_allowed(&fm.foreign).unwrap_or_else(|| self.secure_local_ai())
     }
 
     /// The vault-wide default for secure ⇄ on-device visibility, read from the

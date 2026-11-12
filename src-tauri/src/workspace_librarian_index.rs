@@ -28,8 +28,10 @@ const LOG: &str = ".rotli/librarian/log.jsonl";
 pub(super) const LOG_LINES: usize = 50;
 
 /// One index line: a note's summary, or (`summary: None`) its removal. The
-/// last line for a note wins.
+/// last line for a note wins. A row with any other field is not one Rotli
+/// wrote and is skipped.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct IndexRow {
     id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -38,6 +40,7 @@ struct IndexRow {
 
 /// One log line: what happened, when, and the notes it concerns, by id.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct LogRow {
     at: i64,
     text: String,
@@ -45,13 +48,67 @@ struct LogRow {
     ids: Vec<String>,
 }
 
-/// The local id of a note an agent may read now, from the id it was given.
+/// Whether the note an agent may read now under `local` carries that id in
+/// its own frontmatter. A note without one is known by its path, and a
+/// different file put at that path would inherit the id, so an entry could
+/// follow the path to another note (Codex review of 7f542f5b); only an id the
+/// note carries itself is followed.
+fn owns_its_id(ws: &mut Workspace, local: &str) -> Result<(), String> {
+    let text = ws.store.read_for_ai(local, false).map_err(|_| "not a note you can read".to_string())?;
+    match crate::corpus::parse_document(&text).0.and_then(|fm| fm.id) {
+        Some(own) if own == local => Ok(()),
+        _ => Err("a note without a Rotli id of its own (known only by its path), so the index can't follow it".into()),
+    }
+}
+
+/// The local id of a note an agent may read now, carrying its own id.
 fn readable(ws: &mut Workspace, id: &str) -> Result<String, String> {
     let local = ws.local_id(id)?;
-    match ws.store.read_for_ai(&local, false) {
-        Ok(_) => Ok(local),
-        Err(_) => Err(format!("{id} is not a note you can read")),
+    owns_its_id(ws, &local).map_err(|why| format!("{id} is {why}"))?;
+    Ok(local)
+}
+
+/// Text compared for names: spaces collapsed, JavaScript's trim set, lower
+/// case.
+fn normal(text: &str) -> String {
+    text.split(crate::frontmatter_keys::is_js_space).filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ").to_lowercase()
+}
+
+/// The names (titles and aliases, normalised) of every note, to check text
+/// against. Built from the walk's metadata; a note is read through the gate
+/// only when its name occurs in the text being checked.
+fn note_names(ws: &mut Workspace) -> Result<Vec<(String, String)>, String> {
+    let mut names = Vec::new();
+    for meta in ws.store.list()?.notes {
+        for name in std::iter::once(&meta.title).chain(meta.aliases.iter()) {
+            let name = normal(name);
+            if !name.is_empty() {
+                names.push((name, meta.id.clone()));
+            }
+        }
     }
+    Ok(names)
+}
+
+/// Whether `text` names, by title or alias, a note the agent may not read.
+/// Fails closed: any match to an unreadable note hides the text, however
+/// short the name (Codex review of 7f542f5b: a summary naming a note that
+/// turned secure kept its name public).
+fn names_a_hidden_note(ws: &mut Workspace, names: &[(String, String)], hidden: &mut HashMap<String, bool>, text: &str) -> bool {
+    let text = normal(text);
+    names.iter().filter(|(name, _)| text.contains(name.as_str())).any(|(_, id)| {
+        *hidden.entry(id.clone()).or_insert_with(|| ws.store.read_for_ai(id, false).is_err())
+    })
+}
+
+/// The text a summary or log line may carry: one line, nothing secret-shaped,
+/// and no title or alias of a note the agent can't read.
+fn checked_text(ws: &mut Workspace, names: &[(String, String)], text: &str, what: &str) -> Result<String, String> {
+    let text = one_line(text, MAX_REASON, what)?;
+    if names_a_hidden_note(ws, names, &mut HashMap::new(), &text) {
+        return Err(format!("{what} can't be kept as written; name notes by id, not in the text"));
+    }
+    Ok(text)
 }
 
 fn append(root: &Path, file: &str, row: &impl Serialize) -> Result<(), String> {
@@ -71,18 +128,37 @@ fn rows<T: for<'de> Deserialize<'de>>(root: &Path, file: &str) -> Vec<T> {
     text.lines().filter_map(|line| serde_json::from_str(line).ok()).collect()
 }
 
+/// The index as it stands: each note's latest summary, `None` once removed.
+fn summaries(root: &Path) -> Vec<(String, Option<String>)> {
+    let mut out: Vec<(String, Option<String>)> = Vec::new();
+    for row in rows::<IndexRow>(root, INDEX) {
+        out.retain(|(id, _)| *id != row.id);
+        out.push((row.id, row.summary));
+    }
+    out
+}
+
 /// `librarian_index {entries, remove}`: set or remove the summaries of notes,
 /// each named by id. Every id must be a note the agent can read now, and every
 /// summary one line with nothing secret-shaped; one bad entry refuses all.
 pub(super) fn write_index(ws: &mut Workspace, entries: &[Value], remove: &[Value]) -> Result<Value, String> {
+    let names = note_names(ws)?;
     let mut rows = Vec::new();
     for entry in entries {
         let id = readable(ws, entry["id"].as_str().unwrap_or_default())?;
-        let summary = one_line(entry["summary"].as_str().unwrap_or_default(), MAX_REASON, "summary")?;
+        let summary = checked_text(ws, &names, entry["summary"].as_str().unwrap_or_default(), "summary")?;
         rows.push(IndexRow { id, summary: Some(summary) });
     }
+    // a removal names an entry the index holds now, for a note the agent may
+    // still read: no row is ever written for a secure or a missing note
+    let indexed = summaries(&ws.root.path);
     for id in remove {
-        rows.push(IndexRow { id: ws.local_id(id.as_str().unwrap_or_default())?, summary: None });
+        let given = id.as_str().unwrap_or_default();
+        let local = readable(ws, given)?;
+        if !indexed.iter().any(|(entry, summary)| *entry == local && summary.is_some()) {
+            return Err(format!("{given} is not in the index"));
+        }
+        rows.push(IndexRow { id: local, summary: None });
     }
     for row in &rows {
         append(&ws.root.path, INDEX, row)?;
@@ -94,7 +170,8 @@ pub(super) fn write_index(ws: &mut Workspace, entries: &[Value], remove: &[Value
 /// concerns by id (never by name: a name can't be withdrawn when its note
 /// turns secure, an id is checked every time the log is read).
 pub(super) fn append_log(ws: &mut Workspace, entry: &str, ids: &[String]) -> Result<(), String> {
-    let text = one_line(entry, MAX_REASON, "entry")?;
+    let names = note_names(ws)?;
+    let text = checked_text(ws, &names, entry, "entry")?;
     let ids = ids.iter().map(|id| readable(ws, id)).collect::<Result<Vec<_>, _>>()?;
     append(&ws.root.path, LOG, &LogRow { at: now_millis(), text, ids })
 }
@@ -107,25 +184,25 @@ pub(super) fn append_log(ws: &mut Workspace, entry: &str, ids: &[String]) -> Res
 pub(super) fn render(ws: &mut Workspace, log_lines: usize) -> Result<Value, String> {
     let titles: HashMap<String, String> =
         ws.store.list()?.notes.into_iter().filter(|meta| meta.kind == NoteKind::Note).map(|meta| (meta.id, meta.title)).collect();
+    let names = note_names(ws)?;
+    let mut hidden: HashMap<String, bool> = HashMap::new();
     let mut shown: HashMap<String, Option<Value>> = HashMap::new();
     let mut note = |ws: &mut Workspace, local: &str| -> Option<Value> {
         shown
             .entry(local.to_string())
             .or_insert_with(|| {
                 let title = titles.get(local)?;
-                ws.store.read_for_ai(local, false).ok()?;
+                owns_its_id(ws, local).ok()?;
                 Some(json!({ "id": ws.wire(local), "title": title }))
             })
             .clone()
     };
-    let mut summaries: Vec<(String, Option<String>)> = Vec::new();
-    for row in rows::<IndexRow>(&ws.root.path, INDEX) {
-        summaries.retain(|(id, _)| *id != row.id);
-        summaries.push((row.id, row.summary));
-    }
     let mut index = Vec::new();
-    for (id, summary) in summaries {
+    for (id, summary) in summaries(&ws.root.path) {
         let Some(summary) = summary.and_then(|text| one_line(&text, MAX_REASON, "summary").ok()) else { continue };
+        if names_a_hidden_note(ws, &names, &mut hidden, &summary) {
+            continue;
+        }
         if let Some(mut entry) = note(ws, &id) {
             entry["summary"] = json!(summary);
             index.push(entry);
@@ -137,6 +214,9 @@ pub(super) fn render(ws: &mut Workspace, log_lines: usize) -> Result<Value, Stri
             break;
         }
         let Ok(text) = one_line(&row.text, MAX_REASON, "entry") else { continue };
+        if names_a_hidden_note(ws, &names, &mut hidden, &text) {
+            continue;
+        }
         let notes: Option<Vec<Value>> = row.ids.iter().map(|id| note(ws, id)).collect();
         if let Some(notes) = notes {
             log.push(json!({ "at": row.at, "text": text, "notes": notes }));

@@ -265,18 +265,30 @@ builds until that review has checked these fixes:
    now: an entry shows only while every note it names is readable through
    `read_for_ai`, under that note's live title, so a note that turns secure
    simply drops out and nothing is rewritten. Writes name notes by id and
-   refuse an id the agent can't read; summaries and log text pass
-   `secret::blocked_for_remote` on write and again on render, so a hand-edited
-   row shows nothing it couldn't have been written with. `.rotli/` is outside
+   refuse an id the agent can't read, or one the note doesn't carry in its
+   own frontmatter (a note known only by its path: another file put at that
+   path would inherit the id, Codex review of 7f542f5b); render follows the
+   same rule. Summaries and log text pass `secret::blocked_for_remote` on
+   write and again on render, and an entry whose text contains the title or
+   an alias of a note the agent can't read (spaces collapsed, case aside) is
+   refused on write and hidden on render, failing closed. Rows parse
+   strictly: a row with a field Rotli never writes is skipped. `remove` takes
+   only an entry the index holds, for a note the agent may still read. `.rotli/` is outside
    the walk, so neither file is ever listed, searched, or read as a note.
    Page discovery, `pages.jsonl`, the marker checks, withdrawal, the
    whole-vault frontmatter scan, and the `librarian_page` key are gone. The
    raw metadata merger is dev's again (the stricter one deleted values that
-   merely contained a key's name); instead every reader of a key only Rust
-   writes (`created_by`, `ai_edit`, `local_ai_allowed`) takes only the
-   spelling Rust writes (`frontmatter_keys.rs` `canonical_field`, and the
-   TypeScript twin in `aiEditPolicy.ts`), so a typed `  created_by: agent`
-   grants nothing. Tests: `workspace_librarian_index_tests.rs`
+   merely contained a key's name). Every key only Rust writes (`created_by`,
+   `ai_edit`, `local_ai_allowed`) is read by one rule that fails closed both
+   ways (`frontmatter_keys.rs` `owned_key`, its TypeScript twin
+   `frontmatterKeys.ts` `ownedKey`, used by `aiEditPolicy.ts` and the web
+   vault's reader): a line in any spelling whose value isn't a grant denies
+   or restricts, only Rust's own spelling grants, and a denial wins. So a
+   typed `  created_by: agent` grants nothing, and a typed
+   `  ai_edit: false` or `  local_ai_allowed: false` still denies (Codex
+   review of 7f542f5b: reading only Rust's spelling had turned those
+   denials into grants). Values trim with JavaScript's set on both sides.
+   The person's setters clear every spelling of the key they set. Tests: `workspace_librarian_index_tests.rs`
    (`an_entry_for_a_note_that_turns_secure_drops_out_of_the_rendering`,
    `titles_come_from_the_live_note_and_are_never_stored`,
    `a_write_refuses_an_id_the_agent_cannot_read`,
@@ -284,11 +296,18 @@ builds until that review has checked these fixes:
    `nothing_under_rotli_librarian_is_searchable_or_listed`,
    `an_index_note_from_an_earlier_build_is_left_alone`), and in
    `frontmatter_keys.rs` `the_metadata_editor_never_drops_a_value_that_mentions_a_key`
-   (Codex's summary repro), `readers_of_rust_owned_keys_take_only_rusts_spelling`,
-   and the guard `the_keys_rust_owns_are_read_only_through_the_shared_parser`.
-   Limits, documented: a log line that names a note in plain words instead of
-   passing its id stays shown (the `index-and-log` skill says to pass ids and
-   never write titles). "Librarian index" and "Librarian log" notes an earlier
+   (Codex's summary repro), `a_denial_in_any_spelling_holds_and_only_rusts_spelling_grants`,
+   `setters_see_every_spelling_of_their_key`, and the guard
+   `the_keys_rust_owns_are_read_only_through_the_shared_parser`; from the
+   review of 7f542f5b, `only_a_note_with_its_own_id_can_be_indexed`,
+   `an_entry_naming_a_note_that_is_now_secure_is_hidden`,
+   `a_sidecar_row_with_an_unknown_field_is_skipped`,
+   `remove_takes_only_an_entry_the_index_already_shows`, and the parity
+   fixtures `aiBodyEditCases` and `localAiAllowedCases` (indented denials,
+   U+0085 and U+FEFF values). Limits, documented: text that refers to a note
+   in other words than its title or an alias (a nickname, a description)
+   can't be recognised and stays shown; a note known only by its path can't
+   be indexed or logged. "Librarian index" and "Librarian log" notes an earlier
    development build wrote stay in the vault as ordinary notes, listed,
    searched and readable by AI lanes like any public note
    (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); delete them

@@ -51,17 +51,12 @@ impl Creator {
     }
 }
 
-/// The value of a `created_by:` line, if this is one, in the one spelling
-/// Rust writes (frontmatter_keys.rs): an indented or quoted `created_by` is
-/// not the note's creator.
-pub(crate) fn created_by_field(line: &str) -> Option<&str> {
-    crate::frontmatter_keys::canonical_field(line).filter(|(key, _)| *key == "created_by").map(|(_, value)| value)
-}
-
 /// The value of an `ai_edit:` line, if this is one. Only a literal `true`
 /// grants; a malformed value refuses.
+/// Any spelling counts here, so the person's setter clears them all; the
+/// policy itself reads through `frontmatter_keys::owned_key`.
 pub(crate) fn ai_edit_field(line: &str) -> Option<bool> {
-    crate::frontmatter_keys::canonical_field(line).filter(|(k, _)| *k == "ai_edit").map(|(_, v)| v == "true")
+    crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "ai_edit").map(|(_, v)| v == "true")
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,16 +139,15 @@ pub(crate) fn body_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
     {
         return BodyEdit::Locked;
     }
-    match foreign.iter().find_map(|line| ai_edit_field(line.as_ref())) {
-        Some(true) => return BodyEdit::Allowed,
-        Some(false) => return BodyEdit::Revoked,
-        None => {}
+    // fail closed both ways (frontmatter_keys::owned_key): a denial in any
+    // spelling holds, and only Rust's own spelling grants
+    use crate::frontmatter_keys::{owned_key, Says};
+    match owned_key(foreign, "ai_edit", |value| value == "true") {
+        Says::Grant(_) => return BodyEdit::Allowed,
+        Says::Deny => return BodyEdit::Revoked,
+        Says::Unset => {}
     }
-    let ai_made = foreign
-        .iter()
-        .find_map(|line| created_by_field(line.as_ref()))
-        .is_some_and(|creator| AI_CREATORS.contains(&creator));
-    if ai_made {
+    if matches!(owned_key(foreign, "created_by", |value| AI_CREATORS.contains(&value)), Says::Grant(_)) {
         BodyEdit::Allowed
     } else {
         BodyEdit::PersonWritten
@@ -204,7 +198,8 @@ mod tests {
     fn creator_round_trips_its_line() {
         for creator in [Creator::Chat, Creator::Agent, Creator::Librarian] {
             let line = creator.line();
-            assert_eq!(created_by_field(&line).and_then(Creator::parse), Some(creator));
+            let read = crate::frontmatter_keys::owned_key(std::slice::from_ref(&line), "created_by", |value| Creator::parse(value).is_some());
+            assert_eq!(read, crate::frontmatter_keys::Says::Grant(creator.as_str()));
         }
     }
 

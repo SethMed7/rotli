@@ -141,7 +141,7 @@ fn is_file_target(inner: &str) -> bool {
 /// also strips U+FEFF and keeps U+0085, where Rust's `trim` does the reverse,
 /// so this trims JavaScript's set (third independent review of PR #295).
 pub(crate) fn link_key(value: &str) -> String {
-    value.trim_matches(|c: char| c == '\u{feff}' || (c.is_whitespace() && c != '\u{85}')).to_lowercase()
+    crate::frontmatter_keys::js_trim(value).to_lowercase()
 }
 
 pub(crate) fn body_link_targets(body: &str) -> Vec<String> {

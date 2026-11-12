@@ -35,3 +35,18 @@ fn wikilink_navigation_fixtures_agree() {
         assert_eq!(crate::corpus::links::link_key(label), case["key"].as_str().unwrap(), "link_key({label:?})");
     }
 }
+
+/// Who may read a secure note on device: the web vault's reader and Rust's
+/// decide the same way, failing closed both ways (Codex review of 7f542f5b).
+#[test]
+fn local_ai_allowed_cases_match_fixture() {
+    for case in entry("localAiAllowedCases").as_array().unwrap() {
+        let fields: Vec<String> = case["fields"].as_array().unwrap().iter().map(|f| f.as_str().unwrap().to_string()).collect();
+        let says = match crate::frontmatter_keys::local_ai_allowed(&fields) {
+            Some(true) => "grant",
+            Some(false) => "deny",
+            None => "unset",
+        };
+        assert_eq!(says, case["says"].as_str().unwrap(), "{case}");
+    }
+}

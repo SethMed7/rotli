@@ -28,14 +28,20 @@ builds.
   about is one the agent may read, under that note's current title, so a note
   you make secure simply disappears from them; nothing has to be cleaned up.
   The index and log never show up in search, in Main, or to any AI as notes.
+  An entry is also hidden when its text mentions a hidden note by title or
+  alias, and only notes that carry their own Rotli id can be listed, so an
+  entry can't follow a file path to a different note.
   "Librarian index" and "Librarian log" notes an earlier development build
   wrote stay in your vault as ordinary notes; delete them if you no longer
   want them, especially if they mention notes that are secure now.
-- **An indented copy of Rotli's own markers grants nothing.** Who made a note
-  (`created_by`) and the "Let AI edit" grant (`ai_edit`), and the on-device
-  permission (`local_ai_allowed`), are read only in the form Rotli writes
-  them. Typing an indented or quoted copy into a note's metadata no longer
-  makes the note count as AI-made or AI-editable.
+- **Rotli's own markers can only take permission away when typed by hand.**
+  Who made a note (`created_by`), the "Let AI edit" grant (`ai_edit`) and the
+  on-device permission (`local_ai_allowed`) grant only in the exact form
+  Rotli writes them. A copy typed into a note's metadata in another form
+  (indented, quoted, a list item) can still turn permission off, never on:
+  an indented `ai_edit: false` or `local_ai_allowed: false` keeps its no, on
+  the Mac and in Rotli Web alike. Turning the setting back on in Rotli clears
+  every copy.
 - **A copied vault starts with the Librarian off.** Turning the route on now
   takes `rotli librarian on` in the vault as well as the setting, and that
   consent belongs to the folder: a copy of the vault, wherever it is put,

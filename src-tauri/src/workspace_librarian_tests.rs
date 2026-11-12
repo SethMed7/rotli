@@ -1,7 +1,7 @@
 //! The Librarian route's guards: off by default, secure notes never shown,
-//! proposals instead of rewrites (and no tool that approves them), its own two
-//! pages the only ones it rewrites, and the person's apply running through the
-//! same write seams.
+//! proposals instead of rewrites (and no tool that approves them), no note it
+//! rewrites (its index and log live in Rotli's sidecars), and the person's
+//! apply running through the same write seams.
 
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
