@@ -58,13 +58,10 @@ import {
   type ChatModelInfo,
   type MemexValidateReport,
   type SystemProfile,
-  appVersion,
   chatModels,
-  checkForUpdate,
   cliDetect,
   corpusOverview,
   demoMode,
-  downloadAndInstallUpdate,
   isTauri,
   localModelInstall,
   localModelInstallCancel,
@@ -164,6 +161,7 @@ import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
+import { SettingsNavUpdates, useAppVersion } from "./settings/updatesNav";
 import { VaultPassSettings } from "./settings/vaultPass";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
@@ -387,107 +385,22 @@ function HotkeysPane() {
   );
 }
 
-// ——— Updates: the current version + an explicit manual check, plus the
-// one-click "Install & relaunch" when the signed feed offers a newer build.
-// Launching or merely showing Rotli never contacts the feed. ———
-
-type CheckState =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "current" }
-  | { kind: "available"; version: string | null }
-  | { kind: "installing"; pct: number }
-  | { kind: "error"; message: string };
-
-/** The installed bundle version (null outside the Mac app) — the one source
- * for Updates and About. */
-function useAppVersion(): string | null {
-  const [version, setVersion] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isTauri()) return;
-    let alive = true;
-    void appVersion()
-      .then((v) => {
-        if (alive && v) setVersion(v);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return version;
-}
+// ——— Updates: the version and the manual check / "Install & relaunch" sit at
+// the foot of the Settings menu (settings/updatesNav.tsx); General keeps the
+// automatic-check switch. Launching or merely showing Rotli never contacts the
+// feed unless that switch is on. ———
 
 function UpdatesSection() {
-  const updateAvailable = useUiStore((s) => s.updateAvailable);
-  const updateVersion = useUiStore((s) => s.updateVersion);
-  const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
-  const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
   const autoUpdateCheck = useUiStore((s) => s.autoUpdateCheck);
   const setAutoUpdateCheck = useUiStore((s) => s.setAutoUpdateCheck);
-  const version = useAppVersion() ?? "0.1.0";
-  // Preserve the result of a check (this button's, or the routine one's) while
-  // Settings is reopened.
-  const [state, setState] = useState<CheckState>(
-    updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
-  );
-
-  const check = () => {
-    setState({ kind: "checking" });
-    void checkForUpdate()
-      .then((status) => {
-        if (status.available) {
-          const v = status.version ?? null;
-          setUpdateAvailable(true);
-          setUpdateVersion(v);
-          setState({ kind: "available", version: v });
-        } else {
-          setUpdateAvailable(false);
-          setUpdateVersion(null);
-          setState({ kind: "current" });
-        }
-      })
-      .catch((err: unknown) => {
-        setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-      });
-  };
-
-  const install = () => {
-    setState({ kind: "installing", pct: 0 });
-    // resolves only if the relaunch doesn't happen (it normally does) — on any
-    // error surface it; the app stays on the current build
-    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch((err: unknown) => {
-      setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-    });
-  };
-
-  const installing = state.kind === "installing";
-
   return (
     <>
       <h4 className="sethead">Updates</h4>
-      <div className="setselect-row">
-        <span>
-          Rotli {version}
-          {state.kind === "current" && " — up to date"}
-          {state.kind === "available" && ` — update available${state.version ? ` (v${state.version})` : ""}`}
-        </span>
-        {state.kind === "available" || installing ? (
-          <button type="button" className="ghostbtn" onClick={install} disabled={installing}>
-            {installing ? `Updating… ${state.pct}%` : "Install & relaunch"}
-          </button>
-        ) : (
-          <button type="button" className="ghostbtn" onClick={check} disabled={state.kind === "checking"}>
-            {state.kind === "checking" ? "Checking…" : "Check for updates"}
-          </button>
-        )}
-      </div>
-      {state.kind === "error" && <p className="setnote err">Couldn’t check for updates: {state.message}</p>}
       <div className="swgroup">
         <Toggle
           on={autoUpdateCheck}
           title="Check for updates automatically"
-          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install."
+          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install at the foot of this menu."
           onChange={() => setAutoUpdateCheck(!autoUpdateCheck)}
         />
       </div>
@@ -3103,6 +3016,7 @@ export function SettingsSurface() {
             <span className="fname">{label}</span>
           </button>
         ))}
+        {PLATFORM === "desktop" && <SettingsNavUpdates />}
       </nav>
       <div className="set-stage">
         <SettingsScenery />
