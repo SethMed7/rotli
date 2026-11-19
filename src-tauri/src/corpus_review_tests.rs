@@ -420,18 +420,20 @@ fn every_note_lock_names_its_authority() {
     assert_eq!(seen.len(), SIDECAR_LOCKS.len(), "the scan found {seen:?}; update this guard");
 }
 
-/// Deferred finding #2's qualifier (docs/design/librarian-mcp-and-t3-chat.md):
-/// an index or log page the route wrote in a development build stays an
-/// ordinary note in any build. The gate turns the route off; it doesn't clean
-/// or hide the pages, so they are listed, searched, and readable by AI lanes
-/// like any other public note, including any line about a note made secure
-/// since.
+/// A "Librarian index" or "Librarian log" note an earlier development build
+/// of the route wrote into the vault stays an ordinary note: the route keeps
+/// its index and log in `.rotli/librarian/` now and never touches these
+/// (docs/design/librarian-mcp-and-t3-chat.md). They are listed, searched, and
+/// readable by AI lanes like any other public note.
 #[test]
 fn a_page_the_route_wrote_stays_an_ordinary_searchable_note() {
     let (_dir, mut store) = bare();
-    let page = store
-        .create_librarian_page("Inbox", "# Librarian index\n\n- [[Harbor plan]]: when the harbor opens\n", "index")
-        .unwrap();
+    let body = "# Librarian index\n\n- [[Harbor plan]]: when the harbor opens\n";
+    let page = store.create_as("Inbox", body, false, Some(crate::ai_edit_policy::Creator::Librarian)).unwrap();
+    let rel = store.resolve_note_rel(&page.id).unwrap();
+    let text = fs::read_to_string(store.abs(&rel)).unwrap();
+    fs::write(store.abs(&rel), text.replacen("created_by: librarian", "created_by: librarian\nlibrarian_page: index", 1)).unwrap();
+    store.suppress.bump();
     let listed = store.list().unwrap().notes;
     assert!(listed.iter().any(|m| m.id == page.id), "listed");
     let hits = store.search("harbor opens", 10, false).unwrap();

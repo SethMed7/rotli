@@ -134,6 +134,16 @@ fn is_file_target(inner: &str) -> bool {
         )
 }
 
+/// The case- and space-insensitive form a link and a note's names are
+/// compared in: wikilink.ts `linkKey`, `value.trim().toLocaleLowerCase()`.
+/// Rust's note selectors compare titles and aliases through it; parity.json
+/// `wikilinkNavigation` keeps it in step with the editor. JavaScript's `trim`
+/// also strips U+FEFF and keeps U+0085, where Rust's `trim` does the reverse,
+/// so this trims JavaScript's set (third independent review of PR #295).
+pub(crate) fn link_key(value: &str) -> String {
+    crate::frontmatter_keys::js_trim(value).to_lowercase()
+}
+
 pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     // the open fence: it closes only on the same character, at least as long

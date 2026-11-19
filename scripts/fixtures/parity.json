@@ -488,9 +488,91 @@
         "librarian"
       ]
     },
+    "localAiAllowedCases": {
+      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_keys.rs local_ai_allowed (via owned_key) ↔ src/lib/frontmatterKeys.ts localAiAllowed (the web vault's reader): only Rust's spelling grants, any spelling that says anything but true denies, values trimmed with JavaScript's set",
+      "value": [
+        { "fields": [], "says": "unset" },
+        { "fields": ["local_ai_allowed: true"], "says": "grant" },
+        { "fields": ["local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["  local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "  local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["\"local_ai_allowed\": false"], "says": "deny" },
+        { "fields": ["- local_ai_allowed: false"], "says": "deny" },
+        { "fields": ["  local_ai_allowed: true"], "says": "unset" },
+        { "fields": ["local_ai_allowed: yes"], "says": "deny" },
+        { "fields": ["local_ai_allowed: \u0085true"], "says": "deny" },
+        { "fields": ["local_ai_allowed: \ufefftrue"], "says": "grant" }
+      ]
+    },
     "aiBodyEditCases": {
       "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
       "value": [
+        {
+          "fields": [
+            "created_by: agent",
+            "  ai_edit: false"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "\"ai_edit\": false"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "  ai_edit: no"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: \u0085true"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: \ufefftrue"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "  created_by: person"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: chat",
+            "- created_by: someone"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: \ufeffagent"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "  created_by: agent"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "\"ai_edit\": true",
+            "  ai_edit: true"
+          ],
+          "verdict": "person-written"
+        },
         {
           "fields": [],
           "verdict": "person-written"
@@ -760,6 +842,20 @@
         { "wire": "Storage/café&co!*'.png", "folder": "Notes/Deep", "link": "../../Storage/caf%C3%A9%26co!*'.png" }
       ]
     },
+    "wikilinkNavigation": {
+      "sourceOfTruth": "behavioral: src/editor/wikilink.ts linkKey ↔ src-tauri/src/corpus_links.rs link_key (Rust note selectors compare titles and aliases exactly as the editor navigates: JavaScript's trim set, U+FEFF included and U+0085 kept, then lower-case)",
+      "value": {
+        "keys": [
+          { "label": " Dock project ", "key": "dock project" },
+          { "label": "\ufeffDock project\ufeff", "key": "dock project" },
+          { "label": "\u00a0\u3000Dock project\u2028", "key": "dock project" },
+          { "label": "\u0085Dock project", "key": "\u0085dock project" },
+          { "label": "ÉCOLE", "key": "école" },
+          { "label": "Harbor Plan", "key": "harbor plan" },
+          { "label": "opaque.md", "key": "opaque.md" }
+        ]
+      }
+    },
     "wikilinkTargets": {
       "sourceOfTruth": "behavioral: src-tauri/src/corpus_links.rs body_link_targets ↔ src/graph/linkTargets.ts bodyLinkTargets (independent implementations, fixture-aligned: the Graph view's edges)",
       "value": [
@@ -921,8 +1017,7 @@
         "local_ai_allowed",
         "view_tag",
         "created_by",
-        "ai_edit",
-        "librarian_page"
+        "ai_edit"
       ]
     },
     "managedFileRules": {

@@ -165,7 +165,9 @@ agents, locked notes refuse edits, and every update needs a fresh revision.
 The MCP server, `rotli agent …` commands, and remote agents are development
 builds only for now. So is the Librarian route (`rotli mcp --librarian`), a
 small tool set an agent host can use to keep one vault organised: it is off by
-default even there and isn't in the public app yet. The
+default even there and isn't in the public app yet. Its proposals wait for your
+approval, but `rotli librarian apply` is an ordinary command, so an agent with a
+shell could run it too; keep the shell off in vault threads. The
 [agent workspace contract](docs/architecture/agent-workspace.md) has the details.
 
 ## Build it

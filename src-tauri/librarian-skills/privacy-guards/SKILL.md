@@ -16,7 +16,8 @@ Rotli enforces these in code; follow them anyway so you never waste a call.
 3. **Only Rotli's write path.** Change the vault only through rotli-librarian
    tools. Your host may also give you file or shell tools; don't point them at
    the vault.
-4. **Proposals, not rewrites.** You may create new notes (captures) and
-   rewrite your own two pages (index, log). Anything that would move or change
-   a note the person wrote is a proposal they approve. If a call is refused,
+4. **Proposals, not rewrites.** You may create new notes (captures) and keep
+   your index and log, which live in Rotli, not in the vault. Name notes in
+   them by id, never by title. Anything that would move or change a note the
+   person wrote is a proposal they approve. If a call is refused,
    report the refusal in one sentence and move on; don't try another route.
