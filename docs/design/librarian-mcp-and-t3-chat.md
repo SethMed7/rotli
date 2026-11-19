@@ -39,7 +39,7 @@ history. Concretely, three things, and nothing that runs a model for chat:
    ownership, and journals. Unchanged:
    [`memex-data-contract.md`](../architecture/memex-data-contract.md).
 3. **The Librarian MCP.** An opt-in route (`rotli mcp --librarian`) any agent
-   host can switch on: T3 Code threads, Tesven's Roo, Claude Code, Codex. Nine
+   host can switch on: T3 Code threads, Tesven's Roo, Claude Code, Codex. Ten
    tools, five skills, four guards. It replaces the Librarian bar's and the
    organizer's own model calls as the way a vault "stays organized".
 
@@ -111,7 +111,7 @@ Owning code: `src-tauri/src/workspace_librarian.rs`. Skills:
 `src-tauri/librarian-skills/*/SKILL.md` (compiled in, served by
 `librarian_guide`). Contract: [`agent-workspace.md`](../architecture/agent-workspace.md#the-librarian-route).
 
-### Tools (nine)
+### Tools (ten)
 
 | Tool | Does | Writes? |
 |---|---|---|
@@ -121,8 +121,9 @@ Owning code: `src-tauri/src/workspace_librarian.rs`. Skills:
 | `librarian_capture {title, body, source?}` | Raw source in: a new note in intake, logged | creates |
 | `librarian_file {id, folder, reason}` | **Proposes** a move | proposal only |
 | `librarian_link {id, target, reason}` | **Proposes** one `[[wikilink]]` | proposal only |
-| `librarian_index {body}` | Rewrites the "Librarian index" page (its own) | its own page |
-| `librarian_log {entry}` | Appends a dated line to "Librarian log" (its own) | its own page |
+| `librarian_index {entries, remove?}` | Sets each note's one-line summary in the index, by note id | Rotli's sidecar |
+| `librarian_log {entry, ids?}` | Appends a line to the log, with the ids of the notes it concerns | Rotli's sidecar |
+| `librarian_index_read {logLines?}` | The index and newest log lines, rendered through the gate now | no |
 | `librarian_review` | Lists pending proposals so it never repeats one | no |
 
 There is deliberately **no apply tool**. A person applies or dismisses a
@@ -132,7 +133,9 @@ is not the same as "an agent cannot approve": `rotli librarian apply` is an
 ordinary command, so an agent with a shell, directly or through a
 pseudo-terminal, can run it. The person's approval holds only while the host
 denies vault threads the shell and raw file tools (protocol §3.2), which Rotli
-can't enforce for a host that ignores it.
+can't enforce for a host that ignores it. Rotli says so in `rotli librarian
+status`, the CLI help, and the setup docs (review finding 6, documented
+rather than closed until approval moves into the app).
 
 ### Skills (five)
 
@@ -146,18 +149,19 @@ use Claude Code's skill format, so they can also be copied into a vault's
 1. **Secure notes never leave the Mac.** Every read and search goes through
    the remote read gate (`read_for_ai`): secure flag, secure folders, keyword
    names, the secret detector. Proposals need a readable note, so a secure
-   note can't even be proposed. Reasons, sources and log lines pass
-   `secret::blocked_for_remote`.
+   note can't even be proposed. The index and log name notes by id and are
+   rendered through the same gate each time they are read. Reasons, sources,
+   summaries and log lines pass `secret::blocked_for_remote`.
 2. **No hand-written frontmatter.** Bodies starting with frontmatter are
    refused (`validate_editor_markdown`).
 3. **Writes only through Rotli's write path.** Creates use
-   `create_for_remote_agent`; page rewrites use
+   `create_for_remote_agent`; an applied link uses
    `write_for_remote_agent_if_revision` (revision-checked, journaled, locked
    and person-written refusals); applied moves use `move_for_remote_agent`.
    Keeping the agent's *own* file tools off the vault is host config; see the
    protocol, §3.
-4. **Proposals, not rewrites.** The Librarian creates notes and rewrites only
-   its two pages. Applying a link to a note the person wrote still needs their
+4. **Proposals, not rewrites.** The Librarian creates notes and keeps its index
+   and log outside the vault; it rewrites no note. Applying a link to a note the person wrote still needs their
    "Let AI edit the text" grant, so the old "the Librarian never rewrites"
    holds even after approval.
 
@@ -168,10 +172,12 @@ does the thinking; Rotli only holds the line.
 ### Works on any Obsidian-style vault
 
 The route needs only a registered Rotli root: a Rotli vault (`wiki/_inbox`
-intake) or any connected Markdown folder (`Inbox` intake). Index and log are
-ordinary notes titled "Librarian index" and "Librarian log". Proposals live in
-the vault's `.rotli/librarian/proposals.jsonl`, a deletable sidecar like the
-AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
+intake) or any connected Markdown folder (`Inbox` intake). The index, the log
+and the proposals live in the vault's `.rotli/librarian/` (`index.jsonl`,
+`log.jsonl`, `proposals.jsonl`), deletable sidecars like the AI edit journal,
+which the walk skips like the rest of `.rotli/`. "Librarian index" and
+"Librarian log" notes an earlier development build wrote stay in the vault as
+ordinary notes; the route no longer reads or writes them. Nothing depends on the memex's `STRUCTURE.md`.
 
 ### Built in this branch
 
@@ -190,15 +196,19 @@ AI edit journal. Nothing depends on the memex's `STRUCTURE.md`.
 - `rotli --version` (also `version`, `-V`) answers `{"version": …}` headlessly
   instead of launching the app, which hung for a host probing the binary.
 - The switch: `"librarianMcp": true` in the vault's `.rotli/settings.json`,
-  default off. Rust only reads it; the frontend already keeps unknown keys.
+  default off, plus `rotli librarian on` in that vault, which ties the
+  person's consent to the folder so a copy starts off (2026-11-12). Rust only
+  reads the settings file; the frontend already keeps unknown keys.
   **Not built yet:** the Settings → Librarian toggle that writes it.
-- `rotli librarian status|proposals|apply|dismiss`.
+- `rotli librarian status|on|off|proposals|apply|dismiss`.
 - Tests: `src-tauri/src/workspace_librarian_tests.rs` (off by default,
   tool set has no approve, capture, secure omission, file and link proposals
-  and their apply, person-written refusal, index and log; and from the
-  2026-11-08 review: vault binding, symlinked proposals refused, review
-  hides proposals on notes that turned secure, own pages by title and
-  stamp, concurrent captures, and one gated read).
+  and their apply, person-written refusal; and from the 2026-11-08 review:
+  vault binding, symlinked proposals refused, review hides proposals on
+  notes that turned secure, concurrent captures, and one gated read);
+  `workspace_librarian_index_tests.rs` (the index and log, rendered through
+  the gate); `workspace_librarian_review_tests.rs` and
+  `workspace_librarian_tool_limits_tests.rs` (the 2026-11-09 findings).
 
 ### Next slices (after approval)
 
@@ -239,54 +249,122 @@ docs/architecture/egress-threat-model.md, rows 16b–16f):
   takes its lock through `lock_note` with an `Authority`, checked inside the
   lock.
 
-Still open, reachable only through the route:
+Fixed on `fix/librarian-open-findings`, 2026-11-12, waiting for the
+independent review the owner's rule asks for. The route stays in development
+builds until that review has checked these fixes:
 
-1. **#2 The index and log keep what a note said before it turned secure.**
-   `librarian_index` and `librarian_log` store titles and summaries the agent
-   wrote. When a note later turns secure, those lines stay in two public
-   pages, and search returns them. The gate doesn't change that for pages
-   the route already wrote: a vault used with a development build keeps its
-   Librarian index and log as ordinary Markdown notes, which a public build
-   lists, searches, and lets AI lanes read like any public note
-   (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); the gate
-   turns the route off and cleans nothing. Delete those pages by hand if they
-   mention notes that are secure now. Fix: the route writes only note ids into
-   its pages and renders titles at read time through the gate, or rescans its
-   pages and drops lines about notes it may no longer read. Test: record a
-   note in both pages, mark it secure, and search the index and log for its
-   title and summary.
-2. **#3 Repeating a proposal returns one review hides.** Deduplication in
-   `propose` matches kind, note, folder, and target title, but not `targetId`
-   or current visibility, so a repeated `librarian_link` hands back an old
-   proposal (reason and target) that `librarian_review` would hide. Fix:
-   deduplicate on `targetId`, and return an existing proposal only when
-   `visible_pending` would show it. Test: link to A, make A secure, alias
-   public B with A's title, repeat the link.
-3. **#6 Consent follows a copied vault's settings.** Linked settings are now
-   covered: `enabled` reads `.rotli/settings.json` through the checked
-   reader (`fsutil::read_own_sidecar`: no symlink, no hard link), and a
-   settings file it can't read that way counts as off. Still open: a vault
-   folder copied by hand keeps the switch. Fix: tie the switch to the
-   vault's identity, or reset it when a new folder is registered. Test: a
-   hand-made copy of an enabled vault stays off.
-4. **#7 Apply trusts the proposals file.** `decide` applies a link whose
-   target has since turned secure, and builds `[[target]]` from the stored
-   title, so an edited line can insert any Markdown. Proposals keep no source
-   revision. Fix: re-resolve `targetId` through the gate, refuse a target
-   that is no longer an exact readable title, validate stored fields as
-   strictly as the tool arguments, and record and check the note's revision.
-   Test: a secure target, an injected target line, and a note edited since
-   the proposal; each refuses and stays pending.
-5. **#8 The advertised tool limits aren't enforced.** The schemas say
-   `maxLength` and `additionalProperties: false`, but `handle_mcp_with`
-   doesn't validate arguments, so a 100,001-character capture and unknown
-   arguments are accepted. Fix: validate every call against its tool's
-   schema (lengths, types, required, no extra keys) before it runs, for both
-   servers. Test: one over-length and one undeclared argument per tool.
-6. **Approval relies on the host.** See "Tools (nine)": an agent with a
-   shell can run `rotli librarian apply`. Before stable, either make the
-   person's apply something an agent process can't do alone (the Rotli
-   review list in Settings), or say so wherever the route is offered.
+1. **#2 The index and log kept what a note said before it turned secure.**
+   **Redesigned** (Seth, 2026-11-12) after three independent reviews of PR
+   #295 found that pages kept as vault notes, recognised by markers and
+   holding text about other notes, couldn't be made safe: each hardening
+   (withdrawing lines, recognising pages by Rust-written markers, a stricter
+   metadata merger) opened the next gap. The index and log are no longer
+   notes. Rotli keeps them in its own sidecars, `.rotli/librarian/index.jsonl`
+   (`{id, summary}`) and `.rotli/librarian/log.jsonl` (`{at, text, ids}`),
+   created and written only by the route. `librarian_index_read` renders them
+   now: an entry shows only while every note it names is readable through
+   `read_for_ai`, under that note's live title, so a note that turns secure
+   simply drops out and nothing is rewritten. Writes name notes by id and
+   refuse an id the agent can't read, or one the note doesn't carry in its
+   own frontmatter (a note known only by its path: another file put at that
+   path would inherit the id, Codex review of 7f542f5b); render follows the
+   same rule. Summaries and log text pass `secret::blocked_for_remote` on
+   write and again on render, and an entry whose text contains the title or
+   an alias of a note the agent can't read (spaces collapsed, case aside) is
+   refused on write and hidden on render, failing closed. Rows parse
+   strictly: a row with a field Rotli never writes is skipped. `remove` takes
+   only an entry the index holds, for a note the agent may still read. `.rotli/` is outside
+   the walk, so neither file is ever listed, searched, or read as a note.
+   Page discovery, `pages.jsonl`, the marker checks, withdrawal, the
+   whole-vault frontmatter scan, and the `librarian_page` key are gone. The
+   raw metadata merger is dev's again (the stricter one deleted values that
+   merely contained a key's name). Every key only Rust writes (`created_by`,
+   `ai_edit`, `local_ai_allowed`) is read by one rule that fails closed both
+   ways (`frontmatter_keys.rs` `owned_key`, its TypeScript twin
+   `frontmatterKeys.ts` `ownedKey`, used by `aiEditPolicy.ts` and the web
+   vault's reader): a line in any spelling whose value isn't a grant denies
+   or restricts, only Rust's own spelling grants, and a denial wins. So a
+   typed `  created_by: agent` grants nothing, and a typed
+   `  ai_edit: false` or `  local_ai_allowed: false` still denies (Codex
+   review of 7f542f5b: reading only Rust's spelling had turned those
+   denials into grants). Values trim with JavaScript's set on both sides.
+   The person's setters clear every spelling of the key they set. Tests: `workspace_librarian_index_tests.rs`
+   (`an_entry_for_a_note_that_turns_secure_drops_out_of_the_rendering`,
+   `titles_come_from_the_live_note_and_are_never_stored`,
+   `a_write_refuses_an_id_the_agent_cannot_read`,
+   `a_forged_sidecar_row_never_renders_a_secure_note_or_unchecked_text`,
+   `nothing_under_rotli_librarian_is_searchable_or_listed`,
+   `an_index_note_from_an_earlier_build_is_left_alone`), and in
+   `frontmatter_keys.rs` `the_metadata_editor_never_drops_a_value_that_mentions_a_key`
+   (Codex's summary repro), `a_denial_in_any_spelling_holds_and_only_rusts_spelling_grants`,
+   `setters_see_every_spelling_of_their_key`, and the guard
+   `the_keys_rust_owns_are_read_only_through_the_shared_parser`; from the
+   review of 7f542f5b, `only_a_note_with_its_own_id_can_be_indexed`,
+   `an_entry_naming_a_note_that_is_now_secure_is_hidden`,
+   `a_sidecar_row_with_an_unknown_field_is_skipped`,
+   `remove_takes_only_an_entry_the_index_already_shows`, and the parity
+   fixtures `aiBodyEditCases` and `localAiAllowedCases` (indented denials,
+   U+0085 and U+FEFF values). Limits, documented: text that refers to a note
+   in other words than its title or an alias (a nickname, a description)
+   can't be recognised and stays shown; a note known only by its path can't
+   be indexed or logged. "Librarian index" and "Librarian log" notes an earlier
+   development build wrote stay in the vault as ordinary notes, listed,
+   searched and readable by AI lanes like any public note
+   (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); delete them
+   by hand if they mention notes that are secure now.
+2. **#3 Repeating a proposal returned one review hides.** A repeat must match
+   kind, note, folder, `targetId`, the target's title, and the note's
+   revision, and is returned only when `librarian_review` would show it, so a
+   link to a page renamed since is a new proposal that can apply. A link
+   target must be the exact title of a page the agent can read. Tests:
+   `repeating_a_link_never_returns_a_proposal_review_hides`,
+   `a_pending_link_to_another_page_with_the_title_is_not_a_repeat`,
+   `a_link_to_a_renamed_target_is_a_new_proposal_that_applies`.
+3. **#6 Consent followed a copied vault's settings.** The switch is now
+   `"librarianMcp": true` *and* the person's `rotli librarian on`, recorded in
+   `.rotli/librarian-consent.jsonl` against the vault folder's identity
+   (device and inode). A copy made by hand, or dropped where the vault was,
+   is a different folder and starts off; moving the vault on the same disk
+   keeps it on. Test: `a_hand_made_copy_of_an_enabled_vault_stays_off`. A
+   system with no folder identity (Windows) reads as off.
+4. **#7 Apply trusted the proposals file.** A proposal records its note's
+   revision, and apply refuses once the note has changed. Every stored field
+   is checked as strictly as the tool arguments; the link target is resolved
+   again through the read gate and must still be the exact readable title it
+   was proposed as; the link is built from that title. The stored note title
+   must be the note's own title as read through the gate, so a row can't
+   name a decoy while it moves another note. A refused apply stays
+   pending, and a row that doesn't validate can still be dismissed. Rows from
+   before this change carry no revision and can only be dismissed. Tests:
+   `apply_refuses_a_link_whose_target_turned_secure`,
+   `apply_refuses_an_injected_proposal_line`,
+   `apply_refuses_a_note_edited_since_the_proposal`,
+   `apply_refuses_a_proposal_whose_note_title_was_tampered`.
+5. **#8 The advertised tool limits weren't enforced.** `handle_mcp_with`
+   checks every `tools/call` against the tool's own input schema before the
+   tool runs, for both servers (`mcp_arguments.rs`): types, required
+   arguments, no undeclared ones, string lengths, number bounds, enums, and
+   array sizes, nested ones included. An explicit `arguments: null` refuses
+   (only a missing `arguments` is `{}`), and an `integer` must be a whole JSON
+   number, so `1.0` refuses rather than slipping past the handlers, which
+   read whole numbers only. A test fails on any schema keyword the checker
+   doesn't enforce. Tests:
+   `every_tool_on_both_servers_refuses_an_undeclared_argument`,
+   `every_length_limit_on_both_servers_is_enforced`,
+   `an_over_length_capture_writes_nothing`,
+   `types_bounds_and_enums_are_the_schemas`,
+   `explicit_null_arguments_are_refused`,
+   `an_integer_argument_refuses_a_fractional_number`. Workspace tools whose schemas
+   advertise no length limit still have none beyond the 256 KB request cap.
+6. **Approval relies on the host: documented, not closed.** `rotli librarian
+   apply` is an ordinary command, and nothing a same-user process can do is
+   out of an agent's reach once it has a shell or a pseudo-terminal (a typed
+   confirmation, a TTY check, an environment flag). Rotli says so wherever
+   the route is offered: `rotli librarian status` (`approval`), the CLI help,
+   the server's instructions, the `file-and-link` skill, the protocol (§3.2),
+   and the agent workspace contract. Closing it needs approval inside the
+   Rotli app (the review list in Settings, next slice). Test:
+   `the_person_commands_say_what_approval_cannot_guarantee`.
 
 ## Your chats land in your vault
 
@@ -391,7 +469,7 @@ threads already distilled up to their latest turn.
   - Transcripts are Rotli's own append-only copies of T3 data.
   - Summaries are new notes.
   - Links and moves that touch a person's pages are proposals.
-  - The index and log are the Librarian's own pages.
+  - The index and log are the Librarian's own sidecars, outside the notes.
 - **Secure notes never go to a model.** The copy step uses no model; secure
   transcripts are refused at `librarian_read`.
 - **Writes only through Rotli.** The copy uses Rotli's write path; the

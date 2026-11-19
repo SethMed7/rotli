@@ -10,7 +10,6 @@ export const RAW_IMMUTABLE_KEYS = [
   "view_tag",
   "created_by",
   "ai_edit",
-  "librarian_page",
 ] as const;
 
 export function rawFrontmatterBlock(text: string): string {

@@ -8,6 +8,7 @@ import {
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
+import { frontmatterField } from "../lib/frontmatterKeys";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
@@ -30,7 +31,8 @@ const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
 const withField = (fm: NoteFrontmatter, key: string, value: string | null): NoteFrontmatter => ({
   ...fm,
   foreign: [
-    ...fm.foreign.filter((line) => line.split(":", 1)[0]?.trim() !== key),
+    // every spelling of the key goes, so a typed denial never outlives the person's setting
+    ...fm.foreign.filter((line) => frontmatterField(line)?.key.name !== key),
     ...(value === null ? [] : [`${key}: ${value}`]),
   ],
 });

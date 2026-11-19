@@ -25,6 +25,7 @@ import { namedStyle } from "../documents/codec/paragraphStyles";
 import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES, DOCX_EDITABLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { noteImageLink } from "../editor/imageSource";
+import { linkKey } from "../editor/wikilink";
 import { bodyLinkTargets, metadataLinkTargets } from "../graph/linkTargets";
 import { EMPTY_CANVAS_FILE } from "../jsonCanvas/model";
 import { AI_KEYS, noteSlugify, noteStem } from "../memex/contract";
@@ -50,6 +51,7 @@ import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
 import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
+import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
@@ -276,6 +278,22 @@ describe("parity.json ↔ TS constants", () => {
   test("noteImageLink", () => {
     for (const { wire, folder, link } of entries.noteImageLink.value) {
       expect({ wire, folder, link: noteImageLink(wire, folder) }).toEqual({ wire, folder, link });
+    }
+  });
+
+  test("localAiAllowedCases", () => {
+    const says = (value: boolean | null) => (value === null ? "unset" : value ? "grant" : "deny");
+    for (const c of entries.localAiAllowedCases.value) {
+      expect({ fields: c.fields, says: says(localAiAllowedOverride(c.fields)) }).toEqual({
+        fields: c.fields,
+        says: c.says,
+      });
+    }
+  });
+
+  test("wikilinkNavigation", () => {
+    for (const { label, key } of entries.wikilinkNavigation.value.keys) {
+      expect({ label, key: linkKey(label) }).toEqual({ label, key });
     }
   });
 

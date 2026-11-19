@@ -149,7 +149,9 @@ The route is `rotli mcp --librarian`. It runs in **development builds only**,
 like the full `rotli mcp` workspace server, until the review findings in
 [`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)
 are fixed and reviewed (2026-11-09). There it refuses every call until the
-vault opts in (`"librarianMcp": true` in `<vault>/.rotli/settings.json`). A public build of
+vault opts in: `"librarianMcp": true` in `<vault>/.rotli/settings.json`, and
+the person's `rotli librarian on` for that vault, which ties the consent to
+the vault folder so a copy of the vault starts off. A public build of
 Rotli, and any build older than the route, answers `rotli mcp --librarian`
 with "MCP and agent integrations are available only in development builds";
 the host app MUST show that plainly (the route needs a development build of
@@ -193,6 +195,7 @@ agent's own file tools off for this folder:
       "mcp__rotli-librarian__librarian_guide",
       "mcp__rotli-librarian__librarian_search",
       "mcp__rotli-librarian__librarian_read",
+      "mcp__rotli-librarian__librarian_index_read",
       "mcp__rotli-librarian__librarian_review"
     ]
   }
@@ -205,9 +208,13 @@ Why each part:
   `wiki/_secure/…` would send a secure note to a remote model, which the
   Librarian route exists to prevent. Read access goes through
   `librarian_read`, which refuses secure notes in Rust.
-- `Bash` is denied because a shell writes files. A host that needs a shell
-  in vault threads MUST use a `PreToolUse` hook that refuses any command
-  touching the vault, and SHOULD prefer not to.
+- `Bash` is denied because a shell writes files, and because a shell can run
+  `rotli librarian apply` and approve the agent's own proposals: Rotli can't
+  tell that command from the person's. The person's approval is only as
+  strong as this deny rule. A host that needs a shell in vault threads MUST
+  use a `PreToolUse` hook that refuses any command touching the vault or
+  running `rotli librarian`, MUST tell the person that approval then depends
+  on that hook, and SHOULD prefer not to.
 - Writing tools (`capture`, `file`, `link`, `index`, `log`) are left to the
   host's normal approval, so a person sees each one unless they choose
   otherwise.

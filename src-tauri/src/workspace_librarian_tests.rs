@@ -1,7 +1,7 @@
 //! The Librarian route's guards: off by default, secure notes never shown,
-//! proposals instead of rewrites (and no tool that approves them), its own two
-//! pages the only ones it rewrites, and the person's apply running through the
-//! same write seams.
+//! proposals instead of rewrites (and no tool that approves them), no note it
+//! rewrites (its index and log live in Rotli's sidecars), and the person's
+//! apply running through the same write seams.
 
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,7 +17,7 @@ use super::*;
 use crate::ai_edit_policy::Creator;
 
 /// The route's behaviour exists only in development builds.
-fn public_build() -> bool {
+pub(super) fn public_build() -> bool {
     !crate::feature_policy::agents_enabled()
 }
 
@@ -28,17 +28,18 @@ fn a_public_build_ignores_the_vault_switch() {
     assert_eq!(enabled(temp.path()), !public_build(), "the switch does nothing in a public build");
 }
 
-fn turn_on(temp: &TempDir) {
+pub(super) fn turn_on(temp: &TempDir) {
     fs::create_dir_all(temp.path().join(".rotli")).unwrap();
     fs::write(temp.path().join(".rotli/settings.json"), r#"{"theme":"grove","librarianMcp":true}"#).unwrap();
+    record_consent(temp.path(), true).unwrap();
 }
 
-fn target(id: &str, temp: &TempDir, is_default: bool) -> RootTarget {
+pub(super) fn target(id: &str, temp: &TempDir, is_default: bool) -> RootTarget {
     RootTarget { id: id.into(), label: id.into(), path: temp.path().to_path_buf(), read_only: false, is_default }
 }
 
 /// One call to a Librarian server bound to `bound` (as `serve` binds it at start).
-fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
+pub(super) fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
     let request = json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params });
     BOUND.with(|value| *value.borrow_mut() = bound);
     let response = handle_mcp_with(&request, &SERVER).unwrap();
@@ -46,29 +47,29 @@ fn call_bound(bound: Option<Bound>, method: &str, params: Value) -> Value {
     response["result"].clone()
 }
 
-fn request(temp: &TempDir, method: &str, params: Value) -> Value {
+pub(super) fn request(temp: &TempDir, method: &str, params: Value) -> Value {
     let target = target(DEFAULT_ROOT_ID, temp, true);
     let identity = crate::containment::folder_identity(&target.path);
     call_bound(Some(Bound { target, identity }), method, params)
 }
 
-fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
+pub(super) fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
     request(temp, "tools/call", json!({ "name": name, "arguments": arguments }))
 }
 
 /// The refusal a failed call carries, all its text parts joined.
-fn refusal(result: &Value) -> String {
+pub(super) fn refusal(result: &Value) -> String {
     assert!(result.get("isError").and_then(Value::as_bool).unwrap_or(false), "expected a refusal: {result}");
     let parts = result.get("content").and_then(Value::as_array).cloned().unwrap_or_default();
     parts.iter().filter_map(|part| part.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join(" ")
 }
 
-fn ok(result: Value) -> Value {
+pub(super) fn ok(result: Value) -> Value {
     assert_eq!(result["isError"], false, "{result}");
     result["structuredContent"].clone()
 }
 
-fn body_of(ws: &mut Workspace, id: &str) -> String {
+pub(super) fn body_of(ws: &mut Workspace, id: &str) -> String {
     let local = ws.local_id(id).unwrap();
     ws.read_note(&local).unwrap().note.body
 }
@@ -99,6 +100,8 @@ fn the_route_is_off_until_the_vault_turns_it_on() {
         fs::write(temp.path().join(".rotli/settings.json"), off).unwrap();
         assert!(!enabled(temp.path()), "{off}");
     }
+    fs::write(temp.path().join(".rotli/settings.json"), r#"{"librarianMcp":true}"#).unwrap();
+    assert!(!enabled(temp.path()), "the setting alone is not the person's consent for this folder");
     turn_on(&temp);
     assert!(enabled(temp.path()));
 }
@@ -108,7 +111,7 @@ fn the_tool_set_is_small_and_has_no_way_to_approve() {
     if public_build() { return; } // development-only; feature_policy tests the refusal
     let temp = TempDir::new().unwrap();
     let listed: Vec<String> = (SERVER.tools)().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
-    assert_eq!(listed, [GUIDE, SEARCH, READ, CAPTURE, FILE, LINK, INDEX, LOG, REVIEW]);
+    assert_eq!(listed, [GUIDE, SEARCH, READ, CAPTURE, FILE, LINK, INDEX, LOG, INDEX_READ, REVIEW]);
     assert!(!listed.iter().any(|name| name.contains("apply") || name.contains("approve")));
     let init = request(&temp, "initialize", json!({}));
     assert_eq!(init.pointer("/serverInfo/name").and_then(Value::as_str), Some(SERVER.name));
@@ -126,8 +129,9 @@ fn capture_files_a_raw_source_in_intake_and_logs_it() {
     let mut ws = test_workspace(&temp);
     let body = body_of(&mut ws, note["id"].as_str().unwrap());
     assert!(body.contains("Ana said the tiers are fine.") && body.ends_with("Source: conversation\n"), "{body}");
-    let log_id = ws.resolve_note_selector("Librarian log").unwrap();
-    assert!(body_of(&mut ws, &log_id).contains("capture · [[Pricing call]]"));
+    let pages = ok(mcp(&temp, INDEX_READ, json!({})));
+    assert_eq!(pages["log"][0]["text"], "Captured a new source");
+    assert_eq!(pages["log"][0]["notes"][0]["title"], "Pricing call", "the title is the live note's: {pages}");
 
     let fm = mcp(&temp, CAPTURE, json!({"title":"Sneaky","body":"---\nsecure: false\n---\nx"}));
     assert!(refusal(&fm).contains("frontmatter"), "{fm}");
@@ -209,26 +213,6 @@ fn a_link_on_a_persons_note_waits_for_their_grant() {
     assert!(pending(temp.path()).is_empty());
 }
 
-#[test]
-fn the_index_and_log_are_the_only_pages_it_rewrites() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    ok(mcp(&temp, INDEX, json!({"body":"## Projects\n- [[Launch plan]] — the plan."})));
-    ok(mcp(&temp, INDEX, json!({"body":"## People\n- [[Ana Ruiz]] — design."})));
-    let mut ws = test_workspace(&temp);
-    let index = ws.resolve_note_selector("Librarian index").unwrap();
-    assert_eq!(body_of(&mut ws, &index), "# Librarian index\n\n## People\n- [[Ana Ruiz]] — design.\n");
-
-    ok(mcp(&temp, LOG, json!({"entry":"Left recipes in intake"})));
-    ok(mcp(&temp, LOG, json!({"entry":"Second line"})));
-    let mut ws = test_workspace(&temp);
-    let log = ws.resolve_note_selector("Librarian log").unwrap();
-    let text = body_of(&mut ws, &log);
-    assert_eq!(text.matches("\n- ").count(), 2, "{text}");
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry":"two\nlines"}))).contains("one line"));
-}
-
 /// Found by a real Claude Code session (2026-11-08): MCP's `structuredContent`
 /// must be a JSON object, and Claude Code rejects a list result as malformed,
 /// so search and review failed for every compliant client. A list travels
@@ -260,7 +244,7 @@ fn related_lines_grow_without_touching_prose() {
 }
 
 /// The person makes a note secure after the agent has seen it.
-fn make_secure(ws: &mut Workspace, id: &str) {
+pub(super) fn make_secure(ws: &mut Workspace, id: &str) {
     let rel = ws.store.resolve_note_rel(id).unwrap();
     let path = ws.store.root().join(rel);
     let text = fs::read_to_string(&path).unwrap();
@@ -356,29 +340,6 @@ fn review_drops_proposals_whose_notes_turned_secure() {
     assert_eq!(ok(review.clone())["items"].as_array().unwrap().len(), 0, "{review}");
     assert!(!review.to_string().contains("Harbor") && !review.to_string().contains("Ana"), "{review}");
     assert_eq!(pending(temp.path()).len(), 2, "the person still sees both");
-}
-
-/// Audit 2026-11-08 (finding 6): the index and log are the Librarian's own
-/// pages by exact title and its stamp, never a note that merely shares the
-/// title or carries it as an alias.
-#[test]
-fn own_pages_are_matched_by_exact_title_and_the_librarians_stamp() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let mut ws = test_workspace(&temp);
-    let same_title = ws.create_note("Librarian index", "an agent's own list", MAIN_ROOT).unwrap();
-    let aliased = ws.create_note("Librarian log", "reading notes", MAIN_ROOT).unwrap();
-    ws.rename_note(&aliased.id, "Reading list", None).unwrap();
-
-    let index = ok(mcp(&temp, INDEX, json!({"body":"## Projects"})));
-    ok(mcp(&temp, LOG, json!({"entry":"Tidied intake"})));
-    assert_ne!(index["id"], json!(same_title.id));
-    assert!(body_of(&mut ws, &same_title.id).contains("an agent's own list"));
-    assert!(body_of(&mut ws, &aliased.id).contains("reading notes"));
-    assert!(!body_of(&mut ws, &aliased.id).contains("Tidied intake"));
-    let again = ok(mcp(&temp, INDEX, json!({"body":"## People"})));
-    assert_eq!(again["id"], index["id"], "the Librarian keeps rewriting the page it made");
 }
 
 /// Audit 2026-11-08 (finding 7): two captures that pick the same file name at
@@ -502,6 +463,7 @@ fn proposals_refuse_a_linked_rotli_folder() {
         folder: Some("projects".into()),
         target: None,
         target_id: None,
+        revision: None,
         reason: "r".into(),
         status: "pending".into(),
     };
@@ -521,6 +483,7 @@ fn a_vault_folder_replaced_after_binding_is_refused() {
     let make = |path: &std::path::Path| {
         fs::create_dir_all(path.join(".rotli")).unwrap();
         fs::write(path.join(".rotli/settings.json"), r#"{"librarianMcp":true}"#).unwrap();
+        record_consent(path, true).unwrap();
         let root = RootTarget { id: DEFAULT_ROOT_ID.into(), label: "v".into(), path: fs::canonicalize(path).unwrap(), read_only: false, is_default: true };
         Workspace::open_target(root.clone()).unwrap();
         root
@@ -534,30 +497,6 @@ fn a_vault_folder_replaced_after_binding_is_refused() {
     make(&path);
     let why = refusal(&call_bound(Some(bound), "tools/call", capture));
     assert!(why.contains("replaced"), "{why}");
-}
-
-/// Audit round 2 (finding 4): the People creator stamps a person's note
-/// `created_by: librarian` too, and a person can be called "Librarian index".
-/// The index and log are found by a page marker only this route writes.
-#[test]
-fn a_people_note_named_like_the_index_is_never_rewritten() {
-    if public_build() { return; } // development-only; feature_policy tests the refusal
-    let temp = TempDir::new().unwrap();
-    turn_on(&temp);
-    let mut ws = test_workspace(&temp);
-    let intake = ws.store.layout().intake_dir().to_string();
-    // what corpus_create does for src/services/librarianPeople.ts
-    let person = ws.store.create_as(&intake, "# Librarian index\n\nMet at the library.", false, Some(Creator::Librarian)).unwrap();
-    let index = ok(mcp(&temp, INDEX, json!({"body":"## Projects"})));
-    assert_ne!(index["id"], json!(person.id));
-    assert!(body_of(&mut ws, &person.id).contains("Met at the library."));
-    let again = ok(mcp(&temp, INDEX, json!({"body":"## People"})));
-    assert_eq!(again["id"], index["id"]);
-
-    // the marker is Rotli's: the raw metadata editor can neither add nor change it
-    let original = "---\nid: 01J\ncreated_by: librarian\n---\n\n# Librarian index\n";
-    let merged = crate::corpus::merge_raw_frontmatter(original, "id: 01J\ncreated_by: librarian\nlibrarian_page: index\n").unwrap();
-    assert!(!merged.contains("librarian_page"), "{merged}");
 }
 
 /// Audit round 2 (finding 5): a link proposal is checked against the exact
@@ -580,12 +519,7 @@ fn review_checks_the_exact_page_a_link_was_proposed_for() {
     assert_eq!(ok(mcp(&temp, REVIEW, json!({})))["items"].as_array().unwrap().len(), 2);
 
     make_secure(&mut ws, &ana.id);
-    // the person gives another public note Ana's title as an alias
-    let stand_in = ws.create_note("Ana R", "a different Ana", MAIN_ROOT).unwrap();
-    let rel = ws.store.resolve_note_rel(&stand_in.id).unwrap();
-    let path = ws.store.root().join(rel);
-    let text = fs::read_to_string(&path).unwrap();
-    fs::write(&path, text.replacen("aliases: []", r#"aliases: ["Ana Ruiz"]"#, 1)).unwrap();
+    super::review_tests::alias_ana_on_a_stand_in(&mut ws);
     assert!(ws.resolve_note_selector("Ana Ruiz").is_ok(), "the alias alone would resolve");
     let review = mcp(&temp, REVIEW, json!({}));
     assert_eq!(ok(review.clone())["items"].as_array().unwrap().len(), 0, "{review}");
