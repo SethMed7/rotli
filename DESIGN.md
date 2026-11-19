@@ -379,7 +379,9 @@ documents, both on Univer, are Beta.
 - Saved-chat headers use the available pane width while transcript and composer
   measures remain independently readable.
 - Long-chat prompt markers may be quiet lines, soft dots, a restrained quokka
-  paw trail, or little quokka ears. All are the same accessible navigator:
+  paw trail, or little quokka ears. Tesven offers a hexagon trail in place of
+  both quokka trails (keyed on the applied theme; the stored choice is never
+  rewritten, `state/chatNavigatorStyle.ts`). All are the same accessible navigator:
   each marker opens the compact prompt list and previews its matching row. The
   rail stays unboxed; accent and scale identify the active marker, while hover
   preview uses lower opacity only. The list stays beside the rail and inside

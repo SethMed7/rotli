@@ -85,3 +85,33 @@ test("Tesven locks the line quokka (navy by day, white by night) and leaving it 
   await expect(preview.locator(".quokka-accessory-layer")).toHaveCount(1);
   await expect(banner.locator(".quokka-accessory-layer")).toHaveCount(1);
 });
+
+test("Tesven trades the quokka navigator trails for hexagons and leaves the stored choice alone", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  const picker = page.getByRole("radiogroup", { name: "Conversation navigator" });
+  await expect(picker.getByRole("radio", { name: /Quokka trail/ })).toHaveAttribute("aria-checked", "true");
+  await expect(picker.getByRole("radio", { name: /Hex trail/ })).toHaveCount(0);
+
+  await page.locator(".famcard", { hasText: "Tesven" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "tesven-light");
+  await expect(picker.getByRole("radio")).toHaveText([/Quiet lines/, /Soft dots/, /Hex trail/]);
+  // the default pawprints show as hexagons here
+  await expect(picker.getByRole("radio", { name: /Hex trail/ })).toHaveAttribute("aria-checked", "true");
+  await expect(picker.locator(".navigator-sample.hexes i").first()).toHaveCSS(
+    "clip-path",
+    "polygon(25% 0px, 75% 0px, 100% 50%, 75% 100%, 25% 100%, 0px 50%)",
+  );
+  await picker.getByRole("radio", { name: /Soft dots/ }).click();
+  await expect(picker.getByRole("radio", { name: /Soft dots/ })).toHaveAttribute("aria-checked", "true");
+  await picker.getByRole("radio", { name: /Hex trail/ }).click();
+
+  // in any other theme the hexagons become the quokka trail again
+  await page.locator(".famcard", { hasText: "Ocean" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /^ocean-/);
+  await expect(picker.getByRole("radio", { name: /Hex trail/ })).toHaveCount(0);
+  await expect(picker.getByRole("radio", { name: /Quokka trail/ })).toHaveAttribute("aria-checked", "true");
+});
