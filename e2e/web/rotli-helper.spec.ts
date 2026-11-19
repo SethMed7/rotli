@@ -376,7 +376,7 @@ test("a sent image's tag names the file and shows it when the chat is opened aga
 
   // close the chat and open it again from the Chat list: the transcript is
   // read back from the vault, so the image is known only by its vault id
-  await page.getByRole("tab", { selected: true }).getByRole("button", { name: "Close tab" }).click();
+  await page.locator(".tab.active").getByRole("button", { name: "Close tab" }).click();
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   await page.locator(".sb-chatrow[data-chat-slug]").first().click();
   const chip = page.locator(".cmsg.you .cmsg-imgref").first();
@@ -451,7 +451,7 @@ test("the chat list holds still while a reply runs, lifts the answered chat, and
   await expect(page.locator(".sb-chatactivity")).toHaveCount(0);
 
   // close the chat while it answers; the reply lands unseen and lifts it
-  await page.getByRole("tab", { selected: true }).getByRole("button", { name: "Close tab" }).click();
+  await page.locator(".tab.active").getByRole("button", { name: "Close tab" }).click();
   await expect(page.locator(".chat-thread:visible .cmsg.you").getByText("Follow-up question")).toHaveCount(0);
   release();
   await expect(firstRow.getByRole("img", { name: "Unread reply" })).toBeVisible({ timeout: 15_000 });

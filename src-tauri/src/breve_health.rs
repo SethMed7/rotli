@@ -2,7 +2,6 @@
 //! scheduler from its durable ledger (`scheduler-state.json`) and its sanitized
 //! log tail, without either becoming a second store (audit 2026-09-02 §1.1).
 
-use std::fs;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
@@ -40,7 +39,8 @@ const BREVE_NOTIFICATION_TAIL_BYTES: u64 = 512 * 1024;
 pub(crate) const BREVE_NOTIFICATION_LIMIT: usize = 48;
 
 fn read_tail(path: &Path, max_bytes: u64) -> Option<String> {
-    let mut file = fs::File::open(path).ok()?;
+    // the scheduler log lives in the vault (.rotli/breve): the checked open
+    let mut file = crate::fsutil::open_own_file(path).ok()?;
     let len = file.metadata().ok()?.len();
     let start = len.saturating_sub(max_bytes);
     if start > 0 {

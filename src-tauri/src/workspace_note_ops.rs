@@ -140,7 +140,7 @@ impl Workspace {
             Some(row.note_id.as_str()) == ulid.as_deref() || row.note_id == local_id || row.path == rel
         };
         let mut latest: Vec<AiEditRow> = Vec::new();
-        for row in self.store.ai_journal_rows().into_iter().filter(mine) {
+        for row in self.store.ai_journal_rows()?.into_iter().filter(mine) {
             match latest.iter_mut().find(|seen| seen.id == row.id) {
                 Some(seen) => *seen = row,
                 None => latest.push(row),

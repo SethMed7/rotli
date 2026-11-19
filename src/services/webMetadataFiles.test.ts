@@ -19,6 +19,7 @@ import {
   corpusFrontmatter,
   corpusFileText,
   corpusRawFrontmatter,
+  corpusSetPinned,
   corpusWriteFileBytes,
   corpusWriteFrontmatterRaw,
   fileAssetUrl,
@@ -40,6 +41,16 @@ beforeEach(async () => {
   await dir.writeText("wiki/first-title.md", original);
   notes = new FolderNotesService(dir);
   configureWebVaultIo(dir, notes);
+});
+
+test("web pinning persists without changing the body, dates, or foreign metadata", async () => {
+  await corpusSetPinned("durable", true);
+  expect(await dir.readText("wiki/first-title.md")).toBe(
+    original.replace("custom: keep me", "custom: keep me\npinned: true"),
+  );
+  expect((await new FolderNotesService(dir).getNote("durable"))?.pinned).toBe(true);
+  await corpusSetPinned("durable", false);
+  expect(await dir.readText("wiki/first-title.md")).toBe(original);
 });
 
 test("web protection controls write durable metadata and secure home; AI excludes it", async () => {

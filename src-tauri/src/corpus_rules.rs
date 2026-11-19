@@ -6,19 +6,20 @@
 //! Declared as a CHILD of `corpus` (`#[path]` mod in corpus.rs) so it reuses
 //! the store's own gates and the secure flow (ignore before move).
 
-use std::fs;
 
 use super::{
     editor_body, parse_document, secure_field, title_of, CorpusState, CorpusStore, Layout,
 };
 
 impl CorpusStore {
-    /// The Librarian rules (librarian_rules.rs) from this vault's settings —
-    /// the defaults when the file is missing or unreadable.
-    pub(crate) fn librarian_rules(&self) -> crate::librarian_rules::LibrarianRules {
-        self.dot_read("settings")
-            .map(|settings| crate::librarian_rules::parse_rules(&settings))
-            .unwrap_or_default()
+    /// The Librarian rules (librarian_rules.rs) from this vault's settings:
+    /// the defaults when the file is missing; SETTINGS_UNREADABLE when it
+    /// can't be read or parsed (filing refuses; never empty rules).
+    pub(crate) fn librarian_rules(&self) -> Result<crate::librarian_rules::LibrarianRules, String> {
+        let settings = self
+            .dot_read("settings")
+            .map_err(|_| crate::librarian_rules::SETTINGS_UNREADABLE.to_string())?;
+        crate::librarian_rules::checked_rules(&settings)
     }
 
     /// Missing settings mean the documented empty keyword list. An unreadable
@@ -33,6 +34,16 @@ impl CorpusStore {
     pub(crate) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
         self.layout == Layout::Memex
             && self.secure_keywords_for_classification().is_ok_and(|keywords| {
+                crate::librarian_rules::secure_by_name(title, rel, &keywords)
+            })
+    }
+
+    /// Protection a read reports from the note's name. Settings that can't be
+    /// read can't prove a name public, so the answer is yes (sixth review of
+    /// pull request 267: a copy made from that read must not lose protection).
+    pub(crate) fn protected_by_name(&self, title: &str, rel: &str) -> bool {
+        self.layout == Layout::Memex
+            && self.secure_keywords_for_classification().map_or(true, |keywords| {
                 crate::librarian_rules::secure_by_name(title, rel, &keywords)
             })
     }
@@ -79,7 +90,7 @@ impl CorpusStore {
         rels.sort();
         let mut protected = 0;
         for rel in rels {
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else {
+            let Ok(text) = crate::fsutil::read_own_text(&self.abs(&rel)) else {
                 continue;
             };
             let (fm, raw) = parse_document(&text);

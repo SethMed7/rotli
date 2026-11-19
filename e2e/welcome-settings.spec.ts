@@ -4,12 +4,21 @@ import { gotoApp } from "./support";
 
 const ROW = /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/;
 
+test("desktop General keeps native update and demo controls", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Check for updates", exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByRole("button", { name: "Check for updates", exact: true })).toBeVisible();
+  await expect(page.getByRole("switch", { name: /^Check for updates automatically / })).toHaveCount(1);
+  await expect(page.getByRole("switch", { name: /^Demo mode / })).toHaveCount(1);
+});
+
 test("Settings → Open welcome folder seeds one Welcome folder in Main and opens the welcome note", async ({
   page,
 }) => {
   await gotoApp(page);
   const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
-  const rows = page.locator(".main-tree button[data-main-id][data-note-id]", { hasText: ROW });
+  const rows = page.locator(".main-tree [data-main-id][data-note-id]", { hasText: ROW });
   await expect(folder).toHaveCount(0);
 
   await page.getByRole("button", { name: "Settings", exact: true }).click();

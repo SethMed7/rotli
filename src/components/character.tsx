@@ -20,10 +20,12 @@ import {
   quokkaAccessoryPlacement,
   quokkaCustomColor,
   quokkaFill,
+  resolveQuokkaLook,
   type QuokkaAccessory,
   type QuokkaAccessoryPlacement,
   type QuokkaStyle,
 } from "../brand/quokka";
+import { useDataTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
 import type {
   AccessoryCharacterArt,
@@ -192,7 +194,8 @@ function poseAccessoryArt(set: AccessoryCharacterArtSet, pose: CharacterName): A
 }
 
 /** A full-body quokka illustration. The caller picks the pose; without an
- * explicit treatment it wears the person's chosen look (Settings → Appearance). */
+ * explicit treatment it wears the person's chosen look (Settings → Appearance).
+ * A theme lock (brand/quokka.ts quokkaThemeLock) overrides both. */
 export function Character({
   name,
   size = 120,
@@ -208,8 +211,15 @@ export function Character({
   const preferredAccessory = useUiStore((s) => s.quokkaAccessory);
   const accessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
   const quietLine = appearance === "quiet-line";
-  const resolvedTreatment = quietLine ? "line" : (treatment ?? preferredTreatment);
-  const resolvedAccessory = quietLine ? "none" : (accessory ?? (accessorized ? preferredAccessory : "none"));
+  const look = resolveQuokkaLook(useDataTheme(), {
+    style: quietLine ? "line" : (treatment ?? preferredTreatment),
+    accessory: quietLine ? "none" : (accessory ?? (accessorized ? preferredAccessory : "none")),
+    line: lineColor,
+  });
+  // a theme lock names its own ink, so it also outranks the quiet muted line
+  const quiet = quietLine && !look.locked;
+  const resolvedTreatment = look.style;
+  const resolvedAccessory = look.accessory;
   const resolvedName = name;
   const fill = quokkaFill(resolvedTreatment);
   const [art, setArt] = useState(artCache);
@@ -248,11 +258,11 @@ export function Character({
     // "auto" follows the environment only where there is no body fill to
     // guarantee contrast (the Line treatment); filled treatments keep their
     // designed dark ink on every theme.
-    ...(quietLine
+    ...(quiet
       ? {}
       : {
           "--quokka-ink":
-            lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
+            look.line === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${look.line})`,
         }),
     ...(fill ? { "--quokka-fill": fill } : {}),
     // Line art draws from `currentColor`, and placements (`.quokka`,
@@ -262,7 +272,8 @@ export function Character({
     // drawing light body lines under dark accessory ink (rest state,
     // 2026-09-01), and (b) an explicit Black/White line choice is honored in
     // every placement, canonical or layered — not only in the Settings preview.
-    ...((fill || lineColor !== "auto") && !quietLine ? { color: "var(--quokka-ink)" } : {}),
+    // A theme lock always names its ink, so it wins the same way.
+    ...((fill || look.line !== "auto") && !quiet ? { color: "var(--quokka-ink)" } : {}),
   } as CSSProperties;
   const accessoryColorLayer = accessoryArt && fill && (
     <span
@@ -287,7 +298,7 @@ export function Character({
 
   return (
     <span
-      className={["quokka", quietLine ? "quokka-quiet-line" : "", className ?? ""].filter(Boolean).join(" ")}
+      className={["quokka", quiet ? "quokka-quiet-line" : "", className ?? ""].filter(Boolean).join(" ")}
       style={style}
       data-pose={resolvedName}
       aria-hidden="true"

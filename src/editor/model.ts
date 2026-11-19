@@ -1,118 +1,78 @@
 // The shared document buffer — ONE buffer per noteId across all tabs/panes
 // (the r2 structural lock #4). The document is the note's markdown string,
-// split into lines. Edits mutate this map synchronously (typing never waits
+// split into lines. Edits mutate the buffer synchronously (typing never waits
 // on a store round-trip) and flow to NotesService.update on a debounce, so
 // updatedAt moves and the list/snippets refresh. Tabs hold only view state.
+//
+// The public API over two owners: buffers.ts (the buffers, and the one
+// function that replaces one or declares it saved) and saveQueue.ts (each
+// note's one-at-a-time save queue, recovery included).
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { onQuitFlush } from "../lib/quitFlush";
-import { applyNoteWrite } from "../services/hooks";
-import { markNoteDraftChanged, markNoteDraftSaved } from "../services/noteDrafts";
-import { notesService } from "../services/notes";
+import { onQuitCheck, onQuitFlush } from "../lib/quitFlush";
+import { markNoteDraftChanged } from "../services/noteDrafts";
+import { readAgain, startRead, takeRead } from "../services/noteReads";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
-import { threeWayMerge } from "./merge";
-import { dirtyNoteIds, documentSaveError, isDirty, setDirty, setSaveError } from "./saveStatus";
-import { MARK } from "./taskState";
+import {
+  adopt,
+  baselineOf,
+  bufferLines,
+  bufferText,
+  edit,
+  forget,
+  forgetPending,
+  hasBuffer,
+  isPendingDocument,
+  revisionOf,
+  seed,
+  subscribe,
+  viewers,
+} from "./buffers";
+import { clock } from "./saveClock";
+import { editGeneration } from "./saveGenerations";
+import {
+  flushSyncs,
+  forgetQueue,
+  queueBusy,
+  quitReasons,
+  reloadDocument,
+  reviveGoneNote,
+  scheduleSync,
+} from "./saveQueue";
+import { documentSaveError, isDirty, setSaveError } from "./saveStatus";
+import { draftsOf, setDocumentProtection, type UnsavedDraft } from "./unsavedDrafts";
 
+export { stampRead } from "../services/noteReads";
 export { documentSaveError, useDocumentDirty, useDocumentSaveError } from "./saveStatus";
-
-const SYNC_DEBOUNCE_MS = 400;
-// a failed write retries on its own — waiting for the next keystroke would
-// leave a note that's done being typed in unsaved forever
-const RETRY_DELAY_MS = 5000;
-
-const docs = new Map<string, string[]>();
-const revisions = new Map<string, string>();
-// The editor body that produced `revisions[noteId]`. Rotli-managed moves and
-// metadata writes change the complete-file revision without changing this
-// prose; keeping the body baseline lets us distinguish that safe case from a
-// genuine concurrent body edit.
-const persistedBodies = new Map<string, string>();
-// A Command-T note can be edited before its durable file exists. Pending
-// buffers are real shared editor documents, but they deliberately have no save
-// timer until creation hands them a stable note id + disk revision.
-const pendingDocuments = new Set<string>();
-const protections = new Map<string, { secure: boolean; locked: boolean }>();
-const subs = new Map<string, Set<() => void>>();
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-
-// The one write funnel syncNow uses — swappable so tests can simulate the disk
-// failing (the in-memory test service can't fail any other way).
-let writeNoteBody: (
-  noteId: string,
-  body: string,
-  expectedRevision: string,
-  expectedBody: string,
-) => Promise<Note | void> = (noteId, body, expectedRevision, expectedBody) =>
-  notesService.updateNote(noteId, body, expectedRevision, expectedBody);
-
-export function setWriteNoteBodyForTests(fn: typeof writeNoteBody | null): void {
-  writeNoteBody =
-    fn ??
-    ((noteId, body, expectedRevision, expectedBody) =>
-      notesService.updateNote(noteId, body, expectedRevision, expectedBody));
-}
-
-// ——— checkbox signature: the Tasks projection walks the corpus (corpus_tasks),
-// so a body sync invalidates it ONLY when the note's checkbox lines actually
-// changed — steady typing never pays that walk (perf audit 2026-07-30, #4/#5).
-const TASK_LINE = new RegExp(`^\\s*(?:[-*+]|\\d+\\.)\\s+\\[${MARK}\\](?=\\s)`);
-const taskSigs = new Map<string, string>();
-
-function taskSignature(lines: readonly string[]): string {
-  let sig = "";
-  for (const line of lines) if (TASK_LINE.test(line)) sig += `${line}\n`;
-  return sig;
-}
-
-/** A buffer with edits not yet on disk: its text and the baseline it was
- * typed against, so a page that unloads mid-save can finish it next boot. */
-export interface UnsavedDraft {
-  noteId: string;
-  body: string;
-  expectedRevision: string;
-  expectedBody: string;
-  protection?: { secure: boolean; locked: boolean };
-}
-
-export function setDocumentProtection(noteId: string, note: Pick<Note, "secure" | "locked">): void {
-  protections.set(noteId, { secure: note.secure === true, locked: note.locked === true });
-}
+export {
+  setCreateNoteForTests,
+  setReadNoteForTests,
+  setWriteLimitForTests,
+  setWriteNoteBodyForTests,
+} from "./saveLane";
+export { copiedAside, dismissCopiedAside, useCopiedAside } from "./copiedAside";
+export {
+  discardGoneNote,
+  flushNote,
+  flushSyncs,
+  noteName,
+  saveState,
+  STILL_SAVING,
+  useGoneNotes,
+} from "./saveQueue";
 
 /** Every buffer the dimmed save dot is showing, read synchronously (an
- * unloading page can't await). Pending Command-T buffers have no file yet. */
-export function unsavedDrafts(): UnsavedDraft[] {
-  const out: UnsavedDraft[] = [];
-  for (const noteId of dirtyNoteIds()) {
-    const lines = docs.get(noteId);
-    if (pendingDocuments.has(noteId)) {
-      const body = lines?.join("\n") ?? "";
-      if (body.trim())
-        out.push({
-          noteId,
-          body,
-          expectedRevision: "0",
-          expectedBody: "",
-          protection: { secure: false, locked: false },
-        });
-      continue;
-    }
-    const expectedRevision = revisions.get(noteId);
-    const expectedBody = persistedBodies.get(noteId);
-    if (lines && expectedRevision && expectedBody !== undefined) {
-      out.push({
-        noteId,
-        body: lines.join("\n"),
-        expectedRevision,
-        expectedBody,
-        ...(protections.has(noteId) ? { protection: protections.get(noteId)! } : {}),
-      });
-    }
-  }
-  return out;
-}
+ * unloading page can't await). Rotli Web writes these to its recovery journal
+ * on unload (webVaultOverlays.tsx); the Mac app has no such journal. */
+export const unsavedDrafts = (): UnsavedDraft[] =>
+  draftsOf((noteId) => ({
+    lines: bufferLines(noteId),
+    pending: isPendingDocument(noteId),
+    revision: revisionOf(noteId),
+    persisted: baselineOf(noteId),
+  }));
 
 /** Seed the buffer from the service body. No-op if the note is already open
  * somewhere — the live buffer is the truth, never the (possibly stale) query. */
@@ -123,13 +83,9 @@ export function ensureDocument(
   note?: Pick<Note, "secure" | "locked">,
 ): void {
   if (note) setDocumentProtection(noteId, note);
-  if (docs.has(noteId)) return;
-  const lines = body.split("\n");
-  docs.set(noteId, lines);
-  revisions.set(noteId, revision);
-  persistedBodies.set(noteId, body);
-  taskSigs.set(noteId, taskSignature(lines));
-  if (!subs.get(noteId)?.size) scheduleRelease(noteId); // a seed nobody opened
+  if (hasBuffer(noteId)) return;
+  seed(noteId, body.split("\n"), { body, revision });
+  if (!viewers(noteId)) scheduleRelease(noteId); // a seed nobody opened
 }
 
 /** Stable session id for the editable surface shown before Command-T's file
@@ -141,326 +97,101 @@ export function pendingNoteDocumentId(tabId: string): string {
 /** Seed the first-paint Command-T editor. No revision exists yet, so edits stay
  * in this shared buffer until `adoptPendingDocument` binds them to disk. */
 export function ensurePendingDocument(noteId: string, body = ""): void {
-  if (docs.has(noteId)) return;
-  const lines = body.split("\n");
-  docs.set(noteId, lines);
-  persistedBodies.set(noteId, body);
-  pendingDocuments.add(noteId);
-  taskSigs.set(noteId, taskSignature(lines));
+  seed(noteId, body.split("\n"));
 }
 
 /** Move an optimistic editor buffer onto the newly-created durable note before
  * the tab retargets. The CodeMirror remount therefore sees the exact live text,
  * and a typed draft starts its first ordinary revision-protected save. */
 export function adoptPendingDocument(pendingId: string, note: Note): boolean {
-  const lines = [...(docs.get(pendingId) ?? note.body.split("\n"))];
-  const body = lines.join("\n");
-  const changed = body !== note.body;
-
-  const pendingTimer = timers.get(pendingId);
-  if (pendingTimer !== undefined) clearTimeout(pendingTimer);
-  timers.delete(pendingId);
-  docs.delete(pendingId);
-  revisions.delete(pendingId);
-  persistedBodies.delete(pendingId);
-  pendingDocuments.delete(pendingId);
-  protections.delete(pendingId);
-  taskSigs.delete(pendingId);
-  setDirty(pendingId, false);
-  setSaveError(pendingId, null);
-
-  docs.set(note.id, lines);
+  const lines = [...(bufferLines(pendingId) ?? note.body.split("\n"))];
+  const changed = lines.join("\n") !== note.body;
+  forgetQueue(pendingId);
+  forget(pendingId, "moved");
+  forgetPending(note.id);
+  seed(note.id, note.body.split("\n"), { body: note.body, revision: note.revision });
   setDocumentProtection(note.id, note);
-  revisions.set(note.id, note.revision);
-  persistedBodies.set(note.id, note.body);
-  taskSigs.set(note.id, taskSignature(note.body.split("\n")));
   setSaveError(note.id, null);
   if (changed) {
     markNoteDraftChanged(note.id);
+    edit(note.id, lines);
     scheduleSync(note.id);
   } else {
-    setDirty(note.id, false);
+    adopt(note.id, editGeneration(note.id), { saved: true });
   }
-  const set = subs.get(note.id);
-  if (set) for (const fn of set) fn();
   return changed;
 }
 
-/** Replace a CLEAN buffer with disk truth (external edit / agent write). No-op
- * when the note has unsaved local edits — those win until flush. Seeds when
- * the buffer doesn't exist yet. */
+/** A read of a note (the editor's query, a watcher's refetch) reaching the
+ * editor: dropped when it started before something newer was taken in (a
+ * write of Rotli's own landing, a newer read; services/noteReads.ts), else
+ * seeded or folded in like any disk truth. */
+// The last note each read gave the editor, so a note whose file vanished
+// (deleted outside) still shows its retained words (ninth review: the editor
+// rendered an empty container, in every pane, though the buffer survived).
+const lastRead = new Map<string, Note>();
+
+/** The note to show for `noteId` when its query finds nothing: the last one
+ * read, while its buffer (the person's words) is still here. */
+export function retainedNote(noteId: string): Note | undefined {
+  return hasBuffer(noteId) ? lastRead.get(noteId) : undefined;
+}
+
+export function adoptReadNote(note: Note): boolean {
+  if (!takeRead(note)) {
+    // older than what the editor holds, yet it saw another version: read again
+    if (note.revision !== revisionOf(note.id)) readAgain(note.id);
+    return false;
+  }
+  lastRead.set(note.id, note);
+  reviveGoneNote(note.id);
+  ensureDocument(note.id, note.body, note.revision, note);
+  reloadDocumentIfClean(note.id, note.body, note.revision);
+  return true;
+}
+
+/** Text Rotli itself just wrote outside the editor's queue (`/ai`), shown at
+ * once: a read that starts now, numbered like any other. */
+export function adoptWrittenText(noteId: string, body: string, revision: string): void {
+  if (!takeRead({ id: noteId, body, revision, readAt: startRead() } as Note)) return;
+  reloadDocumentIfClean(noteId, body, revision);
+}
+
+/** Disk truth for a note (external edit / agent write). A clean buffer takes
+ * it; unsaved local edits win until flush, folded together with it when the
+ * two touched different lines. Seeds when the buffer doesn't exist yet. */
 export function reloadDocumentIfClean(noteId: string, body: string, revision: string): void {
-  if (!docs.has(noteId)) {
+  if (!hasBuffer(noteId)) {
     ensureDocument(noteId, body, revision);
     return;
   }
-  if (isDirty(noteId)) {
-    // Disk changed under unsaved edits. Metadata-only writes (the Librarian)
-    // keep the prose, so the new revision is simply a safe base. When the
-    // PROSE changed too — a task ticked from the Tasks view, a chat edit,
-    // another app — fold both edits together when they touched different
-    // lines; only overlapping edits stay a visible conflict (2026-09-03).
-    const base = persistedBodies.get(noteId);
-    if (base !== body) {
-      const mine = (docs.get(noteId) ?? []).join("\n");
-      const merged = base === undefined ? null : threeWayMerge(base, mine, body);
-      if (!merged?.ok) return;
-      const lines = merged.merged.split("\n");
-      docs.set(noteId, lines);
-      taskSigs.set(noteId, taskSignature(lines));
-      const set = subs.get(noteId);
-      if (set) for (const fn of set) fn();
-    }
-    const changedRevision = revisions.get(noteId) !== revision;
-    revisions.set(noteId, revision);
-    persistedBodies.set(noteId, body);
-    if (changedRevision) {
-      if (documentSaveError(noteId)?.startsWith("revision conflict")) setSaveError(noteId, null);
-      scheduleSync(noteId);
-    }
-    return;
-  }
-  const next = body.split("\n");
-  const cur = docs.get(noteId);
-  // A same-body move still changes the complete-file hash. Adopt revision and
-  // baseline before the visual no-op check so the next edit does not present a
-  // stale pre-move revision.
-  revisions.set(noteId, revision);
-  persistedBodies.set(noteId, body);
-  if (cur && cur.length === next.length && cur.every((l, i) => l === next[i])) return;
-  docs.set(noteId, next);
-  taskSigs.set(noteId, taskSignature(next));
-  const set = subs.get(noteId);
-  if (set) for (const fn of set) fn();
+  reloadDocument(noteId, body, revision);
 }
 
-/** Drop a note's buffer + pending sync. The hook for the future delete path,
- * and the unknown-note sync failure — a dead buffer must never keep shadowing
- * (or writing over) service state. */
+/** Drop a note's buffer + pending sync. The hook for the delete path — a dead
+ * buffer must never keep shadowing (or writing over) service state. */
 export function evictDocument(noteId: string): void {
-  const pending = timers.get(noteId);
-  if (pending !== undefined) clearTimeout(pending);
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.delete(noteId);
-  timers.delete(noteId);
-  docs.delete(noteId);
-  revisions.delete(noteId);
-  persistedBodies.delete(noteId);
-  pendingDocuments.delete(noteId);
-  protections.delete(noteId);
-  taskSigs.delete(noteId);
-  setDirty(noteId, false);
-  setSaveError(noteId, null);
-  const set = subs.get(noteId);
-  if (set) for (const fn of set) fn();
+  forgetQueue(noteId);
+  forget(noteId);
+  lastRead.delete(noteId);
 }
 
 /** Apply an edit to the shared buffer: notify every pane synchronously,
  * sync to the service on the debounce. */
-export function editDocument(noteId: string, edit: (lines: readonly string[]) => string[]): void {
-  const current = docs.get(noteId);
+export function editDocument(noteId: string, change: (lines: readonly string[]) => string[]): void {
+  const current = bufferLines(noteId);
   if (!current) return;
   // the single funnel every real keystroke passes through — a session-created
   // note stops being an ephemeral blank draft the moment it's written into,
   // and an edited PREVIEW tab becomes a kept tab (the maintainer, 2026-07-28)
-  if (!pendingDocuments.has(noteId)) {
+  if (!isPendingDocument(noteId)) {
     markNoteDraftChanged(noteId);
     keepTabsFor(noteId);
   }
-  docs.set(noteId, edit(current));
-  const set = subs.get(noteId);
-  if (set) for (const fn of set) fn();
+  edit(noteId, change(current));
   scheduleSync(noteId);
-}
-
-function syncNow(noteId: string): Promise<void> {
-  const lines = docs.get(noteId);
-  if (!lines) return Promise.resolve();
-  const expectedRevision = revisions.get(noteId);
-  if (!expectedRevision) {
-    setSaveError(noteId, "This note has no save revision. Reload it before editing.");
-    return Promise.resolve();
-  }
-  const expectedBody = persistedBodies.get(noteId);
-  if (expectedBody === undefined) {
-    setSaveError(noteId, "This note has no saved-body baseline. Reload it before editing.");
-    return Promise.resolve();
-  }
-  const body = lines.join("\n");
-  return writeNoteBody(noteId, body, expectedRevision, expectedBody)
-    .then((note) => {
-      setSaveError(noteId, null);
-      if (note) {
-        revisions.set(noteId, note.revision);
-        persistedBodies.set(noteId, body);
-      }
-      // saved — unless newer keystrokes already queued the next sync
-      if (!timers.has(noteId)) setDirty(noteId, false);
-      if (!note) return; // test stub — no cache to patch
-      // SCOPED refresh (audit 2026-07-30, #1): patch the fresh note into the
-      // caches instead of invalidating ["notes"] — that fanned into ~9
-      // main-thread corpus walks per 400ms typing tick. Tasks re-derive only
-      // when the checkbox lines changed.
-      const sig = taskSignature(lines);
-      const tasksChanged = taskSigs.get(noteId) !== sig;
-      taskSigs.set(noteId, sig);
-      const applied = applyNoteWrite(note, { tasksChanged });
-      // A blank session draft is intentionally absent from Main. The fresh
-      // note is already patched into the query cache synchronously above, so
-      // its first durable non-empty save can now reveal a correctly titled
-      // row without an intermediate "Untitled" frame.
-      markNoteDraftSaved(noteId, body);
-      return applied;
-    })
-    .catch((err: unknown) => {
-      // Any failure (missing/renamed note, read-only volume, permissions, disk full) keeps the
-      // buffer AND says so: the note stays dirty, the editor shows the error,
-      // and a retry timer keeps the sync alive even with no further keystroke.
-      // The retry rides the timers map, so quit-flush picks it up too.
-      setSaveError(noteId, err instanceof Error ? err.message : String(err));
-      // A conflict never retries blindly: the live buffer stays intact and
-      // dirty. It does get ONE honest attempt at self-resolution — read the
-      // disk version and fold it in (reloadDocumentIfClean merges when the
-      // two edits touched different lines and queues the save that lands).
-      if (err instanceof Error && err.message.startsWith("revision conflict")) {
-        void reconcileFromDisk(noteId);
-        return;
-      }
-      if (err instanceof Error && err.message.startsWith("unknown note")) return;
-      scheduleRetry(noteId);
-    });
-}
-
-let readNote: (noteId: string) => Promise<Note | null> = (noteId) => notesService.getNote(noteId);
-
-export function setReadNoteForTests(fn: typeof readNote | null): void {
-  readNote = fn ?? ((noteId) => notesService.getNote(noteId));
-}
-
-async function reconcileFromDisk(noteId: string): Promise<void> {
-  const note = await readNote(noteId).catch(() => null);
-  if (!note || !isDirty(noteId)) return;
-  reloadDocumentIfClean(noteId, note.body, note.revision);
-}
-
-/** Quit must never be held hostage by a conflict. The unsaved buffer becomes
- * a sibling note (same folder, title suffixed) so nothing is lost, and the
- * open note adopts the disk version. Returns the ids it copied. */
-async function keepConflictCopies(): Promise<string[]> {
-  const kept: string[] = [];
-  for (const noteId of [...dirtyNoteIds()]) {
-    if (!documentSaveError(noteId)?.startsWith("revision conflict")) continue;
-    const mine = docs.get(noteId)?.join("\n");
-    const note = await readNote(noteId).catch(() => null);
-    if (mine === undefined || !note) continue;
-    const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-    const body = mine.startsWith("# ")
-      ? mine.replace(/^# (.*)$/m, `# $1 (unsaved edits ${stamp})`)
-      : `# Unsaved edits ${stamp}\n\n${mine}`;
-    try {
-      await notesService.createNote(note.folderId, body, {
-        secure: note.secure === true,
-        locked: note.locked === true,
-      });
-    } catch {
-      continue; // still dirty: the flush reports it honestly below
-    }
-    const lines = note.body.split("\n");
-    docs.set(noteId, lines);
-    taskSigs.set(noteId, taskSignature(lines));
-    revisions.set(noteId, note.revision);
-    persistedBodies.set(noteId, note.body);
-    setSaveError(noteId, null);
-    setDirty(noteId, false);
-    const set = subs.get(noteId);
-    if (set) for (const fn of set) fn();
-    kept.push(noteId);
-  }
-  return kept;
-}
-
-function scheduleRetry(noteId: string): void {
-  if (timers.has(noteId)) return; // newer keystrokes already queued a sync
-  timers.set(
-    noteId,
-    setTimeout(() => {
-      timers.delete(noteId);
-      void syncNow(noteId);
-    }, RETRY_DELAY_MS),
-  );
-}
-
-function scheduleSync(noteId: string): void {
-  setDirty(noteId, true);
-  if (pendingDocuments.has(noteId)) return;
-  const pending = timers.get(noteId);
-  if (pending !== undefined) clearTimeout(pending);
-  timers.set(
-    noteId,
-    setTimeout(() => {
-      timers.delete(noteId);
-      void syncNow(noteId);
-    }, SYNC_DEBOUNCE_MS),
-  );
-}
-
-/** Flush ONE note's pending debounced sync — the note/tab-switch path.
- * The timer would still fire 400ms later, but flushing at the switch means
- * the list row and the disk are already true when the eye lands elsewhere. */
-export function flushNote(noteId: string): Promise<void> {
-  const pending = timers.get(noteId);
-  if (pending === undefined) return Promise.resolve();
-  clearTimeout(pending);
-  timers.delete(noteId);
-  return syncNow(noteId);
-}
-
-type AfterPaintScheduler = (task: () => void) => void;
-
-function scheduleAfterNextPaint(task: () => void): void {
-  // A hidden document will not reliably receive animation frames. It already
-  // has the visibility flush safety net below; a task turn is the non-blocking
-  // fallback for tests and non-visual runtimes.
-  if (document.hidden || typeof requestAnimationFrame !== "function") {
-    setTimeout(task, 0);
-    return;
-  }
-  requestAnimationFrame(() => setTimeout(task, 0));
-}
-
-/** Tab close/switch presentation must not join and write a large note during
- * React's unmount commit. Keep the existing debounce/quit safety intact, but
- * advance its save after the closing tab has reached a paint boundary. */
-export function flushNoteAfterPaint(
-  noteId: string,
-  schedule: AfterPaintScheduler = scheduleAfterNextPaint,
-): void {
-  if (!timers.has(noteId)) return;
-  schedule(() => void flushNote(noteId));
-}
-
-/** Flush every pending debounced sync immediately — the quit/reload path. The
- * 400ms window must never eat the last keystrokes once the disk-backed service
- * lands. Resolves when every write settles, so the quit handshake can hold the
- * exit until the IPC lands. */
-export async function flushSyncs(): Promise<void> {
-  const pending: Array<Promise<void>> = [];
-  for (const [noteId, timer] of timers) {
-    clearTimeout(timer);
-    pending.push(syncNow(noteId));
-  }
-  timers.clear();
-  await Promise.allSettled(pending);
-  await keepConflictCopies();
-  const unsaved = [...dirtyNoteIds()];
-  if (unsaved.length > 0) {
-    const detail = unsaved
-      .map((noteId) => documentSaveError(noteId))
-      .filter((message): message is string => Boolean(message))[0];
-    throw new Error(
-      `${unsaved.length} note${unsaved.length === 1 ? "" : "s"} still has unsaved edits${detail ? `: ${detail}` : ""}`,
-    );
-  }
 }
 
 // Keystrokes are never lost: quit/reload (pagehide), the window hiding under
@@ -474,6 +205,9 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) void flushSyncs().catch(() => {});
 });
 onQuitFlush(flushSyncs);
+// after every flusher (a workbook, another window): quit is acknowledged only
+// when no note has anything unsaved or outstanding (quitFlush.ts)
+onQuitCheck(quitReasons);
 
 // A note's buffer outlived its last editor for the life of the window — two
 // copies of every body ever opened (audit 2026-10-12). A CLEAN buffer nobody
@@ -488,62 +222,47 @@ export function setReleaseDelayForTests(ms: number | null): void {
 
 function releasable(noteId: string): boolean {
   return (
-    !subs.get(noteId)?.size &&
+    !viewers(noteId) &&
     !isDirty(noteId) &&
-    !timers.has(noteId) &&
-    !pendingDocuments.has(noteId) &&
+    !queueBusy(noteId) &&
+    !isPendingDocument(noteId) &&
     documentSaveError(noteId) === null
   );
 }
 
 function scheduleRelease(noteId: string): void {
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.set(
     noteId,
-    setTimeout(() => {
+    clock.setTimeout(() => {
       releaseTimers.delete(noteId);
-      if (!docs.has(noteId) || subs.get(noteId)?.size) return;
+      if (!hasBuffer(noteId) || viewers(noteId)) return;
       // still unsaved, saving, or failed: look again later rather than keep
       // the buffer for the life of the window once it settles (review of PR 199)
       if (!releasable(noteId)) return scheduleRelease(noteId);
-      docs.delete(noteId);
-      revisions.delete(noteId);
-      persistedBodies.delete(noteId);
-      protections.delete(noteId);
-      taskSigs.delete(noteId);
-      subs.delete(noteId);
+      forget(noteId, "release");
     }, releaseDelayMs),
   );
 }
 
 function subscribeDocument(noteId: string, fn: () => void): () => void {
-  let set = subs.get(noteId);
-  if (!set) {
-    set = new Set();
-    subs.set(noteId, set);
-  }
-  set.add(fn);
-  clearTimeout(releaseTimers.get(noteId));
+  clock.clearTimeout(releaseTimers.get(noteId));
   releaseTimers.delete(noteId);
-  return () => {
-    set.delete(fn);
-    if (set.size === 0) scheduleRelease(noteId);
-  };
+  return subscribe(noteId, fn, () => scheduleRelease(noteId));
 }
 
 /** Live lines for a note; undefined until the buffer exists (callers fall
  * back to the query body — identical content until the first edit). */
-export function useDocumentLines(noteId: string): string[] | undefined {
-  const subscribe = useCallback((fn: () => void) => subscribeDocument(noteId, fn), [noteId]);
-  return useSyncExternalStore(subscribe, () => docs.get(noteId));
+export function useDocumentLines(noteId: string): readonly string[] | undefined {
+  const watch = useCallback((fn: () => void) => subscribeDocument(noteId, fn), [noteId]);
+  return useSyncExternalStore(watch, () => bufferLines(noteId));
 }
 
 /** The whole buffer as one string — the CodeMirror editing surface's source of
  * truth (the editor edits this text directly, the .md never round-trips a rich
  * model). undefined until the buffer exists. */
 export function getDocumentText(noteId: string): string | undefined {
-  const lines = docs.get(noteId);
-  return lines ? lines.join("\n") : undefined;
+  return bufferText(noteId);
 }
 
 /** Replace the whole buffer from the editor (CM → model): notify every pane

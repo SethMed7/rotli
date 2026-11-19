@@ -8,6 +8,7 @@
 
 import { bytesRevision } from "../lib/contentRevision";
 import { isMemexId, parseMemexInfo } from "../memex/contract";
+import type { SkippedFile } from "../types";
 import { type FolderRoles, folderRolesFromMarker, markerInPlace } from "./destinations";
 export { bytesRevision, contentRevision } from "../lib/contentRevision";
 
@@ -48,6 +49,9 @@ export interface VaultDir {
    * A content gate applies only to an existing file; a directory or missing
    * path conflicts, including when the supplied revision is "0". */
   remove(path: string, expectedContent?: string): Promise<void>;
+  /** The files a host left out of `list` because they have a hard link (the
+   * Helper can tell; a browser folder can't, so it has no such method). */
+  skipped?(): Promise<SkippedFile[]>;
 }
 
 /** Trim the separators a caller may pass ("/wiki/", "wiki//a.md") down to the

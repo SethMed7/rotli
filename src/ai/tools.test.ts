@@ -62,11 +62,11 @@ test("the stable desktop build lets chat create a workbook artifact (Sheets ship
   let calls = 0;
   const host = { createArtifact: async () => `created ${++calls}` } as unknown as Host;
   const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
-  expect(await runTool(host, "create_artifact", { kind: "sheet", title: "T", content: "a,b" }, budget)).toBe(
-    "created 1",
-  );
-  expect(await runTool(host, "create_artifact", { kind: "bogus", title: "T", content: "x" }, budget)).toBe(
-    'error: create_artifact needs a supported kind: "document", "sheet", "pdf".',
-  );
+  expect<string>(
+    await runTool(host, "create_artifact", { kind: "sheet", title: "T", content: "a,b" }, budget),
+  ).toBe("created 1");
+  expect<string>(
+    await runTool(host, "create_artifact", { kind: "bogus", title: "T", content: "x" }, budget),
+  ).toBe('error: create_artifact needs a supported kind: "document", "sheet", "pdf".');
   expect(calls).toBe(1);
 });

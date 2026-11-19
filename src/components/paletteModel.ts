@@ -12,3 +12,8 @@ export function paletteMatchScore(query: string, title: string, body: string): n
 export function rankSearchGroups<T extends { score: number }>(groups: readonly T[]): T[] {
   return [...groups].sort((a, b) => a.score - b.score);
 }
+
+/** The launcher and open search field describe the same action. */
+export function searchActionLabel(breve: boolean): string {
+  return breve ? "Search Rotli and actions" : "Search notes and actions";
+}

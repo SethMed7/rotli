@@ -15,10 +15,11 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import { type FolderRoles, folderRoles } from "../services/destinations";
-import type { SearchHit, WelcomeSeed } from "../types";
+import type { NoteSummary, SearchHit, SkippedFile, WelcomeSeed } from "../types";
 import type { NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import type { FrontmatterView } from "./corpusFrontmatter";
+import type { PromptText } from "./promptText";
 export type { FrontmatterView } from "./corpusFrontmatter";
 import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
@@ -286,6 +287,9 @@ export interface CorpusFolder {
   parentId: string | null;
 }
 
+/** `corpus_create`'s answer: the note, with the words and revision it wrote (or found). */
+export type CorpusCreated = CorpusNoteMeta & { body: string; revision: string };
+
 export interface CorpusNoteMeta {
   id: string;
   title: string;
@@ -309,6 +313,7 @@ export interface CorpusNoteMeta {
    * file — image/pdf/…, surfaced read-only, opened in the OS default app). Rust
    * serde-defaults to "note" for back-compat, so it's optional on the wire. */
   kind?: "note" | "board" | "file";
+  onDeviceOnly?: boolean; // an AI row the gate passed only for an on-device reader
 }
 
 /** What corpus_read_board returns — the raw .excalidraw JSON plus file meta.
@@ -326,9 +331,11 @@ export interface CorpusBoardDoc {
 export interface CorpusListPayload {
   folders: CorpusFolder[];
   notes: CorpusNoteMeta[];
+  skipped?: SkippedFile[]; // files the walk left out (absent when none)
 }
 
-export interface CorpusNoteDoc {
+/** With its effective protection (`secure`, `locked`) from the same read as the body (corpus.rs NoteDoc). */
+export interface CorpusNoteDoc extends Pick<NoteSummary, "secure" | "locked"> {
   id: string;
   folderId: string;
   /** Physical folder containing the file (for Brain location/reveal). */
@@ -405,14 +412,11 @@ export function corpusWrite(
 export function corpusCreate(
   folderId: string,
   body: string,
-  policy?: { secure?: boolean; createdBy?: NoteCreator },
-): Promise<CorpusNoteMeta> {
-  return corpusInvoke("corpus_create", {
-    folderId,
-    body,
-    secure: policy?.secure ?? false,
-    ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
-  });
+  policy?: { secure?: boolean; locked?: boolean; createdBy?: NoteCreator; recoveryEvent?: string },
+): Promise<CorpusCreated> {
+  const { secure = false, locked = false, createdBy, recoveryEvent } = policy ?? {};
+  const extra = { ...(createdBy ? { createdBy } : {}), ...(recoveryEvent ? { recoveryEvent } : {}) };
+  return corpusInvoke("corpus_create", { folderId, body, secure, locked, ...extra });
 }
 
 export function corpusDelete(id: string): Promise<void> {
@@ -523,7 +527,7 @@ export function chatModels(): Promise<ChatModelInfo[]> {
  * `data:` URL) and only ride the vision/openai path. */
 export interface ChatWireMsg {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: PromptText; // only PromptText (lib/promptText.ts) reaches a model
   images?: string[];
 }
 
@@ -649,7 +653,7 @@ export function cliComplete(args: {
   requestId: string;
   provider: string;
   model: string;
-  prompt: string;
+  prompt: PromptText; // only PromptText (lib/promptText.ts) reaches a model
   timeoutMs?: number;
   /** Provider-native frontier quality control. Rust validates the allowlist. */
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
@@ -1213,6 +1217,7 @@ export async function corpusFrontmatter(id: string): Promise<FrontmatterView | n
 /** Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
  * note to the top of every list. Does not bump the note's `updated` stamp. */
 export async function corpusSetPinned(id: string, pinned: boolean): Promise<void> {
+  if (!isTauri() && usesWebVaultIo()) return currentWebVaultIo().setPinned(id, pinned);
   if (!isTauri()) return;
   await invoke("corpus_set_pinned", { id, pinned });
 }
@@ -1504,6 +1509,7 @@ export interface CorpusAiRead {
   revision: string;
   /** The editor's copy of the note, when asked for (desktop only). */
   editor?: string;
+  onDeviceOnly?: boolean; // passed only because the reader is on-device
 }
 
 export async function corpusReadAiVersioned(

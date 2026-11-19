@@ -78,6 +78,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "fileHeaderMarks.tsx": "FileSurface header status marks: Beta, or why editing is off",
   "emptyState.tsx": "shared empty-state primitive",
   "fileNotice.tsx": "application-shell transient notice for Finder drops and pastes that landed out of sight",
+  "librarianSettingsNotice.tsx": "Librarian Activity: what to do when the vault's settings can't be read",
   "glyphs.tsx": "shared first-party glyph registry",
   "noteGlyph.tsx": "shared row mark for a note, board, canvas, or file (split from glyphs.tsx)",
   "hotkeyBadges.tsx": "shared shortcut badge overlay",
@@ -127,6 +128,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "agentBridge.ts": "the agent bridge's webview side: an admitted agent request in, the window's answer out",
   "aiFiles.ts": "the AI's Word-document lane: create (recorded as AI-made) and edit only those",
   "aiInsert.ts": "the /ai insert lane: an accepted passage added through corpus_insert_ai",
+  "aiListings.ts":
+    "the AI's file and Librarian listings, gated in Rust (corpus_files_ai, corpus_librarian_ai)",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
@@ -180,6 +183,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "folderWindow.ts": "open in Rotli (a folder window's notes service, listing, and native side)",
   "finderQuickAction.ts": "open in Rotli (Finder's opt-in Quick Action, for Settings)",
+  "appIcon.ts": "app shell (Settings' intent to change the native Dock icon)",
   "vaultImport.ts":
     "vault import (connect a copy with the Librarian: confirm, copy with progress, open the copy)",
   "personSinks.ts": "vault import (a copy's one-time question: move its own Archive and Trash into Rotli's)",
@@ -213,6 +217,7 @@ export const SERVICE_FILE_OWNERS = {
   "mainDismiss.ts": "Main projection",
   "mainTree.ts": "Main projection",
   "noteDrafts.ts": "note editor",
+  "noteReads.ts": "note editor",
   "noteLifecycle.ts": "vault lifecycle",
   "linkedNotes.ts": "notes",
   "notes.ts": "notes adapter",

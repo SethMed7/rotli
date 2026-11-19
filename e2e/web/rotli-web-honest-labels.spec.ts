@@ -30,7 +30,7 @@ test("a web note is in your folder, and the Browser card says it is in the Mac a
   await expect(browser).toHaveAttribute("aria-disabled", "true");
   await expect(browser).toContainText("In the Mac app");
   // the Board card still works on the web
-  await expect(page.locator(".ni-surface").getByRole("button", { name: /^New Board \(press/ })).toBeVisible();
+  await expect(page.locator(".ni-surface").getByRole("button", { name: /^New Board / })).toBeVisible();
 });
 
 test("web note menus hide Finder-only actions and General names browser settings", async ({ page }) => {

@@ -12,28 +12,51 @@ use serde_json::{json, Map, Value};
 
 use super::{joined, millis, parse_rel, resolve, skipped_dir, stat_json, Refusal, MAX_WALK_ENTRIES, READ_MANY_BUDGET, READ_ONE_LIMIT};
 
-/// Every file and directory beneath `rel`, one call: what the page's notes
-/// service would otherwise ask for one `stat` at a time.
-pub(super) fn walk(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
-    let start = resolve(root, rel)?;
-    let mut out = Vec::new();
-    if fs::symlink_metadata(&start).is_ok_and(|m| m.is_dir()) {
-        walk_into(&start, &joined(rel), &mut out)?;
-    }
-    Ok(Value::Array(out))
+/// Never listed or walked: a link (symlink or junction), or a file with a
+/// second name, whose hard link can be a file outside the vault.
+fn skipped_entry(metadata: &fs::Metadata) -> bool {
+    crate::containment::is_link_like(metadata) || hard_linked(metadata)
 }
 
-fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refusal> {
+fn hard_linked(metadata: &fs::Metadata) -> bool {
+    metadata.is_file() && !crate::fsutil::has_one_name(metadata)
+}
+
+/// Every file and directory beneath `rel`, one call: what the page's notes
+/// service would otherwise ask for one `stat` at a time. With `with_skipped`
+/// (third review of pull request 267, #5) the answer is `{ entries, skipped }`
+/// and names each hard-linked file left out, so Rotli Web can tell the person;
+/// without it, the bare array an older page expects.
+pub(super) fn walk(root: &Path, rel: &[String], with_skipped: bool) -> Result<Value, Refusal> {
+    let start = resolve(root, rel)?;
+    let mut out = Vec::new();
+    let mut skipped = Vec::new();
+    if fs::symlink_metadata(&start).is_ok_and(|m| m.is_dir()) {
+        walk_into(&start, &joined(rel), &mut out, &mut skipped)?;
+    }
+    if !with_skipped {
+        return Ok(Value::Array(out));
+    }
+    let skipped = skipped.into_iter().map(|path| json!({ "path": path, "reason": "hardLink" })).collect();
+    Ok(json!({ "entries": out, "skipped": Value::Array(skipped) }))
+}
+
+fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>, skipped: &mut Vec<String>) -> Result<(), Refusal> {
     let Ok(entries) = fs::read_dir(dir) else { return Ok(()) };
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         // file_type() does not follow links: a symlink is neither, and skipped;
         // a Windows junction can report as a directory, so check the reparse bit too
         let Ok(kind) = entry.file_type() else { continue };
-        if fs::symlink_metadata(entry.path()).map_or(true, |m| crate::containment::is_link_like(&m)) {
-            continue;
-        }
         let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
+        match fs::symlink_metadata(entry.path()) {
+            Ok(metadata) if hard_linked(&metadata) && !name.starts_with('.') => {
+                skipped.push(path);
+                continue;
+            }
+            Ok(metadata) if !skipped_entry(&metadata) => {}
+            _ => continue,
+        }
         if kind.is_dir() {
             if skipped_dir(&name) {
                 continue;
@@ -43,7 +66,7 @@ fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refus
             if out.len() > MAX_WALK_ENTRIES {
                 return Err((413, "This folder holds too many files to be a notes vault.".into()));
             }
-            walk_into(&entry.path(), &path, out)?;
+            walk_into(&entry.path(), &path, out, skipped)?;
         } else if kind.is_file() {
             let metadata = entry.metadata().map_err(|e| (500, e.to_string()))?;
             out.push(json!({ "path": path, "kind": "file", "lastModified": millis(metadata.modified()), "size": metadata.len() }));
@@ -62,7 +85,7 @@ pub(super) fn list(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         let Ok(kind) = entry.file_type() else { continue };
-        if fs::symlink_metadata(entry.path()).map_or(true, |m| crate::containment::is_link_like(&m)) {
+        if fs::symlink_metadata(entry.path()).map_or(true, |m| skipped_entry(&m)) {
             continue;
         }
         if kind.is_dir() && !skipped_dir(&name) {
@@ -92,8 +115,9 @@ fn read_bytes(root: &Path, rel: &[String], limit: usize) -> Result<Vec<u8>, Refu
         else { (500, format!("couldn't read {}: {e}", joined(rel))) }
     };
     let check = |metadata: &fs::Metadata| {
-        if !metadata.is_file() {
-            return Err((400, format!("not a regular file: {}", joined(rel))));
+        // a hard link can be a file outside the vault (review 2026-11-09)
+        if !crate::fsutil::has_one_name(metadata) {
+            return Err((400, format!("not a regular file of its own: {}", joined(rel))));
         }
         if metadata.len() > limit as u64 {
             return Err((413, format!("file too large for this read (limit {limit} bytes): {}", joined(rel))));
@@ -101,7 +125,7 @@ fn read_bytes(root: &Path, rel: &[String], limit: usize) -> Result<Vec<u8>, Refu
         Ok(())
     };
     check(&fs::symlink_metadata(&path).map_err(&io_error)?)?;
-    let file = fs::File::open(&path).map_err(&io_error)?;
+    let file = crate::fsutil::open_own_file(&path).map_err(&io_error)?;
     let metadata = file.metadata().map_err(&io_error)?;
     check(&metadata)?;
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
@@ -134,7 +158,7 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize, prompt: Option<&s
     for entry in entries {
         let entry = entry.map_err(|e| (500, e.to_string()))?;
         let metadata = fs::symlink_metadata(entry.path()).map_err(|e| (500, e.to_string()))?;
-        if crate::containment::is_link_like(&metadata) {
+        if skipped_entry(&metadata) {
             continue;
         }
         *seen += 1;
@@ -155,7 +179,7 @@ fn refresh_into(root: &Path, rel: &[String], seen: &mut usize, prompt: Option<&s
             let text = String::from_utf8_lossy(&bytes);
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             // the desktop walk's own rule, so the two ledgers can't drift
-            let protected = crate::corpus::walked_secure(&frontmatter.unwrap_or_default(), body);
+            let protected = crate::corpus::walked_secure(&frontmatter.unwrap_or_default(), body, &text);
             if protected {
                 // Check this body before later notes can evict its hashes.
                 // Both direct and ledger checks use secret.rs's same phrases.

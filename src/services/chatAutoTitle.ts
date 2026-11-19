@@ -6,6 +6,7 @@
 import { titleChatByMeaning } from "../ai/chatTitle";
 import { makeTauriHost } from "../ai/host";
 import { visibleChatText } from "../lib/chatWork";
+import { personText } from "../lib/promptText";
 import type { ChatModelInfo } from "../lib/tauri";
 import type { MemexInstance } from "../memex/config";
 import { listChats, updateChatTitle } from "../memex/service";
@@ -26,6 +27,7 @@ export function nameNewChat(
   existingSlug: string | null | undefined,
   slug: string,
   model: ChatModelInfo,
+  /** What the person typed first. */
   firstPrompt: string,
   createdTitle: string,
   typedTitle: string,
@@ -33,7 +35,7 @@ export function nameNewChat(
 ): void {
   if (existingSlug || typedTitle.trim() || !useUiStore.getState().chatTitleByMeaning) return;
   const host = makeTauriHost(model, { requestId: crypto.randomUUID(), isSecureContext: () => secure });
-  void titleChatByMeaning(host, visibleChatText(firstPrompt))
+  void titleChatByMeaning(host, personText(visibleChatText(firstPrompt)))
     .then(async (title) => {
       if (!title || title === createdTitle) return;
       // a name the person gave while the model was thinking always wins

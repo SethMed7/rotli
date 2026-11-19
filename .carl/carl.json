@@ -454,7 +454,7 @@
       "rules": [
         {
           "id": 0,
-          "text": "Rotli ships seven theme families — Rotli (warm), Paper & Charcoal (mono), Ocean, Grove, Iris, Blossom, and Midnight — each with an intentionally tuned light and dark environment (fourteen data-theme values; check:design-system asserts every label). Rotli Light is the default and the environment every first run opens in; Paper and Charcoal are the calm mono pair. All surfaces use shared semantic color, type, spacing, focus, and state roles.",
+          "text": "Rotli ships eight theme families — Rotli (warm), Paper & Charcoal (mono), Ocean, Grove, Iris, Blossom, Midnight, and Tesven — each with an intentionally tuned light and dark environment (sixteen data-theme values; check:design-system asserts every label). Tesven locks the full-body quokka to the plain Line drawing (brand/quokka.ts quokkaThemeLock) without touching the stored look. Rotli Light is the default and the environment every first run opens in; Paper and Charcoal are the calm mono pair. All surfaces use shared semantic color, type, spacing, focus, and state roles.",
           "added": "2026-07-11",
           "last_reviewed": "2026-09-01",
           "source": "DESIGN.md"

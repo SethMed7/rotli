@@ -73,6 +73,44 @@ if (missing.length) {
   process.exit(1);
 }
 
+// The reverse direction (quality-guards audit 2026-09-23 §3.1): a registered
+// command nothing in src/ calls is webview-reachable surface with no user —
+// memex_read read any vault file, secure notes included, for no caller until
+// 2026-11-11. These are the ones registered with no caller when this check
+// was added; the list may only shrink. Wire a new command up, or don't
+// register it.
+const UNCALLED_BASELINE = new Set([
+  "corpus_add_folder",
+  "corpus_forget_folder",
+  "corpus_new_file_bytes",
+  "corpus_set_field",
+  "generate_image", // the AI host answers "unavailable" instead (src/ai/host.ts)
+  "local_model_default",
+  "local_queue_status",
+]);
+const uncalled = [...registered].filter((command) => !calls.has(command));
+const newlyUncalled = uncalled.filter((command) => !UNCALLED_BASELINE.has(command));
+const stale = [...UNCALLED_BASELINE].filter((command) => !uncalled.includes(command));
+if (newlyUncalled.length || stale.length) {
+  console.error(
+    [
+      ...(newlyUncalled.length
+        ? [
+            "IPC contract check failed — registered Rust commands nothing in src/ calls (remove the registration, or call it):",
+            ...newlyUncalled.map((name) => `  - ${name}`),
+          ]
+        : []),
+      ...(stale.length
+        ? [
+            "IPC contract check failed — UNCALLED_BASELINE lists commands that are now called or gone; delete them from the list:",
+            ...stale.map((name) => `  - ${name}`),
+          ]
+        : []),
+    ].join("\n"),
+  );
+  process.exit(1);
+}
+
 console.log(
-  `check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers`,
+  `check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers; ${uncalled.length} registered without a caller (baseline, may only shrink)`,
 );

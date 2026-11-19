@@ -5,6 +5,7 @@
 // never writes — the editor shows the reply, and only the person's Insert
 // writes it, through corpus_insert_ai.
 
+import { type ApprovedText, type PersonText, externalText, prompt, reshape } from "../lib/promptText";
 import { looksSecret } from "./guard";
 import inlinePrompt from "./prompts/inlineAi.md?raw";
 import { modelFailure, promptAsset, stripThinking } from "./replyText";
@@ -13,7 +14,7 @@ import type { CompleteReq, Host } from "./types";
 const ASSET = promptAsset(inlinePrompt);
 /** The asset's `version:` line. Bump it whenever the instructions change. */
 export const INLINE_AI_VERSION = ASSET.version;
-const SYSTEM = ASSET.system;
+const SYSTEM = prompt`${externalText(ASSET.system)}`;
 
 /** How much of the note around the cursor the model reads. */
 export const INLINE_CONTEXT = { before: 6000, after: 1500 } as const;
@@ -24,12 +25,14 @@ export const CURSOR_MARK = "⟦here⟧";
 
 /** The exact request: the asset as the system message, the note around the
  * cursor fenced as data, then the person's ask. */
-export function renderInlineRequest(ask: string, before: string, after: string): CompleteReq {
-  const note = `${before.slice(-INLINE_CONTEXT.before)}${CURSOR_MARK}${after.slice(0, INLINE_CONTEXT.after)}`;
+export function renderInlineRequest(ask: PersonText, before: ApprovedText, after: ApprovedText): CompleteReq {
+  const head = reshape(before, (text) => text.slice(-INLINE_CONTEXT.before));
+  const tail = reshape(after, (text) => text.slice(0, INLINE_CONTEXT.after));
+  const asked = reshape(ask, (text) => text.trim());
   return {
     messages: [
       { role: "system", content: SYSTEM },
-      { role: "user", content: `<<<\n${note}\n>>>\n\n${ask.trim()}` },
+      { role: "user", content: prompt`<<<\n${head}${CURSOR_MARK}${tail}\n>>>\n\n${asked}` },
     ],
   };
 }
@@ -61,9 +64,9 @@ export function mapAnchor(before: string, at: number, after: string): number | n
  * whatever model is chosen (the egress ledger in Rust still backstops it). */
 export async function askInline(
   host: Pick<Host, "complete">,
-  ask: string,
-  before: string,
-  after: string,
+  ask: PersonText,
+  before: ApprovedText,
+  after: ApprovedText,
 ): Promise<InlineVerdict> {
   if (ask.trim() === "") return { ok: false, reason: "Write what you want first." };
   const request = renderInlineRequest(ask, before, after);

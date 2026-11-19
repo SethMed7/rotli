@@ -164,6 +164,11 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
     [chats.data],
   );
 
+  const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
+  // A focused tab that closes is removed without a blur, so its id can
+  // outlive it; the active tab then keeps the strip's one Tab stop.
+  const rovingTabId =
+    focusedTabId && pane.tabs.some((tab) => tab.id === focusedTabId) ? focusedTabId : pane.activeTabId;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
   const browserActive = activeTabOf(pane)?.surfaceKind === "browser";
@@ -288,7 +293,26 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   };
 
   return (
-    <div className="tabstrip" data-tab-layout={tabLayout} role="tablist">
+    <div className="tabstrip" data-tab-layout={tabLayout}>
+      <div
+        // Accessibility ownership groups the tabs without nesting the adjacent
+        // close/audio/new actions inside tab or tablist roles.
+        className="tab-list-owner"
+        role="tablist"
+        aria-label="Open tabs"
+        aria-owns={
+          pane.tabs
+            .filter(
+              (tab) =>
+                !(
+                  (tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId) ||
+                  (tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug)
+                ),
+            )
+            .map((tab) => `tab-${encodeURIComponent(pane.id)}-${encodeURIComponent(tab.id)}`)
+            .join(" ") || undefined
+        }
+      />
       <div className="tabscroll-wrap" data-fade-left={fade.left} data-fade-right={fade.right}>
         <div
           className="tabscroll"
@@ -300,16 +324,17 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           {pane.tabs.map((tab, i) => {
             const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
             const label = tabLabel(tab, titles, chatTitles);
+            const renaming =
+              (tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId) ||
+              (tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug);
             return (
               <div key={tab.id} className={tab.id === pane.activeTabId ? "tabslot active" : "tabslot"}>
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
                 <div
-                  role="tab"
                   data-tab-id={tab.id}
                   data-tab-index={i}
                   data-hotkey={tabHotkeyAction(i, pane.tabs.length)}
                   title={label}
-                  aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
                     isPreviewTab(tab) ? " preview" : ""
                   }${dragging ? " dragging" : ""}`}
@@ -325,52 +350,98 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   }}
                   onPointerDown={(event) => startTabDrag(event, pane.id, tab.id, label)}
                 >
-                  {tab.surfaceKind === "canvas" ? (
-                    <ExcalidrawGlyph size={13} className="tglyph" />
-                  ) : tab.surfaceKind === "chat" ? (
-                    <ChatGlyph size={13} className="tglyph" />
-                  ) : tab.surfaceKind === "file" ? (
-                    glyphForNote(
-                      { kind: "file", title: fileName(tab.fileId) },
-                      { size: 13, className: "tglyph" },
-                    )
-                  ) : tab.surfaceKind === "activity" ? (
-                    <ClockGlyph size={13} className="tglyph" />
-                  ) : tab.surfaceKind === "browser" ? (
-                    <BrowserGlyph size={13} className="tglyph" />
-                  ) : (
-                    <FileGlyph size={13} className="tglyph" />
-                  )}
-                  {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
-                    <InlineRenameInput
-                      className="tab-rename"
-                      defaultValue={tabLabel(tab, titles, chatTitles)}
-                      ariaLabel="Rename board"
-                      onCommit={(value) => commitRename(tab.boardId, value)}
-                      onCancel={cancelRename}
-                    />
-                  ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
-                    <InlineRenameInput
-                      className="tab-rename"
-                      defaultValue={tabLabel(tab, titles, chatTitles)}
-                      ariaLabel="Rename chat"
-                      onCommit={(value) => commitChatRename(tab.chatSlug ?? "", value)}
-                      onCancel={cancelChatRename}
-                    />
-                  ) : (
-                    <span
-                      className="tab-label"
-                      onDoubleClick={
-                        tab.surfaceKind === "canvas"
-                          ? () => startRename(tab.boardId)
-                          : tab.surfaceKind === "chat" && tab.chatSlug
-                            ? () => startChatRename(tab.chatSlug ?? "")
-                            : undefined
-                      }
-                    >
-                      <span className="tab-title">{label}</span>
-                    </span>
-                  )}
+                  <div
+                    className="tab-activation"
+                    id={`tab-${encodeURIComponent(pane.id)}-${encodeURIComponent(tab.id)}`}
+                    role={renaming ? undefined : "tab"}
+                    aria-selected={renaming ? undefined : tab.id === pane.activeTabId}
+                    tabIndex={tab.id === rovingTabId ? 0 : -1}
+                    onFocus={(event) => {
+                      if (event.target === event.currentTarget) setFocusedTabId(tab.id);
+                    }}
+                    onBlur={(event) => {
+                      if (event.target === event.currentTarget) setFocusedTabId(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.altKey ||
+                        event.target !== event.currentTarget
+                      )
+                        return;
+                      const next =
+                        event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? pane.tabs.length - 1
+                            : event.key === "ArrowRight"
+                              ? (i + 1) % pane.tabs.length
+                              : event.key === "ArrowLeft"
+                                ? (i - 1 + pane.tabs.length) % pane.tabs.length
+                                : event.key === "Enter" || event.key === " "
+                                  ? i
+                                  : null;
+                      if (next === null) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const target = pane.tabs[next];
+                      if (!target) return;
+                      // Manual activation keeps arrow traversal in the strip;
+                      // switching notes may intentionally focus their editor.
+                      if (event.key === "Enter" || event.key === " ") activateTab(pane.id, target.id);
+                      document
+                        .getElementById(`tab-${encodeURIComponent(pane.id)}-${encodeURIComponent(target.id)}`)
+                        ?.focus();
+                    }}
+                  >
+                    {tab.surfaceKind === "canvas" ? (
+                      <ExcalidrawGlyph size={13} className="tglyph" />
+                    ) : tab.surfaceKind === "chat" ? (
+                      <ChatGlyph size={13} className="tglyph" />
+                    ) : tab.surfaceKind === "file" ? (
+                      glyphForNote(
+                        { kind: "file", title: fileName(tab.fileId) },
+                        { size: 13, className: "tglyph" },
+                      )
+                    ) : tab.surfaceKind === "activity" ? (
+                      <ClockGlyph size={13} className="tglyph" />
+                    ) : tab.surfaceKind === "browser" ? (
+                      <BrowserGlyph size={13} className="tglyph" />
+                    ) : (
+                      <FileGlyph size={13} className="tglyph" />
+                    )}
+                    {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
+                      <InlineRenameInput
+                        className="tab-rename"
+                        defaultValue={tabLabel(tab, titles, chatTitles)}
+                        ariaLabel="Rename board"
+                        onCommit={(value) => commitRename(tab.boardId, value)}
+                        onCancel={cancelRename}
+                      />
+                    ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
+                      <InlineRenameInput
+                        className="tab-rename"
+                        defaultValue={tabLabel(tab, titles, chatTitles)}
+                        ariaLabel="Rename chat"
+                        onCommit={(value) => commitChatRename(tab.chatSlug ?? "", value)}
+                        onCancel={cancelChatRename}
+                      />
+                    ) : (
+                      <span
+                        className="tab-label"
+                        onDoubleClick={
+                          tab.surfaceKind === "canvas"
+                            ? () => startRename(tab.boardId)
+                            : tab.surfaceKind === "chat" && tab.chatSlug
+                              ? () => startChatRename(tab.chatSlug ?? "")
+                              : undefined
+                        }
+                      >
+                        <span className="tab-title">{label}</span>
+                      </span>
+                    )}
+                  </div>
                   {tabMedia[tab.id] === "playing" && (
                     <button
                       type="button"

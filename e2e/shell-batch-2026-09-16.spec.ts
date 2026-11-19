@@ -51,7 +51,7 @@ test("All notes stays global and tags a row with the named view that owns it", a
   await viewSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Research");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
   const row = page.locator(".recent-row", { hasText: "Q3 priorities — Northstar" });

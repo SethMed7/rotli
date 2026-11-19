@@ -10,9 +10,10 @@ export type Platform = "desktop" | "web";
 /** Two build-time axes. `development` is the release channel. `platform` is
  * the shell: the Tauri desktop app owns a Rust corpus, model lanes, the
  * Librarian, Breve, agents, native windows, and disk browsers; Rotli Web
- * (served from the site, vault in the browser, `connect-src 'none'`) has
- * none of those and withholds every capability that needs them, whatever
- * the channel says. Neither a URL parameter nor a setting can widen either. */
+ * uses browser/Helper vault adapters and a loopback-only network bridge.
+ * Native-only capabilities remain withheld here; paired-Helper chat is
+ * composed separately from these flags. Neither a URL parameter nor a
+ * setting can widen either build-time axis. */
 export function launchFeatures(development: boolean, platform: Platform = "desktop") {
   const desktop = platform === "desktop";
   return {

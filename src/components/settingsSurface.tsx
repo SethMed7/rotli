@@ -38,11 +38,6 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import appIconBlack from "../assets/appIcons/black.png";
-import appIconCharcoal from "../assets/appIcons/charcoal.png";
-import appIconClay from "../assets/appIcons/clay.png";
-import appIconDefault from "../assets/appIcons/default.png";
-import appIconPaper from "../assets/appIcons/paper.png";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -58,17 +53,15 @@ import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
+import { personText } from "../lib/promptText";
 import {
   type ChatModelInfo,
   type MemexValidateReport,
   type SystemProfile,
-  appVersion,
   chatModels,
-  checkForUpdate,
   cliDetect,
   corpusOverview,
   demoMode,
-  downloadAndInstallUpdate,
   isTauri,
   localModelInstall,
   localModelInstallCancel,
@@ -83,7 +76,6 @@ import {
   secretDelete,
   secretExists,
   secretStore,
-  setAppIcon,
   setDemoMode,
   setDockVisible,
   setHideOnBlur,
@@ -125,9 +117,6 @@ import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
 import { startSetupDetection, useSetupDetection } from "../state/setupDetection";
 import {
   ACCENT_COLORS,
-  CHAT_NAVIGATOR_STYLES,
-  type ChatNavigatorStyle,
-  type AppIcon,
   type OrganizerTrust,
   THEME_FAMILY_PRESENTATIONS,
   type ThemeFamily,
@@ -155,6 +144,7 @@ import { AboutPane } from "./settings/aboutPane";
 import { ALIAS_PASS } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
+import { AppIconSettings } from "./settings/appIconSettings";
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
@@ -163,12 +153,14 @@ import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { LINK_PASS } from "./settings/linkFormatSettings";
+import { NavigatorSettings } from "./settings/navigatorSettings";
 import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
+import { SettingsNavUpdates, useAppVersion } from "./settings/updatesNav";
 import { VaultPassSettings } from "./settings/vaultPass";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
@@ -322,7 +314,7 @@ function HotkeysPane() {
         <button
           type="button"
           className={recording ? "hkchord recording" : "hkchord"}
-          aria-label={`Rebind ${action.title}`}
+          aria-label={`Rebind ${action.title} — ${recording ? "press keys…" : chord ? formatChord(chord) : "—"}`}
           onClick={(event) => {
             // WebKit does not focus buttons on click — without this the
             // recorder never hears a key and the row sticks on "press keys…"
@@ -392,107 +384,22 @@ function HotkeysPane() {
   );
 }
 
-// ——— Updates: the current version + an explicit manual check, plus the
-// one-click "Install & relaunch" when the signed feed offers a newer build.
-// Launching or merely showing Rotli never contacts the feed. ———
-
-type CheckState =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "current" }
-  | { kind: "available"; version: string | null }
-  | { kind: "installing"; pct: number }
-  | { kind: "error"; message: string };
-
-/** The installed bundle version (null outside the Mac app) — the one source
- * for Updates and About. */
-function useAppVersion(): string | null {
-  const [version, setVersion] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isTauri()) return;
-    let alive = true;
-    void appVersion()
-      .then((v) => {
-        if (alive && v) setVersion(v);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return version;
-}
+// ——— Updates: the version and the manual check / "Install & relaunch" sit at
+// the foot of the Settings menu (settings/updatesNav.tsx); General keeps the
+// automatic-check switch. Launching or merely showing Rotli never contacts the
+// feed unless that switch is on. ———
 
 function UpdatesSection() {
-  const updateAvailable = useUiStore((s) => s.updateAvailable);
-  const updateVersion = useUiStore((s) => s.updateVersion);
-  const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
-  const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
   const autoUpdateCheck = useUiStore((s) => s.autoUpdateCheck);
   const setAutoUpdateCheck = useUiStore((s) => s.setAutoUpdateCheck);
-  const version = useAppVersion() ?? "0.1.0";
-  // Preserve the result of a check (this button's, or the routine one's) while
-  // Settings is reopened.
-  const [state, setState] = useState<CheckState>(
-    updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
-  );
-
-  const check = () => {
-    setState({ kind: "checking" });
-    void checkForUpdate()
-      .then((status) => {
-        if (status.available) {
-          const v = status.version ?? null;
-          setUpdateAvailable(true);
-          setUpdateVersion(v);
-          setState({ kind: "available", version: v });
-        } else {
-          setUpdateAvailable(false);
-          setUpdateVersion(null);
-          setState({ kind: "current" });
-        }
-      })
-      .catch((err: unknown) => {
-        setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-      });
-  };
-
-  const install = () => {
-    setState({ kind: "installing", pct: 0 });
-    // resolves only if the relaunch doesn't happen (it normally does) — on any
-    // error surface it; the app stays on the current build
-    void downloadAndInstallUpdate((pct) => setState({ kind: "installing", pct })).catch((err: unknown) => {
-      setState({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-    });
-  };
-
-  const installing = state.kind === "installing";
-
   return (
     <>
       <h4 className="sethead">Updates</h4>
-      <div className="setselect-row">
-        <span>
-          Rotli {version}
-          {state.kind === "current" && " — up to date"}
-          {state.kind === "available" && ` — update available${state.version ? ` (v${state.version})` : ""}`}
-        </span>
-        {state.kind === "available" || installing ? (
-          <button type="button" className="ghostbtn" onClick={install} disabled={installing}>
-            {installing ? `Updating… ${state.pct}%` : "Install & relaunch"}
-          </button>
-        ) : (
-          <button type="button" className="ghostbtn" onClick={check} disabled={state.kind === "checking"}>
-            {state.kind === "checking" ? "Checking…" : "Check for updates"}
-          </button>
-        )}
-      </div>
-      {state.kind === "error" && <p className="setnote err">Couldn’t check for updates: {state.message}</p>}
       <div className="swgroup">
         <Toggle
           on={autoUpdateCheck}
           title="Check for updates automatically"
-          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install."
+          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install at the foot of this menu."
           onChange={() => setAutoUpdateCheck(!autoUpdateCheck)}
         />
       </div>
@@ -543,7 +450,7 @@ function GeneralPane() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [demo, setDemo] = useState(false);
   useEffect(() => {
-    void demoMode().then(setDemo);
+    if (PLATFORM === "desktop") void demoMode().then(setDemo);
   }, []);
   const quickFolder = useUiStore((s) => s.quickFolder);
   const quickVaultId = useUiStore((s) => s.quickVaultId);
@@ -883,19 +790,32 @@ function GeneralPane() {
       <VaultPassSettings native={PLATFORM === "desktop"} pass={ALIAS_PASS} />
       <VaultPassSettings native={PLATFORM === "desktop"} pass={LINK_PASS} />
       <FinderQuickActionSettings native={quickActionAvailable()} />
-      <UpdatesSection />
+      {PLATFORM === "desktop" ? (
+        <UpdatesSection />
+      ) : (
+        <>
+          <h4 className="sethead">Updates</h4>
+          <p className="setnote">In the Mac app.</p>
+        </>
+      )}
 
       <h4 className="sethead">Demo mode</h4>
-      <p className="lead">
-        Switch to a separate demo library with sample content — for screenshots or trying things out. Your
-        real notes are never touched; toggling relaunches Rotli.
-      </p>
-      <Toggle
-        on={demo}
-        title="Demo mode"
-        desc="Read and write a throwaway demo library instead of your real notes."
-        onChange={() => void setDemoMode(!demo)}
-      />
+      {PLATFORM === "desktop" ? (
+        <>
+          <p className="lead">
+            Switch to a separate demo library with sample content — for screenshots or trying things out. Your
+            real notes are never touched; toggling relaunches Rotli.
+          </p>
+          <Toggle
+            on={demo}
+            title="Demo mode"
+            desc="Read and write a throwaway demo library instead of your real notes."
+            onChange={() => void setDemoMode(!demo)}
+          />
+        </>
+      ) : (
+        <p className="setnote">In the Mac app.</p>
+      )}
 
       <h4 className="sethead">Start fresh</h4>
       <p className="lead">
@@ -934,7 +854,9 @@ type PreviewEnvironment =
   | "blossom-light"
   | "blossom-dark"
   | "midnight-light"
-  | "midnight-dark";
+  | "midnight-dark"
+  | "tesven-light"
+  | "tesven-dark";
 
 function previewEnvironment(family: ThemeFamily, mode: "light" | "dark"): PreviewEnvironment {
   if (family === "warm") return mode === "light" ? "warm-light" : "warm-dark";
@@ -969,41 +891,6 @@ function WorkspacePreview({ environments }: { environments: readonly PreviewEnvi
     </span>
   );
 }
-
-const NAVIGATOR_PRESENTATIONS: Record<ChatNavigatorStyle, { label: string; description: string }> = {
-  lines: { label: "Quiet lines", description: "Crisp and minimal" },
-  dots: { label: "Soft dots", description: "Small and steady" },
-  paws: { label: "Quokka trail", description: "A path of pawprints" },
-  ears: { label: "Little ears", description: "A playful landmark" },
-};
-
-function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
-  return (
-    <span className={`navigator-sample ${style}`} aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => (
-        <i className={index === 3 ? "active" : undefined} key={index}>
-          {style === "paws" && (
-            <>
-              <b />
-              <b />
-              <b />
-            </>
-          )}
-        </i>
-      ))}
-    </span>
-  );
-}
-
-/** Dock/app icon options. Each thumbnail is the real Dock artwork, cut by
- * scripts/build-app-icons.mjs from the same render as the native variant. */
-const APP_ICONS: { id: AppIcon; label: string; src: string }[] = [
-  { id: "default", label: "Default", src: appIconDefault },
-  { id: "paper", label: "Paper", src: appIconPaper },
-  { id: "charcoal", label: "Charcoal", src: appIconCharcoal },
-  { id: "clay", label: "Clay", src: appIconClay },
-  { id: "black", label: "Black", src: appIconBlack },
-];
 
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
  * step (the maintainer, 2026-07-28: "charcoal theme with blue primary color"). Default
@@ -1067,8 +954,6 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
-  const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
   const sidebarSide = useUiStore((s) => s.sidebarSide);
   const setSidebarSide = useUiStore((s) => s.setSidebarSide);
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
@@ -1080,8 +965,6 @@ function AppearancePane() {
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
-  const appIcon = useUiStore((s) => s.appIcon);
-  const setAppIconState = useUiStore((s) => s.setAppIcon);
   const pickFamily = (family: ThemeFamily) => setThemeFamily(family);
   const pickMode = (mode: ThemeSetting) => setTheme(mode);
   return (
@@ -1149,29 +1032,7 @@ function AppearancePane() {
 
       <ChatBuddyStudio />
 
-      <h4 className="sethead">Conversation navigator</h4>
-      <p className="lead">
-        Longer chats get a small trail that opens an overview of your prompts. Pick the quiet visual you want
-        beside the conversation.
-      </p>
-      <div className="navigator-picker" role="radiogroup" aria-label="Conversation navigator">
-        {CHAT_NAVIGATOR_STYLES.map((style) => (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={chatNavigatorStyle === style}
-            className={chatNavigatorStyle === style ? "navigator-choice sel" : "navigator-choice"}
-            key={style}
-            onClick={() => setChatNavigatorStyle(style)}
-          >
-            <NavigatorSample style={style} />
-            <span>
-              <strong>{NAVIGATOR_PRESENTATIONS[style].label}</strong>
-              <small>{NAVIGATOR_PRESENTATIONS[style].description}</small>
-            </span>
-          </button>
-        ))}
-      </div>
+      <NavigatorSettings />
 
       <h4 className="sethead">Sidebar</h4>
       <p className="lead">
@@ -1256,27 +1117,7 @@ function AppearancePane() {
         onPick={setSyntaxPalette}
       />
 
-      <h4 className="sethead">App icon</h4>
-      <p className="lead">
-        Pick the Dock icon — it shows when <b>Show in the Dock</b> is on.
-      </p>
-      <div className="appicon-row" role="radiogroup" aria-label="App icon">
-        {APP_ICONS.map(({ id, label, src }) => (
-          <button
-            type="button"
-            key={id}
-            className={appIcon === id ? "appicon sel" : "appicon"}
-            aria-pressed={appIcon === id}
-            onClick={() => {
-              setAppIconState(id);
-              void setAppIcon(id);
-            }}
-          >
-            <img className="appicon-tile" src={src} alt="" draggable={false} />
-            <span className="appicon-label">{label}</span>
-          </button>
-        ))}
-      </div>
+      <AppIconSettings />
     </>
   );
 }
@@ -2671,7 +2512,11 @@ function ModelsPane() {
     }
     setSuggesting(true);
     setGenNote(null);
-    suggestPresets(makeTauriHost(def), available, usage.trim() || "general note-taking and research")
+    suggestPresets(
+      makeTauriHost(def),
+      available,
+      personText(usage.trim() || "general note-taking and research"),
+    )
       .then((out) => {
         setSuggestions(out);
         if (out.length === 0)
@@ -3096,6 +2941,7 @@ export function SettingsSurface() {
 
   return (
     <div className="settings">
+      <h2 className="sr-only">Settings</h2>
       <nav className="set-nav" aria-label="Settings sections">
         <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
           <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
@@ -3122,6 +2968,7 @@ export function SettingsSurface() {
             <span className="fname">{label}</span>
           </button>
         ))}
+        {PLATFORM === "desktop" && <SettingsNavUpdates />}
       </nav>
       <div className="set-stage">
         <SettingsScenery />

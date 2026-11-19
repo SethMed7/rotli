@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { DATA_THEMES } from "../state/theme";
 import {
   DEFAULT_QUOKKA_ACCESSORY_HUE,
   DEFAULT_QUOKKA_CUSTOM_HUE,
@@ -12,6 +13,9 @@ import {
   quokkaCustomColor,
   quokkaFill,
   quokkaHueFromLegacyColor,
+  quokkaThemeLock,
+  QUOKKA_LINE_COLORS,
+  resolveQuokkaLook,
 } from "./quokka";
 
 describe("quokka appearance", () => {
@@ -79,6 +83,44 @@ describe("quokka appearance", () => {
         expect(placement.scaleY).toBeGreaterThan(0.5);
       }
     }
+  });
+
+  test("Tesven locks the line quokka: navy by day, white by night", () => {
+    expect(quokkaThemeLock("tesven-light")).toEqual({
+      style: "line",
+      accessory: "none",
+      line: "navy",
+      locked: true,
+    });
+    expect(quokkaThemeLock("tesven-dark")).toEqual({
+      style: "line",
+      accessory: "none",
+      line: "white",
+      locked: true,
+    });
+  });
+
+  test("the lock overrides the stored look and explicit preview props, without writing either", () => {
+    const wanted = Object.freeze({ style: "berry", accessory: "bucket-hat", line: "black" } as const);
+    for (const theme of ["tesven-light", "tesven-dark"]) {
+      const look = resolveQuokkaLook(theme, wanted);
+      expect(look.style).toBe("line");
+      expect(look.accessory).toBe("none");
+      expect(look.locked).toBeTrue();
+    }
+    // the person's look is untouched, ready for the next theme
+    expect(wanted).toEqual({ style: "berry", accessory: "bucket-hat", line: "black" });
+    // navy is a lock ink only: never stored, never offered
+    expect(QUOKKA_LINE_COLORS as readonly string[]).not.toContain("navy");
+  });
+
+  test("every other environment keeps the person's own look", () => {
+    const wanted = { style: "green", accessory: "glasses", line: "auto" } as const;
+    for (const theme of DATA_THEMES.filter((t) => !t.startsWith("tesven-"))) {
+      expect(quokkaThemeLock(theme)).toBeNull();
+      expect(resolveQuokkaLook(theme, wanted)).toEqual({ ...wanted, locked: false });
+    }
+    expect(quokkaThemeLock(undefined)).toBeNull();
   });
 
   test("keeps the retired scarf out of the accessory catalog", () => {

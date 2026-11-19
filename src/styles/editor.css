@@ -2955,6 +2955,17 @@
 .libchat-error {
   padding: 0 12px 8px;
 }
+/* the one action an on-device-only refusal offers (librarianChat.tsx) */
+.libchat-restart {
+  align-self: flex-start;
+  margin: 0 12px 8px;
+  padding: 2px 0;
+}
+.libchat-restart:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
 .libchat-compose {
   display: flex;
   flex-direction: column;

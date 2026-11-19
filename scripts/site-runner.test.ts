@@ -197,12 +197,25 @@ describe("the 404 game: speed", () => {
   });
 
   test("overhead things wait until the visitor has learned the jump", () => {
-    const early = (game.WORLD.overheadFrom - 1) * game.WORLD.unitsPerMetre;
-    for (let i = 0; i < 200; i++)
-      expect(game.isOverhead(game.SIZES[game.nextKind(early, Math.random)]!)).toBe(false);
+    // Exercise every ground-choice bin, including the last draw below 1,
+    // immediately before the distance at which overhead things become eligible.
+    const early = game.WORLD.overheadFrom * game.WORLD.unitsPerMetre - 1;
+    const kinds = new Set(
+      [0, 0.25, 0.5, 0.75, 1 - Number.EPSILON].map((roll) => game.nextKind(early, () => roll)),
+    );
+    expect(kinds).toEqual(new Set(["rock", "bush", "log", "castle"]));
+  });
+
+  test("every ground and overhead kind is reachable at the eligibility boundary", () => {
     const later = game.WORLD.overheadFrom * game.WORLD.unitsPerMetre;
-    const kinds = new Set(Array.from({ length: 400 }, () => game.nextKind(later, Math.random)));
-    expect(kinds.has("gull") || kinds.has("branch")).toBe(true);
+    const kinds = new Set<string>();
+    for (const gate of [0, 1 - Number.EPSILON]) {
+      for (const roll of [0, 0.25, 0.5, 0.75, 1 - Number.EPSILON]) {
+        let calls = 0;
+        kinds.add(game.nextKind(later, () => (calls++ === 0 ? gate : roll)));
+      }
+    }
+    expect(kinds).toEqual(new Set(["rock", "bush", "log", "castle", "gull", "branch"]));
   });
 });
 

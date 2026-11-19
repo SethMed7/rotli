@@ -14,7 +14,12 @@ import {
   folderWriteFileBytes,
 } from "./folderFileIo";
 import { createManagedFile, discardPristineManagedFile } from "./folderManagedFiles";
-import { readFolderRawMetadata, writeFolderRawMetadata, setFolderProtection } from "./folderMetadata";
+import {
+  readFolderRawMetadata,
+  writeFolderRawMetadata,
+  setFolderProtection,
+  setFolderPinned,
+} from "./folderMetadata";
 import type { FolderNotesService } from "./folderNotes";
 import { type VaultDir, vaultHasRotliMarker } from "./vaultDir";
 
@@ -87,6 +92,7 @@ export const webVaultIo = {
   rawMetadata: async (id: string) => readFolderRawMetadata(directory(), await notePath(id)),
   writeMetadata: async (id: string, block: string, revision: string) =>
     writeFolderRawMetadata(directory(), await notePath(id), block, revision),
+  setPinned: async (id: string, pinned: boolean) => setFolderPinned(directory(), await notePath(id), pinned),
   async frontmatter(id: string): Promise<FrontmatterView | null> {
     const dir = directory();
     const path = await notePath(id);

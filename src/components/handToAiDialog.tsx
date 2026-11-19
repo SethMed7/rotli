@@ -80,7 +80,6 @@ function HandToAiCard({ noteId }: { noteId: string }) {
           basicNow.current = result.prompt;
           setDrafts({ basic: result.prompt, refined: "" });
         }
-        queueMicrotask(() => (result.kind === "ready" ? promptRef.current : closeRef.current)?.focus());
       })
       .catch((error) => {
         if (live.current)
@@ -91,6 +90,13 @@ function HandToAiCard({ noteId }: { noteId: string }) {
       run.current += 1;
     };
   }, [noteId]);
+
+  // focus follows the view once it is on screen: a microtask queued with the
+  // state change could run before React committed it, and focus nothing
+  useEffect(() => {
+    if (view.kind === "loading") return;
+    (view.kind === "ready" ? promptRef.current : closeRef.current)?.focus();
+  }, [view.kind]);
 
   const ready = view.kind === "ready";
   const wantsRefine = ready && mode === "refined" && refine.kind === "idle" && model !== null;

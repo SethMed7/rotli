@@ -14,11 +14,13 @@ import { CANVAS_REFUSAL } from "./model";
 
 const stat = (len: number) => ({ len, revision: "r1", writable: true });
 
+const utf8 = (text: string) => new TextEncoder().encode(text);
+
 const io = (overrides: Partial<CanvasFileIo>, reads: number[] = []): CanvasFileIo => ({
   stat: async () => stat(20),
   read: async (_id, len) => {
     reads.push(len);
-    return '{"nodes":[],"edges":[]}';
+    return utf8('{"nodes":[],"edges":[]}');
   },
   write: async () => "r2",
   ...overrides,
@@ -54,7 +56,38 @@ test("it fails closed: no fake blank canvas with nowhere to keep it, no half a f
   // a file that went away between the look and the read is gone, never empty
   expect(await refused(io({ read: async () => null }))).toBe(CANVAS_LOAD_REFUSAL.gone);
   // a parse failure surfaces the parser's own reason
-  expect(await refused(io({ read: async () => "[1," }))).toBe(CANVAS_REFUSAL.notJson);
+  expect(await refused(io({ read: async () => utf8("[1,") }))).toBe(CANVAS_REFUSAL.notJson);
+});
+
+test("a canvas that isn't UTF-8 is refused, never opened lossily and saved back mangled", async () => {
+  const refused = async (bytes: Uint8Array) => {
+    const { state, revision } = await loadCanvasFile("wiki/Plan.canvas", io({ read: async () => bytes }));
+    expect(revision).toBeNull();
+    return state.status === "error" ? state.error : null;
+  };
+  // a Latin-1 "é" (0xE9) inside a card's text: lossy decoding would turn it
+  // into U+FFFD and the next save would write that over the original byte
+  const latin1 = Uint8Array.from([
+    ...utf8('{"nodes":[{"id":"a","type":"text","text":"caf'),
+    0xe9,
+    ...utf8('"}]}'),
+  ]);
+  expect(await refused(latin1)).toBe(CANVAS_LOAD_REFUSAL.notText);
+  // a byte-order mark stays refused too: decoding past it would drop it on save
+  expect(await refused(Uint8Array.from([0xef, 0xbb, 0xbf, ...utf8('{"nodes":[],"edges":[]}')]))).toBe(
+    CANVAS_REFUSAL.notJson,
+  );
+  // real UTF-8 beyond ASCII opens as written
+  const { state } = await loadCanvasFile(
+    "wiki/Plan.canvas",
+    io({
+      read: async () =>
+        utf8(
+          '{"nodes":[{"id":"a","type":"text","text":"café ✓","x":0,"y":0,"width":1,"height":1}],"edges":[]}',
+        ),
+    }),
+  );
+  expect(state.status === "ready" && state.doc.nodes[0]).toMatchObject({ text: "café ✓" });
 });
 
 test("closing a canvas whose save fails keeps the edit for quit, which retries it", async () => {

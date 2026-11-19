@@ -7,6 +7,7 @@
 import type { Text } from "@codemirror/state";
 
 import { clamp } from "../lib/clamp";
+import { memoPerDoc } from "./docMemo";
 import { lineInFence, scanFences } from "./fences";
 
 export type Align = "left" | "right" | "center" | "";
@@ -74,8 +75,12 @@ export function splitRow(s: string): string[] {
 /** All GFM tables in the doc, in order. Fenced code is OPAQUE: a pipe-table
  * example inside ANY ``` fence is the user's code, never a live widget whose
  * chips would rewrite it (#13, audit 2026-07) — so a header line inside a
- * fence can't start a table. */
-export function scanTables(doc: Text): TableBlock[] {
+ * fence can't start a table. Memoized per document, like scanFences:
+ * livePreview, tableRender, textAlign, and the keymap all ask on the same
+ * keystroke. */
+export const scanTables = memoPerDoc(walkTables);
+
+function walkTables(doc: Text): TableBlock[] {
   const out: TableBlock[] = [];
   const fences = scanFences(doc);
   const total = doc.lines;
@@ -117,7 +122,7 @@ export function scanTables(doc: Text): TableBlock[] {
 }
 
 /** True when a line (by its `from` offset) sits inside any detected table. */
-export function lineInTable(lineFrom: number, tables: TableBlock[]): boolean {
+export function lineInTable(lineFrom: number, tables: readonly TableBlock[]): boolean {
   return tables.some((t) => lineFrom >= t.from && lineFrom <= t.to);
 }
 
@@ -181,15 +186,23 @@ function delimCell(a: Align, w: number): string {
   return dashes(w);
 }
 
+/** A cell's pipes as splitRow reads them back. splitRow takes backslashes in
+ * pairs, so a pipe after an even run (none, `\\`, …) is cell text and gets its
+ * `\`; a pipe after an odd run is already GFM's escaped pipe and stays as it
+ * is. Escaping only by the pipe, as before, turned a typed `\|` into `\\|`: an
+ * escaped backslash and then a real separator, which split the cell. */
+function escapeCellPipes(cell: string): string {
+  return cell.replace(/(\\*)\|/g, (whole, run: string) => (run.length % 2 === 0 ? `${run}\\|` : whole));
+}
+
 /** Serialize a shape back to markdown (no trailing newline). Short rows pad to
  * the header's column count; long (ragged) rows keep their overflow cells —
  * truncation was silent data loss. Cell pipes serialize as GFM `\|` so a pipe
  * typed into a cell can never split it. Columns pad to their widest cell. */
 export function tableToText(t: TableShape): string {
   const cols = Math.max(1, t.header.length);
-  const esc = (c: string) => c.replace(/\|/g, "\\|");
   const norm = (r: string[]) =>
-    (r.length > cols ? r : Array.from({ length: cols }, (_, i) => r[i] ?? "")).map(esc);
+    (r.length > cols ? r : Array.from({ length: cols }, (_, i) => r[i] ?? "")).map(escapeCellPipes);
   const header = norm(t.header);
   const rows = t.rows.map(norm);
   const widths = Array.from({ length: cols }, (_, i) =>

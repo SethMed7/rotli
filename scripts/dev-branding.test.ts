@@ -30,6 +30,32 @@ test("the native dev command uses an unmistakable identity without changing prod
   expect(production.bundle?.icon).not.toContain("icons-dev/icon.icns");
 });
 
+// The bundle, binary and update archive keep the lowercase `rotli` name that
+// release.sh, the updater feed and `rotli` CLI paths depend on; only the name
+// macOS shows (Dock, app menu, Finder) is capitalised, through a merged plist.
+test("macOS shows the app as Rotli, and the dev build as Rotli (Dev)", () => {
+  const plistName = (path: string, key: string): string | undefined =>
+    new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`).exec(
+      readFileSync(join(root, path), "utf8"),
+    )?.[1];
+  const production = readJson("src-tauri/tauri.conf.json") as {
+    app?: { windows?: { title?: string }[] };
+    bundle?: { macOS?: { infoPlist?: string } };
+  };
+  const development = readJson("src-tauri/tauri.dev.conf.json") as {
+    bundle?: { macOS?: { infoPlist?: string } };
+  };
+  const productionPlist = `src-tauri/${production.bundle?.macOS?.infoPlist}`;
+  const developmentPlist = `src-tauri/${development.bundle?.macOS?.infoPlist}`;
+
+  for (const key of ["CFBundleName", "CFBundleDisplayName"]) {
+    expect(plistName(productionPlist, key)).toBe("Rotli");
+    expect(plistName(developmentPlist, key)).toBe("Rotli (Dev)");
+  }
+  expect(production.app?.windows?.[0]?.title).toBe("Rotli");
+  expect(readFileSync(join(root, "index.html"), "utf8")).toContain("<title>Rotli</title>");
+});
+
 test("the development icon uses Rotli's blue identity", async () => {
   const icon = sharp(join(root, "src-tauri/icons-dev/icon.png"));
   const { data, info } = await icon.ensureAlpha().raw().toBuffer({ resolveWithObject: true });

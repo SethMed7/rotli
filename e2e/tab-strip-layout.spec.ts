@@ -36,7 +36,7 @@ test("hovering an inactive tab does not move the tab strip", async ({ page }) =>
   await hovered.click();
   expect(await hovered.boundingBox()).toEqual(before);
   expect(await neighbour.boundingBox()).toEqual(neighbourBefore);
-  await expect(hovered).toHaveAttribute("aria-selected", "true");
+  await expect(hovered.getByRole("tab")).toHaveAttribute("aria-selected", "true");
 });
 
 test("compact shell actions keep useful pointer targets in a narrow window", async ({ page }) => {
@@ -72,7 +72,7 @@ test("compact shell actions keep useful pointer targets in a narrow window", asy
 test("General settings switch the crowded tab bar between scroll and fit", async ({ page }) => {
   await gotoApp(page);
 
-  const strip = page.getByRole("tablist");
+  const strip = page.locator(".tabstrip");
   await expect(strip).toHaveAttribute("data-tab-layout", "scroll");
 
   const addTab = page.locator(".tabplus");

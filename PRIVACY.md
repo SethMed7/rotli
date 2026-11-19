@@ -68,7 +68,8 @@ with your computer's own folder picker, and starts when you log in (remove it
 with the installer's `--uninstall`). The installer hands the page its pairing
 code in the address's `#` fragment, which browsers never send to a server.
 Unsaved typing is held briefly in this browser's local storage so a refresh
-can't lose it, then written into the vault and cleared. The one outbound path
+can't lose it, then written into the vault and cleared. The name of the theme
+you last used is kept there too, so the page opens in it. The one outbound path
 is a chat you start: the helper runs your own AI tool, which contacts its
 provider as above, and secure notes are refused before it runs.
 

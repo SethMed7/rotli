@@ -96,13 +96,12 @@ impl CorpusStore {
                 let target = if below.is_empty() { sink.to_string() } else { format!("{sink}/{below}") };
                 self.writable(&rel)?;
                 self.writable(&target)?;
-                let path = self.abs(&rel);
                 let new_rel = if rel.to_ascii_lowercase().ends_with(".md") {
                     let id = self.wire_id_of(&rel)?;
-                    let meta = crate::fsutil::with_file_lock(&path, || self.relocate(&id, &rel, &target))?;
+                    let meta = self.lock_note(&rel, None, super::Authority::Person).and_then(|_held| self.relocate(&id, &rel, &target))?;
                     self.resolve_note_rel(&meta.id)?
                 } else {
-                    crate::fsutil::with_file_lock(&path, || self.relocate_opaque(&rel, &target))?.id
+                    self.lock_note(&rel, None, super::Authority::Person).and_then(|_held| self.relocate_opaque(&rel, &target))?.id
                 };
                 moves.push((rel, new_rel));
                 count += 1;

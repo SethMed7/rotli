@@ -24,7 +24,7 @@ import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import {
   DEST,
@@ -93,6 +93,7 @@ const ROOT_CONTROL_FILES = new Set(["memex.json", "users.json", "memex.local.jso
 interface CachedFile {
   revision: string;
   text: string;
+  document?: ReturnType<typeof parseNoteDocument>;
 }
 
 export class FolderNotesService implements NotesService {
@@ -106,6 +107,9 @@ export class FolderNotesService implements NotesService {
   private imported = false;
 
   constructor(private readonly dir: VaultDir) {}
+
+  /** The files the vault's host left out because they have a hard link. */
+  listSkipped = async (): Promise<SkippedFile[]> => (this.dir.skipped ? this.dir.skipped() : []);
 
   /** The memex-root marker set used by the All-Notes chats/ exclusion. A memex
    * vault's default root is the bare "" marker; a plain folder has none. */
@@ -146,7 +150,7 @@ export class FolderNotesService implements NotesService {
         index.set(path, path);
         continue;
       }
-      const fm = parseNoteDocument(await this.readFile(path)).frontmatter;
+      const fm = this.documentOf(path, await this.readFile(path)).frontmatter;
       index.set(fm?.id || path, path);
     }
     this.index = index;
@@ -178,6 +182,13 @@ export class FolderNotesService implements NotesService {
     return text;
   }
 
+  /** Parsed data shares the byte cache's existing revision invalidation. */
+  private documentOf(path: string, text: string) {
+    const cached = this.cache.get(path);
+    if (cached?.text !== text) return parseNoteDocument(text);
+    return (cached.document ??= parseNoteDocument(text));
+  }
+
   private async writeFile(path: string, text: string, expectedContent?: string): Promise<void> {
     await this.dir.writeText(path, text, expectedContent);
     this.cache.delete(path);
@@ -188,7 +199,7 @@ export class FolderNotesService implements NotesService {
     const text = await this.readFile(path);
     const stat = await this.dir.stat(path);
     if (!stat) throw new Error(`unknown note: ${path}`);
-    const { frontmatter, body } = parseNoteDocument(text);
+    const { frontmatter, body } = this.documentOf(path, text);
     const title = titleOf(body);
     const diskFolderId = parentPath(path);
     const updatedAt = stampToMs(frontmatter?.updated, stat.lastModified) ?? stat.lastModified;
@@ -393,13 +404,13 @@ export class FolderNotesService implements NotesService {
         shelf: this.imported ? [] : [DEST.inbox],
         reach: [],
         ...(policy?.secure ? { secure: true } : {}),
+        ...(policy?.locked ? { locked: true } : {}),
         ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
       },
       body,
       today(),
     );
-    const protectedText = policy?.locked ? text.replace("\n---\n", "\nlocked: true\n---\n") : text;
-    const exactBodyText = body && !body.endsWith("\n") ? protectedText.slice(0, -1) : protectedText;
+    const exactBodyText = body && !body.endsWith("\n") ? text.slice(0, -1) : text;
     if (policy?.secure) await ignoreInGit(this.dir, path);
     await this.writeFile(path, exactBodyText);
     this.reindex(id, id, path);

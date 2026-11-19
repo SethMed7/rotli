@@ -20,6 +20,21 @@ import { gotoApp } from "./support";
 
 test.use({ viewport: { width: 900, height: 520 } });
 
+// Vite's error overlay consumes ErrorEvents before Playwright's pageerror;
+// listen at the browser boundary as well, without cancelling any event.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const errors: string[] = [];
+    Object.assign(window, { resizeFitErrors: errors });
+    window.addEventListener("error", (event) => errors.push(event.message));
+  });
+});
+test.afterEach(async ({ page }) => {
+  expect(
+    await page.evaluate(() => (window as unknown as { resizeFitErrors: string[] }).resizeFitErrors),
+  ).toEqual([]);
+});
+
 /** Every pane's rect, in DOM order (top pane first for a column split). */
 async function paneRects(page: import("@playwright/test").Page) {
   return page.evaluate(() =>

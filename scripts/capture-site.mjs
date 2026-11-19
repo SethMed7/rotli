@@ -43,7 +43,7 @@ try {
     console.log(`${filename}: ${metadata.width} × ${metadata.height}`);
   }
   const captured = new Set();
-  for (let step = 0; step < 14; step++) {
+  for (let step = 0; step < 16; step++) {
     const name = (await theme.getAttribute("aria-label")).replace("Theme — ", "");
     if (targets.has(name)) {
       await capture(`rotli-app-${targets.get(name)}@3x.png`, 1280, 800);

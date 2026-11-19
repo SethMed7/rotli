@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { model, person } from "../lib/promptText.fixtures";
 import type { LibrarianChat as Chat } from "../state/librarianBar";
 import { ChatPanel, chatShownIn, LibrarianCorner } from "./librarianChat";
 
@@ -34,7 +35,7 @@ describe("the Librarian chat", () => {
           id: "t1",
           role: "librarian",
           text: "Added Ana. Sam already has a note.",
-          raw: "",
+          raw: model(""),
           actions: [],
           vault: [
             { type: "person", name: "Ana", area: "People/Work", about: "", tags: [] },
@@ -76,14 +77,14 @@ describe("the Librarian chat", () => {
         {
           id: "t1",
           role: "user",
-          text: "Who is this?",
+          text: person("Who is this?"),
           highlight: { exact: "the survey in March", prefix: "", suffix: "" },
         },
         {
           id: "t2",
           role: "librarian",
           text: "Someone you met.\n\nI’d file this with Projects.",
-          raw: "",
+          raw: model(""),
           actions: [{ type: "file", area: "Projects", create: false }],
           proposal: { kind: "open", picked: [true] },
         },
@@ -112,7 +113,7 @@ describe("the Librarian chat", () => {
           id: "t2",
           role: "librarian",
           text: "All set.",
-          raw: "",
+          raw: model(""),
           actions: [{ type: "tag", tags: ["person"] }],
           proposal: { kind: "applied", message: "1 change made." },
         },
@@ -127,12 +128,12 @@ describe("the Librarian chat", () => {
     const markup = render({
       ...base,
       turns: [
-        { id: "t1", role: "user", text: "Write me a poem about Maya", highlight: null },
+        { id: "t1", role: "user", text: person("Write me a poem about Maya"), highlight: null },
         {
           id: "t2",
           role: "librarian",
           text: "A poem is one for Chat.",
-          raw: "",
+          raw: model(""),
           actions: [],
           handoff: true,
         },
@@ -157,7 +158,7 @@ describe("the Librarian chat", () => {
           id: "t2",
           role: "librarian",
           text: "A poem is one for Chat.",
-          raw: "",
+          raw: model(""),
           actions: [],
           handoff: true,
           handedOff: true,
@@ -175,7 +176,7 @@ describe("the Librarian chat", () => {
           id: "t2",
           role: "librarian",
           text: "Tagging it.",
-          raw: "",
+          raw: model(""),
           actions: [{ type: "tag", tags: ["person"] }],
           proposal: { kind: "open", picked: [true] },
         },
@@ -204,12 +205,12 @@ describe("the Librarian chat", () => {
     const markup = render({
       ...base,
       turns: [
-        { id: "t1", role: "user", text: "tag and file it", highlight: null },
+        { id: "t1", role: "user", text: person("tag and file it"), highlight: null },
         {
           id: "t2",
           role: "librarian",
           text: "Done.",
-          raw: "",
+          raw: model(""),
           actions: [
             { type: "tag", tags: ["rotli", "bugs"] },
             { type: "file", area: "Projects", create: false },

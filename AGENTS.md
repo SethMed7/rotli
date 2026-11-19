@@ -36,8 +36,8 @@ changelog entries, generated output, and Carl sessions are historical only.
   Rust enforce both independently.
 - Breve is a Rotli capability. Rotli owns its UI, runtime, configuration,
   lifecycle, and scheduler integration.
-- Theme families are Rotli, Paper & Charcoal, Ocean, Grove, Iris, Blossom, and Midnight;
-  every family has an intentionally tuned light and dark environment.
+- Theme families are Rotli, Paper & Charcoal, Ocean, Grove, Iris, Blossom, Midnight,
+  and Tesven; every family has an intentionally tuned light and dark environment.
 
 ## Architecture, design, and syntax
 

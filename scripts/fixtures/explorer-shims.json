@@ -1,0 +1,24 @@
+{
+  "c9601494": {
+    "about": "c9601494 (the eighth-review round) answered quit as one transaction per window: its flushers, then its final check, under a read-only lock the explorer can't model; Rust asked nothing after the flushes. Its publish cancelled only react-query reads, never the explorer's held answers. So: answerFlush = runQuitTransaction, answerCheck says nothing is outstanding, and the read hooks do nothing.",
+    "append": {
+      "src/lib/quitFlush.ts": "\n/** Shim (scripts/explore-at.ts): one transaction per window, nothing asked after. */\nexport const answerFlush = runQuitTransaction;\nexport const answerCheck = (): string | null => null;\n",
+      "src/services/noteReads.ts": "\n/** Shim (scripts/explore-at.ts): c9601494 had no read hooks. */\nexport function setReadHooksForTests(_hooks: unknown): void {}\n"
+    },
+    "create": {
+      "src/editor/copiedAside.ts": "/** Shim (scripts/explore-at.ts): the conflict-copy notice's list lived in saveQueue.ts. */\nexport { copiedAside } from \"./saveQueue\";\n"
+    }
+  },
+  "1880e044": {
+    "about": "1880e044 (the seventh-review round) acknowledged quit when the flushers resolved, read without numbering (the editor took a read's answer as editorSurface.tsx's effect did), had no read hooks, and no notice named a conflict copy.",
+    "append": {
+      "src/lib/quitFlush.ts": "\n/** Shim (scripts/explore-at.ts): the acknowledgement was the flushers resolving; nothing asked after. */\nexport const answerFlush = runQuitFlushers;\nexport const answerCheck = (): string | null => null;\n",
+      "src/editor/model.ts": "\n/** Shims (scripts/explore-at.ts): reads carried no number; the editor took an answer as editorSurface.tsx's effect did. */\nexport const stampRead = <T>(note: T): T => note;\nexport function adoptReadNote(note: Note): void {\n  ensureDocument(note.id, note.body, note.revision, note);\n  reloadDocumentIfClean(note.id, note.body, note.revision);\n}\n",
+      "src/editor/saveQueue.ts": "\n/** Shim (scripts/explore-at.ts): no notice named a conflict copy. */\nexport const copiedAside = (): { copyId: string }[] => [];\n"
+    },
+    "create": {
+      "src/services/noteReads.ts": "/** Shim (scripts/explore-at.ts): 1880e044 had no read numbering or hooks. */\nexport function setReadHooksForTests(_hooks: unknown): void {}\n",
+      "src/editor/copiedAside.ts": "/** Shim (scripts/explore-at.ts): the conflict-copy notice's list lived in saveQueue.ts. */\nexport { copiedAside } from \"./saveQueue\";\n"
+    }
+  }
+}

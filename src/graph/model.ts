@@ -95,10 +95,17 @@ export function writtenOnly(graph: Graph): Graph {
  * focus yields an empty graph rather than the whole vault. */
 export function neighborhood(graph: Graph, focus: string, depth: number): Graph {
   if (!graph.nodes.some((node) => node.id === focus)) return { nodes: [], edges: [] };
+  // push in place: copying a hub's list on every edge made a note with
+  // thousands of links quadratic (canvas-graph audit, P2)
   const adjacent = new Map<string, string[]>();
+  const link = (from: string, to: string) => {
+    const list = adjacent.get(from);
+    if (list) list.push(to);
+    else adjacent.set(from, [to]);
+  };
   for (const { source, target } of graph.edges) {
-    adjacent.set(source, [...(adjacent.get(source) ?? []), target]);
-    adjacent.set(target, [...(adjacent.get(target) ?? []), source]);
+    link(source, target);
+    link(target, source);
   }
   const keep = new Set([focus]);
   let frontier = [focus];

@@ -155,7 +155,7 @@ impl CorpusStore {
             if linker == rel || !names(&body, &folder_of(&linker), rel) {
                 continue;
             }
-            let text = std::fs::read_to_string(self.abs(&linker)).unwrap_or_default();
+            let text = crate::fsutil::read_own_text(&self.abs(&linker)).unwrap_or_default();
             out.push((linker, is_locked(&text)));
         }
         Ok(out)

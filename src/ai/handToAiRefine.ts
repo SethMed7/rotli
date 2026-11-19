@@ -5,6 +5,7 @@
 // reply, and says no when the reply can't be trusted, so the caller falls back
 // to Basic. Pure apart from the injected host; never chooses a model.
 
+import { type ApprovedText, externalText, prompt, reshape } from "../lib/promptText";
 import { looksSecret } from "./guard";
 import refinePrompt from "./prompts/handToAiRefine.md?raw";
 import { modelFailure, promptAsset, stripThinking } from "./replyText";
@@ -13,7 +14,8 @@ import type { CompleteReq, Host } from "./types";
 const ASSET = promptAsset(refinePrompt);
 /** The asset's `version:` line. Bump it whenever the instructions change. */
 export const HAND_TO_AI_REFINE_VERSION = ASSET.version;
-const SYSTEM = ASSET.system;
+// the asset is Rotli's own instructions, bundled with the app
+const SYSTEM = prompt`${externalText(ASSET.system)}`;
 
 /** A reply can't be shorter than a task line, and a runaway reply is not a prompt. */
 const MIN_CHARS = 40;
@@ -21,11 +23,11 @@ const growthCap = (basic: string) => basic.length * 4 + 4000;
 
 /** The exact request the model receives: the asset as the system message, the
  * Basic handoff fenced as data. */
-export function renderRefineRequest(basic: string): CompleteReq {
+export function renderRefineRequest(basic: ApprovedText): CompleteReq {
   return {
     messages: [
       { role: "system", content: SYSTEM },
-      { role: "user", content: `<<<\n${basic.trim()}\n>>>` },
+      { role: "user", content: prompt`<<<\n${reshape(basic, (text) => text.trim())}\n>>>` },
     ],
   };
 }
@@ -81,7 +83,7 @@ export function refineModelFor<M extends { id: string }>(
  * whatever model is chosen (the egress ledger in Rust still backstops it). */
 export async function refineHandoff(
   host: Pick<Host, "complete">,
-  basic: string,
+  basic: ApprovedText,
   paths: readonly string[],
 ): Promise<RefineVerdict> {
   const request = renderRefineRequest(basic);

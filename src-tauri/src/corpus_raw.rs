@@ -206,7 +206,16 @@ pub(crate) fn list_raw_folder(state: &CorpusState, root_id: &str) -> Result<Corp
             meta
         })
         .collect();
-    Ok(CorpusList { folders, notes })
+    let skipped = list
+        .skipped
+        .into_iter()
+        .map(|mut file| {
+            file.path = compose_root_id(root_id, &file.path);
+            file.id = file.id.map(|id| compose_root_id(root_id, &id));
+            file
+        })
+        .collect();
+    Ok(CorpusList { folders, notes, skipped })
 }
 
 #[tauri::command]

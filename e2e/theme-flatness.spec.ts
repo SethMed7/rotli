@@ -17,9 +17,11 @@ const themes = [
   "Blossom Dark",
   "Moonlight",
   "Midnight",
+  "Tesven Light",
+  "Tesven Dark",
 ] as const;
 
-test("all fourteen environments keep titlebar tooltips flat and semantically colored", async ({ page }) => {
+test("all sixteen environments keep titlebar tooltips flat and semantically colored", async ({ page }) => {
   await gotoApp(page);
   await cycleEveryTheme(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
@@ -61,7 +63,7 @@ test("all fourteen environments keep titlebar tooltips flat and semantically col
   }
 });
 
-test("all fourteen environments use one flat semantic scrim for full-screen backdrops", async ({ page }) => {
+test("all sixteen environments use one flat semantic scrim for full-screen backdrops", async ({ page }) => {
   await gotoApp(page);
   await cycleEveryTheme(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });

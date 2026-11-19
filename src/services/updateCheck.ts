@@ -9,7 +9,13 @@
 // re-armed timer, and a hidden window waits for its next wake — which also
 // covers a Mac that slept through the timer.
 
-import { type UpdateStatus, checkForUpdate, isTauri } from "../lib/tauri";
+import {
+  type UpdateStatus,
+  appVersion,
+  checkForUpdate,
+  downloadAndInstallUpdate,
+  isTauri,
+} from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 
 export const UPDATE_CHECK_LAUNCH_DELAY_MS = 30_000;
@@ -111,4 +117,19 @@ export function startRoutineUpdateCheck(): () => void {
     unsubscribe();
     document.removeEventListener("visibilitychange", onVisible);
   };
+}
+
+// ——— The person's own check and install (Settings menu foot) ———
+
+/** The installed bundle version, or null outside the Mac app. */
+export function installedVersion(): Promise<string | null> {
+  return isTauri() ? appVersion() : Promise.resolve(null);
+}
+
+export function checkForUpdateNow(): Promise<UpdateStatus> {
+  return checkForUpdate();
+}
+
+export function installUpdateAndRelaunch(onProgress: (pct: number) => void): Promise<void> {
+  return downloadAndInstallUpdate(onProgress);
 }

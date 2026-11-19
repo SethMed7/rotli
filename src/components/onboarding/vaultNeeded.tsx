@@ -10,6 +10,7 @@ import { useEffect, useRef } from "react";
 
 import { formatChord } from "../../keys/chords";
 import { currentChord } from "../../keys/registry";
+import { containDialogFocus } from "../../lib/dialogFocus";
 import { useUiStore } from "../../state/ui";
 import { PaneScene } from "../paneEmptyState";
 import { useSetupHandle } from "./setupControls";
@@ -52,6 +53,7 @@ export function VaultNeeded({
           aria-labelledby="vault-needed-title"
           aria-describedby="vault-needed-text"
           aria-busy={busy}
+          onKeyDown={containDialogFocus}
         >
           <h2 id="vault-needed-title" className="vault-needed-title">
             Rotli needs a folder for your notes

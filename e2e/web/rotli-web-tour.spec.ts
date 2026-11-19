@@ -42,7 +42,8 @@ test("every major web surface opens without a console error or a failed request"
   test.slow();
   const problems = watchProblems(page);
   await startWithVault(page);
-  const row = (label: string) => page.locator("[role=option]", { hasText: label }).first();
+  const row = (label: string) =>
+    page.locator(".sb-notes-tree button, .sb-system button", { hasText: label }).first();
 
   for (const label of ["All notes", "Captures", "Tasks", "Library", "Assets", "Archive", "Trash"]) {
     await row(label).click();
@@ -73,7 +74,7 @@ test("every major web surface opens without a console error or a failed request"
   await page.setViewportSize({ width: 640, height: 820 });
   await row("All notes").click();
   await page.setViewportSize({ width: 1280, height: 820 });
-  for (let step = 0; step < 14; step += 1) {
+  for (let step = 0; step < 16; step += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
     if (/Dark/.test(themeNow(await toggle.getAttribute("aria-label")))) break;
     await toggle.click();

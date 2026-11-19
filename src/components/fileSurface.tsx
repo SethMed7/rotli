@@ -22,6 +22,7 @@ import { clamp } from "../lib/clamp";
 import { PLATFORM } from "../lib/featurePolicy";
 import { extOf, fileName, managedFileNote } from "../lib/fileKind";
 import { kindOf, OPEN_WITH_BY_KIND } from "../lib/fileSurfaceKinds";
+import { formatBytes } from "../lib/formatBytes";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
@@ -41,7 +42,7 @@ import { deriveSheetFacts, describeShape, formatStamp, sizeLine, truncatedRowsNo
 import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { FileHeaderMarks } from "./fileHeaderMarks";
+import { FileHeaderMarks, FileViewButton, HtmlViewModes } from "./fileHeaderMarks";
 import { OfficeMount } from "./fileOffice/officeMount";
 import { officeEditability, probeOffice } from "./fileOffice/officeProbe";
 
@@ -82,6 +83,8 @@ export function zoomStep(scale: number, dir: 1 | -1): number {
 // SheetJS a truncated zip (cryptic parse error), showing a silently cut CSV,
 // or a Code view whose source ends mid-tag while Preview looks complete.
 const READ_MAX_BYTES = 8_000_000;
+/** One <pre> this long stays responsive; past it the view says it's the start. */
+const TEXT_VIEW_BYTES = 2_000_000;
 
 /** Build the html Preview srcdoc: the raw file text with a <base> injected so
  * relative URLs keep resolving against the file's asset URL (what the old
@@ -118,6 +121,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const ext = extOf(name);
   const [url, setUrl] = useState("");
   const [text, setText] = useState<string | null>(null);
+  const [textCutOf, setTextCutOf] = useState<number | null>(null);
   const [tables, setTables] = useState<SheetTable[] | null>(null);
   const [activeSheet, setActiveSheet] = useState(0);
   // null = probing; the probe decides editable vs read-only viewer for sheets
@@ -173,6 +177,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
     };
     setUrl("");
     setText(null);
+    setTextCutOf(null);
     setTables(null);
     setActiveSheet(0);
     setStat(null);
@@ -197,8 +202,15 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       .catch(() => {});
 
     if (kind === "text") {
-      corpusFileText(fileId)
-        .then((t) => !cancelled && setText(t))
+      // with no cap the read stopped at 200 KB and showed a long log as if
+      // that were all of it: read a named amount, and say when it isn't all
+      corpusFileStat(fileId)
+        .catch(() => null)
+        .then((s) => {
+          if (cancelled) return;
+          if (s && s.len > TEXT_VIEW_BYTES) setTextCutOf(s.len);
+          return corpusFileText(fileId, TEXT_VIEW_BYTES).then((t) => !cancelled && setText(t));
+        })
         .catch(fail);
     } else if (kind === "html") {
       // both modes render the SAME full text (Preview = srcdoc, Code = <pre>),
@@ -417,24 +429,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         </span>
         <FileHeaderMarks {...{ kind, ext, stat, probed, tooLarge, sheetEditable, documentEditable }} />
         <span className="file-head-gap" aria-hidden="true" />
-        {kind === "html" && !tooLarge && (
-          <div className="file-mode-tabs" role="tablist" aria-label="View mode">
-            <button
-              type="button"
-              className={htmlMode === "preview" ? "fsh-tab on" : "fsh-tab"}
-              onClick={() => setHtmlMode("preview")}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              className={htmlMode === "code" ? "fsh-tab on" : "fsh-tab"}
-              onClick={() => setHtmlMode("code")}
-            >
-              Code
-            </button>
-          </div>
-        )}
+        {kind === "html" && !tooLarge && <HtmlViewModes mode={htmlMode} onChange={setHtmlMode} />}
         {kind === "image" && imgNat && (
           <button
             type="button"
@@ -561,7 +556,11 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         onKeyDown={kind === "image" ? onImageKeyDown : undefined}
         onMouseDown={kind === "image" ? (e) => e.currentTarget.focus() : undefined}
       >
-        {err && <p className="file-err">⚠ {err}</p>}
+        {err && (
+          <p className="file-err" role="alert">
+            ⚠ {err}
+          </p>
+        )}
         {(loadingMedia || loadingText || loadingHtml || loadingSheet || loadingDocument) && (
           <p className="file-loading">Loading…</p>
         )}
@@ -622,7 +621,14 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           />
         )}
         {!err && kind === "text" && text !== null && (
-          <pre className="file-text">{text || "(empty file)"}</pre>
+          <>
+            {textCutOf !== null && (
+              <p className="file-loading">
+                Showing the first {formatBytes(TEXT_VIEW_BYTES)} of {formatBytes(textCutOf)}.
+              </p>
+            )}
+            <pre className="file-text">{text || "(empty file)"}</pre>
+          </>
         )}
 
         {(kind === "document" || kind === "sheet") && (
@@ -668,14 +674,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             {tables.length > 1 && (
               <div className="file-sheet-tabs">
                 {tables.map((t, i) => (
-                  <button
-                    key={t.name}
-                    type="button"
-                    className={i === activeSheet ? "fsh-tab on" : "fsh-tab"}
-                    onClick={() => setActiveSheet(i)}
-                  >
+                  <FileViewButton key={t.name} active={i === activeSheet} onClick={() => setActiveSheet(i)}>
                     {t.name}
-                  </button>
+                  </FileViewButton>
                 ))}
               </div>
             )}

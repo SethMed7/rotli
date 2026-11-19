@@ -120,3 +120,16 @@ describe("sortHits — rank asc, then recency desc, then id (mirrors Rust sort_h
     expect(sorted.map((h) => h.id)).toEqual(["title", "words", "new-body", "old-body"]);
   });
 });
+
+test("ASCII case folding keeps title spans identical for every letter", () => {
+  for (let code = 65; code <= 90; code++) {
+    const letter = String.fromCharCode(code);
+    expect(searchMatch(letter, `000${letter.toLowerCase()}111`, "", "")?.spans).toEqual([[3, 1]]);
+  }
+});
+
+test("non-ASCII folding stays per code point, including contextual sigma and expansions", () => {
+  expect(searchMatch("ΟΣ", "οσ", "", "")?.spans).toEqual([[0, 2]]);
+  expect(searchMatch("i", "İ", "", "")?.spans).toEqual([[0, 1]]);
+  expect(searchMatch("A", "🦉a", "", "")?.spans).toEqual([[1, 1]]);
+});

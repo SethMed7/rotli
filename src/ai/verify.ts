@@ -1,10 +1,11 @@
 // Connected-lane verification. Claude Code, Codex, and Cursor ACP are the only
 // executable lanes; every requested model is rechecked against the catalog.
 
+import { fixed } from "../lib/promptText";
 import { cliComplete } from "../lib/tauri";
 import { LANE_PING_MODEL, type ProviderId, resolveLaneModel } from "./models";
 
-const PING = "For this software integration check, reply with exactly: OK";
+const PING = fixed("For this software integration check, reply with exactly: OK");
 const PING_TIMEOUT_MS = 90_000;
 
 export interface LaneVerify {

@@ -6,6 +6,7 @@
 // (the frame inherits the app CSP) while relative URLs still resolve.
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { ZOOM_MAX, ZOOM_MIN, clampZoom, fitScale, htmlPreviewDoc, kindOf, zoomStep } from "./fileSurface";
@@ -120,4 +121,13 @@ describe("image zoom math", () => {
 test("previewed HTML may request nothing — not even the app's own origin", () => {
   expect(HTML_PREVIEW_CSP).toContain("default-src 'none'");
   expect(HTML_PREVIEW_CSP).not.toMatch(/'self'|https?:/);
+});
+
+test("every text read names its cap, so the Mac's 200 KB default can't cut a file silently", () => {
+  // corpus_file_text falls back to 200,000 bytes when no cap is passed, and the
+  // viewer would show that much as if it were the whole file
+  const surface = readFileSync(new URL("fileSurface.tsx", import.meta.url), "utf8");
+  const reads = [...surface.matchAll(/corpusFileText\(([^)]*)\)/g)].map((match) => match[1] ?? "");
+  expect(reads.length).toBeGreaterThan(0);
+  expect(reads.filter((args) => !args.includes(","))).toEqual([]);
 });

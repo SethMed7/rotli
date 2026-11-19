@@ -427,17 +427,17 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
       id: "01JMADE",
       action: "create",
       status: "applied",
-      noteId: "wiki/_inbox/kunal-a1b2c3.md",
-      noteUlid: "01JKUNAL",
-      noteTitle: "Kunal",
+      noteId: "wiki/_inbox/ana-a1b2c3.md",
+      noteUlid: "01JANA",
+      noteTitle: "Ana",
       before: "",
-      after: "wiki/_inbox/kunal-a1b2c3.md",
+      after: "wiki/_inbox/ana-a1b2c3.md",
     });
-    expect(describeAction(a, false)).toBe("Added a note for “Kunal”");
+    expect(describeAction(a, false)).toBe("Added a note for “Ana”");
     expect(canUndo(a)).toBe(true);
-    const { deps, calls } = fakeDeps("wiki/_inbox/kunal-a1b2c3.md");
+    const { deps, calls } = fakeDeps("wiki/_inbox/ana-a1b2c3.md");
     await undoAction(a, deps);
-    expect(calls.trashed).toEqual(["01JKUNAL"]);
+    expect(calls.trashed).toEqual(["01JANA"]);
     expect(calls.filerMove).toEqual([]);
     expect(calls.appended.map((x) => [x.id, x.status])).toEqual([["01JMADE", "reverted"]]);
   });

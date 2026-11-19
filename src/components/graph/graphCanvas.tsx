@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Graph, GraphNode } from "../../graph/model";
 import { useDataTheme } from "../../state/theme";
+import { useUiStore } from "../../state/ui";
 import { type GraphRenderer, createGraphRenderer } from "./graphRenderer";
 
 export interface GraphCanvasProps {
@@ -23,6 +24,8 @@ export function GraphCanvas({ graph, center, matched, onOpen, onCenter }: GraphC
   const handlers = useRef({ onOpen, onCenter });
   const [focused, setFocused] = useState<GraphNode | null>(null);
   const theme = useDataTheme();
+  // the accent changes the active note's colour without touching data-theme
+  const accent = useUiStore((state) => `${state.accentColor}:${state.accentHue}`);
 
   useEffect(() => {
     handlers.current = { onOpen, onCenter };
@@ -50,7 +53,7 @@ export function GraphCanvas({ graph, center, matched, onOpen, onCenter }: GraphC
 
   useEffect(() => {
     rendererRef.current?.repaint();
-  }, [theme]);
+  }, [theme, accent]);
 
   const announce = focused
     ? `${focused.title}${focused.secure ? ", secure" : ""}, ${focused.degree} ${focused.degree === 1 ? "link" : "links"}`

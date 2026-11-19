@@ -8,6 +8,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { longDateLabel } from "../lib/dateLabels";
+import { containDialogFocus } from "../lib/dialogFocus";
 import { extOf, fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
 import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
@@ -129,14 +130,18 @@ export function PreviewModal() {
       text !== null ? (
         <pre className="pv-text">{text}</pre>
       ) : (
-        <p className="pv-wait">{failed ? "Couldn’t read the chat." : "Loading…"}</p>
+        <p key={failed ? "failed" : "loading"} className="pv-wait" role={failed ? "alert" : "status"}>
+          {failed ? "Couldn’t read the chat." : "Loading…"}
+        </p>
       );
   } else if (!isFile) {
     body =
       text !== null ? (
         <MarkdownPeek body={text} />
       ) : (
-        <p className="pv-wait">{failed ? "Couldn’t read the note." : "Loading…"}</p>
+        <p key={failed ? "failed" : "loading"} className="pv-wait" role={failed ? "alert" : "status"}>
+          {failed ? "Couldn’t read the note." : "Loading…"}
+        </p>
       );
   } else if (fkind === "image" && url) {
     body = <img className="pv-media" src={url} alt={name} draggable={false} />;
@@ -169,7 +174,14 @@ export function PreviewModal() {
 
   return (
     <div className="pv-scrim">
-      <div className="pvw" ref={cardRef} role="dialog" aria-modal="true" aria-label={`Preview: ${name}`}>
+      <div
+        className="pvw"
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Preview: ${name}`}
+        onKeyDown={containDialogFocus}
+      >
         <header className="pv-head">
           {glyphForNote(item, { size: 15 })}
           <span className="pv-title">{name || "Empty note"}</span>
@@ -182,6 +194,8 @@ export function PreviewModal() {
           </button>
         </header>
         <div className="pv-body">{body}</div>
+        {/* where Tab lands leaving a PDF or a player, which the trap can't see */}
+        <span tabIndex={0} data-focus-end="" onFocus={() => openBtnRef.current?.focus()} />
       </div>
     </div>
   );

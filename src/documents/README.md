@@ -18,7 +18,11 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   package parts, and retains unsupported objects inside edited paragraphs and
   table cells.
 - `engine/` is the only document folder that imports Univer; `engine/univer.ts`
-  mounts it. Replacing the editor does not change storage, the OOXML codec, or
+  mounts it. `engine/bootstrap.ts` registers the same document preset plugins
+  without constructing the globally extended `FUniver` facade: sheet facade
+  initializers require services absent from a document-only instance. Saves
+  still collect document plugin resources alongside the core model snapshot.
+  Replacing the editor does not change storage, the OOXML codec, or
   application use cases. `engine/policy.ts` owns mutation classification (a
   no-op mutation, such as a format armed at a collapsed caret, is not content:
   it neither dirties the file nor re-lays the canvas, which would clear that

@@ -427,7 +427,57 @@
             "crème"
           ],
           "secure": true
-        }
+        },
+        {
+          "title": "Café receipts",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "café"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Café receipts",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "café"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Notes",
+          "rel": "wiki/_inbox/café-receipts.md",
+          "keywords": [
+            "Café"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Ｂａｎｋ login",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "bank"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Cafe receipts",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "café"
+          ],
+          "secure": false
+        },
+        { "title": "bank™", "rel": "wiki/x.md", "keywords": ["bank"], "secure": true },
+        { "title": "banḱ", "rel": "wiki/x.md", "keywords": ["bank"], "secure": true },
+        { "title": "bank\u0345 login", "rel": "wiki/x.md", "keywords": ["bank"], "secure": true },
+        { "title": "Notes", "rel": "wiki/banḱ-login.md", "keywords": ["bank"], "secure": true },
+        { "title": "Notes", "rel": "wiki/x-é1234.md", "keywords": ["é1234"], "secure": true },
+        { "title": "Notes", "rel": "wiki/x-é1234.md", "keywords": ["é1234"], "secure": true },
+        { "title": "Notes", "rel": "wiki/x-é12345.md", "keywords": ["é12345"], "secure": true },
+        { "title": "Notes", "rel": "wiki/x-3F9K2A.md", "keywords": ["3f9k2a"], "secure": true },
+        { "title": "Notes", "rel": "wiki/x-3f9k2a.md", "keywords": ["3f9k2a"], "secure": false },
+        { "title": "Notes", "rel": "wiki/3f9k2a.md", "keywords": ["3f9k2a"], "secure": true }
       ]
     },
     "aiCreators": {
@@ -871,7 +921,8 @@
         "local_ai_allowed",
         "view_tag",
         "created_by",
-        "ai_edit"
+        "ai_edit",
+        "librarian_page"
       ]
     },
     "managedFileRules": {

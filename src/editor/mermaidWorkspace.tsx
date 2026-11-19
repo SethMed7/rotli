@@ -568,8 +568,14 @@ export function mountMermaidWorkspace(options: MermaidWorkspaceOptions): () => v
   document.body.appendChild(host);
   const root = createRoot(host);
   root.render(<MermaidWorkspace {...options} />);
+  let disposed = false;
   return () => {
-    root.unmount();
+    if (disposed) return;
+    disposed = true;
+    // Closing the host note runs during the parent React root's commit.
+    // Detach the dialog now, then dispose its independent root after that
+    // commit returns; a nested synchronous unmount cannot finish safely.
     host.remove();
+    queueMicrotask(() => root.unmount());
   };
 }

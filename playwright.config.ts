@@ -46,7 +46,8 @@ export default defineConfig({
   webServer: {
     command: `bun run dev -- --port ${PORT} --strictPort`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    // An occupied port may belong to another checkout. Always prove this tree.
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });

@@ -15,6 +15,7 @@ import {
   setAsideCopyName,
   setAsideParked,
   setParked,
+  writeSheetModel,
 } from "./session";
 
 /** A parked session a workbook can really be written from. */
@@ -130,5 +131,16 @@ describe("flushOnHide — a background save that fails says so", () => {
       (message) => reports.push(message),
     );
     expect(reports).toEqual([]);
+  });
+});
+
+describe("a workbook format Rotli can't write faithfully", () => {
+  test("an .xlsm is refused before anything is written, so its macros survive", async () => {
+    const wb = newWorkbook();
+    const model = workbookToModel(wb, "Budget");
+    const idMap = buildSheetIdMap(wb, model);
+    await expect(writeSheetModel("storage/Budget.xlsm", "xlsx", wb, model, idMap, "r1")).rejects.toThrow(
+      /can.t save \.xlsm/,
+    );
   });
 });

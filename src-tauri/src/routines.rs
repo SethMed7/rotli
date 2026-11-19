@@ -5,7 +5,7 @@
 //! into the active corpus, start it only after an explicit takeover marker,
 //! restart it after a crash, and terminate it with Rotli.
 
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -251,7 +251,10 @@ fn prepare_runtime_stage(
     fs::copy(source.join("defaults/bun.lock"), next.join("bun.lock"))
         .map_err(|error| format!("stage Breve runtime lockfile: {error}"))?;
     let skill = next.join("skills/breve/SKILL.md");
-    if let Ok(text) = fs::read_to_string(&skill) {
+    // the app bundle's own copy, read outside the vault (the staged one is
+    // the same text, just written beside the vault's runtime)
+    let bundled = source.join("skills/breve/SKILL.md");
+    if let Ok(text) = fs::read_to_string(&bundled) {  // raw read (outside-vault): the Breve skill in the app bundle
         let root = home.parent().and_then(Path::parent).unwrap_or(home);
         fs::write(&skill, crate::breve::materialize_skill_text(&text, root, home))
             .map_err(|error| format!("materialize {}: {error}", skill.display()))?;
@@ -295,7 +298,7 @@ fn commit_runtime_swap(runtime: &Path, next: &Path, previous: &Path) -> Result<(
         });
     }
     if let Some(parent) = runtime.parent() {
-        if let Ok(directory) = fs::File::open(parent) {
+        if let Ok(directory) = fs::File::open(parent) {  // raw read (dir-sync): opens a directory to sync it
             let _ = directory.sync_all();
         }
     }
@@ -455,14 +458,10 @@ pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, Stri
 
 fn scheduler_command(root: &Path) -> Result<Child, String> {
     let home = root.join(MANAGED_DIR);
-    let logs = home.join("logs");
-    fs::create_dir_all(&logs).map_err(|e| format!("create {}: {e}", logs.display()))?;
-    let log_path = logs.join("rotli-supervisor.log");
-    let stdout = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("open {}: {e}", log_path.display()))?;
+    // the log lives in the vault (.rotli/breve): the checked sidecar opener
+    let log_rel = Path::new(MANAGED_DIR).join("logs/rotli-supervisor.log");
+    let stdout = crate::containment::open_sidecar(root, &log_rel, crate::containment::Sidecar::Append)?
+        .ok_or("open the scheduler log")?;
     let stderr = stdout
         .try_clone()
         .map_err(|e| format!("clone scheduler log: {e}"))?;

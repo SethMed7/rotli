@@ -25,6 +25,28 @@ async function assets(page: Page) {
   await expect(page.locator(".system-browser")).toBeVisible();
 }
 
+test("Pin to top saves on web, survives reload, and unpins without changing note text", async ({ page }) => {
+  const path = "wiki/parity-note.md";
+  await startWithFolder(page, {
+    "memex.json": MARKER,
+    [path]: NOTE,
+    ".rotli/main.json": MAIN,
+  });
+  await booted(page);
+  const row = page.locator('.main-tree [data-main-id="parity-note"]').first();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitemcheckbox", { name: "Pin to top", exact: true }).click();
+  await expect
+    .poll(() => readOpfsFile(page, path))
+    .toBe(NOTE.replace("custom: original", "custom: original\npinned: true"));
+  await page.reload();
+  await booted(page);
+  await row.click({ button: "right" });
+  await expect(page.getByRole("menuitemcheckbox", { name: "Unpin from top", exact: true })).toBeChecked();
+  await page.getByRole("menuitemcheckbox", { name: "Unpin from top", exact: true }).click();
+  await expect.poll(() => readOpfsFile(page, path)).toBe(NOTE);
+});
+
 // The direct web AI corpus exclusion is covered by webMetadataFiles.test.ts;
 // this proves the real menu writes the durable security fact across reboot.
 test("mark secure writes frontmatter and protected home, and survives reload", async ({ page }) => {

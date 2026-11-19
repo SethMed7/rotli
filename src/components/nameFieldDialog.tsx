@@ -1,4 +1,6 @@
-import type { RefObject } from "react";
+import { type RefObject, useEffect } from "react";
+
+import { containDialogFocus } from "../lib/dialogFocus";
 
 /** The one small "type a name" modal shared by name-first creation and Rename…:
  * Enter submits, Escape or a click away cancels, a refusal stays visible. */
@@ -29,10 +31,17 @@ export function NameFieldDialog({
   submitLabel: string;
   submitDisabled: boolean;
 }) {
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
   return (
     <div className="rename-overlay" onMouseDown={onCancel}>
       <div
         className="rename-card"
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-title`}
@@ -40,6 +49,7 @@ export function NameFieldDialog({
         aria-busy={busy}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
+          containDialogFocus(event);
           if (event.key !== "Escape") return;
           event.preventDefault();
           event.stopPropagation();
@@ -59,7 +69,7 @@ export function NameFieldDialog({
           autoComplete="off"
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") return; // the card cancels
+            if (event.key === "Escape" || event.key === "Tab") return; // the card handles these
             event.stopPropagation();
             if (event.key === "Enter") onSubmit();
           }}

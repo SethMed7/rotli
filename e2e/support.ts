@@ -7,23 +7,40 @@
 
 import type { Locator, Page } from "@playwright/test";
 
+const guarded = new WeakSet<Page>();
+
+/** Fail the running test on any uncaught error in the page — an exception or
+ * an unhandled rejection the app never surfaced (production-readiness audit
+ * 2026-08-10). A throw inside a Playwright event handler fails the test that
+ * owns the page. Measured 2026-11-11: the whole desktop-twin and Rotli Web
+ * suites raise none, so any that appears is new. Wired into gotoApp and the
+ * web lane's startWithVault, which nearly every spec opens with. */
+export function failOnPageErrors(page: Page): void {
+  if (guarded.has(page)) return;
+  guarded.add(page);
+  page.on("pageerror", (error) => {
+    throw new Error(`uncaught error in the page: ${error.message}`, { cause: error });
+  });
+}
+
 /** Load the app and wait for the pane tree (the always-present tab strip) to
  * mount — the signal that the seeded corpus has rendered its first tab. */
 export async function gotoApp(page: Page): Promise<void> {
+  failOnPageErrors(page);
   // ROTLI_E2E_APP_PATH=/app/ runs the same specs against the web build
   // served under its sub-path (bun run dev:web), so a shell fix is proved on
   // both twins with one spec.
   await page.goto(process.env.ROTLI_E2E_APP_PATH ?? "/");
-  await page.getByRole("tablist").waitFor();
+  await page.locator(".tabstrip").first().waitFor();
 }
 
-/** Set Appearance → Theme button to All 14 through the real control, so a
+/** Set Appearance → Theme button to All 16 through the real control, so a
  * spec can walk every environment with the titlebar sun (its default flips
  * light and dark inside one family), then come back to the notes. */
 export async function cycleEveryTheme(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  await page.getByRole("button", { name: "All 16", exact: true }).click();
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
 }
 

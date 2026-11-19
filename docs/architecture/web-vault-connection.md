@@ -5,6 +5,36 @@ what it may reach, and what happens when the connection is interrupted.
 Decided by the owner on 2026-09-22; the history is in
 [`../design/web-version-and-shell-batch-2026-09-16.md`](../design/web-version-and-shell-batch-2026-09-16.md) §1.
 
+## Native command availability
+
+[`../../scripts/web-command-parity.json`](../../scripts/web-command-parity.json)
+is the exhaustive inventory of the native `generate_handler!` registry. Each
+command appears exactly once in a capability group with an explanation,
+implementation paths, and test references:
+
+| Status | Meaning |
+| --- | --- |
+| `web` | A web equivalent exists through the connected folder, browser APIs, or paired Helper. The group's explanation names limits and prerequisites. |
+| `notice` | The web surface explains Mac availability and withholds the native operation. |
+| `mac-only` | The native integration is outside the web capability set; its operation is not offered there. Some groups also describe a web fallback or an availability caption. |
+
+These are user-facing capability equivalents, not a promise that the native
+wrapper itself can be called on web. For example, `FolderNotesService` replaces
+corpus IPC, the browser file picker supplies bytes instead of native paths,
+and web sharing uses browser APIs. Development-only capabilities remain gated
+by the build policy on both shells. Helper chat does not enable local models,
+the Librarian, native windows, or arbitrary native commands.
+
+`bun run check:web-parity` compares every registered native command with those
+literal decisions. Missing, stale, duplicate, malformed, or unexplained entries
+fail, as do missing source/test files. Both lint runners include it, so a new
+native handler requires an explicit web decision in the same change. Update
+the owning implementation and focused tests when changing a disposition.
+The checker proves inventory coverage and reference existence; behavior still
+needs the named tests, and native behavior still needs native evidence. It does
+not certify that every path through a capability behaves identically on both
+shells. The development browser twin's in-memory fallbacks are not web support.
+
 ## The rules
 
 1. **A vault is required.** The editor never runs without a connected vault
@@ -178,6 +208,16 @@ capabilities as one-line Mac availability states on web, without Run now,
 hardware scanning, or model install/default/uninstall controls. Helper-supported
 connected CLI configuration stays available.
 
+Appearance keeps the **App icon** heading with **In the Mac app.** on web,
+without the Dock-only choice buttons or their images. The installed Mac app
+keeps all released icon choices and its saved selection; changing a browser
+preference cannot change the Mac's Dock icon.
+
+General likewise labels **Updates** and **Demo mode** as **In the Mac app.**
+on web. It does not mount the native updater controls, claim an installed app
+version or an update result, or offer the native demo-vault switch. Native
+update and demo behavior remains owned by the installed shell.
+
 `/attach` uses a browser `image/*` file picker on web and the existing
 `importImageFilesAtPosition` byte-backed paste/drop lane. Selected image bytes
 land in the bound vault and Markdown receives only a portable `storage:` link;
@@ -195,6 +235,14 @@ reserved keys Rust protects (`id`, `created`, `owner`, `local_ai_allowed`,
 silently restoring those lines. Lock, AI-edit permission, and local-AI access
 use their explicit commands. Local-AI access remains portable metadata even
 though the web's AI corpus has no on-device exception.
+
+**Pin to top** writes the note's `pinned` metadata through the same connected
+folder seam and survives reload. It changes only that top-level line, leaving
+the body, dates, nested metadata, and line endings intact, including in a
+folder opened in place. Unpinning removes the line. Locked notes may still be
+pinned by the person; non-Markdown files are refused. A concurrent edit wins
+through the complete-file revision gate, and write failures reach the menu's
+existing error state.
 
 Marking secure requires a stable frontmatter id, records `secure_origin`,
 protects both paths in `.gitignore` before relocation, and moves the note into

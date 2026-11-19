@@ -99,12 +99,12 @@ Spreadsheets (XLSX and CSV) and Word documents are in **Beta**: they work and
 save in their own formats, and are still being finished. Mermaid diagram tabs
 and read-aloud are coming soon and are not in this release.
 
-## Seven families, light and dark
+## Eight families, light and dark
 
-The titlebar sun switches between paired light and dark environments in seven
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight**
-(Settings → Appearance can make it walk your own picks, or all fourteen). Every
-first run starts in Rotli Light; below is one environment from each family.
+The titlebar sun switches between paired light and dark environments in eight
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight · Tesven**
+(Settings → Appearance can make it walk your own picks, or all sixteen). Every
+first run starts in Rotli Light; below are six of them.
 
 <div align="center">
 <table>
@@ -163,8 +163,10 @@ agents, locked notes refuse edits, and every update needs a fresh revision.
 ```
 
 The MCP server, `rotli agent …` commands, and remote agents are development
-builds only for now. The [agent workspace contract](docs/architecture/agent-workspace.md)
-has the details.
+builds only for now. So is the Librarian route (`rotli mcp --librarian`), a
+small tool set an agent host can use to keep one vault organised: it is off by
+default even there and isn't in the public app yet. The
+[agent workspace contract](docs/architecture/agent-workspace.md) has the details.
 
 ## Build it
 

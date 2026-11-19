@@ -6,6 +6,8 @@
 
 import { expect, type Page } from "@playwright/test";
 
+import { failOnPageErrors } from "../support";
+
 export const APP = "/app/";
 
 /** Setup's heading, whichever step it is on. */
@@ -65,6 +67,7 @@ export function readOpfsFile(page: Page, path: string): Promise<string> {
 /** First visit → setup → connect an empty folder → it becomes a new vault
  * with the Welcome lessons, and the welcome note is open. */
 export async function startWithVault(page: Page, url = APP): Promise<void> {
+  failOnPageErrors(page);
   await page.goto(url);
   await expect(vaultGate(page)).toHaveText("Choose your vault");
   await rememberOpfsVault(page);

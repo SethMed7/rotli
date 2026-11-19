@@ -62,14 +62,16 @@ export class FolderCanvasStore {
     return stat ? { len: stat.size, revision: revisionOf(stat) } : null;
   }
 
-  /** The text, its size, and the revision a save must present — the stat
-   * taken BEFORE the read, so a write in between can only make the next save
-   * conflict, never overwrite a version the editor didn't see. */
-  async read(id: string): Promise<{ text: string; len: number; revision: string } | null> {
+  /** The raw bytes (decoded strictly by the canvas composition — a lossy
+   * `readText` would let a save mangle non-UTF-8 bytes), its size, and the
+   * revision a save must present — the stat taken BEFORE the read, so a write
+   * in between can only make the next save conflict, never overwrite a
+   * version the editor didn't see. */
+  async read(id: string): Promise<{ bytes: Uint8Array; len: number; revision: string } | null> {
     assertCanvasId(id);
     const stat = await this.dir.stat(id);
     if (!stat) return null;
-    return { text: await this.dir.readText(id), len: stat.size, revision: revisionOf(stat) };
+    return { bytes: await this.dir.readBytes(id), len: stat.size, revision: revisionOf(stat) };
   }
 
   /** Save only over the version the editor loaded. */

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { unsavedDrafts } from "../../editor/model";
+import { containDialogFocus } from "../../lib/dialogFocus";
 import { invalidateFolders, invalidateNotes } from "../../services/hooks";
 import {
   type LegacyFile,
@@ -76,7 +77,7 @@ function ReconnectingCover() {
       aria-modal="true"
       aria-labelledby="web-reconnect-title"
     >
-      <div className="web-vault-reconnecting-card" ref={card} tabIndex={-1}>
+      <div className="web-vault-reconnecting-card" ref={card} tabIndex={-1} onKeyDown={containDialogFocus}>
         <h2 id="web-reconnect-title">Reconnecting to “{connectedFolderName() ?? "your vault"}”…</h2>
         <p>
           Rotli Helper stopped answering on this computer. Your latest changes are waiting and save the moment

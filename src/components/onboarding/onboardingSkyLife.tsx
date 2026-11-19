@@ -2,14 +2,14 @@
 // out of the sides; better scenery like clouds or birds, so it's fully alive").
 // Clouds drift slowly across the page and something crosses the upper sky:
 // birds for most themes, a paper plane for Paper & Charcoal, petals for
-// Blossom, twinkling stars for Midnight. All `.sc-*` token classes, all CSS
+// Blossom, a trio of hexagon plates for Tesven, twinkling stars for Midnight. All `.sc-*` token classes, all CSS
 // motion: still under Reduce motion (each rests at its own spot), paused with
 // the rest when the window is put away (base.css).
 
 import type { CSSProperties } from "react";
 
 import type { ThemeFamily } from "../../state/ui";
-import { cloud, star } from "../sceneParts";
+import { cloud, hex, star } from "../sceneParts";
 
 /** Where each drifter sits in the sky, how long its crossing takes, how far
  * along it starts (a negative delay), and where it rests with motion off. */
@@ -63,6 +63,8 @@ function flyer(family: ThemeFamily | "island") {
         <ellipse className="sc-petal" cx="20" cy="-6" rx="4" ry="3" />
       </g>
     );
+  if (family === "tesven")
+    return <g>{[hex(-12, 0, 6, "sc-line"), hex(0, -7, 5, "sc-line"), hex(12, 2, 4, "sc-accent-fill")]}</g>;
   return <g>{[bird(-16, 0, 1, 0), bird(3, -8, 0.85, 1), bird(18, 3, 0.75, 2)]}</g>;
 }
 

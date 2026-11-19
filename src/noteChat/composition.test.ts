@@ -17,6 +17,7 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { syncChatMemory } from "../chatMemory/workflow";
+import { person } from "../lib/promptText.fixtures";
 import * as realTauri from "../lib/tauri";
 import type { MemexInstance } from "../memex/config";
 import * as realService from "../memex/service";
@@ -135,6 +136,7 @@ describe("listChatsForNote", () => {
           stem: "chat-about-fish-audio-vs-elevenlabs",
           body,
           revision: "r1",
+          notes: null,
           aiEditable: true,
         }),
         update: async () => {},
@@ -149,7 +151,7 @@ describe("listChatsForNote", () => {
         title: "Chat about Fish Audio vs ElevenLabs",
         chatSlug: slug,
         attachedStem: NOTE_STEM,
-        turns: [{ speaker: "you", text: "compare them" }],
+        turns: [{ speaker: "you", text: person("compare them") }],
       },
     );
 

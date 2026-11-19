@@ -171,7 +171,7 @@
   font-family: var(--font-display);
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
 }
 .sb-switch-seg svg {
@@ -1964,6 +1964,7 @@
 
 /* — tab strip (r2 frame A2; EVERY pane renders it now — the maintainer 2026-06-13) — */
 .tabstrip {
+  position: relative;
   display: flex;
   align-items: flex-end;
   height: 34px;
@@ -2309,6 +2310,23 @@
 /* — editor chassis (r2 padding; the body/marks/raw-line/format-bar styles
      live in editor.css, phase 1b; the r4 statpill was superseded by the r5
      header-inline status) — */
+/* An open note that has a hard link (src/editor/hardLinkedNote.tsx): the
+   sidebar notice's words, centred in the pane, quiet. */
+.hard-linked-note {
+  max-width: 440px;
+  margin: 72px auto 0;
+  padding: 0 24px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.hard-linked-note-text {
+  margin: 0 0 6px;
+  color: var(--text);
+}
+.hard-linked-note-help {
+  margin: 0;
+}
 .editor {
   flex: 1;
   background: var(--surface);
@@ -2535,6 +2553,66 @@
    Librarian · Settings split one quiet row under the System rows — */
 /* the footer sits OUTSIDE the System zone since the fronts landed (2026-08-01):
    it shows under Home and Chat alike, so it owns its own inset + hairline */
+/* The vault's notice for files Rotli left out because they have a hard link
+   (src/components/skippedFilesNotice.tsx): quiet text on the sidebar's own
+   ground, a hairline above, no badge or alarm colour. */
+.skipped-notice,
+.gone-notice {
+  flex: 0 0 auto;
+  margin: 0 12px;
+  padding: 10px 2px 4px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.skipped-notice-text,
+.skipped-notice-help,
+.gone-notice-text {
+  margin: 0;
+}
+.skipped-notice-toggle,
+.gone-notice-action {
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.skipped-notice-toggle:focus-visible,
+.gone-notice-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+.gone-notice-row + .gone-notice-row {
+  margin-top: 8px;
+}
+.gone-notice-actions {
+  display: flex;
+  gap: 12px;
+}
+.gone-notice-action:disabled {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.skipped-notice-list {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.skipped-notice-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
 .sb-foot {
   flex: 0 0 auto;
   position: relative;
@@ -2867,12 +2945,8 @@
 /* Rotli Web: a front whose feature lives in the Mac app stays in the
    switcher, quieter, and reads as a link to the download on hover */
 .sb-switch-seg.desktop-only {
-  opacity: 0.55;
   text-decoration: none;
   cursor: default;
-}
-.sb-switch-seg.desktop-only:hover {
-  opacity: 0.8;
 }
 
 /* Rename in place (sidebarRenameRows.tsx): the row keeps its size, chevron and
@@ -2992,3 +3066,27 @@ svg.sb-scene * {
 .sidebar[data-icons="color"] .kind-svg {
   color: var(--syntax-blue);
 }
+
+/* Each Main row keeps its open action beside, not around, its star action. */
+.main-note-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.websearch-option.selected .websearch-optiondetail { color: var(--text); }
+
+/* Own tab semantics separately from sibling Close and media actions. */
+.tab-list-owner { position: absolute; inset: 0; pointer-events: none; }
+.tab-activation {
+  display: flex; align-items: center; gap: 7px; flex: 1 1 auto;
+  min-width: 0; height: 100%;
+}
+.tab-activation:focus-visible { outline: 1px solid var(--accent-text); outline-offset: -1px; }

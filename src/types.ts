@@ -64,6 +64,18 @@ export interface Note extends NoteSummary {
   suggestedLinks?: readonly string[];
   /** Opaque complete-file revision returned by the enforcing adapter. */
   revision: string;
+  /** When the read that produced this note started (services/noteReads.ts):
+   * a read older than what the editor already holds is dropped. */
+  readAt?: number;
+}
+
+/** A file a listing left out, and why (Rust `SkippedFile`; the Helper's
+ * walk). A hard-linked file may be a file outside the vault, so Rotli never
+ * opens one, and says so (third review of pull request 267). */
+export interface SkippedFile {
+  /** Relative to the vault (root-prefixed in a connected vault). */
+  path: string;
+  reason: "hardLink";
 }
 
 /** One FULL-TEXT search hit — the corpus_search wire shape (Rust SearchHit,
@@ -86,6 +98,8 @@ export interface SearchHit {
    * for 2–3, empty for 4. matchStart/matchLen mirror the first span. */
   spans: [number, number][];
   updatedAt: number;
+  /** An AI hit the gate passed only for an on-device reader (fourth review). */
+  onDeviceOnly?: boolean;
 }
 
 /** Per-tab view state only — the document buffer is shared per noteId

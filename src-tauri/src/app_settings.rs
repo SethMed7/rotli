@@ -39,6 +39,7 @@ fn validate(contents: &str) -> Result<(), String> {
 #[tauri::command]
 pub fn app_settings_read(app: tauri::AppHandle) -> Result<String, String> {
     let path = settings_file(&app)?;
+    // raw read (outside-vault): app config outside any vault
     match fs::read_to_string(path) {
         Ok(contents) => Ok(contents),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),

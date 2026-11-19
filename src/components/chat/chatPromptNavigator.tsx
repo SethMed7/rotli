@@ -1,5 +1,7 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useReducer, useRef } from "react";
 
+import { resolveNavigatorStyle } from "../../state/chatNavigatorStyle";
+import { useDataTheme } from "../../state/theme";
 import { useUiStore } from "../../state/ui";
 import {
   promptMenuOffset,
@@ -19,7 +21,8 @@ export function ChatPromptNavigator({
   activeMessageIndexes: readonly number[];
   onJump: (messageIndex: number) => void;
 }) {
-  const navigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
+  const storedNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
+  const navigatorStyle = resolveNavigatorStyle(storedNavigatorStyle, useDataTheme());
   const [{ open, previewMessageIndex }, dispatch] = useReducer(promptNavigatorTransition, {
     open: false,
     previewMessageIndex: null,

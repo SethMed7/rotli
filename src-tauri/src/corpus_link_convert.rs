@@ -10,7 +10,6 @@
 //! Declared as a CHILD of `corpus` (`#[path]` mod in corpus.rs) so it reuses
 //! the store's own gates and document helpers.
 
-use std::fs;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use serde::Serialize;
@@ -177,7 +176,7 @@ impl CorpusStore {
         for note in notes.iter().filter(|note| note.kind == NoteKind::Note) {
             let Ok(rel) = self.resolve_note_rel(&note.id) else { continue };
             let path = self.abs(&rel);
-            let Ok(text) = fs::read_to_string(&path) else { continue };
+            let Ok(text) = crate::fsutil::read_own_text(&path) else { continue };
             let folder = folder_of(&rel);
             let actual = |storage_rel: &str| self.actual_storage_rel(storage_rel);
             let block = raw_frontmatter_block(&text);
@@ -224,6 +223,7 @@ impl CorpusStore {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use super::*;
     use tempfile::TempDir;
 

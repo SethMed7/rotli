@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { brandHost, person } from "../lib/promptText.fixtures";
 import type { ChatModelInfo } from "../lib/tauri";
 import { parseRouteChoice, parseSuggestions, presetFor, runHybrid, suggestPresets } from "./hybrid";
 import type { HybridPreset } from "./models";
@@ -53,28 +54,29 @@ const PRESET: HybridPreset = {
  * a function reply may throw to simulate a dead lane. */
 function makeHosts(scripts: Record<string, (string | (() => string))[]>) {
   const prompts: Record<string, string[]> = {};
-  const makeHost = (m: ChatModelInfo): Host => ({
-    complete: async ({ messages }) => {
-      (prompts[m.id] ??= []).push(messages[0]?.content ?? "");
-      const next = scripts[m.id]?.shift();
-      if (next === undefined) return '{"final":"(script exhausted)"}';
-      return typeof next === "function" ? next() : next;
-    },
-    searchNotes: async () => [],
-    readNote: async () => "",
-    createNote: async () => "created note n-new in the intake",
-    readFile: async () => "",
-    webSearch: async () => [],
-    webFetch: async () => "",
-    generateImage: async () => "storage/chats/x/img.png",
-    knowledgeMap: async () => "(index)",
-  });
+  const makeHost = (m: ChatModelInfo): Host =>
+    brandHost({
+      complete: async ({ messages }) => {
+        (prompts[m.id] ??= []).push(messages[0]?.content ?? "");
+        const next = scripts[m.id]?.shift();
+        if (next === undefined) return '{"final":"(script exhausted)"}';
+        return typeof next === "function" ? next() : next;
+      },
+      searchNotes: async () => [],
+      readNote: async () => "",
+      createNote: async () => "created note n-new in the intake",
+      readFile: async () => "",
+      webSearch: async () => [],
+      webFetch: async () => "",
+      generateImage: async () => "storage/chats/x/img.png",
+      knowledgeMap: async () => "(index)",
+    });
   return { makeHost, prompts };
 }
 
 const INPUT: RunInput = {
   history: [],
-  userText: "help me",
+  userText: person("help me"),
   web: false,
   model: { id: "preset:p1", api: "preset" },
 };
@@ -249,7 +251,7 @@ describe("suggestPresets / parseSuggestions", () => {
     const { makeHost, prompts } = makeHosts({
       "gemma-3": ['[{"name":"Everyday","organizer":"gemma-3","routes":[{"when":"quick","model":"sonnet"}]}]'],
     });
-    const out = await suggestPresets(makeHost(gemma), MODELS, "mostly note-taking + research");
+    const out = await suggestPresets(makeHost(gemma), MODELS, person("mostly note-taking + research"));
     expect(out).toHaveLength(1);
     expect(out[0]?.name).toBe("Everyday");
     expect(prompts["gemma-3"]?.[0]).toContain('"gpt-5.5"');

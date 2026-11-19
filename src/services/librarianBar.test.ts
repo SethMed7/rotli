@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
+import type { LibrarianContext } from "../lib/librarianChat";
 import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
+import { approved, model, person } from "../lib/promptText.fixtures";
 import type { FrontmatterView } from "../lib/tauri";
 import { IMPORTED_FOLDER_ROLES } from "./destinations";
 import {
@@ -119,17 +121,18 @@ describe("who may ask", () => {
 });
 
 describe("asking", () => {
-  const ctx = {
-    title: "Maya",
-    doc: "Met Maya at the meetup.",
-    areas: ["Projects"],
+  const ctx: LibrarianContext = {
+    onDeviceOnly: false,
+    title: approved("Maya"),
+    doc: approved("Met Maya at the meetup."),
+    areas: [approved("Projects")],
     tags: [],
-    people: ["People"],
+    people: [person("People")],
     filing: [],
     rules: structuredClone(DEFAULT_LIBRARIAN_RULES),
     known: [],
   };
-  const first = [{ role: "user" as const, text: "tag this", highlight: null }];
+  const first = [{ role: "user" as const, text: person("tag this"), highlight: null }];
 
   test("secret-shaped text never reaches the model, wherever it sits in the conversation", async () => {
     let called = false;
@@ -139,11 +142,11 @@ describe("asking", () => {
         return "{}";
       },
     };
-    const secret = { ...ctx, doc: "api key sk-ant-abcdefghijklmnopqrstuvwx" };
+    const secret = { ...ctx, doc: approved("api key sk-ant-abcdefghijklmnopqrstuvwx") };
     expect(await converseLibrarian(secret, first, host)).toEqual({ kind: "secret" });
     const later = [
       ...first,
-      { role: "user" as const, text: "sk-ant-abcdefghijklmnopqrstuvwx", highlight: null },
+      { role: "user" as const, text: person("sk-ant-abcdefghijklmnopqrstuvwx"), highlight: null },
     ];
     expect(await converseLibrarian(ctx, later, host)).toEqual({ kind: "secret" });
     expect(called).toBe(false);
@@ -163,7 +166,7 @@ describe("asking", () => {
       actions: [{ type: "tag", tags: ["person"] }],
       vault: [],
       handoff: false,
-      raw: 'Tagging it as a person.\n{"actions":[{"type":"tag","tags":["person"]}]}',
+      raw: model('Tagging it as a person.\n{"actions":[{"type":"tag","tags":["person"]}]}'),
     });
     expect(sent.map((message) => message.role)).toEqual(["system", "user"]);
   });

@@ -76,6 +76,6 @@ test("Captures: search narrows the cards, and the select box waits for the point
   await cards.nth(0).click();
   await expect(cards.nth(2).locator(".bc-check")).toHaveCSS("opacity", "1");
   const clear = (await page.getByRole("button", { name: "Clear", exact: true }).boundingBox())!;
-  const archive = (await page.getByRole("button", { name: "Archive" }).boundingBox())!;
+  const archive = (await page.getByRole("button", { name: "Archive", exact: true }).boundingBox())!;
   expect(Math.abs(clear.y + clear.height / 2 - (archive.y + archive.height / 2))).toBeLessThan(1.5);
 });

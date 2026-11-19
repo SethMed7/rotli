@@ -2,7 +2,7 @@
 // knows SheetModel + exceljs codec; never imports @univerjs/*.
 
 import { PLATFORM } from "../lib/featurePolicy";
-import { fileNameStem } from "../lib/fileKind";
+import { extOf, fileNameStem } from "../lib/fileKind";
 import { onQuitFlush } from "../lib/quitFlush";
 import { corpusCreateManagedFile, corpusWriteFileBytes, rootIdOf } from "../lib/tauri";
 import { webVaultKey } from "../services/webNotes";
@@ -13,6 +13,7 @@ import { b64FromBytes, b64FromText, saveXlsx } from "./codec/xlsx";
 import { csvTextFromRows } from "./csv";
 import { applyModelToWorkbook, csvRowsFromSnapshot } from "./engine/bridge";
 import type { SheetModel } from "./engine/types";
+import { SHEET_EDITABLE } from "./kinds";
 
 export type SheetFileMode = "xlsx" | "csv";
 
@@ -74,6 +75,9 @@ export async function writeSheetModel(
     const revision = await corpusWriteFileBytes(fileId, base64, true, expectedRevision);
     return { len: bytes.length, revision, base64 };
   }
+  // the last gate: the xlsx codec loses what it doesn't model (an .xlsm's macros)
+  if (!SHEET_EDITABLE.has(extOf(fileId)))
+    throw new Error(`Rotli can't save .${extOf(fileId)} files faithfully.`);
   applyModelToWorkbook(wb, model, idMap);
   const bytes = await saveXlsx(wb);
   const base64 = b64FromBytes(bytes);

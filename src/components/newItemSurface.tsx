@@ -136,11 +136,11 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
                   type="button"
                   className="ni-card ni-card-soon"
                   aria-disabled="true"
-                  aria-label={`New ${entry.label} — ${entry.caption ?? COMING_SOON_CAPTION}`}
+                  aria-label={`New ${entry.label} ${entry.description} ${entry.caption ?? COMING_SOON_CAPTION}`}
                 >
                   {entry.glyph}
-                  <span className="ni-label">{entry.label}</span>
-                  <span className="ni-desc">{entry.description}</span>
+                  <span className="ni-label">{entry.label}</span>{" "}
+                  <span className="ni-desc">{entry.description}</span>{" "}
                   <span className="ni-soon">{entry.caption ?? COMING_SOON_CAPTION}</span>
                 </button>
               ) : (
@@ -148,15 +148,20 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
                   type="button"
                   className="ni-card"
                   onClick={entry.run}
-                  aria-label={`New ${entry.label}${entry.beta ? ", Beta" : ""} (press ${entry.digit})`}
+                  aria-label={`New ${entry.label}${entry.beta ? " Beta" : ""} ${entry.description} ${entry.digit}`}
                 >
-                  <kbd className="ni-key">{entry.digit}</kbd>
                   {entry.glyph}
                   <span className="ni-label">
                     {entry.label}
-                    {entry.beta && <BetaBadge />}
-                  </span>
-                  <span className="ni-desc">{entry.description}</span>
+                    {entry.beta && (
+                      <>
+                        {" "}
+                        <BetaBadge />
+                      </>
+                    )}
+                  </span>{" "}
+                  <span className="ni-desc">{entry.description}</span>{" "}
+                  <kbd className="ni-key">{entry.digit}</kbd>
                 </button>
               )}
             </li>

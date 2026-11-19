@@ -342,14 +342,8 @@ test("an outside change to an open workbook is never overwritten by the stale ta
   expect((await road.read(path))?.equals(outside)).toBe(true);
 });
 
-// Univer's sheets-ui facade mixes its event wiring into every Univer instance
-// made after the sheets engine loads; on the document editor's docs-only
-// injector it throws "[redi] … HoverManagerService" (minified on the web)
-// inside its own RxJS subscriber. No Rotli surface shows it and nothing
-// breaks — e2e/office-engine-sequence.spec.ts pins the same verdict on the
-// Mac twin. This proves it through real controls: every later save lands.
-const KNOWN_FACADE_NOISE = /\[redi\]: Expect 1 dependency item\(s\) for id "[^"]+" but get 0/;
-
+// Real-control counterpart of the desktop engine-sequence regression.
+// No cross-engine errors are allowed, including vendor facade DI failures.
 test("a document opened right after a workbook in the same tab edits and saves, and so does the workbook again", async ({
   page,
 }) => {
@@ -375,9 +369,5 @@ test("a document opened right after a workbook in the same tab edits and saves, 
   expect((await readXlsx(again)).getWorksheet("Budget")!.getCell("A1").value).toBe("Second pass");
 
   await expect(page.getByRole("alert")).toHaveCount(0);
-  test.info().annotations.push({
-    type: "univer-facade-noise",
-    description: String(errors.filter((error) => KNOWN_FACADE_NOISE.test(error)).length),
-  });
-  expect(errors.filter((error) => !KNOWN_FACADE_NOISE.test(error))).toEqual([]);
+  expect(errors).toEqual([]);
 });

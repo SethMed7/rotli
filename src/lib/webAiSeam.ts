@@ -88,6 +88,7 @@ export interface WebVaultIoShape<Frontmatter, Stat, Versioned> {
   rawMetadata(id: string): Promise<Versioned>;
   writeMetadata(id: string, block: string, revision: string): Promise<string>;
   frontmatter(id: string): Promise<Frontmatter | null>;
+  setPinned(id: string, pinned: boolean): Promise<void>;
   protection(
     id: string,
     key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",

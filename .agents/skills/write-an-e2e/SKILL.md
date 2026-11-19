@@ -13,10 +13,12 @@ description: Write, fix, or diagnose a Playwright spec for Rotli — the Mac-twi
   the Vite dev server with the in-memory demo vault. Set `ROTLI_E2E_PORT` in
   a second checkout so two runs never share a server.
 - **Rotli Web** (`e2e/web/*.spec.ts`, `bun run test:e2e:web`): the real
-  web build under `/app/` on port 1435, with a vault in the browser's private
+  web build under `/app/` on port 1435 by default (`ROTLI_WEB_E2E_PORT` changes
+  it), with a vault in the browser's private
   folder (`startWithVault`, `startWithFolder` in the web support file).
-  Playwright reuses any server already on 1435: never run two web lanes at
-  once, and check the port if results look like someone else's build.
+  Both lanes refuse an occupied server port so they cannot prove another
+  checkout's code. Choose separate ports when running worktrees together;
+  never stop another checkout's server to free its port.
 - Every user-facing change adds or extends a web test (ROADMAP §6).
 
 ## Rules

@@ -1,4 +1,47 @@
 {
+  "1.9.3": [
+    {
+      "title": "Tesven, an eighth theme",
+      "body": "Mist and field blue by day, Night Swim after dark: a crisper, bluer family than Ocean, with its own hexagon scenery. Pick it in Settings → Appearance."
+    },
+    {
+      "title": "The original quokka, in Tesven",
+      "body": "In Tesven your chat buddy is always the plain line drawing, navy by day and white at night. Switch to any other theme and your own look comes back."
+    },
+    {
+      "title": "Rotli, with a capital R",
+      "body": "The Dock, the app menu and the window list now say Rotli.",
+      "platform": "mac"
+    }
+  ],
+  "1.9.2": [
+    {
+      "title": "Your last words are saved",
+      "body": "Typing just before you close a tab, switch notes or quit is no longer lost when an earlier save was still finishing. Rotli now saves each note one change at a time."
+    },
+    {
+      "title": "AI sees only what it may",
+      "body": "Chat's search and note list now show a model only the version of a note Rotli just checked, and a note that is a hard link to a file elsewhere on your Mac is never read.",
+      "platform": "mac"
+    },
+    {
+      "title": "Dark themes open dark",
+      "body": "Rotli no longer flashes its light ground while it starts. Each window opens in the theme it last showed."
+    },
+    {
+      "title": "Easier by keyboard and screen reader",
+      "body": "Tabs move with the arrow keys, Home and End, controls and choice lists have real names and roles, errors are read aloud, and Tab stays inside every dialog until you close it."
+    },
+    {
+      "title": "Quicker with big vaults and long notes",
+      "body": "Large Main lists update only the rows that changed when you switch notes, typing in a very long note does less work per keystroke, and Rotli Web does less repeated work opening and searching your folder."
+    },
+    {
+      "title": "Updates at the foot of Settings",
+      "body": "Your version, Check for updates and Install & relaunch now sit at the bottom of the Settings menu, one click from every page.",
+      "platform": "mac"
+    }
+  ],
   "1.9.1": [
     {
       "title": "Rotli fits in the Dock",

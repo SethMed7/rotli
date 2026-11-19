@@ -138,3 +138,9 @@ describe("summaryOrder — the corpus_list sort, ported", () => {
     expect(sorted.map((r) => r.id)).toEqual(["c", "a", "b"]);
   });
 });
+
+test("a bounded snippet keeps Unicode points and the separating space at its boundary", () => {
+  const prefix = "é🦉".repeat(70);
+  expect(snippetOf(`# Heading\n\n${prefix}\n${"Later words.\n".repeat(10000)}`)).toBe(prefix);
+  expect(snippetOf(`# Heading\n\n${"🦉".repeat(139)}\nnext line`)).toBe(`${"🦉".repeat(139)} `);
+});

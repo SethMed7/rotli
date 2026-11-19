@@ -4,10 +4,11 @@
 // composition talks only to this port, so a canvas never shows as blank or
 // "saved" where nothing can actually hold it.
 
+import { bytesFromBase64 } from "../lib/base64Bytes";
 import {
   corpusCreateCanvas,
+  corpusFileBytes,
   corpusFileStat,
-  corpusFileText,
   corpusWriteFileBytes,
   isTauri,
 } from "../lib/tauri";
@@ -16,9 +17,11 @@ import { activeWebVaultDir } from "./webNotes";
 
 export interface CanvasFileIo {
   stat: (id: string) => Promise<{ len: number; revision: string; writable: boolean } | null>;
-  /** The whole file (`len` from stat, so no default cap cuts it short), or
-   * null when it went away between the stat and the read. */
-  read: (id: string, len: number) => Promise<string | null>;
+  /** The whole file's raw bytes (`len` from stat, so no default cap cuts it
+   * short), or null when it went away between the stat and the read. Bytes,
+   * not text: a lossy decode here would let a save rewrite bytes nobody
+   * edited, so the composition decodes strictly and refuses non-UTF-8. */
+  read: (id: string, len: number) => Promise<Uint8Array | null>;
   /** Save over `revision` only; answers the new revision. */
   write: (id: string, text: string, revision: string) => Promise<string>;
 }
@@ -38,7 +41,7 @@ const desktopIo: CanvasFileIo = {
     const stat = await corpusFileStat(id);
     return stat ? { len: stat.len, revision: stat.revision, writable: stat.writable } : null;
   },
-  read: (id, len) => corpusFileText(id, len),
+  read: async (id, len) => bytesFromBase64(await corpusFileBytes(id, len)),
   write: async (id, text, revision) => corpusWriteFileBytes(id, await base64Of(text), false, revision),
 };
 
@@ -48,7 +51,7 @@ function webIo(store: FolderCanvasStore): CanvasFileIo {
       const stat = await store.stat(id);
       return stat ? { ...stat, writable: true } : null;
     },
-    read: async (id) => (await store.read(id))?.text ?? null,
+    read: async (id) => (await store.read(id))?.bytes ?? null,
     write: (id, text, revision) => store.write(id, text, revision),
   };
 }

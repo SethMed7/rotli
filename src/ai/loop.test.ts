@@ -4,10 +4,10 @@
 
 import { describe, expect, test } from "bun:test";
 
-import type { CorpusNoteMeta } from "../lib/tauri";
+import { approved, brandHost, model, person, promptOf } from "../lib/promptText.fixtures";
 import { budgetFor, contextWindowFor } from "./budget";
 import { containsPrivateDataOverlap, endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
-import { runAgent } from "./loop";
+import { ALL, fakeHost, note, run } from "./loopHost.fixtures";
 import { extractJsonObject, parseAction } from "./parse";
 import { trimHistory } from "./prompt";
 import {
@@ -22,100 +22,7 @@ import {
   stripLeadingFrontmatter,
   truncateBody,
 } from "./tools";
-import type { AgentEvent, ChatTurn, CompleteReq, Host, RunInput, ToolName } from "./types";
-
-function note(p: Partial<CorpusNoteMeta> & { id: string; title: string }): CorpusNoteMeta {
-  return { snippet: "", folderId: "", createdAt: 0, updatedAt: 0, pinned: false, ...p };
-}
-
-interface Calls {
-  complete: CompleteReq[];
-  searchMemory: string[];
-  readMemory: string[];
-  searchNotes: string[];
-  readNote: string[];
-  webSearch: string[];
-  webFetch: string[];
-  generateImage: string[];
-}
-
-function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; calls: Calls } {
-  let i = 0;
-  const calls: Calls = {
-    complete: [],
-    searchMemory: [],
-    readMemory: [],
-    searchNotes: [],
-    readNote: [],
-    webSearch: [],
-    webFetch: [],
-    generateImage: [],
-  };
-  const host: Host = {
-    complete: async (req) => {
-      calls.complete.push(req);
-      return replies[i++] ?? '{"final":"(script exhausted)"}';
-    },
-    searchNotes: async (q) => {
-      calls.searchNotes.push(q);
-      return [{ id: "n1", title: "Pricing", snippet: "Northstar pricing", folder: "Projects" }];
-    },
-    readNote: async (id) => {
-      calls.readNote.push(id);
-      return `# Pricing\nNorthstar pricing is $99/mo (note ${id}).`;
-    },
-    searchMemory: async (q) => {
-      calls.searchMemory.push(q);
-      return [{ id: "chat:cedar", title: "Cedar launch", snippet: "July decision", source: "chat" }];
-    },
-    readMemory: async (id) => {
-      calls.readMemory.push(id);
-      return `# Cedar launch\nThe July decision came from ${id}.`;
-    },
-    createNote: async (title) => `created note n-new ("${title}") in the intake`,
-    readFile: async (q) => `csv,for,${q}\n1,2,3`,
-    webSearch: async (q) => {
-      calls.webSearch.push(q);
-      return [
-        { provider: "duckduckgo", title: "Result", url: "https://example.com", snippet: "a web snippet" },
-      ];
-    },
-    webFetch: async (url) => {
-      calls.webFetch.push(url);
-      return "fetched web page text";
-    },
-    generateImage: async (prompt) => {
-      calls.generateImage.push(prompt);
-      return "storage/chats/test/img-01x.png";
-    },
-    knowledgeMap: async () => "## Projects\n- Pricing  {id: n1}",
-    ...over,
-  };
-  return { host, calls };
-}
-
-async function run(
-  host: Host,
-  input: Omit<RunInput, "model">,
-): Promise<{ final: string; events: AgentEvent[] }> {
-  const events: AgentEvent[] = [];
-  let final = "";
-  for await (const ev of runAgent(host, { ...input, model: { id: "gemma-3-12b-it-qat-4bit" } })) {
-    events.push(ev);
-    if (ev.type === "final") final = ev.text;
-  }
-  return { final, events };
-}
-
-const ALL: ReadonlySet<ToolName> = new Set<ToolName>([
-  "search_notes",
-  "read_note",
-  "search_memory",
-  "read_memory",
-  "research_web",
-  "web_search",
-  "web_fetch",
-]);
+import type { ChatTurn, ToolName } from "./types";
 
 describe("parse", () => {
   test("extracts a balanced object from prose + fences", () => {
@@ -147,7 +54,7 @@ describe("parse", () => {
       kind: "question",
       prompt: "Which layout?",
       options: ["Report", "Brief"],
-      thought: "Need one material choice.",
+      thought: model("Need one material choice."),
     });
     expect(parseAction('{"question":"Which layout?","options":["Only one"]}', ALL).kind).toBe("invalid");
   });
@@ -159,9 +66,9 @@ describe("parse", () => {
       kind: "call",
       tool: "read_note",
       args: { id: "n1" },
-      thought: "check the primary source",
+      thought: model("check the primary source"),
     });
-    const parsed = parseAction(JSON.stringify({ thought: "x".repeat(1200), final: "done" }), ALL);
+    const parsed = parseAction(JSON.stringify({ thought: model("x".repeat(1200)), final: "done" }), ALL);
     expect(parsed.kind).toBe("final");
     if (parsed.kind === "final") expect(parsed.thought).toHaveLength(800);
   });
@@ -180,7 +87,7 @@ describe("retrieval", () => {
       note({ id: "c", title: "board", folderId: "Projects", snippet: "pricing", kind: "board" }),
     ];
     const hits = rankNotes(notes, "pricing", 5);
-    expect(hits.map((h) => h.id)).toEqual(["a"]);
+    expect<string[]>(hits.map((h) => h.id)).toEqual(["a"]);
   });
 
   // ── the 2026-08-01 roster failure ───────────────────────────────────────────
@@ -196,14 +103,19 @@ describe("retrieval", () => {
       note({ id: "x1", title: "Breve — July 31", folderId: "wiki/reference/briefs" }),
       note({ id: "b1", title: "canvas", folderId: "wiki/people", kind: "board" }),
     ];
-    expect(folderHits(notes, "people", 5).map((h) => h.id)).toEqual(["p2", "p1"]); // recency, no board
+    expect<string[]>(folderHits(notes, "people", 5).map((h) => h.id)).toEqual(["p2", "p1"]); // recency, no board
     // a phrase, or a 1-2 char stub, is not a folder name — no listing scan
     expect(folderHits(notes, "who are my people", 5)).toEqual([]);
     expect(folderHits(notes, "pe", 5)).toEqual([]);
   });
 
   test("mergeFolderHits keeps title > folder > body and dedupes", () => {
-    const hit = (id: string) => ({ id, title: id, snippet: "", folder: "wiki/people" });
+    const hit = (id: string) => ({
+      id: approved(id),
+      title: approved(id),
+      snippet: approved(""),
+      folder: approved("wiki/people"),
+    });
     const merged = mergeFolderHits(
       [
         { hit: hit("body"), rank: 2 }, // a body hit (ranks 0–1 are title hits)
@@ -212,7 +124,7 @@ describe("retrieval", () => {
       [hit("folder"), hit("title")],
       5,
     );
-    expect(merged.map((h) => h.id)).toEqual(["title", "folder", "body"]);
+    expect<string[]>(merged.map((h) => h.id)).toEqual(["title", "folder", "body"]);
   });
 
   test("isAreaIndex spots the Filer's generated roster by title == area name", () => {
@@ -224,7 +136,7 @@ describe("retrieval", () => {
   test("search_notes leads with the area index and says what it is", async () => {
     const { host } = fakeHost([]);
     const result = await runTool(
-      {
+      brandHost({
         ...host,
         searchNotes: async () => [
           {
@@ -235,7 +147,7 @@ describe("retrieval", () => {
           },
           { id: "idx", title: "people", snippet: "", folder: "wiki/people" },
         ],
-      },
+      }),
       "search_notes",
       { query: "people" },
       budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
@@ -251,13 +163,13 @@ describe("retrieval", () => {
     // this lane as well — the in-app host sets it from the hit's folder
     const { host } = fakeHost([]);
     const result = await runTool(
-      {
+      brandHost({
         ...host,
         searchMemory: async () => [
           { id: "chat:x", title: "a chat", snippet: "", source: "chat" as const },
           { id: "idx", title: "people", snippet: "", source: "note" as const, role: "area-index" as const },
         ],
-      },
+      }),
       "search_memory",
       { query: "people" },
       budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
@@ -267,20 +179,26 @@ describe("retrieval", () => {
 
   test("frameLinksMetadata warns on the links: line and leaves the body alone", () => {
     const framed = frameLinksMetadata(
-      "---\nid: 01X\nlinks: [[morgan-reed]], [[trailplan]]\nsummary: who's who\n---\n\n# people/\n\nlinks: not metadata down here\n",
+      approved(
+        "---\nid: 01X\nlinks: [[morgan-reed]], [[trailplan]]\nsummary: who's who\n---\n\n# people/\n\nlinks: not metadata down here\n",
+      ),
     );
     expect(framed).toContain("links: (pointers to other notes");
     expect(framed).toContain("[[morgan-reed]], [[trailplan]]");
     expect(framed).toContain("\n\n# people/\n\nlinks: not metadata down here\n");
     // idempotent (a re-read must not stack warnings) and a no-op without a fence
     expect(frameLinksMetadata(framed)).toBe(framed);
-    expect(frameLinksMetadata("# plain\n\nno frontmatter\n")).toBe("# plain\n\nno frontmatter\n");
+    expect<string>(frameLinksMetadata(approved("# plain\n\nno frontmatter\n"))).toBe(
+      "# plain\n\nno frontmatter\n",
+    );
   });
 
   test("a framed note still strips cleanly on the update_note write boundary", () => {
     // the annotation must never be able to reach a note's body: the line keeps
     // its `key: value` shape, so an echoed fence is still recognized metadata
-    const framed = frameLinksMetadata("---\nid: 01X\nlinks: [[a]], [[b]]\n---\n\n# Note\n\nBody.\n");
+    const framed = frameLinksMetadata(
+      approved("---\nid: 01X\nlinks: [[a]], [[b]]\n---\n\n# Note\n\nBody.\n"),
+    );
     expect(stripLeadingFrontmatter(framed)).toBe("# Note\n\nBody.\n");
   });
 
@@ -333,8 +251,8 @@ describe("budget", () => {
   });
 
   test("truncateBody cuts with an explicit marker; short bodies pass untouched", () => {
-    expect(truncateBody("short note", 100)).toBe("short note");
-    const cut = truncateBody("x".repeat(150), 100);
+    expect<string>(truncateBody(approved("short note"), 100)).toBe("short note");
+    const cut = truncateBody(approved("x".repeat(150)), 100);
     expect(cut).toContain("[…truncated — the remaining 50 characters were not shown]");
     expect(cut.startsWith("x".repeat(100))).toBe(true);
   });
@@ -343,7 +261,7 @@ describe("budget", () => {
     const { host } = fakeHost([]);
     const long = `# People\n${"- [[Someone]] — a person\n".repeat(400)}`;
     const result = await runTool(
-      { ...host, readNote: async () => long },
+      brandHost({ ...host, readNote: async () => long }),
       "read_note",
       { id: "n1" },
       budgetFor({ id: "gemma-3-12b-it-qat-4bit" }),
@@ -354,9 +272,9 @@ describe("budget", () => {
 
   test("trimHistory keeps the newest turns within the cap (#65)", () => {
     const history: ChatTurn[] = [
-      { role: "user", text: "A".repeat(1000) },
-      { role: "assistant", text: "B".repeat(1000) },
-      { role: "user", text: "C".repeat(1000) },
+      { role: "user", text: person("A".repeat(1000)) },
+      { role: "assistant", text: model("B".repeat(1000)) },
+      { role: "user", text: person("C".repeat(1000)) },
     ];
     const trimmed = trimHistory(history, 2100);
     // the two newest turns fit; the oldest is folded into the trim marker
@@ -372,7 +290,7 @@ describe("budget", () => {
   test("a very long durable thread still sends only a bounded recent history", () => {
     const history: ChatTurn[] = Array.from({ length: 10_000 }, (_, index) => ({
       role: index % 2 === 0 ? "user" : "assistant",
-      text: `${index}: ${"x".repeat(96)}`,
+      text: promptOf(`${index}: ${"x".repeat(96)}`),
     }));
     const trimmed = trimHistory(history, budgetFor({ id: "gpt-5.6-sol", api: "cli" }).maxHistoryChars);
     const textChars = trimmed.reduce((total, turn) => total + turn.text.length, 0);
@@ -385,16 +303,23 @@ describe("budget", () => {
 
   test("pruneScratch keeps the scratchpad within budget", () => {
     const scratch = [
-      { action: "a1", result: "X".repeat(2000) },
-      { action: "a2", result: "Y".repeat(2000) },
+      { action: model("a1"), result: promptOf("X".repeat(2000)) },
+      { action: model("a2"), result: promptOf("Y".repeat(2000)) },
     ];
     const pruned = pruneScratch(scratch, 1500);
     const total = pruned.reduce((s, e) => s + e.result.length, 0);
     expect(total).toBeLessThan(1700); // within budget (+ trim markers)
     // under budget → returned unchanged
-    expect(pruneScratch([{ action: "a", result: "short" }], 1000)).toHaveLength(1);
+    expect(pruneScratch([{ action: model("a"), result: promptOf("short") }], 1000)).toHaveLength(1);
     const reasoning = pruneScratch(
-      [{ action: "research_web", thought: "T".repeat(1200), result: "short", remainingSteps: 3 }],
+      [
+        {
+          action: model("research_web"),
+          thought: model("T".repeat(1200)),
+          result: promptOf("short"),
+          remainingSteps: 3,
+        },
+      ],
       300,
     );
     expect(reasoning[0]?.thought?.length).toBeLessThan(1200);
@@ -538,7 +463,7 @@ describe("runAgent", () => {
     });
     const { events } = await run(host, {
       history: [],
-      userText: "Create a document about TanStack",
+      userText: person("Create a document about TanStack"),
       web: false,
       documentTool: true,
     });
@@ -559,7 +484,7 @@ describe("runAgent", () => {
     ]);
     const { events } = await run(host, {
       history: [],
-      userText: "Draft the launch material",
+      userText: person("Draft the launch material"),
       web: false,
     });
 
@@ -577,7 +502,11 @@ describe("runAgent", () => {
       '{"tool":"read_memory","args":{"id":"chat:cedar"}}',
       '{"final":"The Cedar launch decision was set for July."}',
     ]);
-    const { final } = await run(host, { history: [], userText: "What did we decide before?", web: false });
+    const { final } = await run(host, {
+      history: [],
+      userText: person("What did we decide before?"),
+      web: false,
+    });
     expect(final).toContain("July");
     expect(calls.searchMemory).toEqual(["cedar launch decision"]);
     expect(calls.readMemory).toEqual(["chat:cedar"]);
@@ -589,7 +518,11 @@ describe("runAgent", () => {
       '{"tool":"read_note","args":{"id":"n1"}}',
       '{"final":"Your Northstar pricing is $99/mo."}',
     ]);
-    const { final, events } = await run(host, { history: [], userText: "what's my pricing?", web: false });
+    const { final, events } = await run(host, {
+      history: [],
+      userText: person("what's my pricing?"),
+      web: false,
+    });
     expect(final).toContain("$99");
     expect(calls.searchNotes).toEqual(["pricing"]);
     expect(calls.readNote).toEqual(["n1"]);
@@ -612,7 +545,11 @@ describe("runAgent", () => {
         },
       },
     );
-    const { final, events } = await run(host, { history: [], userText: "make a note of that", web: false });
+    const { final, events } = await run(host, {
+      history: [],
+      userText: person("make a note of that"),
+      web: false,
+    });
     expect(final).toContain("Created the note");
     expect(opened).toEqual(["n-new"]);
     const tools = events.filter((e) => e.type === "tool").map((e) => (e as { tool: string }).tool);
@@ -635,7 +572,7 @@ describe("runAgent", () => {
     );
     const { events } = await run(host, {
       history: [],
-      userText: "Create a Word document about TanStack",
+      userText: person("Create a Word document about TanStack"),
       web: false,
       documentTool: true,
     });
@@ -663,7 +600,7 @@ describe("runAgent", () => {
     );
     const { final } = await run(host, {
       history: [],
-      userText: "Open up a Word doc, generate images, and use them in the doc",
+      userText: person("Open up a Word doc, generate images, and use them in the doc"),
       web: false,
       imageTool: true,
       documentTool: true,
@@ -677,7 +614,7 @@ describe("runAgent", () => {
     const { host, calls } = fakeHost(['{"final":"I used the attached note."}']);
     const { events } = await run(host, {
       history: [],
-      userText: "What should I change?",
+      userText: person("What should I change?"),
       web: false,
       noteId: "secure-or-local-note-id",
     });
@@ -691,7 +628,7 @@ describe("runAgent", () => {
       '{"tool":"research_web","args":{"query":"weather"}}', // invalid (web off) → observation
       '{"final":"answered from notes"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "hi", web: false });
+    const { final } = await run(host, { history: [], userText: person("hi"), web: false });
     expect(final).toBe("answered from notes");
     expect(calls.webSearch).toEqual([]); // never reached the host
   });
@@ -701,7 +638,7 @@ describe("runAgent", () => {
       '{"tool":"research_web","args":{"query":"look up sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}',
       '{"final":"won\'t leak that"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "search my key", web: true });
+    const { final } = await run(host, { history: [], userText: person("search my key"), web: true });
     expect(final).toContain("won't leak");
     expect(calls.webSearch).toEqual([]); // guard fired before the host
   });
@@ -711,7 +648,7 @@ describe("runAgent", () => {
       '{"tool":"research_web","args":{"query":"rust 2024 release"}}',
       '{"final":"Rust shipped. [S1]"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "latest rust?", web: true });
+    const { final } = await run(host, { history: [], userText: person("latest rust?"), web: true });
     expect(final).toBe("Rust shipped. [S1]");
     expect(calls.webSearch).toEqual(["rust 2024 release"]);
     expect(calls.webFetch).toEqual(["https://example.com"]);
@@ -731,7 +668,7 @@ describe("runAgent", () => {
     );
     const { final } = await run(host, {
       history: [],
-      userText: "Report the Atlas battery's usable capacity and mass.",
+      userText: person("Report the Atlas battery's usable capacity and mass."),
       web: true,
     });
     expect(final).toBe("The usable capacity is 72 Wh. [S1]");
@@ -748,7 +685,7 @@ describe("runAgent", () => {
     ]);
     const { final } = await run(host, {
       history: [],
-      userText: "Identify the purchaser and consideration for the software deal.",
+      userText: person("Identify the purchaser and consideration for the software deal."),
       web: true,
     });
     expect(final).toContain("$2.4 billion");
@@ -768,7 +705,7 @@ describe("runAgent", () => {
       ],
       { readNote: async () => privateBody },
     );
-    const { final } = await run(host, { history: [], userText: "research this", web: true });
+    const { final } = await run(host, { history: [], userText: person("research this"), web: true });
     expect(final).toContain("did not send");
     expect(calls.webSearch).toEqual([]);
   });
@@ -785,7 +722,7 @@ describe("runAgent", () => {
           JSON.stringify({ areas: [{ name: "Projects", notes: [{ title: privateTitle }] }] }),
       },
     );
-    await run(host, { history: [], userText: "research this", web: true });
+    await run(host, { history: [], userText: person("research this"), web: true });
     expect(calls.webSearch).toEqual([]);
   });
 
@@ -817,7 +754,7 @@ describe("runAgent", () => {
         },
       },
     );
-    const { final } = await run(host, { history: [], userText: "who signed the letter?", web: true });
+    const { final } = await run(host, { history: [], userText: person("who signed the letter?"), web: true });
     expect(final).toContain("Researched it");
     // BOTH searches reached the host — the second was NOT blocked as "private"
     expect(calls.webSearch).toEqual(["frontier ai letter", `${phrase} signatories`]);
@@ -835,7 +772,7 @@ describe("runAgent", () => {
       ],
       { readNote: async () => privateBody },
     );
-    await run(host, { history: [], userText: "research this", web: true });
+    await run(host, { history: [], userText: person("research this"), web: true });
     expect(calls.webSearch).toEqual([]); // still blocked
   });
 
@@ -846,7 +783,7 @@ describe("runAgent", () => {
     ]);
     const { final } = await run(host, {
       history: [],
-      userText: "draw me a quokka",
+      userText: person("draw me a quokka"),
       web: false,
       imageTool: true,
     });
@@ -871,7 +808,7 @@ describe("runAgent", () => {
       '{"tool":"generate_image","args":{"prompt":"anything"}}', // invalid → observation
       '{"final":"no images here"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "draw", web: false });
+    const { final } = await run(host, { history: [], userText: person("draw"), web: false });
     expect(final).toBe("no images here");
     expect(calls.generateImage).toEqual([]);
   });
@@ -892,7 +829,7 @@ describe("runAgent", () => {
     );
     const { final } = await run(host, {
       history: [],
-      userText: "make a runway sheet",
+      userText: person("make a runway sheet"),
       web: false,
       artifactTool: true,
     });
@@ -905,7 +842,12 @@ describe("runAgent", () => {
       '{"tool":"generate_image","args":{"prompt":"render sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}',
       '{"final":"not sending that"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "draw my key", web: false, imageTool: true });
+    const { final } = await run(host, {
+      history: [],
+      userText: person("draw my key"),
+      web: false,
+      imageTool: true,
+    });
     expect(final).toBe("not sending that");
     expect(calls.generateImage).toEqual([]); // guard fired before the host
   });
@@ -915,13 +857,13 @@ describe("runAgent", () => {
       '{"tool":"search_notes","args":{"query":"x"}}', // consumes the only step
       "Here is my best final answer.", // the forced-final prose reply
     ]);
-    const { final } = await run(host, { history: [], userText: "q", web: false, maxSteps: 1 });
+    const { final } = await run(host, { history: [], userText: person("q"), web: false, maxSteps: 1 });
     expect(final).toBe("Here is my best final answer.");
   });
 
   test("recovers via force-final after two unparseable replies", async () => {
     const { host } = fakeHost(["not json at all", "still not json", '{"final":"recovered"}']);
-    const { final } = await run(host, { history: [], userText: "q", web: false });
+    const { final } = await run(host, { history: [], userText: person("q"), web: false });
     expect(final).toBe("recovered");
   });
 
@@ -929,7 +871,7 @@ describe("runAgent", () => {
     const same = '{"tool":"search_notes","args":{"query":"pricing"}}';
     // step 1 executes; steps 2+3 are duplicates → two strikes → force-final
     const { host, calls } = fakeHost([same, same, same, "forced final answer"]);
-    const { final } = await run(host, { history: [], userText: "q", web: false });
+    const { final } = await run(host, { history: [], userText: person("q"), web: false });
     expect(final).toBe("forced final answer");
     expect(calls.searchNotes).toEqual(["pricing"]); // executed exactly once
   });
@@ -938,7 +880,7 @@ describe("runAgent", () => {
     const leak = '{"tool":"research_web","args":{"query":"sk-ant-api03-EXAMPLE0EXAMPLE0EXAM"}}';
     // blocked (strike 1) → re-issued, now also a duplicate (strike 2) → final
     const { host, calls } = fakeHost([leak, leak, "best effort without the web"]);
-    const { final } = await run(host, { history: [], userText: "q", web: true });
+    const { final } = await run(host, { history: [], userText: person("q"), web: true });
     expect(final).toBe("best effort without the web");
     expect(calls.webSearch).toEqual([]); // never reached the host
   });
@@ -949,7 +891,7 @@ describe("runAgent", () => {
       '{"final":"Rust shipped."}',
       '{"final":"Rust shipped. [S1]"}',
     ]);
-    const { final } = await run(host, { history: [], userText: "latest rust?", web: true });
+    const { final } = await run(host, { history: [], userText: person("latest rust?"), web: true });
     expect(final).toBe("Rust shipped. [S1]");
     expect(calls.complete).toHaveLength(3);
     expect(calls.complete[2]?.messages[0]?.content).toContain("Web-grounded factual claims need citations");
@@ -989,7 +931,7 @@ describe("runAgent", () => {
         },
       },
     );
-    const { final } = await run(host, { history: [], userText: "When did DART launch?", web: true });
+    const { final } = await run(host, { history: [], userText: person("When did DART launch?"), web: true });
     expect(final).toContain("November 24, 2021 [S1]");
     expect(calls.complete).toHaveLength(3);
     expect(calls.complete[1]?.messages[0]?.content).toContain("REASONING CHECKPOINT");
@@ -1005,7 +947,7 @@ describe("runAgent", () => {
       ],
       { webSearch: async (query) => (calls.webSearch.push(query), []) },
     );
-    const { final } = await run(host, { history: [], userText: "what happened?", web: true });
+    const { final } = await run(host, { history: [], userText: person("what happened?"), web: true });
     expect(final).toContain("couldn't verify");
     expect(final).not.toContain("[S");
     expect(calls.complete).toHaveLength(2);
@@ -1016,7 +958,7 @@ describe("runAgent", () => {
     const other = '{"tool":"read_note","args":{"id":"n1"}}';
     // duplicate (strike 1) → NEW call (reset) → duplicate (strike 1) → final
     const { host } = fakeHost([dup, dup, other, dup, '{"final":"done"}']);
-    const { final } = await run(host, { history: [], userText: "q", web: false, maxSteps: 5 });
+    const { final } = await run(host, { history: [], userText: person("q"), web: false, maxSteps: 5 });
     expect(final).toBe("done");
   });
 });
@@ -1029,7 +971,7 @@ describe("update_note tool", () => {
 
   test("demands an id AND a complete body", async () => {
     const { host } = fakeHost([]);
-    const editable = { ...host, updateNote: async () => "updated" };
+    const editable = brandHost({ ...host, updateNote: async () => "updated" });
     expect(await runTool(editable, "update_note", { id: "n1" }, budget)).toContain("error:");
     expect(await runTool(editable, "update_note", { body: "x" }, budget)).toContain("error:");
   });
@@ -1037,15 +979,15 @@ describe("update_note tool", () => {
   test("routes id + body to the host and returns its observation", async () => {
     const { host } = fakeHost([]);
     const calls: Array<[string, string]> = [];
-    const editable = {
+    const editable = brandHost({
       ...host,
       updateNote: async (id: string, body: string) => {
         calls.push([id, body]);
         return `updated note ${id}`;
       },
-    };
+    });
     const out = await runTool(editable, "update_note", { id: "n1", body: "# New\n\ntext" }, budget);
-    expect(out).toBe("updated note n1");
+    expect<string>(out).toBe("updated note n1");
     expect(calls).toEqual([["n1", "# New\n\ntext"]]);
   });
 
@@ -1166,25 +1108,25 @@ describe("draw_board tool", () => {
     const { host } = fakeHost([]);
     const seen: string[] = [];
     const result = await runTool(
-      {
+      brandHost({
         ...host,
         drawBoard: async (title, mermaid) => {
           seen.push(title, mermaid);
           return "created the board";
         },
-      },
+      }),
       "draw_board",
       { title: "KEK rotation", mermaid: "flowchart TD\n  A --> B" },
       budget,
     );
-    expect(result).toBe("created the board");
+    expect<string>(result).toBe("created the board");
     expect(seen).toEqual(["KEK rotation", "flowchart TD\n  A --> B"]);
   });
 
   test("missing mermaid source errors before the host is touched", async () => {
     const { host } = fakeHost([]);
     const result = await runTool(
-      { ...host, drawBoard: async () => "never" },
+      brandHost({ ...host, drawBoard: async () => "never" }),
       "draw_board",
       { title: "empty" },
       budget,
@@ -1195,7 +1137,7 @@ describe("draw_board tool", () => {
   test("a host without the capability says so instead of throwing", async () => {
     const { host } = fakeHost([]);
     const result = await runTool(host, "draw_board", { mermaid: "flowchart TD\n  A --> B" }, budget);
-    expect(result).toBe("error: this host cannot draw boards.");
+    expect<string>(result).toBe("error: this host cannot draw boards.");
   });
 });
 
@@ -1206,31 +1148,31 @@ describe("create_artifact tool", () => {
     const { host } = fakeHost([]);
     const seen: string[] = [];
     const result = await runTool(
-      {
+      brandHost({
         ...host,
         createArtifact: async (kind, title, content) => {
           seen.push(kind, title, content);
           return "created quarterly-plan.docx";
         },
-      },
+      }),
       "create_artifact",
       { kind: "document", title: "Quarterly plan", content: "## Goals\nShip it." },
       budget,
     );
-    expect(result).toBe("created quarterly-plan.docx");
+    expect<string>(result).toBe("created quarterly-plan.docx");
     expect(seen).toEqual(["document", "Quarterly plan", "## Goals\nShip it."]);
   });
 
   test("rejects unsupported formats and empty content before touching the host", async () => {
     const { host } = fakeHost([]);
     let calls = 0;
-    const withArtifact = {
+    const withArtifact = brandHost({
       ...host,
       createArtifact: async () => {
         calls += 1;
         return "never";
       },
-    };
+    });
     expect(
       await runTool(withArtifact, "create_artifact", { kind: "html", title: "No", content: "x" }, budget),
     ).toContain("supported kind");

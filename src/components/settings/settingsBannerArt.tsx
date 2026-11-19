@@ -9,7 +9,7 @@
 import type { ReactNode } from "react";
 
 import type { ThemeFamily } from "../../state/ui";
-import { cloud, star } from "../sceneParts";
+import { cloud, hex, star } from "../sceneParts";
 
 export type BannerMotif =
   | "general"
@@ -144,6 +144,24 @@ export const BANNER_BACKDROPS: Record<ThemeFamily, ReactNode> = {
       {star(600, 30, 1.2, 1.7)}
       <path className="sc-line" d="M390 16l50 22 80-20" strokeDasharray="1 5" />
       <path className="sc-far" d="M180 104c80-18 200-26 300-22s130 12 160 22z" />
+      {ground}
+    </>
+  ),
+  tesven: (
+    <>
+      {hex(330, 38, 16, "sc-sun")}
+      {[
+        [450, 22],
+        [462, 28.9],
+        [474, 22],
+      ].map(([x, y]) => hex(x!, y!, 8, "sc-line"))}
+      <path className="sc-sea" d="M0 72h640v32H0z" />
+      <path className="sc-wave" d="M0 84h640M0 95h640" />
+      <g className="sc-bob">
+        {hex(262, 72, 11)}
+        {hex(284, 70, 11)}
+        {hex(284, 70, 4, "sc-accent-fill")}
+      </g>
       {ground}
     </>
   ),

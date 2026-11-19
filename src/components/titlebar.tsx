@@ -1,3 +1,4 @@
+import { type MouseEvent, useRef } from "react";
 // The titlebar law (r4/r5 gates): identity LEFT · empty draggable CENTER ·
 // actions RIGHT. Native traffic lights stay (the inset reserves their space).
 // Dragging is manual startDragging so double-click never triggers the built-in
@@ -8,8 +9,6 @@
 // INLINE left of the note-list filter (and on the warm-edge restore strip when
 // both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Keybindings —
 // they just no longer have a home in the bar.
-
-import { type MouseEvent, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
@@ -35,6 +34,7 @@ import {
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { Palette } from "./palette";
+import { searchActionLabel } from "./paletteModel";
 import { PinButtons } from "./pinnedSites/pinButtons";
 import { UpdateBadge, UpdateNote } from "./settings/updateNote";
 
@@ -174,7 +174,7 @@ export function Titlebar() {
                   type="button"
                   className="tb-search"
                   data-tour="search"
-                  aria-label={`${breveActive ? "Search Rotli and actions" : "Search notes and actions"}${hotkeyHint(" — ⌘K")}`}
+                  aria-label={`${searchActionLabel(breveActive)}${hotkeyHint(" — ⌘K")}`}
                   onMouseDown={(event) => event.stopPropagation()}
                   onDoubleClick={(event) => event.stopPropagation()}
                   onClick={() => dispatch("palette.toggle")}
@@ -182,7 +182,7 @@ export function Titlebar() {
                   <span className="tb-search-mark" aria-hidden="true">
                     <QuokkaMark size={15} />
                   </span>
-                  <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
+                  <span className="tb-search-label">{searchActionLabel(breveActive)}</span>{" "}
                   {SHOW_HOTKEYS && <kbd className="tb-search-kbd">⌘K</kbd>}
                 </button>
               )

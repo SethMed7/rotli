@@ -1,8 +1,8 @@
 // An update you can't miss (the owner, 2026-10-10: "some note to drop down and
 // say so and then the settings icon to have a badge … something clear"). The
 // Settings button wears a badge while an update waits, and a note drops down
-// from it once per version per launch: Update opens Settings → General, where
-// the install runs; Later closes the note and leaves the badge.
+// from it once per version per launch: Update opens Settings, where the install
+// runs from the foot of the menu; Later closes the note and leaves the badge.
 
 import { type RefObject, useRef, useState } from "react";
 import { createPortal } from "react-dom";

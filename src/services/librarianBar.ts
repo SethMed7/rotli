@@ -17,6 +17,7 @@ import {
 } from "../lib/librarianChat";
 import type { VaultAction } from "../lib/librarianPeople";
 import { secureByName } from "../lib/librarianRules";
+import { type ModelText, modelText } from "../lib/promptText";
 import {
   corpusFrontmatter,
   corpusNotePath,
@@ -103,20 +104,6 @@ export function librarianReaches(rel: string, roles: FolderRoles | null): boolea
   );
 }
 
-/** The note's current tags, for the prompt. */
-export async function currentTags(
-  noteId: string,
-  deps: Pick<LibrarianDeps, "frontmatter"> = liveLibrarianDeps,
-): Promise<string[]> {
-  const fm = await deps.frontmatter(noteId).catch(() => null);
-  const value = fm ? fieldValue(fm, "tags") : "";
-  return value
-    .replace(/^\[|\]$/g, "")
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-}
-
 export type LibrarianReply =
   | { kind: "secret" }
   | {
@@ -125,7 +112,7 @@ export type LibrarianReply =
       actions: LibrarianAction[];
       vault: VaultAction[];
       handoff: boolean;
-      raw: string;
+      raw: ModelText;
     };
 
 /** One turn of the conversation. The secret check reads exactly what would be
@@ -137,7 +124,7 @@ export async function converseLibrarian(
 ): Promise<LibrarianReply> {
   const messages = librarianChatMessages(ctx, turns);
   if (looksSecret(messages.map((message) => message.content).join("\n"))) return { kind: "secret" };
-  const raw = await host.complete({ messages });
+  const raw = modelText(await host.complete({ messages }));
   const { prose, actions, vault, handoff } = splitLibrarianReply(raw, {
     doc: ctx.doc,
     highlight: latestHighlight(turns),

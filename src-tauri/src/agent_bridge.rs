@@ -166,7 +166,7 @@ fn document_contents_gate(path: &Path) -> Result<(), String> {
     if meta.len() > DOCX_MAX_BYTES {
         return Err("that document is too large for an agent".into());
     }
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let bytes = crate::fsutil::read_own_bytes(path).map_err(|e| e.to_string())?;
     if crate::secret::blocked_for_remote(&crate::ai_files::docx_text(&bytes)?) {
         return Err("blocked: that document holds secret-shaped text; Rotli never gives it to an agent".into());
     }
@@ -322,6 +322,17 @@ pub(crate) fn agent_bridge_reply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Second review of PR #267 (#3): a document handed to an agent that is a
+    /// hard link to a file elsewhere is refused before its text is read.
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_linked_document_is_refused() {
+        let vault = tempfile::TempDir::new().unwrap();
+        let abs = vault.path().join("Docs/linked.docx");
+        let _outside = crate::fsutil::hard_link_outside(&abs, b"PK outside the vault");
+        assert!(document_contents_gate(&abs).unwrap_err().contains("hard link"));
+    }
 
     fn request(tool: &str, root: &Path, read_only: bool) -> BridgeRequest {
         BridgeRequest {

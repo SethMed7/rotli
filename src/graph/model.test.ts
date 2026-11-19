@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
 import {
+  type Graph,
   RESTING_LABELS,
   buildGraph,
   labelVisible,
@@ -177,4 +178,26 @@ test("a big sparse vault still rests with names: the most-linked, then the most 
   const resting = restingLabels(linked);
   expect(resting.size).toBe(RESTING_LABELS);
   expect(resting.has("n5") && resting.has("n6")).toBe(true);
+});
+
+test("the notes around a hub with thousands of links are found in linear time", () => {
+  const spokes = 20_000;
+  const hub: Graph = {
+    nodes: [
+      { id: "hub", title: "Hub", secure: false, degree: spokes },
+      ...Array.from({ length: spokes }, (_, i) => ({
+        id: `n${i}`,
+        title: `N${i}`,
+        secure: false,
+        degree: 1,
+      })),
+    ],
+    edges: Array.from({ length: spokes }, (_, i) => ({ source: "hub", target: `n${i}`, suggested: false })),
+  };
+  const started = performance.now();
+  const around = neighborhood(hub, "n7", 2);
+  // copying the hub's list on every edge took ~700 ms here; linear is ~10 ms
+  expect(performance.now() - started).toBeLessThan(250);
+  expect(around.nodes).toHaveLength(spokes + 1);
+  expect(neighborhood(hub, "n7", 1).nodes.map((node) => node.id)).toEqual(["hub", "n7"]);
 });

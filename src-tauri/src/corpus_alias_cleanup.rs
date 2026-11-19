@@ -12,7 +12,6 @@
 //! the store's own gates and document helpers.
 
 use std::collections::HashSet;
-use std::fs;
 
 use serde::Serialize;
 
@@ -121,7 +120,7 @@ impl CorpusStore {
         let mut linked = HashSet::new();
         for note in notes.iter().filter(|note| note.kind == NoteKind::Note) {
             let Ok(rel) = self.resolve_note_rel(&note.id) else { continue };
-            let Ok(text) = fs::read_to_string(self.abs(&rel)) else { continue };
+            let Ok(text) = crate::fsutil::read_own_text(&self.abs(&rel)) else { continue };
             // the whole file: frontmatter `links: [[…]]` count as links too
             link_targets(&text, &mut linked);
             texts.push((rel, note.title.clone(), text));
@@ -148,6 +147,7 @@ impl CorpusStore {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use super::*;
 
     fn set(items: &[&str]) -> HashSet<String> {

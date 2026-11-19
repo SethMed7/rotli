@@ -42,4 +42,6 @@
 .setup-orb[data-orb="blossom-dark"] { --orb-ground: var(--swatch-blossom-dark); --orb-accent: var(--swatch-blossom-dark-accent); }
 .setup-orb[data-orb="midnight-light"] { --orb-ground: var(--swatch-midnight-light); --orb-accent: var(--swatch-midnight-light-accent); }
 .setup-orb[data-orb="midnight-dark"] { --orb-ground: var(--swatch-midnight-dark); --orb-accent: var(--swatch-midnight-dark-accent); }
+.setup-orb[data-orb="tesven-light"] { --orb-ground: var(--swatch-tesven-light); --orb-accent: var(--swatch-tesven-light-accent); }
+.setup-orb[data-orb="tesven-dark"] { --orb-ground: var(--swatch-tesven-dark); --orb-accent: var(--swatch-tesven-dark-accent); }
 

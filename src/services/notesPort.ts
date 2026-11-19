@@ -1,5 +1,5 @@
 import type { NoteCreationPolicy } from "../security/secureNotes";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
+import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 
 /** Application-facing note access. Implementations live in adapters; callers
  * depend on this port rather than the browser or filesystem implementation. */
@@ -30,4 +30,7 @@ export interface NotesService {
   /** Rename a document/sheet file in place (extension kept); resolves its new id.
    * Refuses a name another file already holds. */
   renameFile(id: string, name: string): Promise<string>;
+  /** The files the listing left out, and why (a hard link): Rotli never opens
+   * one, and tells the person. Absent where a host can't tell. */
+  listSkipped?(): Promise<SkippedFile[]>;
 }

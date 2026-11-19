@@ -1,11 +1,10 @@
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 // ⌘K — titlebar search with an anchored results popover. Empty query = Recent
 // (in-memory MRU) + Suggested
 // actions; typing filters Open tabs · Notes · Actions. Every registry action
 // is listable with its current chord as an inline kbd hint. ⏎ opens replacing
 // the focused pane's active tab; ⌘⏎ opens in a new tab. Esc closes through
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
-
-import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
@@ -15,7 +14,13 @@ import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { useTransientPopover } from "../lib/popover";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
-import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
+import {
+  useFolders,
+  useNoteIndex,
+  useNoteSearch,
+  useSearchableNotes,
+  useSkippedFiles,
+} from "../services/hooks";
 import { isTitleHit } from "../services/search";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
@@ -26,7 +31,8 @@ import { ChatGlyph, FocusGlyph, KeyboardGlyph, PlusGlyph, SplitGlyph, SunGlyph }
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
 import { glyphForNote } from "./noteGlyph";
-import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
+import { paletteMatchScore, rankSearchGroups, searchActionLabel } from "./paletteModel";
+import { SearchSkippedLine } from "./sidebar/skippedFilesNotice";
 
 function actionIcon(id: string): ReactNode {
   if (id === "notes.new" || id === "tabs.new") return <PlusGlyph size={15} />;
@@ -57,6 +63,8 @@ interface Group {
 
 export function Palette({ onClose, breveActive = false }: { onClose: () => void; breveActive?: boolean }) {
   const [query, setQuery] = useState("");
+  // files left out because they have a hard link: said once, under the results
+  const skipped = useSkippedFiles();
   const [index, setIndex] = useState(0);
   const palRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -364,7 +372,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           placeholder={
             breveActive ? "Search Rotli, files, chats, actions…" : "Search notes, files, chats, actions…"
           }
-          aria-label={breveActive ? "Search Rotli and actions" : "Search notes and actions"}
+          aria-label={searchActionLabel(breveActive)}
           onChange={(e) => {
             setQuery(e.target.value);
             setIndex(0);
@@ -405,6 +413,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
           ))}
           {flat.length === 0 && <div className="pal-empty">Nothing matches — try different words?</div>}
         </div>
+        <SearchSkippedLine query={query} count={skipped.length} />
         <div className="pal-foot">
           <span>
             <kbd>↑</kbd>

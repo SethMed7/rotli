@@ -249,11 +249,13 @@ Map (provider → client → auth → streaming → UI):
 
 Ranked:
 
-1. **`cli_detect` has no timeout and inherits stdin** (`provider.rs:1023-1065`,
+1. **FIXED (2026-11-11), `cli_probe.rs`: stdin closed, killed at 15 s.**
+   **`cli_detect` has no timeout and inherits stdin** (`provider.rs:1023-1065`,
    `:1036-1043`). `chatSurface.tsx:1651` gates model resolution on it, so a
    hung `claude auth status` leaves the picker unresolved indefinitely. Fix:
    the same watchdog as `run_registered` (~5 s) plus `Stdio::null()`.
-2. **Every AI note read/write spawns PlistBuddy on the main thread.**
+2. **FIXED (2026-11-11), `chat_registry::models_for_identity`: identity checks
+   skip the pinned-model lookup.** **Every AI note read/write spawns PlistBuddy on the main thread.**
    `corpus_read_ai`/`corpus_write_ai` (`corpus.rs:8268/8358`, sync) →
    `model_is_local` → `read_models` → `local_model_default`
    (`localmodel.rs:202-213`). Every `read_note` tool step pays a subprocess
@@ -370,6 +372,12 @@ Ranked (canonical pattern in parentheses):
    this session. Fix the references and add a `check:design-system` rule.
 2. **No focus trap in any of ~14 dialogs**; only five carry `aria-modal`.
    (`boardNameDialog.tsx` is the model; put one trap in `lib/popover.ts`.)
+   **2026-11-11:** every `aria-modal` dialog now traps Tab:
+   `lib/dialogFocus.ts` `containDialogFocus` was added to the preview, the
+   Librarian intro, the vault-needed and reconnecting cards
+   (`mermaidWorkspace` has its own trap). `scripts/dialog-focus.test.ts`
+   fails a new modal without one. Dialogs without `aria-modal` are still
+   open.
 3. **Chat delete is destructive with no confirmation**
    (`sidebarChat.tsx:319-323`, `:566-568`) while Home's equivalent drills to
    a confirm (`sidebarHome.tsx:327`).
@@ -393,7 +401,13 @@ Ranked (canonical pattern in parentheses):
 12. No `--font-mono` token; 37 monospace stacks in four spellings.
 13. No toast system; 25 bespoke inline error classes; `role="alert"`
     coverage uneven (missing in `renameDialog`, `quickNote`, `captureCard`,
-    `previewModal`, `tabStrip`, `paneTree`).
+    `previewModal`, `tabStrip`, `paneTree`). **The `role="alert"` half was
+    FIXED on 2026-11-11.** The Quick Note error, the preview's "Couldn't read",
+    and four `.file-err` lines (file, tasks, activity, canvas) are now live
+    regions. `scripts/error-announcements.test.ts` fails any `…-err`/`…-error` element
+    without a role. `renameDialog` already announced through `NameFieldDialog`,
+    and `captureCard`, `tabStrip` and `paneTree` no longer render an error
+    line.
 14. Context menus cannot show shortcuts (`MenuSpec` has no chord field) while
     the palette and slash menu always do.
 15. 24 empty-state families; the shared `EmptyState` has one caller.
@@ -502,23 +516,30 @@ Every write lane, with the shape it produces:
 
 Ranked:
 
-1. **Unlocked read-modify-write of `.gitignore` for a secure note**
+1. **FIXED (2026-11-11). Unlocked read-modify-write of `.gitignore` for a secure note**
    (`memex.rs:1204-1215`). `memex_write_note` inlines its own append under
    only a directory lock while `corpus.rs:3717 gitignore_add` does the same
    job under the file lock. Two concurrent secure creates (Quick Note +
    capture, or a second process) can lose an ignore line, which is exactly
    what `gitignore_add` was written to prevent. Fix: call `gitignore_add`.
-2. **Breve's daily digest truncates in place** (`daily-log.ts:85,117,120`)
+2. **FIXED (2026-11-11), the temp + rename half
+   (`breve-runtime/scripts/daily-record.ts`, `test-daily-record.ts`). An
+   empty distillation also no longer puts the stub over a day already
+   written. Routing the write through Rust is still open.** Breve's daily
+   digest truncates in place (`daily-log.ts:85,117,120`)
    into `history/`, which the contract declares never writable by any lane.
    A crash mid-write leaves an empty day. Fix: temp + rename, and long-term
    route through Rust.
-3. **`toggle_task` writes through the only unlocked body-write entry**
+3. **FIXED (2026-11-11). `toggle_task` writes through the only unlocked body-write entry**
    (`corpus.rs:4979` → `5083`); a CLI/MCP patch between its read and write
    is silently discarded.
-4. **Board and sheet/DOCX saves revision-check without a file lock**
+4. **FIXED (2026-11-11), `corpus_save_lock_tests.rs`. Board and sheet/DOCX saves revision-check without a file lock**
    (`corpus.rs:6144`, `3309`); a 500 ms board autosave racing an MCP board
    apply can lose one.
-5. **Breve writes real Library notes through a second, weaker `write_atomic`**
+5. **Partly FIXED (2026-11-11): `write_atomic` is now the shared fsutil
+   writer (folder synced), and the watchlist merge runs under the note's
+   lock (`breve_watchlist_lock_tests.rs`). The watcher mark is still
+   missing.** **Breve writes real Library notes through a second, weaker `write_atomic`**
    (`breve.rs:461`): no directory fsync, no lock, no watcher mark, so every
    Breve write echoes as an “external change” and a user editing the
    watchlist note has no mutual exclusion with Breve.
@@ -536,7 +557,8 @@ Ranked:
 9. **Any internal write invalidates the whole walk cache** (`corpus.rs:2526
    mark()` → `bump()`), so the next list/search/⌘K re-walks and re-hashes
    the vault. With #7 that is often within the same second.
-10. Three flag writers skip `suppress.mark` (`set_locked:3562`,
+10. **FIXED (2026-11-11), the `suppress.mark` half; all three tests are in
+    `corpus_write_race_tests.rs`.** Three flag writers skip `suppress.mark` (`set_locked:3562`,
     `set_pinned:3583`, `set_local_ai_access:4034`) and fire a spurious
     external-change refresh; `create_with_policy:6019` stamps RFC3339 on a
     Memex-layout vault where `write_resolved` uses `YYYY-MM-DD`.

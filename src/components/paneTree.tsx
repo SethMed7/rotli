@@ -228,17 +228,29 @@ function SplitView({ node }: { node: SplitNode }) {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    let frame = 0;
     const observer = new ResizeObserver(() => {
-      const rect = container.getBoundingClientRect();
-      const total = node.dir === "row" ? rect.width : rect.height;
-      if (total <= 0) return;
-      const current = node.children.map((_, i) => node.sizes[i] ?? 1 / node.children.length);
-      const fitted = clampSplitSizes(current, minFracOf(node, total));
-      if (fitted.every((s, i) => Math.abs(s - (current[i] ?? 0)) < 0.001)) return;
-      setSplitSizes(node.id, fitted);
+      // Re-fitting replaces this observer's tree node. Doing that during
+      // delivery registers a fresh, shallower observation in the same cycle,
+      // which the browser must defer with a ResizeObserver-loop ErrorEvent.
+      // Apply the size law once in the next frame, outside observer delivery.
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const rect = container.getBoundingClientRect();
+        const total = node.dir === "row" ? rect.width : rect.height;
+        if (total <= 0) return;
+        const current = node.children.map((_, i) => node.sizes[i] ?? 1 / node.children.length);
+        const fitted = clampSplitSizes(current, minFracOf(node, total));
+        if (fitted.every((s, i) => Math.abs(s - (current[i] ?? 0)) < 0.001)) return;
+        setSplitSizes(node.id, fitted);
+      });
     });
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
     // the tree object is replaced on every store write, so the observer always
     // closes over the current sizes
   }, [node, setSplitSizes]);

@@ -33,7 +33,7 @@ test("private-browser tabs create, switch, and close through Rotli's pane strip"
   await expect(activeStart).toBeVisible();
   await expect(activeDraft).toHaveValue("first tab research draft");
 
-  await browserTabs.nth(0).locator(".x").click();
+  await browserTabs.nth(0).locator("..").locator(".x").click();
   await expect(browserTabs).toHaveCount(3);
   await expect(activeStart).toBeVisible();
 });

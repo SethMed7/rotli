@@ -202,3 +202,6 @@
   min-height: 56px;
   resize: vertical;
 }
+
+/* The engine owns its vendor accessibility adapter without adding a layout box. */
+.board-engine { display: contents; }

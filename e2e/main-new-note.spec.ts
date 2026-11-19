@@ -138,7 +138,7 @@ test("New lands beside the open note, and at the Main root when nothing is open"
   while ((await openTabs.count()) > 0) {
     const tab = openTabs.first();
     await tab.hover(); // the × on an inactive tab is hover-revealed
-    await tab.getByRole("button", { name: "Close tab — ⌘W" }).click({ force: true });
+    await tab.locator("..").getByRole("button", { name: "Close tab — ⌘W" }).click({ force: true });
   }
   await expect(openTabs).toHaveCount(0);
   await page.getByRole("button", { name: /^New note in / }).click();

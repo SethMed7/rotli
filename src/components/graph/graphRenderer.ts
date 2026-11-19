@@ -97,6 +97,7 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   let layout: Layout | null = null;
   let laidOut = "";
   let palette = readPalette(wrap);
+  let paletteStale = false;
   let view: View = { x: 0, y: 0, k: 1 };
   // until the person pans or zooms, the view keeps the whole graph framed
   let autoFit = true;
@@ -122,6 +123,10 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
     const context = canvas.getContext("2d");
     if (!context || !layout) return;
     const ratio = window.devicePixelRatio || 1;
+    if (paletteStale) {
+      palette = readPalette(wrap);
+      paletteStale = false;
+    }
     if (autoFit) view = fitView(points(), width, height);
     const active = hovered ?? focused;
     const near = active ? (neighbors.get(active) ?? new Set<string>()) : null;
@@ -386,7 +391,7 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   };
 
   // size the backing store to the pane (crisp on Retina)
-  const resize = new ResizeObserver(() => {
+  function resizeBacking() {
     const rect = wrap.getBoundingClientRect();
     const ratio = window.devicePixelRatio || 1;
     width = rect.width;
@@ -395,8 +400,26 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
     canvas.width = Math.round(width * ratio);
     canvas.height = Math.round(height * ratio);
     draw();
-  });
+  }
+  const resize = new ResizeObserver(resizeBacking);
   resize.observe(wrap);
+  // a move to a display with another scale keeps the pane's CSS size, so the
+  // ResizeObserver stays quiet: watch the current ratio and re-size the
+  // backing store when it changes (canvas-graph audit, P2)
+  let scaleQuery: MediaQueryList | null = null;
+  const onScale = () => {
+    resizeBacking();
+    watchScale();
+  };
+  function watchScale() {
+    scaleQuery?.removeEventListener("change", onScale);
+    scaleQuery =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+        : null;
+    scaleQuery?.addEventListener("change", onScale);
+  }
+  watchScale();
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", onPointerUp);
@@ -442,15 +465,18 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
       if (centerChanged) autoFit = true;
       requestDraw();
     },
-    /** The theme changed: re-read the tokens. */
+    /** The theme or accent changed: re-read the tokens at the next frame,
+     * after every effect has applied them to <html> (the accent lands in the
+     * App's effect, which runs after this canvas's own). */
     repaint() {
-      palette = readPalette(wrap);
+      paletteStale = true;
       requestDraw();
     },
     destroy() {
       layout?.stop();
       cancelAnimationFrame(frame);
       resize.disconnect();
+      scaleQuery?.removeEventListener("change", onScale);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);

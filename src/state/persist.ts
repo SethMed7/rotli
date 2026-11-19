@@ -143,7 +143,7 @@ import {
   type SyntaxPalette,
   useUiStore,
 } from "./ui";
-import { ACCENT_COLORS, type AccentColor } from "./ui";
+import { ACCENT_COLORS, type AccentColor, type CopiedAside } from "./ui";
 import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
 import { durablePane, type PersistedViewstate } from "./viewstate";
@@ -304,7 +304,7 @@ interface PersistedSettings {
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
   /** The macOS Dock/app icon variant. */
-  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay" | "black";
+  appIcon: "default" | "warm" | "paper" | "charcoal" | "clay" | "black" | "tesven";
   /** Raw frontmatter at the top of the note (Show file metadata): hide / show. */
   fileMetadata: "hide" | "show";
   /** The vault's Brain master switch (vault-vs-brain, 2026-07-26). The Rust
@@ -340,6 +340,7 @@ interface PersistedSettings {
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (the maintainer, 2026-06-15). */
   quickNoteIds: string[];
+  copiedAside: CopiedAside[];
   captureOrder: string[];
   quickActiveId: string | null;
   quickFolder: string;
@@ -460,6 +461,10 @@ export function parseSettings(raw: string): PersistedSettings {
   const quickNoteIds = Array.isArray(data.quickNoteIds)
     ? data.quickNoteIds.filter((x): x is string => typeof x === "string").slice(0, QUICK_MAX)
     : [];
+  const copiedAside = (Array.isArray(data.copiedAside) ? data.copiedAside : [])
+    .map(record)
+    .filter((x) => [x.copyId, x.copyName, x.noteName].every((v) => typeof v === "string"))
+    .map((x) => ({ copyId: String(x.copyId), copyName: String(x.copyName), noteName: String(x.noteName) }));
   const captureOrder = Array.isArray(data.captureOrder)
     ? data.captureOrder.filter((x): x is string => typeof x === "string")
     : [];
@@ -612,7 +617,8 @@ export function parseSettings(raw: string): PersistedSettings {
       data.appIcon === "paper" ||
       data.appIcon === "charcoal" ||
       data.appIcon === "clay" ||
-      data.appIcon === "black"
+      data.appIcon === "black" ||
+      data.appIcon === "tesven"
         ? data.appIcon
         : "default",
     // hide is the safe default — metadata never surprises a fresh (or old) config
@@ -650,6 +656,7 @@ export function parseSettings(raw: string): PersistedSettings {
     lastSeenVersion: typeof data.lastSeenVersion === "string" ? data.lastSeenVersion : "",
     onboardingPhase: onboardingPhaseOf(data.onboardingPhase),
     quickNoteIds,
+    copiedAside,
     captureOrder,
     quickActiveId,
     quickFolder,
@@ -784,6 +791,7 @@ function applySettings(s: PersistedSettings): void {
     lastSeenVersion: s.lastSeenVersion,
     onboardingPhase: s.onboardingPhase,
     quickNoteIds: s.quickNoteIds,
+    copiedAside: s.copiedAside,
     captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
     quickFolder: s.quickFolder,
@@ -1516,6 +1524,7 @@ function settingsSnapshot(): string {
     lastSeenVersion: ui.lastSeenVersion,
     onboardingPhase: ui.onboardingPhase,
     quickNoteIds: ui.quickNoteIds,
+    copiedAside: ui.copiedAside,
     captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,
     quickFolder: ui.quickFolder,

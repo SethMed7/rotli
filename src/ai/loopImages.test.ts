@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { brandHost, model, person } from "../lib/promptText.fixtures";
 import { runAgent } from "./loop";
 import type { CompleteReq, Host } from "./types";
 
@@ -14,7 +15,7 @@ function scriptedHost(replies: string[]): { host: Host; requests: CompleteReq[] 
   const unused = async (): Promise<never> => {
     throw new Error("not part of this script");
   };
-  const host: Host = {
+  const host = brandHost({
     complete: async (req) => {
       requests.push(req);
       return replies.shift() ?? '{"final":"(done)"}';
@@ -27,7 +28,7 @@ function scriptedHost(replies: string[]): { host: Host; requests: CompleteReq[] 
     readFile: unused,
     generateImage: unused,
     knowledgeMap: async () => "",
-  };
+  });
   return { host, requests };
 }
 
@@ -40,7 +41,7 @@ describe("attached images", () => {
     let final = "";
     for await (const ev of runAgent(host, {
       history: [],
-      userText: "[Image #1] review my about page and write me a new bio",
+      userText: person("[Image #1] review my about page and write me a new bio"),
       web: true,
       model: { id: "default", api: "cli" },
       images: [SCREENSHOT],
@@ -64,10 +65,13 @@ describe("the forced final answer", () => {
     ]);
     for await (const ev of runAgent(host, {
       history: [
-        { role: "user", text: "first try" },
-        { role: "assistant", text: "⚠ Claude's safety filter blocked this reply (reasoning_extraction)." },
+        { role: "user", text: person("first try") },
+        {
+          role: "assistant",
+          text: model("⚠ Claude's safety filter blocked this reply (reasoning_extraction)."),
+        },
       ],
-      userText: "[Image #1] write me a new bio",
+      userText: person("[Image #1] write me a new bio"),
       web: true,
       model: { id: "default", api: "cli" },
       images: [SCREENSHOT],

@@ -86,33 +86,49 @@ export function peopleAreas(rules: LibrarianRules): string[] {
   return groups.length > 0 ? groups.map((group) => `${PEOPLE_AREA}/${group}`) : [PEOPLE_AREA];
 }
 
-/** Lowercased words: letters and digits, everything else a break. */
-function words(text: string): string[] {
+/** The ways a name is cut into lowercased words; a note is secure when ANY of
+ * them finds the keyword, since a deny list may only ever grow
+ * (librarian_rules.rs `Words` defines each the same way): plain letters and
+ * digits; the same with combining marks as breaks (`banḱ` holds "bank"); and
+ * NFKC-folded with marks kept (a decomposed `é`, a fullwidth `ｂａｎｋ`). */
+const EVERY_WAY: readonly ((text: string) => string[])[] = [
+  (text) => cut(text, /[^\p{Alphabetic}\p{N}]+/u),
+  (text) => cut(text, /(?:[^\p{Alphabetic}\p{N}]|\p{M})+/u),
+  (text) =>
+    cut(text.normalize("NFKC"), /[^\p{Alphabetic}\p{N}\p{M}]+/u).map((word) => word.normalize("NFKC")),
+];
+
+function cut(text: string, breaks: RegExp): string[] {
   return text
-    .split(/[^\p{L}\p{N}]+/u)
+    .split(breaks)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
 }
 
-/** A note file name's words, without its folder, `.md`, and the short id
- * suffix Rotli adds to a colliding name (`bank-login-3f9k2a.md`). */
-function fileWords(rel: string): string[] {
+/** The short id suffix an older Rotli added to a colliding file name
+ * (`bank-login-3f9k2a.md`): a dash and the ULID's last six characters,
+ * lowercased. Only that exact ASCII shape, with a digit, is dropped. */
+const ID_SUFFIX = /^([\s\S]+)-(?=[0-9a-z]*[0-9])[0-9a-hjkmnp-tv-z]{6}$/;
+
+/** A note file name's words, without its folder, `.md`, and an id suffix. */
+function fileWords(rel: string, words: (text: string) => string[]): string[] {
   const name = rel.split("/").pop() ?? rel;
-  const w = words(name.replace(/\.md$/, ""));
-  const last = w.at(-1);
-  if (w.length > 1 && last && last.length === 6 && /[0-9]/.test(last)) w.pop();
-  return w;
+  const stem = name.replace(/\.md$/, "");
+  const head = words(ID_SUFFIX.exec(stem)?.[1] ?? stem);
+  return head.length > 0 ? head : words(stem);
 }
 
 /** Does a keyword appear in the title or the file name, as whole words, in
  * any case? "bank" matches "Bank login", never "Riverbank". */
 export function secureByName(title: string, rel: string, keywords: readonly string[]): boolean {
-  const names = [words(title), fileWords(rel)];
-  return keywords.some((keyword) => {
-    const k = words(keyword);
-    return (
-      k.length > 0 &&
-      names.some((name) => name.some((_, at) => k.every((word, offset) => name[at + offset] === word)))
-    );
+  return EVERY_WAY.some((words) => {
+    const names = [words(title), fileWords(rel, words)];
+    return keywords.some((keyword) => {
+      const k = words(keyword);
+      return (
+        k.length > 0 &&
+        names.some((name) => name.some((_, at) => k.every((word, offset) => name[at + offset] === word)))
+      );
+    });
   });
 }

@@ -23,6 +23,9 @@ export interface NoteCreationPolicy {
   secure?: boolean;
   /** Preserve a locked note when recovering an unsaved browser draft. */
   locked?: boolean;
+  /** A recovery note's event id (editor/saveQueue.ts): asked again, the
+   * create gives back the note made for it before instead of another. */
+  recoveryEvent?: string;
   /** Which AI made the note (`created_by`); absent for a person, whose notes
    * no AI may rewrite without a grant (src/lib/aiEditPolicy.ts). */
   createdBy?: NoteCreator;

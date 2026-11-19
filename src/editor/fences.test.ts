@@ -7,6 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { Text } from "@codemirror/state";
 
 import { TARGET_LANGS, innerCode, lineInFence, scanFences, withheldEmbedMessage } from "./fences";
+import { scanTables } from "./tables";
 
 function doc(...lines: string[]): Text {
   return Text.of(lines);
@@ -141,4 +142,11 @@ test("document and workbook embeds are withheld only where the build lacks them"
     );
     expect(withheldEmbedMessage(lang!, { sheets: true, documents: true }, target)).toBeNull();
   }
+});
+
+test("one keystroke's consumers share one fence scan and one table scan", () => {
+  // memoPerDoc (docMemo.test.ts) is what makes these the same answer
+  const note = doc("```js", "x", "```", "", "| a |", "|---|", "| 1 |");
+  expect(scanFences(note)).toBe(scanFences(note));
+  expect(scanTables(note)).toBe(scanTables(note));
 });

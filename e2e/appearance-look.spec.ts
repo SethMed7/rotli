@@ -15,6 +15,18 @@ async function appearance(page: Page): Promise<void> {
 
 const backToNotes = (page: Page) => page.getByRole("button", { name: "Back to notes", exact: true }).click();
 
+test("the desktop icon picker keeps every released choice and updates its selection", async ({ page }) => {
+  await gotoApp(page);
+  await appearance(page);
+  const icons = page.getByRole("group", { name: "App icon", exact: true });
+  for (const name of ["Default", "Paper", "Charcoal", "Clay", "Black", "Tesven"]) {
+    const button = icons.getByRole("button", { name, exact: true });
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(icons.locator('[aria-pressed="true"]')).toHaveCount(1);
+  }
+});
+
 test("the sun flips light and dark by default, and walks only the picks when asked", async ({ page }) => {
   await gotoApp(page);
   await expect(sun(page)).toHaveAccessibleName("Theme — Warm Light · click for Warm Dark");

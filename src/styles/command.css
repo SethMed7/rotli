@@ -100,6 +100,16 @@
   font-size: 12.5px;
   color: var(--text-muted);
 }
+/* files left out because they have a hard link: one quiet line under the
+   results (src/lib/hardLinks.ts) */
+.pal-skipped {
+  margin: 0;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
 .pal-foot {
   display: flex;
   gap: 16px;
@@ -578,6 +588,44 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow-y: auto;
+}
+/* the version and the update action, pinned to the foot of the menu so they
+   are one click from every pane (settings/updatesNav.tsx) */
+.set-nav-update {
+  margin-top: auto;
+  padding: 12px 9px 2px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.set-nav-update-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.set-nav-version {
+  color: var(--text-muted);
+}
+.set-nav-update-status {
+  color: var(--text-muted);
+}
+.set-nav-update.has-update .set-nav-update-status {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+.set-nav-update-err {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+.set-nav-update .ghostbtn {
+  max-width: 100%;
 }
 /* the Settings page is one scene (2026-09-29): a wash of the theme's sky
    at the top fading to the surface, the scenery (settings/settingsBanner.tsx
@@ -1866,6 +1914,16 @@
   color: var(--text-muted);
   font-size: 10.5px;
 }
+/* Tesven locks the quokka (brand/quokka.ts quokkaThemeLock): no controls, so
+   the studio is just the preview, not a two-column card with an empty half */
+.quokka-studio.locked {
+  max-width: 210px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.quokka-studio.locked .quokka-studio-preview {
+  min-height: 0;
+  border-right: 0;
+}
 .quokka-studio-controls {
   display: flex;
   min-width: 0;
@@ -2157,6 +2215,25 @@
 }
 .navigator-sample i.active {
   color: var(--accent-text);
+  opacity: 1;
+}
+.navigator-sample.hexes {
+  gap: 1px;
+}
+.navigator-sample.hexes i {
+  width: 10px;
+  height: 9px;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: currentColor;
+  opacity: 0.46;
+}
+.navigator-sample.hexes i:nth-child(even) {
+  transform: translateX(3px);
+}
+.navigator-sample.hexes i:nth-child(odd) {
+  transform: translateX(-3px);
+}
+.navigator-sample.hexes i.active {
   opacity: 1;
 }
 .navigator-sample.paws i {
@@ -3220,16 +3297,22 @@
   color: var(--text);
   cursor: pointer;
 }
-.rename-btn:hover {
+.rename-btn:hover:not(:disabled) {
   background: var(--hov);
 }
 .rename-btn.primary {
-  background: var(--accent);
+  background: var(--accent-text);
   color: var(--on-accent);
   border-color: transparent;
 }
-.rename-btn.primary:hover {
-  background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
+.rename-btn.primary:hover:not(:disabled) {
+  background: var(--accent-text);
+}
+/* a dialog that is saving, or has nothing to submit yet, says so (the
+   .ghostbtn treatment): no hover, no pointer, visibly unavailable */
+.rename-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 /* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
    read and edit a prompt; the prompt box scrolls, never the card */

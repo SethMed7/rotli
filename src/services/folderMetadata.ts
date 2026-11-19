@@ -7,7 +7,7 @@ import {
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
-import { composeInPlace, rotliMade, withSecureLineOnly } from "../lib/frontmatterInPlace";
+import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
@@ -138,6 +138,15 @@ export async function setFolderProtection(
 export async function readFolderRawMetadata(dir: VaultDir, path: string) {
   const opened = await readVersionedFile(dir, path);
   return { ...opened, contents: rawFrontmatterBlock(opened.contents) };
+}
+
+/** Pinning is a user metadata action, including on locked notes. Preserve the
+ * body, timestamps, and all unrelated metadata in either kind of vault. */
+export async function setFolderPinned(dir: VaultDir, path: string, pinned: boolean): Promise<void> {
+  if (!path.endsWith(".md")) throw new Error("not a Markdown note");
+  const opened = await readVersionedFile(dir, path);
+  const next = withTopLevelLine(opened.contents, "pinned", pinned ? "true" : null);
+  if (next !== opened.contents) await writeVersionedFile(dir, path, next, opened.revision);
 }
 
 export async function writeFolderRawMetadata(

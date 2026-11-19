@@ -28,13 +28,17 @@ describe("what the titlebar sun cycles", () => {
     expect(nextTheme(system, true, "all", [])).toEqual({ family: "iris", mode: "light" });
   });
 
-  test("all walks the fourteen in catalog order and wraps", () => {
+  test("all walks the sixteen in catalog order and wraps", () => {
     expect(nextTheme(warmLight, false, "all", [])).toEqual({ family: "warm", mode: "dark" });
     expect(nextTheme({ theme: "dark", themeFamily: "warm" }, false, "all", [])).toEqual({
       family: "mono",
       mode: "light",
     });
     expect(nextTheme({ theme: "dark", themeFamily: "midnight" }, false, "all", [])).toEqual({
+      family: "tesven",
+      mode: "light",
+    });
+    expect(nextTheme({ theme: "dark", themeFamily: "tesven" }, false, "all", [])).toEqual({
       family: "warm",
       mode: "light",
     });
@@ -83,5 +87,6 @@ describe("what the titlebar sun cycles", () => {
   test("environments are named as Appearance names them", () => {
     expect(solidThemeLabel({ family: "mono", mode: "dark" })).toBe("Charcoal");
     expect(solidThemeLabel({ family: "midnight", mode: "light" })).toBe("Moonlight");
+    expect(solidThemeLabel({ family: "tesven", mode: "dark" })).toBe("Tesven Dark");
   });
 });

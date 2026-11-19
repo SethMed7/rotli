@@ -132,6 +132,9 @@ pub struct BreveRoutine {
 pub(crate) mod breve_health;
 #[path = "breve_pdf.rs"]
 pub(crate) mod breve_pdf;
+#[cfg(test)]
+#[path = "breve_watchlist_lock_tests.rs"]
+mod watchlist_lock_tests;
 pub use breve_health::BreveRoutineHealth;
 pub(crate) use breve_health::{recent_notifications, routine_health, BREVE_NOTIFICATION_LIMIT};
 pub use breve_pdf::BrevePdfTheme;
@@ -282,6 +285,7 @@ pub struct BreveDeliverySettings {
 fn production_roots_for_dev(app: &tauri::AppHandle) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Ok(config_dir) = app.path().app_config_dir() {
+        // raw read (outside-vault): app config outside any vault
         if let Some(config) = fs::read_to_string(config_dir.join("corpus.json"))
             .ok()
             .and_then(|body| serde_json::from_str::<crate::corpus::CorpusConfig>(&body).ok())
@@ -1535,12 +1539,12 @@ fn brief_skill_at(root: &Path, dev_custom: Option<String>) -> BreveBriefSkill {
     // the source fallback still carries the {{BREVE_HOME}} placeholder —
     // substitute it like sync_runtime would, or a save of the displayed text
     // would hand the wrappers literal template paths (review, 2026-07-31)
-    let default_text = fs::read_to_string(&materialized)
+    let default_text = crate::fsutil::read_own_text(&materialized)
         .unwrap_or_else(|_| materialize_skill_text(SKILL_SOURCE, root, &home));
     let custom = if cfg!(debug_assertions) {
         dev_custom
     } else {
-        fs::read_to_string(root.join(SKILL_CUSTOM_REL)).ok()
+        crate::fsutil::read_own_text(&root.join(SKILL_CUSTOM_REL)).ok()
     };
     BreveBriefSkill {
         is_custom: custom.is_some(),
@@ -1630,8 +1634,19 @@ pub async fn breve_write_watchlist(
 
 fn write_watchlist_at(root: &Path, markdown: &str) -> Result<BreveSnapshot, String> {
     let path = root.join(WATCHLIST_FILE);
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+    }
+    // under the note's own lock, the one an editor or agent save takes, so a
+    // save landing mid read-merge-write isn't overwritten (audit 2026-09-02 §6 #5)
+    crate::fsutil::with_file_lock(&path, || merge_watchlist(&path, markdown))?;
+    let legacy = legacy_root();
+    Ok(snapshot_at(root, legacy.as_deref()))
+}
+
+fn merge_watchlist(path: &Path, markdown: &str) -> Result<(), String> {
     let body = strip_frontmatter(markdown);
-    let doc = if let Some(existing) = read_text(&path) {
+    let doc = if let Some(existing) = read_text(path) {
         if let Some(after_fence) = existing.strip_prefix("---\n") {
             // offsets into `existing`: 4 (opening fence) + match + 5 ("\n---\n")
             let front_end = after_fence.find("\n---\n").map(|at| at + 9);
@@ -1667,26 +1682,17 @@ fn write_watchlist_at(root: &Path, markdown: &str) -> Result<BreveSnapshot, Stri
             body,
         )
     };
-    write_atomic(&path, doc.as_bytes())?;
-    let legacy = legacy_root();
-    Ok(snapshot_at(root, legacy.as_deref()))
+    write_atomic(path, doc.as_bytes())
 }
 
 fn append_scheduler_event(root: &Path, routine: &str, message: &str) -> Result<(), String> {
-    let path = root
-        .join(routines::MANAGED_DIR)
-        .join("logs/rotli-scheduler.log");
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("create {}: {error}", parent.display()))?;
-    }
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    // the log lives in the vault (.rotli/breve): the checked sidecar opener,
+    // so a hard link there is refused rather than appended to
+    let relative = Path::new(routines::MANAGED_DIR).join("logs/rotli-scheduler.log");
+    let mut file = crate::containment::open_sidecar(root, &relative, crate::containment::Sidecar::Append)?
+        .ok_or("open the scheduler log")?;
     writeln!(file, "{} [{}] {}", now_stamp(), routine, message)
-        .map_err(|error| format!("write {}: {error}", path.display()))
+        .map_err(|error| format!("write the scheduler log: {error}"))
 }
 
 /// Explicit watchlist refresh. This is intentionally not coupled to Save:

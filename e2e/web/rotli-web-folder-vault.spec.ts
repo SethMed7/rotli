@@ -254,7 +254,7 @@ test("a view with no chats of its own shows none in Chat, and Main shows every c
   await homeSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
   await page.getByRole("textbox", { name: "New view" }).fill("Demos");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await pairAndOpenChat(page);
   const rows = page.locator(".sidebar .sb-chatrow:not(.all)");
@@ -361,4 +361,72 @@ test("a chat reply shows a vault image and keeps a video's name on the web", asy
   await expect(bubble.locator("video")).toHaveCount(0);
   await expect(bubble).toContainText("![tracker](https://example.com/pixel.png)");
   await expect(bubble.locator('img[src^="https:"]')).toHaveCount(0);
+});
+
+test("a long folder chat is ordered by its newest reply after reload", async ({ page }) => {
+  await fakeHelper(page);
+  const longChat =
+    chatFile("Long plan", "2026-10-20") +
+    "**rotli** · 2026-10-20T10:01:00Z — Earlier reply\n" +
+    "More detail\n".repeat(60) +
+    "**rotli** · 2026-10-22T10:01:00Z — Newest reply\n" +
+    "**you** · 2026-10-23T10:00:00Z — Still waiting\n";
+  const middleChat =
+    chatFile("Other plan", "2026-10-21") + "**rotli** · 2026-10-21T10:01:00Z — Other reply\n";
+  await plantFolder(page, {
+    "chats/long-plan.md": longChat,
+    "chats/other-plan.md": middleChat,
+  });
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await pairAndOpenChat(page);
+  // Other fixture chats have no reply and fall back to OPFS's current file
+  // time; compare the two reply-bearing chats, independent of today's date.
+  const rows = page.locator(
+    '.sidebar .sb-chatrow:is([data-chat-slug="long-plan"], [data-chat-slug="other-plan"])',
+  );
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "long-plan");
+  await expect(rows.nth(1)).toHaveAttribute("data-chat-slug", "other-plan");
+
+  // Reload opens Hello and selects Home. Wait for that note to finish opening
+  // before selecting Chat, so the boot's front sync cannot undo our click.
+  test.info().annotations.push({
+    type: "race",
+    description: "A Chat click before the restored note opens is superseded by its Home-front sync.",
+  });
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("A note.");
+  await expect(page.getByRole("button", { name: "Home", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "long-plan");
+  await expect(rows.nth(1)).toHaveAttribute("data-chat-slug", "other-plan");
+});
+
+test("a CRLF folder chat keeps its title and pin after reload", async ({ page }) => {
+  await fakeHelper(page);
+  const contents = chatFile("Windows plan", "2026-09-01")
+    .replace("source: rotli", "source: rotli\npinned: true\nmodel: sonnet\nprovider: claude")
+    .replaceAll("\n", "\r\n");
+  await plantFolder(page, { "chats/windows-plan.md": contents });
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await pairAndOpenChat(page);
+  const rows = page.locator(".sidebar .sb-chatrow[data-chat-slug]");
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "windows-plan");
+  await expect(rows.first()).toContainText("Windows plan");
+  // Pinning outranks the four newer LF chats already in the folder fixture.
+  await expect(rows).toHaveCount(5);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Note text" })).toContainText("A note.");
+  await expect(page.getByRole("button", { name: "Home", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(rows.first()).toHaveAttribute("data-chat-slug", "windows-plan");
+  await expect(rows.first()).toContainText("Windows plan");
 });

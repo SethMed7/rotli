@@ -11,6 +11,7 @@ import { useNoteMenu } from "../components/useNoteMenu";
 import { dispatch } from "../keys/registry";
 import { relativeLabel } from "../lib/dateLabels";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { isHardLinkRefusal } from "../lib/hardLinks";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
 import {
@@ -40,17 +41,13 @@ import type { Note } from "../types";
 import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
+import { flushNoteAfterPaint } from "./flushAfterPaint";
 import { FormatBar } from "./formatBar";
+import { HardLinkedNote } from "./hardLinkedNote";
 import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
-import {
-  ensureDocument,
-  flushNoteAfterPaint,
-  reloadDocumentIfClean,
-  useDocumentDirty,
-  useDocumentSaveError,
-} from "./model";
+import { adoptReadNote, retainedNote, useDocumentDirty, useDocumentSaveError, useGoneNotes } from "./model";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -154,10 +151,15 @@ export function EditorSurface({
     }),
     [noteId, pendingCreatedAt],
   );
-  const storedNote = useNote(noteId, { enabled: !pending }).data;
+  const stored = useNote(noteId, { enabled: !pending });
+  // a file deleted outside: its words stay in the buffer, so keep showing them
+  const storedNote = stored.data ?? retainedNote(noteId);
+  // a note that has (or came to have) a hard link is not shown, even from cache
+  const hardLinked = !pending && isHardLinkRefusal(stored.error);
   const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
+  const deleted = useGoneNotes().includes(noteId);
 
   const [aaOpen, setAaOpen] = useState(false);
   // Restore for a sink-resident note (declared up here: hooks before the
@@ -354,8 +356,7 @@ export function EditorSurface({
   // the same file (the maintainer, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
     if (!note || pending) return;
-    ensureDocument(note.id, note.body, note.revision, note);
-    reloadDocumentIfClean(note.id, note.body, note.revision);
+    adoptReadNote(note);
   }, [note, pending]);
 
   // Closing/switching paints first; the existing debounce and quit/visibility
@@ -386,6 +387,13 @@ export function EditorSurface({
     return () => ro.disconnect();
   }, [formatBarVisible, noteReady]);
 
+  if (hardLinked) {
+    return (
+      <div className="editor" ref={rootRef}>
+        <HardLinkedNote />
+      </div>
+    );
+  }
   if (!note) return <div className="editor" ref={rootRef} />;
 
   const fontSize = focusMode ? FOCUS_SIZE : style.size;
@@ -524,7 +532,9 @@ export function EditorSurface({
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
       {saveError && (
         <div className="ed-saveerr" role="alert">
-          ⚠ This note isn’t saving — {saveError}. Your text is kept here and rotli keeps retrying.
+          {deleted
+            ? `⚠ ${saveError}. Copy them or discard them from the notice in the sidebar.`
+            : `⚠ This note isn’t saving — ${saveError}. Your text is kept here.`}
         </div>
       )}
       <CmEditor

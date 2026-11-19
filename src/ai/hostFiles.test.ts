@@ -10,9 +10,11 @@ import { expect, test } from "bun:test";
 
 import ExcelJS from "exceljs";
 
+import { approved, approvedRow } from "../lib/promptText.fixtures";
 import { b64FromBytes, saveXlsx } from "../sheets/codec/xlsx";
 import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
+import { editableDocumentForAi } from "./artifacts";
 import {
   aiFileAccessById as accessById,
   type FileToolIo,
@@ -47,23 +49,23 @@ const io: FileToolIo = {
     cachedList = Object.keys(files).map(listed);
     return { folders: [], notes: cachedList };
   },
-  corpusFileBytesAi: mockAiRead,
-  corpusFileTextAi: mockAiRead,
-  readAiManagedDocument: (async (id: string) => {
+  // the AI file lane: what a model may name, then the gated reads
+  files: async () => Object.keys(files).map(listed).map(approvedRow),
+  fileBytes: async (id) => approved(await mockAiRead(id)),
+  fileText: async (id) => approved(await mockAiRead(id)),
+  documentText: async (id) => {
     documentReads.push(id);
-    return {
-      kind: "ready",
-      warnings: [],
-      revision: "r1",
-      sourceBase64: "",
-      document: {
+    return approved(
+      editableDocumentForAi({
         id: "storage/rotli/brief.docx",
         title: "brief",
         content: [{ kind: "paragraph", paragraph: { namedStyle: "heading1", runs: [{ text: "Kickoff" }] } }],
-      },
-      save: async () => "r2",
-    };
-  }) as FileToolIo["readAiManagedDocument"],
+      } as Parameters<typeof editableDocumentForAi>[0]),
+    );
+  },
+  editDocument: async () => {
+    throw new Error("a test that edits a document must say what the gate returns");
+  },
 };
 
 const makeFileTools = (
@@ -203,7 +205,7 @@ test("a workbook arrives by cell address, its dates as dates", async () => {
   files["budget.xlsx"] = await workbook((wb) => {
     wb.addWorksheet("Budget").addRow(["Due", new Date(Date.UTC(2026, 9, 1))]);
   });
-  expect(await makeFileTools(remote, {}).readFile("budget.xlsx")).toBe(
+  expect<string>(await makeFileTools(remote, {}).readFile("budget.xlsx")).toBe(
     '## Sheet "Budget" (1 rows × 2 columns used)\nA1 "Due" | B1 2026-10-01',
   );
 });
@@ -215,7 +217,7 @@ test("a damaged workbook says so instead of failing the turn", async () => {
 
 test("a Word document arrives as numbered blocks", async () => {
   files["brief.docx"] = "";
-  expect(await makeFileTools(remote, {}).readFile("brief.docx")).toBe("[1] Heading 1: Kickoff");
+  expect<string>(await makeFileTools(remote, {}).readFile("brief.docx")).toBe("[1] Heading 1: Kickoff");
 });
 
 test("a remote model never gets a secret-shaped file; an on-device one does, and the chat is marked", async () => {

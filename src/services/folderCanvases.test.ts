@@ -25,7 +25,7 @@ test("Rotli Web makes, reads, and saves a canvas in the folder, never over a new
   await expect(store.create("Plans", "  ")).rejects.toThrow("a canvas needs a name");
 
   const read = await store.read(id);
-  expect(read?.text).toBe(EMPTY_CANVAS_FILE);
+  expect(new TextDecoder().decode(read?.bytes)).toBe(EMPTY_CANVAS_FILE);
   const stat = await store.stat(id);
   expect(stat?.len).toBe(EMPTY_CANVAS_FILE.length);
   const next = await store.write(id, '{"nodes":[],"edges":[],"x":1}', stat!.revision);
@@ -36,6 +36,13 @@ test("Rotli Web makes, reads, and saves a canvas in the folder, never over a new
   expect(await store.read("Plans/missing.canvas")).toBeNull();
   await expect(store.read("../escape.canvas")).rejects.toThrow("invalid canvas path");
   await expect(store.read("Plans/note.md")).rejects.toThrow("not a canvas");
+});
+
+test("Rotli Web reads a canvas's exact bytes, so a byte that isn't UTF-8 reaches the strict decoder", async () => {
+  const dir = new MemoryVaultDir();
+  const raw = Uint8Array.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xe9, 0x22, 0x7d]); // {"x":"<0xE9>"}
+  await dir.writeBytes("Plans/Latin.canvas", raw);
+  expect((await new FolderCanvasStore(dir).read("Plans/Latin.canvas"))?.bytes).toEqual(raw);
 });
 
 test("a build without canvases leaves .canvas files out of the folder's lists", async () => {

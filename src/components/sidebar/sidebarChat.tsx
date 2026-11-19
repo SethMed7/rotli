@@ -460,7 +460,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             head={["7 days", "Model usage"]}
             rows={[
               <>
-                <strong>Usage</strong>
+                <strong>Usage</strong>{" "}
                 <span>
                   {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
                 </span>
@@ -470,7 +470,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                 <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
                   {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
                   <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
-                </span>
+                </span>{" "}
                 <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
               </>,
             ]}

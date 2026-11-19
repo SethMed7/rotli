@@ -251,6 +251,24 @@
         "src-tauri/src/workspace_documents.rs"
       ],
       "reason": "Not a mirror: both files declare MCP tool input schemas, which are spelled in JSON-Schema's own vocabulary (type, array, items, maxItems). The document tools live in workspace_documents.rs only because workspace.rs is at its size ceiling; they share workspace.rs's tool() builder rather than a copy of it."
+    },
+    {
+      "id": "write-lane-contract-twins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus_write_lane_tests.rs",
+        "src/editor/writeLane.test.ts"
+      ],
+      "reason": "Sixth review of pull request 267: scripts/fixtures/write-lane-contract.json is run against the real Rust store and against the TypeScript test fake, so the fake can't drift from Rust. Each side interprets the same step names and outcomes (`purge`, `note not found`); the shared literals are the fixture working as designed."
+    },
+    {
+      "id": "write-lane-harness-commands",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus_write_lane_tests.rs",
+        "src/editor/realWriteLane.lane.ts"
+      ],
+      "reason": "The real-lane harness: the TypeScript side sends the Tauri command names the app's native adapter uses (`corpus_delete`, `corpus_purge`), and the Rust side answers them with the same store methods. Shared command names are the protocol, not copied logic."
     }
   ]
 }

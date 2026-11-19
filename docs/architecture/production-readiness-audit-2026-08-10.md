@@ -280,7 +280,10 @@ security, or native lifecycle proof. It exercises the twin by design.
   necessary commands after capability narrowing.
 - A global Playwright page-error assertion. The current Vite bridge prints an
   uncaught application error without failing the scenario; known browser-only
-  `ResizeObserver` noise will need a narrow explicit exclusion.
+  `ResizeObserver` noise will need a narrow explicit exclusion. **Done
+  2026-11-11:** `failOnPageErrors` in `e2e/support.ts`, armed by `gotoApp` and
+  `startWithVault`. Both suites measured zero page errors, so no exclusion was
+  needed.
 
 ## Top ten next engineering investments
 

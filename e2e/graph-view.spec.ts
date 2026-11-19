@@ -71,3 +71,47 @@ test("searching highlights in place and a scope with no links says how to make o
   // search never removes dots, so the counts hold
   await expect(page.locator(".graph .board-count")).toContainText("· 8 links");
 });
+
+test("moving to a display with another scale re-sizes the graph's backing store", async ({ page }) => {
+  // headless Chromium updates devicePixelRatio under emulation but never fires
+  // the resolution query's change event, so stand in for the OS: remember the
+  // listeners the page adds to resolution queries and fire them ourselves
+  await page.addInitScript(() => {
+    const listeners: (() => void)[] = [];
+    (window as unknown as { fireScaleChange: () => void }).fireScaleChange = () => {
+      for (const listener of listeners.splice(0)) listener();
+    };
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query: string) => {
+      const list = original(query);
+      if (!query.includes("resolution")) return list;
+      const add = list.addEventListener.bind(list);
+      list.addEventListener = ((type: string, listener: () => void, options?: unknown) => {
+        if (type === "change") listeners.push(listener);
+        add(type, listener as EventListener, options as AddEventListenerOptions);
+      }) as typeof list.addEventListener;
+      return list;
+    };
+  });
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Graph");
+  await page.locator(".prow", { hasText: "Graph of all notes" }).first().click();
+  const canvas = page.getByRole("application", { name: /Graph of/ });
+  await expect(canvas).toBeVisible();
+  const backing = () =>
+    canvas.evaluate((el: HTMLCanvasElement) => ({ ratio: el.width / el.getBoundingClientRect().width }));
+  await expect.poll(async () => (await backing()).ratio).toBeCloseTo(1, 1);
+  // the pane keeps its CSS size, so only the scale changes — what a drag to
+  // a Retina display does (Chromium's emulation fires the same media change)
+  const viewport = page.viewportSize()!;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: 2,
+    mobile: false,
+  });
+  await page.evaluate(() => (window as unknown as { fireScaleChange: () => void }).fireScaleChange());
+  await expect.poll(async () => (await backing()).ratio).toBeCloseTo(2, 1);
+});

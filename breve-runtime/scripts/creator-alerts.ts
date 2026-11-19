@@ -14,6 +14,7 @@ import { BREVE } from "./paths";
 import { sendSignal as sendSig } from "./bin";
 import { tryAcquireProcessLock } from "./process-lock";
 import { errText } from "./err-text";
+import { decodeHtmlEntities } from "./markdown-text";
 
 const DRY = process.env.BREVE_DRY === "1";
 const SIGNAL_ENABLED = (process.env.ROTLI_BREVE_LANES ?? "signal").split(",").includes("signal");
@@ -72,13 +73,9 @@ for (const c of creators) {
   }
   for (const v of fresh.sort((a, b) => a.when - b.when)) {
     if (DRY) { alerts++; console.log(`[creators] DRY would alert: ${c.name} — ${v.title}`); continue; }
-    const ok = await sendSignal(`▶️ ${c.name} just posted:\n${decodeEntities(v.title)}\nhttps://www.youtube.com/watch?v=${v.id}`);
+    const ok = await sendSignal(`▶️ ${c.name} just posted:\n${decodeHtmlEntities(v.title)}\nhttps://www.youtube.com/watch?v=${v.id}`);
     if (ok) { alerts++; console.log(`[creators] alerted: ${c.name} — ${v.title}`); }
   }
-}
-
-function decodeEntities(s: string): string {
-  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 }
 
 // keep state from growing forever

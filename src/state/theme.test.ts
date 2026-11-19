@@ -18,6 +18,8 @@ describe("theme resolution", () => {
     expect(resolveTheme("blossom", "dark")).toBe("blossom-dark");
     expect(resolveTheme("midnight", "light")).toBe("midnight-light");
     expect(resolveTheme("midnight", "dark")).toBe("midnight-dark");
+    expect(resolveTheme("tesven", "light")).toBe("tesven-light");
+    expect(resolveTheme("tesven", "dark")).toBe("tesven-dark");
   });
 
   test("classifies every dark environment for embedded editors", () => {
@@ -30,6 +32,8 @@ describe("theme resolution", () => {
     expect(isDarkDataTheme("blossom-light")).toBe(false);
     expect(isDarkDataTheme("midnight-dark")).toBe(true);
     expect(isDarkDataTheme("midnight-light")).toBe(false);
+    expect(isDarkDataTheme("tesven-dark")).toBe(true);
+    expect(isDarkDataTheme("tesven-light")).toBe(false);
   });
 
   test("system follows the OS within the selected family", () => {

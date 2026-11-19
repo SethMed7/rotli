@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parseChart } from "../editor/chartSpec";
+import { approved, person } from "../lib/promptText.fixtures";
 import {
   CURSOR_MARK,
   INLINE_AI_VERSION,
@@ -18,6 +19,12 @@ import {
 } from "./inlineAi";
 import inlinePrompt from "./prompts/inlineAi.md?raw";
 import type { CompleteReq } from "./types";
+
+/** The person's ask and the approved note around the cursor, as the app gives them. */
+const askTyped = (host: Parameters<typeof askInline>[0], ask: string, before: string, after: string) =>
+  askInline(host, person(ask), approved(before), approved(after));
+const renderTyped = (ask: string, before: string, after: string) =>
+  renderInlineRequest(person(ask), approved(before), approved(after));
 
 /** A model that always gives `reply` (or fails with it), recording each request. */
 function cannedModel(reply: string | Error) {
@@ -43,15 +50,13 @@ const SOURCES_REPLY =
 describe("the request", () => {
   test("is the versioned asset, the note fenced as data with the cursor marked, then the ask", () => {
     expect(INLINE_AI_VERSION).toBe(2);
-    const request = renderInlineRequest(
-      "  a chart of my pages  ",
-      "# Reading\n\nW1 40, W2 55.\n",
-      "\nLater.",
-    );
+    const request = renderTyped("  a chart of my pages  ", "# Reading\n\nW1 40, W2 55.\n", "\nLater.");
     expect(request.messages).toHaveLength(2);
     expect(request.messages[0]?.role).toBe("system");
-    expect(request.messages[0]?.content).toContain("inserted into a person's Markdown note");
-    expect(request.messages[1]?.content).toBe(
+    expect<string | undefined>(request.messages[0]?.content).toContain(
+      "inserted into a person's Markdown note",
+    );
+    expect<string | undefined>(request.messages[1]?.content).toBe(
       `<<<\n# Reading\n\nW1 40, W2 55.\n${CURSOR_MARK}\nLater.\n>>>\n\na chart of my pages`,
     );
   });
@@ -59,7 +64,7 @@ describe("the request", () => {
   test("reads a bounded window of the note around the cursor", () => {
     const before = `${"a".repeat(INLINE_CONTEXT.before)}NEAR`;
     const after = `FAR${"b".repeat(INLINE_CONTEXT.after)}`;
-    const content = renderInlineRequest("x", before, after).messages[1]?.content ?? "";
+    const content = renderTyped("x", before, after).messages[1]?.content ?? "";
     expect(content).toContain(`NEAR${CURSOR_MARK}FAR`);
     expect(content.length).toBeLessThan(INLINE_CONTEXT.before + INLINE_CONTEXT.after + 40);
   });
@@ -74,19 +79,19 @@ describe("the request", () => {
 describe("the reply", () => {
   test("a chart request yields one chart fence that the note can draw", async () => {
     const stub = cannedModel(CHART_REPLY);
-    const verdict = await askInline(stub.host, "chart my pages per week", "W1 40, W2 55, W3 38", "");
+    const verdict = await askTyped(stub.host, "chart my pages per week", "W1 40, W2 55, W3 38", "");
     expect(verdict).toEqual({ ok: true, text: CHART_REPLY });
     const parsed = parseChart(chartBody(verdict.ok ? verdict.text : "") ?? "");
     expect(parsed.ok && parsed.spec.type).toBe("line");
   });
 
   test("a sources request yields a list, kept as written", async () => {
-    const verdict = await askInline(cannedModel(SOURCES_REPLY).host, "sources on attention", "", "");
+    const verdict = await askTyped(cannedModel(SOURCES_REPLY).host, "sources on attention", "", "");
     expect(verdict).toEqual({ ok: true, text: SOURCES_REPLY });
   });
 
   test("a thinking block is never part of the passage", async () => {
-    const verdict = await askInline(
+    const verdict = await askTyped(
       cannedModel(`<think>plan the list</think>\n\n${SOURCES_REPLY}`).host,
       "sources",
       "",
@@ -96,18 +101,18 @@ describe("the reply", () => {
   });
 
   test("an empty or runaway answer is refused, with words", async () => {
-    expect(await askInline(cannedModel("<think>hm</think>").host, "x", "", "")).toEqual({
+    expect(await askTyped(cannedModel("<think>hm</think>").host, "x", "", "")).toEqual({
       ok: false,
       reason: REPLY_EMPTY,
     });
-    expect(await askInline(cannedModel("z".repeat(MAX_INSERT_CHARS + 1)).host, "x", "", "")).toEqual({
+    expect(await askTyped(cannedModel("z".repeat(MAX_INSERT_CHARS + 1)).host, "x", "", "")).toEqual({
       ok: false,
       reason: REPLY_TOO_LONG,
     });
   });
 
   test("a failed model says so", async () => {
-    expect(await askInline(cannedModel(new Error("timed out")).host, "x", "", "")).toEqual({
+    expect(await askTyped(cannedModel(new Error("timed out")).host, "x", "", "")).toEqual({
       ok: false,
       reason: "The model couldn't answer: timed out",
     });
@@ -122,7 +127,7 @@ describe("what never reaches a model", () => {
       ["summarise this", "card 4242 4242 4242 4242"],
     ] as const) {
       const stub = cannedModel(SOURCES_REPLY);
-      const verdict = await askInline(stub.host, ask, before, "");
+      const verdict = await askTyped(stub.host, ask, before, "");
       expect(verdict.ok).toBe(false);
       expect(stub.sent).toHaveLength(0);
     }
@@ -130,7 +135,7 @@ describe("what never reaches a model", () => {
 
   test("an empty ask", async () => {
     const stub = cannedModel(SOURCES_REPLY);
-    expect(await askInline(stub.host, "   ", "note", "")).toEqual({
+    expect(await askTyped(stub.host, "   ", "note", "")).toEqual({
       ok: false,
       reason: "Write what you want first.",
     });

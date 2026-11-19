@@ -1,3 +1,5 @@
+import { afterFrontmatter } from "../lib/frontmatterBlock";
+
 export interface ChatMemoryDocument {
   slug: string;
   title: string;
@@ -90,10 +92,7 @@ export function memoryKeywords(query: string): string[] {
 }
 
 function snippetAround(body: string, keywords: readonly string[], max = 260): string {
-  const compact = body
-    .replace(/^---[\s\S]*?---\s*/m, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const compact = afterFrontmatter(body).replace(/\s+/g, " ").trim();
   const lower = compact.toLowerCase();
   const positions = keywords.map((word) => lower.indexOf(word)).filter((at) => at >= 0);
   const at = positions.length ? Math.min(...positions) : 0;

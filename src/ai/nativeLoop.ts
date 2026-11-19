@@ -8,6 +8,7 @@
 // chat surface treats both transports alike.
 
 import type { NativeSession, NativeToolCall } from "../lib/claudeSession";
+import { externalText, fixed, modelText, type PromptText, prompt } from "../lib/promptText";
 import { artifactClarification } from "./artifactIntent";
 import { budgetFor } from "./budget";
 import {
@@ -37,8 +38,9 @@ export interface NativeRunOpts {
   consent?: string[];
 }
 
-const TAINTED =
-  "error: this chat now carries secure-note content, so nothing more is sent to the remote model. Answer from what you already have.";
+const TAINTED = fixed(
+  "error: this chat now carries secure-note content, so nothing more is sent to the remote model. Answer from what you already have.",
+);
 
 export async function* runNativeAgent(
   host: Host,
@@ -71,11 +73,12 @@ export async function* runNativeAgent(
   const knowledge = await loadKnowledge(host, budget.maxIndexChars);
   // what the model has seen from the vault: the private-prose guard reads it
   const scratch: ScratchStep[] = [];
-  let attached: { id: string; text: string } | undefined;
+  let attached: { id: PromptText; text: PromptText } | undefined;
   if (input.noteId) {
     yield { type: "status", text: READING_ATTACHED };
     const step = await readAttached(host, input.noteId);
-    attached = { id: input.noteId, text: step.result };
+    // the id is the chat's own attachment, not text from the note
+    attached = { id: prompt`${externalText(input.noteId)}`, text: step.result };
     scratch.push(step);
   }
 
@@ -86,20 +89,23 @@ export async function* runNativeAgent(
     wake?.();
   };
   let calls = 0;
-  const onToolCall = async (call: NativeToolCall): Promise<string> => {
+  const onToolCall = async (call: NativeToolCall): Promise<PromptText> => {
     const tool = call.name as ToolName;
-    if (!allowed.has(tool)) return `error: ${call.name} isn't available in this chat.`;
+    if (!allowed.has(tool)) return prompt`error: ${modelText(call.name)} isn't available in this chat.`;
     if (tool === "ask_user") {
       const question = askUserQuestion(call.args);
-      if (!question || asked) return "error: ask one question, with 2–4 short options.";
+      if (!question || asked) return fixed("error: ask one question, with 2–4 short options.");
       asked = true;
       push({ type: "question", prompt: question.prompt, options: question.options });
-      return "asked — their answer comes back as their next message. End your turn now; write nothing else.";
+      return fixed(
+        "asked — their answer comes back as their next message. End your turn now; write nothing else.",
+      );
     }
     if (opts.isSecureContext?.() === true) return TAINTED;
-    const sig = `${tool} ${JSON.stringify(call.args)}`;
+    const sig = modelText(`${tool} ${JSON.stringify(call.args)}`);
     if (scratch.some((s) => s.action === sig)) return DUPLICATE_CALL_RESULT;
-    if (calls >= maxSteps) return "error: this turn's tool budget is spent — answer now from what you have.";
+    if (calls >= maxSteps)
+      return fixed("error: this turn's tool budget is spent — answer now from what you have.");
     const blocked = egressBlock(tool, call.args, knowledge, scratch);
     if (blocked) {
       scratch.push({ action: sig, result: blocked });

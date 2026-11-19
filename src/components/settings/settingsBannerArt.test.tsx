@@ -54,6 +54,7 @@ describe("first run's scenery", () => {
     expect(onboardingSceneName("warm", false)).toBe("island");
     expect(onboardingSceneName("ocean", false)).toBe("ocean");
     expect(onboardingSceneName("midnight", false)).toBe("midnight");
+    expect(onboardingSceneName("tesven", false)).toBe("tesven");
   });
 
   test("every family's backdrop is painted only with its tokens, on the ground line", () => {
