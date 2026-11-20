@@ -272,10 +272,12 @@ fn no_cached_row_reaches_an_ai_row() {
     }
     let corpus = include_str!("corpus.rs");
     let workspace = include_str!("workspace.rs");
+    // the whole listing module: list_remote and the row lane it gates through
+    let listing = include_str!("workspace_listing.rs");
     for lane in [
         body(corpus, "fn search_ai_inner(", "\n}\n"),
         body(corpus, "fn notes_ai_inner(", "\n}\n"),
-        body(workspace, "    fn list_remote(", "\n    }\n"),
+        body(listing, "    pub(super) fn list_remote(", "\n}\n"),
         body(workspace, "    fn search_remote(", "\n    }\n"),
         body(workspace, "    fn query_remote(", "\n    }\n"),
     ] {

@@ -10,8 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Tesven theme card describes the calmer Tesven.** Settings → Appearance
+  now reads "Sea mist by day, night swim after dark." in place of the old
+  field-blue wording.
+
 ### Fixed
 
+- **`rotli notes list` no longer takes minutes on large vaults.** It used to
+  read every file in the vault, including everything in `storage/`, before
+  showing the newest hundred. It now stops once it has what it shows, and
+  lists the same notes and folders in the same order.
 - **Changing a note's metadata in a folder opened in place no longer
   writes a key twice.** If the note spelled a key its own way
   (`locked : false`, `"locked": false`, or a key with a space such as
@@ -20,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Agents see fewer private folder names.** A folder directly under
+  `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
+  secure keywords, is no longer listed to agents by name. This is a partial
+  fix: spelling variants, keyword folders' subfolders, and shelf paths are
+  still being closed. Agent metrics also stopped counting the shelves of
+  notes agents can't read, and count an extensionless note as a note. Your
+  own sidebar is unchanged.
 - **Turning "Let AI edit" or on-device AI back on clears every copy, in
   every kind of vault.** In a folder opened in place, a copy of the setting
   typed in another form used to stay and keep its no; now Rotli removes it,
@@ -72,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matches only as a whole word and no longer hides ordinary text. A note id that two files carry, as a
   copied note does, can't be indexed or logged.
 
-## [1.9.4] - 2026-11-19
+## [1.9.4] - 2026-11-20
 
 ### Added
 
