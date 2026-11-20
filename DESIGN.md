@@ -10,9 +10,11 @@ the token implementation; this file owns the product-level design rules.
 Rotli ships eight complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
 Iris, Blossom, Midnight, and Tesven. Each family owns a deliberately tuned light and dark
 environment; Midnight's dark environment is the deepest neutral workspace.
-Tesven carries the Tesven kit's blues as flat tokens (mist and field blue by
-day, night swim after dark) with its own geometric scenery: hexagon plates,
-even seams, and a calm water line.
+Tesven takes the deep water behind the Tesven app as flat tokens: sea mist
+by day and night swim after dark, with surfaces that hold one low chroma as
+they rise and a single sea-glass accent rather than the kit's bright field
+blue. Its geometric scenery is hexagon plates, even seams, and a calm water
+line.
 Every product surface must work in every supported environment.
 
 Light, Dark, and System are a separate mode choice. System follows the OS within

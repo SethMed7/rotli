@@ -93,8 +93,8 @@
   --swatch-blossom-dark: #1d1217;
   --swatch-midnight-light: #f0f2f5;
   --swatch-midnight-dark: #050607;
-  --swatch-tesven-light: #e8f3fc;
-  --swatch-tesven-dark: #0b1b2e;
+  --swatch-tesven-light: #f0f4f9;
+  --swatch-tesven-dark: #051221;
   /* each environment's accent, for the lit theme orbs in setup (the site's
      orb picker, 2026-09-30) — Blossom included */
   --swatch-warm-light-accent: #c97e62;
@@ -111,8 +111,8 @@
   --swatch-blossom-dark-accent: #e89ab8;
   --swatch-midnight-light-accent: #364152;
   --swatch-midnight-dark-accent: #cfd5dc;
-  --swatch-tesven-light-accent: #1767a8;
-  --swatch-tesven-dark-accent: #6cc0f2;
+  --swatch-tesven-light-accent: #325f82;
+  --swatch-tesven-dark-accent: #87b0d1;
 
   /* Character ink is deliberately independent from app text. "auto" follows
      the environment so the Line treatment never vanishes on a dark theme. */
@@ -255,22 +255,22 @@
   --preview-selected: #191d22;
 }
 .preview-tesven-light {
-  --preview-ground: #e8f3fc;
-  --preview-sidebar: #d9ecfa;
+  --preview-ground: #f0f4f9;
+  --preview-sidebar: #e6ecf2;
   --preview-surface: #ffffff;
   --preview-text: #0b2540;
-  --preview-muted: #3b5874;
-  --preview-border: #b3d2ec;
-  --preview-selected: #c9e4f8;
+  --preview-muted: #475768;
+  --preview-border: #ced7e1;
+  --preview-selected: #d9e2ec;
 }
 .preview-tesven-dark {
-  --preview-ground: #0b1b2e;
-  --preview-sidebar: #0e2640;
-  --preview-surface: #0e3358;
-  --preview-text: #eaf4ff;
-  --preview-muted: #a8c4de;
-  --preview-border: #1e4a75;
-  --preview-selected: #123b63;
+  --preview-ground: #051221;
+  --preview-sidebar: #0a192a;
+  --preview-surface: #112134;
+  --preview-text: #ebeff4;
+  --preview-muted: #a7b2bf;
+  --preview-border: #223243;
+  --preview-selected: #182b40;
 }
 
 /* — MONO · paper (light) — */
@@ -551,49 +551,51 @@
   --scrim: rgba(0, 0, 0, 0.72);
 }
 
-/* — TESVEN · the Tesven kit, flat: mist and field blue by day ("Deep
-   Current"), night swim after dark. Crisper and more saturated than Ocean,
-   on cleaner surfaces. Kit hues kept; the app's surface steps are tuned
-   around the kit's Night Surface (#0e3358, here --surface-2) so every text
-   role clears 4.5:1 on ground, surface, surface-2, and tint. — */
+/* — TESVEN · the deep water behind the Tesven app: night swim after dark,
+   sea mist by day. Calm on purpose (the maintainer, 2026-11-20: the kit's
+   saturated navy steps and #6CC0F2 field blue read loud for a whole window).
+   Surfaces hold one low chroma as they rise, at the depth of the Tesven app's
+   own glass panels; the one accent is sea-glass, not field blue. Ink navy
+   stays for text and the locked quokka. Every text role clears 4.5:1 on
+   ground, surface, surface-2, and tint. — */
 :root[data-theme="tesven-light"] {
-  --ground: #e8f3fc;
+  --ground: #f0f4f9;
   --surface: #ffffff;
-  --surface-2: #d9ecfa;
-  --tint: #c9e4f8;
+  --surface-2: #e6ecf2;
+  --tint: #d9e2ec;
   --text: #0b2540;
-  --text-muted: #3b5874;
-  --border: #b3d2ec;
-  --accent: #1767a8;
-  --theme-accent-swatch: #1767a8;
+  --text-muted: #475768;
+  --border: #ced7e1;
+  --accent: #325f82;
+  --theme-accent-swatch: #325f82;
   --theme-on-accent: #ffffff;
-  --accent-text: #0f4c81;
+  --accent-text: #275170;
   --on-accent: #ffffff;
   --success: #2d6e55;
-  --syntax-blue: #0f4c81;
+  --syntax-blue: #275170;
   --syntax-accent: var(--accent-text);
-  --hov: rgba(11, 37, 64, 0.07);
-  --act: rgba(11, 37, 64, 0.11);
-  --scrim: rgba(11, 27, 46, 0.44);
+  --hov: rgba(11, 37, 64, 0.06);
+  --act: rgba(11, 37, 64, 0.1);
+  --scrim: rgba(5, 18, 33, 0.44);
 }
 :root[data-theme="tesven-dark"] {
-  --ground: #0b1b2e;
-  --surface: #0e2640;
-  --surface-2: #0e3358;
-  --tint: #123b63;
-  --text: #eaf4ff;
-  --text-muted: #a8c4de;
-  --border: #1e4a75;
-  --accent: #6cc0f2;
-  --theme-accent-swatch: #6cc0f2;
-  --theme-on-accent: #0b1b2e;
-  --accent-text: #8acff5;
-  --on-accent: #0b1b2e;
-  --success: #8cc4a5;
-  --syntax-blue: #8acff5;
+  --ground: #051221;
+  --surface: #0a192a;
+  --surface-2: #112134;
+  --tint: #182b40;
+  --text: #ebeff4;
+  --text-muted: #a7b2bf;
+  --border: #223243;
+  --accent: #87b0d1;
+  --theme-accent-swatch: #87b0d1;
+  --theme-on-accent: #051221;
+  --accent-text: #a2c6e2;
+  --on-accent: #051221;
+  --success: #97c4aa;
+  --syntax-blue: #a2c6e2;
   --syntax-accent: var(--accent-text);
-  --hov: rgba(234, 244, 255, 0.08);
-  --act: rgba(234, 244, 255, 0.13);
+  --hov: rgba(235, 239, 244, 0.07);
+  --act: rgba(235, 239, 244, 0.12);
   --scrim: rgba(0, 0, 0, 0.6);
 }
 

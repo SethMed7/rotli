@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ears. If you'd picked either of those, Tesven shows the hexagons; switch to
   another theme and your pawprints or ears are back.
 
+### Changed
+
+- **Tesven is calmer.** Tesven Dark now takes the deep water behind the
+  Tesven app: near-black navy that stays quiet as panels rise, in place of
+  the bright navy steps and borders that made a whole window feel loud, and
+  a soft sea-glass accent in place of the bright field blue. Tesven Light
+  trades its blue-tinted mist for a softer sea mist with a deep-sea accent.
+  Text, the line quokka and the hexagon scenery are unchanged, and every
+  text color still passes AA contrast.
+
 ### Security
 
 These fix the Librarian agent route, which still runs only in development
