@@ -47,7 +47,9 @@ function bracketDepth(text: string): number {
 function sourceText(node: unknown): string {
   if (!isScalar(node)) return "\u0000";
   if (typeof node.value === "string") return node.value;
-  return node.source ?? (node.value === null ? "" : String(node.value));
+  if (node.source !== undefined) return node.source;
+  const value: unknown = node.value;
+  return typeof value === "number" || typeof value === "boolean" ? String(value) : "";
 }
 
 /** The deepest collection nesting under `root`, walked without recursion. */
