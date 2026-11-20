@@ -152,7 +152,9 @@ pub(crate) fn top_level_key(line: &str) -> Option<String> {
 pub(crate) const PERMISSION_KEYS: [&str; 3] = ["created_by", "ai_edit", "local_ai_allowed"];
 
 /// `(key, value)` of a line spelled the way Rust writes its own keys, and
-/// None for every other spelling.
+/// None for every other spelling. (Writers now match a key through
+/// [`top_level_field`]; this pins what "Rust's spelling" means in tests.)
+#[cfg(test)]
 pub(crate) fn canonical_field(line: &str) -> Option<(&str, &str)> {
     let (key, value) = frontmatter_field(line).filter(|(key, _)| key.canonical)?;
     Some((&line[..key.name.len()], value))
@@ -552,7 +554,7 @@ mod tests {
 
     /// The guard for the class: a production reader of a key only Rust writes
     /// goes through this module (`owned_key` for policy, `frontmatter_field`
-    /// for a setter, `canonical_field` for a writer). A new file that names one of these keys
+    /// for a setter, `top_level_field` for an in-place writer). A new file that names one of these keys
     /// fails this test until it does too (the key lists in corpus.rs read
     /// nothing, but corpus.rs reads `local_ai_allowed` through it as well).
     #[test]
