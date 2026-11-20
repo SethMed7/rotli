@@ -11,7 +11,7 @@ export interface WikilinkIndex {
   byAlias: Map<string, NoteSummary[]>;
 }
 
-const linkKey = (value: string): string => value.trim().toLocaleLowerCase();
+export const linkKey = (value: string): string => value.trim().toLocaleLowerCase();
 
 function indexLabel(map: Map<string, NoteSummary[]>, label: string, note: NoteSummary): void {
   const key = linkKey(label);

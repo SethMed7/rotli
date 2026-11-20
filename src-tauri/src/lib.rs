@@ -75,6 +75,8 @@ mod vault_location;
 mod web;
 mod web_page;
 mod web_search;
+mod frontmatter_keys;
+mod mcp_arguments;
 mod workspace;
 mod workspace_help;
 mod workspace_documents;

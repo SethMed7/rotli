@@ -117,8 +117,6 @@ import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
 import { startSetupDetection, useSetupDetection } from "../state/setupDetection";
 import {
   ACCENT_COLORS,
-  CHAT_NAVIGATOR_STYLES,
-  type ChatNavigatorStyle,
   type OrganizerTrust,
   THEME_FAMILY_PRESENTATIONS,
   type ThemeFamily,
@@ -155,6 +153,7 @@ import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { LINK_PASS } from "./settings/linkFormatSettings";
+import { NavigatorSettings } from "./settings/navigatorSettings";
 import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
@@ -893,31 +892,6 @@ function WorkspacePreview({ environments }: { environments: readonly PreviewEnvi
   );
 }
 
-const NAVIGATOR_PRESENTATIONS: Record<ChatNavigatorStyle, { label: string; description: string }> = {
-  lines: { label: "Quiet lines", description: "Crisp and minimal" },
-  dots: { label: "Soft dots", description: "Small and steady" },
-  paws: { label: "Quokka trail", description: "A path of pawprints" },
-  ears: { label: "Little ears", description: "A playful landmark" },
-};
-
-function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
-  return (
-    <span className={`navigator-sample ${style}`} aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => (
-        <i className={index === 3 ? "active" : undefined} key={index}>
-          {style === "paws" && (
-            <>
-              <b />
-              <b />
-              <b />
-            </>
-          )}
-        </i>
-      ))}
-    </span>
-  );
-}
-
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
  * step (the maintainer, 2026-07-28: "charcoal theme with blue primary color"). Default
  * renders as the current theme's own accent. */
@@ -980,8 +954,6 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
-  const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
   const sidebarSide = useUiStore((s) => s.sidebarSide);
   const setSidebarSide = useUiStore((s) => s.setSidebarSide);
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
@@ -1060,29 +1032,7 @@ function AppearancePane() {
 
       <ChatBuddyStudio />
 
-      <h4 className="sethead">Conversation navigator</h4>
-      <p className="lead">
-        Longer chats get a small trail that opens an overview of your prompts. Pick the quiet visual you want
-        beside the conversation.
-      </p>
-      <div className="navigator-picker" role="radiogroup" aria-label="Conversation navigator">
-        {CHAT_NAVIGATOR_STYLES.map((style) => (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={chatNavigatorStyle === style}
-            className={chatNavigatorStyle === style ? "navigator-choice sel" : "navigator-choice"}
-            key={style}
-            onClick={() => setChatNavigatorStyle(style)}
-          >
-            <NavigatorSample style={style} />
-            <span>
-              <strong>{NAVIGATOR_PRESENTATIONS[style].label}</strong>
-              <small>{NAVIGATOR_PRESENTATIONS[style].description}</small>
-            </span>
-          </button>
-        ))}
-      </div>
+      <NavigatorSettings />
 
       <h4 className="sethead">Sidebar</h4>
       <p className="lead">

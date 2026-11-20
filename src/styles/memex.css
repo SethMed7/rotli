@@ -1004,6 +1004,29 @@
 .chat-prompt-trigger.paws .chat-prompt-marker.preview:not(.active) > span {
   opacity: 0.76;
 }
+.chat-prompt-trigger.hexes {
+  min-height: 88px;
+  gap: 1px;
+}
+.chat-prompt-trigger.hexes .chat-prompt-marker > span {
+  width: 11px;
+  height: 10px;
+  border-radius: 0;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  opacity: 0.44;
+}
+.chat-prompt-trigger.hexes .chat-prompt-marker:nth-child(even) > span {
+  transform: translateX(3px);
+}
+.chat-prompt-trigger.hexes .chat-prompt-marker:nth-child(odd) > span {
+  transform: translateX(-3px);
+}
+.chat-prompt-trigger.hexes .chat-prompt-marker.active > span {
+  opacity: 1;
+}
+.chat-prompt-trigger.hexes .chat-prompt-marker.preview:not(.active) > span {
+  opacity: 0.78;
+}
 .chat-prompt-menu {
   position: absolute;
   left: calc(100% + 8px);

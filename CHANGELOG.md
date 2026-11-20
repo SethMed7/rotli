@@ -10,6 +10,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-11-19
+
+### Added
+
+- **A hexagon trail for long chats in Tesven.** In Tesven, Settings →
+  Appearance → Conversation navigator offers Hex trail, a small honeycomb of
+  hexagons beside the conversation, in place of the quokka trail and little
+  ears. If you'd picked either of those, Tesven shows the hexagons; switch to
+  another theme and your pawprints or ears are back.
+
+### Security
+
+These fix the Librarian agent route, which still runs only in development
+builds.
+
+- **Agent tools now enforce their own limits.** Every tool an agent calls,
+  through the Librarian route or the full Rotli MCP server, is checked against
+  the limits it advertises before it runs: no unknown arguments, no text over
+  its length limit, and numbers in range. Before, a 100,001-character capture
+  went through. A number out of range is now refused instead of quietly
+  capped, and so is a whole-number setting written as a decimal (`1.0`) or
+  arguments sent as `null`.
+- **The Librarian's index and log no longer live in your notes.** Rotli keeps
+  them itself, beside the vault, and the Librarian names notes in them only
+  by id. Each time they are read, an entry shows only while the note it is
+  about is one the agent may read, under that note's current title, so a note
+  you make secure simply disappears from them; nothing has to be cleaned up.
+  The index and log never show up in search, in Main, or to any AI as notes.
+  An entry is also hidden when its text mentions a hidden note by title or
+  alias, and only notes that carry their own Rotli id can be listed, so an
+  entry can't follow a file path to a different note.
+  "Librarian index" and "Librarian log" notes an earlier development build
+  wrote stay in your vault as ordinary notes; delete them if you no longer
+  want them, especially if they mention notes that are secure now.
+- **Rotli's own markers can only take permission away when typed by hand.**
+  Who made a note (`created_by`), the "Let AI edit" grant (`ai_edit`) and the
+  on-device permission (`local_ai_allowed`) grant only in the exact form
+  Rotli writes them. A copy typed into a note's metadata in another form
+  (indented, quoted, a list item) can still turn permission off, never on:
+  an indented `ai_edit: false` or `local_ai_allowed: false` keeps its no, on
+  the Mac and in Rotli Web alike. Turning the setting back on in Rotli clears
+  every copy, except in a folder opened in place on the Mac: there a copy
+  typed in another form stays, and keeps its no, until you delete it.
+- **A copied vault starts with the Librarian off.** Turning the route on now
+  takes `rotli librarian on` in the vault as well as the setting, and that
+  consent belongs to the folder: a copy of the vault, wherever it is put,
+  starts off. Moving the vault keeps it on. Run `rotli librarian on` once in
+  each vault that already uses the route.
+- **Applying a proposal checks it again.** `rotli librarian apply` refuses a
+  link to a page that has since turned secure, a proposal whose note changed
+  after it was made, and a proposals file edited to say something the tools
+  would never accept, including one that names a different note than the one
+  it would move. A refused proposal stays waiting, and you can still
+  dismiss it. Proposals made before this change can only be dismissed.
+- **A repeated proposal no longer brings back one you can't see.** Asking for
+  the same link again returns the waiting proposal only if it is still about
+  pages the agent can read, and a link to a page renamed since is a new
+  proposal that can be applied.
+
+### Changed
+
+- **Vault threads spec §5c (2026-11-11):** a host app such as Tesven may create notes in a
+  vault the person chose for threads, only through Rotli's `notes` command line or MCP and
+  only under its own folder (Tesven's bot handoffs go in `Tesven/Bots/<name>/`). Additive,
+  so the protocol stays `vault-threads/1`.
+- **`rotli notes` and agent tools find a note by title or alias the way a `[[link]]` does:**
+  spaces around an alias (an invisible byte-order mark
+  included) and letter case, accented letters too, don't matter.
+- **Approving is yours, but Rotli says plainly what that relies on.**
+  `rotli librarian apply` is an ordinary command, so an agent with a shell
+  could run it too. `rotli librarian status`, the command help and the setup
+  docs now say so; keep the shell off in vault threads.
+- **The TLS library under Rotli's network calls is up to date** (rustls
+  0.23.46).
+
 ## [1.9.3] - 2026-11-12
 
 ### Added
