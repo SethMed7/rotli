@@ -86,6 +86,10 @@ pub(crate) fn frontmatter_field(line: &str) -> Option<(FrontmatterKey, &str)> {
     if !explicit && !after.starts_with(':') {
         return None;
     }
+    // Rust writes `key: value` with one space, or `key:` at the end: a tab
+    // or a second space after the colon is another spelling (review of PR #303)
+    let gap = &after[1.min(after.len())..];
+    canonical &= gap.is_empty() || (gap.starts_with(' ') && !gap[1..].starts_with(is_js_space));
     if name.is_empty() || name.contains(is_js_space) && !explicit {
         return None;
     }
@@ -115,6 +119,9 @@ fn quoted_end(rest: &str, quote: char) -> Option<usize> {
 mod yaml;
 #[path = "frontmatter_writes.rs"]
 mod writes;
+#[cfg(test)]
+#[path = "frontmatter_differential_tests.rs"]
+pub(crate) mod differential_tests;
 pub(crate) use writes::{field_name, guard_write, keeps, keeps_other_verdicts, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
 use yaml::{decoded_value, undecidable, Decoded};
 
@@ -191,7 +198,7 @@ pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: i
         if spelled.name != key {
             continue;
         }
-        if named || !grants(value) || line.chars().any(undecidable) {
+        if named || !grants(value) || line.chars().any(undecidable) || line.contains('\t') {
             return Says::Deny;
         }
         named = true;
@@ -203,11 +210,59 @@ pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: i
     // there that doesn't grant denies, a grant needs it to agree, and
     // frontmatter that can't be read (frontmatter_yaml.rs) is refused
     match decoded_value(fields, key) {
-        Decoded::Refused => Says::Deny,
+        // frontmatter nobody can read denies only where a line could spell
+        // the key: its text, or an escape (review of PR #303, item 3)
+        Decoded::Refused if could_spell(fields, key) => Says::Deny,
+        Decoded::Refused => grant.map_or(Says::Unset, Says::Grant),
         Decoded::Value(Some(value)) if !grants(&value) => Says::Deny,
         Decoded::Value(None) if grant.is_some() => Says::Deny,
         Decoded::Value(_) => grant.map_or(Says::Unset, Says::Grant),
     }
+}
+
+/// Whether a line the line reader doesn't name as `key` could still spell it:
+/// it holds the key's text, an escape (`\u005f`), or an alias. Unreadable frontmatter
+/// denies a key only then; the lines that name it the line reader has judged.
+fn could_spell<S: AsRef<str>>(fields: &[S], key: &str) -> bool {
+    fields.iter().map(AsRef::as_ref).any(|line| !names_key(line, key) && (line.contains(key) || line.contains('\\') || has_alias(line)))
+}
+
+/// Whether a line holds a YAML alias (`*name` after a space, `[`, `{`, `,` or
+/// `:`, or at its start): in unreadable frontmatter an alias could stand for a
+/// key, so it denies there (the unresolved-alias verdict, PR #303).
+fn has_alias(line: &str) -> bool {
+    let chars: Vec<char> = line.chars().collect();
+    chars.iter().enumerate().any(|(at, c)| {
+        *c == '*'
+            && (at == 0 || chars[at - 1].is_whitespace() || "[{,:".contains(chars[at - 1]))
+            && chars.get(at + 1).is_some_and(|next| !next.is_whitespace() && !",[]{}".contains(*next))
+    })
+}
+
+/// Whether a protection flag (`locked`, `secure`) is on: a line in any
+/// spelling saying anything but `false`, the root value as YAML reads it
+/// saying anything but `false`, or unreadable frontmatter a line could spell
+/// it in. Fails closed like the permission keys (review of PR #303, item 8).
+/// TypeScript's twin: frontmatterKeys.ts `flagOn`.
+fn flag_on<S: AsRef<str>>(fields: &[S], key: &str) -> bool {
+    let typed = fields.iter().any(|line| {
+        frontmatter_field(line.as_ref()).is_some_and(|(spelled, value)| spelled.name == key && value != "false")
+    });
+    typed
+        || match decoded_value(fields, key) {
+            Decoded::Value(value) => value.is_some_and(|value| value != "false"),
+            Decoded::Refused => could_spell(fields, key),
+        }
+}
+
+/// Whether the note is locked (no AI edits it).
+pub(crate) fn locked<S: AsRef<str>>(fields: &[S]) -> bool {
+    flag_on(fields, "locked")
+}
+
+/// Whether the note is marked secure (no remote model reads it).
+pub(crate) fn secure<S: AsRef<str>>(fields: &[S]) -> bool {
+    flag_on(fields, "secure")
 }
 
 /// The note's own on-device permission: `Some(true)` only for Rust's
@@ -350,9 +405,9 @@ mod tests {
             assert_eq!(local_ai_allowed(&["local_ai_allowed: true".to_string(), line("local_ai_allowed")]), Some(false), "{spelling}");
             assert_eq!(body_edit(&["created_by: agent".to_string(), line("ai_edit")]), BodyEdit::Revoked, "{spelling}");
         }
-        // a permission key's own line is never blanked, so frontmatter that
-        // won't parse around it is refused, and that denies AI editing too
-        assert_eq!(body_edit(&["created_by: agent", "  created_by: someone"]), BodyEdit::Revoked);
+        // frontmatter that won't parse denies only the keys a line could
+        // spell: the creator here, not AI editing (review of PR #303, item 3)
+        assert_eq!(body_edit(&["created_by: agent", "  created_by: someone"]), BodyEdit::PersonWritten);
         assert_eq!(body_edit(&["  created_by: agent"]), BodyEdit::PersonWritten, "a typed creator grants nothing");
         assert_eq!(body_edit(&["  ai_edit: true"]), BodyEdit::PersonWritten, "a typed grant grants nothing");
         assert_eq!(local_ai_allowed(&["  local_ai_allowed: true"]), None, "a typed grant follows the vault");
@@ -404,7 +459,7 @@ mod tests {
         assert_eq!(body_edit(&["created_by: agent", "summary: a: b", "!!str ai_edit: false"]), BodyEdit::Revoked);
         assert_eq!(body_edit(&["created_by: agent", "summary: a: b", "\"ai\\u005fedit\": false"]), BodyEdit::Revoked);
         assert_eq!(body_edit(&["{created_by: agent, ai_edit: false}"]), BodyEdit::Revoked);
-        assert_eq!(body_edit(&["created_by: agent", "\tnested: tab"]), BodyEdit::Revoked, "unreadable even blanked");
+        assert_eq!(body_edit(&["created_by: agent", "\tnested: tab"]), BodyEdit::Allowed, "an unreadable line that spells no key decides nothing");
         assert_eq!(local_ai_allowed(&["local_ai_allowed: \u{feff}true", "summary: a: b"]), Some(false));
     }
 
@@ -432,19 +487,61 @@ mod tests {
         let deep = format!("x: {}{}", "[".repeat(30_000), "]".repeat(30_000));
         let wide = format!("summary: {}", "x".repeat(70_000));
         let long_key = format!("\"{}\": false", "\\u0061".repeat(20_000));
-        for (hostile, verdict) in [(laughs.join("\n"), BodyEdit::Allowed), (deep, BodyEdit::Revoked), (wide, BodyEdit::Revoked), (long_key, BodyEdit::Revoked)] {
+        // refused: a key is denied only where another line could spell it
+        // (the escaped key could spell any of them)
+        for (hostile, verdict) in [(laughs.join("\n"), BodyEdit::Allowed), (deep, BodyEdit::Allowed), (wide, BodyEdit::Allowed), (long_key, BodyEdit::Locked)] {
             let started = std::time::Instant::now();
             let mut fields: Vec<String> = hostile.split('\n').map(str::to_string).collect();
             fields.push("created_by: agent".into());
             assert_eq!(body_edit(&fields), verdict);
             assert!(started.elapsed() < std::time::Duration::from_secs(2), "{:?}", started.elapsed());
         }
-        // a grant holds at 64 levels of YAML nesting; at 65 it is refused
-        let nested = |lists: usize| ["local_ai_allowed: true".to_string(), format!("x: {{y: {}{}}}", "[".repeat(lists), "]".repeat(lists))];
-        assert_eq!(local_ai_allowed(&nested(62)), Some(true));
-        assert_eq!(decoded_value(&nested(62), "local_ai_allowed"), Decoded::Value(Some("true".into())));
-        assert_eq!(local_ai_allowed(&nested(63)), Some(false));
-        assert_eq!(decoded_value(&nested(63), "local_ai_allowed"), Decoded::Refused);
+        // 64 levels of YAML nesting are read; at 65 the frontmatter is refused,
+        // and then a key is denied only where another line could spell it
+        let nested = |lists: usize, extra: &str| ["local_ai_allowed: true".to_string(), format!("x: {{y: {}{}}}", "[".repeat(lists), "]".repeat(lists)), extra.to_string()];
+        assert_eq!(decoded_value(&nested(62, ""), "local_ai_allowed"), Decoded::Value(Some("true".into())));
+        assert_eq!(decoded_value(&nested(63, ""), "local_ai_allowed"), Decoded::Refused);
+        assert_eq!(local_ai_allowed(&nested(63, "")), Some(true));
+        assert_eq!(local_ai_allowed(&nested(63, "z: \"local\\u005fai_allowed\"")), Some(false));
+    }
+
+    /// Review of PR #303 at 828f994d, found by the differential harness: the
+    /// readers agree on tabs, stray lines, `...`, carriage returns, quoted or
+    /// YAML-only locks and merge keys, and bound list markers before parsing.
+    #[test]
+    fn what_the_differential_harness_found() {
+        use crate::ai_edit_policy::{body_edit, BodyEdit};
+        // item 1: a tab after the colon never grants
+        assert_eq!(body_edit(&["ai_edit:\ttrue"]), BodyEdit::Revoked);
+        assert_eq!(body_edit(&["created_by:\tagent"]), BodyEdit::PersonWritten, "a typed creator grants nothing");
+        assert_eq!(local_ai_allowed(&["secure: true", "local_ai_allowed:\ttrue"]), Some(false));
+        assert_eq!(body_edit(&["date created:\t2024-01-01"]), BodyEdit::PersonWritten);
+        assert_eq!(body_edit(&["created_by: agent", "date created:\t2024-01-01"]), BodyEdit::Allowed);
+        assert_eq!(body_edit(&["created_by:  agent"]), BodyEdit::PersonWritten);
+        // item 3: one malformed ordinary line changes no permission
+        for odd in ["date created: Meeting: x", "c", "- item", "\t- a", "{a: 1,", "%YAML 1.2", "  y: z"] {
+            assert_eq!(body_edit(&["created_by: agent", odd]), BodyEdit::Allowed, "{odd:?}");
+            assert_eq!(body_edit(&[odd]), BodyEdit::PersonWritten, "{odd:?}");
+            assert_eq!(local_ai_allowed(&["secure: true", odd]), None, "{odd:?}");
+        }
+        assert_eq!(body_edit(&["created_by: agent", "\"a\\qb\": c"]), BodyEdit::Allowed, "blanked: a plain key now");
+        assert_eq!(body_edit(&["created_by: agent", "c", "{\"ai\\u005fedit\": false"]), BodyEdit::Locked, "an escape could spell any key, `locked` too");
+        // item 6
+        assert_eq!(local_ai_allowed(&["...", "secure: true", "local_ai_allowed: true"]), Some(true), "nothing else spells the key");
+        assert_eq!(local_ai_allowed(&["...", "local_ai_allowed: true", "x: *nope"]), Some(false), "an alias could");
+        assert_eq!(body_edit(&["ai_edit: true\r\r\r"]), BodyEdit::Allowed);
+        assert_eq!(body_edit(&["\tnested: tab"]), BodyEdit::PersonWritten);
+        // item 8
+        for lock in ["locked: \"true\"", "locked: True", "{locked: true}", "!!str locked: true"] {
+            assert_eq!(body_edit(&[lock, "created_by: agent"]), BodyEdit::Locked, "{lock:?}");
+        }
+        assert_eq!(body_edit(&["created_by: agent", "<<: {ai_edit: false}"]), BodyEdit::Revoked);
+        assert_eq!(body_edit(&["created_by: agent", "base: &x {ai_edit: false}", "<<: *x"]), BodyEdit::Locked, "an alias could carry any key");
+        // item 7
+        let started = std::time::Instant::now();
+        let markers = format!("  {}a", "- ".repeat(30_000));
+        assert_eq!(body_edit(&["created_by: agent", "x:", markers.as_str()]), BodyEdit::Allowed);
+        assert!(started.elapsed() < std::time::Duration::from_millis(500), "{:?}", started.elapsed());
     }
 
     /// The person's setters clear every spelling of the key they set, so a

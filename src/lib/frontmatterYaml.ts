@@ -97,7 +97,8 @@ function readRoot(block: string, key: string): Decoded | null {
   if (!isMap(doc.contents)) return { refused: false, value: null };
   const found: string[] = [];
   for (const pair of doc.contents.items) {
-    if (isAlias(pair.key)) return REFUSED;
+    // an alias as a root key, or a merge key (`<<`), could carry any key
+    if (isAlias(pair.key) || (isScalar(pair.key) && sourceText(pair.key) === "<<")) return REFUSED;
     if (isScalar(pair.key) && sourceText(pair.key) === key) found.push(sourceText(pair.value));
   }
   return found.length > 1 ? REFUSED : { refused: false, value: found[0] ?? null };
@@ -109,17 +110,43 @@ function readRoot(block: string, key: string): Decoded | null {
 export function decodedValue(
   lines: readonly string[],
   key: string,
-  blank: (line: string) => string,
+  blank: (line: string) => string | null,
 ): Decoded {
   const block = lines.join("\n");
-  if (utf8Length(block) > DECODE_MAX_BYTES || bracketDepth(block) > DECODE_MAX_DEPTH) return REFUSED;
-  if (!lines.some((line) => UNDECIDABLE.test(line))) {
-    const first = readRoot(block, key);
-    if (first) return first;
+  if (
+    utf8Length(block) > DECODE_MAX_BYTES ||
+    bracketDepth(block) > DECODE_MAX_DEPTH ||
+    lines.some((line) => markerDepth(line) > DECODE_MAX_DEPTH || line.trimEnd() === "...")
+  )
+    return REFUSED;
+  const first: string[] = [];
+  for (const line of lines) {
+    if (!line.includes("\t")) first.push(line);
+    else {
+      const blanked = blank(line);
+      if (blanked === null) return REFUSED;
+      first.push(blanked);
+    }
   }
-  const blanked = lines.map(blank);
-  if (blanked.some((line) => UNDECIDABLE.test(line))) return REFUSED;
+  if (!first.some((line) => UNDECIDABLE.test(line))) {
+    const read = readRoot(first.join("\n"), key);
+    if (read) return read;
+  }
+  const blanked = lines.map((line) => blank(line) ?? line);
+  if (blanked.some((line) => UNDECIDABLE.test(line) || line.includes("\t"))) return REFUSED;
   return readRoot(blanked.join("\n"), key) ?? REFUSED;
+}
+
+/** The most `- ` / `? ` markers starting one line (`- - - a` nests a list per
+ * marker without a bracket), counted before any parse (`marker_depth`). */
+function markerDepth(line: string): number {
+  let rest = line.replace(/^[ \t]+/, "");
+  let depth = 0;
+  while (rest.startsWith("- ") || rest.startsWith("? ")) {
+    depth++;
+    rest = rest.slice(2).replace(/^[ \t]+/, "");
+  }
+  return depth;
 }
 
 /** A quoted key's text as YAML decodes it (`"ai_edit"` is ai_edit); null

@@ -16,6 +16,7 @@ import {
 } from "../../breve-runtime/scripts/cli-paths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
+import { verdict } from "../../scripts/frontmatter-differential";
 import { editableDocumentForAi } from "../ai/artifacts";
 import { containsPrivateDataOverlap, endpointIsLocal, looksSecret } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
@@ -299,6 +300,11 @@ describe("parity.json ↔ TS constants", () => {
         at: c.at,
       });
     }
+  });
+
+  test("frontmatterDisagreementCases", () => {
+    const wrong = entries.frontmatterDisagreementCases.value.filter((c) => verdict(c.fields) !== c.verdict);
+    expect(wrong.slice(0, 10)).toEqual([]);
   });
 
   test("localAiAllowedCases", () => {

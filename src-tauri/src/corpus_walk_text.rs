@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use super::{looks_secure, secure_context_field, secure_field, CorpusStore, Frontmatter};
+use super::{looks_secure, secure_context_field, CorpusStore, Frontmatter};
 
 /// One walked note's parsed text, cached beside its meta.
 ///
@@ -83,7 +83,7 @@ pub(super) fn searchable_metadata(fm: &Frontmatter) -> String {
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
 pub(crate) fn walked_secure(fm: &Frontmatter, body: &str, text: &str) -> bool {
-    fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+    crate::frontmatter_keys::secure(&fm.foreign)
         || fm
             .foreign
             .iter()

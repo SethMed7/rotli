@@ -73,3 +73,13 @@ fn remove_key_cases_match_fixture() {
         assert_eq!((lines, at), (out, case["at"].as_i64().unwrap()), "{case}");
     }
 }
+
+/// Every input the frontmatter differential harness found the two sides
+/// reading differently at 828f994d, pinned to the verdict both give now.
+#[test]
+fn frontmatter_disagreement_cases_match_fixture() {
+    for case in entry("frontmatterDisagreementCases").as_array().unwrap() {
+        let fields: Vec<String> = case["fields"].as_array().unwrap().iter().map(|f| f.as_str().unwrap().to_string()).collect();
+        assert_eq!(crate::frontmatter_keys::differential_tests::verdict(&fields), case["verdict"].as_str().unwrap(), "{case}");
+    }
+}

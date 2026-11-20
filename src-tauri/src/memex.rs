@@ -1133,9 +1133,7 @@ fn write_note_at_with_suppress(
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---"))
         .is_some_and(|(frontmatter, _)| {
-            frontmatter
-                .lines()
-                .any(|line| crate::corpus::secure_field(line) == Some(true))
+            crate::frontmatter_keys::secure(&frontmatter.lines().collect::<Vec<_>>())
         });
     let librarian_enabled = secure || librarian_enabled_at(root)?;
     let lane = if secure {

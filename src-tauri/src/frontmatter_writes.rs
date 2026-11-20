@@ -217,8 +217,8 @@ fn verdict(foreign: &[String], key: &str) -> (String, u8) {
     };
     let flag = |on: bool| (on.to_string(), u8::from(!on));
     match key {
-        "locked" => flag(foreign.iter().any(|l| crate::corpus::locked_field(l) == Some(true))),
-        "secure" => flag(foreign.iter().any(|l| crate::corpus::secure_field(l) == Some(true))),
+        "locked" => flag(crate::frontmatter_keys::locked(&foreign)),
+        "secure" => flag(crate::frontmatter_keys::secure(&foreign)),
         "created_by" => says(super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
         "local_ai_allowed" => {
             let read = super::local_ai_allowed(foreign);

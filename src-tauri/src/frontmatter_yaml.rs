@@ -79,7 +79,9 @@ fn read_root(block: &str, key: &str) -> Option<Decoded> {
         let starts_node = matches!(event, Event::Scalar(..) | Event::Alias(_) | Event::SequenceStart(..) | Event::MappingStart(..));
         if top && starts_node {
             if at_key {
-                alias_key |= matches!(event, Event::Alias(_));
+                // an alias as a root key, or a merge key (`<<`), could carry
+                // any key: refused
+                alias_key |= matches!(event, Event::Alias(_)) || text.as_deref() == Some("<<");
                 ours = text.as_deref() == Some(key);
             } else if ours {
                 found.push(text.unwrap_or_else(|| "\u{0}".to_string()));
@@ -107,38 +109,72 @@ fn read_root(block: &str, key: &str) -> Option<Decoded> {
     })
 }
 
-/// A key of letters, digits, `_`, `.` and `-` (never a flow map's `{s`).
-fn plain_word(name: &str) -> bool {
-    name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric() || c == '_') && name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c))
+/// A key a blanked line can spell plainly: no colon-space, comment, quote,
+/// or leading YAML sign (so a flow map's `{s` or a quoted key keeps its line).
+fn plain_safe(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(['{', '[', '&', '*', '!', '|', '>', '%', '@', '`', '#', ',', '?', '-', '"', '\'', ' '])
+        && !name.contains(": ")
+        && !name.contains(" #")
+        && !name.contains(['"', '\'', '\t'])
+        && !name.ends_with(':')
 }
 
-/// A plain top-level line of a key other than a permission key, with its
-/// value dropped (`summary: Plan: phase two` → `summary:`); every other line
-/// as it is. The organizer writes `summary:` and `links:` unquoted, so this
-/// is the only tolerance unreadable frontmatter gets.
-fn blank_plain_value(line: &str) -> String {
-    match super::frontmatter_field(line) {
-        Some((spelled, _)) if spelled.canonical && plain_word(&spelled.name) && !super::PERMISSION_KEYS.contains(&spelled.name.as_str()) => format!("{}:", spelled.name),
-        _ => line.to_string(),
+/// A top-level line of a key other than a permission key, with its value
+/// dropped (`summary: Plan: phase two` → `summary:`, `date created:\t2024`
+/// → `date created:`); every other line as it is. Values people and the
+/// organizer type unquoted are the only tolerance unreadable frontmatter gets.
+fn blank_value(line: &str) -> Option<String> {
+    let (name, _) = super::top_level_field(line)?;
+    (plain_safe(&name) && !super::PERMISSION_KEYS.contains(&name.as_str())).then(|| format!("{name}:"))
+}
+
+/// The most `- ` / `? ` markers starting one line (`- - - a` nests a list per
+/// marker without a bracket), counted before any parse, as `[`/`{` are.
+fn marker_depth(line: &str) -> usize {
+    let mut rest = line.trim_start_matches([' ', '\t']);
+    let mut depth = 0;
+    while let Some(after) = rest.strip_prefix("- ").or_else(|| rest.strip_prefix("? ")) {
+        depth += 1;
+        rest = after.trim_start_matches([' ', '\t']);
     }
+    depth
 }
 
-/// The value of `key` in the root mapping. Frontmatter that won't parse is
-/// read once more with the values of plain non-permission keys blanked;
-/// still unreadable, it is refused. TypeScript's twin: `decodedValue`.
+/// The value of `key` in the root mapping. Before any parse: over budget, a
+/// `...` line (a document end the two parsers read differently), or a tab the
+/// parsers disagree on is refused, except that a top-level plain key's line
+/// holding a tab is blanked. Frontmatter that won't parse is read once more
+/// with the values of top-level non-permission keys blanked; still unreadable,
+/// it is refused. TypeScript's twin: `decodedValue`.
 pub(super) fn decoded_value<S: AsRef<str>>(fields: &[S], key: &str) -> Decoded {
     let lines: Vec<&str> = fields.iter().map(|line| line.as_ref().trim_end_matches('\r')).collect();
     let block = lines.join("\n");
-    if block.len() > DECODE_MAX_BYTES || bracket_depth(&block) > DECODE_MAX_DEPTH {
+    if block.len() > DECODE_MAX_BYTES
+        || bracket_depth(&block) > DECODE_MAX_DEPTH
+        || lines.iter().any(|line| marker_depth(line) > DECODE_MAX_DEPTH || line.trim_end() == "...")
+    {
         return Decoded::Refused;
     }
-    if !block.chars().any(undecidable) {
-        if let Some(decoded) = read_root(&block, key) {
+    let mut first = Vec::with_capacity(lines.len());
+    for line in &lines {
+        if line.contains('\t') {
+            match blank_value(line) {
+                Some(blanked) => first.push(blanked),
+                None => return Decoded::Refused,
+            }
+        } else {
+            first.push(line.to_string());
+        }
+    }
+    let first = first.join("\n");
+    if !first.chars().any(undecidable) {
+        if let Some(decoded) = read_root(&first, key) {
             return decoded;
         }
     }
-    let blanked = lines.iter().map(|line| blank_plain_value(line)).collect::<Vec<_>>().join("\n");
-    if blanked.chars().any(undecidable) {
+    let blanked = lines.iter().map(|line| blank_value(line).unwrap_or_else(|| line.to_string())).collect::<Vec<_>>().join("\n");
+    if blanked.chars().any(undecidable) || blanked.contains('\t') {
         return Decoded::Refused;
     }
     read_root(&blanked, key).unwrap_or(Decoded::Refused)

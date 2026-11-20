@@ -58,6 +58,10 @@ export function frontmatterField(line: string): { key: FrontmatterKey; value: st
   }
   after = after.trimStart();
   if (!explicit && !after.startsWith(":")) return null;
+  // Rust writes `key: value` with one space, or `key:` at the end: a tab or
+  // a second space after the colon is another spelling (frontmatter_keys.rs)
+  const gap = after.slice(1);
+  canonical &&= gap === "" || (gap.startsWith(" ") && !/^\s/.test(gap.slice(1)));
   if (!name || (/\s/.test(name) && !explicit)) return null;
   return { key: { name, canonical }, value: (after.startsWith(":") ? after.slice(1) : "").trim() };
 }
@@ -100,20 +104,57 @@ export function topLevelKey(line: string): string | null {
   return topLevelField(line)?.key ?? null;
 }
 
-const withoutCr = (line: string) => line.replace(/\r$/, "");
+const withoutCr = (line: string) => line.replace(/\r+$/, "");
 
-/** A plain top-level line of a key other than a permission key, with its
- * value dropped (`summary: Plan: phase two` → `summary:`); every other line
- * as it is. The organizer writes `summary:` and `links:` unquoted, so this is
- * the only tolerance unreadable frontmatter gets (frontmatter_yaml.rs
- * `blank_plain_value`). */
-function blankPlainValue(line: string): string {
-  const field = frontmatterField(line);
-  return field?.key.canonical &&
-    /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(field.key.name) &&
-    !(PERMISSION_KEYS as readonly string[]).includes(field.key.name)
-    ? `${field.key.name}:`
-    : line;
+/** A key a blanked line can spell plainly (frontmatter_yaml.rs `plain_safe`). */
+function plainSafe(name: string): boolean {
+  return (
+    name !== "" &&
+    !/^[{[&*!|>%@`#,?\-"' ]/.test(name) &&
+    !name.includes(": ") &&
+    !name.includes(" #") &&
+    !/["'\t]/.test(name) &&
+    !name.endsWith(":")
+  );
+}
+
+/** A top-level line of a key other than a permission key, with its value
+ * dropped (`summary: Plan: phase two` → `summary:`), or null
+ * (frontmatter_yaml.rs `blank_value`). */
+function blankValue(line: string): string | null {
+  const name = topLevelField(line)?.key;
+  return name !== undefined && plainSafe(name) && !(PERMISSION_KEYS as readonly string[]).includes(name)
+    ? `${name}:`
+    : null;
+}
+
+/** Whether a line the line reader doesn't name as `key` could still spell it:
+ * its text, or an escape. Unreadable frontmatter denies a key only then
+ * (frontmatter_keys.rs `could_spell`). */
+function couldSpell(fields: readonly string[], key: string): boolean {
+  return fields.some(
+    (line) => !namesKey(line, key) && (line.includes(key) || line.includes("\\") || ALIAS.test(line)),
+  );
+}
+
+/** A YAML alias (`*name` at the start or after a space, `[`, `{`, `,` or `:`):
+ * in unreadable frontmatter it could stand for a key (`has_alias`). */
+const ALIAS = /(^|[\s[{,:])\*[^\s,[\]{}]/u;
+
+/** Whether a protection flag (`locked`, `secure`) is on: a line in any
+ * spelling saying anything but `false`, the YAML root value saying anything
+ * but `false`, or unreadable frontmatter a line could spell it in
+ * (frontmatter_keys.rs `flag_on`). */
+export function flagOn(fields: readonly string[], key: "locked" | "secure"): boolean {
+  if (
+    fields.some((line) => {
+      const field = frontmatterField(line);
+      return field?.key.name === key && field.value !== "false";
+    })
+  )
+    return true;
+  const decoded = decodedValue(fields.map(withoutCr), key, blankValue);
+  return decoded.refused ? couldSpell(fields, key) : decoded.value !== null && decoded.value !== "false";
 }
 
 export type Says = { says: "unset" } | { says: "grant"; value: string } | { says: "deny" };
@@ -128,12 +169,15 @@ export function ownedKey(fields: readonly string[], key: string, grants: (value:
     const line = withoutCr(raw);
     const field = frontmatterField(line);
     if (!field || field.key.name !== key) continue;
-    if (named || !grants(field.value) || UNDECIDABLE.test(line)) return { says: "deny" };
+    if (named || !grants(field.value) || UNDECIDABLE.test(line) || line.includes("\t"))
+      return { says: "deny" };
     named = true;
     if (field.key.canonical) grant = field.value;
   }
-  const decoded = decodedValue(fields.map(withoutCr), key, blankPlainValue);
-  if (decoded.refused) return { says: "deny" };
+  const decoded = decodedValue(fields.map(withoutCr), key, blankValue);
+  // frontmatter nobody can read denies only where a line could spell the key
+  if (decoded.refused && couldSpell(fields, key)) return { says: "deny" };
+  if (decoded.refused) return grant === null ? { says: "unset" } : { says: "grant", value: grant };
   if (decoded.value !== null && !grants(decoded.value)) return { says: "deny" };
   if (decoded.value === null && grant !== null) return { says: "deny" };
   return grant === null ? { says: "unset" } : { says: "grant", value: grant };

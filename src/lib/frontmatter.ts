@@ -6,7 +6,7 @@
 // wins, and the trailing space an empty owned value emits.
 //
 // Pure: no host, no vault, no services.
-import { frontmatterField } from "./frontmatterKeys";
+import { flagOn } from "./frontmatterKeys";
 
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
@@ -26,13 +26,13 @@ export function emptyFrontmatter(): NoteFrontmatter {
   return { id: null, created: null, updated: null, pinned: null, origin: null, foreign: [] };
 }
 
-/** Split like Rust's `str::lines()`: on "\n", dropping one trailing "\r" per
- * line and never yielding a trailing empty segment. Interior blank lines are
- * real (and become foreign `""` lines). */
+/** Split like corpus.rs `parse_fields`: on "\n", dropping every trailing "\r"
+ * of a line (`trim_end_matches`) and never yielding a trailing empty segment.
+ * Interior blank lines are real (and become foreign `""` lines). */
 function rustLines(head: string): string[] {
   const parts = head.split("\n");
   if (parts[parts.length - 1] === "") parts.pop();
-  return parts.map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
+  return parts.map((line) => line.replace(/\r+$/, ""));
 }
 
 function parseFields(head: string): NoteFrontmatter {
@@ -123,25 +123,16 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-/** The values of every line that sets `key`, in any spelling (indented,
- * quoted, a list item): the lock and secure readers count the same lines the
- * Lock and Secure actions replace (Codex review of pull request 303, items 2 and 7). */
-function flagValues(fm: NoteFrontmatter, key: string): string[] {
-  return fm.foreign.flatMap((line) => {
-    const field = frontmatterField(line);
-    return field?.key.name === key ? [field.value] : [];
-  });
-}
-
-/** A foreign `secure` line in any spelling saying anything but `false`: the
- * note is categorically unavailable to remote models (fails closed, as
- * corpus.rs `secure_field`). The vault file is the truth; this only reads it. */
+/** A `secure` flag in any spelling or as YAML reads it, saying anything but
+ * `false`: the note is categorically unavailable to remote models (fails
+ * closed, as frontmatter_keys.rs `secure`). The vault file is the truth. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagValues(fm, "secure").some((value) => value !== "false");
+  return flagOn(fm.foreign, "secure");
 }
 
-/** A foreign `locked: true` line in any spelling: no AI may edit the note,
- * every class reads it (corpus.rs `locked_field`). */
+/** A `locked` flag in any spelling or as YAML reads it, saying anything but
+ * `false`: no AI may edit the note, every class reads it
+ * (frontmatter_keys.rs `locked`). */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagValues(fm, "locked").includes("true");
+  return flagOn(fm.foreign, "locked");
 }
