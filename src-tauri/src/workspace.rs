@@ -31,6 +31,8 @@ use crate::loopback_http::{
 pub(crate) mod attachments;
 #[path = "workspace_file_visibility.rs"]
 mod file_visibility;
+#[path = "workspace_listing.rs"]
+mod listing;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
 #[path = "workspace_librarian.rs"]
@@ -292,43 +294,6 @@ impl Workspace {
         folder.parent_id = folder.parent_id.map(|parent| self.wire(&parent));
         folder.id = self.wire(&folder.id);
         folder
-    }
-
-    fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
-        let notes = self.store.list()?.notes;
-        let mut kept = Vec::with_capacity(notes.len());
-        for meta in notes {
-            // a note's row is built from the one read the gate approved
-            // and a board's or a file's from its path, in its own lane
-            let shown = match meta.kind {
-                NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
-                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false).map(|marked| marked.row),
-                _ => None,
-            };
-            kept.extend(shown);
-        }
-        // directories, and only the shelves of the rows shown
-        let folders = self.store.folders_for_ai(&kept)?;
-        let folders = folders.into_iter().filter(|folder| self.store.agent_listable(&folder.id)).collect();
-        let mut list = CorpusList {
-            notes: kept,
-            folders,
-            // an agent's listing names no file the person's own notice names
-            // (a hard-linked file's path may sit in a secure home)
-            skipped: Vec::new(),
-        };
-        list.notes.truncate(limit.min(500));
-        list.notes = list
-            .notes
-            .into_iter()
-            .map(|meta| self.prefix_meta(meta))
-            .collect();
-        list.folders = list
-            .folders
-            .into_iter()
-            .map(|folder| self.prefix_folder(folder))
-            .collect();
-        Ok(list)
     }
 
     fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
@@ -3060,6 +3025,9 @@ mod secure_reference_tests;
 #[cfg(test)]
 #[path = "workspace_ai_lane_tests.rs"]
 mod ai_lane_tests;
+#[cfg(test)]
+#[path = "workspace_listing_tests.rs"]
+mod listing_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

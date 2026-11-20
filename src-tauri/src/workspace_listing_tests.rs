@@ -1,0 +1,106 @@
+//! `rotli notes list` gated every row of the vault, reading each file's whole
+//! bytes, before keeping the newest hundred: a vault with a large `storage/`
+//! took minutes (2026-11-20). The listing now gates in proportion to its
+//! answer, and the answer is unchanged.
+
+use super::listing::ROWS_GATED;
+use super::tests::test_workspace;
+use super::*;
+use std::time::{Duration, SystemTime};
+use tempfile::TempDir;
+
+const SECRET: &str = "key: sk-ant-api03-EXAMPLE0EXAMPLE0EXAM";
+
+fn put(root: &Path, rel: &str, text: &str, age_days: u64) {
+    let path = root.join(rel);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, text).unwrap();
+    let when = SystemTime::now() - Duration::from_secs(age_days * 86_400 + 60);
+    fs::File::options().write(true).open(&path).unwrap().set_modified(when).unwrap();
+}
+
+fn note(id: &str, extra: &str, title: &str, body: &str) -> String {
+    format!("---\nid: {id}\n{extra}---\n# {title}\n\n{body}\n")
+}
+
+/// A memex vault: recent wiki notes, older shelved and pinned notes, a
+/// secret-shaped note and file, and a `storage/` of `storage_files` files
+/// older than every note.
+fn memex(temp: &TempDir, storage_files: usize) -> Workspace {
+    let root = temp.path();
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+    for i in 0..6 {
+        put(root, &format!("wiki/Projects/recent-{i}.md"), &note(&format!("01LIST{i:020}"), "", &format!("Recent {i}"), "plain"), i);
+    }
+    put(root, "wiki/Projects/shelved.md", &note("01LISTSHELVED00000000000000", "shelf: [wiki/Shelves/Payments]\n", "Shelved", "plain"), 30);
+    put(root, "wiki/Areas/pinned.md", &note("01LISTPINNED000000000000000", "pinned: true\n", "Pinned", "plain"), 40);
+    put(root, "wiki/Areas/token.md", &note("01LISTTOKEN0000000000000000", "", "Token", SECRET), 2);
+    // the newest storage file is secret-shaped: the next one still brings
+    // the Storage folder when every storage row is past the limit
+    put(root, "storage/inbox/secret.txt", SECRET, 50);
+    put(root, "storage/inbox/near.csv", "task,status\nDraft,ready\n", 51);
+    for i in 0..storage_files {
+        put(root, &format!("storage/batch-{}/asset-{i}.csv", i % 4), "a,b\n1,2\n", 60 + i as u64);
+    }
+    test_workspace(temp)
+}
+
+/// The listing as it was: every row gated, then the folders of all of them,
+/// then the limit.
+fn listed_by_gating_every_row(ws: &mut Workspace, limit: usize) -> CorpusList {
+    let mut kept = Vec::new();
+    for meta in ws.store.list().unwrap().notes {
+        let shown = match meta.kind {
+            NoteKind::Note => ws.store.note_row_for_ai(&meta.id, false),
+            _ if ws.remote_meta_visible(&meta) => ws.store.row_for_ai(&meta.id, false).map(|marked| marked.row),
+            _ => None,
+        };
+        kept.extend(shown);
+    }
+    let folders: Vec<FolderMeta> =
+        ws.store.folders_for_ai(&kept).unwrap().into_iter().filter(|folder| ws.store.agent_listable(&folder.id)).collect();
+    kept.truncate(limit.min(500));
+    CorpusList {
+        notes: kept.into_iter().map(|meta| ws.prefix_meta(meta)).collect(),
+        folders: folders.into_iter().map(|folder| ws.prefix_folder(folder)).collect(),
+        skipped: Vec::new(),
+    }
+}
+
+fn json(list: &CorpusList) -> Value {
+    serde_json::to_value(list).unwrap()
+}
+
+#[test]
+fn listing_gates_rows_in_proportion_to_its_limit_not_to_the_vault() {
+    let temp = TempDir::new().unwrap();
+    let mut ws = memex(&temp, 200);
+    ws.store.list().unwrap();
+    ROWS_GATED.with(|count| count.set(0));
+    let listed = ws.list_remote(3).unwrap();
+    let gated = ROWS_GATED.with(|count| count.get());
+    assert_eq!(listed.notes.len(), 3);
+    // the three shown, the shelved note, and the storage files up to the
+    // first visible one; never the 200 older assets
+    assert!(gated <= 12, "gated {gated} rows for a listing of 3");
+}
+
+#[test]
+fn listing_returns_what_gating_every_row_returned() {
+    let temp = TempDir::new().unwrap();
+    let mut ws = memex(&temp, 40);
+    for limit in [0, 1, 3, 8, 12, 600] {
+        let expected = listed_by_gating_every_row(&mut ws, limit);
+        let listed = ws.list_remote(limit).unwrap();
+        assert_eq!(json(&listed), json(&expected), "limit {limit}");
+    }
+    let small = ws.list_remote(1).unwrap();
+    let folder_ids: Vec<&str> = small.folders.iter().map(|folder| folder.id.as_str()).collect();
+    // a shelf only a row past the limit names stays listed
+    assert!(folder_ids.contains(&"wiki/Shelves/Payments"), "{folder_ids:?}");
+    assert!(folder_ids.contains(&"wiki/Shelves"), "{folder_ids:?}");
+    let all = ws.list_remote(600).unwrap();
+    assert!(all.notes.first().is_some_and(|meta| meta.title == "Pinned"), "{:?}", all.notes.first());
+    assert!(all.notes.iter().any(|meta| meta.title == "near.csv"));
+    assert!(!all.notes.iter().any(|meta| meta.title == "Token" || meta.title == "secret.txt"));
+}

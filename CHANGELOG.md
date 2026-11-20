@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rotli notes list` no longer takes minutes on large vaults.** It used to
+  read every file in the vault, including everything in `storage/`, before
+  showing the newest hundred. It now stops once it has what it shows, and
+  lists the same notes and folders in the same order.
+
 ## [1.9.4] - 2026-11-19
 
 ### Added
