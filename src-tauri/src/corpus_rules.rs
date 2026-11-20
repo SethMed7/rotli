@@ -53,6 +53,43 @@ impl CorpusStore {
         in_secure_home_path(rel)
     }
 
+    /// May a remote agent SEE that this path exists at all? Folders and
+    /// surfaced files carry no frontmatter, so nothing per-item marks them —
+    /// the surface predicate is the only policy they have, and the workspace
+    /// listing lane was applying none (audit 2026-08-01, GAP 8). Nothing in a
+    /// secure home is, not even a folder's name (Codex review of pull request
+    /// 302: `wiki/_secure/<name>` was listed). The corpus root ("") always is;
+    /// it is the tree the agent was handed.
+    pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
+        if self.in_secure_home(&super::lifecycle_disk_folder(self.layout, id_or_rel)) {
+            return false;
+        }
+        let (_, rel) = super::split_root_id(id_or_rel);
+        if rel.is_empty() {
+            return true;
+        }
+        let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
+        !matches!(
+            super::surfaced(self.layout, &rel),
+            super::Surface::Hidden | super::Surface::Reference
+        ) && !self.in_secure_home(&super::lifecycle_disk_folder(self.layout, &rel))
+    }
+
+    /// May a remote agent see this folder's name? A folder carries no
+    /// frontmatter, so it gets a file's protection: no secure home and no
+    /// secure keyword in its name, judged on the vault-relative path itself,
+    /// never through a wire prefix or a note id (Codex re-check of pull
+    /// request 302: `PrivateProject:` and a note whose id is the path
+    /// both slipped past). Nothing under it is read. It never shows what the
+    /// shipped check, `agent_listable`, hid.
+    pub(crate) fn agent_listable_folder(&mut self, folder_id: &str) -> bool {
+        self.agent_listable(folder_id)
+            && !matches!(
+            super::surfaced(self.layout, folder_id),
+            super::Surface::Hidden | super::Surface::Reference
+        ) && !self.file_is_protected(&super::lifecycle_disk_folder(self.layout, folder_id))
+    }
+
     /// Frontmatter-free file visibility for AI in either vault layout.
     pub(crate) fn file_is_protected(&self, rel: &str) -> bool {
         let title = std::path::Path::new(rel)

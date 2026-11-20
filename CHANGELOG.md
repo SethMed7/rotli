@@ -16,6 +16,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now reads "Sea mist by day, night swim after dark." in place of the old
   field-blue wording.
 
+### Fixed
+
+- **`rotli notes list` no longer takes minutes on large vaults.** It used to
+  read every file in the vault, including everything in `storage/`, before
+  showing the newest hundred. It now stops once it has what it shows, and
+  lists the same notes and folders in the same order.
+
+### Security
+
+- **Agents see fewer private folder names.** A folder directly under
+  `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
+  secure keywords, is no longer listed to agents by name. This is a partial
+  fix: spelling variants, keyword folders' subfolders, and shelf paths are
+  still being closed. Agent metrics also stopped counting the shelves of
+  notes agents can't read, and count an extensionless note as a note. Your
+  own sidebar is unchanged.
+
 ## [1.9.4] - 2026-11-20
 
 ### Added

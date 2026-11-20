@@ -97,7 +97,7 @@ impl CorpusStore {
     /// its path alone, once the AI file policy allows it (the bytes are read
     /// later, through `read_file_bytes_for_ai`). None when refused.
     pub(crate) fn row_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<AiRow<NoteMeta>> {
-        if id.to_ascii_lowercase().ends_with(".md") || !id.contains('.') {
+        if reads_as_markdown(id) {
             return self.note_ai_row(id, model_is_local);
         }
         let abs = self.file_for_ai(id, model_is_local).ok()?;
@@ -193,6 +193,14 @@ impl CorpusStore {
         folders.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(folders)
     }
+}
+
+/// Does `row_for_ai` read this id as a Markdown note (its row, shelf
+/// included, from the note's text) rather than as a file from its path? An
+/// id with no extension anywhere is read as Markdown even when the walk
+/// listed it as a file.
+pub(crate) fn reads_as_markdown(id: &str) -> bool {
+    id.to_ascii_lowercase().ends_with(".md") || !id.contains('.')
 }
 
 /// The files (not notes, not boards) a model may name, each from its path in

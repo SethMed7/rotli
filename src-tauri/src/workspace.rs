@@ -31,6 +31,8 @@ use crate::loopback_http::{
 pub(crate) mod attachments;
 #[path = "workspace_file_visibility.rs"]
 mod file_visibility;
+#[path = "workspace_listing.rs"]
+mod listing;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
 #[path = "workspace_librarian.rs"]
@@ -294,43 +296,6 @@ impl Workspace {
         folder
     }
 
-    fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
-        let notes = self.store.list()?.notes;
-        let mut kept = Vec::with_capacity(notes.len());
-        for meta in notes {
-            // a note's row is built from the one read the gate approved
-            // and a board's or a file's from its path, in its own lane
-            let shown = match meta.kind {
-                NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
-                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false).map(|marked| marked.row),
-                _ => None,
-            };
-            kept.extend(shown);
-        }
-        // directories, and only the shelves of the rows shown
-        let folders = self.store.folders_for_ai(&kept)?;
-        let folders = folders.into_iter().filter(|folder| self.store.agent_listable(&folder.id)).collect();
-        let mut list = CorpusList {
-            notes: kept,
-            folders,
-            // an agent's listing names no file the person's own notice names
-            // (a hard-linked file's path may sit in a secure home)
-            skipped: Vec::new(),
-        };
-        list.notes.truncate(limit.min(500));
-        list.notes = list
-            .notes
-            .into_iter()
-            .map(|meta| self.prefix_meta(meta))
-            .collect();
-        list.folders = list
-            .folders
-            .into_iter()
-            .map(|folder| self.prefix_folder(folder))
-            .collect();
-        Ok(list)
-    }
-
     fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
         match meta.kind {
             NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
@@ -545,8 +510,11 @@ impl Workspace {
 
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
-        list.notes.retain(|meta| self.remote_meta_visible(meta));
-        list.folders.retain(|folder| self.store.agent_listable(&folder.id));
+        // each row counted as the listing shows it (an extensionless file is
+        // read as a note), and only the vault's own directories: never a shelf
+        list.notes = std::mem::take(&mut list.notes).iter().filter_map(|meta| self.remote_row(meta)).collect();
+        list.folders = self.store.folders_for_ai(&[])?;
+        list.folders.retain(|folder| self.store.agent_listable_folder(&folder.id));
         let visible_notes = list
             .notes
             .iter()
@@ -3060,6 +3028,9 @@ mod secure_reference_tests;
 #[cfg(test)]
 #[path = "workspace_ai_lane_tests.rs"]
 mod ai_lane_tests;
+#[cfg(test)]
+#[path = "workspace_listing_tests.rs"]
+mod listing_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
