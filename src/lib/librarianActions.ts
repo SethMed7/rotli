@@ -3,6 +3,8 @@
 // tags merged into `tags`, and text-quote pointers to passages in `anchors`.
 // Nothing here calls a model or touches a file.
 
+import { breaksALine } from "./controlChars";
+
 /** A pointer to a passage: its words, a little text on each side, and an
  * optional short name. It finds the passage again without changing the note. */
 export interface Anchor {
@@ -98,14 +100,8 @@ export function resolveAnchor(
 
 // a line break or control character would write extra metadata lines through
 // the Filer, `ai_edit: true` among them (review 2026-11-20)
-/** A line break (CR, LF, U+0085, U+2028, U+2029) or another control character. */
-export function breaksALine(char: string): boolean {
-  const code = char.codePointAt(0) ?? 0;
-  return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
-}
-
 function cleanTag(tag: string): string {
-  const oneLine = [...tag].map((char) => (breaksALine(char) ? " " : char)).join("");
+  const oneLine = [...tag].map((char) => (breaksALine(char.charCodeAt(0)) ? " " : char)).join("");
   return oneLine.replace(/[,[\]]/g, "").trim();
 }
 
