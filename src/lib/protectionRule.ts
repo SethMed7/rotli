@@ -4,7 +4,7 @@
 // `secureContext`). Each flag is read the same way on both sides of a
 // rewrite, so an unchanged line always passes. Pure: text in, verdict out.
 
-import { bodyEdit, field } from "./aiEditPolicy";
+import { type AiBodyEdit, bodyEdit, field } from "./aiEditPolicy";
 import { parseNoteDocument } from "./frontmatter";
 import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "./frontmatterBlock";
 import { localAiAllowedOverride } from "./frontmatterKeys";
@@ -15,7 +15,8 @@ export interface Protection {
   secureContext: boolean;
   /** `local_ai_allowed`: 0 denied, 1 follows the vault, 2 granted. */
   localAi: 0 | 1 | 2;
-  aiBodyEdit: boolean;
+  /** Who may edit the body (`locked`, `ai_edit`, `created_by` decide). */
+  bodyEdit: AiBodyEdit;
 }
 
 export function protection(text: string): Protection {
@@ -30,7 +31,7 @@ export function protection(text: string): Protection {
     }),
     secureContext: protectionMark(text, "secureContext"),
     localAi: local === false ? 0 : local === null ? 1 : 2,
-    aiBodyEdit: bodyEdit(foreign) === "allowed",
+    bodyEdit: bodyEdit(foreign),
   };
 }
 
@@ -43,7 +44,7 @@ export function loosened(old: string, next: string): string[] {
   if (a.secure && !b.secure) out.push("secure");
   if (a.secureContext && !b.secureContext) out.push("secureContext");
   if (b.localAi > a.localAi) out.push("local_ai_allowed");
-  if (b.aiBodyEdit && !a.aiBodyEdit) out.push("ai_edit");
+  if (b.bodyEdit === "allowed" && a.bodyEdit !== "allowed") out.push("ai_edit");
   return out;
 }
 
@@ -56,26 +57,33 @@ export function requireNotLooser(old: string, next: string): void {
     );
 }
 
-/** `contents` with `key: true` in its first frontmatter block, replacing any
+/** `contents` with `key: value` in its first frontmatter block, replacing any
  * `key:` line, or in a new block when it has none. */
-function withMark(contents: string, key: string): string {
+function withLine(contents: string, key: string, value: string): string {
   const block = frontmatterBlock(contents);
-  if (!block) return `---\n${key}: true\n---\n\n${contents}`;
+  if (!block) return `---\n${key}: ${value}\n---\n\n${contents}`;
   const lines = block.inner.split("\n");
   const at = lines.findIndex((line) => field(line, key) !== null);
-  if (at >= 0) lines[at] = `${key}: true`;
-  else lines.push(`${key}: true`);
+  if (at >= 0) lines[at] = `${key}: ${value}`;
+  else lines.push(`${key}: ${value}`);
   return withFrontmatterBlock(contents, block, lines.join("\n"));
 }
 
-/** `next` with every on/off protection `old` had put back: what a chat
- * rewrite does, so a re-save can only tighten. */
+const RESTORES: [(had: Protection, now: Protection) => boolean, string, string][] = [
+  [(had, now) => had.secureContext && !now.secureContext, "secureContext", "true"],
+  [(had, now) => had.secure && !now.secure, "secure", "true"],
+  [(had, now) => had.locked && !now.locked, "locked", "true"],
+  [(had, now) => had.localAi === 0 && now.localAi !== 0, "local_ai_allowed", "false"],
+  [(had, now) => had.bodyEdit === "revoked" && now.bodyEdit === "allowed", "ai_edit", "false"],
+];
+
+/** `next` with every protection `old` had put back, flags and denials: what
+ * a chat rewrite does, so a re-save keeps them. A new grant `old` never had is
+ * left for `requireNotLooser` to refuse. */
 export function keepProtection(old: string, next: string): string {
   const had = protection(old);
   let out = next;
-  if (had.secureContext && !protection(out).secureContext) out = withMark(out, "secureContext");
-  if (had.secure && !protection(out).secure) out = withMark(out, "secure");
-  if (had.locked && !protection(out).locked) out = withMark(out, "locked");
+  for (const [lost, key, value] of RESTORES) if (lost(had, protection(out))) out = withLine(out, key, value);
   return out;
 }
 

@@ -203,13 +203,14 @@ second user-visible product or storage location.
   `secureContext`, give the note a `local_ai_allowed` it didn't have, or make
   an AI body edit allowed that wasn't (`ai_edit`, `created_by`). Each flag is
   read the same way before and after, so an unchanged line always passes. A
-  chat re-save puts dropped `locked`/`secure`/`secureContext` lines back and
-  refuses a new grant; a Librarian `_index.md` write (generated text, or an
-  undo restoring the bytes it replaced) is refused if it would loosen. The
-  file save lane (`corpus_write_file_bytes`, and the web's
+  chat re-save puts back a dropped `locked`, `secure`, `secureContext`,
+  `local_ai_allowed: false` or `ai_edit: false`, and refuses a grant the chat
+  never had. A Librarian `_index.md` write (generated text, an undo restoring
+  the bytes it replaced, or an empty body that deletes the file) is refused if
+  it would loosen. The file save lane (`corpus_write_file_bytes` and the web's
   `folderWriteFileBytes`) is for sheets, documents and other binaries: it
-  refuses `.md` and `.excalidraw` in any letter case, which save through their
-  own writers. Loosening a flag is the person's act, through the note's own
+  refuses `.md` and `.excalidraw` in any letter case, which save through
+  their own writers. Loosening a flag is the person's act, through the note's own
   controls (`set_locked`, `set_secure`, the local-AI and AI-edit toggles). The
   vault format is unchanged, so the contract version does not move.
 - A successful direct chat-note write invalidates the owning `CorpusStore`

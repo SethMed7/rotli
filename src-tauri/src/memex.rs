@@ -884,19 +884,9 @@ fn write_chat_at(
                 .map_err(|_| format!("existing chat is not valid UTF-8: {safe}"))?,
             None => String::new(),
         };
-        // a rewrite keeps every protection the chat had (review 2026-11-20:
-        // re-saves dropped `secure` and `locked`), and the flags only tighten
-        let had = crate::note_protection::protection(&existing);
-        let mut next = contents.to_string();
-        if had.secure_context {
-            next = ensure_chat_secure_context(&next);
-        }
-        if had.secure && !crate::note_protection::protection(&next).secure {
-            next = ensure_chat_mark(&next, "secure");
-        }
-        if had.locked && !crate::note_protection::protection(&next).locked {
-            next = ensure_chat_mark(&next, "locked");
-        }
+        // a rewrite keeps every protection the chat had and may only tighten
+        // it (review 2026-11-20: re-saves dropped `secure` and `locked`)
+        let next = crate::note_protection::keep_protection(&existing, contents, set_chat_line);
         crate::note_protection::require_not_looser(&existing, &next)?;
         atomic_write(&path, &next)
     })?;
@@ -917,24 +907,26 @@ fn chat_frontmatter_bounds(contents: &str) -> Option<(usize, usize, &'static str
 
 /// The chat's taint mark, by the grammar TypeScript shares
 /// (protection_mark.rs; seventh review of pull request 267).
+#[cfg(test)]
 fn chat_secure_context(contents: &str) -> bool {
     crate::protection_mark::marked(contents, "secureContext")
 }
 
+#[cfg(test)]
 fn ensure_chat_secure_context(contents: &str) -> String {
     if chat_secure_context(contents) {
         return contents.to_string();
     }
-    ensure_chat_mark(contents, "secureContext")
+    set_chat_line(contents, "secureContext", "true")
 }
 
-/// `contents` with `key: true` in its frontmatter: an existing `key:` line is
+/// `contents` with `key: value` in its frontmatter: an existing `key:` line is
 /// replaced, otherwise one is added (and a block made when there is none).
-fn ensure_chat_mark(contents: &str, key: &str) -> String {
+fn set_chat_line(contents: &str, key: &str, value: &str) -> String {
     let Some((start, end, eol)) = chat_frontmatter_bounds(contents) else {
-        return format!("---\n{key}: true\n---\n\n{contents}");
+        return format!("---\n{key}: {value}\n---\n\n{contents}");
     };
-    let mark = format!("{key}: true");
+    let mark = format!("{key}: {value}");
     let block = &contents[start..end];
     let mut lines: Vec<&str> = block.lines().collect();
     let mut replaced = false;

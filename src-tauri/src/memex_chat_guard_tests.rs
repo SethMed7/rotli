@@ -44,11 +44,18 @@ fn a_chat_rewrite_keeps_its_locked_and_secure_flags() {
 }
 
 #[test]
-fn a_chat_rewrite_cannot_grant_ai_edits_it_did_not_have() {
+fn a_chat_rewrite_keeps_its_denials_and_refuses_new_grants() {
     let dir = tempfile::tempdir().unwrap();
     let root = fs::canonicalize(dir.path()).unwrap();
-    write_chat_at(&root, "revoked", "---\nlocal_ai_allowed: false\n---\n\nturn\n", None).unwrap();
+    let denied = "---\ncreated_by: chat\nai_edit: false\nlocal_ai_allowed: false\n---\n\nturn\n";
+    write_chat_at(&root, "revoked", denied, None).unwrap();
     let revision = read_chat_at(&root, "revoked").unwrap().revision;
-    let err = write_chat_at(&root, "revoked", "---\n---\n\nturn\n", Some(&revision)).unwrap_err();
+    write_chat_at(&root, "revoked", "---\ncreated_by: chat\n---\n\nturn\n", Some(&revision)).unwrap();
+    let saved = fs::read_to_string(root.join("chats/revoked.md")).unwrap();
+    assert!(crate::note_protection::loosened(denied, &saved).is_empty(), "{saved}");
+
+    write_chat_at(&root, "open", "---\ntitle: Open\n---\n", None).unwrap();
+    let revision = read_chat_at(&root, "open").unwrap().revision;
+    let err = write_chat_at(&root, "open", "---\nlocal_ai_allowed: true\n---\n", Some(&revision)).unwrap_err();
     assert!(err.contains("local_ai_allowed"), "{err}");
 }

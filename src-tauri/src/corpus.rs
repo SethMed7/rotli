@@ -5429,6 +5429,12 @@ impl CorpusStore {
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
             self.filer_writable(&rel)?;
+            // the generated overview carries no frontmatter, but an undo puts
+            // back whatever was on disk, and an empty body deletes the file;
+            // either way it may only tighten what the person set on it
+            // (review 2026-11-20)
+            let current = read_existing_text(&path)?;
+            crate::note_protection::require_not_looser(&current, body)?;
             if body.is_empty() {
                 self.suppress.mark(&path);
                 if path.exists() {
@@ -5436,11 +5442,6 @@ impl CorpusStore {
                 }
                 return Ok(());
             }
-            // the generated overview carries no frontmatter, but an undo puts
-            // back whatever was on disk; either way it may only tighten what
-            // the person set on the file (review 2026-11-20)
-            let current = read_existing_text(&path)?;
-            crate::note_protection::require_not_looser(&current, body)?;
             fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", map.area_dir(area)))?;
             self.suppress.mark(&path);
             atomic_write(&path, body)

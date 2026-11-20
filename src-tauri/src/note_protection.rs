@@ -15,8 +15,8 @@ pub(crate) struct Protection {
     pub(crate) secure_context: bool,
     /// `local_ai_allowed`: 0 denied, 1 follows the vault, 2 granted.
     local_ai: u8,
-    /// May an AI edit the body (`ai_edit` / `created_by` decide)?
-    ai_body_edit: bool,
+    /// Who may edit the body (`locked`, `ai_edit`, `created_by` decide).
+    body_edit: BodyEdit,
 }
 
 pub(crate) fn protection(text: &str) -> Protection {
@@ -31,7 +31,7 @@ pub(crate) fn protection(text: &str) -> Protection {
             None => 1,
             Some(true) => 2,
         },
-        ai_body_edit: body_edit(foreign) == BodyEdit::Allowed,
+        body_edit: body_edit(foreign),
     }
 }
 
@@ -51,7 +51,7 @@ pub(crate) fn loosened(old: &str, new: &str) -> Vec<&'static str> {
     if b.local_ai > a.local_ai {
         out.push("local_ai_allowed");
     }
-    if b.ai_body_edit && !a.ai_body_edit {
+    if b.body_edit == BodyEdit::Allowed && a.body_edit != BodyEdit::Allowed {
         out.push("ai_edit");
     }
     out
@@ -68,6 +68,32 @@ pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
         "refused: this write would remove the note's protection ({}); change it from the note's own controls",
         keys.join(", ")
     ))
+}
+
+/// `next` with every protection `old` had put back, through `set_line(text,
+/// key, value)`, the writer's own frontmatter edit: what a chat rewrite does,
+/// so a re-save keeps its flags and denials (review 2026-11-20). A new grant
+/// `old` never had is left for `require_not_looser` to refuse.
+pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &str) -> String) -> String {
+    let had = protection(old);
+    let mut out = next.to_string();
+    let restores: [(fn(&Protection, &Protection) -> bool, &str, &str); 5] = [
+        (|had, now| had.secure_context && !now.secure_context, "secureContext", "true"),
+        (|had, now| had.secure && !now.secure, "secure", "true"),
+        (|had, now| had.locked && !now.locked, "locked", "true"),
+        (|had, now| had.local_ai == 0 && now.local_ai != 0, "local_ai_allowed", "false"),
+        (
+            |had, now| had.body_edit == BodyEdit::Revoked && now.body_edit == BodyEdit::Allowed,
+            "ai_edit",
+            "false",
+        ),
+    ];
+    for (lost, key, value) in restores {
+        if lost(&had, &protection(&out)) {
+            out = set_line(&out, key, value);
+        }
+    }
+    out
 }
 
 /// Is `path` a note or a board, the files whose text carries protection?

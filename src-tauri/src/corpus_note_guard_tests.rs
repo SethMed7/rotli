@@ -84,6 +84,17 @@ fn an_index_undo_restores_frontmatter_it_already_had() {
     fs::write(store.abs("wiki/Projects/_index.md"), before).unwrap();
     store.write_index("Projects", before).unwrap();
     assert_eq!(fs::read_to_string(store.abs("wiki/Projects/_index.md")).unwrap(), before);
+    // deleting it would drop the denial the next regeneration can't restore
+    let err = store.write_index("Projects", "").unwrap_err();
+    assert!(err.contains("local_ai_allowed"), "{err}");
+    assert_eq!(fs::read_to_string(store.abs("wiki/Projects/_index.md")).unwrap(), before);
+}
+
+#[test]
+fn an_unprotected_index_can_still_be_removed() {
+    let (_dir, mut store) = brain();
+    fs::create_dir_all(store.abs("wiki/Projects")).unwrap();
+    store.write_index("Projects", "# Projects\n\n- generated\n").unwrap();
     store.write_index("Projects", "").unwrap();
-    store.write_index("Projects", "# Projects\n\n- regenerated\n").unwrap();
+    assert!(!store.abs("wiki/Projects/_index.md").exists());
 }

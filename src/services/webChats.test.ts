@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
-import { protection } from "../lib/protectionRule";
+import { loosened, protection } from "../lib/protectionRule";
 import { appendMessages, composeNewChat } from "../memex/contract";
 import { MemoryVaultDir } from "./vaultDir";
 import { type ChatStore, FolderChatStore, createWebChatStore, webMemexBridge } from "./webChats";
@@ -236,12 +236,23 @@ describe("a chat re-save keeps its protection (review 2026-11-20)", () => {
       expect(saved).toContain("rotli: a reply");
     });
 
-    test(`${name}: a rewrite cannot grant itself AI access`, async () => {
+    test(`${name}: a rewrite keeps its denials and cannot grant itself AI access`, async () => {
       const store = make();
-      await store.write("no-local", "---\ntitle: No local\nlocal_ai_allowed: false\n---\n\nyou: hi\n", null);
-      const opened = await store.read("no-local");
+      const denied =
+        "---\ntitle: No local\ncreated_by: chat\nai_edit: false\nlocal_ai_allowed: false\n---\n\nyou: hi\n";
+      await store.write("no-local", denied, null);
+      let opened = await store.read("no-local");
+      await store.write(
+        "no-local",
+        "---\ntitle: No local\ncreated_by: chat\n---\n\nyou: hi\n",
+        opened.revision,
+      );
+      expect(loosened(denied, (await store.read("no-local")).contents)).toEqual([]);
+
+      await store.write("granting", "---\ntitle: Granting\n---\n", null);
+      opened = await store.read("granting");
       await expect(
-        store.write("no-local", "---\ntitle: No local\n---\n\nyou: hi\n", opened.revision),
+        store.write("granting", "---\nlocal_ai_allowed: true\n---\n", opened.revision),
       ).rejects.toThrow(/local_ai_allowed/);
     });
   }
