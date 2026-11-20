@@ -100,7 +100,7 @@ export const THEME_FAMILY_PRESENTATIONS: readonly {
   {
     family: "tesven",
     label: "Tesven",
-    description: "Mist and field blue by day, night swim after dark.",
+    description: "Sea mist by day, night swim after dark.",
     lightLabel: "Tesven Light",
     darkLabel: "Tesven Dark",
   },
