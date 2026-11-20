@@ -2,7 +2,7 @@
 // a few hundred wiki notes across nested folders, a storage/ asset store of thousands of
 // binary files, and a large .rotli/ projection folder. Every byte is random or generated.
 //
-//   bun scripts/perf-notes-list-vault.mjs "<empty folder>" [notes=400] [storageFiles=4000] [storageKiB=64]
+//   bun run perf:notes-list-vault "<empty folder>" [notes=400] [storageFiles=4000] [storageKiB=64]
 //   ROTLI_CORPUS_ROOT="<that folder>" rotli notes list > /dev/null
 //
 // It only writes into an empty or missing folder, so it can never touch a real vault.

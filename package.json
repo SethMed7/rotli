@@ -14,6 +14,7 @@
   "type": "module",
   "scripts": {
     "deps": "bun scripts/dependency-workflow.mjs",
+    "perf:notes-list-vault": "bun scripts/perf-notes-list-vault.mjs",
     "dev": "vite",
     "dev:app": "bun --no-orphans scripts/tauri-dev-supervisor.ts",
     "dev:uat": "ROTLI_BUILD_CHANNEL=stable bun --no-orphans scripts/tauri-dev-supervisor.ts",
