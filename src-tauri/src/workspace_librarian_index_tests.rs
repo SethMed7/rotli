@@ -243,3 +243,63 @@ fn remove_takes_only_an_entry_the_index_already_shows() {
     ok(mcp(&temp, INDEX, json!({"entries": [], "remove": [dock.id]})));
     assert_eq!(rows(), 3);
 }
+
+/// Codex review round 5 (P1): two files carrying one id. The walk gives the
+/// id to whichever sorts first, so an earlier-sorting public copy of a secure
+/// note took the id, and the secure note's summary and log came back under
+/// the copy's title. An id more than one file holds names no one note: it is
+/// refused on write and its entries are hidden.
+#[test]
+fn an_id_two_files_carry_is_refused_and_hidden() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let zulu = ws.create_note("Zulu original", "the original", MAIN_ROOT).unwrap();
+    ok(mcp(&temp, INDEX, json!({"entries": [{"id": zulu.id, "summary": "quartermaster figures"}]})));
+    ok(mcp(&temp, LOG, json!({"entry": "Filed the quartermaster figures", "ids": [zulu.id]})));
+    make_secure(&mut ws, &zulu.id);
+    let intake = temp.path().join(ws.store.layout().intake_dir());
+    fs::write(intake.join("aaa-copy.md"), format!("---\nid: {}\n---\n\n# Public copy\n\nnothing private\n", zulu.id)).unwrap();
+    let shown = pages(&temp);
+    assert_eq!((shown["index"].clone(), shown["log"].clone()), (json!([]), json!([])), "{shown}");
+    assert!(!shown.to_string().contains("quartermaster"), "{shown}");
+    let why = refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": zulu.id, "summary": "anything"}]})));
+    assert!(why.contains("more than one"), "{why}");
+}
+
+/// Codex review round 5 (P2): names compare in one form built character by
+/// character, so a Greek final sigma, a German ß, or a full-width letter
+/// can't keep a hidden note's name public.
+#[test]
+fn a_hidden_name_is_found_whatever_its_case_or_form() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    for (title, mention) in [("ΑΡΗΣ", "ΑΡΗΣ’s schedule"), ("Straße", "STRASSE works"), ("ＲＯＴＬＩ", "rotli review")] {
+        let temp = TempDir::new().unwrap();
+        turn_on(&temp);
+        let mut ws = test_workspace(&temp);
+        let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+        let named = ws.create_note(title, "private", MAIN_ROOT).unwrap();
+        ok(mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": mention}]})));
+        make_secure(&mut ws, &named.id);
+        assert_eq!(pages(&temp)["index"], json!([]), "{title} in {mention:?}");
+    }
+}
+
+/// Codex review round 5 (P3): a hidden name matches whole words only, so a
+/// secure note titled "A" doesn't block "Updated the roadmap.", while a
+/// standalone mention of it still hides the entry.
+#[test]
+fn a_short_hidden_name_matches_whole_words_only() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    let pier = ws.create_note("Pier notes", "more", MAIN_ROOT).unwrap();
+    let a = ws.create_note("A", "private", MAIN_ROOT).unwrap();
+    make_secure(&mut ws, &a.id);
+    ok(mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Updated the roadmap."}]})));
+    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": pier.id, "summary": "Met with A today"}]}))).contains("by id"));
+    assert_eq!(titles(&pages(&temp)["index"]), ["Dock notes"]);
+}

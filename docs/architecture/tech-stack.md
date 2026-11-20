@@ -21,6 +21,7 @@ those manifests are the executable truth when they drift.
 | Full-text index | tantivy (derived, rebuildable, never a database) | `src-tauri/src/search_index.rs` |
 | File watching and safe writes | notify, tempfile (atomic rename), trash (delete = OS trash) | `src-tauri/src/corpus.rs`, `fsutil.rs` |
 | Serialization and text | serde, serde_json, regex, base64, time, ulid, uuid, sha2 | across `src-tauri/src/` |
+| Frontmatter permission decoding | yaml-rust2 (Rust) and `yaml` (TypeScript), decoding a note's frontmatter only to decide `created_by`, `ai_edit` and `local_ai_allowed` (never past 64 KiB, 64 levels of nesting, or an alias), the two sides pinned by parity fixtures | `src-tauri/src/frontmatter_keys.rs`, `src/lib/frontmatterKeys.ts` |
 | Local HTTP from Rust | ureq (on-device model calls the webview CSP blocks) | `src-tauri/src/chat.rs`, `localmodel.rs` |
 | PDF text extraction | pdf-extract, wrapped in `catch_unwind` | `src-tauri/src/document_conversion.rs` |
 | Second binary | `rotli-helper`, the loopback bridge Rotli Web pairs with: it serves the one vault folder the user chose to browsers without a folder API, and runs chat through the user's AI tools ([`web-vault-connection.md`](web-vault-connection.md)) | `src-tauri/src/bin/rotli_helper.rs`, `helper_vault.rs` |

@@ -1273,42 +1273,6 @@ fn parse_fields(head: &str) -> Frontmatter {
     fm
 }
 
-/// The clean, top-level metadata vocabulary retrieval may search. This makes
-/// organizer-generated keywords useful without exposing arbitrary nested or
-/// provenance/control frontmatter. Values stay plain text and are never an
-/// independent source of truth.
-fn searchable_metadata(fm: &Frontmatter) -> String {
-    const KEYS: [&str; 8] = [
-        "aliases", "area", "summary", "tags", "links", "shelf", "reach", "view_tag",
-    ];
-    fm.foreign
-        .iter()
-        .filter(|line| {
-            let Some((key, _)) = line.split_once(':') else {
-                return false;
-            };
-            key == key.trim() && KEYS.contains(&key)
-        })
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Is this walked note protected content? The same three-way rule
-/// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
-/// body detector for a note whose metadata panel was never opened.
-pub(crate) fn walked_secure(fm: &Frontmatter, body: &str, text: &str) -> bool {
-    fm.foreign.iter().any(|l| secure_field(l) == Some(true))
-        || fm
-            .foreign
-            .iter()
-            .any(|l| secure_context_field(l) == Some(true))
-        // the chat mark by the grammar TypeScript shares (eighth review: the
-        // line rule above missed `TRUE`, a quoted true, `key : true`)
-        || crate::protection_mark::marked(text, "secureContext")
-        || looks_secure(body)
-}
-
 /// Serialize: our four facts first, then every foreign line verbatim, then the
 /// raw body exactly as given (callers pass the separating blank line).
 pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
@@ -1540,6 +1504,10 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
     &text[..text.len() - body.len()]
 }
 
+#[path = "corpus_walk_text.rs"]
+mod walk_text;
+pub(crate) use walk_text::walked_secure;
+use walk_text::{searchable_metadata, CachedNoteText};
 #[path = "corpus_in_place.rs"]
 mod in_place;
 use in_place::{compose_in_place, rotli_made, with_secure_line_only};
@@ -2470,28 +2438,6 @@ pub struct CorpusStore {
     /// re-gates every hit through `read_for_ai` from disk, so the index is not the
     /// visibility boundary (docs/design/tantivy-search.md).
     search_index: Option<crate::search_index::SearchIndex>,
-}
-
-/// One walked note's parsed text, cached beside its meta.
-///
-/// MEMORY TRADEOFF (deliberate, Greptile PR #14): the whole corpus's note
-/// bodies stay resident while the walk cache is valid — ~3 MB for a typical
-/// 1k-note corpus, ~200 MB for an extreme 20k×10 KB one. That buys
-/// search()/tasks() answering from one parse instead of a second full-vault
-/// read per call. No eviction on purpose (the cache IS the working set of a
-/// local-first notes app); if a future corpus class outgrows this, the
-/// refactor seam is: evict `body`/`metadata` here while keeping the metas,
-/// and let search/tasks fall back to per-note reads.
-struct CachedNoteText {
-    body: String,
-    /// The searchable frontmatter projection ("" when the note has none).
-    metadata: String,
-    /// Decided on the WALK, from the same rule `read_for_ai` applies: the
-    /// `secure:` flag, the chat taint marker, or the body detector. It cannot
-    /// be re-derived from `metadata`, which is an 8-key search projection that
-    /// deliberately omits protection state. The secure-prose ledger is fed
-    /// from this (audit 2026-08-01, GAP 2).
-    secure: bool,
 }
 
 struct ListCache {
@@ -6723,18 +6669,7 @@ fn walk(
                     None => raw,
                 };
                 let fm = fm.unwrap_or_default();
-                texts.insert(
-                    rel.clone(),
-                    CachedNoteText {
-                        body: body.to_string(),
-                        metadata: if had_fm {
-                            searchable_metadata(&fm)
-                        } else {
-                            String::new()
-                        },
-                        secure: walked_secure(&fm, body, &text),
-                    },
-                );
+                texts.insert(rel.clone(), CachedNoteText::new(&fm, had_fm, body, &text, None));
                 reference.push(reference_row(&rel, &abs, &fm, body));
             }
             continue;
@@ -6796,18 +6731,7 @@ fn walk(
             new_index.insert(id.clone(), rel.clone());
             // cache the parsed text beside the meta — search()/tasks() read it
             // instead of a second full read+parse pass (audit 2026-07-30, #5)
-            texts.insert(
-                id.clone(),
-                CachedNoteText {
-                    body: body.to_string(),
-                    metadata: if had_fm {
-                        searchable_metadata(&fm)
-                    } else {
-                        String::new()
-                    },
-                    secure: walked_secure(&fm, body, &text),
-                },
-            );
+            texts.insert(id.clone(), CachedNoteText::new(&fm, had_fm, body, &text, Some(&id)));
             notes.push(note_row(layout, id, &rel, &abs, &fm, body));
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".excalidraw") {
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
@@ -8899,6 +8823,9 @@ mod in_place_marked_tests;
 #[cfg(test)]
 #[path = "corpus_review_tests.rs"]
 pub(crate) mod review_tests;
+#[cfg(test)]
+#[path = "corpus_permission_setter_tests.rs"]
+mod permission_setter_tests;
 
 #[cfg(test)]
 #[path = "corpus_write_lane_tests.rs"]

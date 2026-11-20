@@ -34,7 +34,17 @@ pub(crate) fn with_top_level_line(text: &str, key: &str, value: Option<&str>) ->
         lines.remove(0); // opening ---
         lines.pop(); // closing ---
     }
-    let is_key = |line: &str| crate::frontmatter_keys::canonical_field(line).is_some_and(|(k, _)| k == key);
+    // a permission key goes in every spelling, so a typed denial never
+    // outlives Rotli's own line; any other key in every one-line top-level
+    // spelling (`key :`, `"key":`), so it is replaced, never repeated
+    let permission = crate::frontmatter_keys::PERMISSION_KEYS.contains(&key);
+    let is_key = |line: &str| {
+        if permission {
+            crate::frontmatter_keys::names_key(line, key)
+        } else {
+            crate::frontmatter_keys::top_level_key(line).as_deref() == Some(key)
+        }
+    };
     let at = lines.iter().position(|line| is_key(line));
     lines.retain(|line| !is_key(line));
     if let Some(value) = value {
@@ -68,18 +78,20 @@ pub(crate) fn with_secure_line_only(text: &str, secure: bool) -> String {
 /// `updated` are Rotli's own facts and are never written here.
 pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
     let before = parse_document(original).0.unwrap_or_default();
-    let key_of = |line: &str| line.split_once(':').map(|(k, _)| k.to_string());
+    // a key in any one-line top-level spelling, so `locked : false` and the
+    // `locked: true` an action adds are one key, replaced in place
+    let key_of = crate::frontmatter_keys::top_level_key;
     let value_of = |lines: &[String], key: &str| {
         lines
             .iter()
             .rev()
             .find(|line| key_of(line).as_deref() == Some(key))
-            .and_then(|line| line.split_once(':').map(|(_, v)| v.trim().to_string()))
+            .and_then(|line| crate::frontmatter_keys::frontmatter_field(line).map(|(_, v)| v.to_string()))
     };
     let mut keys: Vec<String> = Vec::new();
     for line in before.foreign.iter().chain(next.foreign.iter()) {
         if let Some(key) = key_of(line) {
-            if !key.starts_with(' ') && !keys.contains(&key) {
+            if !keys.contains(&key) {
                 keys.push(key);
             }
         }
@@ -90,6 +102,16 @@ pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
         let new = value_of(&next.foreign, &key);
         if old != new {
             text = with_top_level_line(&text, &key, new.as_deref());
+        }
+    }
+    // a permission key whose lines on disk aren't exactly the ones the action
+    // built (an indented or escaped spelling beside them) is rewritten, so the
+    // person's setting replaces every spelling (Codex review round 5)
+    for key in crate::frontmatter_keys::PERMISSION_KEYS {
+        let naming = |lines: &[String]| lines.iter().filter(|line| crate::frontmatter_keys::names_key(line, key)).cloned().collect::<Vec<_>>();
+        let (old, new) = (naming(&before.foreign), naming(&next.foreign));
+        if old != new {
+            text = with_top_level_line(&text, key, value_of(&next.foreign, key).as_deref());
         }
     }
     if before.pinned.unwrap_or(false) != next.pinned.unwrap_or(false) {

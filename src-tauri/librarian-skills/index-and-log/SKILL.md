@@ -26,8 +26,8 @@ Sets the one-line summary the index keeps for each note:
   `librarian_read`. Writing an id again replaces its summary; `remove` takes
   notes the index already holds out of it.
 - Every id must be a note you can read now that carries its own Rotli id (a
-  note known only by its file path can't be indexed or logged), or the whole
-  call is refused.
+  note known only by its file path can't be indexed or logged, and neither
+  can an id two files carry), or the whole call is refused.
 - The summary is one line about that note. Don't name other notes in it; give
   each its own entry. Text that names a note you can't read is refused, and
   an entry whose text names a note that later becomes hidden stops showing.

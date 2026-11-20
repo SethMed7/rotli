@@ -53,12 +53,22 @@ struct LogRow {
 /// different file put at that path would inherit the id, so an entry could
 /// follow the path to another note (Codex review of 7f542f5b); only an id the
 /// note carries itself is followed.
+///
+/// An id two files carry names no one note either: the walk gives it to
+/// whichever it reads first, so a public copy sorting before a secure
+/// original took the id and the original's summary showed under the copy's
+/// title (Codex review round 5). Such an id is refused and hidden. Residual:
+/// once the original is deleted the copy holds the id alone, and entries
+/// written about the original show under the copy.
 fn owns_its_id(ws: &mut Workspace, local: &str) -> Result<(), String> {
     let text = ws.store.read_for_ai(local, false).map_err(|_| "not a note you can read".to_string())?;
-    match crate::corpus::parse_document(&text).0.and_then(|fm| fm.id) {
-        Some(own) if own == local => Ok(()),
-        _ => Err("a note without a Rotli id of its own (known only by its path), so the index can't follow it".into()),
+    if crate::corpus::parse_document(&text).0.and_then(|fm| fm.id).as_deref() != Some(local) {
+        return Err("a note without a Rotli id of its own (known only by its path), so the index can't follow it".into());
     }
+    if ws.store.ids_held_twice()?.contains(local) {
+        return Err("an id more than one file carries, so it names no one note".into());
+    }
+    Ok(())
 }
 
 /// The local id of a note an agent may read now, carrying its own id.
@@ -68,10 +78,50 @@ fn readable(ws: &mut Workspace, id: &str) -> Result<String, String> {
     Ok(local)
 }
 
-/// Text compared for names: spaces collapsed, JavaScript's trim set, lower
-/// case.
-fn normal(text: &str) -> String {
-    text.split(crate::frontmatter_keys::is_js_space).filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ").to_lowercase()
+/// Text compared for names, built one character at a time so both sides of
+/// a comparison fold the same way whatever surrounds them (Codex review round
+/// 5: lowercasing a whole string turns a Greek final sigma into ς in one and
+/// σ in the other). NFKC first (full-width forms, ligatures), then each
+/// character folded: ß and ẞ to "ss", ς to σ, every other character
+/// lower-cased on its own; spaces collapsed.
+fn folded(text: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    let mut out = String::with_capacity(text.len());
+    for c in text.nfkc() {
+        match c {
+            'ß' | 'ẞ' => out.push_str("ss"),
+            'ς' => out.push('σ'),
+            c if crate::frontmatter_keys::is_js_space(c) => out.push(' '),
+            c => out.extend(c.to_lowercase()),
+        }
+    }
+    out.split(' ').filter(|word| !word.is_empty()).collect::<Vec<_>>().join(" ")
+}
+
+/// Scripts written without spaces between words, where a name can sit inside
+/// a run of letters (Han, kana, Thai, Lao, Khmer, Myanmar): no word boundary
+/// is needed there, so a mention is never missed.
+fn unspaced(c: char) -> bool {
+    matches!(c as u32,
+        0x0E00..=0x0EFF | 0x1000..=0x109F | 0x1780..=0x17FF | 0x3040..=0x30FF | 0x31F0..=0x31FF
+        | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0xFF66..=0xFF9F | 0x20000..=0x3FFFF)
+}
+
+/// Whether folded `text` mentions folded `name` as a whole word (Codex review
+/// round 5: a secure note titled "A" refused "Updated the roadmap."). A name
+/// counts unless a letter or digit runs straight into it on either side, so a
+/// possessive ("ΑΡΗΣ’s") and punctuation still match; in a script without
+/// spaces any occurrence counts.
+fn mentions(text: &str, name: &str) -> bool {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    let joined = |edge: Option<char>, beside: Option<char>| match (edge, beside) {
+        (Some(edge), Some(beside)) => word(edge) && word(beside) && !unspaced(edge) && !unspaced(beside),
+        _ => false,
+    };
+    let (first, last) = (name.chars().next(), name.chars().next_back());
+    text.match_indices(name).any(|(at, _)| {
+        !joined(first, text[..at].chars().next_back()) && !joined(last, text[at + name.len()..].chars().next())
+    })
 }
 
 /// The names (titles and aliases, normalised) of every note, to check text
@@ -81,7 +131,7 @@ fn note_names(ws: &mut Workspace) -> Result<Vec<(String, String)>, String> {
     let mut names = Vec::new();
     for meta in ws.store.list()?.notes {
         for name in std::iter::once(&meta.title).chain(meta.aliases.iter()) {
-            let name = normal(name);
+            let name = folded(name);
             if !name.is_empty() {
                 names.push((name, meta.id.clone()));
             }
@@ -95,8 +145,8 @@ fn note_names(ws: &mut Workspace) -> Result<Vec<(String, String)>, String> {
 /// short the name (Codex review of 7f542f5b: a summary naming a note that
 /// turned secure kept its name public).
 fn names_a_hidden_note(ws: &mut Workspace, names: &[(String, String)], hidden: &mut HashMap<String, bool>, text: &str) -> bool {
-    let text = normal(text);
-    names.iter().filter(|(name, _)| text.contains(name.as_str())).any(|(_, id)| {
+    let text = folded(text);
+    names.iter().filter(|(name, _)| mentions(&text, name)).any(|(_, id)| {
         *hidden.entry(id.clone()).or_insert_with(|| ws.store.read_for_ai(id, false).is_err())
     })
 }
@@ -224,4 +274,38 @@ pub(super) fn render(ws: &mut Workspace, log_lines: usize) -> Result<Value, Stri
     }
     log.reverse();
     Ok(json!({ "index": index, "log": log }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{folded, mentions};
+
+    /// One form for every comparison, character by character.
+    #[test]
+    fn names_fold_the_same_way_on_both_sides() {
+        for (label, form) in [
+            ("ΟΔΥΣΣΕΥΣ", "οδυσσευσ"),
+            ("οδυσσευς", "οδυσσευσ"),
+            ("ΟΔΥΣΣΕΥΣ’ voyage", "οδυσσευσ’ voyage"),
+            ("Weißbier", "weissbier"),
+            ("WEISSBIER", "weissbier"),
+            ("ẞ", "ss"),
+            ("İstanbul", "i\u{307}stanbul"),
+            ("ISTANBUL", "istanbul"),
+            ("ＲＯＴＬＩ　plan", "rotli plan"),
+            ("ﬁle", "file"),
+        ] {
+            assert_eq!(folded(label), form, "{label}");
+        }
+    }
+
+    #[test]
+    fn a_name_matches_whole_words_and_runs_of_unspaced_script() {
+        assert!(!mentions(&folded("A banana cake"), "b"));
+        assert!(mentions(&folded("Plan B, then"), "b"));
+        assert!(mentions(&folded("ΟΔΥΣΣΕΥΣ’ voyage"), &folded("Οδυσσευς")));
+        assert!(mentions(&folded("see (A), then"), "a"));
+        assert!(!mentions(&folded("Planet nine"), "plan"));
+        assert!(mentions(&folded("我们的公司计划"), &folded("公司")), "no spaces between Han words");
+    }
 }

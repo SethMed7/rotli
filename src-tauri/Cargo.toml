@@ -56,6 +56,7 @@ uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids 
 # binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
 tantivy = "0.26.1"
 tauri-plugin-clipboard-manager = "2"
+yaml-rust2 = { version = "=0.13.0", default-features = false }
 
 # macOS-only crates: the Keychain and the AppKit bindings behind the runtime
 # Dock/app icon swap (Settings → Appearance → App icon).

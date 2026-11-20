@@ -489,7 +489,7 @@
       ]
     },
     "localAiAllowedCases": {
-      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_keys.rs local_ai_allowed (via owned_key) ↔ src/lib/frontmatterKeys.ts localAiAllowed (the web vault's reader): only Rust's spelling grants, any spelling that says anything but true denies, values trimmed with JavaScript's set",
+      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_keys.rs local_ai_allowed (via owned_key) ↔ src/lib/frontmatterKeys.ts localAiAllowedOverride (the web vault's reader): only Rust's spelling grants, any spelling that says anything but true denies, a second line naming the key, or one holding a control character or U+FEFF, denies; where the frontmatter decodes as YAML the decoded value must agree; frontmatter that won't decode denies only when a line the line reader can't name mentions the key",
       "value": [
         { "fields": [], "says": "unset" },
         { "fields": ["local_ai_allowed: true"], "says": "grant" },
@@ -501,12 +501,62 @@
         { "fields": ["  local_ai_allowed: true"], "says": "unset" },
         { "fields": ["local_ai_allowed: yes"], "says": "deny" },
         { "fields": ["local_ai_allowed: \u0085true"], "says": "deny" },
-        { "fields": ["local_ai_allowed: \ufefftrue"], "says": "grant" }
+        { "fields": ["local_ai_allowed: \ufefftrue"], "says": "deny" },
+        { "fields": ["\"local\\u005fai_allowed\": false"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "x: [unclosed"], "says": "grant" },
+        { "fields": ["summary: Plan: phase two"], "says": "unset" },
+        { "fields": ["local_ai_allowed: true", "summary: Plan: phase two", "links: [[Alpha]], [[Beta]]"], "says": "grant" },
+        { "fields": ["local_ai_allowed: true", "tags: [a]", "tags: [b]"], "says": "grant" },
+        { "fields": ["local_ai_allowed: true", "summary: about local_ai_allowed: x"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "local_ai_allowed: true"], "says": "deny" },
+        { "fields": ["{\"local\\u005fai_allowed\": false, x: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"], "says": "deny" },
+        { "fields": ["{\"local\\u005fai_allowed\": false, x: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"], "says": "unset" },
+        { "fields": ["local_ai_allowed: true", "a: &a x", "b: *a"], "says": "grant" },
+        { "fields": ["a: &a {local_ai_allowed: false}", "b: *a", "local_ai_allowed: true"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "\"local\\u005fai_allowed\": true"], "says": "deny" }
       ]
     },
     "aiBodyEditCases": {
       "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
       "value": [
+        {
+          "fields": ["created_by: agent", "\"ai\\u005fedit\": false"],
+          "verdict": "revoked"
+        },
+        {
+          "fields": ["created_by: agent", "summary: Plan: phase two"],
+          "verdict": "allowed"
+        },
+        {
+          "fields": ["created_by: librarian", "summary: Plan: phase two", "links: [[Alpha]], [[Beta]]"],
+          "verdict": "allowed"
+        },
+        {
+          "fields": ["summary: Plan: phase two", "links: [[Alpha]], [[Beta]]"],
+          "verdict": "person-written"
+        },
+        { "fields": ["created_by: agent", "tags: [a]", "tags: [b]"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "\tnested: tab"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: @mention"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: *bold* words"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: &anchor text"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: %done"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "title: {{template}}"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: \"unclosed"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "summary: pasted\u0085text"], "verdict": "allowed" },
+        { "fields": ["{created_by: agent, ai_edit: false}"], "verdict": "revoked" },
+        { "fields": ["created_by: agent", "ai_edit: True"], "verdict": "revoked" },
+        { "fields": ["created_by: agent", "summary: a: b", "!!str ai_edit: false"], "verdict": "revoked" },
+        { "fields": ["created_by: agent", "summary: a: b", "\"ai\\u005fedit\": false"], "verdict": "revoked"
+        },
+        {
+          "fields": ["created_by: agent", "ai_edit: true", "ai_edit: true"],
+          "verdict": "revoked"
+        },
+        {
+          "fields": ["created_by: agent", "'ai_edit': false"],
+          "verdict": "revoked"
+        },
         {
           "fields": [
             "created_by: agent",
@@ -538,7 +588,7 @@
           "fields": [
             "ai_edit: \ufefftrue"
           ],
-          "verdict": "allowed"
+          "verdict": "revoked"
         },
         {
           "fields": [
@@ -558,7 +608,7 @@
           "fields": [
             "created_by: \ufeffagent"
           ],
-          "verdict": "allowed"
+          "verdict": "person-written"
         },
         {
           "fields": [
@@ -571,7 +621,7 @@
             "\"ai_edit\": true",
             "  ai_edit: true"
           ],
-          "verdict": "person-written"
+          "verdict": "revoked"
         },
         {
           "fields": [],

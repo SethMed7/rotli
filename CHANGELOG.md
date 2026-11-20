@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Locking a note in a folder opened in place no longer leaves two lock
+  lines.** If the note's metadata spelled the lock its own way
+  (`locked : false`, `"locked": false`), Rotli now replaces that line
+  instead of adding its own beside it.
+
+### Security
+
+- **Turning "Let AI edit" or on-device AI back on clears every copy, in
+  every kind of vault.** In a folder opened in place, a copy of the setting
+  typed in another form used to stay and keep its no; now Rotli removes it,
+  on the Mac and in Rotli Web alike.
+- **Rotli's markers keep their no in more forms.** Who made a note, the
+  "Let AI edit" grant and the on-device permission are also read the way a
+  YAML reader reads them, so an escaped or quoted copy
+  (`"ai\u005fedit": false`) still says no, and so do two copies of one
+  marker. Metadata a YAML reader can't read, such as a summary with a colon
+  in it or several links on one line (how the organizer writes them),
+  changes nothing: those notes keep their permissions.
+- **The Librarian's index hides notes more reliably** (the Librarian agent
+  route, which still runs only in development builds). An entry that
+  mentions a hidden note by title or alias is caught in any case or letter
+  form (Greek, German ß, full-width), as a whole word, so a short secure
+  title no longer hides ordinary text. A note id that two files carry, as a
+  copied note does, can't be indexed or logged.
+
 ## [1.9.4] - 2026-11-19
 
 ### Added

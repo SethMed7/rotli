@@ -68,8 +68,9 @@ pub(crate) fn frontmatter_field(line: &str) -> Option<(FrontmatterKey, &str)> {
     let (name, after) = match rest.chars().next() {
         Some(quote @ ('"' | '\'')) => {
             canonical = false;
-            let close = rest[1..].find(quote)? + 1;
-            (rest[1..close].to_string(), &rest[close + 1..])
+            let close = quoted_end(rest, quote)?;
+            // a quoted key is decoded as YAML decodes it (`"ai\u005fedit"` is ai_edit)
+            (decode_scalar(&rest[..=close]).unwrap_or_else(|| rest[1..close].to_string()), &rest[close + 1..])
         }
         _ => match rest.find(':') {
             Some(colon) => {
@@ -91,6 +92,53 @@ pub(crate) fn frontmatter_field(line: &str) -> Option<(FrontmatterKey, &str)> {
     let value = js_trim(after.strip_prefix(':').unwrap_or_default());
     Some((FrontmatterKey { name, canonical }, value))
 }
+
+/// The byte index of the quote closing the quoted scalar `rest` starts with:
+/// a `\` escapes in double quotes, `''` is a quote in single quotes.
+fn quoted_end(rest: &str, quote: char) -> Option<usize> {
+    let mut chars = rest.char_indices().skip(1).peekable();
+    while let Some((at, c)) = chars.next() {
+        if quote == '"' && c == '\\' {
+            chars.next();
+        } else if c == quote {
+            if quote == '\'' && chars.peek().is_some_and(|(_, next)| *next == '\'') {
+                chars.next();
+            } else {
+                return Some(at);
+            }
+        }
+    }
+    None
+}
+
+/// A quoted YAML scalar, decoded by the YAML parser; None when it won't parse.
+fn decode_scalar(token: &str) -> Option<String> {
+    let docs = yaml_rust2::YamlLoader::load_from_str(token).ok()?;
+    docs.first()?.as_str().map(str::to_string)
+}
+
+/// Whether a frontmatter line names `key` in any spelling, quoted keys
+/// decoded. Every setter of a permission key removes each such line.
+pub(crate) fn names_key(line: &str, key: &str) -> bool {
+    frontmatter_field(line).is_some_and(|(spelled, _)| spelled.name == key)
+}
+
+/// The key a top-level line sets in a one-line spelling (`key:`, `key :`,
+/// `"key":`, `'key':`, quoted keys decoded); None for an indented line, a
+/// list item, `? key`, or a line that sets no key. A write in a folder opened
+/// in place replaces the line this names, so a key the person spelled their
+/// own way is replaced rather than repeated beside Rotli's line.
+pub(crate) fn top_level_key(line: &str) -> Option<String> {
+    if line.starts_with(is_js_space) || line.starts_with("- ") || line.starts_with("? ") {
+        return None;
+    }
+    frontmatter_field(line).map(|(key, _)| key.name)
+}
+
+/// The keys Rust writes that grant or deny an AI permission. Any spelling of
+/// one can deny, so every writer clears every spelling before writing its
+/// own line (Codex review round 5 of PR #295).
+pub(crate) const PERMISSION_KEYS: [&str; 3] = ["created_by", "ai_edit", "local_ai_allowed"];
 
 /// `(key, value)` of a line spelled the way Rust writes its own keys, and
 /// None for every other spelling.
@@ -118,20 +166,128 @@ pub(crate) enum Says<'a> {
 /// way isn't Rust's; and a denial wins over a grant. TypeScript's twin is
 /// src/lib/frontmatterKeys.ts `ownedKey`.
 pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: impl Fn(&str) -> bool) -> Says<'a> {
+    // every line, in any spelling (quoted keys decoded); a second line naming
+    // the key, or one holding a character the two YAML parsers could read
+    // differently, decides nothing and so denies
     let mut grant = None;
+    let mut named = false;
     for line in fields {
-        let Some((spelled, value)) = frontmatter_field(line.as_ref()) else { continue };
+        let line = line.as_ref().trim_end_matches('\r');
+        let Some((spelled, value)) = frontmatter_field(line) else { continue };
         if spelled.name != key {
             continue;
         }
-        if !grants(value) {
+        if named || !grants(value) || line.chars().any(undecidable) {
             return Says::Deny;
         }
-        if spelled.canonical && grant.is_none() {
+        named = true;
+        if spelled.canonical {
             grant = Some(value);
         }
     }
-    grant.map_or(Says::Unset, Says::Grant)
+    // and the frontmatter as a YAML parser decodes it (escapes, flow maps):
+    // a decoded value that doesn't grant denies, and a grant needs both to
+    // agree. Frontmatter that won't decode (the organizer writes values
+    // unquoted, people type what they like) says nothing by itself; it denies
+    // only when a line the reader above can't name mentions the key.
+    match decoded_value(fields, key) {
+        Decoded::Value(Some(value)) if !grants(&value) => Says::Deny,
+        Decoded::Value(None) if grant.is_some() => Says::Deny,
+        Decoded::Unreadable if mentioned_unnamed(fields, key) => Says::Deny,
+        _ => grant.map_or(Says::Unset, Says::Grant),
+    }
+}
+
+/// Characters the two YAML parsers (yaml-rust2 here, `yaml` in TypeScript)
+/// could read differently: C0 and C1 controls other than tab and the line
+/// feed between lines, and U+FEFF. A line about a key holding one denies that
+/// key; frontmatter holding one elsewhere isn't decoded.
+fn undecidable(c: char) -> bool {
+    (c < ' ' && c != '\t' && c != '\n') || ('\u{7f}'..='\u{9f}').contains(&c) || c == '\u{feff}'
+}
+
+/// What a YAML parser makes of the frontmatter for one key.
+enum Decoded {
+    /// A single mapping: the key's top-level value as text, None when absent.
+    Value(Option<String>),
+    /// It won't decode, isn't one mapping, repeats a key, holds an
+    /// [`undecidable`] character, or isn't [`affordable`]: the parser says
+    /// nothing.
+    Unreadable,
+}
+
+#[cfg(test)]
+impl Decoded {
+    fn is_readable(&self) -> bool {
+        matches!(self, Decoded::Value(_))
+    }
+}
+
+/// Whether a line the line reader doesn't name as `key` still contains the
+/// key's text (`!!str ai_edit: false`, `{ai_edit: false}`, a value that
+/// mentions it): in frontmatter that won't decode, such a line might be a
+/// denial nobody can read, so it denies.
+fn mentioned_unnamed<S: AsRef<str>>(fields: &[S], key: &str) -> bool {
+    fields.iter().map(AsRef::as_ref).any(|line| line.contains(key) && !names_key(line, key))
+}
+
+/// The most frontmatter the decoder reads, in UTF-8 bytes, and the deepest
+/// nesting it builds; past either it says nothing (the line rules still
+/// apply). TypeScript's twins: `DECODE_MAX_BYTES`, `DECODE_MAX_DEPTH`.
+const DECODE_MAX_BYTES: usize = 64 * 1024;
+const DECODE_MAX_DEPTH: usize = 64;
+
+/// Whether the decoder may build `block` into a tree: within
+/// [`DECODE_MAX_BYTES`], no alias (yaml-rust2 copies an alias's whole target,
+/// so a few hundred bytes of nested aliases expand without bound), and
+/// nesting within [`DECODE_MAX_DEPTH`] (its loader recurses once per level).
+/// Walked event by event and stopped at the first excess, so the check itself
+/// is linear and never recurses.
+fn affordable(block: &str) -> bool {
+    use yaml_rust2::Event;
+    if block.len() > DECODE_MAX_BYTES {
+        return false;
+    }
+    let mut parser = yaml_rust2::parser::Parser::new_from_str(block);
+    let mut depth = 0usize;
+    loop {
+        match parser.next_token() {
+            Err(_) | Ok((Event::Alias(_), _)) => return false,
+            Ok((Event::StreamEnd, _)) => return true,
+            Ok((Event::SequenceStart(..) | Event::MappingStart(..), _)) => {
+                depth += 1;
+                if depth > DECODE_MAX_DEPTH {
+                    return false;
+                }
+            }
+            Ok((Event::SequenceEnd | Event::MappingEnd, _)) => depth = depth.saturating_sub(1),
+            Ok(_) => {}
+        }
+    }
+}
+
+/// The top-level value of `key` once the frontmatter is decoded as YAML, as
+/// text (`true`, `false`, a string, a number). TypeScript's twin:
+/// `decodedValue` in frontmatterKeys.ts.
+fn decoded_value<S: AsRef<str>>(fields: &[S], key: &str) -> Decoded {
+    use yaml_rust2::Yaml;
+    let block = fields.iter().map(|line| line.as_ref().trim_end_matches('\r')).collect::<Vec<_>>().join("\n");
+    if block.chars().any(undecidable) || !affordable(&block) {
+        return Decoded::Unreadable;
+    }
+    let Ok(docs) = yaml_rust2::YamlLoader::load_from_str(&block) else { return Decoded::Unreadable };
+    let map = match docs.first() {
+        None | Some(Yaml::Null) => return Decoded::Value(None),
+        Some(Yaml::Hash(map)) if docs.len() == 1 => map,
+        _ => return Decoded::Unreadable,
+    };
+    Decoded::Value(map.get(&Yaml::String(key.to_string())).map(|value| match value {
+        Yaml::Boolean(flag) => flag.to_string(),
+        Yaml::String(text) | Yaml::Real(text) => text.clone(),
+        Yaml::Integer(number) => number.to_string(),
+        Yaml::Null => String::new(),
+        _ => "\u{0}".to_string(), // a list or a map: grants nothing
+    }))
 }
 
 /// The note's own on-device permission: `Some(true)` only for Rust's
@@ -274,15 +430,88 @@ mod tests {
             assert_eq!(local_ai_allowed(&["local_ai_allowed: true".to_string(), line("local_ai_allowed")]), Some(false), "{spelling}");
             assert_eq!(body_edit(&["created_by: agent".to_string(), line("ai_edit")]), BodyEdit::Revoked, "{spelling}");
         }
+        // a second line naming the creator denies the creator, not AI editing
         assert_eq!(body_edit(&["created_by: agent", "  created_by: someone"]), BodyEdit::PersonWritten);
         assert_eq!(body_edit(&["  created_by: agent"]), BodyEdit::PersonWritten, "a typed creator grants nothing");
         assert_eq!(body_edit(&["  ai_edit: true"]), BodyEdit::PersonWritten, "a typed grant grants nothing");
         assert_eq!(local_ai_allowed(&["  local_ai_allowed: true"]), None, "a typed grant follows the vault");
         assert_eq!(local_ai_allowed(&["local_ai_allowed: true"]), Some(true));
         assert_eq!(body_edit(&["ai_edit: true"]), BodyEdit::Allowed);
-        // values trim with JavaScript's set: U+0085 stays (no grant), U+FEFF goes
+        // a control character or U+FEFF, which two YAML parsers could read
+        // differently, decides nothing: it denies on both sides
         assert_eq!(body_edit(&["ai_edit: \u{85}true"]), BodyEdit::Revoked);
-        assert_eq!(body_edit(&["ai_edit: \u{feff}true"]), BodyEdit::Allowed);
+        assert_eq!(body_edit(&["ai_edit: \u{feff}true"]), BodyEdit::Revoked);
+    }
+
+    /// The organizer writes values unquoted (`summary: <one line>`,
+    /// `links: [[A]], [[B]]`), and people type frontmatter no strict YAML
+    /// parser reads. Frontmatter that won't decode says nothing about a key
+    /// by itself: the note keeps its permissions (the round-5 WIP denied all
+    /// three on such a note, so a filed AI note stopped being editable).
+    #[test]
+    fn a_filed_note_with_an_unquoted_colon_keeps_its_permissions() {
+        use crate::ai_edit_policy::{body_edit, BodyEdit};
+        let filed = ["summary: Plan: phase two", "links: [[Alpha]], [[Beta]]"];
+        let with = |head: &[&str]| head.iter().chain(filed.iter()).map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(body_edit(&with(&["created_by: librarian"])), BodyEdit::Allowed);
+        assert_eq!(body_edit(&with(&["created_by: agent", "ai_edit: true"])), BodyEdit::Allowed);
+        assert_eq!(body_edit(&with(&[])), BodyEdit::PersonWritten, "not revoked: a consented insert still lands");
+        assert_eq!(local_ai_allowed(&with(&["secure: true", "local_ai_allowed: true"])), Some(true));
+        assert_eq!(local_ai_allowed(&with(&["secure: true"])), None, "follows the vault");
+        // a repeated ordinary key, a stray control character, a tab-indented line
+        for extra in ["tags: [a]\ntags: [b]", "summary: pasted\u{85}text", "x: [unclosed", "\tnested: tab"] {
+            let fields: Vec<&str> = ["created_by: agent"].into_iter().chain(extra.split('\n')).collect();
+            assert_eq!(body_edit(&fields), BodyEdit::Allowed, "{extra:?}");
+        }
+    }
+
+    /// The fail-closed cases that remain on frontmatter that won't decode: a
+    /// line about the key itself (a second copy, a control character, a
+    /// spelling the line reader can't name) still denies.
+    #[test]
+    fn undecodable_frontmatter_still_denies_where_a_line_is_about_the_key() {
+        use crate::ai_edit_policy::{body_edit, BodyEdit};
+        assert_eq!(body_edit(&["created_by: agent", "ai_edit: true", "ai_edit: true"]), BodyEdit::Revoked);
+        assert_eq!(body_edit(&["created_by: agent", "summary: a: b", "!!str ai_edit: false"]), BodyEdit::Revoked);
+        assert_eq!(body_edit(&["created_by: agent", "summary: a: b", "\"ai\\u005fedit\": false"]), BodyEdit::Revoked);
+        assert_eq!(local_ai_allowed(&["local_ai_allowed: true", "summary: about local_ai_allowed: x"]), Some(false));
+        assert_eq!(local_ai_allowed(&["local_ai_allowed: \u{feff}true", "summary: a: b"]), Some(false));
+        // a well-formed document still decides: a denial only a YAML parser
+        // sees (a top-level flow map) holds
+        assert_eq!(body_edit(&["{created_by: agent, ai_edit: false}"]), BodyEdit::Revoked);
+    }
+
+    /// The decoder reads untrusted frontmatter (any file in the vault), so it
+    /// never builds what it can't afford: nested aliases (exponential copies
+    /// in yaml-rust2), nesting past 64 levels (its loader recurses), or more
+    /// than 64 KiB. Such frontmatter says nothing, the line rules still decide,
+    /// and a denial only a parser would see still denies through its text.
+    #[test]
+    fn hostile_frontmatter_is_never_built_into_a_tree() {
+        use crate::ai_edit_policy::{body_edit, BodyEdit};
+        let mut laughs = vec!["a: &a [x, x, x, x, x, x, x, x, x]".to_string()];
+        for (at, name) in "bcdefghijk".chars().enumerate() {
+            let prev = "abcdefghijk".chars().nth(at).unwrap();
+            laughs.push(format!("{name}: &{name} [{}]", vec![format!("*{prev}"); 9].join(", ")));
+        }
+        let deep = format!("x: {}{}", "[".repeat(30_000), "]".repeat(30_000));
+        let wide = format!("summary: {}", "x".repeat(70_000));
+        for hostile in [laughs.join("\n"), deep, wide] {
+            let started = std::time::Instant::now();
+            let mut fields: Vec<String> = hostile.split('\n').map(str::to_string).collect();
+            fields.push("created_by: agent".into());
+            assert_eq!(body_edit(&fields), BodyEdit::Allowed);
+            fields.push("{ai_edit: false}".into());
+            assert_eq!(body_edit(&fields), BodyEdit::Revoked);
+            assert!(started.elapsed() < std::time::Duration::from_secs(2), "{:?}", started.elapsed());
+        }
+        // an escaped key in a flow map is a denial only a decoder sees: it
+        // holds at 64 levels of nesting, and at 65 the frontmatter isn't decoded
+        let flow = |lists: usize| [format!("{{\"local\\u005fai_allowed\": false, x: {}{}}}", "[".repeat(lists), "]".repeat(lists))];
+        assert_eq!(local_ai_allowed(&flow(63)), Some(false));
+        assert!(decoded_value(&flow(63), "local_ai_allowed").is_readable());
+        assert_eq!(local_ai_allowed(&flow(64)), None);
+        assert!(!decoded_value(&flow(64), "local_ai_allowed").is_readable());
     }
 
     /// The person's setters clear every spelling of the key they set, so a

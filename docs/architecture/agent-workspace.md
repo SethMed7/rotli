@@ -283,7 +283,11 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   can't be followed: another file put at the path would inherit the id), or
   the whole call is refused. Summaries and log text are one line that passes
   `secret::blocked_for_remote` and names no note the agent can't read by
-  title or alias (spaces collapsed, case aside). `remove` takes only an
+  title or alias, compared folded (NFKC, ß→ss, ς→σ, each character
+  lower-cased alone) at word boundaries (none in scripts written without
+  spaces). An id two files carry (the walk keeps it on one and mints another
+  for the rest; `CorpusStore::ids_held_twice`) is refused on write and hidden
+  on render. `remove` takes only an
   entry the index holds, for a note the agent may still read. Rows parse
   strictly; a row with an unknown field is skipped. `librarian_index_read {logLines?}`
   renders them: an index entry while its note is readable through
@@ -305,11 +309,29 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   and `local_ai_allowed` are decided by `frontmatter_keys.rs` `owned_key`
   (TypeScript: `frontmatterKeys.ts` `ownedKey`, used by `aiEditPolicy.ts` and
   the web vault's reader): a line in any spelling (indented, quoted, a list
-  item, `? key`) whose value isn't a grant denies or restricts; only the
-  spelling Rust writes (`key: value` at the start of a line) grants; a
-  denial wins. Values trim with JavaScript's set on both sides. The raw
-  metadata editor keeps a typed line as the person wrote it, and the
-  person's setters clear every spelling of the key they set. Parity:
+  item, `? key`, a quoted key decoded) whose value isn't a grant denies or
+  restricts, and so does a second line naming the key or one holding a
+  control character or U+FEFF (the two YAML parsers could read those
+  differently). The frontmatter is also decoded with a YAML parser
+  (yaml-rust2 in Rust, `yaml` in TypeScript): where it decodes, a decoded
+  value that doesn't grant denies, and a grant needs the decoded value to
+  agree. Frontmatter that won't decode says nothing by itself, because the
+  organizer writes values unquoted (`summary: Plan: phase two`,
+  `links: [[A]], [[B]]`) and people type what they like; on such
+  frontmatter a line the line reader can't name that still contains the
+  key's text (`!!str ai_edit: false`) denies. The decoder never builds
+  frontmatter over 64 KiB, nested past 64 levels, or holding an alias
+  (yaml-rust2 copies an alias's whole target): such frontmatter counts as
+  not decoding. Only the spelling Rust writes
+  (`key: value` at the start of a line) grants. Values trim with
+  JavaScript's set on both sides. The raw
+  metadata editor keeps a typed line as the person wrote it; every writer of
+  a permission key (`set_ai_edit`, the on-device toggle, secure removal, the
+  in-place writers `with_top_level_line`/`compose_in_place` and their
+  TypeScript twins, Rotli Web's `withField`) removes every spelling of it
+  before writing Rotli's line, and the in-place writers replace any other
+  key in its one-line top-level spellings (`key :`, `"key":`), so a key
+  the person spelled their own way is never repeated. Parity:
   `aiBodyEditCases`, `localAiAllowedCases`. A source test fails on a new
   Rust reader that doesn't use the shared module. Rust's note selectors compare titles and aliases through
   `corpus_links.rs` `link_key`, which trims JavaScript's whitespace set
