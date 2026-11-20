@@ -197,6 +197,21 @@ second user-visible product or storage location.
 - Saved chat updates use the same rule. Creation refuses an existing slug, and
   `secureContext` is a one-way transition inside the same locked write window,
   so concurrent windows cannot erase taint or overwrite a newer transcript.
+- A rewrite never loosens a note's protection by accident (review
+  2026-11-20). The rule is one function per side, `note_protection.rs` and
+  `src/lib/protectionRule.ts`: a write may not turn off `locked`, `secure` or
+  `secureContext`, give the note a `local_ai_allowed` it didn't have, or make
+  an AI body edit allowed that wasn't (`ai_edit`, `created_by`). Each flag is
+  read the same way before and after, so an unchanged line always passes. A
+  chat re-save puts dropped `locked`/`secure`/`secureContext` lines back and
+  refuses a new grant; a Librarian `_index.md` write (generated text, or an
+  undo restoring the bytes it replaced) is refused if it would loosen. The
+  file save lane (`corpus_write_file_bytes`, and the web's
+  `folderWriteFileBytes`) is for sheets, documents and other binaries: it
+  refuses `.md` and `.excalidraw` in any letter case, which save through their
+  own writers. Loosening a flag is the person's act, through the note's own
+  controls (`set_locked`, `set_secure`, the local-AI and AI-edit toggles). The
+  vault format is unchanged, so the contract version does not move.
 - A successful direct chat-note write invalidates the owning `CorpusStore`
   generation before returning. Its initiating webview can therefore read the
   new note immediately instead of waiting for a watcher echo. Watcher delivery

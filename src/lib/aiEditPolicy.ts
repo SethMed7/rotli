@@ -19,7 +19,7 @@ export type NoteCreator = (typeof AI_CREATORS)[number];
 export type AiBodyEdit = "allowed" | "locked" | "person-written" | "revoked";
 
 /** The value of `key: value` when the line's (trimmed) key is `key`. */
-function field(line: string, key: string): string | null {
+export function field(line: string, key: string): string | null {
   const colon = line.indexOf(":");
   if (colon < 0 || line.slice(0, colon).trim() !== key) return null;
   return line.slice(colon + 1).trim();
