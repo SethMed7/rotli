@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.9.4] - 2026-11-19
+### Changed
+
+- **The Tesven theme card describes the calmer Tesven.** Settings → Appearance
+  now reads "Sea mist by day, night swim after dark." in place of the old
+  field-blue wording.
+
+## [1.9.4] - 2026-11-20
 
 ### Added
 
