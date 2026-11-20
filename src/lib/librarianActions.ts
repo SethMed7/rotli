@@ -96,8 +96,15 @@ export function resolveAnchor(
 
 // ── tags ─────────────────────────────────────────────────────────────────────
 
+// a line break or control character would write extra metadata lines through
+// the Filer, `ai_edit: true` among them (review 2026-11-20)
+const LINE_BREAKS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+
 function cleanTag(tag: string): string {
-  return tag.replace(/[,[\]]/g, "").trim();
+  return tag
+    .replace(/[,[\]]/g, "")
+    .replace(LINE_BREAKS, " ")
+    .trim();
 }
 
 /** A model's tag list, cleaned: strings only, no commas or brackets, no

@@ -133,7 +133,11 @@ function flagField(fm: NoteFrontmatter, key: string): boolean {
 /** A foreign `secure: true` line — the note is categorically unavailable to
  * remote models. The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "secure");
+  // Rust's secure_field: only a literal `false` opens the ordinary lane
+  return fm.foreign.some((line) => {
+    const colon = line.indexOf(":");
+    return colon >= 0 && line.slice(0, colon).trim() === "secure" && line.slice(colon + 1).trim() !== "false";
+  });
 }
 
 /** A foreign `locked: true` line — no AI may edit the note, every class reads it. */

@@ -49,8 +49,10 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| ai_edit_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || ai_edit_field(l).is_none());
             fm.foreign.push(format!("ai_edit: {allowed}"));
+            let says = crate::frontmatter_keys::owned_key(&fm.foreign, "ai_edit", |v| v == "true");
+            super::took(matches!(says, crate::frontmatter_keys::Says::Grant(_)) == allowed, "ai_edit")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })

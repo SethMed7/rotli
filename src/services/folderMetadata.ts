@@ -8,8 +8,9 @@ import {
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
-import { frontmatterField } from "../lib/frontmatterKeys";
+import { frontmatterField, localAiAllowedOverride, ownedKey } from "../lib/frontmatterKeys";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import { requireOwnedNotLooser } from "../lib/protectionRule";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -31,8 +32,10 @@ const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
 const withField = (fm: NoteFrontmatter, key: string, value: string | null): NoteFrontmatter => ({
   ...fm,
   foreign: [
-    // every spelling of the key goes, so a typed denial never outlives the person's setting
-    ...fm.foreign.filter((line) => frontmatterField(line)?.key.name !== key),
+    // every top-level spelling of the key goes, so a typed denial never
+    // outlives the person's setting; an indented line belongs to a block
+    // scalar or a nested map, which a setter never touches (review 2026-11-20)
+    ...fm.foreign.filter((line) => /^[ \t]/.test(line) || frontmatterField(line)?.key.name !== key),
     ...(value === null ? [] : [`${key}: ${value}`]),
   ],
 });
@@ -131,6 +134,16 @@ export async function setFolderProtection(
     }
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
+  // another line that still decides the key (an indented one) means the
+  // setting can't take: say so rather than report it done
+  const took =
+    key === "ai_edit"
+      ? (ownedKey(fm.foreign, "ai_edit", (v) => v === "true").says === "grant") === allowed
+      : key !== "local_ai_allowed" || localAiAllowedOverride(fm.foreign) === allowed;
+  if (!took)
+    throw new Error(
+      `another \`${key}:\` line in this note's metadata still decides it; change it in Show file metadata`,
+    );
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
@@ -163,6 +176,7 @@ export async function writeFolderRawMetadata(
     throw new Error("revision conflict: note changed after metadata was opened");
   const next = mergeRawFrontmatter(opened.contents, block);
   if (next === opened.contents) return opened.revision;
+  requireOwnedNotLooser(opened.contents, next);
   const was = parseNoteDocument(opened.contents).frontmatter;
   const after = parseNoteDocument(next).frontmatter;
   const beforeSecure = !!was && isSecureFrontmatter(was);

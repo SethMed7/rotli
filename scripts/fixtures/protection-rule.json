@@ -1,5 +1,5 @@
 {
-  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case.",
+  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case. AI body edits rank revoked < person-written < allowed, read without the `locked` line (locked is its own flag).",
   "cases": [
     {
       "name": "dropping the block drops every flag",
@@ -104,6 +104,38 @@
       "old": "---\nlocked: no\n---\n",
       "new": "---\n---\n",
       "loosened": []
+    },
+    {
+      "name": "dropping ai_edit: false on a person's note is loosening (revoked is stricter than person-written)",
+      "old": "---\nai_edit: false\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "ai_edit"
+      ]
+    },
+    {
+      "name": "a quoted denial counts as a denial",
+      "old": "---\ncreated_by: agent\n\"ai_edit\": false\n---\n",
+      "new": "---\ncreated_by: agent\n---\n",
+      "loosened": [
+        "ai_edit"
+      ]
+    },
+    {
+      "name": "unlocking reports locked alone",
+      "old": "---\nlocked: true\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "locked"
+      ]
+    },
+    {
+      "name": "secure: \"true\" is secure",
+      "old": "---\nsecure: \"true\"\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "secure"
+      ]
     }
   ],
   "notePaths": [

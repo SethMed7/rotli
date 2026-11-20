@@ -15,8 +15,20 @@ pub(crate) struct Protection {
     pub(crate) secure_context: bool,
     /// `local_ai_allowed`: 0 denied, 1 follows the vault, 2 granted.
     local_ai: u8,
-    /// Who may edit the body (`locked`, `ai_edit`, `created_by` decide).
-    body_edit: BodyEdit,
+    /// Who may edit the body, by `ai_edit` and `created_by` alone (`locked`
+    /// is its own flag above): 0 revoked, 1 person-written, 2 allowed. A
+    /// revoked note is stricter than a person's: their consent to one `/ai`
+    /// insertion never overrides a deliberate "no".
+    body_edit: u8,
+}
+
+fn body_rank(foreign: &[String]) -> u8 {
+    let unlocked: Vec<&String> = foreign.iter().filter(|l| locked_field(l).is_none()).collect();
+    match body_edit(&unlocked) {
+        BodyEdit::Revoked | BodyEdit::Locked => 0,
+        BodyEdit::PersonWritten => 1,
+        BodyEdit::Allowed => 2,
+    }
 }
 
 pub(crate) fn protection(text: &str) -> Protection {
@@ -31,7 +43,7 @@ pub(crate) fn protection(text: &str) -> Protection {
             None => 1,
             Some(true) => 2,
         },
-        body_edit: body_edit(foreign),
+        body_edit: body_rank(foreign),
     }
 }
 
@@ -51,7 +63,7 @@ pub(crate) fn loosened(old: &str, new: &str) -> Vec<&'static str> {
     if b.local_ai > a.local_ai {
         out.push("local_ai_allowed");
     }
-    if b.body_edit == BodyEdit::Allowed && a.body_edit != BodyEdit::Allowed {
+    if b.body_edit > a.body_edit {
         out.push("ai_edit");
     }
     out
@@ -68,6 +80,35 @@ pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
         "refused: this write would remove the note's protection ({}); change it from the note's own controls",
         keys.join(", ")
     ))
+}
+
+/// The keys a person can't loosen from the raw metadata editor either: the
+/// ones only Rust writes, and the one-way chat taint. `locked` and `secure`
+/// are the person's to type there (review 2026-11-20: a quoted
+/// `"ai_edit": false` was dropped by the raw save).
+pub(crate) fn require_owned_not_looser(old: &str, new: &str) -> Result<(), String> {
+    let keys: Vec<&str> = loosened(old, new).into_iter().filter(|k| !matches!(*k, "locked" | "secure")).collect();
+    if keys.is_empty() {
+        return Ok(());
+    }
+    Err(format!("refused: this would remove the note's {} setting; use the note's own controls", keys.join(", ")))
+}
+
+/// A frontmatter key or value must stay on its one line: a line break (CR,
+/// LF, U+0085, U+2028, U+2029) or other control character in it would write
+/// extra metadata lines, `ai_edit: true` among them (review 2026-11-20: a
+/// model's tag reached the Filer that way).
+pub(crate) fn refuse_line_breaks(text: &str) -> Result<(), String> {
+    if text.chars().any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}')) {
+        return Err("refused: a metadata field can't hold a line break or control character".into());
+    }
+    Ok(())
+}
+
+/// A frontmatter line a setter may replace: a top-level one. An indented line
+/// belongs to a block scalar or a nested map, which no setter touches.
+pub(crate) fn top_level(line: &str) -> bool {
+    !line.starts_with([' ', '\t'])
 }
 
 /// One protection a rewrite may have lost: did it (`had`, `now`), and the
@@ -87,7 +128,7 @@ pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &s
         (|had, now| had.locked && !now.locked, "locked", "true"),
         (|had, now| had.local_ai == 0 && now.local_ai != 0, "local_ai_allowed", "false"),
         (
-            |had, now| had.body_edit == BodyEdit::Revoked && now.body_edit == BodyEdit::Allowed,
+            |had, now| had.body_edit == 0 && now.body_edit > 0,
             "ai_edit",
             "false",
         ),

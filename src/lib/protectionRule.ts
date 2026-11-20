@@ -15,9 +15,14 @@ export interface Protection {
   secureContext: boolean;
   /** `local_ai_allowed`: 0 denied, 1 follows the vault, 2 granted. */
   localAi: 0 | 1 | 2;
-  /** Who may edit the body (`locked`, `ai_edit`, `created_by` decide). */
-  bodyEdit: AiBodyEdit;
+  /** Who may edit the body, by `ai_edit` and `created_by` alone (`locked` is
+   * its own flag): 0 revoked, 1 person-written, 2 allowed. Revoked is stricter
+   * than a person's note: consent to one `/ai` insertion never overrides a
+   * deliberate "no". */
+  bodyEdit: 0 | 1 | 2;
 }
+
+const BODY_RANK: Record<AiBodyEdit, 0 | 1 | 2> = { revoked: 0, locked: 0, "person-written": 1, allowed: 2 };
 
 export function protection(text: string): Protection {
   const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
@@ -31,7 +36,7 @@ export function protection(text: string): Protection {
     }),
     secureContext: protectionMark(text, "secureContext"),
     localAi: local === false ? 0 : local === null ? 1 : 2,
-    bodyEdit: bodyEdit(foreign),
+    bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => field(line, "locked") === null))],
   };
 }
 
@@ -44,7 +49,7 @@ export function loosened(old: string, next: string): string[] {
   if (a.secure && !b.secure) out.push("secure");
   if (a.secureContext && !b.secureContext) out.push("secureContext");
   if (b.localAi > a.localAi) out.push("local_ai_allowed");
-  if (b.bodyEdit === "allowed" && a.bodyEdit !== "allowed") out.push("ai_edit");
+  if (b.bodyEdit > a.bodyEdit) out.push("ai_edit");
   return out;
 }
 
@@ -54,6 +59,17 @@ export function requireNotLooser(old: string, next: string): void {
   if (keys.length)
     throw new Error(
       `refused: this write would remove the note's protection (${keys.join(", ")}); change it from the note's own controls`,
+    );
+}
+
+/** Throw when `next` loosens a key the raw metadata editor may not: the ones
+ * only Rust writes and the one-way chat taint (`locked` and `secure` are the
+ * person's to type there). Rust's require_owned_not_looser. */
+export function requireOwnedNotLooser(old: string, next: string): void {
+  const keys = loosened(old, next).filter((key) => key !== "locked" && key !== "secure");
+  if (keys.length)
+    throw new Error(
+      `refused: this would remove the note's ${keys.join(", ")} setting; use the note's own controls`,
     );
 }
 
@@ -74,7 +90,7 @@ const RESTORES: [(had: Protection, now: Protection) => boolean, string, string][
   [(had, now) => had.secure && !now.secure, "secure", "true"],
   [(had, now) => had.locked && !now.locked, "locked", "true"],
   [(had, now) => had.localAi === 0 && now.localAi !== 0, "local_ai_allowed", "false"],
-  [(had, now) => had.bodyEdit === "revoked" && now.bodyEdit === "allowed", "ai_edit", "false"],
+  [(had, now) => had.bodyEdit === 0 && now.bodyEdit > 0, "ai_edit", "false"],
 ];
 
 /** `next` with every protection `old` had put back, flags and denials: what

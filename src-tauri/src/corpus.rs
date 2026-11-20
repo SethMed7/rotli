@@ -2339,6 +2339,13 @@ fn atomic_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
 /// `unwrap_or_default` here once let an unreadable note read as "blank" — and
 /// blank is exactly what discard destroys and what a rewrite starts from
 /// (audit 2026-07-29: fail-open reads).
+/// A setter's honest answer when another line still decides the key (an
+/// indented one in a nested map, which setters never touch): nothing is
+/// written and the person is told why (review 2026-11-20).
+pub(crate) fn took(took: bool, key: &str) -> Result<(), String> {
+    took.then_some(()).ok_or_else(|| format!("another `{key}:` line in this note's metadata still decides it; change it in Show file metadata"))
+}
+
 fn read_existing_text(path: &Path) -> Result<String, String> {
     match crate::fsutil::read_own_text(path) {
         Ok(text) => Ok(text),
@@ -3241,6 +3248,11 @@ impl CorpusStore {
         if key.is_empty() {
             return Err("a field needs a name".into());
         }
+        crate::note_protection::refuse_line_breaks(&format!("{key}{value}"))?;
+        let name = crate::frontmatter_keys::frontmatter_field(&format!("{key}:")).map(|(k, _)| k.name);
+        if let Some(key) = name.as_deref().filter(|n| RESERVED_KEYS.contains(n) || AI_KEYS.contains(n)) {
+            return Err(format!("`{key}` is managed by rotli, not editable here"));
+        }
         if RESERVED_KEYS.contains(&key) {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
@@ -3256,13 +3268,15 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
+            let out = self.compose_for(&text, &fm, body);
+            crate::note_protection::require_not_looser(&text, &out)?;
             self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3315,6 +3329,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
+            crate::note_protection::require_owned_not_looser(&text, &out)?;
             if out == text {
                 return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
             }
@@ -3596,7 +3611,7 @@ impl CorpusStore {
             if !secure {
                 return Err("Local AI access is only meaningful for a secure note".into());
             }
-            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || local_ai_allowed_field(l).is_none());
             // pin the classification either way: a detector-secure note that now
             // carries an explicit access decision must carry the flag it decides on
             if !explicitly_secure {
@@ -3604,6 +3619,7 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            took(crate::frontmatter_keys::local_ai_allowed(&fm.foreign) == Some(allowed), "local_ai_allowed")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
@@ -5391,6 +5407,7 @@ impl CorpusStore {
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
         }
+        crate::note_protection::refuse_line_breaks(value)?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
@@ -5398,13 +5415,15 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
+            let out = self.compose_for(&text, &fm, body);
+            crate::note_protection::require_not_looser(&text, &out)?;
             self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
