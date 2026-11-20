@@ -7,6 +7,7 @@
 import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
 import { frontmatterBlock } from "../lib/frontmatterBlock";
+import { keepProtection, requireNotLooser } from "../lib/protectionRule";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { lastReplyMs } from "../memex/chatRecency";
@@ -103,14 +104,16 @@ export class WebChatStore implements ChatStore {
   /** Rust's contract: a new chat presents no revision and refuses to overwrite. */
   async write(slug: string, contents: string, expectedRevision: string | null): Promise<string> {
     let expected = expectedRevision;
+    const existing = await this.vault.readVersioned(chatKey(slug));
     if (expected === null) {
-      const existing = await this.vault.readVersioned(chatKey(slug));
       if (existing.contents) throw new Error(`a chat named "${slug}" already exists`);
       // a removed chat's key is gone (see remove), so a fresh slug starts at "0"
       expected = existing.revision;
     }
+    // a stale read is caught by the revision gate below, so this text is the one replaced
+    const next = guardedChatText(existing.revision === expected ? existing.contents : "", contents);
     try {
-      await this.vault.writeVersioned(chatKey(slug), contents, expected);
+      await this.vault.writeVersioned(chatKey(slug), next, expected);
     } catch (reason) {
       if (reason instanceof RevisionConflict)
         throw new Error("This chat changed in another tab — reopen it.");
@@ -153,6 +156,14 @@ export interface ChatStore {
   remove(slug: string, bin: "trash" | "archive"): Promise<void>;
   folders(): Promise<{ contents: string; revision: string }>;
   writeFolders(contents: string, expectedRevision: string): Promise<string>;
+}
+
+/** A chat rewrite keeps every protection the transcript had and may only
+ * tighten it (review 2026-11-20): Rust's write_chat_at does the same. */
+function guardedChatText(existing: string, contents: string): string {
+  const next = keepProtection(existing, contents);
+  requireNotLooser(existing, next);
+  return next;
 }
 
 const CHATS_DIR = "chats";
@@ -235,7 +246,8 @@ export class FolderChatStore implements ChatStore {
     } else if (current !== expectedRevision) {
       throw new Error("This chat changed on disk — reopen it.");
     }
-    await this.dir.writeText(path, contents);
+    const existing = current === "0" ? "" : await this.dir.readText(path);
+    await this.dir.writeText(path, guardedChatText(existing, contents));
     return path;
   }
 

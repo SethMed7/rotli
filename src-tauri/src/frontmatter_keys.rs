@@ -335,6 +335,6 @@ mod tests {
             }
         }
         readers.sort();
-        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
+        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_in_place.rs", "note_protection.rs"], "a new reader of a key only Rust writes: check it, then add it here");
     }
 }

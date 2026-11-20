@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
+import { loosened, protection } from "../lib/protectionRule";
 import { appendMessages, composeNewChat } from "../memex/contract";
 import { MemoryVaultDir } from "./vaultDir";
-import { FolderChatStore, createWebChatStore, webMemexBridge } from "./webChats";
+import { type ChatStore, FolderChatStore, createWebChatStore, webMemexBridge } from "./webChats";
 
 const DATE = "2026-09-16";
 
@@ -212,4 +213,47 @@ test("frontmatter-shaped text in a chat body remains body text", async () => {
   await dir.writeText("chats/body-only.md", "# Body\r\n\r\ntitle: Not metadata\r\npinned: true\r\n");
   const [listed] = await new FolderChatStore(dir).list();
   expect(listed).toMatchObject({ title: "body-only", pinned: false });
+});
+
+describe("a chat re-save keeps its protection (review 2026-11-20)", () => {
+  const PROTECTED =
+    "---\ntitle: Guarded\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nfirst turn\n";
+  const DROPPED = "---\ntitle: Web transcript\n---\n\nyou: hello\n\nrotli: a reply\n";
+
+  const stores: [string, () => ChatStore][] = [
+    ["browser", () => createWebChatStore(new MemoryVaultStore())],
+    ["folder", () => new FolderChatStore(new MemoryVaultDir())],
+  ];
+
+  for (const [name, make] of stores) {
+    test(`${name}: locked, secure and secureContext survive a rewrite that drops them`, async () => {
+      const store = make();
+      await store.write("web-transcript", PROTECTED, null);
+      const opened = await store.read("web-transcript");
+      await store.write("web-transcript", DROPPED, opened.revision);
+      const saved = (await store.read("web-transcript")).contents;
+      expect(protection(saved)).toMatchObject({ locked: true, secure: true, secureContext: true });
+      expect(saved).toContain("rotli: a reply");
+    });
+
+    test(`${name}: a rewrite keeps its denials and cannot grant itself AI access`, async () => {
+      const store = make();
+      const denied =
+        "---\ntitle: No local\ncreated_by: chat\nai_edit: false\nlocal_ai_allowed: false\n---\n\nyou: hi\n";
+      await store.write("no-local", denied, null);
+      let opened = await store.read("no-local");
+      await store.write(
+        "no-local",
+        "---\ntitle: No local\ncreated_by: chat\n---\n\nyou: hi\n",
+        opened.revision,
+      );
+      expect(loosened(denied, (await store.read("no-local")).contents)).toEqual([]);
+
+      await store.write("granting", "---\ntitle: Granting\n---\n", null);
+      opened = await store.read("granting");
+      await expect(
+        store.write("granting", "---\nlocal_ai_allowed: true\n---\n", opened.revision),
+      ).rejects.toThrow(/local_ai_allowed/);
+    });
+  }
 });

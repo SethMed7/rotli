@@ -2872,6 +2872,7 @@ impl CorpusStore {
     /// content, so the exact pre-Rotli package remains recoverable.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         self.guard_rel(rel)?;
         // the contract gate — unless this is the sanctioned in-place edit of an
         // existing storage office file, which the note lanes
@@ -2916,6 +2917,7 @@ impl CorpusStore {
         expected_revision: &str,
     ) -> Result<String, String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         let abs = self.guard_rel(rel)?;
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
@@ -5427,6 +5429,12 @@ impl CorpusStore {
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
             self.filer_writable(&rel)?;
+            // the generated overview carries no frontmatter, but an undo puts
+            // back whatever was on disk, and an empty body deletes the file;
+            // either way it may only tighten what the person set on it
+            // (review 2026-11-20)
+            let current = read_existing_text(&path)?;
+            crate::note_protection::require_not_looser(&current, body)?;
             if body.is_empty() {
                 self.suppress.mark(&path);
                 if path.exists() {
@@ -8894,6 +8902,10 @@ mod write_race_tests;
 #[cfg(test)]
 #[path = "corpus_save_lock_tests.rs"]
 mod save_lock_tests;
+
+#[cfg(test)]
+#[path = "corpus_note_guard_tests.rs"]
+mod note_guard_tests;
 
 #[cfg(test)]
 mod tests {

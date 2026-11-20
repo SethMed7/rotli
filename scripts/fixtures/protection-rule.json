@@ -1,0 +1,135 @@
+{
+  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case.",
+  "cases": [
+    {
+      "name": "dropping the block drops every flag",
+      "old": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "new": "---\n---\n\nbody\n",
+      "loosened": [
+        "locked",
+        "secure",
+        "secureContext"
+      ]
+    },
+    {
+      "name": "a body-only rewrite drops every flag",
+      "old": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "new": "body only\n",
+      "loosened": [
+        "locked",
+        "secure",
+        "secureContext"
+      ]
+    },
+    {
+      "name": "locked: false unlocks",
+      "old": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "new": "---\nlocked: false\nsecure: true\nsecureContext: true\n---\n",
+      "loosened": [
+        "locked"
+      ]
+    },
+    {
+      "name": "an unchanged note passes",
+      "old": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "new": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "loosened": []
+    },
+    {
+      "name": "adding protection passes",
+      "old": "plain\n",
+      "new": "---\nlocked: true\nsecure: true\nsecureContext: true\n---\n\nbody\n",
+      "loosened": []
+    },
+    {
+      "name": "a new plain note passes",
+      "old": "",
+      "new": "# new note\n",
+      "loosened": []
+    },
+    {
+      "name": "revoking AI access passes",
+      "old": "---\ncreated_by: agent\n---\n",
+      "new": "---\nai_edit: false\nlocal_ai_allowed: false\n---\n",
+      "loosened": []
+    },
+    {
+      "name": "a new note may not claim an AI creator",
+      "old": "",
+      "new": "---\ncreated_by: librarian\n---\n",
+      "loosened": [
+        "ai_edit"
+      ]
+    },
+    {
+      "name": "dropping ai_edit: false re-opens an AI-made note",
+      "old": "---\ncreated_by: agent\nai_edit: false\n---\n",
+      "new": "---\ncreated_by: agent\n---\n",
+      "loosened": [
+        "ai_edit"
+      ]
+    },
+    {
+      "name": "dropping a local-AI denial",
+      "old": "---\nlocal_ai_allowed: false\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "local_ai_allowed"
+      ]
+    },
+    {
+      "name": "granting local AI",
+      "old": "x",
+      "new": "---\nlocal_ai_allowed: true\n---\n",
+      "loosened": [
+        "local_ai_allowed"
+      ]
+    },
+    {
+      "name": "secure fails closed: yes stays secure",
+      "old": "---\nsecure: yes\n---\n",
+      "new": "---\nsecure: yes\n---\n",
+      "loosened": []
+    },
+    {
+      "name": "secure fails closed: yes to false loosens",
+      "old": "---\nsecure: yes\n---\n",
+      "new": "---\nsecure: false\n---\n",
+      "loosened": [
+        "secure"
+      ]
+    },
+    {
+      "name": "locked: no is not locked",
+      "old": "---\nlocked: no\n---\n",
+      "new": "---\n---\n",
+      "loosened": []
+    }
+  ],
+  "notePaths": [
+    {
+      "path": "a/b.md",
+      "note": true
+    },
+    {
+      "path": "a/B.MD",
+      "note": true
+    },
+    {
+      "path": "x.Excalidraw",
+      "note": true
+    },
+    {
+      "path": "x.xlsx",
+      "note": false
+    },
+    {
+      "path": "x.canvas",
+      "note": false
+    },
+    {
+      "path": "notes.md.bak",
+      "note": false
+    }
+  ]
+}

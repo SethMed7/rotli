@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Saving a chat or a spreadsheet can no longer unlock or unprotect a
+  note.** Some saves replaced a note's whole text and quietly dropped its
+  Locked or Secure setting, or a chat's mark that it holds secure content.
+  A chat save now keeps those settings, the spreadsheet save refuses to write
+  over a note or a board, and the Librarian's area overviews can't remove a
+  setting you put on them. Turning a protection off still works from the
+  note's own controls.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial
