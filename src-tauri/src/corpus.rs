@@ -3148,7 +3148,7 @@ impl CorpusStore {
                 fm.foreign.push("locked: true".to_string());
             }
             let out = self.compose_for(&text, &fm, body);
-            crate::frontmatter_keys::keeps_promise(&out, |fields| fields.iter().any(|l| locked_field(l) == Some(true)) == locked)?;
+            crate::frontmatter_keys::keeps(&text, &out, &["locked"], |fields| fields.iter().any(|l| locked_field(l) == Some(true)) == locked)?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &out)
         })
@@ -3320,11 +3320,13 @@ impl CorpusStore {
             // 2026-10-13): no move, so no id to key one by, and no Rotli fields
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
+            let out = with_secure_line_only(&text, secure);
+            crate::frontmatter_keys::keeps(&text, &out, &["secure", "local_ai_allowed"], |fields| fields.iter().any(|l| secure_field(l) == Some(true)) == secure)?;
             if secure {
                 self.gitignore_add(rel)?;
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            atomic_write(&path, &out)?;
             if !secure {
                 self.gitignore_remove(rel)?;
             }
@@ -3344,21 +3346,18 @@ impl CorpusStore {
             current_folder == secure_home || current_folder.starts_with(&format!("{secure_home}/"));
 
         if secure {
-            if !in_secure_home
-                && !fm
-                    .foreign
-                    .iter()
-                    .any(|line| secure_origin_field(line).is_some())
-            {
+            if !in_secure_home && !fm.foreign.iter().any(|line| secure_origin_field(line).is_some()) {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
             crate::frontmatter_keys::remove_key(&mut fm.foreign, "secure");
             fm.foreign.push("secure: true".to_string());
+            let out = compose_document(&fm, body);
+            crate::frontmatter_keys::keeps(&text, &out, &["secure"], |fields| fields.iter().any(|l| secure_field(l) == Some(true)))?;
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
             self.gitignore_add(rel)?;
             self.suppress.mark(&path);
-            atomic_write(&path, &compose_document(&fm, body))?;
+            atomic_write(&path, &out)?;
             if !in_secure_home {
                 return self.relocate(&note_id, rel, secure_home).map(Some);
             }
@@ -3388,7 +3387,7 @@ impl CorpusStore {
             crate::frontmatter_keys::remove_key(&mut final_fm.foreign, key);
         }
         let out = compose_document(&final_fm, final_body);
-        crate::frontmatter_keys::keeps_promise(&out, |fields| !fields.iter().any(|l| secure_field(l) == Some(true)))?;
+        crate::frontmatter_keys::keeps(&final_text, &out, &["secure", "local_ai_allowed"], |fields| !fields.iter().any(|l| secure_field(l) == Some(true)))?;
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &out)?;
         self.gitignore_remove(&final_rel)?;
@@ -3546,7 +3545,7 @@ impl CorpusStore {
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
             let out = self.compose_for(&text, &fm, body);
-            crate::frontmatter_keys::keeps_promise(&out, |fields| crate::frontmatter_keys::local_ai_allowed(fields) == Some(allowed))?;
+            crate::frontmatter_keys::keeps(&text, &out, &["local_ai_allowed", "secure"], |fields| crate::frontmatter_keys::local_ai_allowed(fields) == Some(allowed))?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &out)
         })
@@ -5360,8 +5359,10 @@ impl CorpusStore {
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             crate::frontmatter_keys::put_field(&mut fm.foreign, key, key, value);
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::keeps_other_verdicts(&text, &out, &[])?;
             self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 

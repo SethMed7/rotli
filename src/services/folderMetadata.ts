@@ -1,5 +1,6 @@
 // The web twin of the corpus protection and raw-metadata commands.
 import { looksSecret } from "../ai/guard";
+import { AI_CREATORS } from "../lib/aiEditPolicy";
 import {
   composeNoteDocument,
   emptyFrontmatter,
@@ -11,7 +12,7 @@ import {
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { localAiAllowedOverride, ownedKey } from "../lib/frontmatterKeys";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
-import { keepPromise, removeKey } from "../lib/frontmatterWrites";
+import { keepOtherVerdicts, keepPromise, removeKey } from "../lib/frontmatterWrites";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -40,13 +41,31 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
   ],
 });
 
-/** What a protection or permission setting reads as in a written note. */
-function settingOf(text: string, key: "locked" | "ai_edit" | "secure" | "local_ai_allowed"): string {
+/** How each setting a note's metadata decides reads in a written note. */
+function settingsOf(text: string): Record<string, string> {
   const fm = parseNoteDocument(text).frontmatter ?? emptyFrontmatter();
-  if (key === "locked") return String(isLockedFrontmatter(fm));
-  if (key === "secure") return String(isSecureFrontmatter(fm));
-  if (key === "local_ai_allowed") return String(localAiAllowedOverride(fm.foreign));
-  return ownedKey(fm.foreign, "ai_edit", (value) => value === "true").says;
+  return {
+    created_by: ownedKey(fm.foreign, "created_by", (value) =>
+      (AI_CREATORS as readonly string[]).includes(value),
+    ).says,
+    ai_edit: ownedKey(fm.foreign, "ai_edit", (value) => value === "true").says,
+    local_ai_allowed: String(localAiAllowedOverride(fm.foreign)),
+    locked: String(isLockedFrontmatter(fm)),
+    secure: String(isSecureFrontmatter(fm)),
+  };
+}
+
+/** A protection or permission write checked both ways: it says what it
+ * promised, and no setting outside `owned` reads differently. */
+function keepWrite(
+  before: string,
+  after: string,
+  owned: readonly string[],
+  key: string,
+  promised: string,
+): void {
+  keepPromise(settingsOf(after)[key] === promised);
+  keepOtherVerdicts(before, after, owned, settingsOf);
 }
 
 function assertSecureRemoval(body: string): void {
@@ -67,7 +86,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
     const written = withSecureLineOnly(opened.contents, secure);
-    keepPromise(settingOf(written, "secure") === String(secure));
+    keepWrite(opened.contents, written, ["secure", "local_ai_allowed"], "secure", String(secure));
     if (secure) await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, written, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
@@ -80,6 +99,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
     fm = withField(fm, "secure", "true");
+    keepWrite(opened.contents, composeNoteDocument(fm, body), ["secure"], "secure", "true");
     await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
   }
@@ -114,7 +134,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     for (const key of ["secure", "local_ai_allowed", "secure_origin"])
       cleared = withField(cleared, key, null);
     const written = composeNoteDocument(cleared, parsed.body);
-    keepPromise(settingOf(written, "secure") === "false");
+    keepWrite(final.contents, written, ["secure", "local_ai_allowed"], "secure", "false");
     await writeVersionedFile(dir, target, written, final.revision);
     await updateGitExclusions(dir, [], [target]);
   }
@@ -150,7 +170,14 @@ export async function setFolderProtection(
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
-  keepPromise(settingOf(text, key) === (key === "ai_edit" ? (allowed ? "grant" : "deny") : String(allowed)));
+  const owned = key === "local_ai_allowed" ? [key, "secure"] : [key];
+  keepWrite(
+    opened.contents,
+    text,
+    owned,
+    key,
+    key === "ai_edit" ? (allowed ? "grant" : "deny") : String(allowed),
+  );
   await writeVersionedFile(dir, path, text, opened.revision);
 }
 

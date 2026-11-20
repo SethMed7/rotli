@@ -180,3 +180,50 @@ fn a_key_spelled_with_a_space_before_its_colon_is_replaced_in_place() {
     let out = super::in_place::with_top_level_line("---\ndate created : 2020\n---\nWords.\n", "date created", Some("2021"));
     assert_eq!(out, "---\ndate created: 2021\n---\nWords.\n");
 }
+
+/// Codex review of PR #303, second round: a write never changes how a
+/// setting it doesn't own reads. Each case below erased a denial before.
+#[test]
+fn a_write_never_changes_a_setting_it_does_not_own() {
+    for (_dir, mut store) in both_kinds() {
+        for (frontmatter, write) in [
+            ("created_by: agent\nexample: |\n  ai_edit: false\n", "field"),
+            ("ai_edit: false\n  locked: true\n", "ai_edit"),
+            ("created_by: agent\nsecure: true\n{s: 1, \"local\\u005fai_allowed\": false}\n", "flow"),
+        ] {
+            let rel = note(&mut store, &format!("id: 01PLANNOTE\n{frontmatter}"));
+            let before = disk(&store, &rel);
+            let wrote = match write {
+                "field" => store.set_field(&rel, "example", "x"),
+                "ai_edit" => store.set_ai_edit(&rel, true),
+                _ => store.set_field(&rel, "{s", "x}"),
+            };
+            assert!(wrote.is_err(), "adopted={} {frontmatter:?}", store.adopted);
+            assert_eq!(disk(&store, &rel), before, "adopted={} {frontmatter:?}", store.adopted);
+        }
+    }
+    // the filer's field write too
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().join("brain");
+    super::tests::seed_memex(&root);
+    fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+    let text = "---\nid: 01JFILERSPANULID0000000000\ncreated_by: agent\ntags:\n  ai_edit: false\n---\n# Plan\n";
+    fs::write(root.join("wiki/_inbox/plan.md"), text).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    store.os_trash = false;
+    store.list().unwrap();
+    assert!(store.set_ai_field("01JFILERSPANULID0000000000", "tags", "[a]").is_err());
+    assert_eq!(fs::read_to_string(root.join("wiki/_inbox/plan.md")).unwrap(), text);
+}
+
+/// Turning secure off clears a quoted `"secure": true` too, in a folder
+/// opened in place (the reader counts that spelling, so the writer must).
+#[test]
+fn turning_secure_off_clears_a_quoted_secure_line_in_place() {
+    let place = TempDir::new().unwrap();
+    let mut store = opened_in_place(&place);
+    let rel = note(&mut store, "id: obs-plan\n\"secure\": true\ntags: [plan]\n");
+    store.set_secure(&rel, false).unwrap();
+    let foreign = parse_document(&disk(&store, &rel)).0.unwrap_or_default().foreign;
+    assert_eq!(foreign, ["tags: [plan]"]);
+}

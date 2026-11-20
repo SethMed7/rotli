@@ -109,7 +109,9 @@ const withoutCr = (line: string) => line.replace(/\r$/, "");
  * `blank_plain_value`). */
 function blankPlainValue(line: string): string {
   const field = frontmatterField(line);
-  return field?.key.canonical && !(PERMISSION_KEYS as readonly string[]).includes(field.key.name)
+  return field?.key.canonical &&
+    /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(field.key.name) &&
+    !(PERMISSION_KEYS as readonly string[]).includes(field.key.name)
     ? `${field.key.name}:`
     : line;
 }

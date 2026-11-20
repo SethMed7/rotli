@@ -333,7 +333,9 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `remove_key` (`frontmatterWrites.ts` `removeKey`): its line, the lines
   under it, a `? key`'s `: value` line, never text inside a block scalar;
   and refuses, writing nothing, when the result wouldn't say what it
-  promised (`keeps_promise`). In a folder opened in place,
+  promised or would change how any setting it doesn't own reads
+  (`keeps`, `keeps_other_verdicts`; Rotli Web's `keepWrite`), the generic
+  and filer field writes included. In a folder opened in place,
   `compose_in_place` (`composeInPlace`) copies the action's own lines for a
   changed key verbatim, never a line built from a decoded value, and the
   generic setters (`set_field`, the filer's `set_ai_field`) check the key

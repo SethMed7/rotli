@@ -1135,7 +1135,7 @@ fn write_note_at_with_suppress(
         .is_some_and(|(frontmatter, _)| {
             frontmatter
                 .lines()
-                .any(|line| line.trim() == "secure: true")
+                .any(|line| crate::corpus::secure_field(line) == Some(true))
         });
     let librarian_enabled = secure || librarian_enabled_at(root)?;
     let lane = if secure {

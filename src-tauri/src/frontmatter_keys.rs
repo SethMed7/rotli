@@ -115,7 +115,7 @@ fn quoted_end(rest: &str, quote: char) -> Option<usize> {
 mod yaml;
 #[path = "frontmatter_writes.rs"]
 mod writes;
-pub(crate) use writes::{field_name, keeps_promise, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
+pub(crate) use writes::{field_name, keeps, keeps_other_verdicts, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
 use yaml::{decoded_value, undecidable, Decoded};
 
 /// Whether a frontmatter line names `key` in any spelling, quoted keys

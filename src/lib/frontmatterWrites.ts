@@ -119,10 +119,23 @@ export function removeKey(lines: readonly string[], key: string): { lines: strin
   }
 }
 
+const UNSAFE =
+  "Rotli couldn't change this safely: the note's metadata has a line for a setting that Rotli can't read or won't remove (inside a block of text, for example). Edit the note's metadata by hand.";
+
 /** Refuse a write whose result doesn't say what the setter promised. */
 export function keepPromise(holds: boolean): void {
-  if (!holds)
-    throw new Error(
-      "Rotli couldn't change this setting safely: the note's metadata has another line for it that Rotli won't remove (inside a block of text, for example). Edit the note's metadata by hand.",
-    );
+  if (!holds) throw new Error(UNSAFE);
+}
+
+/** Refuse a write that changes how any setting it doesn't own reads (twin
+ * of frontmatter_writes.rs `keeps_other_verdicts`): `read` gives each
+ * setting's verdict for a written text. */
+export function keepOtherVerdicts(
+  before: string,
+  after: string,
+  owned: readonly string[],
+  read: (text: string) => Record<string, string>,
+): void {
+  const [was, now] = [read(before), read(after)];
+  if (Object.keys(was).some((key) => !owned.includes(key) && was[key] !== now[key])) throw new Error(UNSAFE);
 }

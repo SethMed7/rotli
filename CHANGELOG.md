@@ -43,8 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now treats `secure: "true"` as secure, as the Mac does.
 - **Changing a setting never edits your text.** Turning a setting on or
   off removes Rotli's line with everything under it, never a line inside a
-  block of text in your metadata; if such a line would keep the setting
-  from changing, Rotli says so and leaves the note as it was.
+  block of text in your metadata, and never changes another setting; if a
+  change would, Rotli says so and leaves the note as it was.
 - **The Librarian's index hides notes more reliably** (the Librarian agent
   route, which still runs only in development builds). An entry that
   mentions a hidden note by title or alias is caught in any case or letter

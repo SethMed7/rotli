@@ -578,6 +578,8 @@
         { "fields": ["created_by: agent", "1.0: a", "1.00: b", "summary: The ai_edit setting"], "verdict": "allowed" },
         { "fields": ["created_by: agent", "1: a", "1: b"], "verdict": "allowed" },
         { "fields": ["created_by: agent", "ai_edit: tRuE"], "verdict": "revoked" },
+        { "fields": ["\"locked\": true", "ai_edit: true"], "verdict": "locked" },
+        { "fields": ["  locked: true", "created_by: agent"], "verdict": "locked" },
         { "fields": ["created_by: agent", "x: \"one", "ai_edit: true", "\""], "verdict": "revoked" },
         { "fields": ["created_by: agent", "x: [a,", "ai_edit: true]"], "verdict": "revoked" },
         { "fields": ["created_by: agent", "meta:", "  created_by: person"], "verdict": "person-written" },

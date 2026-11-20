@@ -98,3 +98,16 @@ for (const inPlace of [true, false]) {
     expect(after).toContain("tags: [plan]");
   });
 }
+
+// Codex review of pull request 303, second round: a setting's write never
+// changes how another setting reads (here, a lock indented under ai_edit).
+for (const inPlace of [true, false]) {
+  test(`a write never changes a setting it doesn't own (${inPlace ? "in place" : "Rotli vault"})`, async () => {
+    const text = "---\nid: n7\nai_edit: false\n  locked: true\n---\n# Plan\n";
+    const dir = await vault(inPlace, text);
+    await expect(setFolderProtection(dir, notes, "n7", "ai_edit", true)).rejects.toThrow(
+      "Edit the note's metadata by hand",
+    );
+    expect(await dir.readText(PATH)).toBe(text);
+  });
+}

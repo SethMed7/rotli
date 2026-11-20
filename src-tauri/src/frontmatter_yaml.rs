@@ -107,13 +107,18 @@ fn read_root(block: &str, key: &str) -> Option<Decoded> {
     })
 }
 
+/// A key of letters, digits, `_`, `.` and `-` (never a flow map's `{s`).
+fn plain_word(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric() || c == '_') && name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c))
+}
+
 /// A plain top-level line of a key other than a permission key, with its
 /// value dropped (`summary: Plan: phase two` → `summary:`); every other line
 /// as it is. The organizer writes `summary:` and `links:` unquoted, so this
 /// is the only tolerance unreadable frontmatter gets.
 fn blank_plain_value(line: &str) -> String {
     match super::frontmatter_field(line) {
-        Some((spelled, _)) if spelled.canonical && !super::PERMISSION_KEYS.contains(&spelled.name.as_str()) => format!("{}:", spelled.name),
+        Some((spelled, _)) if spelled.canonical && plain_word(&spelled.name) && !super::PERMISSION_KEYS.contains(&spelled.name.as_str()) => format!("{}:", spelled.name),
         _ => line.to_string(),
     }
 }

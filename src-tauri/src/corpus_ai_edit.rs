@@ -51,7 +51,7 @@ impl CorpusStore {
             crate::frontmatter_keys::remove_key(&mut fm.foreign, "ai_edit");
             fm.foreign.push(format!("ai_edit: {allowed}"));
             let out = self.compose_for(&text, &fm, body);
-            crate::frontmatter_keys::keeps_promise(&out, |fields| {
+            crate::frontmatter_keys::keeps(&text, &out, &["ai_edit"], |fields| {
                 let says = crate::frontmatter_keys::owned_key(fields, "ai_edit", |value| value == "true");
                 if allowed { matches!(says, crate::frontmatter_keys::Says::Grant(_)) } else { says == crate::frontmatter_keys::Says::Deny }
             })?;

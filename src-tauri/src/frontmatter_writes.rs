@@ -141,8 +141,8 @@ pub(crate) fn remove_key(lines: &mut Vec<String>, key: &str) -> Option<usize> {
 /// #303, item 1): each one line, the key without a colon, and the key as YAML
 /// reads it (`"ai_edit"` is ai_edit) none of `refused`. The name to replace.
 pub(crate) fn field_name(key: &str, value: &str, refused: &[&str]) -> Result<String, String> {
-    if key.contains(['\n', '\r', ':']) || value.contains(['\n', '\r']) {
-        return Err("a field's name and value are one line each, and a name has no colon".into());
+    if key.contains(['\n', '\r', ':']) || value.contains(['\n', '\r']) || key.starts_with(['{', '[', '&', '*', '!', '|', '>', '%', '@', '`', '#', ',', '?', '-']) {
+        return Err("a field's name and value are one line each, and a name has no colon and doesn't start with a YAML sign".into());
     }
     let name = frontmatter_field(&format!("{key}: x")).map_or_else(|| key.to_string(), |(spelled, _)| spelled.name);
     if refused.contains(&name.as_str()) || refused.contains(&key) || read_in_any_spelling(&name) {
@@ -164,11 +164,17 @@ pub(crate) fn put_field(foreign: &mut Vec<String>, name: &str, key: &str, value:
 /// Refuse a generic write that changes any line of a Rotli-managed key,
 /// whatever was typed (Codex review of PR #303, item 1).
 pub(crate) fn leaves_managed(before: &str, after: &str, managed: &[&str]) -> Result<(), String> {
-    if lines_setting(before, managed) == lines_setting(after, managed) {
-        Ok(())
-    } else {
-        Err("that change would touch a field rotli manages".into())
+    if lines_setting(before, managed) != lines_setting(after, managed) {
+        return Err("that change would touch a field rotli manages".into());
     }
+    keeps_other_verdicts(before, after, &[])
+}
+
+/// A setting's write checked both ways: `after` says what it promised, and
+/// no setting outside `owned` reads differently than in `before`.
+pub(crate) fn keeps(before: &str, after: &str, owned: &[&str], holds: impl Fn(&[String]) -> bool) -> Result<(), String> {
+    keeps_promise(after, holds)?;
+    keeps_other_verdicts(before, after, owned)
 }
 
 /// The frontmatter lines of `text` that set any of `keys` (Rotli's typed
@@ -179,6 +185,8 @@ pub(crate) fn lines_setting(text: &str, keys: &[&str]) -> Vec<String> {
     keys.iter().flat_map(|key| key_lines(&foreign, key)).collect()
 }
 
+const UNSAFE: &str = "Rotli couldn't change this safely: the note's metadata has a line for a setting that Rotli can't read or won't remove (inside a block of text, for example). Edit the note's metadata by hand.";
+
 /// Refuse a write whose result doesn't say what the setter promised: a line
 /// for the setting Rotli can't safely remove (inside a text block) would
 /// otherwise outlive the person's choice.
@@ -187,7 +195,31 @@ pub(crate) fn keeps_promise(text: &str, holds: impl Fn(&[String]) -> bool) -> Re
     if holds(&foreign) {
         Ok(())
     } else {
-        Err("Rotli couldn't change this setting safely: the note's metadata has another line for it that Rotli won't remove (inside a block of text, for example). Edit the note's metadata by hand.".into())
+        Err(UNSAFE.into())
+    }
+}
+
+/// The settings a note's metadata decides, and how each reads now.
+const VERDICTS: [&str; 5] = ["created_by", "ai_edit", "local_ai_allowed", "locked", "secure"];
+
+fn verdict(foreign: &[String], key: &str) -> String {
+    match key {
+        "locked" => foreign.iter().any(|l| crate::corpus::locked_field(l) == Some(true)).to_string(),
+        "secure" => foreign.iter().any(|l| crate::corpus::secure_field(l) == Some(true)).to_string(),
+        "created_by" => format!("{:?}", super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
+        _ => format!("{:?}", super::owned_key(foreign, key, |v| v == "true")),
+    }
+}
+
+/// Refuse a write that changes how any setting it doesn't own reads: a
+/// generic edit, or one setting's write, never erases another's denial
+/// (Codex review of PR #303, second round).
+pub(crate) fn keeps_other_verdicts(before: &str, after: &str, owned: &[&str]) -> Result<(), String> {
+    let read = |text: &str| crate::corpus::parse_document(text).0.unwrap_or_default().foreign;
+    let (before, after) = (read(before), read(after));
+    match VERDICTS.iter().find(|key| !owned.contains(key) && verdict(&before, key) != verdict(&after, key)) {
+        None => Ok(()),
+        Some(_) => Err(UNSAFE.into()),
     }
 }
 
