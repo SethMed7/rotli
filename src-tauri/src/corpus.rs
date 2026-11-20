@@ -2459,6 +2459,8 @@ pub struct CorpusStore {
     adopted: bool,
     /// A file opened from Finder (corpus_raw.rs): sidecar redirected, one file seen.
     raw: Option<raw::RawMount>,
+    /// A workspace agent's store: its AI gates also ask `protected_path`.
+    agent_lane: bool,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2637,6 +2639,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
+            agent_lane: false,
             adopted: true,
             raw: None,
             list_cache: None,
@@ -2694,6 +2697,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
+            agent_lane: false,
             adopted: false,
             raw: None,
             list_cache: None,
@@ -2741,6 +2745,7 @@ impl CorpusStore {
             layout,
             band_read_only,
             perms_read_only: read_only,
+            agent_lane: false,
             // the marker, not the registry, says "connected in place": every
             // open path (startup, switch, refresh, reconnect) lands here
             adopted,
@@ -3654,7 +3659,7 @@ impl CorpusStore {
         let abs = self.guard_rel(&rel)?;
         let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         self.judge_for_ai(&rel, &text, model_is_local)?;
-        Ok(self.doc_from_text(id, &rel, &abs, &text))
+        self.agent_doc(self.doc_from_text(id, &rel, &abs, &text))
     }
 
     /// The AI read gate over one file's text (see `read_for_ai`).
@@ -8832,6 +8837,8 @@ pub(crate) use files::is_canvas_path;
 /// The Librarian rules' store side (secure keywords, the batch) — a child module.
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
+#[path = "corpus_protected_path.rs"]
+pub mod protected_path;
 
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]

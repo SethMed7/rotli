@@ -409,14 +409,17 @@ roots carry their root-prefixed wire id in the link.
   folder filter, which on a memex then hides `Storage` and shelves outside
   `wiki/`. The cost follows the answer, not the size of `storage/`. Notes,
   folders, order, and ids match gating every row (`workspace_listing.rs`).
-- A folder row is listed to an agent only when the older path check
-  (`agent_listable`) allows it and, on the folder's own path, it is not inside
-  a secure home (`wiki/_secure/`, `Secure notes/`) and its name carries none of
-  the vault's secure keywords (`agent_listable_folder`). This is a narrow
-  check, not complete path protection: it compares exact spellings (no Unicode
-  case folding), looks at the folder's own name rather than its ancestors, and
-  does not cover a row's `folderId` or a shelf named in frontmatter. A folder
-  with an ordinary name whose notes are all secure is still listed by name.
+- Every path an agent lane shows or judges (a row, a folder, a shelf
+  `folderId`, a path-shaped id, a document or attachment) goes through one
+  rule, `protected_path`. It protects a path when any component, in any
+  spelling the Mac's disk treats as the same name (case, `ß`/`ss`, `ſ`/`s`,
+  composed or decomposed) or through a symlink, is a secure home or holds a
+  secure keyword; `..` and unresolvable symlinks fail closed. A shelf that
+  isn't a clean path, or is protected, is shown as the note's own folder.
+  (`docs/architecture/egress-threat-model.md`, row 16k.)
+- A folder row is listed to an agent only when `agent_listable` allows it
+  and its own path is not a hidden or reference surface
+  (`agent_listable_folder`).
 - `rotli_metrics` and `agent doctor` count each row by the kind the listing's
   gate returns (an extensionless file read as Markdown counts as a note).
   `physicalFolders` counts walked directories that pass the folder check

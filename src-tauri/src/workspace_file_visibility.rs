@@ -4,8 +4,16 @@
 use super::*;
 
 impl Workspace {
+    pub(super) fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
+        match meta.kind {
+            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
+            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
+            NoteKind::File => self.file_visible_to_remote(&meta.id),
+        }
+    }
+
     pub(super) fn file_visible_to_remote(&mut self, rel: &str) -> bool {
-        if !self.store.agent_listable(rel) || self.store.file_is_protected(rel) {
+        if !self.store.agent_listable(rel) || self.store.protected_path(rel) {
             return false;
         }
         let Ok(path) = self.store.file_for_ai(rel, false) else {

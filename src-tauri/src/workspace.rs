@@ -238,6 +238,7 @@ impl Workspace {
             CorpusStore::open(root.path.clone())?
         };
         store.set_perms_read_only(root.read_only);
+        store.set_agent_lane();
         Ok(Self { root, store })
     }
 
@@ -294,14 +295,6 @@ impl Workspace {
         folder.parent_id = folder.parent_id.map(|parent| self.wire(&parent));
         folder.id = self.wire(&folder.id);
         folder
-    }
-
-    fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
-        match meta.kind {
-            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
-            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
-            NoteKind::File => self.file_visible_to_remote(&meta.id),
-        }
     }
 
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
@@ -934,7 +927,7 @@ impl Workspace {
 
     fn read_board_for_remote(&mut self, local_id: &str) -> Result<CorpusBoardDoc, String> {
         let rel = self.store.resolve_note_rel(local_id)?;
-        if self.store.file_is_protected(&rel) {
+        if self.store.protected_path(&rel) {
             return Err("blocked: a secure board cannot be sent to a remote agent".into());
         }
         let board = self.store.read_board(&rel)?;
@@ -3031,6 +3024,9 @@ mod ai_lane_tests;
 #[cfg(test)]
 #[path = "workspace_listing_tests.rs"]
 mod listing_tests;
+#[cfg(test)]
+#[path = "workspace_path_protection_tests.rs"]
+mod path_protection_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
