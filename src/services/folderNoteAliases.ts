@@ -88,7 +88,5 @@ export async function prepareFolderTitleRename(
       : await freeVaultPath(dir, parentPath(path), desired, (stem, ext, n) => `${stem} (${n})${ext}`);
   const fm = withRenameAliases(parsed.frontmatter, path, oldTitle, newTitle);
   if (target !== path && isSecureNote(text)) await updateGitExclusions(dir, [target]);
-  const renamed = composeNoteDocument(fm, parsed.body);
-  guardFrontmatterWrite(text, renamed);
-  return { path: target, text: renamed };
+  return { path: target, text: guardFrontmatterWrite(text, composeNoteDocument(fm, parsed.body)) };
 }

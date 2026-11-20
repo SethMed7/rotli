@@ -122,19 +122,48 @@ function plainSafe(name: string): boolean {
  * dropped (`summary: Plan: phase two` → `summary:`), or null
  * (frontmatter_yaml.rs `blank_value`). */
 function blankValue(line: string): string | null {
+  // never a line holding a character some parser reads as a line break, nor
+  // a lock or secure line, whose own value decides it (frontmatter_yaml.rs)
+  if (UNDECIDABLE.test(line)) return null;
   const name = topLevelField(line)?.key;
-  return name !== undefined && plainSafe(name) && !(PERMISSION_KEYS as readonly string[]).includes(name)
-    ? `${name}:`
-    : null;
+  return name !== undefined && plainSafe(name) && !READ_IN_ANY_SPELLING.includes(name) ? `${name}:` : null;
 }
+
+/** The permission and protection keys (frontmatter_writes.rs `read_in_any_spelling`). */
+const READ_IN_ANY_SPELLING: readonly string[] = [...PERMISSION_KEYS, "locked", "secure"];
 
 /** Whether a line the line reader doesn't name as `key` could still spell it:
  * its text, or an escape. Unreadable frontmatter denies a key only then
  * (frontmatter_keys.rs `could_spell`). */
 function couldSpell(fields: readonly string[], key: string): boolean {
   return fields.some(
-    (line) => !namesKey(line, key) && (line.includes(key) || line.includes("\\") || ALIAS.test(line)),
+    (line) =>
+      !namesKey(line, key) && (keyToken(line, key) || keyToken(unescaped(line), key) || ALIAS.test(line)),
   );
+}
+
+/** `line` with its `\xHH`, `\uHHHH`, `\UHHHHHHHH` escapes decoded, so an escaped
+ * key counts only for the key it spells (frontmatter_keys.rs `unescaped`). */
+function unescaped(line: string): string {
+  return line.replace(/\\(?:x([0-9A-Fa-f]{2})|u([0-9A-Fa-f]{4})|U([0-9A-Fa-f]{8}))/g, (whole, x, u, big) => {
+    const code = Number.parseInt(x ?? u ?? big, 16);
+    return code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : whole;
+  });
+}
+
+/** Whether `line` holds `key` as a key would be written: not inside a longer
+ * word, then an optional quote, spaces or tabs, and a colon
+ * (frontmatter_keys.rs `key_token`). */
+function keyToken(line: string, key: string): boolean {
+  for (let at = line.indexOf(key); at >= 0; at = line.indexOf(key, at + 1)) {
+    const before = line[at - 1];
+    const rest = line
+      .slice(at + key.length)
+      .replace(/^["']+/, "")
+      .replace(/^[ \t]+/, "");
+    if (!(before !== undefined && /[A-Za-z0-9_]/.test(before)) && rest.startsWith(":")) return true;
+  }
+  return false;
 }
 
 /** A YAML alias (`*name` at the start or after a space, `[`, `{`, `,` or `:`):

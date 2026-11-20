@@ -224,18 +224,61 @@ pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: i
 /// it holds the key's text, an escape (`\u005f`), or an alias. Unreadable frontmatter
 /// denies a key only then; the lines that name it the line reader has judged.
 fn could_spell<S: AsRef<str>>(fields: &[S], key: &str) -> bool {
-    fields.iter().map(AsRef::as_ref).any(|line| !names_key(line, key) && (line.contains(key) || line.contains('\\') || has_alias(line)))
+    fields.iter().map(AsRef::as_ref).any(|line| !names_key(line, key) && (key_token(line, key) || key_token(&unescaped(line), key) || has_alias(line)))
+}
+
+/// Whether `line` holds `key` as a key would be written: not inside a longer
+/// word (`blocked` is no `locked`), then an optional quote, spaces or tabs,
+/// and a colon (review of PR #303 at e06d292e, item 4).
+fn key_token(line: &str, key: &str) -> bool {
+    line.match_indices(key).any(|(at, _)| {
+        let before = line[..at].chars().next_back();
+        let rest = line[at + key.len()..].trim_start_matches(['"', '\'']).trim_start_matches([' ', '\t']);
+        !before.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_') && rest.starts_with(':')
+    })
+}
+
+/// `line` with its `\xHH`, `\uHHHH` and `\UHHHHHHHH` escapes decoded (the
+/// only escapes that spell a key's letters), so an escaped key counts only
+/// for the key it spells; a Windows path or LaTeX backslash stays as it is.
+/// TypeScript's twin: frontmatterKeys.ts `unescaped`.
+fn unescaped(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(at) = rest.find('\\') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        let width = match after.chars().next() {
+            Some('x') => 2,
+            Some('u') => 4,
+            Some('U') => 8,
+            _ => 0,
+        };
+        let digits = after.get(1..1 + width).filter(|d| width > 0 && d.chars().all(|c| c.is_ascii_hexdigit()));
+        match digits.and_then(|d| u32::from_str_radix(d, 16).ok()).and_then(char::from_u32) {
+            Some(decoded) => {
+                out.push(decoded);
+                rest = &after[1 + width..];
+            }
+            None => {
+                out.push('\\');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Whether a line holds a YAML alias (`*name` after a space, `[`, `{`, `,` or
-/// `:`, or at its start): in unreadable frontmatter an alias could stand for a
+/// `:`, or at its start; spaces in JavaScript's set, as TypeScript reads them): in unreadable frontmatter an alias could stand for a
 /// key, so it denies there (the unresolved-alias verdict, PR #303).
 fn has_alias(line: &str) -> bool {
     let chars: Vec<char> = line.chars().collect();
     chars.iter().enumerate().any(|(at, c)| {
         *c == '*'
-            && (at == 0 || chars[at - 1].is_whitespace() || "[{,:".contains(chars[at - 1]))
-            && chars.get(at + 1).is_some_and(|next| !next.is_whitespace() && !",[]{}".contains(*next))
+            && (at == 0 || is_js_space(chars[at - 1]) || "[{,:".contains(chars[at - 1]))
+            && chars.get(at + 1).is_some_and(|next| !is_js_space(*next) && !",[]{}".contains(*next))
     })
 }
 

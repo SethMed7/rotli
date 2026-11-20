@@ -1129,12 +1129,8 @@ fn write_note_at_with_suppress(
         return Err("This vault keeps new notes in its Inbox, not a Library lane.".into());
     }
     let safe = safe_slug(stem)?;
-    let secure = contents
-        .strip_prefix("---\n")
-        .and_then(|rest| rest.split_once("\n---"))
-        .is_some_and(|(frontmatter, _)| {
-            crate::frontmatter_keys::secure(&frontmatter.lines().collect::<Vec<_>>())
-        });
+    // the note codec's own fence reading (CRLF too; review of PR #303)
+    let secure = crate::corpus::parse_document(contents).0.is_some_and(|fm| crate::frontmatter_keys::secure(&fm.foreign));
     let librarian_enabled = secure || librarian_enabled_at(root)?;
     let lane = if secure {
         Some("_secure")

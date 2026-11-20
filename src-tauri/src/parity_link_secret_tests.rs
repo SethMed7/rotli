@@ -83,3 +83,15 @@ fn frontmatter_disagreement_cases_match_fixture() {
         assert_eq!(crate::frontmatter_keys::differential_tests::verdict(&fields), case["verdict"].as_str().unwrap(), "{case}");
     }
 }
+
+/// The write guard gives one answer on both sides (review of PR #303 at
+/// e06d292e, item 5: a grant's value is part of how it reads).
+#[test]
+fn guard_write_cases_match_fixture() {
+    for case in entry("guardWriteCases").as_array().unwrap() {
+        let list = |name: &str| case[name].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect::<Vec<_>>();
+        let (owned, tighten) = (list("owned"), list("tighten"));
+        let refused = crate::frontmatter_keys::guard_write(case["before"].as_str().unwrap(), case["after"].as_str().unwrap(), &owned, &tighten).is_err();
+        assert_eq!(refused, case["refused"].as_bool().unwrap(), "{case}");
+    }
+}

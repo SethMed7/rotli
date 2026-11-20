@@ -359,7 +359,10 @@ builds until that review has checked these fixes:
    twin), `pasted_metadata_in_a_note_without_any_stays_text`,
    `the_field_editor_never_removes_a_chat_taint`, "a re-save never drops a
    chat's secure-context taint" (`webChats.test.ts`), and
-   `a_long_hidden_name_is_found_inflected`. Index names of five or more
+   `a_long_hidden_name_is_found_inflected`; from the review of e06d292e,
+   `what_the_second_review_found` (with its `frontmatterKeys.test.ts` twin),
+   `a_crlf_secure_note_lands_in_the_secure_lane`, and the parity entry
+   `guardWriteCases`. Index names of five or more
    characters match as prefixes ("Alazans", "AlazanDeal"); shorter ones stay
    whole-word. Limits, documented: text that refers to a note
    in other words than its title or an alias (a nickname, a description)

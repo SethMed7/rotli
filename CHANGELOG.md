@@ -49,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can't read changes nothing when the cause is a plain value such as a
   summary with a colon in it or several links on one line (how the
   organizer writes them); metadata that stays unreadable, or is huge or
-  deeply nested, now counts as no.
+  deeply nested, counts as no for a setting only where a line could be
+  hiding it.
 - **The metadata editor can't grant what only Rotli grants.** Typing a key
   such as `"ai_edit"` or `"secure"` (quoted) into a note's metadata field is
   refused like the plain key, and a field's name and value must each be one
@@ -74,7 +75,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   secure flag (`locked: "true"`, `{locked: true}`) now counts; and one
   line Rotli can't read, such as a key with a colon in its value, no
   longer turns AI editing or on-device access off unless that line could
-  be hiding one of those settings.
+  be hiding one of those settings. `locked: false` and `secure: false`
+  still mean off beside such a line, and a word like "blocked" or a
+  Windows path no longer counts as a hidden setting.
+- **Lock and secure are on unless they say exactly `false`.** If you typed
+  `locked: no`, `locked: off`, `locked: 0`, `locked: 'false'`,
+  `locked: false # a comment`, or `locked:` with nothing after it, the note
+  now counts as locked, and the same goes for `secure`. Write
+  `locked: false` (or remove the line, as Rotli does) to turn it off.
 - **Pasting a metadata block into a note can't change its settings.** In
   a note without metadata, pasted text that starts with `---` stays text;
   in a folder opened in place, Rotli says why it won't save it as is.

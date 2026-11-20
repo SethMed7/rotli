@@ -326,8 +326,14 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   spaces too), because the organizer writes `summary: Plan: phase two` and
   `links: [[A]], [[B]]` unquoted and people type what they like. Refused
   frontmatter denies a key only where a line the line reader doesn't name
-  could still spell it (the key's text, an escape, an alias); otherwise the
-  line reader's verdict stands, so one stray line never revokes a note. Only
+  could still spell it: the key as a key-like token (`key:`, optionally
+  quoted; `blocked` is no `locked`), an `\x`/`\u`/`\U` escape that decodes
+  to it, or an alias (spaces judged by JavaScript's set on both sides);
+  otherwise the line reader's verdict stands, so one stray line never
+  revokes a note. Blanking never touches a lock or secure line (its own
+  value decides) nor a line holding a character some parser reads as a line
+  break (a lone CR, U+0085, U+2028/9), so `x: 1\rsecure: true` stays secure.
+  One read of a block answers all five settings. Only
   the spelling Rust writes grants: exactly `key: value` (one space) or
   `key:`, at the start of a line. Values trim with JavaScript's set on both
   sides, and every trailing carriage return goes. `locked` and `secure` are
@@ -357,8 +363,10 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   writes, pin, body save, move, rename and alias cleanup, view tags, and the
   raw metadata editor, where the person owns lock and secure and a
   permission may only tighten (a typed `ai_edit: false` can be added there,
-  never removed). Source tests fail on a writer that doesn't, and on any
-  write or text-returning path whose value the guard never saw
+  never removed). The guard returns the text it approved, and a writer
+  writes only that. Source tests fail on a writer that doesn't, on any
+  write or text-returning path whose value isn't the guard's own return, and
+  (Rust) on a guarded value changed before it is written
   (`every_frontmatter_writer_runs_the_guard`, `frontmatterWriters.test.ts`).
   A body save of a note without metadata whose new text starts with a `---`
   block keeps that block as text: a Rotli vault writes Rotli's own facts

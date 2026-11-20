@@ -5,7 +5,9 @@
 import { describe, expect, test } from "bun:test";
 
 import { bodyEdit } from "./aiEditPolicy";
+import { emptyFrontmatter, isLockedFrontmatter, isSecureFrontmatter } from "./frontmatter";
 import { localAiAllowedOverride } from "./frontmatterKeys";
+import { guardFrontmatterWrite } from "./frontmatterWrites";
 
 // What the organizer writes: values unquoted (`summary: <one line>`,
 // `links: [[A]], [[B]]`), neither of which a YAML parser reads.
@@ -82,7 +84,7 @@ describe("frontmatter read as YAML", () => {
       [laughs, "allowed"],
       [[deep], "allowed"],
       [[wide], "allowed"],
-      [[longKey], "locked"],
+      [[longKey], "allowed"],
     ] as const) {
       const started = performance.now();
       expect(bodyEdit([...hostile, "created_by: agent"])).toBe(verdict);
@@ -95,7 +97,8 @@ describe("frontmatter read as YAML", () => {
     ];
     expect(localAiAllowedOverride(nested(62))).toBe(true);
     expect(localAiAllowedOverride(nested(63))).toBe(true);
-    expect(localAiAllowedOverride([...nested(63), 'z: "local\\u005fai_allowed"'])).toBe(false);
+    expect(localAiAllowedOverride([...nested(63), 'z: "local\\u005fai_allowed"'])).toBe(true);
+    expect(localAiAllowedOverride([...nested(63), '"local\\u005fai_allowed": false'])).toBe(false);
   });
 });
 
@@ -118,7 +121,7 @@ describe("what the differential harness found", () => {
       expect({ odd, local: localAiAllowedOverride(["secure: true", odd]) }).toEqual({ odd, local: null });
     }
     expect(bodyEdit(["created_by: agent", '"a\\qb": c'])).toBe("allowed");
-    expect(bodyEdit(["created_by: agent", "c", '{"ai\\u005fedit": false'])).toBe("locked");
+    expect(bodyEdit(["created_by: agent", "c", '{"ai\\u005fedit": false'])).toBe("revoked");
   });
 
   test("a document end, carriage returns, and a lone tab line read alike (item 6)", () => {
@@ -140,4 +143,29 @@ describe("what the differential harness found", () => {
     expect(bodyEdit(["created_by: agent", "x:", `  ${"- ".repeat(30_000)}a`])).toBe("allowed");
     expect(performance.now() - started).toBeLessThan(200);
   });
+});
+
+// Review of pull request 303 at e06d292e (twin of `what_the_second_review_found`).
+test("what the second review found", () => {
+  const flags = (fields: string[]) => {
+    const fm = { ...emptyFrontmatter(), foreign: fields };
+    return { locked: isLockedFrontmatter(fm), secure: isSecureFrontmatter(fm) };
+  };
+  expect(bodyEdit(["ai_edit: true", "created_by: agent", "l:", "  - a\u0085*b"])).toBe("allowed");
+  expect(bodyEdit(["ai_edit: true", "created_by: agent", "l:", "  - a\ufeff*b"])).toBe("locked");
+  expect(flags(["id: a", "x: 1\rsecure: true"]).secure).toBe(true);
+  expect(flags(["x: 1\rlocked: true"]).locked).toBe(true);
+  expect(bodyEdit(["created_by: agent", "ai_edit: true", "x: 1\rai_edit: false"])).toBe("revoked");
+  expect(localAiAllowedOverride(["local_ai_allowed: true", "x: 1\rlocal_ai_allowed: false"])).toBe(false);
+  expect(flags(["x: a\u2028secure: true"]).secure).toBe(true);
+  expect(flags(["title: Plan: phase two", "locked:  false"]).locked).toBe(false);
+  expect(flags(["title: Plan: phase two", "secure:  false"]).secure).toBe(false);
+  expect(flags(["tags:", "  - a: b: c", "status: blocked"]).locked).toBe(false);
+  expect(flags(["topic: insecure defaults", "tags:", "  - a: b: c"]).secure).toBe(false);
+  expect(flags(["path: C:\\x", "tags:", "  - a: b: c"])).toEqual({ locked: false, secure: false });
+  expect(localAiAllowedOverride(["path: C:\\x", "tags:", "  - a: b: c"])).toBeNull();
+  expect(flags(["tags:", "  - a: b: c", '"\\x6cocked": true'])).toEqual({ locked: true, secure: false });
+  expect(() =>
+    guardFrontmatterWrite("---\ncreated_by: agent\n---\nx\n", "---\ncreated_by: chat\n---\nx\n"),
+  ).toThrow();
 });

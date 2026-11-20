@@ -106,12 +106,13 @@ export async function writeFolderViews(
       const tag = next.get(id);
       const foreign = fm.foreign.filter((line) => line.split(":", 1)[0] !== "view_tag");
       if (tag) foreign.push(`view_tag: ${tag}`);
-      const applied =
+      const applied = guardFrontmatterWrite(
+        opened.contents,
         inPlace && !rotliMade(parsed.frontmatter)
           ? withTopLevelLine(opened.contents, "view_tag", tag ?? null)
-          : composeNoteDocument({ ...fm, foreign }, parsed.body);
+          : composeNoteDocument({ ...fm, foreign }, parsed.body),
+      );
       if (applied === opened.contents) continue;
-      guardFrontmatterWrite(opened.contents, applied);
       await writeVersionedFile(dir, notePath, applied, opened.revision);
       written.push({ path: notePath, before: opened.contents, applied });
     }

@@ -51,9 +51,10 @@ function keepWrite(
   owned: readonly Setting[],
   key: Setting,
   promised: string,
-): void {
-  keepPromise(settingsOf(after)[key].reads === promised);
-  guardFrontmatterWrite(before, after, { owned });
+): string {
+  const reads = settingsOf(after)[key].reads; // a grant reads with its value (`grant:true`)
+  keepPromise(reads === promised || reads.startsWith(`${promised}:`));
+  return guardFrontmatterWrite(before, after, { owned });
 }
 
 function assertSecureRemoval(body: string): void {
@@ -73,8 +74,13 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
-    const written = withSecureLineOnly(opened.contents, secure);
-    keepWrite(opened.contents, written, ["secure", "local_ai_allowed"], "secure", String(secure));
+    const written = keepWrite(
+      opened.contents,
+      withSecureLineOnly(opened.contents, secure),
+      ["secure", "local_ai_allowed"],
+      "secure",
+      String(secure),
+    );
     if (secure) await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, written, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
@@ -87,8 +93,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
     fm = withField(fm, "secure", "true");
-    const secured = composeNoteDocument(fm, body);
-    keepWrite(opened.contents, secured, ["secure"], "secure", "true");
+    const secured = keepWrite(opened.contents, composeNoteDocument(fm, body), ["secure"], "secure", "true");
     await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, secured, opened.revision);
   }
@@ -122,8 +127,13 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     let cleared = parsed.frontmatter ?? emptyFrontmatter();
     for (const key of ["secure", "local_ai_allowed", "secure_origin"])
       cleared = withField(cleared, key, null);
-    const written = composeNoteDocument(cleared, parsed.body);
-    keepWrite(final.contents, written, ["secure", "local_ai_allowed"], "secure", "false");
+    const written = keepWrite(
+      final.contents,
+      composeNoteDocument(cleared, parsed.body),
+      ["secure", "local_ai_allowed"],
+      "secure",
+      "false",
+    );
     await writeVersionedFile(dir, target, written, final.revision);
     await updateGitExclusions(dir, [], [target]);
   }
@@ -158,11 +168,10 @@ export async function setFolderProtection(
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
-  const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
   const owned: Setting[] = key === "local_ai_allowed" ? [key, "secure"] : [key];
-  keepWrite(
+  const text = keepWrite(
     opened.contents,
-    text,
+    inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body),
     owned,
     key,
     key === "ai_edit" ? (allowed ? "grant" : "deny") : String(allowed),
@@ -180,8 +189,10 @@ export async function readFolderRawMetadata(dir: VaultDir, path: string) {
 export async function setFolderPinned(dir: VaultDir, path: string, pinned: boolean): Promise<void> {
   if (!path.endsWith(".md")) throw new Error("not a Markdown note");
   const opened = await readVersionedFile(dir, path);
-  const next = withTopLevelLine(opened.contents, "pinned", pinned ? "true" : null);
-  guardFrontmatterWrite(opened.contents, next);
+  const next = guardFrontmatterWrite(
+    opened.contents,
+    withTopLevelLine(opened.contents, "pinned", pinned ? "true" : null),
+  );
   if (next !== opened.contents) await writeVersionedFile(dir, path, next, opened.revision);
 }
 
@@ -195,9 +206,11 @@ export async function writeFolderRawMetadata(
   const opened = await readVersionedFile(dir, path);
   if (!revision || opened.revision !== revision)
     throw new Error("revision conflict: note changed after metadata was opened");
-  const next = mergeRawFrontmatter(opened.contents, block);
   // the person owns lock and secure here; a permission may only tighten
-  guardFrontmatterWrite(opened.contents, next, { owned: ["locked", "secure"], tighten: PERMISSION_KEYS });
+  const next = guardFrontmatterWrite(opened.contents, mergeRawFrontmatter(opened.contents, block), {
+    owned: ["locked", "secure"],
+    tighten: PERMISSION_KEYS,
+  });
   if (next === opened.contents) return opened.revision;
   const was = parseNoteDocument(opened.contents).frontmatter;
   const after = parseNoteDocument(next).frontmatter;

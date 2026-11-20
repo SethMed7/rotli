@@ -17,10 +17,11 @@ export const DECODE_MAX_DEPTH = 64;
  * `QUOTED_KEY_MAX_BYTES`): no escaped permission key is longer. */
 const QUOTED_KEY_MAX_BYTES = 256;
 
-/** C0 and C1 controls other than tab and line feed, and U+FEFF: the two YAML
- * parsers could read them differently. */
+/** C0 and C1 controls other than tab and line feed, U+FEFF, U+2028 and
+ * U+2029: the two YAML parsers could read them differently (some as a line
+ * break). frontmatter_yaml.rs `undecidable`. */
 // eslint-disable-next-line no-control-regex
-export const UNDECIDABLE = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f﻿]/;
+export const UNDECIDABLE = /[\u0000-\u0008\u000a-\u001f\u007f-\u009f\ufeff\u2028\u2029]/;
 
 /** The key's value in the root mapping as its source text (`\0` for a list, a
  * map or an alias; null when absent), or refused: over budget, an alias as a
@@ -90,51 +91,77 @@ function unresolvedAlias(doc: ReturnType<typeof parseDocument>): boolean {
 }
 
 /** One read of the text; null when it won't parse. */
-function readRoot(block: string, key: string): Decoded | null {
+/** What one read of a block found: every root key's values as source text,
+ * or a refusal that holds for every key (frontmatter_yaml.rs `Root`). */
+type Root = Map<string, string[]> | "refused";
+
+function readRoot(block: string): Root | null {
   const doc = parseDocument(block, { uniqueKeys: false });
   if (doc.errors.length > 0 || unresolvedAlias(doc)) return null;
-  if (nesting(doc.contents) > DECODE_MAX_DEPTH) return REFUSED;
-  if (!isMap(doc.contents)) return { refused: false, value: null };
-  const found: string[] = [];
+  if (nesting(doc.contents) > DECODE_MAX_DEPTH) return "refused";
+  const keys = new Map<string, string[]>();
+  if (!isMap(doc.contents)) return keys;
   for (const pair of doc.contents.items) {
     // an alias as a root key, or a merge key (`<<`), could carry any key
-    if (isAlias(pair.key) || (isScalar(pair.key) && sourceText(pair.key) === "<<")) return REFUSED;
-    if (isScalar(pair.key) && sourceText(pair.key) === key) found.push(sourceText(pair.value));
+    if (isAlias(pair.key) || (isScalar(pair.key) && sourceText(pair.key) === "<<")) return "refused";
+    if (isScalar(pair.key)) {
+      const name = sourceText(pair.key);
+      keys.set(name, [...(keys.get(name) ?? []), sourceText(pair.value)]);
+    }
   }
-  return found.length > 1 ? REFUSED : { refused: false, value: found[0] ?? null };
+  return keys;
 }
 
-/** The value of `key` in the root mapping. Frontmatter that won't parse is
- * read once more through `blank` (the values of plain non-permission keys
- * dropped); still unreadable, it is refused. Twin of `decoded_value`. */
+/** The value of `key` in the root mapping (twin of `decoded_value`): one read
+ * per block answers all five settings (`read_block_once`). */
 export function decodedValue(
   lines: readonly string[],
   key: string,
   blank: (line: string) => string | null,
 ): Decoded {
+  const root = readBlockOnce(lines, blank);
+  if (root === "refused") return REFUSED;
+  const values = root.get(key) ?? [];
+  return values.length > 1 ? REFUSED : { refused: false, value: values[0] ?? null };
+}
+
+let last: { block: string; root: Root } | null = null;
+
+function readBlockOnce(lines: readonly string[], blank: (line: string) => string | null): Root {
   const block = lines.join("\n");
+  if (last?.block === block) return last.root;
+  const root = readBlock(block, lines, blank);
+  last = { block, root };
+  return root;
+}
+
+/** Before any parse, refuse what is over budget, a `...` line, or a tab the
+ * parsers disagree on (a top-level plain key's line holding a tab is
+ * blanked); then read once more through `blank` if it won't parse
+ * (frontmatter_yaml.rs `read_block`). */
+function readBlock(block: string, lines: readonly string[], blank: (line: string) => string | null): Root {
   if (
     utf8Length(block) > DECODE_MAX_BYTES ||
     bracketDepth(block) > DECODE_MAX_DEPTH ||
     lines.some((line) => markerDepth(line) > DECODE_MAX_DEPTH || line.trimEnd() === "...")
   )
-    return REFUSED;
+    return "refused";
   const first: string[] = [];
   for (const line of lines) {
     if (!line.includes("\t")) first.push(line);
     else {
       const blanked = blank(line);
-      if (blanked === null) return REFUSED;
+      if (blanked === null) return "refused";
       first.push(blanked);
     }
   }
   if (!first.some((line) => UNDECIDABLE.test(line))) {
-    const read = readRoot(first.join("\n"), key);
+    const read = readRoot(first.join("\n"));
     if (read) return read;
   }
   const blanked = lines.map((line) => blank(line) ?? line);
-  if (blanked.some((line) => UNDECIDABLE.test(line) || line.includes("\t"))) return REFUSED;
-  return readRoot(blanked.join("\n"), key) ?? REFUSED;
+  if (blanked.some((line) => UNDECIDABLE.test(line) || line.includes("\t"))) return "refused";
+  return readRoot(blanked.join("\n")) ?? "refused";
 }
 
 /** The most `- ` / `? ` markers starting one line (`- - - a` nests a list per

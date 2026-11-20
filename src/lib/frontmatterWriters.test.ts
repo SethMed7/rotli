@@ -134,8 +134,18 @@ function unguardedPaths(): string[] {
       if (!around || around.name === name || EXEMPT[`${rel} ${around.name}`]) continue;
       if (!writers.has(around.fn))
         writers.set(around.fn, { name: around.name, guarded: new Set(), writes: [], returns: [] });
-      if (GUARD_CALLS.has(name) && call.arguments[1] && ts.isIdentifier(call.arguments[1]))
-        writers.get(around.fn)!.guarded.add(call.arguments[1].text);
+      // a value counts as guarded only when it IS the guard's return: a
+      // `const` bound to the call (never reassignable), or the call itself,
+      // so "guard one text, write another" can't pass (review of e06d292e)
+      const declared = call.parent;
+      if (
+        GUARD_CALLS.has(name) &&
+        ts.isVariableDeclaration(declared) &&
+        ts.isIdentifier(declared.name) &&
+        ts.isVariableDeclarationList(declared.parent) &&
+        (declared.parent.flags & ts.NodeFlags.Const) !== 0
+      )
+        writers.get(around.fn)!.guarded.add(declared.name.text);
     }
     for (const call of calls) {
       const at = WRITES[calleeName(call)];
@@ -156,6 +166,7 @@ function unguardedPaths(): string[] {
           return true;
         if (ts.isParenthesizedExpression(expr) || ts.isAwaitExpression(expr)) return ok(expr.expression);
         if (ts.isIdentifier(expr)) return writer.guarded.has(expr.text);
+        if (ts.isCallExpression(expr)) return GUARD_CALLS.has(calleeName(expr));
         if (ts.isConditionalExpression(expr)) return ok(expr.whenTrue) && ok(expr.whenFalse);
         return false;
       };

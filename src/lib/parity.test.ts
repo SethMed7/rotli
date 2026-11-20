@@ -55,7 +55,7 @@ import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
 import { emptyFrontmatter, isLockedFrontmatter, isSecureFrontmatter } from "./frontmatter";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
-import { removeKey } from "./frontmatterWrites";
+import { guardFrontmatterWrite, removeKey, type Setting } from "./frontmatterWrites";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
@@ -299,6 +299,21 @@ describe("parity.json ↔ TS constants", () => {
         out: c.out,
         at: c.at,
       });
+    }
+  });
+
+  test("guardWriteCases", () => {
+    for (const c of entries.guardWriteCases.value) {
+      let refused = false;
+      try {
+        guardFrontmatterWrite(c.before, c.after, {
+          owned: c.owned as Setting[],
+          tighten: c.tighten as Setting[],
+        });
+      } catch {
+        refused = true;
+      }
+      expect({ case: c, refused }).toEqual({ case: c, refused: c.refused });
     }
   });
 

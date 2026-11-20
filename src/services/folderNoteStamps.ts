@@ -46,8 +46,7 @@ export function savedNoteText(
   else if (parseNoteDocument(body).frontmatter)
     saved = composeNoteDocument(ownedNoteFacts(emptyFrontmatter(), modified!, true), `\n${body}`);
   else saved = body;
-  guardFrontmatterWrite(original, saved);
-  return saved;
+  return guardFrontmatterWrite(original, saved);
 }
 
 /** In a folder opened in place a note without metadata keeps none: text that
@@ -72,8 +71,7 @@ export function movedNoteText(
   asWritten: boolean,
 ): string | null {
   if (asWritten) {
-    const text = composeInPlace(original, next);
-    guardFrontmatterWrite(original, text);
+    const text = guardFrontmatterWrite(original, composeInPlace(original, next));
     return text === original ? null : text;
   }
   const changed =
@@ -83,9 +81,7 @@ export function movedNoteText(
     next.origin !== frontmatter.origin ||
     next.foreign !== frontmatter.foreign;
   if (!changed) return null;
-  const moved = composeNoteDocument(next, body);
-  guardFrontmatterWrite(original, moved);
-  return moved;
+  return guardFrontmatterWrite(original, composeNoteDocument(next, body));
 }
 
 /** The text with a note's `origin` breadcrumb cleared (a note leaving Trash
@@ -96,9 +92,10 @@ export function originClearedText(
   body: string,
   asWritten: boolean,
 ): string {
-  const text = asWritten
-    ? withTopLevelLine(original, "origin", null)
-    : composeNoteDocument({ ...frontmatter, origin: null }, body);
-  guardFrontmatterWrite(original, text);
-  return text;
+  return guardFrontmatterWrite(
+    original,
+    asWritten
+      ? withTopLevelLine(original, "origin", null)
+      : composeNoteDocument({ ...frontmatter, origin: null }, body),
+  );
 }

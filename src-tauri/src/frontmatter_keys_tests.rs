@@ -113,8 +113,8 @@ fn hostile_frontmatter_is_never_built_into_a_tree() {
     let wide = format!("summary: {}", "x".repeat(70_000));
     let long_key = format!("\"{}\": false", "\\u0061".repeat(20_000));
     // refused: a key is denied only where another line could spell it
-    // (the escaped key could spell any of them)
-    for (hostile, verdict) in [(laughs.join("\n"), BodyEdit::Allowed), (deep, BodyEdit::Allowed), (wide, BodyEdit::Allowed), (long_key, BodyEdit::Locked)] {
+    // (`\u0061…` spells none of them)
+    for (hostile, verdict) in [(laughs.join("\n"), BodyEdit::Allowed), (deep, BodyEdit::Allowed), (wide, BodyEdit::Allowed), (long_key, BodyEdit::Allowed)] {
         let started = std::time::Instant::now();
         let mut fields: Vec<String> = hostile.split('\n').map(str::to_string).collect();
         fields.push("created_by: agent".into());
@@ -127,7 +127,8 @@ fn hostile_frontmatter_is_never_built_into_a_tree() {
     assert_eq!(decoded_value(&nested(62, ""), "local_ai_allowed"), Decoded::Value(Some("true".into())));
     assert_eq!(decoded_value(&nested(63, ""), "local_ai_allowed"), Decoded::Refused);
     assert_eq!(local_ai_allowed(&nested(63, "")), Some(true));
-    assert_eq!(local_ai_allowed(&nested(63, "z: \"local\\u005fai_allowed\"")), Some(false));
+    assert_eq!(local_ai_allowed(&nested(63, "z: \"local\\u005fai_allowed\"")), Some(true), "a value spelling the key sets nothing");
+    assert_eq!(local_ai_allowed(&nested(63, "\"local\\u005fai_allowed\": false")), Some(false), "a key spelling it denies");
 }
 
 /// Review of PR #303 at 828f994d, found by the differential harness: the
@@ -150,7 +151,7 @@ fn what_the_differential_harness_found() {
         assert_eq!(local_ai_allowed(&["secure: true", odd]), None, "{odd:?}");
     }
     assert_eq!(body_edit(&["created_by: agent", "\"a\\qb\": c"]), BodyEdit::Allowed, "blanked: a plain key now");
-    assert_eq!(body_edit(&["created_by: agent", "c", "{\"ai\\u005fedit\": false"]), BodyEdit::Locked, "an escape could spell any key, `locked` too");
+    assert_eq!(body_edit(&["created_by: agent", "c", "{\"ai\\u005fedit\": false"]), BodyEdit::Revoked, "the escape spells ai_edit, and only ai_edit");
     // item 6
     assert_eq!(local_ai_allowed(&["...", "secure: true", "local_ai_allowed: true"]), Some(true), "nothing else spells the key");
     assert_eq!(local_ai_allowed(&["...", "local_ai_allowed: true", "x: *nope"]), Some(false), "an alias could");
@@ -256,7 +257,22 @@ fn every_frontmatter_writer_runs_the_guard() {
                 let not_a_note = [("views_write_unlocked", "raw", "rolls the views manifest back; not a note")];
                 if value.is_empty() || !guarded(&value) && !not_a_note.iter().any(|(f, v, _)| *f == fn_name && *v == value) {
                     unguarded.push(format!("{name}: {fn_name} writes `{value}` unguarded"));
+                    continue;
                 }
+                // between the last guard of `value` and this write, `value` is
+                // not reassigned, shadowed or mutated (review of e06d292e)
+                let before_write = &body[..at];
+                let guard_at = GUARDS.iter().filter_map(|guard| before_write.rfind(guard)).max().unwrap_or(0);
+                let between = &before_write[guard_at..];
+                let changed = [format!("let {value} ="), format!("let mut {value} ="), format!("{value}.push"), format!("&mut {value}"), format!(" {value} = ")]
+                    .iter()
+                    .any(|pattern| between.contains(pattern.as_str()));
+                if changed {
+                    unguarded.push(format!("{name}: {fn_name} changes `{value}` after its guard"));
+                }
+            }
+            if body.contains("let _ = crate::frontmatter_keys::guard_write") || body.contains("let _ = guard_write") {
+                unguarded.push(format!("{name}: {fn_name} discards its guard's verdict"));
             }
             // ...and one that writes nothing never hands back a composer's
             // result before a guard has seen it
@@ -314,4 +330,35 @@ fn the_keys_rust_owns_are_read_only_through_the_shared_parser() {
     }
     readers.sort();
     assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_ai_edit.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
+}
+
+/// Review of PR #303 at e06d292e: the readers agree on whitespace beside an
+/// alias, a lone carriage return never hides a key, a false lock or secure
+/// line stays false beside a bad line, unreadable frontmatter denies only a
+/// key a line could spell, and the guard compares a grant's value.
+#[test]
+fn what_the_second_review_found() {
+    use crate::ai_edit_policy::{body_edit, BodyEdit};
+    // item 1: U+0085 is not a space beside `*`, U+FEFF is (JavaScript's set)
+    assert_eq!(body_edit(&["ai_edit: true", "created_by: agent", "l:", "  - a\u{85}*b"]), BodyEdit::Allowed);
+    assert_eq!(body_edit(&["ai_edit: true", "created_by: agent", "l:", "  - a\u{feff}*b"]), BodyEdit::Locked);
+    // item 2: what a parser reads after a lone CR is never blanked away
+    assert!(secure(&["id: a", "x: 1\rsecure: true"]));
+    assert!(locked(&["x: 1\rlocked: true"]));
+    assert_eq!(body_edit(&["created_by: agent", "ai_edit: true", "x: 1\rai_edit: false"]), BodyEdit::Revoked);
+    assert_eq!(local_ai_allowed(&["local_ai_allowed: true", "x: 1\rlocal_ai_allowed: false"]), Some(false));
+    assert!(secure(&["x: a\u{2028}secure: true"]));
+    // item 3: a false lock or secure line is read as written beside a bad line
+    assert!(!locked(&["title: Plan: phase two", "locked:  false"]));
+    assert!(!secure(&["title: Plan: phase two", "secure:  false"]));
+    // item 4: only a key-like token, or an escape spelling that very key
+    assert!(!locked(&["tags:", "  - a: b: c", "status: blocked"]));
+    assert!(!secure(&["topic: insecure defaults", "tags:", "  - a: b: c"]));
+    let windows = ["path: C:\\x", "tags:", "  - a: b: c"];
+    assert!(!locked(&windows) && !secure(&windows));
+    assert_eq!(local_ai_allowed(&["path: C:\\x", "tags:", "  - a: b: c"]), None);
+    assert!(locked(&["tags:", "  - a: b: c", "\"\\x6cocked\": true"]), "an escape spelling the key");
+    assert!(!secure(&["tags:", "  - a: b: c", "\"\\x6cocked\": true"]), "spells another key");
+    // item 5: the guard compares a grant's value, on both sides
+    assert!(crate::frontmatter_keys::guard_write("---\ncreated_by: agent\n---\nx\n", "---\ncreated_by: chat\n---\nx\n", &[], &[]).is_err());
 }

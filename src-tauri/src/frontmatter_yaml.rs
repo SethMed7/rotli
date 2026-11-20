@@ -26,7 +26,7 @@ pub(super) const QUOTED_KEY_MAX_BYTES: usize = 256;
 /// could read differently: C0 and C1 controls other than tab and the line
 /// feed between lines, and U+FEFF.
 pub(super) fn undecidable(c: char) -> bool {
-    (c < ' ' && c != '\t' && c != '\n') || ('\u{7f}'..='\u{9f}').contains(&c) || c == '\u{feff}'
+    (c < ' ' && c != '\t' && c != '\n') || ('\u{7f}'..='\u{9f}').contains(&c) || matches!(c, '\u{feff}' | '\u{2028}' | '\u{2029}')
 }
 
 /// What the frontmatter, read as YAML, says about one key.
@@ -58,15 +58,25 @@ fn bracket_depth(text: &str) -> usize {
     deepest
 }
 
+/// What one read of a frontmatter block found: every root key's values as
+/// source text (`\0` for a list, a map or an alias), or a refusal that holds
+/// for every key (more than one document, nesting past the cap, an alias or
+/// a merge key as a root key). One read answers all five settings.
+#[derive(Clone)]
+enum Root {
+    Keys(std::collections::HashMap<String, Vec<String>>),
+    Refused,
+}
+
 /// One pass over the parser's events: None when the text won't parse.
-fn read_root(block: &str, key: &str) -> Option<Decoded> {
+fn read_root(block: &str) -> Option<Root> {
     let mut parser = Parser::new_from_str(block);
     let (mut depth, mut deepest, mut documents) = (0usize, 0usize, 0usize);
     let mut root_is_map = false;
     let mut at_key = true;
-    let mut ours = false;
+    let mut current: Option<String> = None;
     let mut alias_key = false;
-    let mut found: Vec<String> = Vec::new();
+    let mut keys: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     loop {
         let (event, _) = parser.next_token().ok()?;
         // a node that starts directly inside the root mapping is its key or
@@ -82,9 +92,9 @@ fn read_root(block: &str, key: &str) -> Option<Decoded> {
                 // an alias as a root key, or a merge key (`<<`), could carry
                 // any key: refused
                 alias_key |= matches!(event, Event::Alias(_)) || text.as_deref() == Some("<<");
-                ours = text.as_deref() == Some(key);
-            } else if ours {
-                found.push(text.unwrap_or_else(|| "\u{0}".to_string()));
+                current = text;
+            } else if let Some(key) = current.take() {
+                keys.entry(key).or_default().push(text.unwrap_or_else(|| "\u{0}".to_string()));
             }
             at_key = !at_key;
         }
@@ -102,11 +112,7 @@ fn read_root(block: &str, key: &str) -> Option<Decoded> {
             _ => {}
         }
     }
-    Some(if documents > 1 || deepest > DECODE_MAX_DEPTH || alias_key || found.len() > 1 {
-        Decoded::Refused
-    } else {
-        Decoded::Value(found.pop())
-    })
+    Some(if documents > 1 || deepest > DECODE_MAX_DEPTH || alias_key { Root::Refused } else { Root::Keys(keys) })
 }
 
 /// A key a blanked line can spell plainly: no colon-space, comment, quote,
@@ -125,8 +131,15 @@ fn plain_safe(name: &str) -> bool {
 /// → `date created:`); every other line as it is. Values people and the
 /// organizer type unquoted are the only tolerance unreadable frontmatter gets.
 fn blank_value(line: &str) -> Option<String> {
+    // never a line holding a character some parser reads as a line break (a
+    // lone CR, U+0085, U+2028/9): blanking would drop the key after it
+    // (`x: 1\rsecure: true`); nor a lock or secure line, whose own value
+    // decides it (review of PR #303 at e06d292e, items 2 and 3)
+    if line.chars().any(undecidable) {
+        return None;
+    }
     let (name, _) = super::top_level_field(line)?;
-    (plain_safe(&name) && !super::PERMISSION_KEYS.contains(&name.as_str())).then(|| format!("{name}:"))
+    (plain_safe(&name) && !super::read_in_any_spelling(&name)).then(|| format!("{name}:"))
 }
 
 /// The most `- ` / `? ` markers starting one line (`- - - a` nests a list per
@@ -150,18 +163,48 @@ fn marker_depth(line: &str) -> usize {
 pub(super) fn decoded_value<S: AsRef<str>>(fields: &[S], key: &str) -> Decoded {
     let lines: Vec<&str> = fields.iter().map(|line| line.as_ref().trim_end_matches('\r')).collect();
     let block = lines.join("\n");
+    match read_block_once(&block, &lines) {
+        Root::Refused => Decoded::Refused,
+        Root::Keys(keys) => match keys.get(key).map(Vec::as_slice) {
+            None => Decoded::Value(None),
+            Some([value]) => Decoded::Value(Some(value.clone())),
+            Some(_) => Decoded::Refused, // the key twice
+        },
+    }
+}
+
+thread_local! {
+    /// The last block read and what it held: a note's five settings read it
+    /// once, not once each (review of PR #303 at e06d292e, item 5).
+    static LAST: std::cell::RefCell<Option<(String, Root)>> = const { std::cell::RefCell::new(None) };
+}
+
+fn read_block_once(block: &str, lines: &[&str]) -> Root {
+    if let Some(root) = LAST.with(|last| last.borrow().as_ref().filter(|(seen, _)| seen == block).map(|(_, root)| root.clone())) {
+        return root;
+    }
+    let root = read_block(block, lines);
+    LAST.with(|last| *last.borrow_mut() = Some((block.to_string(), root.clone())));
+    root
+}
+
+/// The block read as YAML, before any parse refusing what is over budget, a
+/// `...` line, or a tab the parsers disagree on (a top-level plain key's line
+/// holding a tab is blanked); then read once more with top-level
+/// non-permission values blanked if it won't parse.
+fn read_block(block: &str, lines: &[&str]) -> Root {
     if block.len() > DECODE_MAX_BYTES
-        || bracket_depth(&block) > DECODE_MAX_DEPTH
+        || bracket_depth(block) > DECODE_MAX_DEPTH
         || lines.iter().any(|line| marker_depth(line) > DECODE_MAX_DEPTH || line.trim_end() == "...")
     {
-        return Decoded::Refused;
+        return Root::Refused;
     }
     let mut first = Vec::with_capacity(lines.len());
-    for line in &lines {
+    for line in lines {
         if line.contains('\t') {
             match blank_value(line) {
                 Some(blanked) => first.push(blanked),
-                None => return Decoded::Refused,
+                None => return Root::Refused,
             }
         } else {
             first.push(line.to_string());
@@ -169,15 +212,15 @@ pub(super) fn decoded_value<S: AsRef<str>>(fields: &[S], key: &str) -> Decoded {
     }
     let first = first.join("\n");
     if !first.chars().any(undecidable) {
-        if let Some(decoded) = read_root(&first, key) {
-            return decoded;
+        if let Some(root) = read_root(&first) {
+            return root;
         }
     }
     let blanked = lines.iter().map(|line| blank_value(line).unwrap_or_else(|| line.to_string())).collect::<Vec<_>>().join("\n");
     if blanked.chars().any(undecidable) || blanked.contains('\t') {
-        return Decoded::Refused;
+        return Root::Refused;
     }
-    read_root(&blanked, key).unwrap_or(Decoded::Refused)
+    read_root(&blanked).unwrap_or(Root::Refused)
 }
 
 /// A quoted key's text as YAML decodes it (`"ai_edit"` is ai_edit);

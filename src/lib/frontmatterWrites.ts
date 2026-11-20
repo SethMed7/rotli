@@ -151,7 +151,11 @@ const SAYS_RANK = { deny: 0, unset: 1, grant: 2 } as const;
  * most restrictive): the twin of frontmatter_writes.rs `verdict`. */
 export function settingsOf(text: string): Record<Setting, { reads: string; rank: number }> {
   const fm = parseNoteDocument(text).frontmatter ?? emptyFrontmatter();
-  const says = (read: Says) => ({ reads: read.says, rank: SAYS_RANK[read.says] });
+  // a grant reads with its value, as frontmatter_writes.rs `verdict` (`Grant("agent")`)
+  const says = (read: Says) => ({
+    reads: read.says === "grant" ? `grant:${read.value}` : read.says,
+    rank: SAYS_RANK[read.says],
+  });
   const flag = (on: boolean) => ({ reads: String(on), rank: on ? 0 : 1 });
   const local = localAiAllowedOverride(fm.foreign);
   return {
@@ -170,12 +174,13 @@ export function settingsOf(text: string): Record<Setting, { reads: string; rank:
  * names each one), twin of frontmatter_writes.rs `guard_write`: a setting in
  * `owned` may change as the action says; one in `tighten` may only become
  * more restrictive; every other must read exactly as before. Throws, and the
- * caller writes nothing (Codex re-check of pull request 303). */
+ * caller writes nothing; returns the text it approved, the only text a writer
+ * may write (frontmatterWriters.test.ts checks; Codex re-check of pull request 303). */
 export function guardFrontmatterWrite(
   before: string,
   after: string,
   rule: { owned?: readonly Setting[]; tighten?: readonly Setting[] } = {},
-): void {
+): string {
   const [was, now] = [settingsOf(before), settingsOf(after)];
   const breaks = (key: Setting) =>
     rule.owned?.includes(key)
@@ -184,4 +189,5 @@ export function guardFrontmatterWrite(
         ? now[key].rank > was[key].rank
         : now[key].reads !== was[key].reads;
   if (SETTINGS.some(breaks)) throw new Error(UNSAFE);
+  return after;
 }

@@ -290,3 +290,16 @@ fn the_field_editor_never_removes_a_chat_taint() {
     let before = "---\nsecureContext: true\n---\nWords.\n";
     assert!(crate::frontmatter_keys::guard_write(before, "---\ntopic: x\n---\nWords.\n", &[], &[]).is_err());
 }
+
+/// Review of PR #303 at e06d292e (item 5): a CRLF note marked secure, made
+/// through the memex, landed in the Inbox lane instead of `_secure`.
+#[test]
+fn a_crlf_secure_note_lands_in_the_secure_lane() {
+    let tmp = TempDir::new().unwrap();
+    let root = tmp.path().join("brain");
+    super::tests::seed_memex(&root);
+    let crlf = crate::memex::write_note_at(&root, "probe", "---\r\nsecure: true\r\n---\r\nhello\r\n").unwrap();
+    let lf = crate::memex::write_note_at(&root, "probe-lf", "---\nsecure: true\n---\nhello\n").unwrap();
+    assert!(crlf.contains("_secure"), "{crlf}");
+    assert!(lf.contains("_secure"), "{lf}");
+}
