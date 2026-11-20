@@ -415,8 +415,11 @@ roots carry their root-prefixed wire id in the link.
   spelling the Mac's disk treats as the same name (case, `ß`/`ss`, `ſ`/`s`,
   composed or decomposed) or through a symlink, is a secure home or holds a
   secure keyword; `..` and unresolvable symlinks fail closed. A shelf that
-  isn't a clean path, or is protected, is shown as the note's own folder.
-  (`docs/architecture/egress-threat-model.md`, row 16k.)
+  isn't a clean path, or is protected, is shown as the note's own folder, and
+  an archived or trashed note's `origin` only when it is clean and
+  unprotected. Main and view folder names are labels, not paths, and stay
+  visible. (`docs/architecture/egress-threat-model.md`, row 16k, with its
+  residuals.)
 - A folder row is listed to an agent only when `agent_listable` allows it
   and its own path is not a hidden or reference surface
   (`agent_listable_folder`).
