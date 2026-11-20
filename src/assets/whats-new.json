@@ -1,4 +1,19 @@
 {
+  "1.9.4": [
+    {
+      "title": "A hex trail in Tesven",
+      "body": "Long chats in Tesven get a small honeycomb trail beside the conversation. Pick it in Settings → Appearance → Conversation navigator; your pawprints or ears come back in every other theme."
+    },
+    {
+      "title": "Hand-typed permissions only say no",
+      "body": "A copy of Rotli's AI permissions typed into a note's metadata by hand can now only turn permission off, never on, on the Mac and in Rotli Web."
+    },
+    {
+      "title": "Notes found the way links find them",
+      "body": "rotli notes finds a note by title or alias the way a [[link]] does: letter case, accented letters too, and stray spaces don't matter.",
+      "platform": "mac"
+    }
+  ],
   "1.9.3": [
     {
       "title": "Tesven, an eighth theme",

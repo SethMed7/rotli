@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-11-19
+
 ### Added
 
 - **A hexagon trail for long chats in Tesven.** In Tesven, Settings →
@@ -73,13 +75,15 @@ builds.
   vault the person chose for threads, only through Rotli's `notes` command line or MCP and
   only under its own folder (Tesven's bot handoffs go in `Tesven/Bots/<name>/`). Additive,
   so the protocol stays `vault-threads/1`.
-- **`rotli notes` and agent tools find a note by title or alias the way a
-  `[[link]]` does:** spaces around an alias (an invisible byte-order mark
+- **`rotli notes` and agent tools find a note by title or alias the way a `[[link]]` does:**
+  spaces around an alias (an invisible byte-order mark
   included) and letter case, accented letters too, don't matter.
 - **Approving is yours, but Rotli says plainly what that relies on.**
   `rotli librarian apply` is an ordinary command, so an agent with a shell
   could run it too. `rotli librarian status`, the command help and the setup
   docs now say so; keep the shell off in vault threads.
+- **The TLS library under Rotli's network calls is up to date** (rustls
+  0.23.46).
 
 ## [1.9.3] - 2026-11-12
 
