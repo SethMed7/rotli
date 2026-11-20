@@ -217,9 +217,9 @@ fn verdict(text: &str, foreign: &[String], key: &str) -> (String, u8) {
     };
     let flag = |on: bool| (on.to_string(), u8::from(!on));
     match key {
-        "locked" => flag(crate::frontmatter_keys::locked(&foreign)),
+        "locked" => flag(crate::frontmatter_keys::locked(foreign)),
         // a chat's `secureContext` taint is secure too (review of PR #303, item 5)
-        "secure" => flag(crate::frontmatter_keys::secure(&foreign) || crate::protection_mark::marked(text, "secureContext")),
+        "secure" => flag(crate::frontmatter_keys::secure(foreign) || crate::protection_mark::marked(text, "secureContext")),
         "created_by" => says(super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
         "local_ai_allowed" => {
             let read = super::local_ai_allowed(foreign);

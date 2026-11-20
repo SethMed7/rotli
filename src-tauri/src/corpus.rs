@@ -3130,7 +3130,7 @@ impl CorpusStore {
                 fm.foreign.push("locked: true".to_string());
             }
             let out = self.compose_for(&text, &fm, body);
-            crate::frontmatter_keys::keeps(&text, &out, &["locked"], |fields| crate::frontmatter_keys::locked(&fields) == locked)?;
+            crate::frontmatter_keys::keeps(&text, &out, &["locked"], |fields| crate::frontmatter_keys::locked(fields) == locked)?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &out)
         })
@@ -3302,7 +3302,7 @@ impl CorpusStore {
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
             let out = with_secure_line_only(&text, secure);
-            crate::frontmatter_keys::keeps(&text, &out, &["secure", "local_ai_allowed"], |fields| crate::frontmatter_keys::secure(&fields) == secure)?;
+            crate::frontmatter_keys::keeps(&text, &out, &["secure", "local_ai_allowed"], |fields| crate::frontmatter_keys::secure(fields) == secure)?;
             if secure {
                 self.gitignore_add(rel)?;
             }
@@ -3333,7 +3333,7 @@ impl CorpusStore {
             crate::frontmatter_keys::remove_key(&mut fm.foreign, "secure");
             fm.foreign.push("secure: true".to_string());
             let out = compose_document(&fm, body);
-            crate::frontmatter_keys::keeps(&text, &out, &["secure"], |fields| crate::frontmatter_keys::secure(&fields))?;
+            crate::frontmatter_keys::keeps(&text, &out, &["secure"], crate::frontmatter_keys::secure)?;
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
             self.gitignore_add(rel)?;
@@ -3368,7 +3368,7 @@ impl CorpusStore {
             crate::frontmatter_keys::remove_key(&mut final_fm.foreign, key);
         }
         let out = compose_document(&final_fm, final_body);
-        crate::frontmatter_keys::keeps(&final_text, &out, &["secure", "local_ai_allowed"], |fields| !crate::frontmatter_keys::secure(&fields))?;
+        crate::frontmatter_keys::keeps(&final_text, &out, &["secure", "local_ai_allowed"], |fields| !crate::frontmatter_keys::secure(fields))?;
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &out)?;
         self.gitignore_remove(&final_rel)?;

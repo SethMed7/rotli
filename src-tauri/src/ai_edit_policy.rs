@@ -134,7 +134,7 @@ pub(crate) fn is_pure_insertion(before: &str, after: &str, text: &str) -> bool {
 
 /// The one body-edit verdict, from a note's foreign frontmatter lines.
 pub(crate) fn body_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
-    if crate::frontmatter_keys::locked(&foreign)
+    if crate::frontmatter_keys::locked(foreign)
     {
         return BodyEdit::Locked;
     }
