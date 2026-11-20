@@ -115,7 +115,7 @@ fn quoted_end(rest: &str, quote: char) -> Option<usize> {
 mod yaml;
 #[path = "frontmatter_writes.rs"]
 mod writes;
-pub(crate) use writes::{field_name, keeps, keeps_other_verdicts, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
+pub(crate) use writes::{field_name, guard_write, keeps, keeps_other_verdicts, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
 use yaml::{decoded_value, undecidable, Decoded};
 
 /// Whether a frontmatter line names `key` in any spelling, quoted keys
@@ -470,6 +470,63 @@ mod tests {
             let merged = merge_raw_frontmatter(original, &format!("id: 01J\n{line}\n")).unwrap();
             assert!(merged.contains(line), "{line:?} was altered:\n{merged}");
         }
+    }
+
+    /// The guard for the writer class (Codex re-check of PR #303): every
+    /// production function that composes a note's frontmatter runs
+    /// `guard_write` (or a wrapper of it) before writing, so no writer can
+    /// leave a note more permissive than the action owns. A new writer fails
+    /// this test until it does, or is named below with its reason.
+    #[test]
+    fn every_frontmatter_writer_runs_the_guard() {
+        const COMPOSERS: [&str; 8] = ["compose_for(", "compose_document(", "compose_in_place(", "with_top_level_line(", "with_key_lines(", "with_secure_line_only(", "with_view_tag(", "merge_raw_frontmatter("];
+        const GUARDS: [&str; 4] = ["guard_write(", "keeps(", "keeps_other_verdicts(", "leaves_managed("];
+        let exempt: std::collections::HashMap<&str, &str> = [
+            ("compose_for", "picks the composer for a write; each caller guards the result"),
+            ("create_marked", "creates a new note: there is no earlier frontmatter to loosen"),
+            ("compose_in_place", "a pure composer: returns text; its callers write and guard it"),
+            ("with_secure_line_only", "a pure composer: returns text; its callers write and guard it"),
+            ("with_top_level_line", "a pure composer: returns text; its callers write and guard it"),
+            ("with_view_tag", "a pure composer: returns text; its callers write and guard it"),
+        ]
+        .into_iter()
+        .collect();
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
+        let mut unguarded = Vec::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            if path.extension() != Some(std::ffi::OsStr::new("rs")) || name.contains("test") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let production = text.split(concat!("#[cfg(test)]\n", "mod tests")).next().unwrap_or_default();
+            // each function's text, from its `fn` line to the next one
+            let mut function: Option<(String, String)> = None;
+            let mut check = |function: Option<(String, String)>| {
+                let Some((fn_name, body)) = function else { return };
+                let composes = COMPOSERS.iter().any(|call| body.contains(call) && !call.starts_with(&format!("{fn_name}(")));
+                if composes && !GUARDS.iter().any(|guard| body.contains(guard)) && !exempt.contains_key(fn_name.as_str()) {
+                    unguarded.push(format!("{name}: {fn_name}"));
+                }
+            };
+            for line in production.lines() {
+                let trimmed = line.trim_start();
+                let declares = ["fn ", "pub fn ", "pub(crate) fn ", "pub(super) fn ", "async fn ", "pub(crate) async fn "].iter().find(|p| trimmed.starts_with(*p));
+                if let Some(prefix) = declares {
+                    check(function.take());
+                    let rest = &trimmed[prefix.len()..];
+                    let fn_name = rest.split(|c: char| !(c.is_alphanumeric() || c == '_')).next().unwrap_or_default().to_string();
+                    function = Some((fn_name, String::new()));
+                } else if let Some((_, body)) = function.as_mut() {
+                    body.push_str(line);
+                    body.push('\n');
+                }
+            }
+            check(function.take());
+        }
+        unguarded.sort();
+        assert!(unguarded.is_empty(), "frontmatter writers without guard_write: {unguarded:?}");
     }
 
     /// The guard for the class: a production reader of a key only Rust writes

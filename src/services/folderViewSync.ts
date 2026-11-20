@@ -2,6 +2,7 @@
 // restores only our own bytes; a newer external edit always wins.
 import { composeNoteDocument, emptyFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
+import { guardFrontmatterWrite } from "../lib/frontmatterWrites";
 import { readVersionedFile, textRevision, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
 import { FolderNotesService } from "./folderNotes";
@@ -110,6 +111,7 @@ export async function writeFolderViews(
           ? withTopLevelLine(opened.contents, "view_tag", tag ?? null)
           : composeNoteDocument({ ...fm, foreign }, parsed.body);
       if (applied === opened.contents) continue;
+      guardFrontmatterWrite(opened.contents, applied);
       await writeVersionedFile(dir, notePath, applied, opened.revision);
       written.push({ path: notePath, before: opened.contents, applied });
     }

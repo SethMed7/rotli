@@ -199,28 +199,62 @@ pub(crate) fn keeps_promise(text: &str, holds: impl Fn(&[String]) -> bool) -> Re
     }
 }
 
-/// The settings a note's metadata decides, and how each reads now.
+/// The settings a note's metadata decides. TypeScript's twin:
+/// frontmatterWrites.ts `SETTINGS`.
 const VERDICTS: [&str; 5] = ["created_by", "ai_edit", "local_ai_allowed", "locked", "secure"];
 
-fn verdict(foreign: &[String], key: &str) -> String {
+/// How a setting reads (to compare for equality) and how permissive that is
+/// (0 the most restrictive), so a write can be held to "never looser".
+fn verdict(foreign: &[String], key: &str) -> (String, u8) {
+    use super::Says;
+    let says = |says: Says| {
+        let rank = match says {
+            Says::Deny => 0,
+            Says::Unset => 1,
+            Says::Grant(_) => 2,
+        };
+        (format!("{says:?}"), rank)
+    };
+    let flag = |on: bool| (on.to_string(), u8::from(!on));
     match key {
-        "locked" => foreign.iter().any(|l| crate::corpus::locked_field(l) == Some(true)).to_string(),
-        "secure" => foreign.iter().any(|l| crate::corpus::secure_field(l) == Some(true)).to_string(),
-        "created_by" => format!("{:?}", super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
-        _ => format!("{:?}", super::owned_key(foreign, key, |v| v == "true")),
+        "locked" => flag(foreign.iter().any(|l| crate::corpus::locked_field(l) == Some(true))),
+        "secure" => flag(foreign.iter().any(|l| crate::corpus::secure_field(l) == Some(true))),
+        "created_by" => says(super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
+        "local_ai_allowed" => {
+            let read = super::local_ai_allowed(foreign);
+            (format!("{read:?}"), read.map_or(1, |on| if on { 2 } else { 0 }))
+        }
+        _ => says(super::owned_key(foreign, key, |v| v == "true")),
     }
 }
 
-/// Refuse a write that changes how any setting it doesn't own reads: a
-/// generic edit, or one setting's write, never erases another's denial
-/// (Codex review of PR #303, second round).
-pub(crate) fn keeps_other_verdicts(before: &str, after: &str, owned: &[&str]) -> Result<(), String> {
+/// THE guard every frontmatter writer runs (a source test names each one):
+/// a setting in `owned` may change as the action says; one in `tighten` may
+/// only become more restrictive; every other must read exactly as before.
+/// Refused, nothing is written (Codex re-check of PR #303).
+pub(crate) fn guard_write(before: &str, after: &str, owned: &[&str], tighten: &[&str]) -> Result<(), String> {
     let read = |text: &str| crate::corpus::parse_document(text).0.unwrap_or_default().foreign;
     let (before, after) = (read(before), read(after));
-    match VERDICTS.iter().find(|key| !owned.contains(key) && verdict(&before, key) != verdict(&after, key)) {
-        None => Ok(()),
-        Some(_) => Err(UNSAFE.into()),
+    let breaks = |key: &&str| {
+        let (was, now) = (verdict(&before, key), verdict(&after, key));
+        if owned.contains(key) {
+            false
+        } else if tighten.contains(key) {
+            now.1 > was.1
+        } else {
+            now.0 != was.0
+        }
+    };
+    if VERDICTS.iter().any(breaks) {
+        Err(UNSAFE.into())
+    } else {
+        Ok(())
     }
+}
+
+/// [`guard_write`] for an action that owns `owned` and tightens nothing.
+pub(crate) fn keeps_other_verdicts(before: &str, after: &str, owned: &[&str]) -> Result<(), String> {
+    guard_write(before, after, owned, &[])
 }
 
 #[cfg(test)]

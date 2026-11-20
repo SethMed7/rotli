@@ -106,7 +106,11 @@ fn without_aliases(text: &str, remove: &[String]) -> Option<String> {
     } else {
         fm.foreign[at] = format!("aliases: {}", serde_json::to_string(&after).ok()?);
     }
-    Some(compose_document(&fm, raw))
+    let out = compose_document(&fm, raw);
+    // like every frontmatter writer: a cleanup that would change how a
+    // setting reads is skipped, never written
+    crate::frontmatter_keys::guard_write(text, &out, &[], &[]).ok()?;
+    Some(out)
 }
 
 impl CorpusStore {

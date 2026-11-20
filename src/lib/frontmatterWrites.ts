@@ -3,7 +3,17 @@
 // parity.json (`removeKeyCases`). A key goes as a whole (its line, the lines
 // indented under it, a `? key`'s `: value` line) and never by deleting text
 // inside a block scalar (`example: |`) (Codex review of pull request 303).
-import { frontmatterField, namesKey, PERMISSION_KEYS, topLevelKey } from "./frontmatterKeys";
+import { AI_CREATORS } from "./aiEditPolicy";
+import { emptyFrontmatter, isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "./frontmatter";
+import {
+  frontmatterField,
+  localAiAllowedOverride,
+  namesKey,
+  ownedKey,
+  PERMISSION_KEYS,
+  type Says,
+  topLevelKey,
+} from "./frontmatterKeys";
 
 /** Keys read in any spelling that protect a note, besides the permission keys. */
 export const PROTECTION_KEYS = ["locked", "secure"] as const;
@@ -130,12 +140,46 @@ export function keepPromise(holds: boolean): void {
 /** Refuse a write that changes how any setting it doesn't own reads (twin
  * of frontmatter_writes.rs `keeps_other_verdicts`): `read` gives each
  * setting's verdict for a written text. */
-export function keepOtherVerdicts(
+/** The settings a note's metadata decides (frontmatter_writes.rs `VERDICTS`). */
+export const SETTINGS = ["created_by", "ai_edit", "local_ai_allowed", "locked", "secure"] as const;
+export type Setting = (typeof SETTINGS)[number];
+
+const SAYS_RANK = { deny: 0, unset: 1, grant: 2 } as const;
+
+/** How each setting reads in a note's text, and how permissive that is (0 the
+ * most restrictive): the twin of frontmatter_writes.rs `verdict`. */
+export function settingsOf(text: string): Record<Setting, { reads: string; rank: number }> {
+  const fm = parseNoteDocument(text).frontmatter ?? emptyFrontmatter();
+  const says = (read: Says) => ({ reads: read.says, rank: SAYS_RANK[read.says] });
+  const flag = (on: boolean) => ({ reads: String(on), rank: on ? 0 : 1 });
+  const local = localAiAllowedOverride(fm.foreign);
+  return {
+    created_by: says(
+      ownedKey(fm.foreign, "created_by", (value) => (AI_CREATORS as readonly string[]).includes(value)),
+    ),
+    ai_edit: says(ownedKey(fm.foreign, "ai_edit", (value) => value === "true")),
+    local_ai_allowed: { reads: String(local), rank: local === null ? 1 : local ? 2 : 0 },
+    locked: flag(isLockedFrontmatter(fm)),
+    secure: flag(isSecureFrontmatter(fm)),
+  };
+}
+
+/** THE guard every Web frontmatter writer runs (frontmatterWrites.test.ts
+ * names each one), twin of frontmatter_writes.rs `guard_write`: a setting in
+ * `owned` may change as the action says; one in `tighten` may only become
+ * more restrictive; every other must read exactly as before. Throws, and the
+ * caller writes nothing (Codex re-check of pull request 303). */
+export function guardFrontmatterWrite(
   before: string,
   after: string,
-  owned: readonly string[],
-  read: (text: string) => Record<string, string>,
+  rule: { owned?: readonly Setting[]; tighten?: readonly Setting[] } = {},
 ): void {
-  const [was, now] = [read(before), read(after)];
-  if (Object.keys(was).some((key) => !owned.includes(key) && was[key] !== now[key])) throw new Error(UNSAFE);
+  const [was, now] = [settingsOf(before), settingsOf(after)];
+  const breaks = (key: Setting) =>
+    rule.owned?.includes(key)
+      ? false
+      : rule.tighten?.includes(key)
+        ? now[key].rank > was[key].rank
+        : now[key].reads !== was[key].reads;
+  if (SETTINGS.some(breaks)) throw new Error(UNSAFE);
 }

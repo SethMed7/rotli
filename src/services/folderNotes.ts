@@ -13,14 +13,8 @@ import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isSkippedDir } from "../lib/fileKind";
-import {
-  composeNoteDocument,
-  parseNoteDocument,
-  withShelf,
-  isLockedFrontmatter,
-  isSecureFrontmatter,
-} from "../lib/frontmatter";
-import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
+import { parseNoteDocument, withShelf, isLockedFrontmatter, isSecureFrontmatter } from "../lib/frontmatter";
+import { rotliMade } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
@@ -60,7 +54,7 @@ import {
   under,
   withoutSinkPrefix,
 } from "./folderNoteRelocation";
-import { movedNoteText, ownedNoteFacts, savedNoteText } from "./folderNoteStamps";
+import { movedNoteText, originClearedText, ownedNoteFacts, savedNoteText } from "./folderNoteStamps";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import {
@@ -571,10 +565,7 @@ export class FolderNotesService implements NotesService {
     const { frontmatter, body } =
       original === null ? { frontmatter: null, body: "" } : parseNoteDocument(original);
     if (original !== null && frontmatter && frontmatter.origin !== null) {
-      const text =
-        this.inPlace && !rotliMade(frontmatter)
-          ? withTopLevelLine(original, "origin", null)
-          : composeNoteDocument({ ...frontmatter, origin: null }, body);
+      const text = originClearedText(original, frontmatter, body, this.inPlace && !rotliMade(frontmatter));
       await this.writeFile(path, text, contentRevision(original));
     }
     const note = await this.noteAt(path);

@@ -1,7 +1,8 @@
 // Owned metadata on a hand-written fenced note, matching the Rust corpus
 // write_resolved / relocate paths. The browser has mtime but no birth time.
 import { composeNoteDocument, type NoteFrontmatter } from "../lib/frontmatter";
-import { composeInPlace } from "../lib/frontmatterInPlace";
+import { composeInPlace, withTopLevelLine } from "../lib/frontmatterInPlace";
+import { guardFrontmatterWrite } from "../lib/frontmatterWrites";
 import { stampToMs, today, ulid } from "../memex/contract";
 
 export function ownedNoteFacts(
@@ -31,7 +32,10 @@ export function savedNoteText(
   asWritten: boolean,
 ): string {
   if (asWritten) return `${original.slice(0, original.length - currentBody.length)}${body}`;
-  return frontmatter ? composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body) : body;
+  if (!frontmatter) return body;
+  const saved = composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body);
+  guardFrontmatterWrite(original, saved);
+  return saved;
 }
 
 /** The text a move writes before relocating, or `null` when the bytes stay.
@@ -47,6 +51,7 @@ export function movedNoteText(
 ): string | null {
   if (asWritten) {
     const text = composeInPlace(original, next);
+    guardFrontmatterWrite(original, text);
     return text === original ? null : text;
   }
   const changed =
@@ -55,5 +60,23 @@ export function movedNoteText(
     next.updated !== frontmatter.updated ||
     next.origin !== frontmatter.origin ||
     next.foreign !== frontmatter.foreign;
-  return changed ? composeNoteDocument(next, body) : null;
+  if (!changed) return null;
+  const moved = composeNoteDocument(next, body);
+  guardFrontmatterWrite(original, moved);
+  return moved;
+}
+
+/** The text with a note's `origin` breadcrumb cleared (a note leaving Trash
+ * or Archive): only that line in place, a recomposed document elsewhere. */
+export function originClearedText(
+  original: string,
+  frontmatter: NoteFrontmatter,
+  body: string,
+  asWritten: boolean,
+): string {
+  const text = asWritten
+    ? withTopLevelLine(original, "origin", null)
+    : composeNoteDocument({ ...frontmatter, origin: null }, body);
+  guardFrontmatterWrite(original, text);
+  return text;
 }

@@ -1,6 +1,7 @@
 // Durable selectors: Rust note_aliases / preserve_rename_aliases twins.
 import { fileNameStem } from "../lib/fileKind";
 import { type NoteFrontmatter, composeNoteDocument, parseNoteDocument } from "../lib/frontmatter";
+import { guardFrontmatterWrite } from "../lib/frontmatterWrites";
 import { isPlaceholderAlias, isTitleTypingTrail } from "../memex/aliases";
 import { noteSlugify } from "../memex/contract";
 import { isSecureNote } from "./folderMemexNotes";
@@ -87,5 +88,7 @@ export async function prepareFolderTitleRename(
       : await freeVaultPath(dir, parentPath(path), desired, (stem, ext, n) => `${stem} (${n})${ext}`);
   const fm = withRenameAliases(parsed.frontmatter, path, oldTitle, newTitle);
   if (target !== path && isSecureNote(text)) await updateGitExclusions(dir, [target]);
-  return { path: target, text: composeNoteDocument(fm, parsed.body) };
+  const renamed = composeNoteDocument(fm, parsed.body);
+  guardFrontmatterWrite(text, renamed);
+  return { path: target, text: renamed };
 }

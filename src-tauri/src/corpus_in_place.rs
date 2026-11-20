@@ -104,3 +104,19 @@ pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
     }
     text
 }
+
+/// Set (`Some`) or remove (`None`) a Rotli vault note's `view_tag` line,
+/// recomposing its frontmatter (moved from corpus.rs; `views_write_unlocked`
+/// guards the result like every frontmatter writer).
+pub(crate) fn with_view_tag(text: &str, tag: Option<&str>) -> String {
+    let (frontmatter, body) = parse_document(text);
+    let mut frontmatter = frontmatter.unwrap_or_default();
+    frontmatter.foreign.retain(|line| {
+        line.split_once(':')
+            .is_none_or(|(key, _)| key != key.trim() || key != "view_tag")
+    });
+    if let Some(tag) = tag {
+        frontmatter.foreign.push(format!("view_tag: {tag}"));
+    }
+    super::compose_document(&frontmatter, body)
+}

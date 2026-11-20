@@ -1512,7 +1512,7 @@ pub(crate) use walk_text::walked_secure;
 use walk_text::{searchable_metadata, CachedNoteText};
 #[path = "corpus_in_place.rs"]
 mod in_place;
-use in_place::{compose_in_place, rotli_made, with_secure_line_only};
+use in_place::{compose_in_place, rotli_made, with_secure_line_only, with_view_tag};
 
 pub(crate) const STORAGE_OFFICE_EXTS: [&str; 6] = ["xlsx", "csv", "docx", "docm", "dotx", "dotm"];
 pub(crate) const MANAGED_FILE_EXTS: [&str; 2] = ["xlsx", "docx"];
@@ -2532,19 +2532,6 @@ fn validated_view_membership(manifest: &ViewsManifest) -> Result<HashMap<String,
     Ok(membership)
 }
 
-fn with_view_tag(text: &str, tag: Option<&str>) -> String {
-    let (frontmatter, body) = parse_document(text);
-    let mut frontmatter = frontmatter.unwrap_or_default();
-    frontmatter.foreign.retain(|line| {
-        line.split_once(':')
-            .is_none_or(|(key, _)| key != key.trim() || key != "view_tag")
-    });
-    if let Some(tag) = tag {
-        frontmatter.foreign.push(format!("view_tag: {tag}"));
-    }
-    compose_document(&frontmatter, body)
-}
-
 impl CorpusStore {
     /// Open (or first-run-initialize) a corpus at `root`. The dispatcher: probe
     /// `root/memex.json` once — a valid `mx_` id routes to the memex path (browse
@@ -3171,8 +3158,10 @@ impl CorpusStore {
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
             fm.pinned = Some(pinned);
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::guard_write(&text, &out, &[], &[])?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3256,6 +3245,8 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
+            // the person owns lock and secure here; a permission may only tighten
+            crate::frontmatter_keys::guard_write(&text, &out, &["locked", "secure"], &crate::frontmatter_keys::PERMISSION_KEYS)?;
             if out == text {
                 return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
             }
@@ -4937,6 +4928,7 @@ impl CorpusStore {
         }
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
+        crate::frontmatter_keys::guard_write(&existing, &text, &[], &[])?;
         // Rewrite in place first, then use the filesystem's rename operation.
         // The former copy-to-target + ignored remove_file failure could leave
         // two independent files with the same durable note id; a later index
@@ -5220,6 +5212,7 @@ impl CorpusStore {
         // both paths are OUR writes — neither should echo back as external
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
+        crate::frontmatter_keys::guard_write(&text, &out, &[], &["secure"])?; // into a secure home: secure only tightens
         // Rewrite the single source inode first, then move it. Never implement
         // an identity-preserving move as copy + best-effort delete: a failed
         // delete creates duplicate durable ids and unstable reachability.
@@ -5734,6 +5727,7 @@ impl CorpusStore {
                 if updated == original {
                     return Ok(None);
                 }
+                crate::frontmatter_keys::guard_write(&original, &updated, &[], &[])?;
                 self.suppress.mark(path);
                 atomic_write(path, &updated)?;
                 Ok(Some((original, updated)))

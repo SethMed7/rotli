@@ -347,7 +347,11 @@ builds until that review has checked these fixes:
    `setters_keep_block_text_and_remove_whole_spans`,
    `a_key_spelled_with_a_space_before_its_colon_is_replaced_in_place` (with
    twins in `folderPermissionSetters.test.ts` and `frontmatterInPlace.test.ts`),
-   and the parity fixtures `protectionFlagCases` and `removeKeyCases`. Limits, documented: text that refers to a note
+   and the parity fixtures `protectionFlagCases` and `removeKeyCases`; from
+   its re-check, `pinning_and_raw_saves_never_loosen_a_permission` (with
+   twins in `folderPermissionSetters.test.ts`), the unresolved-alias cases in
+   `localAiAllowedCases`, and the writer guards
+   `every_frontmatter_writer_runs_the_guard` and `frontmatterWriters.test.ts`. Limits, documented: text that refers to a note
    in other words than its title or an alias (a nickname, a description)
    can't be recognised and stays shown; a note known only by its path can't
    be indexed or logged; once a secure original is deleted, a copy that

@@ -227,3 +227,25 @@ fn turning_secure_off_clears_a_quoted_secure_line_in_place() {
     let foreign = parse_document(&disk(&store, &rel)).0.unwrap_or_default().foreign;
     assert_eq!(foreign, ["tags: [plan]"]);
 }
+
+/// Codex re-check of PR #303 (lead 1): pinning removed a denial indented
+/// under `pinned:`; (lead 2) a raw metadata save could delete a typed
+/// denial. Neither may leave the note more permissive; a raw save may tighten.
+#[test]
+fn pinning_and_raw_saves_never_loosen_a_permission() {
+    for (_dir, mut store) in both_kinds() {
+        let rel = note(&mut store, "id: 01PLANNOTE\ncreated_by: agent\npinned: false\n  ai_edit: false\n");
+        let _ = store.set_pinned(&rel, true);
+        let foreign = parse_document(&disk(&store, &rel)).0.unwrap_or_default().foreign;
+        assert_eq!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Revoked, "adopted={}", store.adopted);
+
+        let rel = note(&mut store, "id: 01PLANNOTE\ncreated_by: agent\n\"ai_edit\": false\n");
+        let before = disk(&store, &rel);
+        assert!(store.write_frontmatter_raw(&rel, "id: 01PLANNOTE\ncreated_by: agent\n").is_err(), "adopted={}", store.adopted);
+        assert_eq!(disk(&store, &rel), before);
+        let rel = note(&mut store, "id: 01PLANNOTE\ncreated_by: agent\n");
+        store.write_frontmatter_raw(&rel, "id: 01PLANNOTE\ncreated_by: agent\n  ai_edit: false\n").unwrap();
+        let foreign = parse_document(&disk(&store, &rel)).0.unwrap_or_default().foreign;
+        assert_eq!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Revoked);
+    }
+}

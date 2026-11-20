@@ -7,7 +7,7 @@
 // are read. Key identity is "a scalar whose text is the key"; a repeat is
 // counted for the one key asked about and nothing else, so neither library's
 // duplicate or number rules decide anything (Codex review of pull request 303).
-import { isAlias, isMap, isPair, isScalar, isSeq, parse as parseYaml, parseDocument } from "yaml";
+import { isAlias, isMap, isPair, isScalar, isSeq, parse as parseYaml, parseDocument, visit } from "yaml";
 
 /** The most frontmatter read, in UTF-8 bytes, and the deepest nesting
  * accepted; past either the frontmatter is refused, which denies. */
@@ -69,10 +69,30 @@ function nesting(root: unknown): number {
   return deepest;
 }
 
+/** Whether an alias names an anchor not defined before it. yaml-rust2's
+ * parser refuses such a document and `yaml` doesn't, so it counts as one
+ * that won't parse on both sides (Codex re-check of pull request 303, lead 3). */
+function unresolvedAlias(doc: ReturnType<typeof parseDocument>): boolean {
+  const anchors = new Set<string>();
+  let unresolved = false;
+  visit(doc, {
+    Node(_key, node) {
+      if (isAlias(node)) {
+        if (!anchors.has(node.source)) {
+          unresolved = true;
+          return visit.BREAK;
+        }
+      } else if (node.anchor) anchors.add(node.anchor);
+      return undefined;
+    },
+  });
+  return unresolved;
+}
+
 /** One read of the text; null when it won't parse. */
 function readRoot(block: string, key: string): Decoded | null {
   const doc = parseDocument(block, { uniqueKeys: false });
-  if (doc.errors.length > 0) return null;
+  if (doc.errors.length > 0 || unresolvedAlias(doc)) return null;
   if (nesting(doc.contents) > DECODE_MAX_DEPTH) return REFUSED;
   if (!isMap(doc.contents)) return { refused: false, value: null };
   const found: string[] = [];

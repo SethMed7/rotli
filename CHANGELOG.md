@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   off removes Rotli's line with everything under it, never a line inside a
   block of text in your metadata, and never changes another setting; if a
   change would, Rotli says so and leaves the note as it was.
+- **No metadata change makes a note more open to AI than you asked.**
+  Pinning, saving, moving, renaming, changing a note's views and editing its
+  raw metadata are each checked: if one would change who may edit or read
+  the note, Rotli leaves the note as it was and says so. In the raw
+  metadata editor you can still add a "no" for AI, but not remove one; use
+  the note's menu for that.
 - **The Librarian's index hides notes more reliably** (the Librarian agent
   route, which still runs only in development builds). An entry that
   mentions a hidden note by title or alias is caught in any case or letter

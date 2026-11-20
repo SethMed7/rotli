@@ -1,18 +1,22 @@
 // The web twin of the corpus protection and raw-metadata commands.
 import { looksSecret } from "../ai/guard";
-import { AI_CREATORS } from "../lib/aiEditPolicy";
 import {
   composeNoteDocument,
   emptyFrontmatter,
-  isLockedFrontmatter,
   isSecureFrontmatter,
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
-import { localAiAllowedOverride, ownedKey } from "../lib/frontmatterKeys";
+import { PERMISSION_KEYS } from "../lib/frontmatterKeys";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
-import { keepOtherVerdicts, keepPromise, removeKey } from "../lib/frontmatterWrites";
+import {
+  guardFrontmatterWrite,
+  keepPromise,
+  removeKey,
+  type Setting,
+  settingsOf,
+} from "../lib/frontmatterWrites";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -41,31 +45,15 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
   ],
 });
 
-/** How each setting a note's metadata decides reads in a written note. */
-function settingsOf(text: string): Record<string, string> {
-  const fm = parseNoteDocument(text).frontmatter ?? emptyFrontmatter();
-  return {
-    created_by: ownedKey(fm.foreign, "created_by", (value) =>
-      (AI_CREATORS as readonly string[]).includes(value),
-    ).says,
-    ai_edit: ownedKey(fm.foreign, "ai_edit", (value) => value === "true").says,
-    local_ai_allowed: String(localAiAllowedOverride(fm.foreign)),
-    locked: String(isLockedFrontmatter(fm)),
-    secure: String(isSecureFrontmatter(fm)),
-  };
-}
-
-/** A protection or permission write checked both ways: it says what it
- * promised, and no setting outside `owned` reads differently. */
 function keepWrite(
   before: string,
   after: string,
-  owned: readonly string[],
-  key: string,
+  owned: readonly Setting[],
+  key: Setting,
   promised: string,
 ): void {
-  keepPromise(settingsOf(after)[key] === promised);
-  keepOtherVerdicts(before, after, owned, settingsOf);
+  keepPromise(settingsOf(after)[key].reads === promised);
+  guardFrontmatterWrite(before, after, { owned });
 }
 
 function assertSecureRemoval(body: string): void {
@@ -170,7 +158,7 @@ export async function setFolderProtection(
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
-  const owned = key === "local_ai_allowed" ? [key, "secure"] : [key];
+  const owned: Setting[] = key === "local_ai_allowed" ? [key, "secure"] : [key];
   keepWrite(
     opened.contents,
     text,
@@ -192,6 +180,7 @@ export async function setFolderPinned(dir: VaultDir, path: string, pinned: boole
   if (!path.endsWith(".md")) throw new Error("not a Markdown note");
   const opened = await readVersionedFile(dir, path);
   const next = withTopLevelLine(opened.contents, "pinned", pinned ? "true" : null);
+  guardFrontmatterWrite(opened.contents, next);
   if (next !== opened.contents) await writeVersionedFile(dir, path, next, opened.revision);
 }
 
@@ -206,6 +195,8 @@ export async function writeFolderRawMetadata(
   if (!revision || opened.revision !== revision)
     throw new Error("revision conflict: note changed after metadata was opened");
   const next = mergeRawFrontmatter(opened.contents, block);
+  // the person owns lock and secure here; a permission may only tighten
+  guardFrontmatterWrite(opened.contents, next, { owned: ["locked", "secure"], tighten: PERMISSION_KEYS });
   if (next === opened.contents) return opened.revision;
   const was = parseNoteDocument(opened.contents).frontmatter;
   const after = parseNoteDocument(next).frontmatter;

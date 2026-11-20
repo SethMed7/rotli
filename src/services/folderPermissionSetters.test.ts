@@ -7,7 +7,12 @@ import { describe, expect, test } from "bun:test";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { parseNoteDocument } from "../lib/frontmatter";
 import { frontmatterField, localAiAllowedOverride } from "../lib/frontmatterKeys";
-import { setFolderProtection } from "./folderMetadata";
+import {
+  readFolderRawMetadata,
+  setFolderPinned,
+  setFolderProtection,
+  writeFolderRawMetadata,
+} from "./folderMetadata";
 import { MemoryVaultDir } from "./vaultDir";
 
 const MARKER = `${JSON.stringify({ id: "mx_test123", contract: "3.4" })}\n`;
@@ -109,5 +114,37 @@ for (const inPlace of [true, false]) {
       "Edit the note's metadata by hand",
     );
     expect(await dir.readText(PATH)).toBe(text);
+  });
+}
+
+// Codex re-check of pull request 303 (lead 1): pinning removed a denial
+// indented under `pinned:`, and (lead 2) a raw metadata save could delete a
+// typed denial; neither may leave the note more permissive.
+for (const inPlace of [true, false]) {
+  const where = inPlace ? "in place" : "Rotli vault";
+  test(`pinning never loosens AI editing (${where})`, async () => {
+    const text = "---\nid: n8\ncreated_by: agent\npinned: false\n  ai_edit: false\n---\n# Plan\n";
+    const dir = await vault(inPlace, text);
+    await setFolderPinned(dir, PATH, true).catch(() => undefined);
+    expect(bodyEdit(await fields(dir))).toBe("revoked");
+  });
+
+  test(`a raw metadata save never loosens a permission, but may tighten one (${where})`, async () => {
+    const text = '---\nid: n9\ncreated_by: agent\n"ai_edit": false\n---\n# Plan\n';
+    const dir = await vault(inPlace, text);
+    const { revision } = await readFolderRawMetadata(dir, PATH);
+    await expect(
+      writeFolderRawMetadata(dir, PATH, "id: n9\ncreated_by: agent\n", revision),
+    ).rejects.toThrow();
+    expect(await dir.readText(PATH)).toBe(text);
+    const open = await vault(inPlace, "---\nid: n10\ncreated_by: agent\n---\n# Plan\n");
+    const opened = await readFolderRawMetadata(open, PATH);
+    await writeFolderRawMetadata(
+      open,
+      PATH,
+      "id: n10\ncreated_by: agent\n  ai_edit: false\n",
+      opened.revision,
+    );
+    expect(bodyEdit(await fields(open))).toBe("revoked");
   });
 }

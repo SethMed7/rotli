@@ -333,9 +333,17 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `remove_key` (`frontmatterWrites.ts` `removeKey`): its line, the lines
   under it, a `? key`'s `: value` line, never text inside a block scalar;
   and refuses, writing nothing, when the result wouldn't say what it
-  promised or would change how any setting it doesn't own reads
-  (`keeps`, `keeps_other_verdicts`; Rotli Web's `keepWrite`), the generic
-  and filer field writes included. In a folder opened in place,
+  promised or would change how any setting it doesn't own reads. That is
+  one guard, `frontmatter_writes.rs` `guard_write` (Rotli Web:
+  `frontmatterWrites.ts` `guardFrontmatterWrite`), and every writer of a
+  note's frontmatter runs it: the setters, the generic and filer field
+  writes, pin, body save, move, rename and alias cleanup, view tags, and the
+  raw metadata editor, where the person owns lock and secure and a
+  permission may only tighten (a typed `ai_edit: false` can be added there,
+  never removed). Source tests fail on a writer that doesn't
+  (`every_frontmatter_writer_runs_the_guard`, `frontmatterWriters.test.ts`).
+  An alias naming no anchor before it makes frontmatter unparseable on both
+  sides (yaml-rust2 refuses it; `yaml` is held to the same). In a folder opened in place,
   `compose_in_place` (`composeInPlace`) copies the action's own lines for a
   changed key verbatim, never a line built from a decoded value, and the
   generic setters (`set_field`, the filer's `set_ai_field`) check the key
