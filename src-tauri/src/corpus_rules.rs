@@ -53,6 +53,25 @@ impl CorpusStore {
         in_secure_home_path(rel)
     }
 
+    /// May a remote agent SEE that this path exists at all? Folders and
+    /// surfaced files carry no frontmatter, so nothing per-item marks them —
+    /// the surface predicate is the only policy they have, and the workspace
+    /// listing lane was applying none (audit 2026-08-01, GAP 8). Nothing in a
+    /// secure home is, not even a folder's name (Codex review of pull request
+    /// 302: `wiki/_secure/<name>` was listed). The corpus root ("") always is;
+    /// it is the tree the agent was handed.
+    pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
+        let (_, rel) = super::split_root_id(id_or_rel);
+        if rel.is_empty() {
+            return true;
+        }
+        let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
+        !matches!(
+            super::surfaced(self.layout, &rel),
+            super::Surface::Hidden | super::Surface::Reference
+        ) && !self.in_secure_home(&super::lifecycle_disk_folder(self.layout, &rel))
+    }
+
     /// Frontmatter-free file visibility for AI in either vault layout.
     pub(crate) fn file_is_protected(&self, rel: &str) -> bool {
         let title = std::path::Path::new(rel)

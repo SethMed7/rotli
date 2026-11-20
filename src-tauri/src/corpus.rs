@@ -4002,25 +4002,6 @@ impl CorpusStore {
         }
     }
 
-    /// May a remote agent SEE that this path exists at all? Folders and
-    /// surfaced files carry no frontmatter, so nothing per-item marks them —
-    /// the surface predicate is the only policy they have, and the workspace
-    /// listing lane was applying none (audit 2026-08-01, GAP 8). The corpus
-    /// root ("") is always listable; it is the tree the agent was handed.
-    pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
-        let (_, rel) = split_root_id(id_or_rel);
-        if rel.is_empty() {
-            return true;
-        }
-        let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
-        // nothing in a secure home, not even a folder's name (Codex review of
-        // pull request 302: `wiki/_secure/<name>` was listed to agents)
-        !matches!(
-            surfaced(self.layout, &rel),
-            Surface::Hidden | Surface::Reference
-        ) && !self.in_secure_home(&lifecycle_disk_folder(self.layout, &rel))
-    }
-
     pub(crate) fn move_for_remote_agent(
         &mut self,
         id: &str,
