@@ -1,12 +1,13 @@
-//! The workspace's note listing (`rotli notes list`, MCP `list_notes`): the
+//! The workspace's note listing (`rotli notes list`, MCP `rotli_list`): the
 //! newest rows a remote agent may see, and the folders beside them.
 //!
 //! Gating a row is the expensive part — a file's whole bytes are read and
 //! secret-scanned before even its name is shown — so it is proportional to
 //! the answer, not to the vault. Rows are gated in the walk's order until the
-//! limit is met; past it, a row is gated only when it alone could add a
-//! folder (a shelf, or the memex `Storage` destination) no gated row has
-//! added yet. The answer is the one gating every row would give: a vault's
+//! limit is met. Past it, every note is still gated (its shelf is read from
+//! its frontmatter), but a board or a file only when its path alone could add
+//! a folder (the memex `Storage` destination) no gated row has added yet. The
+//! answer is the one gating every row would give: a vault's
 //! `storage/` held thousands of files and the listing took minutes
 //! (2026-11-20).
 
@@ -30,7 +31,10 @@ impl Workspace {
         let mut backing = Vec::new();
         for meta in notes {
             let shown = kept.len() < cap;
-            if !shown && adds_no_folder(&known, &meta.folder_id) {
+            // a note's folder can come from its frontmatter (a shelf), which
+            // may have changed since the walk: past the limit, only a board's
+            // or a file's folder, read from its path, is trusted from the walk
+            if !shown && meta.kind != NoteKind::Note && adds_no_folder(&known, &meta.folder_id) {
                 continue;
             }
             let Some(row) = self.remote_row(&meta) else {

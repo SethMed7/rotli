@@ -80,8 +80,8 @@ fn listing_gates_rows_in_proportion_to_its_limit_not_to_the_vault() {
     let listed = ws.list_remote(3).unwrap();
     let gated = ROWS_GATED.with(|count| count.get());
     assert_eq!(listed.notes.len(), 3);
-    // the three shown, the shelved note, and the storage files up to the
-    // first visible one; never the 200 older assets
+    // every note (nine), and the storage files up to the first visible one;
+    // never the 200 older assets
     assert!(gated <= 12, "gated {gated} rows for a listing of 3");
 }
 
@@ -103,4 +103,36 @@ fn listing_returns_what_gating_every_row_returned() {
     assert!(all.notes.first().is_some_and(|meta| meta.title == "Pinned"), "{:?}", all.notes.first());
     assert!(all.notes.iter().any(|meta| meta.title == "near.csv"));
     assert!(!all.notes.iter().any(|meta| meta.title == "Token" || meta.title == "secret.txt"));
+    // Codex review of pull request 302, #1: a shelf is read from frontmatter,
+    // so a note past the limit that moved shelf since the walk still brings
+    // its new folder, as gating every row did
+    let moved = note("01LIST00000000000000000005", "shelf: [wiki/New/Shelf]\n", "Recent 5", "plain");
+    put(temp.path(), "wiki/Projects/recent-5.md", &moved, 5);
+    for limit in [0, 1, 3, 600] {
+        let expected = listed_by_gating_every_row(&mut ws, limit);
+        let listed = ws.list_remote(limit).unwrap();
+        assert_eq!(json(&listed), json(&expected), "after the edit, limit {limit}");
+        let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
+        assert!(ids.contains(&"wiki/New/Shelf") && ids.contains(&"wiki/New"), "limit {limit}: {ids:?}");
+    }
+}
+
+/// Codex review of pull request 302, #2 (older than the pull request): a
+/// directory inside a secure home was listed to agents by name, even with
+/// no rows asked for, while every note in it stayed hidden.
+#[test]
+fn no_folder_inside_a_secure_home_is_listed_to_agents() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+    put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
+    put(root, "wiki/_secure/PrivateFolder/kept.md", &note("01LISTKEPT00000000000000000", "", "Kept", "plain"), 2);
+    let mut ws = test_workspace(&temp);
+    for limit in [0, 100] {
+        let listed = ws.list_remote(limit).unwrap();
+        let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
+        assert!(ids.contains(&"wiki/Projects"), "{ids:?}");
+        assert!(!ids.iter().any(|id| id.contains("_secure") || id.contains("PrivateFolder")), "limit {limit}: {ids:?}");
+        assert!(!listed.notes.iter().any(|meta| meta.title == "Kept"));
+    }
 }

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing the newest hundred. It now stops once it has what it shows, and
   lists the same notes and folders in the same order.
 
+### Security
+
+- **Agents no longer see the names of folders inside a secure home.** A folder
+  under `wiki/_secure/` or `Secure notes/` was listed to agents by name, though
+  every note in it stayed hidden. Your own sidebar is unchanged.
+
 ## [1.9.4] - 2026-11-19
 
 ### Added

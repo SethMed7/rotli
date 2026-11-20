@@ -4013,10 +4013,12 @@ impl CorpusStore {
             return true;
         }
         let rel = self.resolve_note_rel(&rel).unwrap_or(rel);
+        // nothing in a secure home, not even a folder's name (Codex review of
+        // pull request 302: `wiki/_secure/<name>` was listed to agents)
         !matches!(
             surfaced(self.layout, &rel),
             Surface::Hidden | Surface::Reference
-        )
+        ) && !self.in_secure_home(&lifecycle_disk_folder(self.layout, &rel))
     }
 
     pub(crate) fn move_for_remote_agent(

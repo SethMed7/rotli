@@ -400,11 +400,13 @@ roots carry their root-prefixed wire id in the link.
   human explicitly requests them.
 - MCP list/search results are capped. Note reads default to 20,000 characters
   and expose `offset`, `nextOffset`, and `totalChars` for paging.
-- `rotli notes list` and `rotli_list` gate rows newest first and stop once
-  the limit is met. Past the limit a row is gated only when it alone would add
-  a folder (a shelf, or the memex `Storage` destination) to the listing, so the
-  cost follows the answer, not the size of `storage/`. Notes, folders, order,
-  and ids match gating every row (`workspace_listing.rs`).
+- `rotli notes list` and `rotli_list` gate rows newest first until the limit
+  is met. Past the limit every note is still gated (a shelf folder comes from
+  its frontmatter), but a board or file only when its path alone would add a
+  folder (the memex `Storage` destination), so the cost follows the answer,
+  not the size of `storage/`. Notes, folders, order, and ids match gating
+  every row (`workspace_listing.rs`). No folder inside a secure home
+  (`wiki/_secure/`, `Secure notes/`) is listed to an agent, not even by name.
 - Every adapter caps one JSON-RPC request at 256 KB before parsing and one MCP
   response at 512 KB. The relay permits 256 additional bytes only around the
   Mac's response for its bounded request-id envelope; it never expands the MCP
