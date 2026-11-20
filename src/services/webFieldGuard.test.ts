@@ -1,4 +1,4 @@
-// Triage of #303, Table 4 (2026-11-20): Rotli Web's metadata writers. Each
+// Triage of pull request 303, Table 4 (2026-11-20): Rotli Web's metadata writers. Each
 // case sets up a protected note and expects the write to keep the protection
 // or be refused with the file untouched.
 import { expect, test } from "bun:test";
