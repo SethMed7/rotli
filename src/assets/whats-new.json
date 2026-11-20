@@ -1,6 +1,10 @@
 {
   "1.9.4": [
     {
+      "title": "A calmer Tesven",
+      "body": "Tesven Dark now sits in the deep water behind the Tesven app, with a soft sea-glass accent instead of bright blue. Tesven Light gets a softer sea mist to match."
+    },
+    {
       "title": "A hex trail in Tesven",
       "body": "Long chats in Tesven get a small honeycomb trail beside the conversation. Pick it in Settings → Appearance → Conversation navigator; your pawprints or ears come back in every other theme."
     },
