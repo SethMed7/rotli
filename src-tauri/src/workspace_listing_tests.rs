@@ -35,6 +35,8 @@ fn memex(temp: &TempDir, storage_files: usize) -> Workspace {
     put(root, "wiki/Projects/shelved.md", &note("01LISTSHELVED00000000000000", "shelf: [wiki/Shelves/Payments]\n", "Shelved", "plain"), 30);
     put(root, "wiki/Areas/pinned.md", &note("01LISTPINNED000000000000000", "pinned: true\n", "Pinned", "plain"), 40);
     put(root, "wiki/Areas/token.md", &note("01LISTTOKEN0000000000000000", "", "Token", SECRET), 2);
+    // walked as a file, read as Markdown (an id with no extension)
+    put(root, "wiki/Projects/README", "# Readme\n\nplain\n", 45);
     // the newest storage file is secret-shaped: the next one still brings
     // the Storage folder when every storage row is past the limit
     put(root, "storage/inbox/secret.txt", SECRET, 50);
@@ -58,7 +60,7 @@ fn listed_by_gating_every_row(ws: &mut Workspace, limit: usize) -> CorpusList {
         kept.extend(shown);
     }
     let folders: Vec<FolderMeta> =
-        ws.store.folders_for_ai(&kept).unwrap().into_iter().filter(|folder| ws.store.agent_listable(&folder.id)).collect();
+        ws.store.folders_for_ai(&kept).unwrap().into_iter().filter(|folder| ws.store.agent_listable_folder(&folder.id)).collect();
     kept.truncate(limit.min(500));
     CorpusList {
         notes: kept.into_iter().map(|meta| ws.prefix_meta(meta)).collect(),
@@ -108,12 +110,16 @@ fn listing_returns_what_gating_every_row_returned() {
     // its new folder, as gating every row did
     let moved = note("01LIST00000000000000000005", "shelf: [wiki/New/Shelf]\n", "Recent 5", "plain");
     put(temp.path(), "wiki/Projects/recent-5.md", &moved, 5);
+    // Codex re-check, #2: an extensionless file is walked as a file but read
+    // as Markdown, so its shelf comes from its frontmatter too
+    put(temp.path(), "wiki/Projects/README", "---\nshelf: [wiki/Readme/Shelf]\n---\n# Readme\n\nplain\n", 45);
     for limit in [0, 1, 3, 600] {
         let expected = listed_by_gating_every_row(&mut ws, limit);
         let listed = ws.list_remote(limit).unwrap();
         assert_eq!(json(&listed), json(&expected), "after the edit, limit {limit}");
         let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
         assert!(ids.contains(&"wiki/New/Shelf") && ids.contains(&"wiki/New"), "limit {limit}: {ids:?}");
+        assert!(ids.contains(&"wiki/Readme/Shelf"), "limit {limit}: {ids:?}");
     }
 }
 
@@ -127,12 +133,55 @@ fn no_folder_inside_a_secure_home_is_listed_to_agents() {
     fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
     put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
     put(root, "wiki/_secure/PrivateFolder/kept.md", &note("01LISTKEPT00000000000000000", "", "Kept", "plain"), 2);
+    // Codex re-check, #1: a `:` in the name read as a vault prefix, and a
+    // public note whose id is the folder's path redirected the check to itself
+    put(root, "wiki/_secure/PrivateProject:/kept.md", &note("01LISTCOLON0000000000000000", "", "Kept", "plain"), 3);
+    put(root, "wiki/_secure/PrivateProject/kept.md", &note("01LISTALIAS0000000000000000", "", "Kept", "plain"), 3);
+    put(root, "wiki/Projects/decoy.md", &note("wiki/_secure/PrivateProject", "", "Decoy", "plain"), 4);
     let mut ws = test_workspace(&temp);
     for limit in [0, 100] {
         let listed = ws.list_remote(limit).unwrap();
         let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
         assert!(ids.contains(&"wiki/Projects"), "{ids:?}");
-        assert!(!ids.iter().any(|id| id.contains("_secure") || id.contains("PrivateFolder")), "limit {limit}: {ids:?}");
+        assert!(!ids.iter().any(|id| id.contains("_secure") || id.contains("Private")), "limit {limit}: {ids:?}");
         assert!(!listed.notes.iter().any(|meta| meta.title == "Kept"));
     }
+}
+
+/// Codex re-check, #4: a folder is frontmatter-free, so its name gets the
+/// protection a file's name gets: the vault's secure keywords. Nothing under
+/// it is read to decide.
+#[test]
+fn a_folder_named_with_a_secure_keyword_is_not_listed_to_agents() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+    put(root, ".rotli/settings.json", "{\"librarianRules\":{\"secureKeywords\":[\"Juniper\"]}}\n", 1);
+    put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
+    put(root, "wiki/Matter Juniper/brief.md", &note("01LISTBRIEF0000000000000000", "", "Brief", SECRET), 2);
+    let mut ws = test_workspace(&temp);
+    let listed = ws.list_remote(0).unwrap();
+    let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
+    assert!(ids.contains(&"wiki/Projects"), "{ids:?}");
+    assert!(!ids.iter().any(|id| id.contains("Juniper")), "{ids:?}");
+}
+
+/// Codex re-check, #3 (older than pull request 302): metrics counted the
+/// shelf of a note no agent may read as a physical folder.
+#[test]
+fn metrics_count_no_folder_from_a_refused_note() {
+    let vault = |refused: bool| {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+        fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+        put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
+        if refused {
+            let token = note("01LISTTOKEN0000000000000000", "shelf: [wiki/Unshared/Private]\n", "Token", SECRET);
+            put(root, "wiki/Projects/token.md", &token, 2);
+        }
+        let mut ws = test_workspace(&temp);
+        let metrics = ws.metrics().unwrap();
+        (metrics.physical_folders, metrics.visible_notes)
+    };
+    assert_eq!(vault(true), vault(false));
 }

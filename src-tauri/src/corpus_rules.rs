@@ -61,6 +61,9 @@ impl CorpusStore {
     /// 302: `wiki/_secure/<name>` was listed). The corpus root ("") always is;
     /// it is the tree the agent was handed.
     pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
+        if self.in_secure_home(&super::lifecycle_disk_folder(self.layout, id_or_rel)) {
+            return false;
+        }
         let (_, rel) = super::split_root_id(id_or_rel);
         if rel.is_empty() {
             return true;
@@ -70,6 +73,19 @@ impl CorpusStore {
             super::surfaced(self.layout, &rel),
             super::Surface::Hidden | super::Surface::Reference
         ) && !self.in_secure_home(&super::lifecycle_disk_folder(self.layout, &rel))
+    }
+
+    /// May a remote agent see this folder's name? A folder carries no
+    /// frontmatter, so it gets a file's protection: no secure home and no
+    /// secure keyword in its name, judged on the vault-relative path itself,
+    /// never through a wire prefix or a note id (Codex re-check of pull
+    /// request 302: `PrivateProject:` and a note whose id is the path
+    /// both slipped past). Nothing under it is read.
+    pub(crate) fn agent_listable_folder(&self, folder_id: &str) -> bool {
+        !matches!(
+            super::surfaced(self.layout, folder_id),
+            super::Surface::Hidden | super::Surface::Reference
+        ) && !self.file_is_protected(&super::lifecycle_disk_folder(self.layout, folder_id))
     }
 
     /// Frontmatter-free file visibility for AI in either vault layout.

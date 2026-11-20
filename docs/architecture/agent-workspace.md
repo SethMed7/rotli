@@ -401,12 +401,19 @@ roots carry their root-prefixed wire id in the link.
 - MCP list/search results are capped. Note reads default to 20,000 characters
   and expose `offset`, `nextOffset`, and `totalChars` for paging.
 - `rotli notes list` and `rotli_list` gate rows newest first until the limit
-  is met. Past the limit every note is still gated (a shelf folder comes from
-  its frontmatter), but a board or file only when its path alone would add a
-  folder (the memex `Storage` destination), so the cost follows the answer,
-  not the size of `storage/`. Notes, folders, order, and ids match gating
-  every row (`workspace_listing.rs`). No folder inside a secure home
-  (`wiki/_secure/`, `Secure notes/`) is listed to an agent, not even by name.
+  is met. Past the limit every row read as Markdown (a note, or a file with no
+  extension) is still gated, since its shelf folder comes from its
+  frontmatter; a board or file only when its path alone would add a folder
+  (the memex `Storage` destination). The cost follows the answer, not the
+  size of `storage/`. Notes, folders, order, and ids match gating every row
+  (`workspace_listing.rs`).
+- A folder is listed to an agent only when a file at its path would be: not
+  inside a secure home (`wiki/_secure/`, `Secure notes/`) and not named with
+  one of the vault's secure keywords, judged on the folder's own path
+  (`agent_listable_folder`). Nothing under it is read, so a folder with an
+  ordinary name whose notes are all secure is still listed by name.
+  `rotli_metrics` and `agent doctor` count these same folders, never a shelf
+  from a note an agent can't read.
 - Every adapter caps one JSON-RPC request at 256 KB before parsing and one MCP
   response at 512 KB. The relay permits 256 additional bytes only around the
   Mac's response for its bounded request-id envelope; it never expands the MCP

@@ -4,9 +4,10 @@
 //! Gating a row is the expensive part — a file's whole bytes are read and
 //! secret-scanned before even its name is shown — so it is proportional to
 //! the answer, not to the vault. Rows are gated in the walk's order until the
-//! limit is met. Past it, every note is still gated (its shelf is read from
-//! its frontmatter), but a board or a file only when its path alone could add
-//! a folder (the memex `Storage` destination) no gated row has added yet. The
+//! limit is met. Past it, every row read as Markdown is still gated (its
+//! shelf is read from its frontmatter), but a board or a file only when its
+//! path alone could add a folder (the memex `Storage` destination) no gated
+//! row has added yet. The
 //! answer is the one gating every row would give: a vault's
 //! `storage/` held thousands of files and the listing took minutes
 //! (2026-11-20).
@@ -31,10 +32,11 @@ impl Workspace {
         let mut backing = Vec::new();
         for meta in notes {
             let shown = kept.len() < cap;
-            // a note's folder can come from its frontmatter (a shelf), which
-            // may have changed since the walk: past the limit, only a board's
-            // or a file's folder, read from its path, is trusted from the walk
-            if !shown && meta.kind != NoteKind::Note && adds_no_folder(&known, &meta.folder_id) {
+            // a row read as Markdown takes its folder from its frontmatter (a
+            // shelf), which may have changed since the walk: past the limit,
+            // only a folder read from a board's or a file's path is trusted
+            let path_folder = meta.kind != NoteKind::Note && !crate::corpus::ai_rows::reads_as_markdown(&meta.id);
+            if !shown && path_folder && adds_no_folder(&known, &meta.folder_id) {
                 continue;
             }
             let Some(row) = self.remote_row(&meta) else {
@@ -50,7 +52,7 @@ impl Workspace {
         // directories, and the shelves of the rows an agent may see
         let gated: Vec<NoteMeta> = kept.iter().chain(&backing).cloned().collect();
         let folders = self.store.folders_for_ai(&gated)?;
-        let folders = folders.into_iter().filter(|folder| self.store.agent_listable(&folder.id)).collect::<Vec<_>>();
+        let folders = folders.into_iter().filter(|folder| self.store.agent_listable_folder(&folder.id)).collect::<Vec<_>>();
         Ok(CorpusList {
             notes: kept.into_iter().map(|meta| self.prefix_meta(meta)).collect(),
             folders: folders.into_iter().map(|folder| self.prefix_folder(folder)).collect(),

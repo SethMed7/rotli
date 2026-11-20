@@ -511,7 +511,9 @@ impl Workspace {
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
         list.notes.retain(|meta| self.remote_meta_visible(meta));
-        list.folders.retain(|folder| self.store.agent_listable(&folder.id));
+        // the vault's own directories, not the shelves of notes no agent reads
+        list.folders = self.store.folders_for_ai(&[])?;
+        list.folders.retain(|folder| self.store.agent_listable_folder(&folder.id));
         let visible_notes = list
             .notes
             .iter()
