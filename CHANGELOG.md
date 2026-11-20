@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Tesven theme card describes the calmer Tesven.** Settings → Appearance
+  now reads "Sea mist by day, night swim after dark." in place of the old
+  field-blue wording.
+
 ### Fixed
 
 - **`rotli notes list` no longer takes minutes on large vaults.** It used to
@@ -27,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notes agents can't read, and count an extensionless note as a note. Your
   own sidebar is unchanged.
 
-## [1.9.4] - 2026-11-19
+## [1.9.4] - 2026-11-20
 
 ### Added
 
