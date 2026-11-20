@@ -113,6 +113,9 @@ fn quoted_end(rest: &str, quote: char) -> Option<usize> {
 
 #[path = "frontmatter_yaml.rs"]
 mod yaml;
+#[path = "frontmatter_writes.rs"]
+mod writes;
+pub(crate) use writes::{field_name, keeps_promise, key_lines, leaves_managed, put_field, read_in_any_spelling, remove_key};
 use yaml::{decoded_value, undecidable, Decoded};
 
 /// Whether a frontmatter line names `key` in any spelling, quoted keys
@@ -135,7 +138,7 @@ pub(crate) fn top_level_field(line: &str) -> Option<(String, String)> {
     }
     match frontmatter_field(line) {
         Some((key, value)) => Some((key.name, value.to_string())),
-        None => line.split_once(':').map(|(key, value)| (key.to_string(), value.trim().to_string())),
+        None => line.split_once(':').map(|(key, value)| (js_trim(key).to_string(), value.trim().to_string())),
     }
 }
 
@@ -482,7 +485,7 @@ mod tests {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let name = path.file_name().unwrap().to_string_lossy().to_string();
-            if path.extension() != Some(std::ffi::OsStr::new("rs")) || name.contains("test") || name.starts_with("frontmatter_keys") || name.starts_with("frontmatter_yaml") {
+            if path.extension() != Some(std::ffi::OsStr::new("rs")) || name.contains("test") || name.starts_with("frontmatter_") {
                 continue;
             }
             let text = std::fs::read_to_string(&path).unwrap();
@@ -494,6 +497,6 @@ mod tests {
             }
         }
         readers.sort();
-        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
+        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_ai_edit.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
     }
 }

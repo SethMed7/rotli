@@ -3,13 +3,15 @@ import { looksSecret } from "../ai/guard";
 import {
   composeNoteDocument,
   emptyFrontmatter,
+  isLockedFrontmatter,
   isSecureFrontmatter,
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
-import { frontmatterField } from "../lib/frontmatterKeys";
+import { localAiAllowedOverride, ownedKey } from "../lib/frontmatterKeys";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import { keepPromise, removeKey } from "../lib/frontmatterWrites";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -31,11 +33,21 @@ const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
 const withField = (fm: NoteFrontmatter, key: string, value: string | null): NoteFrontmatter => ({
   ...fm,
   foreign: [
-    // every spelling of the key goes, so a typed denial never outlives the person's setting
-    ...fm.foreign.filter((line) => frontmatterField(line)?.key.name !== key),
+    // every span of the key goes (any spelling of a permission or protection
+    // key; never block text), so a typed denial never outlives the setting
+    ...removeKey(fm.foreign, key).lines,
     ...(value === null ? [] : [`${key}: ${value}`]),
   ],
 });
+
+/** What a protection or permission setting reads as in a written note. */
+function settingOf(text: string, key: "locked" | "ai_edit" | "secure" | "local_ai_allowed"): string {
+  const fm = parseNoteDocument(text).frontmatter ?? emptyFrontmatter();
+  if (key === "locked") return String(isLockedFrontmatter(fm));
+  if (key === "secure") return String(isSecureFrontmatter(fm));
+  if (key === "local_ai_allowed") return String(localAiAllowedOverride(fm.foreign));
+  return ownedKey(fm.foreign, "ai_edit", (value) => value === "true").says;
+}
 
 function assertSecureRemoval(body: string): void {
   if (looksSecret(body))
@@ -54,8 +66,10 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
+    const written = withSecureLineOnly(opened.contents, secure);
+    keepPromise(settingOf(written, "secure") === String(secure));
     if (secure) await updateGitExclusions(dir, [path]);
-    await writeVersionedFile(dir, path, withSecureLineOnly(opened.contents, secure), opened.revision);
+    await writeVersionedFile(dir, path, written, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
     return path;
   }
@@ -99,7 +113,9 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     let cleared = parsed.frontmatter ?? emptyFrontmatter();
     for (const key of ["secure", "local_ai_allowed", "secure_origin"])
       cleared = withField(cleared, key, null);
-    await writeVersionedFile(dir, target, composeNoteDocument(cleared, parsed.body), final.revision);
+    const written = composeNoteDocument(cleared, parsed.body);
+    keepPromise(settingOf(written, "secure") === "false");
+    await writeVersionedFile(dir, target, written, final.revision);
     await updateGitExclusions(dir, [], [target]);
   }
   return target;
@@ -134,6 +150,7 @@ export async function setFolderProtection(
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  keepPromise(settingOf(text, key) === (key === "ai_edit" ? (allowed ? "grant" : "deny") : String(allowed)));
   await writeVersionedFile(dir, path, text, opened.revision);
 }
 

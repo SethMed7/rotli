@@ -6,7 +6,7 @@
 // nothing is converted to JavaScript values, and only the root mapping's keys
 // are read. Key identity is "a scalar whose text is the key"; a repeat is
 // counted for the one key asked about and nothing else, so neither library's
-// duplicate or number rules decide anything (Codex review of PR #303).
+// duplicate or number rules decide anything (Codex review of pull request 303).
 import { isAlias, isMap, isPair, isScalar, isSeq, parse as parseYaml, parseDocument } from "yaml";
 
 /** The most frontmatter read, in UTF-8 bytes, and the deepest nesting

@@ -5,8 +5,9 @@ import { type NoteFrontmatter, parseNoteDocument } from "./frontmatter";
 // frontmatter lines stay byte-for-byte, Rotli's own facts (id, created,
 // updated) are never minted, and a fence is added only to hold a line the
 // person asked for (docs/design/vault-copy-and-obsidian-compatibility.md).
-import { namesKey, PERMISSION_KEYS, topLevelField, topLevelKey } from "./frontmatterKeys";
+import { frontmatterField, topLevelKey } from "./frontmatterKeys";
 import { rawFrontmatterBlock } from "./frontmatterRaw";
+import { keyLines, readInAnySpelling, removeKey } from "./frontmatterWrites";
 
 /** A ULID (Crockford base32, 26 characters) — every Rotli create path mints one. */
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
@@ -20,9 +21,16 @@ export function rotliMade(fm: NoteFrontmatter | null): boolean {
 
 /** Set (a string) or remove (`null`) one top-level frontmatter line, keeping
  * every other byte. A fence is added only to hold a new line and goes when
- * removal empties it; a replaced line keeps its place. Keys match untrimmed:
- * an indented line belongs to a nested map. */
+ * removal empties it; a replaced line keeps its place. */
 export function withTopLevelLine(text: string, key: string, value: string | null): string {
+  return withKeyLines(text, key, value === null ? [] : [`${key}: ${value}`]);
+}
+
+/** Replace every span that sets `key` (frontmatterWrites.ts: its line, the
+ * lines under it, never block text; a permission or protection key in any
+ * spelling) with `replacement`, verbatim, where the first one was; a new key
+ * goes last. Twin of corpus_in_place.rs `with_key_lines`. */
+export function withKeyLines(text: string, key: string, replacement: readonly string[]): string {
   const block = rawFrontmatterBlock(text);
   const body = text.slice(block.length);
   const nl = block.includes("\r\n") || (!block && text.includes("\r\n")) ? "\r\n" : "\n";
@@ -32,16 +40,11 @@ export function withTopLevelLine(text: string, key: string, value: string | null
         .split(/\r?\n/)
         .slice(1, -1)
     : [];
-  // a permission key goes in every spelling, so a typed denial never outlives
-  // Rotli's own line; any other key in every one-line top-level spelling
-  // (`key :`, `"key":`), so it is replaced, never repeated
-  const permission = (PERMISSION_KEYS as readonly string[]).includes(key);
-  const isKey = (line: string) => (permission ? namesKey(line, key) : topLevelKey(line) === key);
-  const at = lines.findIndex(isKey);
-  const kept = lines.filter((line) => !isKey(line));
-  if (value !== null) kept.splice(at === -1 ? kept.length : Math.min(at, kept.length), 0, `${key}: ${value}`);
-  if (kept.length === 0) return body;
-  return `---${nl}${kept.join(nl)}${nl}---${nl}${body}`;
+  const removed = removeKey(lines, key);
+  const at = removed.at < 0 ? removed.lines.length : removed.at;
+  removed.lines.splice(at, 0, ...replacement);
+  if (removed.lines.length === 0) return body;
+  return `---${nl}${removed.lines.join(nl)}${nl}---${nl}${body}`;
 }
 
 /** Add or remove only the secure lines (removal also drops the local-AI
@@ -54,36 +57,29 @@ export function withSecureLineOnly(text: string, secure: boolean): string {
 }
 
 /** A metadata change in a folder opened in place: apply only the keys whose
- * value differs between the note on disk (`original`) and the frontmatter a
- * Rotli action built (`next`). id, created, and updated are never written. */
+ * lines differ between the note on disk (`original`) and the frontmatter a
+ * Rotli action built (`next`), copying the action's lines verbatim (never a
+ * line built from a decoded value, so a typed `"ai_edit": true` stays typed;
+ * Codex review of pull request 303, items 1 and 2). id, created, and updated are never
+ * written. Twin of corpus_in_place.rs `compose_in_place`. */
 export function composeInPlace(original: string, next: NoteFrontmatter): string {
   const before = parseNoteDocument(original).frontmatter;
   const beforeForeign = before?.foreign ?? [];
-  // a key in any one-line top-level spelling, so `locked : false` and the
-  // `locked: true` an action adds are one key, replaced in place
-  const valueOf = (lines: string[], key: string) => {
-    for (const line of [...lines].reverse()) {
-      const field = topLevelField(line);
-      if (field?.key === key) return field.value;
-    }
-    return null;
+  // a permission or protection key in any spelling; any other in its one-line
+  // top-level spellings (`locked : false`, `"locked": false`, `locked: true`)
+  const identity = (line: string) => {
+    const name = frontmatterField(line)?.key.name;
+    return name !== undefined && readInAnySpelling(name) ? name : topLevelKey(line);
   };
   const keys: string[] = [];
   for (const line of [...beforeForeign, ...next.foreign]) {
-    const key = topLevelKey(line);
+    const key = identity(line);
     if (key !== null && !keys.includes(key)) keys.push(key);
   }
   let text = original;
   for (const key of keys) {
-    const now = valueOf(next.foreign, key);
-    if (valueOf(beforeForeign, key) !== now) text = withTopLevelLine(text, key, now);
-  }
-  // a permission key whose lines on disk aren't exactly the ones the action
-  // built (an indented or escaped spelling beside them) is rewritten
-  for (const key of PERMISSION_KEYS) {
-    const naming = (lines: string[]) => lines.filter((line) => namesKey(line, key)).join("\n");
-    if (naming(beforeForeign) !== naming(next.foreign))
-      text = withTopLevelLine(text, key, valueOf(next.foreign, key));
+    const now = keyLines(next.foreign, key);
+    if (keyLines(beforeForeign, key).join("\n") !== now.join("\n")) text = withKeyLines(text, key, now);
   }
   if ((before?.pinned ?? false) !== (next.pinned ?? false))
     text = withTopLevelLine(text, "pinned", next.pinned ? "true" : null);

@@ -95,3 +95,88 @@ fn a_key_with_a_space_is_edited_and_removed_in_place() {
     let removed = Frontmatter { foreign: vec!["tags: [plan]".into()], ..before };
     assert_eq!(compose_in_place(note, &removed), "---\ntags: [plan]\n---\n# Plan\n");
 }
+
+fn disk(store: &CorpusStore, rel: &str) -> String {
+    fs::read_to_string(store.abs(rel)).unwrap()
+}
+
+/// Codex review of PR #303, blocker 1: the generic metadata setter took the
+/// quoted key `"ai_edit"` (and `"secure"`) past its reserved-key check, and
+/// the in-place writer then wrote Rotli's own `ai_edit: true`, or replaced
+/// `secure: true`, so the note became AI-editable or passed the remote gate.
+#[test]
+fn the_generic_setter_never_grants_or_unsecures() {
+    for (_dir, mut store) in both_kinds() {
+        let rel = note(&mut store, "id: 01PLANNOTE\nsecure: true\ncreated_by: agent\nai_edit: false\n");
+        let before = disk(&store, &rel);
+        for (key, value) in [("\"ai_edit\"", "true"), ("'ai_edit'", "true"), ("\"secure\"", "false"), ("\"ai\\u005fedit\"", "true"), ("topic", "x\nai_edit: true"), ("a: b", "c")] {
+            assert!(store.set_field(&rel, key, value).is_err(), "adopted={} {key:?}", store.adopted);
+            assert_eq!(disk(&store, &rel), before, "adopted={} {key:?}", store.adopted);
+        }
+        assert!(store.read_for_ai(&rel, false).is_err(), "a remote model is still refused");
+        // a typed spelling is kept as typed
+        store.set_field(&rel, "\"topic\"", "plans").unwrap();
+        assert!(disk(&store, &rel).contains("\n\"topic\": plans\n"), "adopted={}: {}", store.adopted, disk(&store, &rel));
+    }
+    // the in-place writer copies an action's line verbatim: a typed grant stays typed
+    let original = "---\ncreated_by: person\n---\nWords.\n";
+    let mut next = parse_document(original).0.unwrap_or_default();
+    next.foreign.push("\"ai_edit\": true".into());
+    let out = compose_in_place(original, &next);
+    assert_eq!(out, "---\ncreated_by: person\n\"ai_edit\": true\n---\nWords.\n");
+    let foreign = parse_document(&out).0.unwrap_or_default().foreign;
+    assert_ne!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Allowed);
+}
+
+/// Codex review of PR #303, blocker 2: on a note with `"locked": true` and
+/// `ai_edit: true`, Lock succeeded while AI editing stayed enabled: the lock
+/// reader ignored the quoted spelling and the writer saw an equal value.
+#[test]
+fn a_quoted_lock_locks_and_the_lock_actions_replace_it() {
+    for (_dir, mut store) in both_kinds() {
+        let rel = note(&mut store, "id: 01PLANNOTE\n\"locked\": true\ncreated_by: agent\nai_edit: true\n");
+        assert!(crate::corpus::has_locked_frontmatter(&disk(&store, &rel)), "the reader counts a quoted lock");
+        store.set_locked(&rel, true).unwrap();
+        let (locks, foreign) = naming(&store, &rel, "locked");
+        assert_eq!(locks, ["locked: true"], "adopted={}: {foreign:?}", store.adopted);
+        assert_eq!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Locked);
+        store.set_locked(&rel, false).unwrap();
+        let (locks, foreign) = naming(&store, &rel, "locked");
+        assert!(locks.is_empty(), "adopted={}: {foreign:?}", store.adopted);
+        assert!(!crate::corpus::has_locked_frontmatter(&disk(&store, &rel)));
+    }
+}
+
+/// Codex review of PR #303, item 4: setting `ai_edit` deleted an indented
+/// `ai_edit: false` from inside a person's `example: |` text, and left the
+/// `: false` line of a `? ai_edit` behind. A setter now removes whole spans,
+/// never block text, and refuses when its result wouldn't say what it promised.
+#[test]
+fn setters_keep_block_text_and_remove_whole_spans() {
+    for (_dir, mut store) in both_kinds() {
+        let rel = note(&mut store, "id: 01PLANNOTE\ncreated_by: agent\nexample: |\n  ai_edit: false\n");
+        let before = disk(&store, &rel);
+        assert!(store.set_ai_edit(&rel, true).is_err(), "adopted={}", store.adopted);
+        assert_eq!(disk(&store, &rel), before, "the person's text stays");
+
+        let rel = note(&mut store, "id: 01PLANNOTE\n? ai_edit\n: false\ntags: [plan]\n");
+        store.set_ai_edit(&rel, true).unwrap();
+        let (named, foreign) = naming(&store, &rel, "ai_edit");
+        assert_eq!(named, ["ai_edit: true"], "adopted={}: {foreign:?}", store.adopted);
+        assert!(!foreign.iter().any(|line| line.starts_with(':')), "adopted={}: {foreign:?}", store.adopted);
+        assert!(foreign.contains(&"tags: [plan]".to_string()));
+    }
+}
+
+/// Codex review of PR #303, item 8: `date created :` (a space before the
+/// colon) was repeated, not replaced, in a folder opened in place.
+#[test]
+fn a_key_spelled_with_a_space_before_its_colon_is_replaced_in_place() {
+    let place = TempDir::new().unwrap();
+    let mut store = opened_in_place(&place);
+    let rel = note(&mut store, "id: obs-plan\ndate created : 2020-01-01\n");
+    store.set_field(&rel, "date created", "2021-02-02").unwrap();
+    assert_eq!(parse_document(&disk(&store, &rel)).0.unwrap_or_default().foreign, ["date created: 2021-02-02"]);
+    let out = super::in_place::with_top_level_line("---\ndate created : 2020\n---\nWords.\n", "date created", Some("2021"));
+    assert_eq!(out, "---\ndate created: 2021\n---\nWords.\n");
+}

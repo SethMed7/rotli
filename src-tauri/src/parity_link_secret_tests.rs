@@ -50,3 +50,26 @@ fn local_ai_allowed_cases_match_fixture() {
         assert_eq!(says, case["says"].as_str().unwrap(), "{case}");
     }
 }
+
+/// The lock and secure readers count the same lines on both sides, in any
+/// spelling (Codex review of PR #303, items 2 and 7).
+#[test]
+fn protection_flag_cases_match_fixture() {
+    for case in entry("protectionFlagCases").as_array().unwrap() {
+        let line = case["line"].as_str().unwrap();
+        assert_eq!(crate::corpus::locked_field(line) == Some(true), case["locked"].as_bool().unwrap(), "{case}");
+        assert_eq!(crate::corpus::secure_field(line) == Some(true), case["secure"].as_bool().unwrap(), "{case}");
+    }
+}
+
+/// A key is removed as a whole, never from block text, the same way on both
+/// sides (Codex review of PR #303, items 4 and 8).
+#[test]
+fn remove_key_cases_match_fixture() {
+    for case in entry("removeKeyCases").as_array().unwrap() {
+        let mut lines: Vec<String> = case["lines"].as_array().unwrap().iter().map(|l| l.as_str().unwrap().to_string()).collect();
+        let at = crate::frontmatter_keys::remove_key(&mut lines, case["key"].as_str().unwrap()).map_or(-1, |at| at as i64);
+        let out: Vec<String> = case["out"].as_array().unwrap().iter().map(|l| l.as_str().unwrap().to_string()).collect();
+        assert_eq!((lines, at), (out, case["at"].as_i64().unwrap()), "{case}");
+    }
+}

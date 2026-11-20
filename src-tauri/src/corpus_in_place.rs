@@ -19,9 +19,17 @@ pub(crate) fn rotli_made(fm: &Frontmatter) -> bool {
 
 /// Set (`Some`) or remove (`None`) one top-level frontmatter line, keeping
 /// every other byte. A fence is added only to hold a new line, and goes when
-/// removal leaves it empty. Keys are matched untrimmed: an indented line
-/// belongs to a nested map, not to the top level.
+/// removal leaves it empty.
 pub(crate) fn with_top_level_line(text: &str, key: &str, value: Option<&str>) -> String {
+    let lines: Vec<String> = value.map(|value| vec![format!("{key}: {value}")]).unwrap_or_default();
+    with_key_lines(text, key, &lines)
+}
+
+/// Replace every span that sets `key` (frontmatter_writes.rs: its line, the
+/// lines under it, never block text; a permission or protection key in any
+/// spelling) with `replacement`, verbatim, where the first one was; a new key
+/// goes last. Every other byte stays.
+pub(crate) fn with_key_lines(text: &str, key: &str, replacement: &[String]) -> String {
     let block = raw_frontmatter_block(text);
     let body = &text[block.len()..];
     let nl = if block.contains("\r\n") || (block.is_empty() && text.contains("\r\n")) {
@@ -34,27 +42,8 @@ pub(crate) fn with_top_level_line(text: &str, key: &str, value: Option<&str>) ->
         lines.remove(0); // opening ---
         lines.pop(); // closing ---
     }
-    // a permission key goes in every spelling, so a typed denial never
-    // outlives Rotli's own line; any other key in every one-line top-level
-    // spelling (`key :`, `"key":`), so it is replaced, never repeated
-    let permission = crate::frontmatter_keys::PERMISSION_KEYS.contains(&key);
-    let is_key = |line: &str| {
-        if permission {
-            crate::frontmatter_keys::names_key(line, key)
-        } else {
-            crate::frontmatter_keys::top_level_key(line).as_deref() == Some(key)
-        }
-    };
-    let at = lines.iter().position(|line| is_key(line));
-    lines.retain(|line| !is_key(line));
-    if let Some(value) = value {
-        let line = format!("{key}: {value}");
-        // a replaced line keeps its place; a new one goes last
-        match at {
-            Some(i) => lines.insert(i.min(lines.len()), line),
-            None => lines.push(line),
-        }
-    }
+    let at = crate::frontmatter_keys::remove_key(&mut lines, key).unwrap_or(lines.len());
+    lines.splice(at..at, replacement.iter().cloned());
     if lines.is_empty() {
         return body.to_string();
     }
@@ -78,40 +67,33 @@ pub(crate) fn with_secure_line_only(text: &str, secure: bool) -> String {
 /// `updated` are Rotli's own facts and are never written here.
 pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
     let before = parse_document(original).0.unwrap_or_default();
-    // a key in any one-line top-level spelling, so `locked : false` and the
-    // `locked: true` an action adds are one key, replaced in place
-    let key_of = crate::frontmatter_keys::top_level_key;
-    let value_of = |lines: &[String], key: &str| {
-        lines
-            .iter()
-            .rev()
-            .find_map(|line| crate::frontmatter_keys::top_level_field(line).filter(|(k, _)| k == key))
-            .map(|(_, value)| value)
+    // a key by its identity: a permission or protection key in any spelling,
+    // any other in its one-line top-level spellings (`locked : false`,
+    // `"locked": false` and the action's `locked: true` are one key)
+    let identity = |line: &str| {
+        crate::frontmatter_keys::frontmatter_field(line)
+            .map(|(spelled, _)| spelled.name)
+            .filter(|name| crate::frontmatter_keys::read_in_any_spelling(name))
+            .or_else(|| crate::frontmatter_keys::top_level_key(line))
     };
     let mut keys: Vec<String> = Vec::new();
     for line in before.foreign.iter().chain(next.foreign.iter()) {
-        if let Some(key) = key_of(line) {
+        if let Some(key) = identity(line) {
             if !keys.contains(&key) {
                 keys.push(key);
             }
         }
     }
+    // a key whose lines differ takes the action's lines as the action wrote
+    // them: never a line Rotli builds from a decoded value, so a typed
+    // `"ai_edit": true` stays typed (and grants nothing), and a lock action's
+    // `locked: true` replaces a `"locked": true` it compares equal to (Codex
+    // review of PR #303, items 1 and 2)
     let mut text = original.to_string();
     for key in keys {
-        let old = value_of(&before.foreign, &key);
-        let new = value_of(&next.foreign, &key);
-        if old != new {
-            text = with_top_level_line(&text, &key, new.as_deref());
-        }
-    }
-    // a permission key whose lines on disk aren't exactly the ones the action
-    // built (an indented or escaped spelling beside them) is rewritten, so the
-    // person's setting replaces every spelling (Codex review round 5)
-    for key in crate::frontmatter_keys::PERMISSION_KEYS {
-        let naming = |lines: &[String]| lines.iter().filter(|line| crate::frontmatter_keys::names_key(line, key)).cloned().collect::<Vec<_>>();
-        let (old, new) = (naming(&before.foreign), naming(&next.foreign));
-        if old != new {
-            text = with_top_level_line(&text, key, value_of(&next.foreign, key).as_deref());
+        let now = crate::frontmatter_keys::key_lines(&next.foreign, &key);
+        if crate::frontmatter_keys::key_lines(&before.foreign, &key) != now {
+            text = with_key_lines(&text, &key, &now);
         }
     }
     if before.pinned.unwrap_or(false) != next.pinned.unwrap_or(false) {

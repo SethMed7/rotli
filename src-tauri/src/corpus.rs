@@ -1306,8 +1306,9 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
 /// line is `locked: …`, else `None`. Shared with the organizer daemon, whose
 /// locked-skip must read the same line the same way.
 pub(crate) fn locked_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "locked").then(|| v.trim() == "true")
+    // any spelling (`"locked": true` too), so the reader and the Lock action
+    // count the same lines (Codex review of PR #303, item 2)
+    crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "locked").map(|(_, v)| v == "true")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
@@ -1359,8 +1360,8 @@ pub(crate) const AI_KEYS: [&str; 9] = [
 /// opens the ordinary lane; malformed values fail closed as secure.
 /// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() != "false")
+    // any spelling, and anything but `false` is secure (fails closed)
+    crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "secure").map(|(_, v)| v != "false")
 }
 
 /// Does this whole document carry `locked: true`? The lock check written once,
@@ -1389,6 +1390,7 @@ pub(crate) fn secure_context_field(line: &str) -> Option<bool> {
 /// Absence and malformed values fail closed. Remote models ignore this flag.
 /// Any spelling counts here, so a setter clears them all; the permission is
 /// decided by `frontmatter_keys::local_ai_allowed` (deny in any spelling).
+#[cfg(test)]
 pub(crate) fn local_ai_allowed_field(line: &str) -> Option<bool> {
     crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "local_ai_allowed").map(|(_, v)| v == "true")
 }
@@ -3141,12 +3143,14 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| locked_field(l).is_none());
+            crate::frontmatter_keys::remove_key(&mut fm.foreign, "locked");
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::keeps_promise(&out, |fields| fields.iter().any(|l| locked_field(l) == Some(true)) == locked)?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3185,14 +3189,9 @@ impl CorpusStore {
         if key.is_empty() {
             return Err("a field needs a name".into());
         }
-        if RESERVED_KEYS.contains(&key) {
-            return Err(format!("`{key}` is managed by rotli, not editable here"));
-        }
-        if AI_KEYS.contains(&key) {
-            return Err(format!(
-                "`{key}` belongs to the AI filer — not editable here"
-            ));
-        }
+        // the key as YAML reads it (`"ai_edit"` is ai_edit), one line each
+        let refused: Vec<&str> = RESERVED_KEYS.iter().chain(AI_KEYS.iter()).copied().collect();
+        let name = crate::frontmatter_keys::field_name(key, value, &refused)?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.writable(rel)?;
         let path = self.abs(rel);
@@ -3200,13 +3199,11 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
-            let value = value.trim();
-            if !value.is_empty() {
-                fm.foreign.push(format!("{key}: {value}"));
-            }
+            crate::frontmatter_keys::put_field(&mut fm.foreign, &name, key, value);
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::leaves_managed(&text, &out, &refused)?;
             self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3355,7 +3352,7 @@ impl CorpusStore {
             {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
-            fm.foreign.retain(|line| secure_field(line).is_none());
+            crate::frontmatter_keys::remove_key(&mut fm.foreign, "secure");
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
@@ -3387,13 +3384,13 @@ impl CorpusStore {
         let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
-        final_fm.foreign.retain(|line| {
-            secure_field(line).is_none()
-                && local_ai_allowed_field(line).is_none()
-                && secure_origin_field(line).is_none()
-        });
+        for key in ["secure", "local_ai_allowed", "secure_origin"] {
+            crate::frontmatter_keys::remove_key(&mut final_fm.foreign, key);
+        }
+        let out = compose_document(&final_fm, final_body);
+        crate::frontmatter_keys::keeps_promise(&out, |fields| !fields.iter().any(|l| secure_field(l) == Some(true)))?;
         self.suppress.mark(&final_path);
-        atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
+        atomic_write(&final_path, &out)?;
         self.gitignore_remove(&final_rel)?;
         Ok(None)
     }
@@ -3540,7 +3537,7 @@ impl CorpusStore {
             if !secure {
                 return Err("Local AI access is only meaningful for a secure note".into());
             }
-            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+            crate::frontmatter_keys::remove_key(&mut fm.foreign, "local_ai_allowed");
             // pin the classification either way: a detector-secure note that now
             // carries an explicit access decision must carry the flag it decides on
             if !explicitly_secure {
@@ -3548,8 +3545,10 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::keeps_promise(&out, |fields| crate::frontmatter_keys::local_ai_allowed(fields) == Some(allowed))?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -5352,6 +5351,7 @@ impl CorpusStore {
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
         }
+        crate::frontmatter_keys::field_name(key, value, &[])?; // one line each: never a second key
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
@@ -5359,11 +5359,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
-            let value = value.trim();
-            if !value.is_empty() {
-                fm.foreign.push(format!("{key}: {value}"));
-            }
+            crate::frontmatter_keys::put_field(&mut fm.foreign, key, key, value);
             self.suppress.mark(&path);
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })

@@ -67,3 +67,34 @@ test("locking in place replaces a lock line spelled another way", async () => {
     expect({ spelled, after }).toEqual({ spelled, after: ["tags: [plan]", "locked: true"] });
   }
 });
+
+// Codex review of pull request 303, blocker 2: a quoted lock counted for
+// nothing and the Lock action left it, so AI editing stayed on.
+for (const inPlace of [true, false]) {
+  test(`a quoted lock locks, and the lock actions replace it (${inPlace ? "in place" : "Rotli vault"})`, async () => {
+    const dir = await vault(
+      inPlace,
+      '---\nid: n4\n"locked": true\ncreated_by: agent\nai_edit: true\n---\n# Plan\n',
+    );
+    await setFolderProtection(dir, notes, "n4", "locked", true);
+    expect(naming(await fields(dir), "locked")).toEqual(["locked: true"]);
+    await setFolderProtection(dir, notes, "n4", "locked", false);
+    expect(naming(await fields(dir), "locked")).toEqual([]);
+  });
+
+  // Codex review of pull request 303, item 4
+  test(`setters keep block text and remove whole spans (${inPlace ? "in place" : "Rotli vault"})`, async () => {
+    const text = "---\nid: n5\ncreated_by: agent\nexample: |\n  ai_edit: false\n---\n# Plan\n";
+    const dir = await vault(inPlace, text);
+    await expect(setFolderProtection(dir, notes, "n5", "ai_edit", true)).rejects.toThrow(
+      "Edit the note's metadata by hand",
+    );
+    expect(await dir.readText(PATH)).toBe(text);
+    const spanned = await vault(inPlace, "---\nid: n6\n? ai_edit\n: false\ntags: [plan]\n---\n# Plan\n");
+    await setFolderProtection(spanned, notes, "n6", "ai_edit", true);
+    const after = await fields(spanned);
+    expect(naming(after, "ai_edit")).toEqual(["ai_edit: true"]);
+    expect(after.filter((line) => line.startsWith(":"))).toEqual([]);
+    expect(after).toContain("tags: [plan]");
+  });
+}

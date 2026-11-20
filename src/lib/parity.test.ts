@@ -51,8 +51,10 @@ import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
 import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
+import { emptyFrontmatter, isLockedFrontmatter, isSecureFrontmatter } from "./frontmatter";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
+import { removeKey } from "./frontmatterWrites";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
@@ -278,6 +280,24 @@ describe("parity.json ↔ TS constants", () => {
   test("noteImageLink", () => {
     for (const { wire, folder, link } of entries.noteImageLink.value) {
       expect({ wire, folder, link: noteImageLink(wire, folder) }).toEqual({ wire, folder, link });
+    }
+  });
+
+  test("protectionFlagCases", () => {
+    for (const c of entries.protectionFlagCases.value) {
+      const fm = { ...emptyFrontmatter(), foreign: [c.line] };
+      expect({ line: c.line, locked: isLockedFrontmatter(fm), secure: isSecureFrontmatter(fm) }).toEqual(c);
+    }
+  });
+
+  test("removeKeyCases", () => {
+    for (const c of entries.removeKeyCases.value) {
+      const removed = removeKey(c.lines, c.key);
+      expect({ key: c.key, out: removed.lines, at: removed.at }).toEqual({
+        key: c.key,
+        out: c.out,
+        at: c.at,
+      });
     }
   });
 

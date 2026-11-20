@@ -55,6 +55,7 @@ impl Creator {
 /// grants; a malformed value refuses.
 /// Any spelling counts here, so the person's setter clears them all; the
 /// policy itself reads through `frontmatter_keys::owned_key`.
+#[cfg(test)]
 pub(crate) fn ai_edit_field(line: &str) -> Option<bool> {
     crate::frontmatter_keys::frontmatter_field(line).filter(|(k, _)| k.name == "ai_edit").map(|(_, v)| v == "true")
 }

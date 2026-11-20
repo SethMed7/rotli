@@ -92,7 +92,7 @@ export function topLevelField(raw: string): { key: string; value: string } | nul
   const field = frontmatterField(line);
   if (field) return { key: field.key.name, value: field.value };
   const colon = line.indexOf(":");
-  return colon < 0 ? null : { key: line.slice(0, colon), value: line.slice(colon + 1).trim() };
+  return colon < 0 ? null : { key: line.slice(0, colon).trim(), value: line.slice(colon + 1).trim() };
 }
 
 /** The key of {@link topLevelField}. */

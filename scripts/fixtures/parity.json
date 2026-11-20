@@ -526,6 +526,35 @@
         { "fields": ["local_ai_allowed: true", "\"local\\u005fai_allowed\": true"], "says": "deny" }
       ]
     },
+    "protectionFlagCases": {
+      "sourceOfTruth": "behavioral: src-tauri/src/corpus.rs locked_field / secure_field ↔ src/lib/frontmatter.ts isLockedFrontmatter / isSecureFrontmatter: a lock or secure line in any spelling counts; locked only for `true`, secure for anything but `false` (Codex review of PR #303, items 2 and 7)",
+      "value": [
+        { "line": "secure: true", "locked": false, "secure": true },
+        { "line": "secure: \"true\"", "locked": false, "secure": true },
+        { "line": "\"secure\": true", "locked": false, "secure": true },
+        { "line": "  secure: true", "locked": false, "secure": true },
+        { "line": "- secure: yes", "locked": false, "secure": true },
+        { "line": "secure:", "locked": false, "secure": true },
+        { "line": "secure: false", "locked": false, "secure": false },
+        { "line": "locked: true", "locked": true, "secure": false },
+        { "line": "\"locked\": true", "locked": true, "secure": false },
+        { "line": "'locked' : true", "locked": true, "secure": false },
+        { "line": "  locked: true", "locked": true, "secure": false },
+        { "line": "locked: \"true\"", "locked": false, "secure": false },
+        { "line": "locked: false", "locked": false, "secure": false },
+        { "line": "lockedx: true", "locked": false, "secure": false }
+      ]
+    },
+    "removeKeyCases": {
+      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_writes.rs remove_key ↔ src/lib/frontmatterWrites.ts removeKey: a key goes with its span (lines under it, a `? key`'s `: value` line), never from block text; a list item's next key takes its dash; a plain key only at the top level (Codex review of PR #303, items 4 and 8)",
+      "value": [
+        { "lines": ["example: |", "  ai_edit: false", "tags: [a]", "ai_edit:", "  - nested", "? ai_edit", ": false", "items:", "- ai_edit: false", "  other: x"], "key": "ai_edit", "out": ["example: |", "  ai_edit: false", "tags: [a]", "items:", "- other: x"], "at": 3 },
+        { "lines": ["date created : 2020", "meta:", "  date created: inner"], "key": "date created", "out": ["meta:", "  date created: inner"], "at": 0 },
+        { "lines": ["\"locked\": true", "  note: kept with it", "locked: false", "tags: [a]"], "key": "locked", "out": ["tags: [a]"], "at": 0 },
+        { "lines": ["body: >-", "  secure: true", "", "  more", "secure: true"], "key": "secure", "out": ["body: >-", "  secure: true", "", "  more"], "at": 4 },
+        { "lines": ["tags: [a]"], "key": "ai_edit", "out": ["tags: [a]"], "at": -1 }
+      ]
+    },
     "aiBodyEditCases": {
       "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
       "value": [

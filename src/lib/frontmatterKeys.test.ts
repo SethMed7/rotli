@@ -27,7 +27,7 @@ describe("frontmatter read as YAML", () => {
     }
   });
 
-  // Codex review of PR #303, item 3
+  // Codex review of pull request 303, item 3
   test("a denial only YAML sees holds beside an alias or a bad value", () => {
     const flow = '{s: 1, "local\\u005fai_allowed": false, note: x}';
     for (const extra of ["a: &k one", "b: *k", "summary: a: b"]) {
@@ -58,7 +58,7 @@ describe("frontmatter read as YAML", () => {
     expect(localAiAllowedOverride(["local_ai_allowed: ﻿true", "summary: a: b"])).toBe(false);
   });
 
-  // Codex review of PR #303, item 5
+  // Codex review of pull request 303, item 5
   test("unrelated keys never change the verdict", () => {
     expect(bodyEdit(["created_by: agent", "1.0: a", "1.00: b", "summary: The ai_edit setting"])).toBe(
       "allowed",

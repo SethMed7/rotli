@@ -6,6 +6,7 @@
 // wins, and the trailing space an empty owned value emits.
 //
 // Pure: no host, no vault, no services.
+import { frontmatterField } from "./frontmatterKeys";
 
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
@@ -122,21 +123,25 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-function flagField(fm: NoteFrontmatter, key: string): boolean {
-  return fm.foreign.some((line) => {
-    const colon = line.indexOf(":");
-    if (colon < 0) return false;
-    return line.slice(0, colon).trim() === key && line.slice(colon + 1).trim() === "true";
+/** The values of every line that sets `key`, in any spelling (indented,
+ * quoted, a list item): the lock and secure readers count the same lines the
+ * Lock and Secure actions replace (Codex review of pull request 303, items 2 and 7). */
+function flagValues(fm: NoteFrontmatter, key: string): string[] {
+  return fm.foreign.flatMap((line) => {
+    const field = frontmatterField(line);
+    return field?.key.name === key ? [field.value] : [];
   });
 }
 
-/** A foreign `secure: true` line — the note is categorically unavailable to
- * remote models. The vault file is the truth; this only reads it. */
+/** A foreign `secure` line in any spelling saying anything but `false`: the
+ * note is categorically unavailable to remote models (fails closed, as
+ * corpus.rs `secure_field`). The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "secure");
+  return flagValues(fm, "secure").some((value) => value !== "false");
 }
 
-/** A foreign `locked: true` line — no AI may edit the note, every class reads it. */
+/** A foreign `locked: true` line in any spelling: no AI may edit the note,
+ * every class reads it (corpus.rs `locked_field`). */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "locked");
+  return flagValues(fm, "locked").includes("true");
 }

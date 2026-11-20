@@ -9,7 +9,6 @@ use super::{
     atomic_write, lifecycle_disk_folder, parse_document, prefix_write_result,
     split_root_id, CorpusState, CorpusStore, CorpusWriteResult, NoteMeta,
 };
-use crate::ai_edit_policy::ai_edit_field;
 
 /// How an AI body write may change a note: rewrite it (chat, under the grant),
 /// rewrite it once because the person said "Allow once" when the chat asked
@@ -49,10 +48,15 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| ai_edit_field(l).is_none());
+            crate::frontmatter_keys::remove_key(&mut fm.foreign, "ai_edit");
             fm.foreign.push(format!("ai_edit: {allowed}"));
+            let out = self.compose_for(&text, &fm, body);
+            crate::frontmatter_keys::keeps_promise(&out, |fields| {
+                let says = crate::frontmatter_keys::owned_key(fields, "ai_edit", |value| value == "true");
+                if allowed { matches!(says, crate::frontmatter_keys::Says::Grant(_)) } else { says == crate::frontmatter_keys::Says::Deny }
+            })?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
