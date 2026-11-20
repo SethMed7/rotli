@@ -70,6 +70,10 @@ pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
     ))
 }
 
+/// One protection a rewrite may have lost: did it (`had`, `now`), and the
+/// line that puts it back.
+type Restore = (fn(&Protection, &Protection) -> bool, &'static str, &'static str);
+
 /// `next` with every protection `old` had put back, through `set_line(text,
 /// key, value)`, the writer's own frontmatter edit: what a chat rewrite does,
 /// so a re-save keeps its flags and denials (review 2026-11-20). A new grant
@@ -77,7 +81,7 @@ pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
 pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &str) -> String) -> String {
     let had = protection(old);
     let mut out = next.to_string();
-    let restores: [(fn(&Protection, &Protection) -> bool, &str, &str); 5] = [
+    let restores: [Restore; 5] = [
         (|had, now| had.secure_context && !now.secure_context, "secureContext", "true"),
         (|had, now| had.secure && !now.secure, "secure", "true"),
         (|had, now| had.locked && !now.locked, "locked", "true"),
