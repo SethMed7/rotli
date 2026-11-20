@@ -289,19 +289,24 @@
       "reason": "Not a mirror: the same reported path spellings (_ſecure, STRASSE for Straße, a keyword on a parent folder, a symlink into the secure home) are checked twice on purpose, once against the protected_path rule and once end to end through the agent listing, search, metrics and reads. Sharing the fixture strings would couple the two layers' tests."
     },
     {
-      "id": "source-guard-idiom-24a9e6e1bf",
-      "fingerprint": "24a9e6e1bf344076cdd53eec93ffae3f8f119ae7a9befced04906535c32349fb",
+      "id": "source-guard-idiom-no-cached-row",
+      "fingerprint": "8a38f739df4fd0904ec9401789308963f39ec3d0d4adfe126f275e449134b2df",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
-      "id": "source-guard-idiom-00c1c62aa5",
-      "fingerprint": "00c1c62aa533a795c6e10363ccf225e49a01ff9a095df030a98fbcedd7896c73",
+      "id": "source-guard-idiom-note-lock",
+      "fingerprint": "b7f899f0e59eac32d0c11f4ab738ee6cb412f60c1593b534c94698b45504eadb",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
       "id": "source-guard-idiom-fa8f469859",
       "fingerprint": "fa8f469859db591738efe46552f421eee0620c0ad27762225b43315a9bd2dcd0",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
+    },
+    {
+      "id": "secure-home-listing-and-end-to-end-tests",
+      "fingerprint": "776a363ac5eacc301b31eee5fa8de125579edb51ebf954b6e7d8c9140c7df55b",
+      "reason": "Not a mirror: workspace_listing_tests.rs checks that the listing hides secure-home folders, and workspace_path_protection_tests.rs checks every spelling of those paths end to end; both name the same wiki/_secure fixture folders on purpose."
     }
   ]
 }
