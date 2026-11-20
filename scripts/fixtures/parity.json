@@ -507,16 +507,22 @@
         { "fields": ["summary: Plan: phase two"], "says": "unset" },
         { "fields": ["local_ai_allowed: true", "summary: Plan: phase two", "links: [[Alpha]], [[Beta]]"], "says": "grant" },
         { "fields": ["local_ai_allowed: true", "tags: [a]", "tags: [b]"], "says": "grant" },
-        { "fields": ["local_ai_allowed: true", "summary: about local_ai_allowed: x"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "summary: about local_ai_allowed: x"], "says": "grant" },
         { "fields": ["local_ai_allowed: true", "local_ai_allowed: true"], "says": "deny" },
-        { "fields": ["x: \"one", "local_ai_allowed: true", "\""], "says": "grant" },
+        { "fields": ["secure: true", "local_ai_allowed: true", "{s: 1, \"local\\u005fai_allowed\": false}", "b: *k"], "says": "deny" },
+        { "fields": ["secure: true", "local_ai_allowed: true", "{s: 1, \"local\\u005fai_allowed\": false}", "a: &k one", "b: *k"], "says": "deny" },
+        { "fields": ["secure: true", "local_ai_allowed: true", "{s: 1, \"local\\u005fai_allowed\": false}", "summary: a: b"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "a: &k local_ai_allowed", "*k : false"], "says": "deny" },
+        { "fields": ["local_ai_allowed: true", "a: &k one", "b: *k", "c: [unclosed"], "says": "grant" },
+        { "fields": ["local_ai_allowed: true", "a: &k one", "b: *k", "\tc: tab"], "says": "deny" },
+        { "fields": ["x: \"one", "local_ai_allowed: true", "\""], "says": "deny" },
         { "fields": ["x: [a,", "local_ai_allowed: true]"], "says": "deny" },
         { "fields": ["x: \"one", "local_ai_allowed: true\""], "says": "deny" },
         { "fields": ["local_ai_allowed: true", "meta:", "  created_by: person"], "says": "grant" },
         { "fields": ["{\"local\\u005fai_allowed\": false, x: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"], "says": "deny" },
-        { "fields": ["{\"local\\u005fai_allowed\": false, x: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"], "says": "unset" },
+        { "fields": ["{\"local\\u005fai_allowed\": false, x: [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}"], "says": "deny" },
         { "fields": ["local_ai_allowed: true", "a: &a x", "b: *a"], "says": "grant" },
-        { "fields": ["a: &a {local_ai_allowed: false}", "b: *a", "local_ai_allowed: true"], "says": "deny" },
+        { "fields": ["a: &a {local_ai_allowed: false}", "b: *a", "local_ai_allowed: true"], "says": "grant" },
         { "fields": ["local_ai_allowed: true", "\"local\\u005fai_allowed\": true"], "says": "deny" }
       ]
     },
@@ -540,10 +546,13 @@
           "verdict": "person-written"
         },
         { "fields": ["created_by: agent", "tags: [a]", "tags: [b]"], "verdict": "allowed" },
-        { "fields": ["created_by: agent", "x: \"one", "ai_edit: true", "\""], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "1.0: a", "1.00: b", "summary: The ai_edit setting"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "1: a", "1: b"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "ai_edit: tRuE"], "verdict": "revoked" },
+        { "fields": ["created_by: agent", "x: \"one", "ai_edit: true", "\""], "verdict": "revoked" },
         { "fields": ["created_by: agent", "x: [a,", "ai_edit: true]"], "verdict": "revoked" },
         { "fields": ["created_by: agent", "meta:", "  created_by: person"], "verdict": "person-written" },
-        { "fields": ["created_by: agent", "\tnested: tab"], "verdict": "allowed" },
+        { "fields": ["created_by: agent", "\tnested: tab"], "verdict": "revoked" },
         { "fields": ["created_by: agent", "summary: @mention"], "verdict": "allowed" },
         { "fields": ["created_by: agent", "summary: *bold* words"], "verdict": "allowed" },
         { "fields": ["created_by: agent", "summary: &anchor text"], "verdict": "allowed" },
@@ -602,20 +611,20 @@
             "created_by: agent",
             "  created_by: person"
           ],
-          "verdict": "person-written"
+          "verdict": "revoked"
         },
         {
           "fields": [
             "created_by: chat",
             "- created_by: someone"
           ],
-          "verdict": "person-written"
+          "verdict": "revoked"
         },
         {
           "fields": [
             "created_by: \ufeffagent"
           ],
-          "verdict": "person-written"
+          "verdict": "revoked"
         },
         {
           "fields": [
