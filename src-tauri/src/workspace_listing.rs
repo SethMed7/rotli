@@ -19,6 +19,10 @@ use std::collections::HashSet;
 thread_local! {
     /// Rows gated by this thread's listings, for the proportionality test.
     pub(super) static ROWS_GATED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The last listing's folders before the agent folder filter, for the
+    /// parity test: the memex `Storage` destination and a shelf outside
+    /// `wiki/` are synthesized here and then filtered out of every answer.
+    pub(super) static UNFILTERED_FOLDERS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 impl Workspace {
@@ -52,6 +56,8 @@ impl Workspace {
         // directories, and the shelves of the rows an agent may see
         let gated: Vec<NoteMeta> = kept.iter().chain(&backing).cloned().collect();
         let folders = self.store.folders_for_ai(&gated)?;
+        #[cfg(test)]
+        UNFILTERED_FOLDERS.with(|ids| *ids.borrow_mut() = folders.iter().map(|folder| folder.id.clone()).collect());
         let folders = folders.into_iter().filter(|folder| self.store.agent_listable_folder(&folder.id)).collect::<Vec<_>>();
         Ok(CorpusList {
             notes: kept.into_iter().map(|meta| self.prefix_meta(meta)).collect(),

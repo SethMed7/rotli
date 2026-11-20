@@ -404,9 +404,11 @@ roots carry their root-prefixed wire id in the link.
   is met. Past the limit every row read as Markdown (a note, or a file with no
   extension) is still gated, since its shelf folder comes from its
   frontmatter; a board or file only when its path alone would add a folder
-  (the memex `Storage` destination). The cost follows the answer, not the
-  size of `storage/`. Notes, folders, order, and ids match gating every row
-  (`workspace_listing.rs`).
+  not yet known (such as the memex `Storage` destination). Past-limit gating
+  keeps parity with the unfiltered `folders_for_ai` result, before the agent
+  folder filter, which on a memex then hides `Storage` and shelves outside
+  `wiki/`. The cost follows the answer, not the size of `storage/`. Notes,
+  folders, order, and ids match gating every row (`workspace_listing.rs`).
 - A folder row is listed to an agent only when the older path check
   (`agent_listable`) allows it and, on the folder's own path, it is not inside
   a secure home (`wiki/_secure/`, `Secure notes/`) and its name carries none of

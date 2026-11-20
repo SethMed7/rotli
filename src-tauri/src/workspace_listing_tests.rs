@@ -3,7 +3,7 @@
 //! took minutes (2026-11-20). The listing now gates in proportion to its
 //! answer, and the answer is unchanged.
 
-use super::listing::ROWS_GATED;
+use super::listing::{ROWS_GATED, UNFILTERED_FOLDERS};
 use super::tests::test_workspace;
 use super::*;
 use std::time::{Duration, SystemTime};
@@ -33,12 +33,15 @@ fn memex(temp: &TempDir, storage_files: usize) -> Workspace {
         put(root, &format!("wiki/Projects/recent-{i}.md"), &note(&format!("01LIST{i:020}"), "", &format!("Recent {i}"), "plain"), i);
     }
     put(root, "wiki/Projects/shelved.md", &note("01LISTSHELVED00000000000000", "shelf: [wiki/Shelves/Payments]\n", "Shelved", "plain"), 30);
+    // a typical shelf outside wiki/: synthesized, then hidden from agents
+    put(root, "wiki/Projects/northstar.md", &note("01LISTNORTHSTAR000000000000", "shelf: [Northstar/Payments]\n", "Northstar", "plain"), 35);
     put(root, "wiki/Areas/pinned.md", &note("01LISTPINNED000000000000000", "pinned: true\n", "Pinned", "plain"), 40);
     put(root, "wiki/Areas/token.md", &note("01LISTTOKEN0000000000000000", "", "Token", SECRET), 2);
     // walked as a file, read as Markdown (an id with no extension)
     put(root, "wiki/Projects/README", "# Readme\n\nplain\n", 45);
     // the newest storage file is secret-shaped: the next one still brings
-    // the Storage folder when every storage row is past the limit
+    // the memex Storage destination into the unfiltered folders when every
+    // storage row is past the limit (agents never see Storage itself)
     put(root, "storage/inbox/secret.txt", SECRET, 50);
     put(root, "storage/inbox/near.csv", "task,status\nDraft,ready\n", 51);
     for i in 0..storage_files {
@@ -48,8 +51,8 @@ fn memex(temp: &TempDir, storage_files: usize) -> Workspace {
 }
 
 /// The listing as it was: every row gated, then the folders of all of them,
-/// then the limit.
-fn listed_by_gating_every_row(ws: &mut Workspace, limit: usize) -> CorpusList {
+/// then the limit. Also returns the folders before the agent filter.
+fn listed_by_gating_every_row(ws: &mut Workspace, limit: usize) -> (CorpusList, Vec<String>) {
     let mut kept = Vec::new();
     for meta in ws.store.list().unwrap().notes {
         let shown = match meta.kind {
@@ -59,14 +62,26 @@ fn listed_by_gating_every_row(ws: &mut Workspace, limit: usize) -> CorpusList {
         };
         kept.extend(shown);
     }
-    let folders: Vec<FolderMeta> =
-        ws.store.folders_for_ai(&kept).unwrap().into_iter().filter(|folder| ws.store.agent_listable_folder(&folder.id)).collect();
+    let unfiltered = ws.store.folders_for_ai(&kept).unwrap();
+    let ids = unfiltered.iter().map(|folder| folder.id.clone()).collect();
+    let folders: Vec<FolderMeta> = unfiltered.into_iter().filter(|folder| ws.store.agent_listable_folder(&folder.id)).collect();
     kept.truncate(limit.min(500));
-    CorpusList {
+    let list = CorpusList {
         notes: kept.into_iter().map(|meta| ws.prefix_meta(meta)).collect(),
         folders: folders.into_iter().map(|folder| ws.prefix_folder(folder)).collect(),
         skipped: Vec::new(),
-    }
+    };
+    (list, ids)
+}
+
+/// The listing and its unfiltered folders match gating every row.
+fn assert_parity(ws: &mut Workspace, limit: usize, when: &str) -> Vec<String> {
+    let (expected, expected_unfiltered) = listed_by_gating_every_row(ws, limit);
+    let listed = ws.list_remote(limit).unwrap();
+    assert_eq!(json(&listed), json(&expected), "{when}, limit {limit}");
+    let unfiltered = UNFILTERED_FOLDERS.with(|ids| ids.borrow().clone());
+    assert_eq!(unfiltered, expected_unfiltered, "{when}, limit {limit}: folders before the agent filter");
+    listed.folders.iter().map(|folder| folder.id.clone()).collect()
 }
 
 fn json(list: &CorpusList) -> Value {
@@ -82,9 +97,12 @@ fn listing_gates_rows_in_proportion_to_its_limit_not_to_the_vault() {
     let listed = ws.list_remote(3).unwrap();
     let gated = ROWS_GATED.with(|count| count.get());
     assert_eq!(listed.notes.len(), 3);
-    // every note (nine), and the storage files up to the first visible one;
-    // never the 200 older assets
-    assert!(gated <= 12, "gated {gated} rows for a listing of 3");
+    // the ten notes and the extensionless README (read as Markdown, so
+    // always gated), then storage files until one is visible and brings
+    // Storage: secret.txt (refused) and near.csv. Never the 200 older assets,
+    // and never fewer: skipping a file whose folder is unknown would drop
+    // Storage from the unfiltered folders.
+    assert_eq!(gated, 13, "rows gated for a listing of 3");
 }
 
 #[test]
@@ -92,15 +110,19 @@ fn listing_returns_what_gating_every_row_returned() {
     let temp = TempDir::new().unwrap();
     let mut ws = memex(&temp, 40);
     for limit in [0, 1, 3, 8, 12, 600] {
-        let expected = listed_by_gating_every_row(&mut ws, limit);
-        let listed = ws.list_remote(limit).unwrap();
-        assert_eq!(json(&listed), json(&expected), "limit {limit}");
+        assert_parity(&mut ws, limit, "walked");
     }
-    let small = ws.list_remote(1).unwrap();
-    let folder_ids: Vec<&str> = small.folders.iter().map(|folder| folder.id.as_str()).collect();
-    // a shelf only a row past the limit names stays listed
-    assert!(folder_ids.contains(&"wiki/Shelves/Payments"), "{folder_ids:?}");
-    assert!(folder_ids.contains(&"wiki/Shelves"), "{folder_ids:?}");
+    let listed = assert_parity(&mut ws, 1, "walked");
+    let unfiltered = UNFILTERED_FOLDERS.with(|ids| ids.borrow().clone());
+    // past the limit, the rows that alone bring a folder are still gated:
+    // the memex Storage destination and a shelf outside wiki/ are in the
+    // unfiltered folders (the agent filter then hides both, for both
+    // algorithms), and a shelf under wiki/ survives the filter too
+    for id in ["Storage", "Northstar/Payments", "Northstar", "wiki/Shelves/Payments"] {
+        assert!(unfiltered.iter().any(|folder| folder == id), "{id} unfiltered: {unfiltered:?}");
+    }
+    assert!(!listed.iter().any(|id| id == "Storage" || id.starts_with("Northstar")), "{listed:?}");
+    assert!(listed.iter().any(|id| id == "wiki/Shelves/Payments") && listed.iter().any(|id| id == "wiki/Shelves"), "{listed:?}");
     let all = ws.list_remote(600).unwrap();
     assert!(all.notes.first().is_some_and(|meta| meta.title == "Pinned"), "{:?}", all.notes.first());
     assert!(all.notes.iter().any(|meta| meta.title == "near.csv"));
@@ -114,12 +136,9 @@ fn listing_returns_what_gating_every_row_returned() {
     // as Markdown, so its shelf comes from its frontmatter too
     put(temp.path(), "wiki/Projects/README", "---\nshelf: [wiki/Readme/Shelf]\n---\n# Readme\n\nplain\n", 45);
     for limit in [0, 1, 3, 600] {
-        let expected = listed_by_gating_every_row(&mut ws, limit);
-        let listed = ws.list_remote(limit).unwrap();
-        assert_eq!(json(&listed), json(&expected), "after the edit, limit {limit}");
-        let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
-        assert!(ids.contains(&"wiki/New/Shelf") && ids.contains(&"wiki/New"), "limit {limit}: {ids:?}");
-        assert!(ids.contains(&"wiki/Readme/Shelf"), "limit {limit}: {ids:?}");
+        let ids = assert_parity(&mut ws, limit, "after the edit");
+        let has = |id: &str| ids.iter().any(|folder| folder == id);
+        assert!(has("wiki/New/Shelf") && has("wiki/New") && has("wiki/Readme/Shelf"), "limit {limit}: {ids:?}");
     }
 }
 
