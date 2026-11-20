@@ -98,13 +98,15 @@ export function resolveAnchor(
 
 // a line break or control character would write extra metadata lines through
 // the Filer, `ai_edit: true` among them (review 2026-11-20)
-const LINE_BREAKS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
+/** A line break (CR, LF, U+0085, U+2028, U+2029) or another control character. */
+export function breaksALine(char: string): boolean {
+  const code = char.codePointAt(0) ?? 0;
+  return code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+}
 
 function cleanTag(tag: string): string {
-  return tag
-    .replace(/[,[\]]/g, "")
-    .replace(LINE_BREAKS, " ")
-    .trim();
+  const oneLine = [...tag].map((char) => (breaksALine(char) ? " " : char)).join("");
+  return oneLine.replace(/[,[\]]/g, "").trim();
 }
 
 /** A model's tag list, cleaned: strings only, no commas or brackets, no

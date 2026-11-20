@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
-import { cleanTags } from "../lib/librarianActions";
+import { breaksALine, cleanTags } from "../lib/librarianActions";
 import { corpusSetAiEdit } from "../lib/noteProtection";
 import { corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
@@ -34,7 +34,7 @@ test("a model's tag can't carry a line break into the metadata", () => {
     "a\u2028b\u0085c",
     "tab\there",
   ]);
-  for (const tag of tags) expect(tag).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
+  for (const tag of tags) expect([...tag].some(breaksALine)).toBe(false);
   expect(tags.some((tag) => tag.includes("plans"))).toBe(true);
 });
 
