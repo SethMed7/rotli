@@ -280,17 +280,22 @@ builds until that review has checked these fixes:
    raw metadata merger is dev's again (the stricter one deleted values that
    merely contained a key's name). Every key only Rust writes (`created_by`,
    `ai_edit`, `local_ai_allowed`) is read by one rule that fails closed both
-   ways, and since the fifth review it decodes the frontmatter with a real
-   YAML parser on both sides (yaml-rust2 and `yaml`): where it decodes, a
-   decoded value that doesn't grant denies; quoted keys are decoded, so
-   `"ai\u005fedit": false` denies; a second line naming the key, or one
-   holding a control character or U+FEFF, denies; a grant needs Rotli's own
-   line and, where the frontmatter decodes, a decoded value that agrees.
-   Frontmatter that won't decode (the organizer writes `summary:` and
-   `links:` unquoted) says nothing by itself; there, a line the line reader
-   can't name that still contains the key's text denies. Every writer of a
-   permission key (Rotli vault or folder opened in place, Rust or Rotli Web)
-   removes every spelling before writing Rotli's line. Notes the walk keeps
+   ways, and since the fifth review it also reads the frontmatter as YAML
+   on both sides (yaml-rust2's events, `yaml`'s syntax tree; no values built,
+   no alias expanded): quoted keys are decoded, so `"ai\u005fedit": false`
+   denies; a value in the root mapping that doesn't grant denies; a second
+   line naming the key, one holding a control character or U+FEFF, the key
+   twice in the root mapping, or an alias as a root key denies; a grant
+   needs Rotli's own line and a root value that agrees. Frontmatter that
+   won't parse is read again with the values of plain non-permission keys
+   blanked (the organizer writes `summary:` and `links:` unquoted); still
+   unreadable, over 64 KiB, or nested past 64 levels, it is refused, which
+   denies (Codex review of PR #303 removed an earlier "says nothing, plus a
+   text search" rule that missed an escaped key beside an alias). Every
+   writer of a permission or protection key (Rotli vault or folder opened in
+   place, Rust or Rotli Web) removes each one as a whole span, never block
+   text, copies an action's lines verbatim, and refuses a result that
+   doesn't say what it promised. Notes the walk keeps
    under a duplicate frontmatter id are refused and hidden by the index (an
    id two files carry names no one note; nothing in the app shows such ids
    today), and names compare folded character by character (NFKC, ß→ss,
@@ -320,8 +325,8 @@ builds until that review has checked these fixes:
    `a_sidecar_row_with_an_unknown_field_is_skipped`,
    `remove_takes_only_an_entry_the_index_already_shows`, and the parity
    fixtures `aiBodyEditCases` and `localAiAllowedCases` (indented denials,
-   U+0085 and U+FEFF values, escaped keys, undecodable frontmatter,
-   duplicate keys, the parser-edge shapes both suites assert); from the fifth review,
+   U+0085 and U+FEFF values, escaped keys, unparseable frontmatter,
+   duplicate keys, aliases, the parser-edge shapes both suites assert); from the fifth review,
    `turning_let_ai_edit_on_clears_every_spelling_of_ai_edit` and
    `allowing_on_device_ai_clears_every_spelling_of_local_ai_allowed` (Rust)
    and `folderPermissionSetters.test.ts` (Rotli Web), each checking the file
@@ -333,14 +338,25 @@ builds until that review has checked these fixes:
    `undecodable_frontmatter_still_denies_where_a_line_is_about_the_key`
    (Rust, with TypeScript twins in `frontmatterKeys.test.ts`), and
    `locking_in_place_replaces_a_lock_line_spelled_another_way` (Rust and
-   `folderPermissionSetters.test.ts`). Limits, documented: text that refers to a note
+   `folderPermissionSetters.test.ts`); from Codex's review of PR #303,
+   `a_denial_only_yaml_sees_holds_beside_an_alias_or_a_bad_value`,
+   `unrelated_keys_never_change_the_verdict`,
+   `hostile_frontmatter_is_never_built_into_a_tree` (each with a
+   `frontmatterKeys.test.ts` twin), `the_generic_setter_never_grants_or_unsecures`,
+   `a_quoted_lock_locks_and_the_lock_actions_replace_it`,
+   `setters_keep_block_text_and_remove_whole_spans`,
+   `a_key_spelled_with_a_space_before_its_colon_is_replaced_in_place` (with
+   twins in `folderPermissionSetters.test.ts` and `frontmatterInPlace.test.ts`),
+   and the parity fixtures `protectionFlagCases` and `removeKeyCases`. Limits, documented: text that refers to a note
    in other words than its title or an alias (a nickname, a description)
    can't be recognised and stays shown; a note known only by its path can't
    be indexed or logged; once a secure original is deleted, a copy that
    carried its id holds it alone, and entries about the original show under
-   the copy. In frontmatter no YAML parser can decode, a denial spelled so
-   that the line reader can't name it and without the key's own text (an
-   escape behind a YAML tag, an alias) isn't seen. "Librarian index" and "Librarian log" notes an earlier
+   the copy. The line reader still counts a permission line inside a block
+   scalar's text as a denial (reading block scalars as text there was held
+   back for review: a mismatch between the two hand-written detectors would
+   be a missed denial); a setter refuses to change such a note rather than
+   edit the person's text. "Librarian index" and "Librarian log" notes an earlier
    development build wrote stay in the vault as ordinary notes, listed,
    searched and readable by AI lanes like any public note
    (`a_page_the_route_wrote_stays_an_ordinary_searchable_note`); delete them

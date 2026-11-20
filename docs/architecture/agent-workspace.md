@@ -312,27 +312,35 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   item, `? key`, a quoted key decoded) whose value isn't a grant denies or
   restricts, and so does a second line naming the key or one holding a
   control character or U+FEFF (the two YAML parsers could read those
-  differently). The frontmatter is also decoded with a YAML parser
-  (yaml-rust2 in Rust, `yaml` in TypeScript): where it decodes, a decoded
-  value that doesn't grant denies, and a grant needs the decoded value to
-  agree. Frontmatter that won't decode says nothing by itself, because the
-  organizer writes values unquoted (`summary: Plan: phase two`,
-  `links: [[A]], [[B]]`) and people type what they like; on such
-  frontmatter a line the line reader can't name that still contains the
-  key's text (`!!str ai_edit: false`) denies. The decoder never builds
-  frontmatter over 64 KiB, nested past 64 levels, or holding an alias
-  (yaml-rust2 copies an alias's whole target): such frontmatter counts as
-  not decoding. Only the spelling Rust writes
-  (`key: value` at the start of a line) grants. Values trim with
-  JavaScript's set on both sides. The raw
-  metadata editor keeps a typed line as the person wrote it; every writer of
-  a permission key (`set_ai_edit`, the on-device toggle, secure removal, the
-  in-place writers `with_top_level_line`/`compose_in_place` and their
-  TypeScript twins, Rotli Web's `withField`) removes every spelling of it
-  before writing Rotli's line, and the in-place writers replace any other
-  key in its one-line top-level spellings (`key :`, `"key":`), so a key
-  the person spelled their own way is never repeated. Parity:
-  `aiBodyEditCases`, `localAiAllowedCases`. A source test fails on a new
+  differently). The frontmatter is also read as YAML
+  (`frontmatter_yaml.rs` over yaml-rust2's events, `frontmatterYaml.ts` over
+  `yaml`'s syntax tree; neither builds values or expands an alias): the
+  key is a root-mapping scalar whose text is the key, a value there that
+  doesn't grant denies, a grant needs it to agree, and the key twice or an
+  alias as a root key is refused. Frontmatter that won't parse is read once
+  more with the values of plain non-permission keys blanked, because the
+  organizer writes `summary: Plan: phase two` and `links: [[A]], [[B]]`
+  unquoted; still unreadable, over 64 KiB, or nested past 64 levels (`[`/`{`
+  counted before any parse), it is refused, and refused denies. Only the
+  spelling Rust writes (`key: value` at the start of a line) grants. Values
+  trim with JavaScript's set on both sides. `locked` and `secure` are read
+  in any spelling too (`locked_field`, `secure_field`; Rotli Web's
+  `isLockedFrontmatter`, `isSecureFrontmatter`; locked for `true`, secure
+  for anything but `false`). The raw metadata editor keeps a typed line as
+  the person wrote it. Every writer of these keys (`set_ai_edit`, the
+  on-device toggle, Lock, Secure and its removal, Rotli Web's `withField`)
+  removes each one as a whole span through `frontmatter_writes.rs`
+  `remove_key` (`frontmatterWrites.ts` `removeKey`): its line, the lines
+  under it, a `? key`'s `: value` line, never text inside a block scalar;
+  and refuses, writing nothing, when the result wouldn't say what it
+  promised (`keeps_promise`). In a folder opened in place,
+  `compose_in_place` (`composeInPlace`) copies the action's own lines for a
+  changed key verbatim, never a line built from a decoded value, and the
+  generic setters (`set_field`, the filer's `set_ai_field`) check the key
+  as YAML reads it (`field_name`), refuse a newline in a key or value, and
+  refuse any change to a Rotli-managed line. Parity:
+  `aiBodyEditCases`, `localAiAllowedCases`, `protectionFlagCases`,
+  `removeKeyCases`. A source test fails on a new
   Rust reader that doesn't use the shared module. Rust's note selectors compare titles and aliases through
   `corpus_links.rs` `link_key`, which trims JavaScript's whitespace set
   (U+FEFF included) and is parity-pinned to `wikilink.ts` `linkKey`.

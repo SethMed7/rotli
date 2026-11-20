@@ -505,13 +505,15 @@ An adopted folder, and the source of any import, is **protected**:
   means. **Rotli adds nothing to the note** (decision B): no `id`, `created`,
   `updated`, or rename `aliases` in a protected folder's frontmatter. Rotli
   keeps those facts in `.rotli/` instead. The note's text is exactly what the
-  person wrote. A line the person asked Rotli to change replaces that key in
-  any one-line top-level spelling (`locked : false`, `"locked": false`, a key
-  with a space such as `date created`), so the key is never written twice
-  (`corpus_in_place.rs` `compose_in_place`, `frontmatterInPlace.ts`
-  `composeInPlace`, both through `top_level_field`); indented lines and
-  `? key` lines are never touched. The permission keys (`created_by`,
-  `ai_edit`, `local_ai_allowed`) go in every spelling.
+  person wrote. A key an action changed is replaced as a whole span (its
+  line and the lines under it, never text inside a block scalar) in any
+  one-line top-level spelling (`locked : false`, `"locked": false`, a key
+  with a space such as `date created`), by the action's own lines copied
+  verbatim, so the key is never written twice and a typed spelling stays
+  typed (`corpus_in_place.rs` `compose_in_place`, `frontmatterInPlace.ts`
+  `composeInPlace`, through `frontmatter_writes.rs` `remove_key`). The
+  permission keys (`created_by`, `ai_edit`, `local_ai_allowed`) and
+  `locked`/`secure` go in every spelling, indented ones too.
 - Enforcement lives in the core, not only in the UI. The Mac marks an adopted
   store (`CorpusStore.adopted`, derived from the marker's `inPlace` since
   decision I); Rotli Web decides by the same marker (`vaultOpenedInPlace`). The

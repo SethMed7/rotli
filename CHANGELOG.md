@@ -27,10 +27,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Rotli's markers keep their no in more forms.** Who made a note, the
   "Let AI edit" grant and the on-device permission are also read the way a
   YAML reader reads them, so an escaped or quoted copy
-  (`"ai\u005fedit": false`) still says no, and so do two copies of one
-  marker. Metadata a YAML reader can't read, such as a summary with a colon
-  in it or several links on one line (how the organizer writes them),
-  changes nothing: those notes keep their permissions.
+  (`"ai\u005fedit": false`) still says no, even beside other unusual
+  metadata, and so do two copies of one marker. Metadata a YAML reader
+  can't read changes nothing when the cause is a plain value such as a
+  summary with a colon in it or several links on one line (how the
+  organizer writes them); metadata that stays unreadable, or is huge or
+  deeply nested, now counts as no.
+- **The metadata editor can't grant what only Rotli grants.** Typing a key
+  such as `"ai_edit"` or `"secure"` (quoted) into a note's metadata field is
+  refused like the plain key, and a field's name and value must each be one
+  line.
+- **Lock and secure count in any form.** A lock or secure line typed in
+  another form (`"locked": true`, indented) now locks or protects the note,
+  and Lock replaces it rather than leaving it beside its own line. Rotli Web
+  now treats `secure: "true"` as secure, as the Mac does.
+- **Changing a setting never edits your text.** Turning a setting on or
+  off removes Rotli's line with everything under it, never a line inside a
+  block of text in your metadata; if such a line would keep the setting
+  from changing, Rotli says so and leaves the note as it was.
 - **The Librarian's index hides notes more reliably** (the Librarian agent
   route, which still runs only in development builds). An entry that
   mentions a hidden note by title or alias is caught in any case or letter
