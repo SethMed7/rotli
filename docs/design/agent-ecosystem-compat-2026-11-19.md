@@ -379,6 +379,15 @@ all of it filed while the person approves proposals in Rotli.
 
 ## 6. Decisions for Seth
 
+**Decided 2026-11-20.** Seth took the recommended option on all five:
+- skills over the public CLI now;
+- the on-device Librarian stays the default;
+- direct writes are forbidden in the skills and caught into intake;
+- the copy learns and keeps the person's layout;
+- the relay stays until we know whether Grok Bot can run a local command.
+
+Still open inside 4: whether decision E's `_index.md` is skipped where a vault already has index notes. The skill pack follows the `rotli notes list` speed fix, since that command is its door.
+
 1. **Ship the skill pack now?**
    - **Skills only over the public CLI, now (recommended).** Works with every agent today and matches Obsidian's shape. Trade-off: advice, not a fence.
    - Wait until MCP leaves development builds. One stronger release; nothing for outside agents until then.
