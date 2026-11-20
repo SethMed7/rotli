@@ -19,11 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Agents no longer see the names of private folders.** A folder under
-  `wiki/_secure/` or `Secure notes/`, or one named with one of your secure
-  keywords, was listed to agents by name, though every note in it stayed
-  hidden. Agent metrics also stopped counting the shelves of notes agents
-  can't read. Your own sidebar is unchanged.
+- **Agents see fewer private folder names.** A folder directly under
+  `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
+  secure keywords, is no longer listed to agents by name. This is a partial
+  fix: spelling variants, keyword folders' subfolders, and shelf paths are
+  still being closed. Agent metrics also stopped counting the shelves of
+  notes agents can't read, and count an extensionless note as a note. Your
+  own sidebar is unchanged.
 
 ## [1.9.4] - 2026-11-19
 

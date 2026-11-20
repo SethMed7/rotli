@@ -185,3 +185,37 @@ fn metrics_count_no_folder_from_a_refused_note() {
     };
     assert_eq!(vault(true), vault(false));
 }
+
+/// Codex re-check 2, #4 (older than pull request 302): the listing gate reads
+/// an extensionless file as a note, and metrics counted it as a file.
+#[test]
+fn metrics_count_each_row_as_the_listing_shows_it() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+    put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
+    put(root, "wiki/Projects/README", "# Readme\n\nplain\n", 2);
+    let mut ws = test_workspace(&temp);
+    let listed = ws.list_remote(100).unwrap();
+    let count = |kind| listed.notes.iter().filter(|row| row.kind == kind).count();
+    let metrics = ws.metrics().unwrap();
+    assert_eq!((metrics.visible_notes, metrics.files), (count(NoteKind::Note), count(NoteKind::File)));
+    assert_eq!((metrics.visible_notes, metrics.files), (2, 0));
+}
+
+/// Pull request 302 is a speed fix: its folder check only ever hides more
+/// than the shipped one. A `:` made the shipped check read `x:identity` as
+/// the brain's identity lane and hide it, so the new one does too.
+#[test]
+fn the_folder_check_never_shows_a_folder_the_shipped_check_hid() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    fs::write(root.join("memex.json"), "{\"id\":\"mx_listing_fixture\"}\n").unwrap();
+    put(root, "wiki/Projects/open.md", &note("01LISTOPEN00000000000000000", "", "Open", "plain"), 1);
+    put(root, "wiki/x:identity/n.md", &note("01LISTCOLONID000000000000000", "", "Plain", "plain"), 2);
+    let mut ws = test_workspace(&temp);
+    assert!(!ws.store.agent_listable("wiki/x:identity"), "the shipped check hides it");
+    let listed = ws.list_remote(0).unwrap();
+    let ids: Vec<&str> = listed.folders.iter().map(|folder| folder.id.as_str()).collect();
+    assert!(!ids.contains(&"wiki/x:identity"), "{ids:?}");
+}

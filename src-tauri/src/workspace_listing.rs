@@ -65,7 +65,7 @@ impl Workspace {
     /// The row a remote agent may see for a walked row: a note's from the one
     /// read the gate approved, a board's or a file's from its path, in its
     /// own lane. None when refused.
-    fn remote_row(&mut self, meta: &NoteMeta) -> Option<NoteMeta> {
+    pub(super) fn remote_row(&mut self, meta: &NoteMeta) -> Option<NoteMeta> {
         #[cfg(test)]
         ROWS_GATED.with(|count| count.set(count.get() + 1));
         match meta.kind {

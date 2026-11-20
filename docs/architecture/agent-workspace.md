@@ -407,13 +407,18 @@ roots carry their root-prefixed wire id in the link.
   (the memex `Storage` destination). The cost follows the answer, not the
   size of `storage/`. Notes, folders, order, and ids match gating every row
   (`workspace_listing.rs`).
-- A folder is listed to an agent only when a file at its path would be: not
-  inside a secure home (`wiki/_secure/`, `Secure notes/`) and not named with
-  one of the vault's secure keywords, judged on the folder's own path
-  (`agent_listable_folder`). Nothing under it is read, so a folder with an
-  ordinary name whose notes are all secure is still listed by name.
-  `rotli_metrics` and `agent doctor` count these same folders, never a shelf
-  from a note an agent can't read.
+- A folder row is listed to an agent only when the older path check
+  (`agent_listable`) allows it and, on the folder's own path, it is not inside
+  a secure home (`wiki/_secure/`, `Secure notes/`) and its name carries none of
+  the vault's secure keywords (`agent_listable_folder`). This is a narrow
+  check, not complete path protection: it compares exact spellings (no Unicode
+  case folding), looks at the folder's own name rather than its ancestors, and
+  does not cover a row's `folderId` or a shelf named in frontmatter. A folder
+  with an ordinary name whose notes are all secure is still listed by name.
+- `rotli_metrics` and `agent doctor` count each row by the kind the listing's
+  gate returns (an extensionless file read as Markdown counts as a note).
+  `physicalFolders` counts walked directories that pass the folder check
+  only, never a shelf.
 - Every adapter caps one JSON-RPC request at 256 KB before parsing and one MCP
   response at 512 KB. The relay permits 256 additional bytes only around the
   Mac's response for its bounded request-id envelope; it never expands the MCP

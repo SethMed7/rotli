@@ -80,9 +80,11 @@ impl CorpusStore {
     /// secure keyword in its name, judged on the vault-relative path itself,
     /// never through a wire prefix or a note id (Codex re-check of pull
     /// request 302: `PrivateProject:` and a note whose id is the path
-    /// both slipped past). Nothing under it is read.
-    pub(crate) fn agent_listable_folder(&self, folder_id: &str) -> bool {
-        !matches!(
+    /// both slipped past). Nothing under it is read. It never shows what the
+    /// shipped check, `agent_listable`, hid.
+    pub(crate) fn agent_listable_folder(&mut self, folder_id: &str) -> bool {
+        self.agent_listable(folder_id)
+            && !matches!(
             super::surfaced(self.layout, folder_id),
             super::Surface::Hidden | super::Surface::Reference
         ) && !self.file_is_protected(&super::lifecycle_disk_folder(self.layout, folder_id))

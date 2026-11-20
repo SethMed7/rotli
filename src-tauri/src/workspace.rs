@@ -510,8 +510,9 @@ impl Workspace {
 
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
-        list.notes.retain(|meta| self.remote_meta_visible(meta));
-        // the vault's own directories, not the shelves of notes no agent reads
+        // each row counted as the listing shows it (an extensionless file is
+        // read as a note), and only the vault's own directories: never a shelf
+        list.notes = std::mem::take(&mut list.notes).iter().filter_map(|meta| self.remote_row(meta)).collect();
         list.folders = self.store.folders_for_ai(&[])?;
         list.folders.retain(|folder| self.store.agent_listable_folder(&folder.id));
         let visible_notes = list
