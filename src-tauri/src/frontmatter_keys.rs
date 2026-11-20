@@ -123,16 +123,27 @@ pub(crate) fn names_key(line: &str, key: &str) -> bool {
     frontmatter_field(line).is_some_and(|(spelled, _)| spelled.name == key)
 }
 
-/// The key a top-level line sets in a one-line spelling (`key:`, `key :`,
-/// `"key":`, `'key':`, quoted keys decoded); None for an indented line, a
-/// list item, `? key`, or a line that sets no key. A write in a folder opened
+/// The key and value a top-level line sets in a one-line spelling (`key:`,
+/// `key :`, `"key":`, `'key':`, quoted keys decoded); None for an indented
+/// line, a list item, `? key`, or a line without a colon. A key the line
+/// reader doesn't name (one with a space inside, as Obsidian's
+/// `date created`) is its text before the colon. A write in a folder opened
 /// in place replaces the line this names, so a key the person spelled their
 /// own way is replaced rather than repeated beside Rotli's line.
-pub(crate) fn top_level_key(line: &str) -> Option<String> {
+pub(crate) fn top_level_field(line: &str) -> Option<(String, String)> {
+    let line = line.trim_end_matches('\r');
     if line.starts_with(is_js_space) || line.starts_with("- ") || line.starts_with("? ") {
         return None;
     }
-    frontmatter_field(line).map(|(key, _)| key.name)
+    match frontmatter_field(line) {
+        Some((key, value)) => Some((key.name, value.to_string())),
+        None => line.split_once(':').map(|(key, value)| (key.to_string(), value.trim().to_string())),
+    }
+}
+
+/// The key of [`top_level_field`].
+pub(crate) fn top_level_key(line: &str) -> Option<String> {
+    top_level_field(line).map(|(key, _)| key)
 }
 
 /// The keys Rust writes that grant or deny an AI permission. Any spelling of

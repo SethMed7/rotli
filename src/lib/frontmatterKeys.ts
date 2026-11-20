@@ -90,14 +90,24 @@ export function namesKey(line: string, key: string): boolean {
   return frontmatterField(line)?.key.name === key;
 }
 
-/** The key a top-level line sets in a one-line spelling (`key:`, `key :`,
- * `"key":`, quoted keys decoded); null for an indented line, a list item, `?
- * key`, or a line that sets no key. Twin of frontmatter_keys.rs
- * `top_level_key`: a write in a folder opened in place replaces this line. */
+/** The key and value a top-level line sets in a one-line spelling (`key:`,
+ * `key :`, `"key":`, quoted keys decoded); null for an indented line, a list
+ * item, `? key`, or a line without a colon. A key the line reader doesn't name
+ * (one with a space inside, as Obsidian's `date created`) is its text before
+ * the colon. Twin of frontmatter_keys.rs `top_level_field`: a write in a
+ * folder opened in place replaces this line. */
+export function topLevelField(raw: string): { key: string; value: string } | null {
+  const line = raw.replace(/\r$/, "");
+  if (/^\s/.test(line) || line.startsWith("- ") || line.startsWith("? ")) return null;
+  const field = frontmatterField(line);
+  if (field) return { key: field.key.name, value: field.value };
+  const colon = line.indexOf(":");
+  return colon < 0 ? null : { key: line.slice(0, colon), value: line.slice(colon + 1).trim() };
+}
+
+/** The key of {@link topLevelField}. */
 export function topLevelKey(line: string): string | null {
-  if (/^\s/.test(line) || line.startsWith("\ufeff") || line.startsWith("- ") || line.startsWith("? "))
-    return null;
-  return frontmatterField(line)?.key.name ?? null;
+  return topLevelField(line)?.key ?? null;
 }
 
 /** C0 and C1 controls other than tab and line feed, and U+FEFF: the two YAML

@@ -85,8 +85,8 @@ pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
         lines
             .iter()
             .rev()
-            .find(|line| key_of(line).as_deref() == Some(key))
-            .and_then(|line| crate::frontmatter_keys::frontmatter_field(line).map(|(_, v)| v.to_string()))
+            .find_map(|line| crate::frontmatter_keys::top_level_field(line).filter(|(k, _)| k == key))
+            .map(|(_, value)| value)
     };
     let mut keys: Vec<String> = Vec::new();
     for line in before.foreign.iter().chain(next.foreign.iter()) {

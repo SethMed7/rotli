@@ -83,3 +83,15 @@ fn locking_in_place_replaces_a_lock_line_spelled_another_way() {
         assert_eq!(foreign, ["tags: [plan]", "locked: true"], "{spelled:?}: the line keeps its place");
     }
 }
+
+/// A key the line reader doesn't name (a space inside, as Obsidian's
+/// `date created`) is still edited and removed in place, once.
+#[test]
+fn a_key_with_a_space_is_edited_and_removed_in_place() {
+    let note = "---\ndate created: 2020-01-01\ntags: [plan]\n---\n# Plan\n";
+    let before = parse_document(note).0.unwrap_or_default();
+    let edited = Frontmatter { foreign: vec!["date created: 2021-02-02".into(), "tags: [plan]".into()], ..before.clone() };
+    assert_eq!(compose_in_place(note, &edited), "---\ndate created: 2021-02-02\ntags: [plan]\n---\n# Plan\n");
+    let removed = Frontmatter { foreign: vec!["tags: [plan]".into()], ..before };
+    assert_eq!(compose_in_place(note, &removed), "---\ntags: [plan]\n---\n# Plan\n");
+}

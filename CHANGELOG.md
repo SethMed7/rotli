@@ -12,10 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Locking a note in a folder opened in place no longer leaves two lock
-  lines.** If the note's metadata spelled the lock its own way
-  (`locked : false`, `"locked": false`), Rotli now replaces that line
-  instead of adding its own beside it.
+- **Changing a note's metadata in a folder opened in place no longer
+  writes a key twice.** If the note spelled a key its own way
+  (`locked : false`, `"locked": false`, or a key with a space such as
+  `date created`), Rotli now replaces that line instead of adding its own
+  beside it.
 
 ### Security
 

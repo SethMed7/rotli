@@ -5,7 +5,7 @@ import { type NoteFrontmatter, parseNoteDocument } from "./frontmatter";
 // frontmatter lines stay byte-for-byte, Rotli's own facts (id, created,
 // updated) are never minted, and a fence is added only to hold a line the
 // person asked for (docs/design/vault-copy-and-obsidian-compatibility.md).
-import { frontmatterField, namesKey, PERMISSION_KEYS, topLevelKey } from "./frontmatterKeys";
+import { namesKey, PERMISSION_KEYS, topLevelField, topLevelKey } from "./frontmatterKeys";
 import { rawFrontmatterBlock } from "./frontmatterRaw";
 
 /** A ULID (Crockford base32, 26 characters) — every Rotli create path mints one. */
@@ -62,8 +62,11 @@ export function composeInPlace(original: string, next: NoteFrontmatter): string 
   // a key in any one-line top-level spelling, so `locked : false` and the
   // `locked: true` an action adds are one key, replaced in place
   const valueOf = (lines: string[], key: string) => {
-    const line = [...lines].reverse().find((l) => topLevelKey(l) === key);
-    return line === undefined ? null : (frontmatterField(line)?.value ?? null);
+    for (const line of [...lines].reverse()) {
+      const field = topLevelField(line);
+      if (field?.key === key) return field.value;
+    }
+    return null;
   };
   const keys: string[] = [];
   for (const line of [...beforeForeign, ...next.foreign]) {

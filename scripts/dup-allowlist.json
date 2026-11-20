@@ -30,6 +30,17 @@
       "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
     },
     {
+      "id": "frontmatter-permission-twin-tests",
+      "files": [
+        "src-tauri/src/frontmatter_keys.rs",
+        "src/lib/frontmatterKeys.test.ts",
+        "src-tauri/src/corpus_permission_setter_tests.rs",
+        "src/services/folderPermissionSetters.test.ts",
+        "src/lib/frontmatterInPlace.test.ts"
+      ],
+      "reason": "Fixture-guarded mirror: secure notes fail closed and TS and Rust enforce the permission keys independently (AGENTS.md), so each side's regression tests name the same synthetic frontmatter; scripts/fixtures/parity.json (aiBodyEditCases, localAiAllowedCases) holds the two readers aligned."
+    },
+    {
       "id": "endpoint-locality-parity",
       "fingerprint": "ad1b9951a56985f95f18daa18c1312788f287accc2855495e02d207a352667a1",
       "reason": "Batch 1 fixture-guarded mirror: endpoint_is_local (chat.rs) vs endpointIsLocal tests share the scripts/fixtures/parity.json endpoint fixture URLs by design."
