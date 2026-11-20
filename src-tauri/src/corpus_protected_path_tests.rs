@@ -96,7 +96,9 @@ fn every_spelling_of_a_secure_home_is_protected() {
 
 #[test]
 fn every_spelling_of_a_keyword_in_any_component_is_protected() {
-    let (_temp, store) = vault(&["Straße", "Juniper", "Café"]);
+    let (_temp, store) = vault(&["Straße", "Juniper", "Café", "Cafe"]);
+    // a decomposed name holds the bare word as written, as the leaf check read it
+    assert!(store.protected_path("wiki/Cafe\u{301}/x.md"));
     for keyword in ["STRASSE", "Juniper", "CAFÉ"] {
         for name in spellings(keyword) {
             for parts in [vec!["wiki", &name], vec!["wiki", "Projects", &name, "Ordinary", "n.md"], vec!["wiki", &format!("Matter {name}"), "x.csv"]] {
@@ -111,6 +113,7 @@ fn every_spelling_of_a_keyword_in_any_component_is_protected() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn climbing_or_unresolvable_paths_fail_closed() {
     let (temp, store) = vault(&[]);
@@ -122,11 +125,37 @@ fn climbing_or_unresolvable_paths_fail_closed() {
     std::os::unix::fs::symlink(root.join("wiki/missing"), root.join("wiki/Dangling")).unwrap();
     let outside = TempDir::new().unwrap();
     std::os::unix::fs::symlink(outside.path(), root.join("wiki/Away")).unwrap();
-    for path in ["wiki/Link", "wiki/Link/Deep", "wiki/Link/Deep/new/shelf", "wiki/LINK/Deep", "wiki/Dangling/x", "wiki/Away/x"] {
+    for path in ["wiki/Link", "wiki/Link/Deep", "wiki/Link/Deep/new/shelf", "wiki/Dangling/x", "wiki/Away/x"] {
         assert!(store.protected_path(path), "{path:?}");
+    }
+    // a case-insensitive disk opens `LINK` as `Link`
+    if cfg!(target_os = "macos") {
+        assert!(store.protected_path("wiki/LINK/Deep"));
     }
     // a shelf that names no folder on disk yet is judged by its name alone
     assert!(!store.protected_path("wiki/New/Shelf"));
+}
+
+/// The rule replaced the leaf-name and secure-home checks at the board read,
+/// the document bridge, and attachments: whatever they protected, it still
+/// protects (generated names, both rules asked on the same paths).
+#[test]
+fn the_rule_protects_everything_the_checks_it_replaced_protected() {
+    let (temp, _) = vault(&["Straße", "Cafe", "bank"]);
+    let store = CorpusStore::open(temp.path().to_path_buf()).unwrap();
+    let names = ["Cafe\u{301}", "CAFE", "café", "Straße", "STRASSE", "bank-login", "Bank details", "plain", "_secure", "_SECURE", "Secure notes"];
+    let mut checked = 0;
+    for a in names {
+        for b in names {
+            for path in [format!("wiki/{a}/{b}.md"), format!("{a}/{b}"), format!("wiki/{a}/x/{b}.csv"), format!("{a}.md")] {
+                if store.file_is_protected(&path) {
+                    checked += 1;
+                    assert!(store.protected_path(&path), "{path:?}");
+                }
+            }
+        }
+    }
+    assert!(checked > 50, "the old check protected {checked} generated paths");
 }
 
 #[test]
@@ -160,6 +189,8 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
         .collect();
     agent_files.sort();
     assert!(agent_files.iter().any(|(name, _)| name == "workspace.rs") && agent_files.len() >= 8, "{:?}", agent_files.iter().map(|f| &f.0).collect::<Vec<_>>());
+    let scanned: usize = agent_files.iter().map(|(_, text)| production(text).lines().count()).sum();
+    assert!(scanned > 3000, "the guard read only {scanned} production lines");
     let forbidden = ["in_secure_home", "secure_by_name(", "file_is_protected(", "SECURE_NOTES_FOLDER", "\"wiki/_secure", "\"Secure notes"];
     for (name, text) in &agent_files {
         for (number, line) in production(text).lines().enumerate() {

@@ -32,6 +32,12 @@ fn answers(temp: &TempDir) -> String {
         seen += &serde_json::to_string(&ws.list_remote(limit).unwrap()).unwrap();
     }
     seen += &serde_json::to_string(&ws.search_remote("plain", 100).unwrap()).unwrap();
+    // a query also returns a public note's own frontmatter values: the note's
+    // text, like its body, not a path Rotli derived, so only the derived
+    // fields are checked here
+    for row in ws.query_remote(r#"title:~"e""#, 100).unwrap().notes {
+        seen += &format!("{} {} {}", row.id, row.title, row.path);
+    }
     seen += &serde_json::to_string(&ws.metrics().unwrap()).unwrap();
     seen
 }
@@ -73,6 +79,7 @@ fn a_keyword_matches_every_spelling_and_protects_everything_under_it() {
     assert_hidden(&temp, &["jUNIPER", "Ordinary"]);
 }
 
+#[cfg(unix)]
 #[test]
 fn a_shelf_or_note_id_never_names_a_protected_or_unclean_path() {
     let temp = vault(None);
@@ -107,4 +114,36 @@ fn a_protected_note_is_refused_to_a_read_by_any_spelling() {
     ws.list_remote(100).unwrap();
     assert!(ws.read_note("01PATHHIDDEN000000000000000").is_err());
     assert!(ws.read_note("wiki/_ſecure/n.md").is_err());
+}
+
+/// The secure home spelled canonically on disk, and asked for by an agent in
+/// another spelling the Mac's disk opens as the same file, or through a
+/// symlink. Each refusal has a public control asked the same way, so the
+/// request is known to reach the file.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_request_in_another_spelling_or_through_a_symlink_is_refused() {
+    let temp = vault(None);
+    let root = temp.path();
+    put(root, "wiki/_secure/n.md", "# Hidden\n\nplain words\n");
+    put(root, "wiki/_secure/b.excalidraw", "{\"elements\":[]}");
+    put(root, "wiki/_secure/f.csv", "a,b\n1,2\n");
+    put(root, "wiki/Projects/c.excalidraw", "{\"elements\":[]}");
+    put(root, "wiki/Projects/pub.csv", "a,b\n1,2\n");
+    std::os::unix::fs::symlink(root.join("wiki/_secure"), root.join("wiki/Link")).unwrap();
+    let links = "[a](wiki/_\u{17f}ecure/f.csv) [b](wiki/_SECURE/f.csv) [c](wiki/Link/f.csv) [d](wiki/PROJECTS/pub.csv)";
+    put(root, "wiki/Projects/links.md", &format!("---\nid: 01PATHLINKS0000000000000000\n---\n# Links\n\n{links}\n"));
+    let mut ws = test_workspace(&temp);
+    for spelling in ["wiki/_\u{17f}ecure", "wiki/_SECURE", "wiki/_Secure", "wiki/Link"] {
+        assert!(ws.store.read_for_ai(&format!("{spelling}/n.md"), false).is_err(), "{spelling} note");
+        assert!(ws.read_board_for_remote(&format!("{spelling}/b.excalidraw")).is_err(), "{spelling} board");
+        assert!(ws.store.file_for_ai(&format!("{spelling}/f.csv"), false).is_err(), "{spelling} file");
+    }
+    assert!(ws.store.read_for_ai("wiki/PROJECTS/open.md", false).is_ok(), "control note");
+    assert!(ws.read_board_for_remote("wiki/PROJECTS/c.excalidraw").is_ok(), "control board");
+    assert!(ws.store.file_for_ai("wiki/PROJECTS/pub.csv", false).is_ok(), "control file");
+    let described = ws.attachments("01PATHLINKS0000000000000000", Some(64), false).unwrap();
+    let available: Vec<bool> =
+        described["attachments"].as_array().unwrap().iter().map(|a| a["available"].as_bool().unwrap()).collect();
+    assert_eq!(available, vec![false, false, false, true], "{described}");
 }

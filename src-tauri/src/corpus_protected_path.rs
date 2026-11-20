@@ -57,14 +57,18 @@ pub(crate) fn is_clean(rel: &str) -> bool {
 }
 
 /// Do these components sit in a secure home, or name a secure keyword in any
-/// component? `keywords` are already folded.
+/// component? Each component is matched both as written, the way the
+/// leaf-name check always matched it (a decomposed `Cafe\u{301}` still holds
+/// the word `cafe`), and folded (`STRASSE` holds `Straße`).
 fn names_protected(parts: &[String], keywords: &[String]) -> bool {
     let folded: Vec<String> = parts.iter().map(|part| fold(part)).collect();
     let in_home = SECURE_HOMES.iter().any(|home| {
         let home: Vec<String> = home.split('/').map(fold).collect();
         folded.len() >= home.len() && folded[..home.len()] == home[..]
     });
-    in_home || folded.iter().any(|name| crate::librarian_rules::secure_by_name(name, name, keywords))
+    let folded_keywords: Vec<String> = keywords.iter().map(|keyword| fold(keyword)).collect();
+    let named = |name: &String, keywords: &[String]| crate::librarian_rules::secure_by_name(name, name, keywords);
+    in_home || parts.iter().any(|name| named(name, keywords)) || folded.iter().any(|name| named(name, &folded_keywords))
 }
 
 /// The vault-relative components `parts` really point at: the longest prefix
@@ -72,9 +76,15 @@ fn names_protected(parts: &[String], keywords: &[String]) -> bool {
 /// fails or lands outside the vault.
 fn resolved(root: &Path, parts: &[String]) -> Option<Vec<String>> {
     let real_root = std::fs::canonicalize(root).ok()?;
+    // only a component that isn't there shortens the prefix; any other error
+    // (no permission, a loop) answers None, which protects
     let mut existing = parts.len();
-    while existing > 0 && std::fs::symlink_metadata(join(root, &parts[..existing])).is_err() {
-        existing -= 1;
+    while existing > 0 {
+        match std::fs::symlink_metadata(join(root, &parts[..existing])) {
+            Ok(_) => break,
+            Err(error) if matches!(error.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory) => existing -= 1,
+            Err(_) => return None,
+        }
     }
     let real = std::fs::canonicalize(join(root, &parts[..existing])).ok()?;
     let inside = real.strip_prefix(&real_root).ok()?;
@@ -112,7 +122,6 @@ impl CorpusStore {
         let Ok(keywords) = self.secure_keywords_for_classification() else {
             return true;
         };
-        let keywords: Vec<String> = keywords.iter().map(|keyword| fold(keyword)).collect();
         if names_protected(&parts, &keywords) {
             return true;
         }
