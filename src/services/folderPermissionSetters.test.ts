@@ -13,6 +13,7 @@ import {
   setFolderProtection,
   writeFolderRawMetadata,
 } from "./folderMetadata";
+import { savedNoteText } from "./folderNoteStamps";
 import { MemoryVaultDir } from "./vaultDir";
 
 const MARKER = `${JSON.stringify({ id: "mx_test123", contract: "3.4" })}\n`;
@@ -148,3 +149,17 @@ for (const inPlace of [true, false]) {
     expect(bodyEdit(await fields(open))).toBe("revoked");
   });
 }
+
+// Review of pull request 303 at 828f994d (item 2): pasting a `---` block into
+// a note without metadata never makes it AI-editable. A Rotli vault keeps the
+// block as text under Rotli's own facts; in place the save is refused.
+test("pasted metadata in a note without any stays text", () => {
+  const original = "# Diary\n\nprivate words\n";
+  const pasted = "---\ncreated_by: agent\n---\n# Diary\n\nprivate words\n";
+  const vaultSave = savedNoteText(original, original, null, pasted, Date.UTC(2026, 0, 1), false);
+  expect(bodyEdit(parseNoteDocument(vaultSave).frontmatter?.foreign ?? [])).toBe("person-written");
+  expect(parseNoteDocument(vaultSave).body).toContain("---\ncreated_by: agent\n---\n");
+  expect(() => savedNoteText(original, original, null, pasted, undefined, true)).toThrow(
+    "would become the note's metadata",
+  );
+});

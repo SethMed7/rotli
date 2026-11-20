@@ -87,9 +87,10 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
     fm = withField(fm, "secure", "true");
-    keepWrite(opened.contents, composeNoteDocument(fm, body), ["secure"], "secure", "true");
+    const secured = composeNoteDocument(fm, body);
+    keepWrite(opened.contents, secured, ["secure"], "secure", "true");
     await updateGitExclusions(dir, [path]);
-    await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
+    await writeVersionedFile(dir, path, secured, opened.revision);
   }
   const origin = valueOf(fm, "secure_origin");
   const targetHome = secure

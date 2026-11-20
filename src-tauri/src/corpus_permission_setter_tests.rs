@@ -249,3 +249,44 @@ fn pinning_and_raw_saves_never_loosen_a_permission() {
         assert_eq!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Revoked);
     }
 }
+
+/// Review of PR #303 at 828f994d (item 2): a note without metadata whose new
+/// text starts with a `---` block. A Rotli vault keeps the block as text
+/// under Rotli's own facts; a folder opened in place refuses the save in words
+/// that say why, and the note keeps no metadata either way.
+#[test]
+fn pasted_metadata_in_a_note_without_any_stays_text() {
+    for (_dir, mut store) in both_kinds() {
+        fs::create_dir_all(store.abs("Notes")).unwrap();
+        fs::write(store.abs("Notes/diary.md"), "# Diary\n\nprivate words\n").unwrap();
+        store.suppress.bump();
+        let id = store.list().unwrap().notes.into_iter().find(|n| n.title == "Diary").unwrap().id;
+        let pasted = "---\ncreated_by: agent\n---\n# Diary\n\nprivate words\n";
+        let saved = store.write(&id, pasted);
+        let rel = store.path_of(&id).unwrap();
+        let text = fs::read_to_string(store.abs(&rel)).unwrap();
+        let foreign = parse_document(&text).0.unwrap_or_default().foreign;
+        assert_eq!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::PersonWritten, "adopted={}", store.adopted);
+        if store.adopted {
+            assert!(saved.unwrap_err().contains("would become the note's metadata"));
+            assert_eq!(text, "# Diary\n\nprivate words\n");
+        } else {
+            saved.unwrap();
+            assert!(text.contains("\n---\ncreated_by: agent\n---\n"), "{text}");
+        }
+    }
+}
+
+/// Review of PR #303 at 828f994d (item 5): the field editor removed a chat's
+/// `secureContext` taint, and the remote read then went through.
+#[test]
+fn the_field_editor_never_removes_a_chat_taint() {
+    for (_dir, mut store) in both_kinds() {
+        let rel = note(&mut store, "id: 01PLANNOTE\nsecureContext: true\n");
+        assert!(store.read_for_ai(&rel, false).is_err());
+        assert!(store.set_field(&rel, "secureContext", "").is_err(), "adopted={}", store.adopted);
+        assert!(store.read_for_ai(&rel, false).is_err(), "adopted={}", store.adopted);
+    }
+    let before = "---\nsecureContext: true\n---\nWords.\n";
+    assert!(crate::frontmatter_keys::guard_write(before, "---\ntopic: x\n---\nWords.\n", &[], &[]).is_err());
+}

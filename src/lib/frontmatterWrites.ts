@@ -5,6 +5,7 @@
 // inside a block scalar (`example: |`) (Codex review of pull request 303).
 import { AI_CREATORS } from "./aiEditPolicy";
 import { emptyFrontmatter, isLockedFrontmatter, isSecureFrontmatter, parseNoteDocument } from "./frontmatter";
+import { protectionMark } from "./frontmatterBlock";
 import {
   frontmatterField,
   localAiAllowedOverride,
@@ -160,7 +161,8 @@ export function settingsOf(text: string): Record<Setting, { reads: string; rank:
     ai_edit: says(ownedKey(fm.foreign, "ai_edit", (value) => value === "true")),
     local_ai_allowed: { reads: String(local), rank: local === null ? 1 : local ? 2 : 0 },
     locked: flag(isLockedFrontmatter(fm)),
-    secure: flag(isSecureFrontmatter(fm)),
+    // a chat's `secureContext` taint is secure too (frontmatter_writes.rs `verdict`)
+    secure: flag(isSecureFrontmatter(fm) || protectionMark(text, "secureContext")),
   };
 }
 

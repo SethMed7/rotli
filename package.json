@@ -71,6 +71,7 @@
     "check:knip": "knip",
     "check:breve-contract": "bun scripts/check-breve-contract.mjs",
     "check:dup": "bun scripts/check-duplication.mjs",
+    "frontmatter:differential": "bun scripts/frontmatter-differential.ts",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bash -n breve-runtime/scripts/custom-brief.sh && bun run check:breve-contract",
     "check": "bun run lint && bun run test:regression",
     "format": "oxfmt -c .oxfmtrc.json \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts",

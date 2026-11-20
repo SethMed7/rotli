@@ -6,8 +6,8 @@
 // on any verdict that differs, and src/lib/frontmatterDifferential.test.ts
 // fails when the fixture is stale or a denial reads as allowed.
 //
-//   bun scripts/frontmatter-differential.ts --write          refresh the fixture
-//   bun scripts/frontmatter-differential.ts --cases 50000 --out <file>
+//   bun run frontmatter:differential --write          refresh the fixture
+//   bun run frontmatter:differential --cases 50000 --out <file>
 //     a bigger run; then ROTLI_FRONTMATTER_DIFFERENTIAL=<file> cargo test differential
 import { readFileSync, writeFileSync } from "node:fs";
 

@@ -107,20 +107,24 @@ fn unspaced(c: char) -> bool {
         | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0xFF66..=0xFF9F | 0x20000..=0x3FFFF)
 }
 
-/// Whether folded `text` mentions folded `name` as a whole word (Codex review
-/// round 5: a secure note titled "A" refused "Updated the roadmap."). A name
-/// counts unless a letter or digit runs straight into it on either side, so a
-/// possessive ("ΑΡΗΣ’s") and punctuation still match; in a script without
-/// spaces any occurrence counts.
+/// Whether folded `text` mentions folded `name` (Codex review round 5: a
+/// secure note titled "A" refused "Updated the roadmap."). A name counts
+/// unless a letter or digit runs straight into its start, or, for a name of
+/// fewer than five characters, its end: so "Alazans deal", "AlazanDeal" and
+/// "alazan2" mention "Alazan" (review of PR #303, item 4), while "banana"
+/// doesn't mention "b" nor "Planet" "plan". A possessive and punctuation still
+/// match; in a script without spaces any occurrence counts.
 fn mentions(text: &str, name: &str) -> bool {
+    const PREFIX_FROM: usize = 5;
     let word = |c: char| c.is_alphanumeric() || c == '_';
     let joined = |edge: Option<char>, beside: Option<char>| match (edge, beside) {
         (Some(edge), Some(beside)) => word(edge) && word(beside) && !unspaced(edge) && !unspaced(beside),
         _ => false,
     };
     let (first, last) = (name.chars().next(), name.chars().next_back());
+    let prefix = name.chars().count() >= PREFIX_FROM;
     text.match_indices(name).any(|(at, _)| {
-        !joined(first, text[..at].chars().next_back()) && !joined(last, text[at + name.len()..].chars().next())
+        !joined(first, text[..at].chars().next_back()) && (prefix || !joined(last, text[at + name.len()..].chars().next()))
     })
 }
 
@@ -307,5 +311,17 @@ mod tests {
         assert!(mentions(&folded("see (A), then"), "a"));
         assert!(!mentions(&folded("Planet nine"), "plan"));
         assert!(mentions(&folded("我们的公司计划"), &folded("公司")), "no spaces between Han words");
+    }
+
+    /// Review of PR #303 at 828f994d (item 4): an inflected secure title of
+    /// five or more characters is still a mention; a short one stays whole-word.
+    #[test]
+    fn a_long_hidden_name_is_found_inflected() {
+        let alazan = folded("Alazan");
+        for text in ["Reviewed the Alazans deal", "AlazanDeal notes", "alazan2 plan", "Alazan’s", "Alazan-based"] {
+            assert!(mentions(&folded(text), &alazan), "{text}");
+        }
+        assert!(!mentions(&folded("Kalazan notes"), &alazan), "the start stays a word boundary");
+        assert!(!mentions(&folded("Planet nine"), "plan"), "four characters: whole word");
     }
 }

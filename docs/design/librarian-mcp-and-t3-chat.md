@@ -351,7 +351,17 @@ builds until that review has checked these fixes:
    its re-check, `pinning_and_raw_saves_never_loosen_a_permission` (with
    twins in `folderPermissionSetters.test.ts`), the unresolved-alias cases in
    `localAiAllowedCases`, and the writer guards
-   `every_frontmatter_writer_runs_the_guard` and `frontmatterWriters.test.ts`. Limits, documented: text that refers to a note
+   `every_frontmatter_writer_runs_the_guard` and `frontmatterWriters.test.ts`;
+   from the review of 828f994d, the differential harness
+   (`rust_and_typescript_read_every_differential_case_alike`,
+   `frontmatterDifferential.test.ts`, `frontmatterDisagreementCases`),
+   `what_the_differential_harness_found` (with its `frontmatterKeys.test.ts`
+   twin), `pasted_metadata_in_a_note_without_any_stays_text`,
+   `the_field_editor_never_removes_a_chat_taint`, "a re-save never drops a
+   chat's secure-context taint" (`webChats.test.ts`), and
+   `a_long_hidden_name_is_found_inflected`. Index names of five or more
+   characters match as prefixes ("Alazans", "AlazanDeal"); shorter ones stay
+   whole-word. Limits, documented: text that refers to a note
    in other words than its title or an alias (a nickname, a description)
    can't be recognised and stays shown; a note known only by its path can't
    be indexed or logged; once a secure original is deleted, a copy that

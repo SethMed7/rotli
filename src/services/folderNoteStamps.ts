@@ -1,6 +1,11 @@
 // Owned metadata on a hand-written fenced note, matching the Rust corpus
 // write_resolved / relocate paths. The browser has mtime but no birth time.
-import { composeNoteDocument, type NoteFrontmatter } from "../lib/frontmatter";
+import {
+  composeNoteDocument,
+  emptyFrontmatter,
+  type NoteFrontmatter,
+  parseNoteDocument,
+} from "../lib/frontmatter";
 import { composeInPlace, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { guardFrontmatterWrite } from "../lib/frontmatterWrites";
 import { stampToMs, today, ulid } from "../memex/contract";
@@ -21,8 +26,10 @@ export function ownedNoteFacts(
 
 /** The text a body save writes. A person's note in a folder opened in place
  * (`asWritten`, decision B 2026-10-13) keeps its frontmatter bytes and gets
- * only the new words; a fenceless note stays fenceless; any other fenced note
- * gets its owned facts. */
+ * only the new words; a fenceless note stays fenceless unless its new text
+ * would itself read as metadata, which then stays body under Rotli's own
+ * facts, as on the Mac (corpus.rs `write_resolved`); any other fenced note
+ * gets its owned facts. Every path ends in the one guarded return. */
 export function savedNoteText(
   original: string,
   currentBody: string,
@@ -31,11 +38,26 @@ export function savedNoteText(
   modified: number | undefined,
   asWritten: boolean,
 ): string {
-  if (asWritten) return `${original.slice(0, original.length - currentBody.length)}${body}`;
-  if (!frontmatter) return body;
-  const saved = composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body);
+  let saved: string;
+  if (asWritten) {
+    saved = `${original.slice(0, original.length - currentBody.length)}${body}`;
+    keepsItsMetadata(original, saved);
+  } else if (frontmatter) saved = composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body);
+  else if (parseNoteDocument(body).frontmatter)
+    saved = composeNoteDocument(ownedNoteFacts(emptyFrontmatter(), modified!, true), `\n${body}`);
+  else saved = body;
   guardFrontmatterWrite(original, saved);
   return saved;
+}
+
+/** In a folder opened in place a note without metadata keeps none: text that
+ * would become its metadata (a pasted `---` block) is refused, in the words
+ * frontmatter_writes.rs `keeps_its_metadata` uses. */
+export function keepsItsMetadata(original: string, saved: string): void {
+  if (!parseNoteDocument(original).frontmatter && parseNoteDocument(saved).frontmatter)
+    throw new Error(
+      "This text starts with a metadata block (--- … ---), which would become the note's metadata in this folder. Add a line above it, or change the note's settings from its menu.",
+    );
 }
 
 /** The text a move writes before relocating, or `null` when the bytes stay.

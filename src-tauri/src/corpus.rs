@@ -1322,7 +1322,8 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
 /// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
 /// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
-const RESERVED_KEYS: [&str; 14] = [
+const RESERVED_KEYS: [&str; 15] = [
+    "secureContext",
     "id",
     "created",
     "updated",
@@ -4905,7 +4906,7 @@ impl CorpusStore {
         }
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
-        crate::frontmatter_keys::guard_write(&existing, &text, &[], &[])?;
+        crate::frontmatter_keys::keeps_its_metadata(as_written, &existing, &text).and_then(|()| crate::frontmatter_keys::guard_write(&existing, &text, &[], &[]))?;
         // Rewrite in place first, then use the filesystem's rename operation.
         // The former copy-to-target + ignored remove_file failure could leave
         // two independent files with the same durable note id; a later index

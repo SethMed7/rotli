@@ -30,9 +30,15 @@
       "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
     },
     {
+      "id": "parity-suites-name-their-entries",
+      "files": ["src-tauri/src/parity_link_secret_tests.rs", "src/lib/parity.test.ts"],
+      "reason": "Fixture-guarded mirror: scripts/check-parity.mjs requires both parity suites to name every parity.json entry (`localAiAllowedCases`) and its verdict words, so these shared literals are the parity contract itself."
+    },
+    {
       "id": "frontmatter-permission-twin-tests",
       "files": [
         "src-tauri/src/frontmatter_keys.rs",
+        "src-tauri/src/frontmatter_keys_tests.rs",
         "src/lib/frontmatterKeys.test.ts",
         "src-tauri/src/corpus_permission_setter_tests.rs",
         "src/services/folderPermissionSetters.test.ts",

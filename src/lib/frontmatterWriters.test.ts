@@ -92,3 +92,112 @@ test("every exemption still names a function that composes frontmatter", () => {
   for (const file of named)
     expect(readFileSync(join(ROOT, file!), "utf8")).toMatch(/compose|withTopLevelLine|withSecureLineOnly/);
 });
+
+// Review of pull request 303 at 828f994d: a guard somewhere in a function
+// is not enough (savedNoteText returned twice before its guard). In every
+// function that composes or guards frontmatter, each write must write a value
+// the guard saw, and a function that writes nothing must return only guarded
+// values (or null): every path, not just one.
+const WRITES: Record<string, number> = { writeVersionedFile: 2, writeFile: 1, writeText: 1 };
+const GUARD_CALLS = new Set(["guardFrontmatterWrite", "keepWrite"]);
+
+function ownFunction(node: ts.Node): ts.Node | undefined {
+  for (let at = node.parent; at; at = at.parent) if (ts.isFunctionLike(at)) return at;
+  return undefined;
+}
+
+function unguardedPaths(): string[] {
+  const out: string[] = [];
+  for (const path of sources(join(ROOT, "src"))) {
+    const rel = relative(ROOT, path);
+    const file = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+    const writers = new Map<
+      ts.Node,
+      { name: string; guarded: Set<string>; writes: ts.CallExpression[]; returns: ts.ReturnStatement[] }
+    >();
+    const calls: ts.CallExpression[] = [];
+    const returns: ts.ReturnStatement[] = [];
+    const collect = (node: ts.Node) => {
+      if (ts.isCallExpression(node)) calls.push(node);
+      if (ts.isReturnStatement(node)) returns.push(node);
+      ts.forEachChild(node, collect);
+    };
+    collect(file);
+    const calleeName = (call: ts.CallExpression) => {
+      const callee = ts.isPropertyAccessExpression(call.expression) ? call.expression.name : call.expression;
+      return ts.isIdentifier(callee) ? callee.text : "";
+    };
+    for (const call of calls) {
+      const name = calleeName(call);
+      if (!COMPOSERS.has(name) && !GUARD_CALLS.has(name)) continue;
+      const around = enclosing(call);
+      if (!around || around.name === name || EXEMPT[`${rel} ${around.name}`]) continue;
+      if (!writers.has(around.fn))
+        writers.set(around.fn, { name: around.name, guarded: new Set(), writes: [], returns: [] });
+      if (GUARD_CALLS.has(name) && call.arguments[1] && ts.isIdentifier(call.arguments[1]))
+        writers.get(around.fn)!.guarded.add(call.arguments[1].text);
+    }
+    for (const call of calls) {
+      const at = WRITES[calleeName(call)];
+      const around = at === undefined ? null : enclosing(call);
+      if (around && writers.has(around.fn)) writers.get(around.fn)!.writes.push(call);
+    }
+    for (const statement of returns) {
+      const own = ownFunction(statement);
+      if (own && writers.has(own)) writers.get(own)!.returns.push(statement);
+    }
+    for (const writer of writers.values()) {
+      const ok = (expr: ts.Expression | undefined): boolean => {
+        if (
+          !expr ||
+          expr.kind === ts.SyntaxKind.NullKeyword ||
+          (ts.isIdentifier(expr) && expr.text === "undefined")
+        )
+          return true;
+        if (ts.isParenthesizedExpression(expr) || ts.isAwaitExpression(expr)) return ok(expr.expression);
+        if (ts.isIdentifier(expr)) return writer.guarded.has(expr.text);
+        if (ts.isConditionalExpression(expr)) return ok(expr.whenTrue) && ok(expr.whenFalse);
+        return false;
+      };
+      for (const call of writer.writes)
+        if (
+          !ok(call.arguments[WRITES[calleeName(call)]!]) &&
+          !RETURNS_OK[`${rel} ${writer.name}: ${call.arguments[WRITES[calleeName(call)]!]?.getText()}`]
+        )
+          out.push(`${rel} ${writer.name}: writes ${call.arguments[WRITES[calleeName(call)]!]?.getText()}`);
+      if (writer.writes.length > 0) continue;
+      for (const statement of writer.returns) {
+        const value = statement.expression;
+        const text =
+          value && ts.isObjectLiteralExpression(value)
+            ? value.properties.find((p) => p.name?.getText() === "text")
+            : undefined;
+        const checked =
+          text && ts.isPropertyAssignment(text)
+            ? text.initializer
+            : text && ts.isShorthandPropertyAssignment(text)
+              ? text.name
+              : value;
+        if (!ok(checked) && !RETURNS_OK[`${rel} ${writer.name}: ${checked?.getText()}`])
+          out.push(`${rel} ${writer.name}: returns ${checked?.getText()}`);
+      }
+    }
+  }
+  return out.sort();
+}
+
+/** Returns that hand back text unchanged, never a rewrite, with reasons. */
+const RETURNS_OK: Record<string, string> = {
+  "src/services/folderNoteAliases.ts prepareFolderTitleRename: text":
+    "returns the text it was given (no rename, or a plain note): nothing is rewritten",
+  "src/services/folderViewSync.ts writeFolderViews: contents": "writes the views file, not a note",
+  "src/services/folderViewSync.ts writeFolderViews: raw": "writes Main's tree file, not a note",
+  "src/services/folderViewSync.ts writeFolderViews: previous": "rolls a views file back to its bytes on disk",
+  "src/services/folderViewSync.ts writeFolderViews: entry.before": "rolls a note back to its bytes on disk",
+  "src/services/folderViewSync.ts writeFolderViews: ignoreRollback.before":
+    "rolls `.gitignore` back to its bytes on disk",
+};
+
+test("every path a frontmatter writer takes writes or returns guarded text", () => {
+  expect(unguardedPaths()).toEqual([]);
+});

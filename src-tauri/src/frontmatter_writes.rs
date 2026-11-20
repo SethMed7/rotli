@@ -205,7 +205,7 @@ const VERDICTS: [&str; 5] = ["created_by", "ai_edit", "local_ai_allowed", "locke
 
 /// How a setting reads (to compare for equality) and how permissive that is
 /// (0 the most restrictive), so a write can be held to "never looser".
-fn verdict(foreign: &[String], key: &str) -> (String, u8) {
+fn verdict(text: &str, foreign: &[String], key: &str) -> (String, u8) {
     use super::Says;
     let says = |says: Says| {
         let rank = match says {
@@ -218,7 +218,8 @@ fn verdict(foreign: &[String], key: &str) -> (String, u8) {
     let flag = |on: bool| (on.to_string(), u8::from(!on));
     match key {
         "locked" => flag(crate::frontmatter_keys::locked(&foreign)),
-        "secure" => flag(crate::frontmatter_keys::secure(&foreign)),
+        // a chat's `secureContext` taint is secure too (review of PR #303, item 5)
+        "secure" => flag(crate::frontmatter_keys::secure(&foreign) || crate::protection_mark::marked(text, "secureContext")),
         "created_by" => says(super::owned_key(foreign, key, |v| crate::ai_edit_policy::AI_CREATORS.contains(&v))),
         "local_ai_allowed" => {
             let read = super::local_ai_allowed(foreign);
@@ -234,9 +235,9 @@ fn verdict(foreign: &[String], key: &str) -> (String, u8) {
 /// Refused, nothing is written (Codex re-check of PR #303).
 pub(crate) fn guard_write(before: &str, after: &str, owned: &[&str], tighten: &[&str]) -> Result<(), String> {
     let read = |text: &str| crate::corpus::parse_document(text).0.unwrap_or_default().foreign;
-    let (before, after) = (read(before), read(after));
+    let (before_fields, after_fields) = (read(before), read(after));
     let breaks = |key: &&str| {
-        let (was, now) = (verdict(&before, key), verdict(&after, key));
+        let (was, now) = (verdict(before, &before_fields, key), verdict(after, &after_fields, key));
         if owned.contains(key) {
             false
         } else if tighten.contains(key) {
@@ -250,6 +251,17 @@ pub(crate) fn guard_write(before: &str, after: &str, owned: &[&str], tighten: &[
     } else {
         Ok(())
     }
+}
+
+/// In a folder opened in place a note without metadata keeps none: a save
+/// whose text would become its metadata (a pasted `---` block) is refused in
+/// its own words (review of PR #303, item 2). TypeScript's twin:
+/// folderNoteStamps.ts `keepsItsMetadata`.
+pub(crate) fn keeps_its_metadata(in_place: bool, before: &str, after: &str) -> Result<(), String> {
+    if in_place && crate::corpus::parse_document(before).0.is_none() && crate::corpus::parse_document(after).0.is_some() {
+        return Err("This text starts with a metadata block (--- … ---), which would become the note's metadata in this folder. Add a line above it, or change the note's settings from its menu.".into());
+    }
+    Ok(())
 }
 
 /// [`guard_write`] for an action that owns `owned` and tightens nothing.

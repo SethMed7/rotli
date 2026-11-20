@@ -317,16 +317,33 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `yaml`'s syntax tree; neither builds values or expands an alias): the
   key is a root-mapping scalar whose text is the key, a value there that
   doesn't grant denies, a grant needs it to agree, and the key twice or an
-  alias as a root key is refused. Frontmatter that won't parse is read once
-  more with the values of plain non-permission keys blanked, because the
-  organizer writes `summary: Plan: phase two` and `links: [[A]], [[B]]`
-  unquoted; still unreadable, over 64 KiB, or nested past 64 levels (`[`/`{`
-  counted before any parse), it is refused, and refused denies. Only the
-  spelling Rust writes (`key: value` at the start of a line) grants. Values
-  trim with JavaScript's set on both sides. `locked` and `secure` are read
-  in any spelling too (`locked_field`, `secure_field`; Rotli Web's
-  `isLockedFrontmatter`, `isSecureFrontmatter`; locked for `true`, secure
-  for anything but `false`). The raw metadata editor keeps a typed line as
+  alias or a merge key (`<<`) as a root key is refused. Before any parse,
+  over 64 KiB, `[`/`{` or leading `- `/`? ` markers nested past 64, or a
+  `...` line is refused, and a tab (which the two parsers read differently)
+  denies on a permission line, is blanked after a top-level plain key, and
+  is refused anywhere else. Frontmatter that won't parse is read once more
+  with the values of every top-level non-permission key blanked (keys with
+  spaces too), because the organizer writes `summary: Plan: phase two` and
+  `links: [[A]], [[B]]` unquoted and people type what they like. Refused
+  frontmatter denies a key only where a line the line reader doesn't name
+  could still spell it (the key's text, an escape, an alias); otherwise the
+  line reader's verdict stands, so one stray line never revokes a note. Only
+  the spelling Rust writes grants: exactly `key: value` (one space) or
+  `key:`, at the start of a line. Values trim with JavaScript's set on both
+  sides, and every trailing carriage return goes. `locked` and `secure` are
+  read by one note-level reader each (`frontmatter_keys.rs` `locked`/`secure`,
+  Rotli Web's `isLockedFrontmatter`/`isSecureFrontmatter`): a line in any
+  spelling saying anything but `false`, or the YAML root value saying
+  anything but `false`, or refused frontmatter a line could spell it in; the
+  guard's secure verdict also reads a chat's `secureContext` taint, which
+  the field editor can't set (`RESERVED_KEYS`) and a Web chat re-save keeps.
+  A differential harness keeps the two runtimes to one verdict:
+  `scripts/frontmatter-differential.ts` records the TypeScript verdicts for
+  3,000 seeded cases over the risky alphabet, `frontmatter_differential_tests.rs`
+  rebuilds them and fails on any difference, `frontmatterDifferential.test.ts`
+  fails on a stale record or a denial read as allowed, and every input it
+  ever found read differently is pinned in `parity.json`
+  (`frontmatterDisagreementCases`). The raw metadata editor keeps a typed line as
   the person wrote it. Every writer of these keys (`set_ai_edit`, the
   on-device toggle, Lock, Secure and its removal, Rotli Web's `withField`)
   removes each one as a whole span through `frontmatter_writes.rs`
@@ -340,8 +357,13 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   writes, pin, body save, move, rename and alias cleanup, view tags, and the
   raw metadata editor, where the person owns lock and secure and a
   permission may only tighten (a typed `ai_edit: false` can be added there,
-  never removed). Source tests fail on a writer that doesn't
+  never removed). Source tests fail on a writer that doesn't, and on any
+  write or text-returning path whose value the guard never saw
   (`every_frontmatter_writer_runs_the_guard`, `frontmatterWriters.test.ts`).
+  A body save of a note without metadata whose new text starts with a `---`
+  block keeps that block as text: a Rotli vault writes Rotli's own facts
+  above it, and a folder opened in place refuses the save in its own words
+  (`keeps_its_metadata`).
   An alias naming no anchor before it makes frontmatter unparseable on both
   sides (yaml-rust2 refuses it; `yaml` is held to the same). In a folder opened in place,
   `compose_in_place` (`composeInPlace`) copies the action's own lines for a

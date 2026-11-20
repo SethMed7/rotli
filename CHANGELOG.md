@@ -51,11 +51,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the note, Rotli leaves the note as it was and says so. In the raw
   metadata editor you can still add a "no" for AI, but not remove one; use
   the note's menu for that.
+- **Rotli Web and the Mac now read note settings the same way, and a
+  stray line no longer locks you out.** A setting typed with a tab after
+  the colon never grants AI access; a quoted or unusually written lock or
+  secure flag (`locked: "true"`, `{locked: true}`) now counts; and one
+  line Rotli can't read, such as a key with a colon in its value, no
+  longer turns AI editing or on-device access off unless that line could
+  be hiding one of those settings.
+- **Pasting a metadata block into a note can't change its settings.** In
+  a note without metadata, pasted text that starts with `---` stays text;
+  in a folder opened in place, Rotli says why it won't save it as is.
+- **A chat that touched a secure note stays protected.** Its marker can't
+  be removed from the metadata editor, and saving the chat on the web keeps
+  it.
 - **The Librarian's index hides notes more reliably** (the Librarian agent
   route, which still runs only in development builds). An entry that
   mentions a hidden note by title or alias is caught in any case or letter
-  form (Greek, German ß, full-width), as a whole word, so a short secure
-  title no longer hides ordinary text. A note id that two files carry, as a
+  form (Greek, German ß, full-width), and a secure title of five or more
+  letters also inside a longer word ("Alazans"), while a short secure title
+  matches only as a whole word and no longer hides ordinary text. A note id that two files carry, as a
   copied note does, can't be indexed or logged.
 
 ## [1.9.4] - 2026-11-19

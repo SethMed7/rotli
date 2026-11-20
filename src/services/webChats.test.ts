@@ -213,3 +213,21 @@ test("frontmatter-shaped text in a chat body remains body text", async () => {
   const [listed] = await new FolderChatStore(dir).list();
   expect(listed).toMatchObject({ title: "body-only", pinned: false });
 });
+
+// Review of pull request 303 at 828f994d (item 5): a chat's secure-context
+// taint is one-way on the web too, as Rust's write_chat_at keeps it.
+test("a re-save never drops a chat's secure-context taint", async () => {
+  const tainted = "---\ntitle: Plan\nsecureContext: true\n---\n\n## You\nhello\n";
+  const resaved = "---\ntitle: Plan\n---\n\n## You\nhello\n\n## Assistant\nhi\n";
+  const dir = new MemoryVaultDir();
+  const folder = new FolderChatStore(dir);
+  await folder.write("plan", tainted, null);
+  const { revision } = await folder.read("plan");
+  await folder.write("plan", resaved, revision);
+  expect((await folder.read("plan")).contents).toContain("secureContext: true");
+  const browser = createWebChatStore(new MemoryVaultStore());
+  await browser.write("plan", tainted, null);
+  const opened = await browser.read("plan");
+  await browser.write("plan", "## You\nhello\n", opened.revision);
+  expect((await browser.read("plan")).contents).toStartWith("---\nsecureContext: true\n---\n\n## You");
+});

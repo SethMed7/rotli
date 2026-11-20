@@ -10,6 +10,7 @@ import { frontmatterBlock } from "../lib/frontmatterBlock";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { lastReplyMs } from "../memex/chatRecency";
+import { hasSecureContext, setChatSecureContext } from "../memex/contract";
 import { type VaultDir, freeSiblingPath, vaultFolderRoles } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
@@ -103,14 +104,17 @@ export class WebChatStore implements ChatStore {
   /** Rust's contract: a new chat presents no revision and refuses to overwrite. */
   async write(slug: string, contents: string, expectedRevision: string | null): Promise<string> {
     let expected = expectedRevision;
+    const existing = await this.vault.readVersioned(chatKey(slug));
     if (expected === null) {
-      const existing = await this.vault.readVersioned(chatKey(slug));
       if (existing.contents) throw new Error(`a chat named "${slug}" already exists`);
       // a removed chat's key is gone (see remove), so a fresh slug starts at "0"
       expected = existing.revision;
     }
+    // the secure-context taint is one-way (memex.rs `write_chat_at`)
+    const next =
+      existing.contents && hasSecureContext(existing.contents) ? keepSecureContext(contents) : contents;
     try {
-      await this.vault.writeVersioned(chatKey(slug), contents, expected);
+      await this.vault.writeVersioned(chatKey(slug), next, expected);
     } catch (reason) {
       if (reason instanceof RevisionConflict)
         throw new Error("This chat changed in another tab — reopen it.");
@@ -235,7 +239,11 @@ export class FolderChatStore implements ChatStore {
     } else if (current !== expectedRevision) {
       throw new Error("This chat changed on disk — reopen it.");
     }
-    await this.dir.writeText(path, contents);
+    // the secure-context taint is one-way: a save from a session that never
+    // saw it keeps it (memex.rs `write_chat_at`, review of pull request 303)
+    const existing = current === "0" ? null : await this.dir.readText(path);
+    const next = existing !== null && hasSecureContext(existing) ? keepSecureContext(contents) : contents;
+    await this.dir.writeText(path, next);
     return path;
   }
 
@@ -321,4 +329,13 @@ export function createWebChatStore(store?: VaultStore): WebChatStore {
  * browser vault. */
 export function chatStoreFor(dir: VaultDir | null): ChatStore {
   return dir ? new FolderChatStore(dir) : createWebChatStore();
+}
+
+/** A chat's text with the secure-context taint kept: set in its frontmatter,
+ * or a frontmatter added for it (memex.rs `ensure_chat_secure_context`). */
+function keepSecureContext(contents: string): string {
+  if (hasSecureContext(contents)) return contents;
+  return frontmatterBlock(contents)
+    ? setChatSecureContext(contents)
+    : `---\nsecureContext: true\n---\n\n${contents}`;
 }
