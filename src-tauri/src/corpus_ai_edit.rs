@@ -41,6 +41,14 @@ impl CorpusStore {
     /// or `ai_edit: false` — never removes it, so turning AI editing off sticks
     /// even on a note an AI made. SANCTIONED writable() exception, like
     /// set_locked: it is a Rotli control flag, not content.
+    /// A metadata setter's write: refused when it would loosen the note's
+    /// protection (review 2026-11-20), never an external-change echo.
+    pub(crate) fn write_tightened(&self, path: &std::path::Path, old: &str, out: &str) -> Result<(), String> {
+        crate::note_protection::require_not_looser(old, out)?;
+        self.suppress.mark(path);
+        atomic_write(path, out)
+    }
+
     pub(crate) fn set_ai_edit(&mut self, id_or_rel: &str, allowed: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
@@ -52,7 +60,7 @@ impl CorpusStore {
             fm.foreign.retain(|l| !crate::note_protection::top_level(l) || ai_edit_field(l).is_none());
             fm.foreign.push(format!("ai_edit: {allowed}"));
             let says = crate::frontmatter_keys::owned_key(&fm.foreign, "ai_edit", |v| v == "true");
-            super::took(matches!(says, crate::frontmatter_keys::Says::Grant(_)) == allowed, "ai_edit")?;
+            crate::note_protection::took(matches!(says, crate::frontmatter_keys::Says::Grant(_)) == allowed, "ai_edit")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })

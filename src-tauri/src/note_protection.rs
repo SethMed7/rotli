@@ -105,6 +105,26 @@ pub(crate) fn refuse_line_breaks(text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// A field editor's key and value: each on one line, and the key no spelling
+/// of one `owned` by Rotli (`"ai_edit"` is `ai_edit`; review 2026-11-20).
+pub(crate) fn refuse_field(key: &str, value: &str, owned: &[&str]) -> Result<(), String> {
+    refuse_line_breaks(&format!("{key}{value}"))?;
+    let name = crate::frontmatter_keys::frontmatter_field(&format!("{key}:")).map(|(k, _)| k.name);
+    match name.filter(|n| owned.contains(&n.as_str())) {
+        Some(name) => Err(format!("`{name}` is managed by rotli, not editable here")),
+        None => Ok(()),
+    }
+}
+
+/// A setter's honest answer when another line still decides the key (an
+/// indented one in a nested map, which setters never touch): nothing is
+/// written and the person is told why (review 2026-11-20).
+pub(crate) fn took(took: bool, key: &str) -> Result<(), String> {
+    took.then_some(()).ok_or_else(|| {
+        format!("another `{key}:` line in this note's metadata still decides it; change it in Show file metadata")
+    })
+}
+
 /// A frontmatter line a setter may replace: a top-level one. An indented line
 /// belongs to a block scalar or a nested map, which no setter touches.
 pub(crate) fn top_level(line: &str) -> bool {
