@@ -123,7 +123,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
-            agent_lane: false,
+            agent: Default::default(),
             adopted: true,
             raw: Some(raw),
             list_cache: None,

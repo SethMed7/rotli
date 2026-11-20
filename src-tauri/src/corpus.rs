@@ -2460,7 +2460,7 @@ pub struct CorpusStore {
     /// A file opened from Finder (corpus_raw.rs): sidecar redirected, one file seen.
     raw: Option<raw::RawMount>,
     /// A workspace agent's store: its AI gates also ask `protected_path`.
-    agent_lane: bool,
+    agent: protected_path::AgentLane,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2639,7 +2639,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
-            agent_lane: false,
+            agent: Default::default(),
             adopted: true,
             raw: None,
             list_cache: None,
@@ -2697,7 +2697,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
-            agent_lane: false,
+            agent: Default::default(),
             adopted: false,
             raw: None,
             list_cache: None,
@@ -2745,7 +2745,7 @@ impl CorpusStore {
             layout,
             band_read_only,
             perms_read_only: read_only,
-            agent_lane: false,
+            agent: Default::default(),
             // the marker, not the registry, says "connected in place": every
             // open path (startup, switch, refresh, reconnect) lands here
             adopted,

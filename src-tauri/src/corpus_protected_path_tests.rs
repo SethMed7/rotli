@@ -207,9 +207,159 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
         let from = text.find(start).unwrap_or_else(|| panic!("{start} is gone; update this guard"));
         &text[from..from + text[from..].find("\n    }\n").unwrap()]
     };
-    assert!(body(rules, "fn file_is_protected(").contains("protected_path("), "judge_for_ai and file_for_ai ask it through here");
-    assert!(body(rules, "fn agent_listable(").contains("protected_path("));
-    assert!(body(include_str!("corpus_ai_rows.rs"), "fn parse_approved(").contains("agent_row("));
-    assert!(body(include_str!("corpus.rs"), "fn read_doc_for_ai(").contains("agent_doc("));
-    assert!(body(include_str!("workspace.rs"), "fn open_target(").contains("set_agent_lane()"));
+    let rule = include_str!("corpus_protected_path.rs");
+    let bridge = include_str!("agent_bridge.rs");
+    // each agent-lane gate, and the call that makes it one: deleting the
+    // call fails here even when no forbidden spelling is added (Opus review
+    // of pull request 304: removing it from read_board_for_remote kept this
+    // guard green)
+    let gates: [(&'static str, &str, &str); 12] = [
+        (rules, "fn file_is_protected(", "protected_path("),
+        (rules, "fn agent_listable(", "protected_path("),
+        (rules, "fn agent_listable_folder(", "agent_listable("),
+        (rule, "fn agent_row(", "agent_folder("),
+        (rule, "fn agent_doc(", "agent_folder("),
+        (rule, "fn agent_folder(", "protected_path("),
+        (include_str!("corpus_ai_rows.rs"), "fn parse_approved(", "agent_row("),
+        (include_str!("corpus.rs"), "fn read_doc_for_ai(", "agent_doc("),
+        (include_str!("workspace.rs"), "fn open_target(", "set_agent_lane()"),
+        (include_str!("workspace.rs"), "fn read_board_for_remote(", "protected_path("),
+        (include_str!("workspace_file_visibility.rs"), "fn file_visible_to_remote(", "protected_path("),
+        (bridge, "fn document_records_gate(", "protected_path("),
+    ];
+    for (text, start, call) in gates {
+        assert!(body(text, start).contains(call), "{start} no longer calls {call}");
+    }
+    assert!(body(rule, "fn agent_row(").contains("agent_origin(") && body(rule, "fn agent_doc(").contains("agent_origin("));
+    assert!(body(include_str!("workspace_attachments.rs"), "fn describe_attachment(").contains("agent_listable("));
+    // the agent-lane functions in corpus*.rs never compare a path themselves
+    let corpus_lanes = [
+        (rules, "fn agent_listable("),
+        (rules, "fn agent_listable_folder("),
+        (include_str!("corpus.rs"), "fn move_for_remote_agent("),
+        (include_str!("corpus.rs"), "fn create_for_remote_agent("),
+        (rule, "fn agent_row("),
+        (rule, "fn agent_doc("),
+        (rule, "fn agent_folder("),
+        (rule, "fn agent_origin("),
+    ];
+    for (text, start) in corpus_lanes {
+        for line in body(text, start).lines().filter(|line| !line.trim_start().starts_with("//")) {
+            for token in forbidden {
+                assert!(!line.contains(token), "{start} compares a path without protected_path: {line}");
+            }
+        }
+    }
+}
+
+/// Every field of a row, a read note, or a folder an agent lane returns,
+/// classified. A path is cleaned by `agent_row` / `agent_doc` (or, for a
+/// folder, judged by `agent_listable_folder`); anything else is the note's
+/// own text, a label, or a fact. A new field fails here until it is
+/// classified, and, if it is a path, cleaned (Opus review of pull request
+/// 304: `origin` was a path nobody cleaned).
+const FIELDS: [(&str, &[&str], &[&str]); 3] = [
+    ("NoteMeta", &["id", "folder_id", "disk_folder_id", "origin"], &["title", "snippet", "body_empty", "aliases", "created_at", "updated_at", "pinned", "kind"]),
+    ("NoteDoc", &["id", "folder_id", "disk_folder_id", "origin"], &["body", "revision", "created_at", "updated_at", "pinned", "secure", "locked"]),
+    ("FolderMeta", &["id", "parent_id"], &["name"]),
+];
+
+#[test]
+fn every_field_an_agent_sees_is_classified() {
+    let corpus = include_str!("corpus.rs");
+    for (name, paths, others) in FIELDS {
+        let start = corpus.find(&format!("pub struct {name} {{")).unwrap_or_else(|| panic!("{name} is gone; update this guard"));
+        let body = &corpus[start..start + corpus[start..].find("\n}").unwrap()];
+        let mut fields: Vec<&str> = body
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("pub ")?.split_once(':').map(|(field, _)| field.trim()))
+            .collect();
+        fields.sort();
+        let mut known: Vec<&str> = paths.iter().chain(others.iter()).copied().collect();
+        known.sort();
+        assert_eq!(fields, known, "{name}: classify each new field here, and clean it in agent_row/agent_doc if it names a path");
+    }
+}
+
+fn meta(id: &str, folder: &str, disk: &str, origin: Option<&str>) -> NoteMeta {
+    NoteMeta {
+        id: id.into(),
+        title: "Plan".into(),
+        snippet: String::new(),
+        body_empty: false,
+        aliases: Vec::new(),
+        folder_id: folder.into(),
+        disk_folder_id: disk.into(),
+        created_at: 0,
+        updated_at: 0,
+        pinned: false,
+        origin: origin.map(Into::into),
+        kind: crate::corpus::NoteKind::Note,
+    }
+}
+
+fn shown_paths(row: &NoteMeta) -> Vec<String> {
+    [Some(row.id.clone()), Some(row.folder_id.clone()), Some(row.disk_folder_id.clone()), row.origin.clone()].into_iter().flatten().collect()
+}
+
+#[test]
+fn no_path_field_an_agent_sees_names_a_protected_place() {
+    let (_temp, store) = vault(&["Juniper"]);
+    for secret in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double", "wiki\\x"] {
+        let rows = [
+            meta(secret, "wiki/Projects", "wiki/Projects", None),
+            meta("01ID", secret, "wiki/Projects", None),
+            meta("01ID", "wiki/Projects", secret, None),
+            meta("01ID", "wiki/Projects", "wiki/Projects", Some(secret)),
+        ];
+        for row in rows {
+            if let Some(shown) = store.agent_row(row.clone()) {
+                for path in shown_paths(&shown) {
+                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret}: {row:?} showed {path:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn no_path_field_of_a_read_note_names_a_protected_place() {
+    let (_temp, store) = vault(&["Juniper"]);
+    let doc = |id: &str, folder: &str, disk: &str, origin: Option<&str>| NoteDoc {
+        id: id.into(),
+        folder_id: folder.into(),
+        disk_folder_id: disk.into(),
+        body: String::new(),
+        revision: String::new(),
+        created_at: 0,
+        updated_at: 0,
+        pinned: false,
+        origin: origin.map(Into::into),
+        secure: false,
+        locked: false,
+    };
+    for secret in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double"] {
+        let docs = [
+            doc(secret, "wiki/Projects", "wiki/Projects", None),
+            doc("01ID", secret, "wiki/Projects", None),
+            doc("01ID", "wiki/Projects", secret, None),
+            doc("01ID", "wiki/Projects", "wiki/Projects", Some(secret)),
+        ];
+        for read in docs {
+            if let Ok(shown) = store.agent_doc(read) {
+                for path in [Some(shown.id), Some(shown.folder_id), Some(shown.disk_folder_id), shown.origin].into_iter().flatten() {
+                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret} showed {path:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_folder_row_is_judged_with_its_parents() {
+    let (_temp, mut store) = vault(&["Juniper"]);
+    for (id, parent) in [("wiki/_secure/x", "wiki/_secure"), ("wiki/Projects/Juniper/Ordinary", "wiki/Projects/Juniper")] {
+        assert!(store.protected_path(parent) && !store.agent_listable_folder(id), "{id}");
+    }
+    assert!(store.agent_listable_folder("wiki/Projects"));
 }

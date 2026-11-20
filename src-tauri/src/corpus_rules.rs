@@ -25,6 +25,11 @@ impl CorpusStore {
     /// Missing settings mean the documented empty keyword list. An unreadable
     /// or malformed settings file cannot prove that a name is public.
     pub(super) fn secure_keywords_for_classification(&self) -> Result<Vec<String>, String> {
+        // an agent's store reads them once per call (agent_keywords)
+        self.agent_keywords().unwrap_or_else(|| self.read_keywords_for_classification())
+    }
+
+    pub(super) fn read_keywords_for_classification(&self) -> Result<Vec<String>, String> {
         let settings = self.dot_read("settings")?;
         crate::librarian_rules::classifiable_secure_keywords(&settings)
     }
@@ -109,7 +114,7 @@ impl CorpusStore {
             })
             // a workspace agent's store also asks the one path rule (it is
             // also what judge_for_ai and file_for_ai ask, through here)
-            || (self.agent_lane && self.protected_path(rel))
+            || (self.is_agent_lane() && self.protected_path(rel))
     }
 
     /// Protect every Library note already named with a secure keyword (the

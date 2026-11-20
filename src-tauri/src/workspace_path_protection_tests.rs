@@ -147,3 +147,38 @@ fn a_request_in_another_spelling_or_through_a_symlink_is_refused() {
         described["attachments"].as_array().unwrap().iter().map(|a| a["available"].as_bool().unwrap()).collect();
     assert_eq!(available, vec![false, false, false, true], "{described}");
 }
+
+/// Opus review of pull request 304, #1: an archived or trashed note carries
+/// `origin`, the folder it came from, which Rotli writes itself; it named a
+/// protected folder to every agent lane.
+#[test]
+fn an_archived_notes_origin_never_names_a_protected_folder() {
+    let temp = vault(Some("Juniper"));
+    put(temp.path(), "archive/plan2.md", "---\nid: 01PATHPLAN20000000000000000\norigin: wiki/Projects/Juniper\n---\n# Plan two\n\nplain words\n");
+    put(temp.path(), "archive/plan3.md", "---\nid: 01PATHPLAN30000000000000000\norigin: wiki/_secure/PrivateProject\n---\n# Plan three\n\nplain words\n");
+    put(temp.path(), "archive/plan4.md", "---\nid: 01PATHPLAN40000000000000000\norigin: wiki/Projects\n---\n# Plan four\n\nplain words\n");
+    assert_hidden(&temp, &["Juniper", "PrivateProject", "_secure"]);
+    let mut ws = test_workspace(&temp);
+    for id in ["01PATHPLAN20000000000000000", "01PATHPLAN30000000000000000"] {
+        assert_eq!(ws.read_note(id).unwrap().note.origin, None, "{id}");
+    }
+    // an ordinary origin still travels
+    assert_eq!(ws.read_note("01PATHPLAN40000000000000000").unwrap().note.origin.as_deref(), Some("wiki/Projects"));
+}
+
+/// The same, archived by the person in the app (Rotli writes `origin`).
+#[test]
+fn a_note_archived_out_of_a_keyword_folder_names_no_origin() {
+    let temp = TempDir::new().unwrap();
+    put(temp.path(), ".rotli/settings.json", "{\"librarianRules\":{\"secureKeywords\":[\"Juniper\"]}}\n");
+    let mut ws = test_workspace(&temp);
+    let note = ws.create_note("Plan", "plain words", MAIN_ROOT).unwrap();
+    ws.store.move_note(&note.id, "Projects/Juniper").unwrap();
+    let archived = ws.store.move_note(&note.id, "Archive").unwrap();
+    assert_eq!(archived.origin.as_deref(), Some("Projects/Juniper"), "the person's own row keeps it");
+    let mut ws = test_workspace(&temp);
+    let listed = serde_json::to_string(&ws.list_remote(50).unwrap()).unwrap();
+    assert!(!listed.contains("Juniper"), "{listed}");
+    let local = ws.local_id(&note.id).unwrap();
+    assert_eq!(ws.read_note(&local).unwrap().note.origin, None);
+}
