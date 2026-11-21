@@ -417,8 +417,11 @@ roots carry their root-prefixed wire id in the link.
   secure keyword; `..` and unresolvable symlinks fail closed. A shelf that
   isn't a clean path, or is protected, is shown as the note's own folder, and
   an archived or trashed note's `origin` only when it is clean and
-  unprotected. Main and view folder names are labels, not paths, and stay
-  visible. (`docs/architecture/egress-threat-model.md`, row 16k, with its
+  unprotected. Main and view references, note history paths, query
+  metadata paths, and the locked-link refusal follow the same rule. Main and
+  view folder names are labels, not paths, and stay visible. The guard is the
+  behaviour harness `workspace_agent_surface_tests.rs`: every MCP tool and CLI
+  command, against one vault seeded with every decoy kind. (`docs/architecture/egress-threat-model.md`, row 16k, with its
   residuals.)
 - A folder row is listed to an agent only when `agent_listable` allows it
   and its own path is not a hidden or reference surface

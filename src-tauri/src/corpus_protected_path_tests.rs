@@ -191,7 +191,15 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
     assert!(agent_files.iter().any(|(name, _)| name == "workspace.rs") && agent_files.len() >= 8, "{:?}", agent_files.iter().map(|f| &f.0).collect::<Vec<_>>());
     let scanned: usize = agent_files.iter().map(|(_, text)| production(text).lines().count()).sum();
     assert!(scanned > 3000, "the guard read only {scanned} production lines");
-    let forbidden = ["in_secure_home", "secure_by_name(", "file_is_protected(", "SECURE_NOTES_FOLDER", "\"wiki/_secure", "\"Secure notes"];
+    let forbidden = ["in_secure_home", "secure_by_name(", "file_is_protected(", "SECURE_NOTES_FOLDER", "\"wiki/_secure", "\"Secure notes", "/_secure", "_secure/"];
+    // the AI row builders serve the app's own lanes too (an on-device reader's
+    // file_is_protected is theirs), but never compare a path to a secure home
+    // themselves (Opus re-check of #304, mutation 6)
+    for (number, line) in include_str!("corpus_ai_rows.rs").lines().enumerate().filter(|(_, line)| !line.trim_start().starts_with("//")) {
+        for token in ["in_secure_home", "secure_by_name(", "SECURE_NOTES_FOLDER", "\"wiki/_secure", "\"Secure notes", "/_secure", "_secure/"] {
+            assert!(!line.contains(token), "corpus_ai_rows.rs:{}: compares a path without protected_path: {line}", number + 1);
+        }
+    }
     for (name, text) in &agent_files {
         for (number, line) in production(text).lines().enumerate() {
             if line.trim_start().starts_with("//") {
