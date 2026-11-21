@@ -59,3 +59,35 @@ fn a_chat_rewrite_keeps_its_denials_and_refuses_new_grants() {
     let err = write_chat_at(&root, "open", "---\nlocal_ai_allowed: true\n---\n", Some(&revision)).unwrap_err();
     assert!(err.contains("local_ai_allowed"), "{err}");
 }
+
+#[test]
+fn a_locked_chat_keeps_its_ai_edit_denial_too() {
+    // self-review of 305: `locked` used to hide the revoked grant, so a
+    // rewrite dropping both put back only the lock
+    let dir = tempfile::tempdir().unwrap();
+    let root = fs::canonicalize(dir.path()).unwrap();
+    let old = "---\nlocked: true\ncreated_by: chat\nai_edit: false\n---\n\nturn\n";
+    write_chat_at(&root, "both", old, None).unwrap();
+    let revision = read_chat_at(&root, "both").unwrap().revision;
+    write_chat_at(&root, "both", "---\ncreated_by: chat\n---\n\nturn\n", Some(&revision)).unwrap();
+    let saved = fs::read_to_string(root.join("chats/both.md")).unwrap();
+    assert!(crate::note_protection::loosened(old, &saved).is_empty(), "{saved}");
+    let unlocked: String = saved.lines().filter(|l| !l.starts_with("locked:")).map(|l| format!("{l}\n")).collect();
+    let foreign = parse_document_fm(&unlocked);
+    assert_ne!(crate::ai_edit_policy::body_edit(&foreign), crate::ai_edit_policy::BodyEdit::Allowed, "{saved}");
+}
+
+#[test]
+fn a_chat_rewrite_keeps_its_secure_context() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = fs::canonicalize(dir.path()).unwrap();
+    write_chat_at(&root, "taint", "---\ntitle: T\nsecureContext: true\n---\n\nturn\n", None).unwrap();
+    let revision = read_chat_at(&root, "taint").unwrap().revision;
+    write_chat_at(&root, "taint", "---\ntitle: T\nsecureContext: false\n---\n\nturn\n", Some(&revision)).unwrap();
+    let saved = fs::read_to_string(root.join("chats/taint.md")).unwrap();
+    assert!(crate::note_protection::protection(&saved).secure_context, "{saved}");
+}
+
+fn parse_document_fm(text: &str) -> Vec<String> {
+    crate::corpus::parse_document(text).0.unwrap_or_default().foreign
+}

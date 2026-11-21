@@ -101,5 +101,11 @@ export function keepProtection(old: string, next: string): string {
 
 /** A note or a board: the files whose own text carries protection. */
 export function isNotePath(path: string): boolean {
-  return /\.(md|excalidraw)$/i.test(path);
+  // Rust's `Path::extension`: trailing slashes go, and a leading-dot name
+  // (`.md`) has no extension (shared fixture, protection-rule.json)
+  const name = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return false;
+  const ext = name.slice(dot + 1).toLowerCase();
+  return ext === "md" || ext === "excalidraw";
 }

@@ -168,6 +168,15 @@
       "loosened": [
         "secure"
       ]
+    },
+    {
+      "name": "a lock beside a revoked grant: dropping both loosens both",
+      "old": "---\nlocked: true\ncreated_by: chat\nai_edit: false\n---\n",
+      "new": "---\ncreated_by: chat\n---\n",
+      "loosened": [
+        "locked",
+        "ai_edit"
+      ]
     }
   ],
   "notePaths": [
@@ -194,6 +203,22 @@
     {
       "path": "notes.md.bak",
       "note": false
+    },
+    {
+      "path": ".md",
+      "note": false
+    },
+    {
+      "path": "wiki/.md",
+      "note": false
+    },
+    {
+      "path": "foo.md/",
+      "note": true
+    },
+    {
+      "path": "a/B.MD/",
+      "note": true
     }
   ]
 }
