@@ -37,6 +37,9 @@ interface Mention {
   block: boolean;
   /** Leading space characters before the key. */
   indent: number;
+  /** The piece after the one holding the mention, where a continuation would
+   * start (rule 3). */
+  next: number;
 }
 
 const BREAKS = /[\r\n\u0085\u2028\u2029]/;
@@ -169,7 +172,15 @@ function blockMention(text: string, key: string): Mention | null {
   }
   if ((!explicit && !after.startsWith(":")) || name !== key) return null;
   const raw = after.startsWith(":") ? after.slice(1) : "";
-  return { value: raw.trim(), raw, canonical, plain: indent === 0 && !decorated, block: true, indent };
+  return {
+    value: raw.trim(),
+    raw,
+    canonical,
+    plain: indent === 0 && !decorated,
+    block: true,
+    indent,
+    next: 0,
+  };
 }
 
 /** Every `{…, key: value}` flow entry naming `key` in `text`, past any `? `,
@@ -195,7 +206,7 @@ function flowMentions(text: string, key: string, out: Mention[]): void {
     let end = 1;
     while (end < rest.length && rest[end] !== "," && rest[end] !== "}") end++;
     const raw = rest.slice(1, end);
-    out.push({ value: raw.trim(), raw, canonical: false, plain: false, block: false, indent: 0 });
+    out.push({ value: raw.trim(), raw, canonical: false, plain: false, block: false, indent: 0, next: 0 });
   }
 }
 
@@ -275,13 +286,15 @@ function mentions(fields: readonly string[], all: Pieces, line: number, key: str
   const out: Mention[] = [];
   for (let at = all.first[line]!; at < end; at++) {
     if (all.inBlock[at]) continue;
+    const from = out.length;
     const block = blockMention(all.text[at]!, key);
     if (block) out.push(block);
     flowMentions(all.text[at]!, key, out);
+    for (const mention of out.slice(from)) mention.next = at + 1;
   }
   if (!all.whole[line] && !all.inBlock[all.first[line]!]) {
     const block = blockMention(fields[line]!.replace(/\r+$/, ""), key);
-    if (block) out.push(block);
+    if (block) out.push({ ...block, next: end });
   }
   return out;
 }
@@ -299,10 +312,13 @@ function saysOff(raw: string): boolean {
 }
 
 /** The first line that turns `locked`/`secure` on: any mention whose value
- * doesn't say off (rule 1); -1 when none does. */
+ * doesn't say off (rule 1), or says off but continues onto a deeper plain
+ * line, which YAML folds into the value (`false until friday` is no off);
+ * -1 when none does. */
 export function flagLine(fields: readonly string[], key: "locked" | "secure"): number {
   const all = pieces(fields);
-  return fields.findIndex((_, line) => mentions(fields, all, line, key).some((m) => !saysOff(m.raw)));
+  const on = (m: Mention) => !saysOff(m.raw) || (m.block && continued(all.text, m.next, m.indent));
+  return fields.findIndex((_, line) => mentions(fields, all, line, key).some(on));
 }
 
 /** Is the note locked: any line turns `locked` on. */
@@ -381,7 +397,7 @@ export function ownedKey(fields: readonly string[], key: string, grants: (value:
   for (let line = 0; line < fields.length; line++) {
     for (const mention of mentions(fields, all, line, key)) {
       if (!all.whole[line] || !grants(mention.value)) return { says: "deny" };
-      if (mention.block && continued(all.text, all.first[line]! + 1, mention.indent)) return { says: "deny" };
+      if (mention.block && continued(all.text, mention.next, mention.indent)) return { says: "deny" };
       if (mention.canonical && grant === null) grant = mention.value;
     }
   }

@@ -105,9 +105,10 @@ fn unlock_in_a_rotli_vault_clears_top_level_lines_and_refuses_the_rest() {
 fn unlock_refuses_a_spelling_it_cannot_reach() {
     let (_dir, root, mut store) = folder_with(&[
         ("Notes/quoted.md", "---\n\"locked\": true\n---\n# Quoted\n"),
+        ("Notes/spaced.md", "---\nlocked : on\n---\n# Spaced\n"),
         ("Notes/flow.md", "---\nmeta: {locked: true, mood: calm}\n---\n# Flow\n"),
     ]);
-    for rel in ["Notes/quoted.md", "Notes/flow.md"] {
+    for rel in ["Notes/quoted.md", "Notes/spaced.md", "Notes/flow.md"] {
         let id = crate::corpus::adopted_tests::adopted_id(&mut store, rel);
         let before = fs::read_to_string(root.join(rel)).unwrap();
         let refused = store.set_locked(&id, false).unwrap_err();

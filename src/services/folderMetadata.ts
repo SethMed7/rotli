@@ -43,13 +43,22 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
  * another key, a key on a line a lone CR breaks, or (in a folder opened in
  * place) a spelling other than Rotli's (Rust `refuse_if_still_on`). */
 function refuseIfStillOn(text: string, key: "locked" | "secure"): void {
-  const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
+  refuseIfFlagged(parseNoteDocument(text).frontmatter?.foreign ?? [], key);
+}
+
+function refuseIfFlagged(foreign: readonly string[], key: "locked" | "secure"): void {
   const line = foreign[flagLine(foreign, key)];
   if (line !== undefined)
     throw new Error(
       `This note still turns ${key} on in a line the switch can't change (${line.trim()}). Remove that line in the note's metadata, then try again.`,
     );
 }
+
+/** Rotli's own spelling of `key`: `key: value` at the start of the line. */
+const ownLine = (line: string, key: string) => {
+  const field = frontmatterField(line);
+  return field !== null && field.key.canonical && field.key.name === key;
+};
 
 /** `locked`/`secure` set to `value` (null clears it): an off-switch removes
  * only the top-level single-line spellings, so the frontmatter stays YAML
@@ -157,6 +166,14 @@ export async function setFolderProtection(
   fm = key === "locked" ? withFlag(fm, key, allowed ? "true" : null) : withField(fm, key, String(allowed));
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
+  // in a folder opened in place, a switch changes only Rotli's own
+  // `locked: …` line, as Rust's in-place writer does; any other spelling
+  // that still holds the lock refuses
+  if (key === "locked" && !allowed && inPlace)
+    refuseIfFlagged(
+      (frontmatter?.foreign ?? []).filter((line) => !ownLine(line, "locked")),
+      "locked",
+    );
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
   if (key === "locked" && !allowed) refuseIfStillOn(text, "locked");
   await writeVersionedFile(dir, path, text, opened.revision);

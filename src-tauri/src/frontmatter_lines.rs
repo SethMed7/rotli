@@ -41,6 +41,9 @@ pub(crate) struct Mention<'a> {
     block: bool,
     /// Leading space characters before the key.
     indent: usize,
+    /// The piece after the one holding the mention, where a continuation
+    /// would start (rule 3).
+    next: usize,
 }
 
 fn is_break(c: char) -> bool {
@@ -174,7 +177,7 @@ fn block_mention<'a>(text: &'a str, key: &str) -> Option<Mention<'a>> {
         return None;
     }
     let raw = after.strip_prefix(':').unwrap_or_default();
-    Some(Mention { value: js_trim(raw), raw, canonical, plain: indent == 0 && !decorated, block: true, indent })
+    Some(Mention { value: js_trim(raw), raw, canonical, plain: indent == 0 && !decorated, block: true, indent, next: 0 })
 }
 
 /// Every `{…, key: value}` flow entry naming `key` in `text`, past any `? `,
@@ -200,7 +203,7 @@ fn flow_mentions<'a>(text: &'a str, key: &str, out: &mut Vec<Mention<'a>>) {
         };
         let Some(value) = rest.strip_prefix(':').filter(|_| name == key) else { continue };
         let raw = &value[..value.find([',', '}']).unwrap_or(value.len())];
-        out.push(Mention { value: js_trim(raw), raw, canonical: false, plain: false, block: false, indent: 0 });
+        out.push(Mention { value: js_trim(raw), raw, canonical: false, plain: false, block: false, indent: 0, next: 0 });
     }
 }
 
@@ -279,12 +282,14 @@ fn mentions<'a, S: AsRef<str>>(fields: &'a [S], pieces: &Pieces<'a>, line: usize
     let mut out = Vec::new();
     for at in pieces.first[line]..end {
         if !pieces.in_block[at] {
+            let from = out.len();
             out.extend(block_mention(pieces.text[at], key));
             flow_mentions(pieces.text[at], key, &mut out);
+            out[from..].iter_mut().for_each(|mention| mention.next = at + 1);
         }
     }
     if !pieces.whole[line] && !pieces.in_block[pieces.first[line]] {
-        out.extend(block_mention(fields[line].as_ref().trim_end_matches('\r'), key));
+        out.extend(block_mention(fields[line].as_ref().trim_end_matches('\r'), key).map(|mention| Mention { next: end, ..mention }));
     }
     out
 }
@@ -303,10 +308,12 @@ fn says_off(raw: &str) -> bool {
 }
 
 /// The first line that turns `locked`/`secure` on: any mention whose value
-/// doesn't say off (rule 1).
+/// doesn't say off (rule 1), or says off but continues onto a deeper plain
+/// line, which YAML folds into the value (`false until friday` is no off).
 pub(crate) fn flag_line<S: AsRef<str>>(fields: &[S], key: &str) -> Option<usize> {
     let pieces = pieces(fields);
-    (0..fields.len()).find(|&line| mentions(fields, &pieces, line, key).iter().any(|mention| !says_off(mention.raw)))
+    let on = |mention: &Mention| !says_off(mention.raw) || (mention.block && continued(&pieces.text, mention.next, mention.indent));
+    (0..fields.len()).find(|&line| mentions(fields, &pieces, line, key).iter().any(on))
 }
 
 /// Is `locked`/`secure` on in these frontmatter lines?
@@ -401,7 +408,7 @@ pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: i
             if !pieces.whole[line] || !grants(mention.value) {
                 return Says::Deny;
             }
-            if mention.block && continued(&pieces.text, pieces.first[line] + 1, mention.indent) {
+            if mention.block && continued(&pieces.text, mention.next, mention.indent) {
                 return Says::Deny;
             }
             if mention.canonical && grant.is_none() {

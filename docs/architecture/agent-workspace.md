@@ -316,7 +316,9 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
      doesn't say off. Off is `false`, `no` or `off` in any case, optionally
      in single or double quotes, optionally followed by a `# comment`.
      Everything else turns them on: empty, `yes`, `True`, `"true"`, `~`,
-     `null`, `0`.
+     `null`, `0`. An off value continued onto a deeper plain line is no off
+     either (rule 3's continuation: YAML reads `secure: false` +
+     `  until friday` as the text "false until friday").
   2. Any spelling of `ai_edit` or `local_ai_allowed` whose value isn't
      exactly `true` denies, and any spelling of `created_by` that doesn't
      name `chat`, `agent` or `librarian` makes the note person-written.
@@ -342,8 +344,8 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   person's off-switches remove only top-level single-line spellings of their
   key: at the start of the line with no `- `, `? `, tag or anchor (quoted or
   `key :` is fine), unbroken, with the value on that line and nothing deeper
-  after it. In a folder opened in place, Rust removes only Rotli's own
-  spelling. When a spelling a switch can't remove still holds the flag on (an
+  after it. In a folder opened in place, both Rust and Rotli Web remove
+  only Rotli's own `key: value` line, for `locked` and `secure` alike. When a spelling a switch can't remove still holds the flag on (an
   explicit `? locked` key, a list item, a flow entry inside another key, a
   broken line), it refuses and names the line instead of reporting success
   or leaving frontmatter YAML can't read. Parity: `permissionLineCases`,

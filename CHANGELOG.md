@@ -34,7 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tag such as `!!str` or an anchor such as `&a`, inside `{…}`, or with escapes
   in a quoted key. They are on unless the value says off: `false`, `no` or
   `off` in any case, quoted or not, with or without a `# comment`. Anything
-  else, including an empty value, `yes`, `on`, `~` or `null`, turns them on.
+  else, including an empty value, `yes`, `on`, `~` or `null`, turns them on,
+  and so does an off value continued onto an indented line (`secure: false`,
+  then `  until friday`), which reads as the text "false until friday".
   Rotli Web now reads `secure` the same way as the desktop app.
 - **Prose that mentions a flag stays prose.** A `description: |` (or `>`)
   block whose text says `locked: true` or `secure: yes` no longer locks the
@@ -57,7 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at the top level. When the flag is spelled where removing it could break
   the note's metadata (an explicit `? locked` key, a list item, inside
   another key's `{…}`), the switch names the line to delete instead of
-  reporting success while the note stays protected.
+  reporting success while the note stays protected. In a folder opened in
+  place, the switches change only Rotli's own `locked: true` or
+  `secure: true` line, on the desktop and in Rotli Web alike.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

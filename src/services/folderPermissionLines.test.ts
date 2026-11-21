@@ -79,29 +79,22 @@ test("unlock in a Rotli vault clears top-level lines and refuses the rest, writi
   }
 });
 
-test("unlock in place turns a lock it finds off, or refuses and writes nothing", async () => {
+test("in place, unlock changes only Rotli's own line and refuses any other spelling, writing nothing", async () => {
   const dir = new MemoryVaultDir();
   for (const [path, text] of [
-    ["Notes/quoted.md", '---\n"locked": true\n---\n# Quoted\n'],
-    ["Notes/flow.md", "---\nmeta: {locked: true, mood: calm}\n---\n# Flow\n"],
+    ["Web/quoted.md", '---\n"locked": yes\n---\n# Web quoted\n'],
+    ["Web/spaced.md", "---\nlocked  : true\n---\n# Web spaced\n"],
+    ["Web/flow.md", "---\nprefs: {theme: dark, locked: 1}\n---\n# Web flow\n"],
   ] as const) {
     await dir.writeText(path, text);
-    const refused = await setFolderProtection(dir, notesAt(path), path, "locked", false).then(
-      () => null,
-      (error: Error) => error.message,
+    await expect(setFolderProtection(dir, notesAt(path), path, "locked", false)).rejects.toThrow(
+      /still turns locked on/,
     );
-    const after = await dir.readText(path);
-    if (refused === null) expect(isLockedFrontmatter(read(after))).toBe(false);
-    else
-      expect({ refused: /still turns locked on/.test(refused), after }).toEqual({
-        refused: true,
-        after: text,
-      });
+    expect(await dir.readText(path)).toBe(text);
   }
-  // a flow entry inside another key is beyond every switch: it refuses
-  await expect(
-    setFolderProtection(dir, notesAt("Notes/flow.md"), "Notes/flow.md", "locked", false),
-  ).rejects.toThrow(/still turns locked on/);
+  await dir.writeText("Notes/own.md", "---\ntags: [a]\nlocked: true\n---\n# Own\n");
+  await setFolderProtection(dir, notesAt("Notes/own.md"), "Notes/own.md", "locked", false);
+  expect(await dir.readText("Notes/own.md")).toBe("---\ntags: [a]\n---\n# Own\n");
 });
 
 test("removing secure refuses a spelling it can't reach, before anything moves", async () => {

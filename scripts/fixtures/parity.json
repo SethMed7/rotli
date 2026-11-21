@@ -1167,6 +1167,42 @@
             "created_by: chat"
           ],
           "verdict": "au00"
+        },
+        {
+          "fields": [
+            "secure: false",
+            "  until friday"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "locked: no",
+            "  - later"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "x: 1\rsecure: off",
+            "  more"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "secure: false",
+            "  # note"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "locked: false",
+            "  x: y"
+          ],
+          "verdict": "pu00"
         }
       ]
     },

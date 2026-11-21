@@ -138,15 +138,17 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-/** Any spelling of `secure` whose value isn't exactly `false`
- * (frontmatterLines.ts, rule 1): the note is categorically unavailable to
- * remote models. The vault file is the truth; this only reads it. */
+/** Any spelling of `secure` whose value doesn't say off (frontmatterLines.ts,
+ * rule 1: `false`, `no` or `off` in any case, quoted or with a `# comment`,
+ * and not continued onto a deeper line): the note is categorically
+ * unavailable to remote models. The vault file is the truth; this only
+ * reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
   return secureOn(fm.foreign);
 }
 
-/** Any spelling of `locked` whose value isn't exactly `false` — no AI may
- * edit the note, every class reads it. */
+/** Any spelling of `locked` whose value doesn't say off (the same rule) — no
+ * AI may edit the note, every class reads it. */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
   return lockedOn(fm.foreign);
 }

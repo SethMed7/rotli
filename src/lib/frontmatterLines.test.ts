@@ -154,6 +154,20 @@ describe("rule 2: the same spellings deny a key only Rust writes", () => {
   });
 });
 
+describe("a continued off is no off (review of PR 307, H1)", () => {
+  test("an off value folded with a deeper plain line turns the flag on", () => {
+    expect(secureOn(["secure: false", "  until friday"])).toBe(true);
+    expect(locks("locked: no", "  - later")).toBe(true);
+    expect(secureOn(["x: 1\rsecure: off", "  more"])).toBe(true);
+  });
+
+  test("a comment or a nested key after it leaves it off", () => {
+    expect(secureOn(["secure: false", "  # note"])).toBe(false);
+    expect(locks("locked: false", "  x: y")).toBe(false);
+    expect(secureOn(["secure: false", "other: 1"])).toBe(false);
+  });
+});
+
 describe("rule 3: a grant continued onto a plain line", () => {
   test("a deeper plain line turns the grant into text, which denies", () => {
     for (const next of ["  until friday", "  - later", "  ? maybe", "\tmore"])

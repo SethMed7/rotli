@@ -49,4 +49,11 @@ test("oracle L sees what the rules name and nothing the readers decide alone", (
   expect(oracleL(["created_by: agent", "{ai_edit: false}"]).editDeny).toBe(true);
   expect(oracleL(["notes: |", "  locked: true"]).lock).toBe(false);
   expect(oracleL(["locked: false"]).lock).toBe(false);
+  // YAML folds a deeper plain line into the value (review of PR 307, H1)
+  expect(oracleL(["secure: false", "  until friday"]).secure).toBe(true);
+  expect(oracleL(["locked: no", "  - later"]).lock).toBe(true);
+  expect(oracleL(["x: 1\rsecure: off", "  more"]).secure).toBe(true);
+  expect(oracleL(["created_by: agent", "ai_edit: true", "  until friday"]).editDeny).toBe(true);
+  expect(oracleL(["secure: false", "  # note"]).secure).toBe(false);
+  expect(oracleL(["secure: false", "  x: y"]).secure).toBe(false);
 });

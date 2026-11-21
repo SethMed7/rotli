@@ -93,7 +93,12 @@ export const verdicts = (set: CaseSet) => cases(set).map(permissionVerdict).join
 // A line naming the key in a common spelling (indent, `- `, `? `, quotes,
 // `!!str`, a `{…}` flow entry), after splitting on CR, U+2028, U+2029 and
 // U+0085 and skipping block-scalar text. Any occurrence that denies counts.
-// Ported from the PR #303 triage (oracle L), regexes and all, on purpose.
+// Ported from the PR #303 triage (oracle L), regexes and all, on purpose,
+// plus YAML's plain-scalar folding (review of PR 307, H1): a block key whose
+// next non-blank line is deeper, not a comment and not itself `key: value`
+// carries that line in its value (`ai_edit: true` + `  until friday` is
+// "true until friday"), and a continued `locked`/`secure` value is no plain
+// off, so it counts as on.
 
 export interface Intent {
   editDeny: boolean;
@@ -107,8 +112,10 @@ const ON = /^(true|yes|on|y)$/i;
 
 export function oracleL(fields: string[]): Intent {
   const found: Record<string, string[]> = {};
+  const continuedFlag = new Set<string>();
   let blockIndent = -1;
-  for (const line of fields.flatMap((l) => l.replace(/\r+$/, "").split(/\r|\u2028|\u2029|\u0085/))) {
+  const lines = fields.flatMap((l) => l.replace(/\r+$/, "").split(/\r|\u2028|\u2029|\u0085/));
+  for (const [at, line] of lines.entries()) {
     const indent = line.length - line.trimStart().length;
     if (blockIndent >= 0 && (line.trim() === "" || indent > blockIndent)) continue;
     blockIndent = -1;
@@ -121,7 +128,14 @@ export function oracleL(fields: string[]): Intent {
           .replace(/^(["'])(.*)\1$/, "$2"),
       );
     const block = line.match(/^\s*(?:-\s+)*(?:\?\s+)?(?:!!str\s+)?(["']?)([A-Za-z_]+)\1\s*:(?:\s+(.*))?$/);
-    if (block) add(block[2]!, block[3] ?? "");
+    const next = lines.slice(at + 1).find((l) => l.trim() !== "");
+    const continued =
+      next !== undefined &&
+      next.length - next.trimStart().length > indent &&
+      !next.trim().startsWith("#") &&
+      !/:(\s|$)/.test(next.trim());
+    if (block) add(block[2]!, continued ? `${block[3] ?? ""} ${next.trim()}` : (block[3] ?? ""));
+    if (block && continued) continuedFlag.add(block[2]!);
     for (const flow of line.matchAll(/[{,]\s*(["']?)([A-Za-z_]+)\1\s*:\s*([^,}]*)/g)) add(flow[2]!, flow[3]!);
   }
   const pick = (k: string, deny: (v: string) => boolean) => {
@@ -134,11 +148,11 @@ export function oracleL(fields: string[]): Intent {
   const lo = pick("locked", (v) => ON.test(v));
   const se = pick("secure", (v) => ON.test(v));
   const la = pick("local_ai_allowed", notTrue);
-  const lock = lo.has && ON.test(lo.v);
+  const lock = (lo.has && ON.test(lo.v)) || continuedFlag.has("locked");
   return {
     editDeny: lock || (ai.has && notTrue(ai.v)) || (!ai.has && cb.has && !CREATORS.includes(cb.v)),
     lock,
-    secure: se.has && ON.test(se.v),
+    secure: (se.has && ON.test(se.v)) || continuedFlag.has("secure"),
     localDeny: la.has && notTrue(la.v),
   };
 }
