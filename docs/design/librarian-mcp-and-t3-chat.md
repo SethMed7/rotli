@@ -280,9 +280,9 @@ builds until that review has checked these fixes:
    raw metadata merger is dev's again (the stricter one deleted values that
    merely contained a key's name). Every key only Rust writes (`created_by`,
    `ai_edit`, `local_ai_allowed`) is read by one rule that fails closed both
-   ways (`frontmatter_keys.rs` `owned_key`, its TypeScript twin
-   `frontmatterKeys.ts` `ownedKey`, used by `aiEditPolicy.ts` and the web
-   vault's reader): a line in any spelling whose value isn't a grant denies
+   ways (`frontmatter_lines.rs` `owned_key`, its TypeScript twin
+   `frontmatterLines.ts` `ownedKey`, used by `aiEditPolicy.ts` and the web
+   vault's reader; the line rules are in agent-workspace.md): a line in any spelling whose value isn't a grant denies
    or restricts, only Rust's own spelling grants, and a denial wins. So a
    typed `  created_by: agent` grants nothing, and a typed
    `  ai_edit: false` or `  local_ai_allowed: false` still denies (Codex

@@ -3,8 +3,11 @@
 // by parity.json (`aiBodyEditCases`, `localAiAllowedCases`). Fail closed both
 // ways: a line in any spelling (indented, quoted, a list item…) whose value
 // isn't a grant denies; only Rust's own spelling, `key: value` at the start
-// of a line, grants; a denial wins. Values trim with `String.prototype.trim`,
-// which Rust's `js_trim` matches.
+// of a line, grants; a denial wins. The policy itself is `ownedKey` in
+// frontmatterLines.ts; `frontmatterField` here is the setters' key match.
+// Values trim with `String.prototype.trim`, which Rust's `js_trim` matches.
+
+import { ownedKey } from "./frontmatterLines";
 
 export interface FrontmatterKey {
   name: string;
@@ -54,20 +57,6 @@ export function frontmatterField(line: string): { key: FrontmatterKey; value: st
   if (!explicit && !after.startsWith(":")) return null;
   if (!name || (/\s/.test(name) && !explicit)) return null;
   return { key: { name, canonical }, value: (after.startsWith(":") ? after.slice(1) : "").trim() };
-}
-
-export type Says = { says: "unset" } | { says: "grant"; value: string } | { says: "deny" };
-
-/** What the fields say about one key only Rust writes (frontmatter_keys.rs `owned_key`). */
-export function ownedKey(fields: readonly string[], key: string, grants: (value: string) => boolean): Says {
-  let grant: string | null = null;
-  for (const line of fields) {
-    const field = frontmatterField(line);
-    if (!field || field.key.name !== key) continue;
-    if (!grants(field.value)) return { says: "deny" };
-    if (field.key.canonical && grant === null) grant = field.value;
-  }
-  return grant === null ? { says: "unset" } : { says: "grant", value: grant };
 }
 
 /** The note's own on-device permission: true, false, or null to follow the vault. */

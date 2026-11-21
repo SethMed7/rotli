@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
+use crate::frontmatter_lines::{refuse_if_still_on, without_flag};
 use crate::note_dates::{stamp_to_ms, today_stamp};
 use ulid::Ulid;
 
@@ -1250,9 +1251,20 @@ pub fn parse_document(text: &str) -> (Option<Frontmatter>, &str) {
 
 fn parse_fields(head: &str) -> Frontmatter {
     let mut fm = Frontmatter::default();
-    for raw in head.lines() {
-        let line = raw.trim_end_matches('\r');
+    let lines: Vec<&str> = head.lines().map(|raw| raw.trim_end_matches('\r')).collect();
+    let mut block = crate::frontmatter_lines::BlockText::default();
+    for (at, &line) in lines.iter().enumerate() {
         let known = (|| {
+            // never an owned fact, so the permission readers see it
+            // (frontmatter_lines.rs): a broken line, one naming a permission
+            // key, or one ending an open block scalar before a deeper line
+            // (taking it out would glue that line into the block)
+            if !crate::frontmatter_lines::segments(line).1
+                || crate::frontmatter_lines::names_permission_key(line)
+                || block.continues(&lines[at + 1..])
+            {
+                return None;
+            }
             let (key, value) = line.split_once(':')?;
             let value = value.trim();
             match key {
@@ -1267,6 +1279,7 @@ fn parse_fields(head: &str) -> Frontmatter {
             Some(())
         })();
         if known.is_none() {
+            block.feed_line(line);
             fm.foreign.push(line.to_string());
         }
     }
@@ -1298,7 +1311,7 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
 pub(crate) fn walked_secure(fm: &Frontmatter, body: &str, text: &str) -> bool {
-    fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+    secure_on(&fm.foreign)
         || fm
             .foreign
             .iter()
@@ -1338,12 +1351,10 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
     out
 }
 
-/// A frontmatter line setting the per-note AI lock — `Some(true/false)` when the
-/// line is `locked: …`, else `None`. Shared with the organizer daemon, whose
-/// locked-skip must read the same line the same way.
-pub(crate) fn locked_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "locked").then(|| v.trim() == "true")
+/// The per-note AI lock, in any spelling (frontmatter_lines.rs). Shared with
+/// the organizer daemon, whose locked-skip must read it the same way.
+pub(crate) fn locked_on<S: AsRef<str>>(fields: &[S]) -> bool {
+    crate::frontmatter_lines::flag_on(fields, "locked")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
@@ -1391,23 +1402,16 @@ pub(crate) const AI_KEYS: [&str; 9] = [
     "anchors",
 ];
 
-/// A frontmatter line setting the per-note SECURE flag. Only literal `false`
-/// opens the ordinary lane; malformed values fail closed as secure.
-/// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
-pub(crate) fn secure_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() != "false")
+/// The per-note SECURE flag, in any spelling (frontmatter_lines.rs): only a
+/// value that says off opens the ordinary lane. Shared with the organizer.
+pub(crate) fn secure_on<S: AsRef<str>>(fields: &[S]) -> bool {
+    crate::frontmatter_lines::flag_on(fields, "secure")
 }
 
 /// Does this whole document carry `locked: true`? The lock check written once,
 /// for callers that hold the file text rather than a parsed `Frontmatter`.
 pub(crate) fn has_locked_frontmatter(text: &str) -> bool {
-    parse_document(text)
-        .0
-        .unwrap_or_default()
-        .foreign
-        .iter()
-        .any(|line| locked_field(line) == Some(true))
+    locked_on(&parse_document(text).0.unwrap_or_default().foreign)
 }
 
 /// The CHAT taint marker (`src/memex/contract.ts` writes it, one-way): this
@@ -3045,10 +3049,7 @@ impl CorpusStore {
                     .into(),
             );
         }
-        if frontmatter
-            .foreign
-            .iter()
-            .any(|line| locked_field(line) == Some(true))
+        if locked_on(&frontmatter.foreign)
         {
             return Err("Locked notes cannot be used as generated PDF sources.".into());
         }
@@ -3111,8 +3112,8 @@ impl CorpusStore {
         let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
         let (fm_opt, body) = parse_document(&text);
         let mut fm = fm_opt.unwrap_or_default();
-        let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
-        let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        let locked = locked_on(&fm.foreign);
+        let mut secure = secure_on(&fm.foreign);
         // auto-flag: secrets detected (or a secure keyword in the note's name, the
         // Librarian rules) + not yet marked → set secure:true + gitignore + move.
         // The detector is the regex pass today; the local LLM refines it later.
@@ -3195,12 +3196,16 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| locked_field(l).is_none());
+            fm.foreign = without_flag(&fm.foreign, "locked");
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            let out = self.compose_for(&text, &fm, body);
+            if !locked {
+                refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "locked")?;
+            }
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3317,12 +3322,7 @@ impl CorpusStore {
                 return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
             }
             let was_secure = |t: &str| {
-                parse_document(t)
-                    .0
-                    .unwrap_or_default()
-                    .foreign
-                    .iter()
-                    .any(|l| secure_field(l) == Some(true))
+                secure_on(&parse_document(t).0.unwrap_or_default().foreign)
             };
             let (before, after) = (was_secure(&text), was_secure(&out));
             let (_, out_body) = parse_document(&out);
@@ -3377,11 +3377,15 @@ impl CorpusStore {
             // 2026-10-13): no move, so no id to key one by, and no Rotli fields
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
+            let out = with_secure_line_only(&text, secure);
+            if !secure {
+                refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "secure")?;
+            }
             if secure {
                 self.gitignore_add(rel)?;
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            atomic_write(&path, &out)?;
             if !secure {
                 self.gitignore_remove(rel)?;
             }
@@ -3409,7 +3413,7 @@ impl CorpusStore {
             {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
-            fm.foreign.retain(|line| secure_field(line).is_none());
+            fm.foreign = without_flag(&fm.foreign, "secure");
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
@@ -3424,7 +3428,8 @@ impl CorpusStore {
 
         // Move while the secure flag + ignore are still active; only then drop
         // protection at the destination. A failed move therefore never exposes
-        // the file at an unignored path.
+        // the file at an unignored path. A spelling it can't remove refuses first.
+        refuse_if_still_on(&without_flag(&fm.foreign, "secure"), "secure")?;
         let restore_home = fm
             .foreign
             .iter()
@@ -3441,11 +3446,8 @@ impl CorpusStore {
         let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
-        final_fm.foreign.retain(|line| {
-            secure_field(line).is_none()
-                && local_ai_allowed_field(line).is_none()
-                && secure_origin_field(line).is_none()
-        });
+        final_fm.foreign = without_flag(&final_fm.foreign, "secure");
+        final_fm.foreign.retain(|line| local_ai_allowed_field(line).is_none() && secure_origin_field(line).is_none());
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
@@ -3490,7 +3492,7 @@ impl CorpusStore {
             };
             let (fm, raw) = parse_document(&text);
             let Some(fm) = fm else { continue };
-            if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
+            if !secure_on(&fm.foreign) {
                 continue;
             }
             let Some(id) = fm.id.clone().filter(|id| !id.is_empty()) else {
@@ -3540,7 +3542,7 @@ impl CorpusStore {
         let text = crate::fsutil::read_own_text(&self.abs(&rel)).map_err(|e| e.to_string())?;
         let (fm, _) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        if !fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
+        if !secure_on(&fm.foreign) {
             return Err("Repair applies only to a note explicitly marked secure".into());
         }
         let note_ulid = fm
@@ -3589,7 +3591,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            let explicitly_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+            let explicitly_secure = secure_on(&fm.foreign);
             let secure = explicitly_secure || looks_secure(body);
             if !secure {
                 return Err("Local AI access is only meaningful for a secure note".into());
@@ -3662,7 +3664,7 @@ impl CorpusStore {
         let (fm, body) = parse_document(text);
         let fm = fm.unwrap_or_default();
         let secure = self.file_is_protected(rel)
-            || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || secure_on(&fm.foreign)
             || fm
                 .foreign
                 .iter()
@@ -3807,10 +3809,7 @@ impl CorpusStore {
         let text = self.read_for_ai(&rel, model_is_local)?;
         let (fm, target_body) = parse_document(&text);
         let fm = fm.unwrap_or_default();
-        if fm
-            .foreign
-            .iter()
-            .any(|line| locked_field(line) == Some(true))
+        if locked_on(&fm.foreign)
         {
             return Err(
                 "This note is locked — no AI may edit it. Unlock it from the note's menu first."
@@ -3829,7 +3828,7 @@ impl CorpusStore {
         // CAN see that the incoming body is protected content, so it refuses to
         // let protected prose land anywhere it would stop being protected.
         let target_secure =
-            fm.foreign.iter().any(|l| secure_field(l) == Some(true)) || looks_secure(target_body);
+            secure_on(&fm.foreign) || looks_secure(target_body);
         if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
             return Err(refusal.into());
         }
@@ -3861,10 +3860,7 @@ impl CorpusStore {
             let text = self.read_for_ai(&rel, model_is_local)?;
             let (fm, target_body) = parse_document(&text);
             let fm = fm.unwrap_or_default();
-            if fm
-                .foreign
-                .iter()
-                .any(|line| locked_field(line) == Some(true))
+            if locked_on(&fm.foreign)
             {
                 return Err(
                     "This note is locked — no AI may edit it. Unlock it from the note's menu first."
@@ -3893,7 +3889,7 @@ impl CorpusStore {
                     );
                 }
             }
-            let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            let target_secure = secure_on(&fm.foreign)
                 || looks_secure(target_body);
             if let Some(refusal) = crate::secret::secure_write_refusal(target_secure, body) {
                 return Err(refusal.into());
@@ -3929,10 +3925,7 @@ impl CorpusStore {
         let rel = self.resolve_note_rel(id)?;
         let text = self.read_for_ai(&rel, false)?;
         let fm = parse_document(&text).0.unwrap_or_default();
-        if fm
-            .foreign
-            .iter()
-            .any(|line| locked_field(line) == Some(true))
+        if locked_on(&fm.foreign)
         {
             return Err("note is locked — an external agent may not edit it".into());
         }
@@ -3963,10 +3956,7 @@ impl CorpusStore {
         self.lock_note(&rel, None, Authority::Agent).and_then(|_held| {
             let text = self.read_for_ai(&rel, false)?;
             let fm = parse_document(&text).0.unwrap_or_default();
-            if fm
-                .foreign
-                .iter()
-                .any(|line| locked_field(line) == Some(true))
+            if locked_on(&fm.foreign)
             {
                 return Err("note is locked — an external agent may not edit it".into());
             }
@@ -4780,14 +4770,14 @@ impl CorpusStore {
         let folder = project_folder(self.layout, &disk_folder, &fm);
         // a chat's taint mark counts too, read by the grammar TypeScript
         // shares (seventh review of pull request 267: it was left out)
-        let secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+        let secure = secure_on(&fm.foreign)
             || crate::protection_mark::marked(text, "secureContext")
             || self.in_secure_home(rel)
             || looks_secure(body)
             || self.protected_by_name(&title_of(body), rel);
         NoteDoc {
             secure,
-            locked: fm.foreign.iter().any(|l| locked_field(l) == Some(true)),
+            locked: locked_on(&fm.foreign),
             id: id.to_string(),
             origin: if is_hidden_root(self.layout, &disk_folder) {
                 fm.origin.clone()
@@ -4967,7 +4957,7 @@ impl CorpusStore {
         // the ignore doesn't cover, with the index still on the old rel, was
         // the worse failure). A pre-added line for a rename that then fails is
         // a harmless stale entry.
-        let is_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        let is_secure = secure_on(&fm.foreign);
         // the Librarian rules: a save that gives the note a secure keyword in its
         // title or file name protects it now, not at the next metadata read
         let name_secure = !is_secure && self.secure_by_name(&title, &target_rel);
@@ -5173,10 +5163,7 @@ impl CorpusStore {
         // that policy until the user deliberately removes protection.
         if (target_folder == SECURE_NOTES_FOLDER
             || target_folder.starts_with(&format!("{SECURE_NOTES_FOLDER}/")))
-            && !old_fm
-                .foreign
-                .iter()
-                .any(|line| secure_field(line) == Some(true))
+            && !secure_on(&old_fm.foreign)
         {
             old_fm.foreign.push("secure: true".to_string());
         }
@@ -5252,7 +5239,7 @@ impl CorpusStore {
         // AFTER the move — the note sat at a path no ignore line covered while
         // the index still pointed at the removed old rel). A pre-added line for
         // a move that then fails is a harmless stale entry.
-        let is_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        let is_secure = secure_on(&fm.foreign);
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
@@ -5359,11 +5346,11 @@ impl CorpusStore {
         if abs.is_file() {
             let text = crate::fsutil::read_own_text(&abs).map_err(|e| e.to_string())?;
             let fm = parse_document(&text).0.unwrap_or_default();
-            let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
+            let locked = locked_on(&fm.foreign);
             if locked {
                 return Err("note is locked — the filer must not touch it".into());
             }
-            if fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            if secure_on(&fm.foreign)
                 || rel == "wiki/_secure"
                 || rel.starts_with("wiki/_secure/")
             {
@@ -8874,6 +8861,10 @@ mod ai_file_tests;
 #[cfg(test)]
 #[path = "corpus_adopted_tests.rs"]
 mod adopted_tests;
+
+#[cfg(test)]
+#[path = "corpus_permission_line_tests.rs"]
+mod permission_line_tests;
 
 #[cfg(test)]
 #[path = "corpus_in_place_marked_tests.rs"]
