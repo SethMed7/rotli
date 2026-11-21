@@ -119,3 +119,28 @@ test("a mark on a passage with a line separator stays on one line", () => {
 test("a tab in a tag is kept, since it breaks no line", () => {
   expect(breaksALine(0x09)).toBe(false);
 });
+
+// re-check of 306 at d4a22c34 (2026-11-20)
+
+for (const text of ["---\nsecure : true\n---\n# S\n", "---\n\uFEFFsecure: true\n---\n# S\n"])
+  test(`in place: Remove protection checks the text it would write (${JSON.stringify(text.split("\n")[1])})`, async () => {
+    const { dir, note } = await vault("in place", "Notes/secret.md", text);
+    await dir.writeText(".gitignore", "Notes/secret.md\n");
+    await expect(corpusSetSecure(note.id, false)).rejects.toThrow(/secure/);
+    expect(await dir.readText("Notes/secret.md")).toBe(text);
+    expect(await dir.readText(".gitignore")).toBe("Notes/secret.md\n");
+  });
+
+test("in place: Unlock of `locked : true` takes, and is checked on the text it writes", async () => {
+  const { dir, note } = await vault("in place", "Notes/locked.md", "---\nlocked : true\n---\n# L\n");
+  await corpusSetLocked(note.id, false);
+  const saved = await dir.readText("Notes/locked.md");
+  expect(verdict(saved)).not.toBe("locked");
+});
+
+test("in place: the refusal for a typed --- block points to Show file metadata", async () => {
+  const { notes, note } = await vault("in place", "Garden/plain.md", "# Plain\n");
+  await expect(notes.updateNote(note.id, "---\ntags: [x]\n---\n# Plain\n", note.revision)).rejects.toThrow(
+    /Show file metadata/,
+  );
+});

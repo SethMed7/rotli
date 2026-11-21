@@ -223,9 +223,11 @@ second user-visible product or storage location.
   key Rust owns (`"ai_edit"`) is refused by the field editor like the plain
   one, and both setters run the tighten-only rule on what they write. A
   setter never deletes or rewrites an indented line (a block scalar's text or
-  a nested map); on Rotli Web, when such a line still decides the key, "Let
-  AI edit", the local-AI toggle, Unlock and Remove protection write nothing,
-  move nothing, keep the `.gitignore` line, and say so. The raw metadata
+  a nested map). "Let AI edit", the local-AI toggle, Unlock and Remove
+  protection check the exact text they would write, on the Mac and on Rotli
+  Web, in both vault kinds: when another line still decides the key (an
+  indented one, `secure : true`, a U+FEFF before the key) they write
+  nothing, move nothing, keep the `.gitignore` line, and say so. The raw metadata
   editor may change `locked` and `secure`, but may not loosen `ai_edit`,
   `local_ai_allowed`, `created_by` or `secureContext` in any spelling;
   `secureContext` can be added from there and never removed. An AI body edit
@@ -235,13 +237,18 @@ second user-visible product or storage location.
   Mac and on Rotli Web: in a folder opened in place that save is refused,
   whoever makes it (a `/ai` insert or "Allow once" reply that opens with
   `---` would otherwise become a standing AI grant); in a Rotli vault the
-  note gains its own block, so the pasted one stays body text. Every Mac body
-  save also runs the tighten-only rule. The organizer leaves an area's
+  note gains its own block, so the pasted one stays body text. On the Mac,
+  every AI or agent body save (`/ai`, "Allow once", Hand to AI, chat edits,
+  CLI and MCP) also runs the tighten-only rule; the person's own saves
+  (typing, paste, undo) are never refused for how protection reads. A
+  `secureContext` mark counts as a note's protection only inside a block that
+  closes: an unclosed `---` at the top is a horizontal rule. The organizer leaves an area's
   generated overview alone, without an error, when regenerating it would
   loosen a protection the person put on it.
-- `secure:` reads the same in Rust and on Rotli Web: the key is named when
-  either side's trim names it (Rust trims U+0085, JavaScript U+FEFF), and
-  only a value that reads `false` under both opens the note. Loosening a
+- `secure:` and `locked:` read the same in Rust and on Rotli Web: the key is
+  named when either side's trim names it (Rust trims U+0085, JavaScript
+  U+FEFF); `secure` is off only for a value that reads `false` under both,
+  and `locked` is on for a value that reads `true` under either. Loosening a
   flag is the person's act, through the note's own controls (`set_locked`,
   `set_secure`, the local-AI and AI-edit toggles). The
   vault format is unchanged, so the contract version does not move.

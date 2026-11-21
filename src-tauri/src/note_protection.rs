@@ -37,7 +37,7 @@ pub(crate) fn protection(text: &str) -> Protection {
     Protection {
         locked: foreign.iter().any(|l| locked_field(l) == Some(true)),
         secure: foreign.iter().any(|l| secure_field(l) == Some(true)),
-        secure_context: crate::protection_mark::marked(text, "secureContext"),
+        secure_context: crate::protection_mark::marked_in_closed_block(text, "secureContext"),
         local_ai: match crate::frontmatter_keys::local_ai_allowed(foreign) {
             Some(false) => 0,
             None => 1,

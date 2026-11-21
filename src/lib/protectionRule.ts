@@ -5,7 +5,7 @@
 // rewrite, so an unchanged line always passes. Pure: text in, verdict out.
 
 import { type AiBodyEdit, bodyEdit, field } from "./aiEditPolicy";
-import { parseNoteDocument, securesNote } from "./frontmatter";
+import { locksNote, namesLocked, parseNoteDocument, securesNote } from "./frontmatter";
 import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "./frontmatterBlock";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 
@@ -28,11 +28,11 @@ export function protection(text: string): Protection {
   const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
   const local = localAiAllowedOverride(foreign);
   return {
-    locked: foreign.some((line) => field(line, "locked") === "true"),
+    locked: foreign.some(locksNote),
     secure: foreign.some(securesNote),
-    secureContext: protectionMark(text, "secureContext"),
+    secureContext: protectionMark(text, "secureContext", false),
     localAi: local === false ? 0 : local === null ? 1 : 2,
-    bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => field(line, "locked") === null))],
+    bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => !namesLocked(line)))],
   };
 }
 

@@ -1,5 +1,5 @@
 {
-  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case. AI body edits rank revoked < person-written < allowed, read without the `locked` line (locked is its own flag). Rust and JavaScript trim different characters (Rust U+0085, JavaScript U+FEFF), so `secure` is named when either trim names it and off only for a value that reads `false` under both.",
+  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case. AI body edits rank revoked < person-written < allowed, read without the `locked` line (locked is its own flag). Rust and JavaScript trim different characters (Rust U+0085, JavaScript U+FEFF), so `secure` is named when either trim names it and off only for a value that reads `false` under both. A secureContext mark counts only inside a block that closes: an unclosed `---` at the top is a horizontal rule, not a taint to keep. `locked` is named by either side's trim too, and on when its value reads `true` under either.",
   "cases": [
     {
       "name": "dropping the block drops every flag",
@@ -176,6 +176,50 @@
       "loosened": [
         "locked",
         "ai_edit"
+      ]
+    },
+    {
+      "name": "an unclosed --- (a rule at the top) is no secureContext to lose",
+      "old": "---\n\nIntro after a rule\n",
+      "new": "Intro after a rule\n",
+      "loosened": []
+    },
+    {
+      "name": "an unclosed --- after blank lines is no secureContext to lose",
+      "old": "\n\n---\nIntro\n",
+      "new": "Intro\n",
+      "loosened": []
+    },
+    {
+      "name": "a closed mark block after a blank line still counts",
+      "old": "\n---\nsecureContext: true\n---\n\nwords\n",
+      "new": "\nwords\n",
+      "loosened": [
+        "secureContext"
+      ]
+    },
+    {
+      "name": "U+FEFF before the key still names locked",
+      "old": "---\n\ufefflocked: true\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "locked"
+      ]
+    },
+    {
+      "name": "locked: true then U+FEFF stays locked",
+      "old": "---\nlocked: true\ufeff\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "locked"
+      ]
+    },
+    {
+      "name": "U+0085 before the key still names locked",
+      "old": "---\n\u0085locked: true\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "locked"
       ]
     }
   ],

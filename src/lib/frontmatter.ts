@@ -122,14 +122,6 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-function flagField(fm: NoteFrontmatter, key: string): boolean {
-  return fm.foreign.some((line) => {
-    const colon = line.indexOf(":");
-    if (colon < 0) return false;
-    return line.slice(0, colon).trim() === key && line.slice(colon + 1).trim() === "true";
-  });
-}
-
 /** A foreign `secure: true` line — the note is categorically unavailable to
  * remote models. The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
@@ -160,7 +152,23 @@ export function securesNote(line: string): boolean {
   return !(value.trim() === "false" && rustTrim(value) === "false");
 }
 
+/** Does the line name `locked`, by either side's trim (Rust's locked_field)? */
+export function namesLocked(line: string): boolean {
+  const colon = line.indexOf(":");
+  if (colon < 0) return false;
+  const key = line.slice(0, colon);
+  return key.trim() === "locked" || rustTrim(key) === "locked";
+}
+
+/** A `locked:` line reading `true` under either trim: failing closed, so the
+ * Mac and the web agree on a U+FEFF or U+0085 around it (re-check of 306). */
+export function locksNote(line: string): boolean {
+  if (!namesLocked(line)) return false;
+  const value = line.slice(line.indexOf(":") + 1);
+  return value.trim() === "true" || rustTrim(value) === "true";
+}
+
 /** A foreign `locked: true` line — no AI may edit the note, every class reads it. */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "locked");
+  return fm.foreign.some(locksNote);
 }

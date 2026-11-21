@@ -260,3 +260,92 @@ fn a_tab_is_not_a_line_break_so_undo_still_works() {
     store.set_ai_field(rel, "summary", "hand\ttyped").unwrap();
     assert!(fs::read_to_string(store.abs(rel)).unwrap().contains("summary: hand\ttyped"));
 }
+
+// ── re-check of 306 at d4a22c34 (2026-11-20) ───────────────────────────────
+
+fn in_place_note(name: &str, text: &str) -> (TempDir, CorpusStore, std::path::PathBuf, String) {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("in-place");
+    fs::create_dir_all(root.join("Notes")).unwrap();
+    fs::write(root.join(format!("Notes/{name}")), text).unwrap();
+    crate::vault_roles::mark_in_place(&root).unwrap();
+    let root = fs::canonicalize(root).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    store.os_trash = false;
+    let id = super::adopted_tests::adopted_id(&mut store, &format!("Notes/{name}"));
+    (dir, store, root.join(format!("Notes/{name}")), id)
+}
+
+fn first_id(store: &mut CorpusStore) -> String {
+    store.list().unwrap().notes[0].id.clone()
+}
+
+#[test]
+fn a_person_can_save_a_note_that_opens_with_a_rule() {
+    // R1: an unclosed `---` read as a chat's secureContext, so every save
+    // of the person's own note "removed" it
+    for text in ["---\n\nIntro after a rule\n", "\n\n---\nIntro\n", "---\r\n\r\nIntro\r\n"] {
+        let (_dir, mut store, _path) = person_note(text);
+        let id = first_id(&mut store);
+        store.write(&id, &format!("{text}x")).unwrap_or_else(|e| panic!("{text:?}: {e}"));
+        store.set_field(&id, "topic", "rules").unwrap_or_else(|e| panic!("{text:?}: {e}"));
+    }
+    let (_dir, mut store, path, id) = in_place_note("Rule.md", "---\n\nIntro after a rule\n");
+    store.write(&id, "Intro after a rule\n").unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "Intro after a rule\n");
+}
+
+const MARKED: &str = "\n---\nsecureContext: true\n---\n\nwords\n";
+
+#[test]
+fn the_backstop_refuses_an_ai_write_that_drops_a_mark() {
+    // R3: a leading blank line means no frontmatter for the editor, but the
+    // mark grammar still reads this block; only the backstop sees the loss
+    let (_dir, mut store, path, id) = in_place_note("Marked.md", MARKED);
+    let revision = crate::fsutil::revision(MARKED.as_bytes());
+    let err = store
+        .write_for_ai_as(&id, "\nwords\n", true, &revision, AiWrite::ConsentedReplace)
+        .unwrap_err();
+    assert!(err.contains("secureContext"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), MARKED);
+}
+
+#[test]
+fn the_backstop_lets_the_person_edit_their_own_text() {
+    let (_dir, mut store, path, id) = in_place_note("Marked.md", MARKED);
+    store.write(&id, "\nwords\n").unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "\nwords\n");
+}
+
+fn ignore_of(store: &CorpusStore) -> String {
+    fs::read_to_string(store.root().join(".gitignore")).unwrap_or_default()
+}
+
+#[test]
+fn in_place_remove_protection_says_so_when_another_line_keeps_it() {
+    for text in [
+        "---\nsecure: true\nexample: |\n  secure: true\n---\n# S\n",
+        "---\nsecure : true\n---\n# S\n",
+        "---\n\u{feff}secure: true\n---\n# S\n",
+    ] {
+        let (_dir, mut store, path, id) = in_place_note("Secret.md", text);
+        fs::write(store.root().join(".gitignore"), "Notes/Secret.md\n").unwrap();
+        let err = store.set_secure(&id, false).unwrap_err();
+        assert!(err.contains("secure"), "{text:?}: {err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), text, "{text:?}");
+        assert_eq!(ignore_of(&store), "Notes/Secret.md\n", "{text:?}");
+    }
+}
+
+#[test]
+fn in_place_unlock_says_so_when_another_line_keeps_it() {
+    for text in [
+        "---\nlocked: true\nexample: |\n  locked: true\n---\n# L\n",
+        "---\nlocked : true\n---\n# L\n",
+    ] {
+        let (_dir, mut store, path, id) = in_place_note("Locked.md", text);
+        let err = store.set_locked(&id, false).unwrap_err();
+        assert!(err.contains("locked"), "{text:?}: {err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), text, "{text:?}");
+    }
+}

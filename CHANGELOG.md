@@ -46,9 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opened in place, an AI insert or an "Allow once" edit that starts with a
   `---` block could become the metadata of a note that had none, and let AI
   edit it from then on. Rotli now refuses that save, on the Mac as on the
-  web. On Rotli Web, Unlock and Remove protection now tell you when another
-  line in the note's metadata still keeps it locked or secure, instead of
-  reporting success and moving the note out of its secure folder.
+  web. Unlock and Remove protection now tell you when another line in the
+  note's metadata still keeps it locked or secure, instead of reporting
+  success, moving the note out of its secure folder or dropping its
+  `.gitignore` line.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

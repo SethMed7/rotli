@@ -1343,7 +1343,10 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
 /// locked-skip must read the same line the same way.
 pub(crate) fn locked_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
-    (k.trim() == "locked").then(|| v.trim() == "true")
+    // either side's trim names the key and reads `true` (the secure_field rule,
+    // failing closed to locked; re-check of 306)
+    let js_trim = crate::frontmatter_keys::js_trim;
+    (k.trim() == "locked" || js_trim(k) == "locked").then(|| v.trim() == "true" || js_trim(v) == "true")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
@@ -3204,8 +3207,10 @@ impl CorpusStore {
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            let out = self.compose_for(&text, &fm, body);
+            crate::note_protection::took(crate::note_protection::protection(&out).locked == locked, "locked")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3383,11 +3388,13 @@ impl CorpusStore {
             // 2026-10-13): no move, so no id to key one by, and no Rotli fields
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
+            let out = with_secure_line_only(&text, secure);
+            crate::note_protection::took(crate::note_protection::protection(&out).secure == secure, "secure")?;
             if secure {
                 self.gitignore_add(rel)?;
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            atomic_write(&path, &out)?;
             if !secure {
                 self.gitignore_remove(rel)?;
             }
@@ -3841,7 +3848,7 @@ impl CorpusStore {
             return Err(refusal.into());
         }
         self.writable(&rel)?;
-        self.write_resolved(id_or_rel, body, rel)
+        self.write_resolved(id_or_rel, body, rel, true)
     }
 
     pub(crate) fn write_for_ai_if_revision(
@@ -3907,7 +3914,7 @@ impl CorpusStore {
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
-            let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
+            let meta = self.write_resolved(id_or_rel, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -3951,7 +3958,7 @@ impl CorpusStore {
         } else {
             self.writable(&rel)?;
         }
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, true)
     }
 
     pub(crate) fn write_for_remote_agent_if_revision(
@@ -3981,7 +3988,7 @@ impl CorpusStore {
                 return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4707,7 +4714,7 @@ impl CorpusStore {
             .and_then(|f| f.id.clone())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| rel.clone());
-        self.write_resolved(&wire_id, &new_body, rel).map(|_| ())
+        self.write_resolved(&wire_id, &new_body, rel, false).map(|_| ())
     }
 
     /// Resolve an id through the index; on a miss (stale index, external
@@ -4827,7 +4834,7 @@ impl CorpusStore {
     pub fn write(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, false)
     }
 
     /// Human/interactive whole-body save with optimistic concurrency. The
@@ -4864,7 +4871,7 @@ impl CorpusStore {
                     crate::fsutil::compare_revision(expected_revision, &current)?;
                 }
             }
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), false)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4875,7 +4882,7 @@ impl CorpusStore {
         })
     }
 
-    fn write_resolved(&mut self, id: &str, body: &str, rel: String) -> Result<NoteMeta, String> {
+    fn write_resolved(&mut self, id: &str, body: &str, rel: String, ai: bool) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
         // an unreadable existing file must abort the save — regenerating
@@ -4964,11 +4971,14 @@ impl CorpusStore {
         // the Librarian rules: a save that gives the note a secure keyword in its
         // title or file name protects it now, not at the next metadata read
         let name_secure = !is_secure && self.secure_by_name(&title, &target_rel);
+        // an AI or agent save may only tighten; the person's own save is never
+        // refused for how protection reads (review and re-check of 305/306)
+        if ai {
+            crate::note_protection::require_not_looser(&existing, &text)?;
+        }
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
-        // every lane's save may only tighten (review of 305/306, 2026-11-20)
-        crate::note_protection::require_not_looser(&existing, &text)?;
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
         // Rewrite in place first, then use the filesystem's rename operation.

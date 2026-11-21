@@ -44,7 +44,7 @@ export function savedNoteText(
   if (asWritten) {
     if (pastedBlock)
       throw new Error(
-        "This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or edit the file outside Rotli.",
+        "This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or add metadata from Show file metadata.",
       );
     return `${original.slice(0, original.length - currentBody.length)}${body}`;
   }

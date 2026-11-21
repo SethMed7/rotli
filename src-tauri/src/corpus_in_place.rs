@@ -75,7 +75,7 @@ pub(crate) fn with_secure_line_only(text: &str, secure: bool) -> String {
 /// of 305/306, 2026-11-20). Rotli Web refuses the same save.
 pub(crate) fn in_place_text(existing: &str, old_raw: &str, had_fence: bool, body: &str) -> Result<String, String> {
     if !had_fence && parse_document(body).0.is_some() {
-        return Err("This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or edit the file outside Rotli.".into());
+        return Err("This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or add metadata from Show file metadata.".into());
     }
     let block = raw_frontmatter_block(existing);
     let separator = if !had_fence {

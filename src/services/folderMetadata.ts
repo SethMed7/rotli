@@ -3,8 +3,8 @@ import { looksSecret } from "../ai/guard";
 import {
   composeNoteDocument,
   emptyFrontmatter,
-  isLockedFrontmatter,
   isSecureFrontmatter,
+  locksNote,
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
@@ -74,8 +74,13 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
+    // the exact text to be written must read as asked before the ignore
+    // line changes (re-check of 306: `secure : true` survived)
+    const next = withSecureLineOnly(opened.contents, secure);
+    if (isSecureFrontmatter(parseNoteDocument(next).frontmatter ?? emptyFrontmatter()) !== secure)
+      throw notTaken("secure");
     if (secure) await updateGitExclusions(dir, [path]);
-    await writeVersionedFile(dir, path, withSecureLineOnly(opened.contents, secure), opened.revision);
+    await writeVersionedFile(dir, path, next, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
     return path;
   }
@@ -151,18 +156,21 @@ export async function setFolderProtection(
     }
   }
   fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
-  // another line that still decides the key (an indented one) means the
-  // setting can't take: say so rather than report it done
-  const took =
-    key === "ai_edit"
-      ? (ownedKey(fm.foreign, "ai_edit", (v) => v === "true").says === "grant") === allowed
-      : key === "locked"
-        ? isLockedFrontmatter(fm) === allowed
-        : localAiAllowedOverride(fm.foreign) === allowed;
-  if (!took) throw notTaken(key);
+
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  // the exact text to be written must read as asked: another line that still
+  // decides the key (indented, or a spelling the in-place writer leaves) means
+  // the setting can't take, so say so rather than report it done
+  const written = parseNoteDocument(text).frontmatter?.foreign ?? [];
+  const took =
+    key === "ai_edit"
+      ? (ownedKey(written, "ai_edit", (v) => v === "true").says === "grant") === allowed
+      : key === "locked"
+        ? written.some(locksNote) === allowed
+        : localAiAllowedOverride(written) === allowed;
+  if (!took) throw notTaken(key);
   await writeVersionedFile(dir, path, text, opened.revision);
 }
 
