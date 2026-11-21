@@ -7,7 +7,7 @@ use super::tests::test_workspace;
 use super::*;
 use tempfile::TempDir;
 
-fn put(root: &Path, rel: &str, text: &str) {
+pub(super) fn put(root: &Path, rel: &str, text: &str) {
     let path = root.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(&path, text).unwrap();

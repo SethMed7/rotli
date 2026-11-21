@@ -7,6 +7,7 @@
 //! in any answer or error. A tool or command the harness doesn't know fails
 //! the test, so a new one is covered the day it lands.
 
+use super::path_protection_tests::put;
 use super::tests::test_workspace;
 use super::*;
 use tempfile::TempDir;
@@ -18,12 +19,6 @@ const PROTECTED: [&str; 10] =
 const OPEN: &str = "01SURFOPEN00000000000000000";
 const AGENT_NOTE: &str = "01SURFAGENT0000000000000000";
 const BOARD: &str = "wiki/Projects/b.excalidraw";
-
-fn put(root: &Path, rel: &str, text: &str) {
-    let path = root.join(rel);
-    fs::create_dir_all(path.parent().unwrap()).unwrap();
-    fs::write(&path, text).unwrap();
-}
 
 /// A vault with a public note, board, and file beside every kind of decoy.
 fn seeded() -> TempDir {

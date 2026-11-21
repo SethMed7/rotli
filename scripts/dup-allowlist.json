@@ -290,12 +290,12 @@
     },
     {
       "id": "source-guard-idiom-no-cached-row",
-      "fingerprint": "8a38f739df4fd0904ec9401789308963f39ec3d0d4adfe126f275e449134b2df",
+      "fingerprint": "711ae7fc941c1c6e13dd9b8d1bfcc4f6c6585a232fc768e52dc1137f5a94d016",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
       "id": "source-guard-idiom-note-lock",
-      "fingerprint": "b7f899f0e59eac32d0c11f4ab738ee6cb412f60c1593b534c94698b45504eadb",
+      "fingerprint": "361650bcd6a4e7d5be523c01940937b98c71a953f227e6916f900f7367b1a9d9",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
@@ -307,6 +307,41 @@
       "id": "secure-home-listing-and-end-to-end-tests",
       "fingerprint": "776a363ac5eacc301b31eee5fa8de125579edb51ebf954b6e7d8c9140c7df55b",
       "reason": "Not a mirror: workspace_listing_tests.rs checks that the listing hides secure-home folders, and workspace_path_protection_tests.rs checks every spelling of those paths end to end; both name the same wiki/_secure fixture folders on purpose."
+    },
+    {
+      "id": "agent-surface-harness-names-0b4c68cb5a",
+      "fingerprint": "0b4c68cb5ae2a7c95f7bfcf50c0a50546290ce5fb952d384184426411e3cb693",
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "agent-surface-harness-names-3bdedd297b",
+      "fingerprint": "3bdedd297b2c501293d9dab4ef0d8aeec4f933bc0460f272fa892921cc58b2f8",
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "agent-surface-harness-names-27962c96e9",
+      "fingerprint": "27962c96e986766cf84577f719d9d8f21228e50f816c55d53b94e6e2b6db3444",
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "agent-surface-harness-names-ae3c6e1905",
+      "fingerprint": "ae3c6e1905a9417d30414823701a31146e737a8b4b0221e20d9f415ef14fcad4",
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "agent-surface-harness-names-4f0f7518b1",
+      "fingerprint": "4f0f7518b1de797bb8848b09ba1427ba645ebacbec991adeb0ad93ee4f61e002",
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "agent-surface-harness-and-focused-path-tests",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/workspace_agent_surface_tests.rs",
+        "src-tauri/src/workspace_path_protection_tests.rs",
+        "src-tauri/src/workspace_listing_tests.rs"
+      ],
+      "reason": "Not a mirror: the harness seeds one vault with every decoy the focused tests each seed one of (secure-home and keyword folders, a path-shaped id, a shelf, an origin, Main, a journal row, a locked linker), using the same fixture names on purpose so a failure in one points at the other."
     }
   ]
 }
