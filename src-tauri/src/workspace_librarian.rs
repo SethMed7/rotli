@@ -160,6 +160,17 @@ fn guide(skill: Option<&str>) -> Result<Value, String> {
     Ok(json!({ "skill": name, "markdown": text, "skills": SKILLS.iter().map(|(n, _)| *n).collect::<Vec<_>>() }))
 }
 
+/// Run `body` with this thread's Librarian server bound to `target`, as
+/// `serve` binds it at start (the agent-surface harness).
+#[cfg(test)]
+pub(super) fn with_bound<T>(target: RootTarget, body: impl FnOnce() -> T) -> T {
+    let identity = crate::containment::folder_identity(&target.path);
+    BOUND.with(|slot| *slot.borrow_mut() = Some(Bound { target, identity }));
+    let out = body();
+    BOUND.with(|slot| *slot.borrow_mut() = None);
+    out
+}
+
 /// `rotli mcp --librarian [--vault PATH]`: bind once, then serve stdio.
 pub(super) fn serve(args: &[String]) -> Result<(), String> {
     if option(args, "--root").is_some() {

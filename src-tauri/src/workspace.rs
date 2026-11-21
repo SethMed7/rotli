@@ -334,6 +334,11 @@ impl Workspace {
             }
             let mut visible_metadata = metadata;
             visible_metadata.remove("text");
+            // a frontmatter value that is a path (a shelf, an origin) is shown
+            // only when the path rule allows it (Opus re-check of #304)
+            for values in visible_metadata.values_mut() {
+                values.retain(|value| !value.contains(['/', '\\']) || self.store.agent_id_shown(value));
+            }
             let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
                 deep_link: self.deep_link_of(&wire_id, "note"),
@@ -585,6 +590,12 @@ impl Workspace {
     }
 
     fn reference_visible_to_remote(&mut self, wire_id: &str) -> bool {
+        // the id is shown as written: a path-shaped one must pass the rule
+        // itself, not only the note it resolves to (Opus re-check of #304)
+        let local = wire_id.split_once(':').map_or(wire_id, |(_, local)| local);
+        if !self.store.agent_id_shown(wire_id) || !self.store.agent_id_shown(local) {
+            return false;
+        }
         if !self.root.is_default || !wire_id.contains(':') {
             let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
                 return false;
@@ -3027,6 +3038,9 @@ mod listing_tests;
 #[cfg(test)]
 #[path = "workspace_path_protection_tests.rs"]
 mod path_protection_tests;
+#[cfg(test)]
+#[path = "workspace_agent_surface_tests.rs"]
+mod agent_surface_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -79,8 +79,9 @@ struct Keywords {
     folded: Vec<String>,
 }
 
-/// One directory's entries by stored name, each with whether it is a
-/// symlink. None when the directory isn't there.
+/// One directory's entries by stored name, each with whether it must be
+/// resolved on disk (a symlink, or an entry whose type couldn't be read:
+/// unknown is resolved, never trusted). None when the directory isn't there.
 type Entries = Option<HashMap<String, bool>>;
 
 /// What an agent store remembers while it lives (one CLI or MCP call, a
@@ -132,7 +133,7 @@ impl AgentLane {
             Ok(entries) => Some(Some(
                 entries
                     .filter_map(Result::ok)
-                    .map(|entry| (entry.file_name().to_string_lossy().into_owned(), entry.file_type().is_ok_and(|t| t.is_symlink())))
+                    .map(|entry| (entry.file_name().to_string_lossy().into_owned(), entry.file_type().map_or(true, |t| t.is_symlink())))
                     .collect(),
             )),
             Err(error) if is_absent(&error) => Some(None),
@@ -279,15 +280,19 @@ impl CorpusStore {
 
     /// A row's id may be shown: a ULID, or a path that is clean and
     /// unprotected (a hand-written id can be any text).
-    fn agent_id_shown(&self, id: &str) -> bool {
+    pub(crate) fn agent_id_shown(&self, id: &str) -> bool {
         !id.contains(['/', '\\']) || (is_clean(id) && !self.protected_path(id))
     }
 
     /// The folder a row shows: its shelf when that is a clean, unprotected
     /// path, else the folder it lives in. None (the row is refused) when the
-    /// folder it lives in is itself protected or unclean.
+    /// folder it lives in is itself protected. That folder comes from the walk,
+    /// not from an agent or from frontmatter, so it need not be "clean": a
+    /// folder named `A\B` on disk keeps its notes listed (Opus re-check of
+    /// #304, N3); `protected_path` still reads its `\` as a separator, which
+    /// only ever protects more.
     fn agent_folder(&self, folder: &str, disk_folder: &str) -> Option<String> {
-        if !is_clean(disk_folder) || self.protected_path(disk_folder) {
+        if self.protected_path(disk_folder) {
             return None;
         }
         if is_clean(folder) && !self.protected_path(folder) {

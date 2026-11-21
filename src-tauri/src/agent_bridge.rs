@@ -138,6 +138,14 @@ fn document_rel(request: &BridgeRequest) -> Result<String, String> {
     Ok(rel)
 }
 
+/// The bridge's whole gate on one document, for the agent-surface harness
+/// (which never asks the running app).
+#[cfg(test)]
+pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel: &str) -> Result<(), String> {
+    let path = document_records_gate(store, rel, false)?;
+    document_contents_gate(&path)
+}
+
 /// What a remote reader may never receive, by the vault's own records (held
 /// under the corpus lock): a document hidden from agents or named with a
 /// secure keyword, and, for an edit, one no AI made. Returns its path.

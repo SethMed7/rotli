@@ -272,7 +272,13 @@ fn every_field_an_agent_sees_is_classified() {
         let body = &corpus[start..start + corpus[start..].find("\n}").unwrap()];
         let mut fields: Vec<&str> = body
             .lines()
-            .filter_map(|line| line.trim().strip_prefix("pub ")?.split_once(':').map(|(field, _)| field.trim()))
+            // every field, whatever its visibility (`pub(crate) origin` was missed)
+            .filter_map(|line| {
+                let line = line.trim();
+                let line = line.strip_prefix("pub(crate) ").or_else(|| line.strip_prefix("pub(super) ")).or_else(|| line.strip_prefix("pub ")).unwrap_or(line);
+                let (field, _) = line.split_once(':')?;
+                field.chars().all(|c| c.is_ascii_lowercase() || c == '_').then_some(field).filter(|field| !field.is_empty())
+            })
             .collect();
         fields.sort();
         let mut known: Vec<&str> = paths.iter().chain(others.iter()).copied().collect();
@@ -298,10 +304,6 @@ fn meta(id: &str, folder: &str, disk: &str, origin: Option<&str>) -> NoteMeta {
     }
 }
 
-fn shown_paths(row: &NoteMeta) -> Vec<String> {
-    [Some(row.id.clone()), Some(row.folder_id.clone()), Some(row.disk_folder_id.clone()), row.origin.clone()].into_iter().flatten().collect()
-}
-
 #[test]
 fn no_path_field_an_agent_sees_names_a_protected_place() {
     let (_temp, store) = vault(&["Juniper"]);
@@ -314,7 +316,10 @@ fn no_path_field_an_agent_sees_names_a_protected_place() {
         ];
         for row in rows {
             if let Some(shown) = store.agent_row(row.clone()) {
-                for path in shown_paths(&shown) {
+                // the folder a note lives in comes from the walk: unprotected
+                // is enough; every other path must also be clean
+                assert!(!store.protected_path(&shown.disk_folder_id), "{secret}: {row:?}");
+                for path in [Some(shown.id.clone()), Some(shown.folder_id.clone()), shown.origin.clone()].into_iter().flatten() {
                     assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret}: {row:?} showed {path:?}");
                 }
             }
@@ -347,7 +352,8 @@ fn no_path_field_of_a_read_note_names_a_protected_place() {
         ];
         for read in docs {
             if let Ok(shown) = store.agent_doc(read) {
-                for path in [Some(shown.id), Some(shown.folder_id), Some(shown.disk_folder_id), shown.origin].into_iter().flatten() {
+                assert!(!store.protected_path(&shown.disk_folder_id), "{secret}");
+                for path in [Some(shown.id), Some(shown.folder_id), shown.origin].into_iter().flatten() {
                     assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret} showed {path:?}");
                 }
             }

@@ -182,3 +182,67 @@ fn a_note_archived_out_of_a_keyword_folder_names_no_origin() {
     let local = ws.local_id(&note.id).unwrap();
     assert_eq!(ws.read_note(&local).unwrap().note.origin, None);
 }
+
+/// Opus re-check of #304, N3: a walked folder whose name holds `\` is a real
+/// folder, not an agent's path; its notes stay listed and readable.
+#[test]
+fn a_folder_named_with_a_backslash_keeps_its_notes() {
+    let temp = vault(None);
+    put(temp.path(), "wiki/Projects/A\\B/inner.md", "---\nid: 01PATHBACKSLASH000000000000\n---\n# Inner\n\nplain words\n");
+    let mut ws = test_workspace(&temp);
+    let listed = ws.list_remote(100).unwrap();
+    assert!(listed.notes.iter().any(|row| row.title == "Inner"), "{:?}", listed.notes);
+    assert!(ws.read_note("01PATHBACKSLASH000000000000").is_ok());
+}
+
+/// Opus re-check of #304, B1: Main and named views showed a reference's id
+/// as written; a public note whose id is a secure-home path leaked through it.
+#[test]
+fn main_and_views_never_show_a_protected_path_shaped_id() {
+    let temp = vault(None);
+    put(temp.path(), "wiki/Projects/decoy.md", "---\nid: wiki/_secure/PrivateProject\n---\n# Decoy\n\nplain words\n");
+    let tree = "[{\"note\":\"wiki/_secure/PrivateProject\"},{\"note\":\"01PATHOPEN00000000000000000\"}]";
+    put(temp.path(), ".rotli/main.json", &format!("{{\"version\":1,\"tree\":{tree}}}\n"));
+    put(temp.path(), ".rotli/views.json", &format!("{{\"version\":1,\"views\":[{{\"name\":\"V\",\"tree\":{tree}}}]}}\n"));
+    let mut ws = test_workspace(&temp);
+    let main = serde_json::to_string(&ws.read_main_remote().unwrap()).unwrap();
+    let views = serde_json::to_string(&ws.read_views_remote().unwrap()).unwrap();
+    for shown in [&main, &views] {
+        assert!(!shown.contains("_secure") && shown.contains("01PATHOPEN00000000000000000"), "{shown}");
+    }
+}
+
+/// Opus re-check of #304, B2: note history showed the journal row's path
+/// (where the note was when an on-device edit landed: the secure home) and
+/// every key the row carried.
+#[test]
+fn note_history_never_shows_a_protected_path_or_unknown_keys() {
+    let temp = vault(Some("Juniper"));
+    put(temp.path(), "wiki/Projects/h.md", "---\nid: 01PATHHISTORY00000000000000\n---\n# H\n\nplain words\n");
+    let mut row = crate::corpus::ai_journal::AiEditRow::new("edit", "01PATHHISTORY00000000000000", "wiki/_secure/Bank plan.md", &crate::corpus::ai_journal::AiEditor::agent(None), "fnv1a64:0");
+    row.extra.insert("from".into(), json!("wiki/Projects/Juniper/x.md"));
+    put(temp.path(), ".rotli/ai-edit-journal.jsonl", &format!("{}\n", serde_json::to_string(&row).unwrap()));
+    let mut ws = test_workspace(&temp);
+    let history = serde_json::to_value(ws.note_history("01PATHHISTORY00000000000000", 20).unwrap()).unwrap();
+    let shown = history.to_string();
+    assert!(!shown.contains("_secure") && !shown.contains("Juniper") && !shown.contains("Bank plan"), "{shown}");
+    assert_eq!(history["entries"][0]["path"], "wiki/Projects/h.md", "{shown}");
+}
+
+/// Opus re-check of #304, S2: a move refused for a locked linker named that
+/// note's path, even when the linker is secure.
+#[test]
+fn a_locked_link_refusal_names_only_a_note_the_agent_may_read() {
+    let temp = vault(None);
+    put(temp.path(), "wiki/Projects/a.md", "---\nid: 01PATHLINKA0000000000000000\ncreated_by: agent\n---\n# A\n\nplain words\n");
+    put(temp.path(), "wiki/_secure/Diary of Juniper.md", "---\nid: 01PATHLINKS0000000000000000\nlocked: true\n---\n# Diary\n\nsee [a](../Projects/a.md)\n");
+    let mut ws = test_workspace(&temp);
+    let refused = ws.move_note("01PATHLINKA0000000000000000", "wiki/Areas").unwrap_err();
+    assert!(refused.contains("a locked note links to it") && !refused.contains("Diary") && !refused.contains("_secure"), "{refused}");
+    // a public locked linker is still named
+    put(temp.path(), "wiki/Areas/index.md", "---\nid: 01PATHLINKP0000000000000000\nlocked: true\n---\n# Index\n\nsee [a](../Projects/a.md)\n");
+    fs::remove_file(temp.path().join("wiki/_secure/Diary of Juniper.md")).unwrap();
+    let mut ws = test_workspace(&temp);
+    let refused = ws.move_note("01PATHLINKA0000000000000000", "wiki/Projects/Sub").unwrap_err();
+    assert!(refused.contains("wiki/Areas/index.md"), "{refused}");
+}
