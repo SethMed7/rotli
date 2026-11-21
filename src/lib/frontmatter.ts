@@ -7,6 +7,8 @@
 //
 // Pure: no host, no vault, no services.
 
+import { protectionMark } from "./frontmatterBlock";
+
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
 export interface NoteFrontmatter {
@@ -166,6 +168,12 @@ export function locksNote(line: string): boolean {
   if (!namesLocked(line)) return false;
   const value = line.slice(line.indexOf(":") + 1);
   return value.trim() === "true" || rustTrim(value) === "true";
+}
+
+/** A note's own secure reading: its `secure:` line, or a chat's taint mark
+ * read as Rust's native read does (lane check of 306). */
+export function secureNoteText(text: string, fm: NoteFrontmatter | null): boolean {
+  return (!!fm && isSecureFrontmatter(fm)) || protectionMark(text, "secureContext");
 }
 
 /** A foreign `locked: true` line — no AI may edit the note, every class reads it. */

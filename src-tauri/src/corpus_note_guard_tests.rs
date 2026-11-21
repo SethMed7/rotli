@@ -437,34 +437,23 @@ fn every_body_save_names_its_lane() {
     // Q4: the AI/agent saves run the backstop, the person's never. Two of
     // them can't reach it by behaviour (the remote lane refuses a person's
     // note first; a task tick can't loosen), so their lane is pinned here.
-    let source = include_str!("corpus.rs");
-    let want = [
-        ("write_for_ai", "true"),
-        ("write_for_ai_as", "true"),
-        ("write_for_remote_agent", "true"),
-        ("write_for_remote_agent_if_revision", "true"),
-        ("toggle_task", "false"),
-        ("write", "false"),
-        ("write_if_revision_with_body_base", "false"),
+    let lanes = [
+        ("write_for_ai(", true),
+        ("write_for_ai_as(", true),
+        ("write_for_remote_agent(", true),
+        ("write_for_remote_agent_if_revision(", true),
+        ("toggle_task(", false),
+        ("write(", false),
+        ("write_if_revision_with_body_base(", false),
     ];
-    let mut found = Vec::new();
-    let mut current = "";
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        for prefix in ["pub(crate) fn ", "pub fn ", "fn "] {
-            if let Some(rest) = trimmed.strip_prefix(prefix) {
-                current = rest.split(['(', '<']).next().unwrap_or("");
-            }
-        }
-        if line.contains("self.write_resolved(") {
-            let lane = if line.contains(", true)") { "true" } else if line.contains(", false)") { "false" } else { "?" };
-            found.push((current.to_string(), lane));
-        }
-    }
-    let found: Vec<(&str, &str)> = found.iter().map(|(f, l)| (f.as_str(), *l)).collect();
-    assert_eq!(found.len(), want.len(), "{found:?}");
-    for pair in want {
-        assert!(found.contains(&pair), "{pair:?} not in {found:?}");
+    let src = include_str!("corpus.rs");
+    assert_eq!(src.matches("self.write_resolved(").count(), lanes.len(), "a new body save: give it a lane here");
+    for (sig, ai) in lanes {
+        let at = src.find(&format!(" fn {sig}")).unwrap_or_else(|| panic!("{sig} is gone"));
+        let call = at + src[at..].find("self.write_resolved(").unwrap();
+        let stmt = &src[call..call + src[call..].find('\n').unwrap()];
+        let lane = if ai { "AI" } else { "person" };
+        assert!(stmt.contains(if ai { ", true)" } else { ", false)" }), "{sig} must be the {lane} lane: {stmt}");
     }
 }
 
