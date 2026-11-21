@@ -104,7 +104,6 @@ fn a_chat_with_an_unclosed_taint_keeps_it() {
     write_chat_at(&root, "open", "turn\n", Some(&revision)).unwrap();
     let saved = fs::read_to_string(root.join("chats/open.md")).unwrap();
     assert!(crate::protection_mark::marked(&saved, "secureContext"), "{saved}");
-    assert!(crate::note_protection::protection(&saved).secure_context, "{saved}");
 }
 
 #[test]

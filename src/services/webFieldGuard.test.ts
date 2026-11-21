@@ -12,8 +12,10 @@ import { corpusSetAiEdit, corpusSetLocked, corpusSetSecure } from "../lib/notePr
 import { corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
+import { createWebAiCorpus } from "./webAiCorpus";
 import { configureWebVaultIo } from "./webVaultIo";
 
+const notesFor = (dir: MemoryVaultDir) => new FolderNotesService(dir);
 const verdict = (text: string) => bodyEdit(parseNoteDocument(text).frontmatter?.foreign ?? []);
 
 async function vault(kind: "rotli" | "in place", path: string, text: string) {
@@ -171,4 +173,13 @@ test("rotli vault: a titled note retitled to an empty title stays listed, as unt
   const listed = await notes.listAll();
   expect(listed).toHaveLength(1);
   expect(await notes.filePathOf(listed[0]!.id)).toBe("wiki/untitled.md");
+});
+
+test("a web AI write can't drop a taint only the marker reader sees", async () => {
+  const text = "\n---\nsecureContext: true\n---\n\nwords\n";
+  const { dir, note } = await vault("rotli", "wiki/marked.md", text);
+  await expect(
+    createWebAiCorpus(() => notesFor(dir)).write(note.id, "words\n", note.revision),
+  ).rejects.toThrow();
+  expect(await dir.readText("wiki/marked.md")).toBe(text);
 });

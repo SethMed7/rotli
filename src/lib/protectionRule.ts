@@ -77,9 +77,10 @@ function withLine(contents: string, key: string, value: string): string {
   const block = frontmatterBlock(contents);
   if (!block) return `---\n${key}: ${value}\n---\n\n${contents}`;
   const lines = block.inner.split("\n");
-  // an indented line is block text, never the key (self-review of 306)
-  const at = lines.findIndex((line) => !/^[ \t]/.test(line) && field(line, key) !== null);
-  if (at >= 0) lines[at] = `${key}: ${value}`;
+  // every top-level `key:` line is replaced, as Rust's set_chat_line does; an
+  // indented line is block text, never the key (self-review of 306)
+  const top = (line: string) => !/^[ \t]/.test(line) && field(line, key) !== null;
+  if (lines.some(top)) lines.forEach((line, at) => top(line) && (lines[at] = `${key}: ${value}`));
   else lines.push(`${key}: ${value}`);
   return withFrontmatterBlock(contents, block, lines.join("\n"));
 }
