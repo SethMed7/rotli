@@ -161,9 +161,16 @@ fn guide(skill: Option<&str>) -> Result<Value, String> {
 }
 
 /// Run `body` with this thread's Librarian server bound to `target`, as
-/// `serve` binds it at start (the agent-surface harness).
+/// `serve` binds it at start, with the route switched on and consented to
+/// for that vault (the agent-surface harness).
 #[cfg(test)]
 pub(super) fn with_bound<T>(target: RootTarget, body: impl FnOnce() -> T) -> T {
+    let settings = target.path.join(".rotli/settings.json");
+    let mut value: Value = fs::read_to_string(&settings).ok().and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_else(|| json!({}));
+    value["librarianMcp"] = json!(true);
+    fs::create_dir_all(target.path.join(".rotli")).unwrap();
+    fs::write(&settings, value.to_string()).unwrap();
+    record_consent(&target.path, true).unwrap();
     let identity = crate::containment::folder_identity(&target.path);
     BOUND.with(|slot| *slot.borrow_mut() = Some(Bound { target, identity }));
     let out = body();

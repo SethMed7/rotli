@@ -25,7 +25,7 @@ fn seeded() -> TempDir {
     let temp = TempDir::new().unwrap();
     let root = temp.path();
     fs::write(root.join("memex.json"), "{\"id\":\"mx_agent_surface\",\"contract\":\"3.4\",\"apps\":{}}\n").unwrap();
-    put(root, ".rotli/settings.json", "{\"librarianRules\":{\"secureKeywords\":[\"Juniper\",\"Straße\"]},\"librarianMcp\":true}\n");
+    put(root, ".rotli/settings.json", "{\"librarianRules\":{\"secureKeywords\":[\"Juniper\",\"Straße\"]}}\n");
     let note = |id: &str, extra: &str, title: &str, body: &str| format!("---\nid: {id}\n{extra}---\n# {title}\n\n{body}\n");
     // public: a note, an agent-made note, a board, a file, links to each
     put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv)"));
@@ -56,7 +56,6 @@ fn seeded() -> TempDir {
     let mut row = crate::corpus::ai_journal::AiEditRow::new("edit", OPEN, "wiki/_secure/Bank plan.md", &crate::corpus::ai_journal::AiEditor::agent(None), "fnv1a64:0");
     row.extra.insert("from".into(), json!("wiki/Projects/Juniper/x.md"));
     put(root, ".rotli/ai-edit-journal.jsonl", &format!("{}\n", serde_json::to_string(&row).unwrap()));
-    super::librarian::record_consent(root, true).unwrap();
     temp
 }
 
