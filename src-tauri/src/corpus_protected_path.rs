@@ -64,9 +64,12 @@ pub(crate) fn is_clean(rel: &str) -> bool {
 /// the word `cafe`), and folded (`STRASSE` holds `Straße`).
 fn names_protected(parts: &[String], keywords: &Keywords) -> bool {
     let folded: Vec<String> = parts.iter().map(|part| fold(part)).collect();
+    // a secure home anywhere in the path, not only at its start: a trashed
+    // or archived copy (`trash/wiki/_secure/…`) is still the secure home's
+    // (final review threads on pull request 304, hold 2)
     let in_home = SECURE_HOMES.iter().any(|home| {
         let home: Vec<String> = home.split('/').map(fold).collect();
-        folded.len() >= home.len() && folded[..home.len()] == home[..]
+        folded.windows(home.len()).any(|run| run == &home[..])
     });
     let named = |name: &String, keywords: &[String]| crate::librarian_rules::secure_by_name(name, name, keywords);
     in_home || parts.iter().any(|name| named(name, &keywords.raw)) || folded.iter().any(|name| named(name, &keywords.folded))
@@ -287,15 +290,17 @@ impl CorpusStore {
     /// Text that may name a vault path (an id, a shelf, an origin, a journal
     /// path, a frontmatter value), judged as written and as YAML, a wikilink,
     /// or a wire id would read it: unquoted, unwrapped from `[[…]]` (and its
-    /// `|alias`), and after a `root:` prefix. The rule anchors a secure home
-    /// at the path's start, so a leading quote or prefix walked past it
-    /// (final check of pull request 304, B3).
+    /// `|alias`), and after every `:` (any `word:` prefix, any number of
+    /// them). A leading quote or prefix walked past the rule (final check of
+    /// pull request 304, B3, and its review threads).
     pub(crate) fn names_protected_path(&self, text: &str) -> bool {
         let bare = text.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace());
         let bare = bare.strip_prefix("[[").and_then(|inner| inner.strip_suffix("]]")).unwrap_or(bare);
         let bare = bare.split_once('|').map_or(bare, |(target, _)| target);
-        let local = bare.split_once(':').map_or(bare, |(_, rest)| rest);
-        [text, bare, local].iter().any(|candidate| self.protected_path(candidate))
+        // after any number of `word:` prefixes, not only a known root's
+        // (`evil:`, `x:y:`; final review threads on pull request 304, hold 1)
+        let tails = bare.match_indices(':').map(|(at, _)| &bare[at + 1..]);
+        [text, bare].into_iter().chain(tails).any(|candidate| self.protected_path(candidate))
     }
 
     /// The folder a row shows: its shelf when that is a clean, unprotected

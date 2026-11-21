@@ -419,8 +419,9 @@ roots carry their root-prefixed wire id in the link.
   an archived or trashed note's `origin` only when it is clean and
   unprotected. Main and view references, note history paths, query
   metadata paths, and the locked-link refusal follow the same rule, and each
-  value is judged as written, unquoted, unwrapped from `[[…]]`, and after a
-  `root:` prefix. Main and
+  value is judged as written, unquoted, unwrapped from `[[…]]`, and after
+  any `word:` prefix. A secure home matches anywhere in a path, so trashed and
+  archived copies stay protected. Main and
   view folder names are labels, not paths, and stay visible. The guard is the
   behaviour harness `workspace_agent_surface_tests.rs`: every MCP tool and CLI
   command, against one vault seeded with every decoy kind. (`docs/architecture/egress-threat-model.md`, row 16k, with its

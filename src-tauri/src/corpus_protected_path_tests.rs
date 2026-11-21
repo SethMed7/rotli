@@ -377,3 +377,49 @@ fn a_folder_row_is_judged_with_its_parents() {
     }
     assert!(store.agent_listable_folder("wiki/Projects"));
 }
+
+/// Final review threads on pull request 304, hold 1: any `word:` prefix,
+/// once or more, in front of a protected path still names it.
+#[test]
+fn a_protected_path_behind_any_prefix_is_protected() {
+    let (_temp, store) = vault(&["Juniper"]);
+    for text in ["evil:wiki/_secure/Leak", "x:y:wiki/_secure/PrivateId", "a:b:c:wiki/Projects/Juniper", "\"evil:wiki/_secure/Leak\"", "[[x:wiki/_secure/Leak|alias]]"] {
+        assert!(store.names_protected_path(text), "{text}");
+        assert!(!store.agent_id_shown(text), "{text}");
+    }
+    for text in ["https://example.com/a/b", "default:wiki/Projects/open", "a:b:wiki/Projects"] {
+        assert!(!store.names_protected_path(text), "{text}");
+    }
+}
+
+/// Hold 2: a secure home anywhere in a path, in any spelling: a trashed or
+/// archived copy is still the secure home's.
+#[test]
+fn a_secure_home_anywhere_in_the_path_is_protected() {
+    let (_temp, store) = vault(&[]);
+    for path in ["trash/wiki/_secure/Diary.md", "archive/wiki/_secure/a.md", "Trash/wiki/_secure", "Archive/wiki/_SECURE/x", "trash/wiki/_\u{17f}ecure/x", "wiki/Projects/Secure notes/x"] {
+        assert!(store.protected_path(path), "{path}");
+    }
+    for path in ["trash/wiki/Projects/x.md", "wiki/secure/x", "wiki/_securely/x"] {
+        assert!(!store.protected_path(path), "{path}");
+    }
+}
+
+/// The person's own lifecycle moves never ask the agent rule: a secure note
+/// trashed by path is restored and read as before; only an agent's store
+/// treats the copy as protected.
+#[test]
+fn the_persons_restore_from_trash_is_unaffected() {
+    let (temp, _) = vault(&[]);
+    fs::write(temp.path().join("memex.json"), "{\"id\":\"mx_protected_path\",\"contract\":\"3.4\",\"apps\":{}}\n").unwrap();
+    fs::create_dir_all(temp.path().join("trash/wiki/_secure")).unwrap();
+    fs::write(temp.path().join("trash/wiki/_secure/kept.md"), "---\nid: 01PATHKEPT00000000000000000\n---\n# Kept\n\nbody\n").unwrap();
+    let mut person = CorpusStore::open(temp.path().to_path_buf()).unwrap();
+    person.list().unwrap();
+    assert!(person.read("01PATHKEPT00000000000000000").unwrap().body.contains("body"));
+    let restored = person.move_note("01PATHKEPT00000000000000000", "wiki/_secure").unwrap();
+    assert_eq!(restored.disk_folder_id, "wiki/_secure");
+    let mut agent = CorpusStore::open(temp.path().to_path_buf()).unwrap();
+    agent.set_agent_lane();
+    assert!(agent.protected_path("trash/wiki/_secure/kept.md"));
+}

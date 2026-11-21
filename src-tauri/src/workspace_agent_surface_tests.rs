@@ -69,6 +69,17 @@ fn seeded() -> TempDir {
     put(root, "wiki/Projects/qdecoy.md", &note("\"wiki/_secure/PrivateProject/q\"", "", "Quoted decoy", "plain words"));
     put(root, "wiki/Projects/pdecoy.md", &note("default:wiki/_secure/PrivateProject/p", "", "Prefixed decoy", "plain words"));
     put(root, "wiki/Projects/bdecoy.md", &note("wiki\\_secure\\PrivateProject", "", "Backslash decoy", "plain words"));
+    // any `word:` prefix, once or more (final review threads on #304, hold 1)
+    put(root, "wiki/Projects/edecoy.md", &note("evil:wiki/_secure/PrivateProject/e", "", "Evil decoy", "plain words"));
+    put(root, "wiki/Projects/xydecoy.md", &note("x:y:wiki/_secure/PrivateProject/xy", "", "Double decoy", "plain words"));
+    put(root, "wiki/Projects/eshelved.md", &note("01SURFSHELFE00000000000000", "shelf: [evil:wiki/_secure/DirectExample]\n", "Evil shelf", "plain words"));
+    put(root, "archive/gone4.md", &note("01SURFGONE40000000000000000", "origin: x:y:wiki/_secure/OldHome\n", "Gone four", "plain words"));
+    // trashed and archived copies of the secure home (hold 2): a note, a
+    // board, and a locked linker of the agent's note
+    put(root, "trash/wiki/_secure/trashed plan.md", &note("01SURFTRASHED00000000000000", "", "Hidden note five", "plain words classified"));
+    put(root, "trash/wiki/_secure/b.excalidraw", "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[]}");
+    put(root, "archive/wiki/_secure/archived plan.md", &note("01SURFARCHIVED0000000000000", "", "Hidden note six", "plain words classified"));
+    put(root, "trash/wiki/_secure/Diary.md", &note("01SURFTDIARY000000000000000", "locked: true\n", "Diary two", "see [a](../../../wiki/Projects/a.md)"));
     put(root, "wiki/Projects/shelved.md", &note("01SURFSHELF000000000000000", "shelf: [wiki/_secure/DirectExample]\n", "Shelved", "plain words"));
     put(root, "wiki/Projects/qshelved.md", &note("01SURFSHELFQ00000000000000", "shelf: \"wiki/_secure/DirectExample\"\n", "Quoted shelf", "plain words"));
     put(root, "wiki/Projects/lshelved.md", &note("01SURFSHELFL00000000000000", "shelf: [\"wiki/_secure/DirectExample\"]\n", "Listed shelf", "plain words"));
