@@ -31,25 +31,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `locked: true # my note` or `meta: {locked: true}` left the note open to AI
   edits, and `"secure": true` let remote models read it. Now `locked` and
   `secure` count in any spelling: indented, quoted, after `- ` or `? `, after a
-  tag such as `!!str`, inside `{…}`, or with escapes in a quoted key. Any value
-  except exactly `false` turns them on, including an empty value, `yes`, `on`,
-  `no`, `'false'` and `false # comment`. Rotli Web now reads `secure` the same
-  way as the desktop app.
+  tag such as `!!str` or an anchor such as `&a`, inside `{…}`, or with escapes
+  in a quoted key. They are on unless the value says off: `false`, `no` or
+  `off` in any case, quoted or not, with or without a `# comment`. Anything
+  else, including an empty value, `yes`, `on`, `~` or `null`, turns them on.
+  Rotli Web now reads `secure` the same way as the desktop app.
+- **Prose that mentions a flag stays prose.** A `description: |` (or `>`)
+  block whose text says `locked: true` or `secure: yes` no longer locks the
+  note or hides it from AI, on the desktop or in Rotli Web.
 - **AI edit and on-device permissions deny in every spelling too.** A quoted,
-  flow-map, tagged or escaped `ai_edit` or `local_ai_allowed` that says
-  anything but `true` now denies, as an indented one already did. A
+  flow-map, tagged, anchored or escaped `ai_edit` or `local_ai_allowed` that
+  says anything but `true` now denies, as an indented one already did. A
   `created_by` spelled that way that doesn't name `chat`, `agent` or
   `librarian` makes the note person-written. A grant continued onto an
   indented line (`ai_edit: true`, then `  until friday`) no longer grants,
   because it no longer reads `true`.
-- **Odd line breaks can't hide a flag.** A lone carriage return, U+0085,
-  U+2028 or U+2029 inside a metadata line used to let `x: 1`, then a hidden
-  `secure: true`, read as an ordinary note. These now split the line. A broken
-  line never grants AI access, and an `id:` or `pinned:` line can't carry a
-  flag past the readers.
-- **Unlock and "remove secure" tell you when they can't.** If a lock or
-  secure flag is spelled where the switch can't remove it (for example inside
-  another key's `{…}`), the switch now names the line to delete instead of
+- **Odd line breaks and Rotli's own fields can't hide a flag.** A lone
+  carriage return, U+0085, U+2028 or U+2029 inside a metadata line used to let
+  `x: 1`, then a hidden `secure: true`, read as an ordinary note. These now
+  split the line, and a broken line never grants AI access. An `id:`,
+  `created:`, `updated:`, `pinned:` or `origin:` line that carries a flag
+  (`pinned: {secure: true}`) is now read for it.
+- **Unlock and "remove secure" never leave broken metadata, and tell you when
+  they can't.** They remove a lock or secure line only when it stands alone
+  at the top level. When the flag is spelled where removing it could break
+  the note's metadata (an explicit `? locked` key, a list item, inside
+  another key's `{…}`), the switch names the line to delete instead of
   reporting success while the note stays protected.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your

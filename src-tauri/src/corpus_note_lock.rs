@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use super::{locked_field, parse_document, CorpusStore};
+use super::{locked_on, parse_document, CorpusStore};
 
 /// Who a note mutation acts for. Every note lock names one (`lock_note`), and
 /// its policy is checked inside the lock, right before the change: a check
@@ -39,7 +39,7 @@ impl CorpusStore {
     pub(super) fn ai_may_change(&mut self, rel: &str, model_is_local: bool) -> Result<(), String> {
         let text = self.read_for_ai(rel, model_is_local)?;
         let fm = parse_document(&text).0.unwrap_or_default();
-        if fm.foreign.iter().any(|line| locked_field(line) == Some(true)) {
+        if locked_on(&fm.foreign) {
             return Err("note is locked — AI may not change it".into());
         }
         Ok(())

@@ -9,7 +9,7 @@ import {
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { frontmatterField } from "../lib/frontmatterKeys";
-import { lineFlag } from "../lib/frontmatterLines";
+import { flagLine, withoutFlag } from "../lib/frontmatterLines";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
@@ -43,12 +43,21 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
  * another key, a key on a line a lone CR breaks, or (in a folder opened in
  * place) a spelling other than Rotli's (Rust `refuse_if_still_on`). */
 function refuseIfStillOn(text: string, key: "locked" | "secure"): void {
-  const line = (parseNoteDocument(text).frontmatter?.foreign ?? []).find((l) => lineFlag(l, key) === true);
+  const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
+  const line = foreign[flagLine(foreign, key)];
   if (line !== undefined)
     throw new Error(
       `This note still turns ${key} on in a line the switch can't change (${line.trim()}). Remove that line in the note's metadata, then try again.`,
     );
 }
+
+/** `locked`/`secure` set to `value` (null clears it): an off-switch removes
+ * only the top-level single-line spellings, so the frontmatter stays YAML
+ * (frontmatterLines.ts `withoutFlag`); anything left refuses. */
+const withFlag = (fm: NoteFrontmatter, key: "locked" | "secure", value: string | null): NoteFrontmatter => ({
+  ...fm,
+  foreign: [...withoutFlag(fm.foreign, key), ...(value === null ? [] : [`${key}: ${value}`])],
+});
 
 function assertSecureRemoval(body: string): void {
   if (looksSecret(body))
@@ -75,13 +84,13 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     return path;
   }
   if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
-  if (!secure) refuseIfStillOn(composeNoteDocument(withField(fm, "secure", null), body), "secure");
+  if (!secure) refuseIfStillOn(composeNoteDocument(withFlag(fm, "secure", null), body), "secure");
   const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
   const current = parentPath(path);
   const inHome = current === home || current.startsWith(`${home}/`);
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
-    fm = withField(fm, "secure", "true");
+    fm = withFlag(fm, "secure", "true");
     await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
   }
@@ -112,9 +121,8 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (!secure) {
     const final = await readVersionedFile(dir, target);
     const parsed = parseNoteDocument(final.contents);
-    let cleared = parsed.frontmatter ?? emptyFrontmatter();
-    for (const key of ["secure", "local_ai_allowed", "secure_origin"])
-      cleared = withField(cleared, key, null);
+    let cleared = withFlag(parsed.frontmatter ?? emptyFrontmatter(), "secure", null);
+    for (const key of ["local_ai_allowed", "secure_origin"]) cleared = withField(cleared, key, null);
     await writeVersionedFile(dir, target, composeNoteDocument(cleared, parsed.body), final.revision);
     await updateGitExclusions(dir, [], [target]);
   }
@@ -142,11 +150,11 @@ export async function setFolderProtection(
     if (!isSecureFrontmatter(fm) && !looksSecret(body))
       throw new Error("Local AI access is only meaningful for a secure note");
     if (!isSecureFrontmatter(fm)) {
-      fm = withField(fm, "secure", "true");
+      fm = withFlag(fm, "secure", "true");
       await updateGitExclusions(dir, [path]);
     }
   }
-  fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
+  fm = key === "locked" ? withFlag(fm, key, allowed ? "true" : null) : withField(fm, key, String(allowed));
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);

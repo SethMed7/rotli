@@ -7,7 +7,7 @@
 //
 // Pure: no host, no vault, no services.
 
-import { lockedOn, secureOn, segments } from "./frontmatterLines";
+import { BlockText, lockedOn, namesPermissionKey, secureOn, segments } from "./frontmatterLines";
 
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
@@ -38,14 +38,22 @@ function rustLines(head: string): string[] {
 
 function parseFields(head: string): NoteFrontmatter {
   const fm = emptyFrontmatter();
-  for (const line of rustLines(head)) {
+  const lines = rustLines(head);
+  const block = new BlockText();
+  lines.forEach((line, at) => {
     // Rust splits on the FIRST ':' and matches the key UNTRIMMED, so " id: x"
     // and "id : x" are foreign lines. Only the value is trimmed.
     const colon = line.indexOf(":");
-    // a line a lone CR, U+0085, U+2028 or U+2029 breaks is never an owned
-    // fact: `pinned: false` + CR + `secure: true` stays foreign, where the
-    // permission readers see its `secure` (frontmatterLines.ts, rule 4)
-    const key = colon < 0 || !segments(line).whole ? null : line.slice(0, colon);
+    // never an owned fact, so the permission readers see it
+    // (frontmatterLines.ts): a broken line, one naming a permission key, or
+    // one ending an open block scalar before a deeper line (taking it out
+    // would glue that line into the block)
+    const owned =
+      colon >= 0 &&
+      segments(line).whole &&
+      !namesPermissionKey(line) &&
+      !block.continues(lines.slice(at + 1));
+    const key = owned ? line.slice(0, colon) : null;
     const value = colon < 0 ? "" : line.slice(colon + 1).trim();
     // First occurrence wins; a second `id:` line falls through to foreign.
     if (key === "id" && fm.id === null) fm.id = value;
@@ -54,8 +62,11 @@ function parseFields(head: string): NoteFrontmatter {
     else if (key === "pinned" && fm.pinned === null) fm.pinned = value === "true";
     // an empty value (`origin:`) stays "" — distinct from absent
     else if (key === "origin" && fm.origin === null) fm.origin = value;
-    else fm.foreign.push(line);
-  }
+    else {
+      block.feedLine(line);
+      fm.foreign.push(line);
+    }
+  });
   return fm;
 }
 

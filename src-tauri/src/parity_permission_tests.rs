@@ -7,24 +7,26 @@
 use super::entry;
 
 /// A note's permissions as four characters, the harness's verdict: body edit
-/// (a/p/r/l), on-device (t/u/f), locked (1/0), secure (1/0).
+/// (a/p/r/l), on-device (t/u/f), locked (1/0), secure (1/0). The lines go
+/// through the app's own note parse first, as a file on disk does, so a
+/// typed fact (`id:`, `pinned:` …) is read the way the app reads it.
 pub(crate) fn permission_verdict(fields: &[String]) -> String {
     use crate::ai_edit_policy::{body_edit, BodyEdit};
-    let body = match body_edit(fields) {
+    let document = format!("---\n{}\n---\n", fields.join("\n"));
+    let foreign = crate::corpus::parse_document(&document).0.unwrap_or_default().foreign;
+    let body = match body_edit(&foreign) {
         BodyEdit::Allowed => 'a',
         BodyEdit::PersonWritten => 'p',
         BodyEdit::Revoked => 'r',
         BodyEdit::Locked => 'l',
     };
-    let local = match crate::frontmatter_keys::local_ai_allowed(fields) {
+    let local = match crate::frontmatter_keys::local_ai_allowed(&foreign) {
         Some(true) => 't',
         Some(false) => 'f',
         None => 'u',
     };
     let flag = |on: bool| if on { '1' } else { '0' };
-    let locked = fields.iter().any(|line| crate::corpus::locked_field(line) == Some(true));
-    let secure = fields.iter().any(|line| crate::corpus::secure_field(line) == Some(true));
-    [body, local, flag(locked), flag(secure)].iter().collect()
+    [body, local, flag(crate::corpus::locked_on(&foreign)), flag(crate::corpus::secure_on(&foreign))].iter().collect()
 }
 
 #[test]

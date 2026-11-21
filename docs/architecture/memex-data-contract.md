@@ -803,7 +803,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   (`wiki/_secure/`), not a database or opaque vault. The underscore excludes it
   from normal organizer areas while the sidebar exposes it deliberately.
   Protection is also stored on each Markdown file as `secure: true`. Any
-  spelling of `secure` whose value isn't exactly `false` counts (the line rules
+  spelling of `secure` whose value doesn't say off counts (the line rules
   in [agent-workspace.md](agent-workspace.md), "Permission keys are read by
   line rules").
   AI reads classify the physical secure home even when a plain text file there
@@ -901,7 +901,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   chat file) and only reads the person's note. A memory note from before
   provenance existed is treated the same way; Rotli never claims one.
 - **`locked: true` refuses every AI edit** (any spelling of `locked` whose
-  value isn't exactly `false`, by the same line rules) — interactive chat (`update_note`),
+  value doesn't say off, by the same line rules) — interactive chat (`update_note`),
   the per-turn chat-memory sync, the headless workspace agents, and the
   organizer. Both layers enforce it: TypeScript fails fast and Rust refuses
   again inside `corpus_write_ai`. A locked note stays fully READABLE by every

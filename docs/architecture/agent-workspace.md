@@ -305,15 +305,18 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
   `secure`, and the keys only Rust writes (`created_by`, `ai_edit`,
   `local_ai_allowed`) are read off the frontmatter lines with no YAML parser,
   by `frontmatter_lines.rs` (TypeScript twin: `frontmatterLines.ts`).
-  `corpus.rs` `locked_field`/`secure_field`, `frontmatter_keys.rs`
-  `owned_key`, `aiEditPolicy.ts`, `isLockedFrontmatter` and
-  `isSecureFrontmatter` all go through it. A key counts in any line spelling:
-  indented, after `- ` or `? `, single- or double-quoted, after a tag such as
-  `!!str`, as a `{…}` flow entry (`meta: {locked: true}`), or as a quoted key
-  with escapes (`"\u006cocked"`). The rules:
-  1. `locked` and `secure` are on when any spelling holds a value other than
-     exactly `false`: empty, `yes`, `True`, `"true"`, `no`, `'false'` and
-     `false # comment` all turn them on.
+  `corpus.rs` `locked_on`/`secure_on`, `frontmatter_keys.rs` `owned_key`,
+  `aiEditPolicy.ts`, `isLockedFrontmatter` and `isSecureFrontmatter` all go
+  through it. A key counts in any line spelling: indented, after `- ` or
+  `? `, single- or double-quoted, after a tag such as `!!str` or an anchor
+  such as `&a` (in either order), as a `{…}` flow entry (`meta: {locked:
+  true}`, `<<: {&a secure: true}`), or as a quoted key with escapes
+  (`"\u006cocked"`). The rules:
+  1. `locked` and `secure` are on when any spelling holds a value that
+     doesn't say off. Off is `false`, `no` or `off` in any case, optionally
+     in single or double quotes, optionally followed by a `# comment`.
+     Everything else turns them on: empty, `yes`, `True`, `"true"`, `~`,
+     `null`, `0`.
   2. Any spelling of `ai_edit` or `local_ai_allowed` whose value isn't
      exactly `true` denies, and any spelling of `created_by` that doesn't
      name `chat`, `agent` or `librarian` makes the note person-written.
@@ -323,21 +326,36 @@ It is the opt-in, much smaller surface for keeping a vault organised; the full
      `? `/`: ` line at the margin doesn't change the grant.
   4. A lone CR, U+0085, U+2028 and U+2029 split a line. A broken line is read
      piece by piece and also whole, never grants, and denies any key only
-     Rust writes it names. A typed key (`id`, `pinned`, …) on a broken line
-     is kept as a foreign line, so it can't hide a flag behind it.
+     Rust writes it names.
+  Text inside a block scalar is text, as YAML reads it: after a `key: |` or
+  `key: >` header (with chomping or indent indicators such as `|-` or `>2`,
+  but no trailing comment), every blank or deeper line names no key. A header
+  with a trailing comment isn't treated as one, which can only tighten.
+  The note parse keeps an `id:`, `created:`, `updated:`, `pinned:` or
+  `origin:` line as a foreign line, where these readers see it, when the line
+  is broken, names a permission key (`pinned: {secure: true}`), or ends an
+  open block scalar just before a deeper line (taking it out would glue that
+  line into the block).
   Only Rotli's own unbroken spelling grants: `ai_edit: true`, `created_by:
   agent|chat|librarian` or `local_ai_allowed: true` at the start of a line.
   The raw metadata editor keeps a typed line as the person wrote it. The
-  person's off-switches clear every block spelling of their key in a Rotli
-  vault (in a folder opened in place, Rust clears only Rotli's own spelling),
-  and when a spelling they can't reach still holds the flag on (a flow entry
-  inside another key, a broken line), they refuse with the line to remove
-  instead of reporting success. Parity: `permissionLineCases`,
+  person's off-switches remove only top-level single-line spellings of their
+  key: at the start of the line with no `- `, `? `, tag or anchor (quoted or
+  `key :` is fine), unbroken, with the value on that line and nothing deeper
+  after it. In a folder opened in place, Rust removes only Rotli's own
+  spelling. When a spelling a switch can't remove still holds the flag on (an
+  explicit `? locked` key, a list item, a flow entry inside another key, a
+  broken line), it refuses and names the line instead of reporting success
+  or leaving frontmatter YAML can't read. Parity: `permissionLineCases`,
   `aiBodyEditCases`, `localAiAllowedCases`, and the seeded differential
   harness `scripts/permission-differential.ts` (7,386 cases in `bun run
-  check`; `--large` builds about 123,000) that TypeScript and Rust must read
-  identically, scored against an independent line oracle. A source test
-  fails on a new Rust reader that doesn't use the shared module. Rust's note selectors compare titles and aliases through
+  check`; `--large` builds about 123,000). TypeScript and Rust must read
+  every case identically through the app's own note parse, and the harness
+  scores them against an independent line oracle. Residuals, all adversarial
+  (no tool writes them): an alias used as a key (`*k : true`), an explicit
+  key whose name is on the next line (`?` then `  secure`), and a
+  block-scalar key are not read. A source test fails on a new Rust reader
+  that doesn't use the shared module. Rust's note selectors compare titles and aliases through
   `corpus_links.rs` `link_key`, which trims JavaScript's whitespace set
   (U+FEFF included) and is parity-pinned to `wikilink.ts` `linkKey`.
 - **Proposals:** `librarian_file` and `librarian_link` append to
