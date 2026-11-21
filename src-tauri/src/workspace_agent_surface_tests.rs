@@ -68,6 +68,7 @@ fn seeded() -> TempDir {
     put(root, "wiki/Projects/decoy.md", &note("wiki/_secure/PrivateProject", "", "Decoy", "plain words"));
     put(root, "wiki/Projects/qdecoy.md", &note("\"wiki/_secure/PrivateProject/q\"", "", "Quoted decoy", "plain words"));
     put(root, "wiki/Projects/pdecoy.md", &note("default:wiki/_secure/PrivateProject/p", "", "Prefixed decoy", "plain words"));
+    put(root, "wiki/Projects/bdecoy.md", &note("wiki\\_secure\\PrivateProject", "", "Backslash decoy", "plain words"));
     put(root, "wiki/Projects/shelved.md", &note("01SURFSHELF000000000000000", "shelf: [wiki/_secure/DirectExample]\n", "Shelved", "plain words"));
     put(root, "wiki/Projects/qshelved.md", &note("01SURFSHELFQ00000000000000", "shelf: \"wiki/_secure/DirectExample\"\n", "Quoted shelf", "plain words"));
     put(root, "wiki/Projects/lshelved.md", &note("01SURFSHELFL00000000000000", "shelf: [\"wiki/_secure/DirectExample\"]\n", "Listed shelf", "plain words"));
@@ -165,7 +166,7 @@ fn workspace_cases(name: &str, temp: &TempDir) -> Option<Vec<(Value, Expect)>> {
         "rotli_metrics" => one(json!({}), Shows("visibleNotes")),
         "rotli_list" => one(json!({"limit": 500}), Shows(OPEN)),
         "rotli_search" => one(json!({"query": "plain"}), Shows(OPEN)),
-        "rotli_query" => one(json!({"query": "title:~\"e\""}), Shows(OPEN)),
+        "rotli_query" => one(json!({"query": "title:~\"e\""}), Shows("https://example.com/a/b")),
         "rotli_read_note" => one(json!({"id": OPEN}), Shows(OPEN)),
         "rotli_create_note" => one(json!({"title": "New", "body": "plain words"}), Shows("New")),
         "rotli_update_note" => one(json!({"id": AGENT_NOTE, "body": "plain words, again", "expectedRevision": revision(temp, AGENT_NOTE)}), Shows("again")),
@@ -351,7 +352,7 @@ fn cli_case(command: &str, temp: &TempDir) -> Option<Option<(Vec<String>, Expect
         "agent doctor" => (plain("agent doctor"), Shows("metrics")),
         "rename" => (words(&["rename", AGENT_NOTE, "Renamed"]), Shows("Renamed")),
         "notes search" => (words(&["notes", "search", "plain"]), Shows(OPEN)),
-        "notes query" => (words(&["notes", "query", "title:~\"e\""]), Shows(OPEN)),
+        "notes query" => (words(&["notes", "query", "title:~\"e\""]), Shows("https://example.com/a/b")),
         "notes read" => (words(&["notes", "read", OPEN]), Shows(OPEN)),
         "notes create" => (words(&["notes", "create", "--title", "New", "--body", "plain"]), Shows("New")),
         "notes update" => (words(&["notes", "update", AGENT_NOTE, "--revision", &agent_rev(), "--body", "plain words, again"]), Shows("again")),
