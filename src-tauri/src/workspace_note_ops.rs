@@ -163,7 +163,7 @@ impl Workspace {
                 // path rule allows it, else where it is now; keys this build
                 // doesn't know are dropped (Opus re-check of #304: an on-device
                 // edit of a secure note journals its secure path)
-                if !crate::corpus::protected_path::is_clean(&row.path) || self.store.protected_path(&row.path) {
+                if !crate::corpus::protected_path::is_clean(&row.path) || self.store.names_protected_path(&row.path) {
                     row.path = here.clone();
                 }
                 row.extra.clear();

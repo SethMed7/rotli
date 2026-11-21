@@ -281,7 +281,21 @@ impl CorpusStore {
     /// A row's id may be shown: a ULID, or a path that is clean and
     /// unprotected (a hand-written id can be any text).
     pub(crate) fn agent_id_shown(&self, id: &str) -> bool {
-        !id.contains(['/', '\\']) || (is_clean(id) && !self.protected_path(id))
+        !id.contains(['/', '\\']) || (is_clean(id) && !self.names_protected_path(id))
+    }
+
+    /// Text that may name a vault path (an id, a shelf, an origin, a journal
+    /// path, a frontmatter value), judged as written and as YAML, a wikilink,
+    /// or a wire id would read it: unquoted, unwrapped from `[[…]]` (and its
+    /// `|alias`), and after a `root:` prefix. The rule anchors a secure home
+    /// at the path's start, so a leading quote or prefix walked past it
+    /// (final check of pull request 304, B3).
+    pub(crate) fn names_protected_path(&self, text: &str) -> bool {
+        let bare = text.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace());
+        let bare = bare.strip_prefix("[[").and_then(|inner| inner.strip_suffix("]]")).unwrap_or(bare);
+        let bare = bare.split_once('|').map_or(bare, |(target, _)| target);
+        let local = bare.split_once(':').map_or(bare, |(_, rest)| rest);
+        [text, bare, local].iter().any(|candidate| self.protected_path(candidate))
     }
 
     /// The folder a row shows: its shelf when that is a clean, unprotected
@@ -295,7 +309,7 @@ impl CorpusStore {
         if self.protected_path(disk_folder) {
             return None;
         }
-        if is_clean(folder) && !self.protected_path(folder) {
+        if is_clean(folder) && !self.names_protected_path(folder) {
             return Some(folder.to_string());
         }
         Some(disk_folder.to_string())
@@ -305,7 +319,7 @@ impl CorpusStore {
     /// writes it on the move): shown only when it is a clean, unprotected
     /// path (Opus review of pull request 304).
     fn agent_origin(&self, origin: Option<String>) -> Option<String> {
-        origin.filter(|origin| is_clean(origin) && !self.protected_path(origin))
+        origin.filter(|origin| is_clean(origin) && !self.names_protected_path(origin))
     }
 }
 

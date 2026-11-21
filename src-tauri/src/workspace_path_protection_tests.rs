@@ -246,3 +246,18 @@ fn a_locked_link_refusal_names_only_a_note_the_agent_may_read() {
     let refused = ws.move_note("01PATHLINKA0000000000000000", "wiki/Projects/Sub").unwrap_err();
     assert!(refused.contains("wiki/Areas/index.md"), "{refused}");
 }
+
+/// Final check of #304, S4: the metadata filter hid every URL and `./`
+/// path; only values naming a protected path are hidden.
+#[test]
+fn query_metadata_keeps_urls_and_relative_paths() {
+    let temp = vault(None);
+    put(temp.path(), "wiki/Projects/m.md", "---\nid: 01PATHMETA00000000000000000\nsource: https://example.com/a/b\nurl: \"https://example.com/x\"\nrelated: ./notes/x.md\nhidden: \"[[wiki/_secure/Bank plan]]\"\n---\n# M\n\nplain words\n");
+    let mut ws = test_workspace(&temp);
+    let rows = ws.query_remote(r#"title:~"M""#, 10).unwrap();
+    let metadata = &rows.notes.iter().find(|row| row.title == "M").unwrap().metadata;
+    assert_eq!(metadata["source"], vec!["https://example.com/a/b".to_string()]);
+    assert_eq!(metadata["url"].len(), 1, "{metadata:?}");
+    assert_eq!(metadata["related"], vec!["./notes/x.md".to_string()]);
+    assert!(metadata["hidden"].is_empty(), "{metadata:?}");
+}

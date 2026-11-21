@@ -334,10 +334,11 @@ impl Workspace {
             }
             let mut visible_metadata = metadata;
             visible_metadata.remove("text");
-            // a frontmatter value that is a path (a shelf, an origin) is shown
-            // only when the path rule allows it (Opus re-check of #304)
+            // a frontmatter value that names a protected path (a shelf, an
+            // origin, a wikilink), in any quoting or prefix, is not shown;
+            // URLs and other values are (final check of #304, B3 and S4)
             for values in visible_metadata.values_mut() {
-                values.retain(|value| !value.contains(['/', '\\']) || self.store.agent_id_shown(value));
+                values.retain(|value| !value.contains(['/', '\\']) || !self.store.names_protected_path(value));
             }
             let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
