@@ -222,8 +222,8 @@ second user-visible product or storage location.
   and a Librarian mark escapes them inside its JSON. A quoted spelling of a
   key Rust owns (`"ai_edit"`) is refused by the field editor like the plain
   one, and both setters run the tighten-only rule on what they write. A
-  setter never deletes or rewrites an indented line (a block scalar's text or
-  a nested map). "Let AI edit", the local-AI toggle, Unlock and Remove
+  setter, Lock, Unlock and Remove protection among them, never deletes or
+  rewrites an indented line (a block scalar's text or a nested map). "Let AI edit", the local-AI toggle, Unlock and Remove
   protection check the exact text they would write, on the Mac and on Rotli
   Web, in both vault kinds: when another line still decides the key (an
   indented one, `secure : true`, a U+FEFF before the key) they write

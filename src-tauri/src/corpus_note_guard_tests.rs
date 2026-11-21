@@ -349,3 +349,30 @@ fn in_place_unlock_says_so_when_another_line_keeps_it() {
         assert_eq!(fs::read_to_string(&path).unwrap(), text, "{text:?}");
     }
 }
+
+#[test]
+fn rotli_vault_unlock_and_remove_protection_never_touch_block_text() {
+    // self-review of 306 at d4a22c34: these two still deleted an indented
+    // `locked:` / `secure:` inside a block scalar
+    let locked = "---\nid: 01JFIELDGUARD0000000000000\nlocked: true\nexample: |\n  locked: true\n---\n\n# L\n";
+    let (_dir, mut store, path) = person_note(locked);
+    let err = store.set_locked(PERSON_ID, false).unwrap_err();
+    assert!(err.contains("locked"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), locked);
+
+    let secure = "---\nid: 01JFIELDGUARD0000000000000\nsecure: true\nexample: |\n  secure: true\n---\n\n# S\n";
+    let (_dir, mut store, path) = person_note(secure);
+    fs::write(store.root().join(".gitignore"), "field-guard.md\n").unwrap();
+    let err = store.set_secure(PERSON_ID, false).unwrap_err();
+    assert!(err.contains("secure"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), secure);
+    assert_eq!(ignore_of(&store), "field-guard.md\n");
+
+    // locking keeps the block's own text
+    let block = "---\nid: 01JFIELDGUARD0000000000000\nexample: |\n  locked: false\n---\n\n# B\n";
+    let (_dir, mut store, path) = person_note(block);
+    store.set_locked(PERSON_ID, true).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(saved.contains("example: |\n  locked: false\n"), "{saved}");
+    assert!(crate::note_protection::protection(&saved).locked, "{saved}");
+}

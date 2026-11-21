@@ -3203,7 +3203,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| locked_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || locked_field(l).is_none());
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
@@ -3422,7 +3422,7 @@ impl CorpusStore {
             {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
-            fm.foreign.retain(|line| secure_field(line).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || secure_field(l).is_none());
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
@@ -3438,6 +3438,12 @@ impl CorpusStore {
         // Move while the secure flag + ignore are still active; only then drop
         // protection at the destination. A failed move therefore never exposes
         // the file at an unignored path.
+        // un-securing takes before anything moves; setters never touch an indented line
+        let cleared = |fm: &mut Frontmatter| fm.foreign.retain(|l| !crate::note_protection::top_level(l)
+            || (secure_field(l).is_none() && local_ai_allowed_field(l).is_none() && secure_origin_field(l).is_none()));
+        let mut check = fm.clone();
+        cleared(&mut check);
+        crate::note_protection::took(!crate::note_protection::protection(&compose_document(&check, body)).secure, "secure")?;
         let restore_home = fm
             .foreign
             .iter()
@@ -3454,11 +3460,7 @@ impl CorpusStore {
         let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
-        final_fm.foreign.retain(|line| {
-            secure_field(line).is_none()
-                && local_ai_allowed_field(line).is_none()
-                && secure_origin_field(line).is_none()
-        });
+        cleared(&mut final_fm);
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
