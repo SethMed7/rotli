@@ -643,6 +643,315 @@
         }
       ]
     },
+    "permissionLineCases": {
+      "sourceOfTruth": "behavioral: src-tauri/src/frontmatter_lines.rs (locked_field, secure_field, owned_key) \u2194 src/lib/frontmatterLines.ts, read through each side's note readers (body_edit/bodyEdit, local_ai_allowed/localAiAllowedOverride, locked/isLockedFrontmatter, secure/isSecureFrontmatter). Verdict: body edit a/p/r/l, on-device t/u/f, locked 1/0, secure 1/0. Representative rows only; scripts/permission-differential.ts carries the bulk.",
+      "value": [
+        {
+          "fields": [
+            "locked: True"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "\"locked\": true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "- locked: yes"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "? locked",
+            ": true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "!!str locked: true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "meta: {locked: true}"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "\"\\u006cocked\": true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "locked: \"true\""
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "locked:"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "locked: true # set by hand"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "locked: false"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "  locked: false"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "secure: True"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "'secure': true"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "{secure: true}"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "secure: yes # by hand"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "secure: false"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "\"ai_edit\": false"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "{ai_edit: false}"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "<<: {ai_edit: false}"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "!!str ai_edit: false"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "\"\\u0061i_edit\": false"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "secure: true",
+            "local_ai_allowed: true",
+            "{local_ai_allowed: no}"
+          ],
+          "verdict": "pf01"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "'created_by': person"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "\"ai_edit\": true"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "ai_edit: true",
+            "  until friday"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "  - x"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "secure: true",
+            "local_ai_allowed: true",
+            "  later"
+          ],
+          "verdict": "pf01"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "  maybe"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "\"ai_edit\": true",
+            "  until friday"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "? x"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "  x: y"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "ai_edit: true",
+            "  # note"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "x: 1\rsecure: true"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "x: 1\u2028locked: true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "x: 1\u0085secure: true"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "x: 1\u2029locked: true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "ai_edit: true\rx: y"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "created_by: agent",
+            "x: 1\rai_edit: true"
+          ],
+          "verdict": "ru00"
+        },
+        {
+          "fields": [
+            "secure: false\rx: y"
+          ],
+          "verdict": "pu01"
+        },
+        {
+          "fields": [
+            "x: 1\rsecure: false"
+          ],
+          "verdict": "pu00"
+        },
+        {
+          "fields": [
+            "locked\u2028: true"
+          ],
+          "verdict": "lu10"
+        },
+        {
+          "fields": [
+            "ai_edit: true"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "ai_edit:\ttrue"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "created_by: librarian"
+          ],
+          "verdict": "au00"
+        },
+        {
+          "fields": [
+            "secure: true",
+            "local_ai_allowed: true"
+          ],
+          "verdict": "pt01"
+        },
+        {
+          "fields": [
+            "ai_edit: true\r"
+          ],
+          "verdict": "au00"
+        }
+      ]
+    },
     "consentedInsertCases": {
       "sourceOfTruth": "src/lib/aiEditPolicy.ts consentedInsertRefusal ↔ src-tauri/src/ai_edit_policy.rs consented_insert_refusal (behavioral: a /ai insertion the person accepted lands under the default, never past a lock or an explicit no)",
       "value": [

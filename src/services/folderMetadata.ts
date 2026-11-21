@@ -9,6 +9,7 @@ import {
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
 import { frontmatterField } from "../lib/frontmatterKeys";
+import { lineFlag } from "../lib/frontmatterLines";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
@@ -37,6 +38,18 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
   ],
 });
 
+/** An off-switch refuses, rather than report success, when its flag is still
+ * on after it removed what it can: a `{locked: true}` flow entry inside
+ * another key, a key on a line a lone CR breaks, or (in a folder opened in
+ * place) a spelling other than Rotli's (Rust `refuse_if_still_on`). */
+function refuseIfStillOn(text: string, key: "locked" | "secure"): void {
+  const line = (parseNoteDocument(text).frontmatter?.foreign ?? []).find((l) => lineFlag(l, key) === true);
+  if (line !== undefined)
+    throw new Error(
+      `This note still turns ${key} on in a line the switch can't change (${line.trim()}). Remove that line in the note's metadata, then try again.`,
+    );
+}
+
 function assertSecureRemoval(body: string): void {
   if (looksSecret(body))
     throw new Error("Remove the detected secret from the note before removing secure protection");
@@ -54,12 +67,15 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
+    const out = withSecureLineOnly(opened.contents, secure);
+    if (!secure) refuseIfStillOn(out, "secure");
     if (secure) await updateGitExclusions(dir, [path]);
-    await writeVersionedFile(dir, path, withSecureLineOnly(opened.contents, secure), opened.revision);
+    await writeVersionedFile(dir, path, out, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
     return path;
   }
   if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
+  if (!secure) refuseIfStillOn(composeNoteDocument(withField(fm, "secure", null), body), "secure");
   const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
   const current = parentPath(path);
   const inHome = current === home || current.startsWith(`${home}/`);
@@ -134,6 +150,7 @@ export async function setFolderProtection(
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  if (key === "locked" && !allowed) refuseIfStillOn(text, "locked");
   await writeVersionedFile(dir, path, text, opened.revision);
 }
 

@@ -1,0 +1,636 @@
+{
+  "_comment": "The permission differential harness (scripts/permission-differential.ts): TypeScript's verdicts for every case of every set, four characters each (body edit a/p/r/l, on-device t/u/f, locked 1/0, secure 1/0). src-tauri/src/permission_differential_tests.rs rebuilds the same cases and must read every one the same way. pool303 is PR #303's harness pool and seed; reviewers holds the review rounds' odd inputs; structural is the triage's enumeration (48 permission setups x 1-2 continuation lines), sampled by stride; spelling is the triage's key x spelling x value x context matrix. Refresh: bun scripts/permission-differential.ts --write.",
+  "sets": [
+    {
+      "name": "pool303",
+      "kind": "pool",
+      "seed": 303,
+      "count": 1500,
+      "maxLines": 6,
+      "pool": [
+        "created_by: agent",
+        "created_by: librarian",
+        "created_by: person",
+        "  created_by: agent",
+        "\"created_by\": agent",
+        "created_by:\tagent",
+        "created_by:  agent",
+        "created_by: agent # note",
+        "ai_edit: true",
+        "ai_edit: false",
+        "ai_edit:\ttrue",
+        "  ai_edit: false",
+        "- ai_edit: false",
+        "\"ai_edit\": false",
+        "'ai_edit': true",
+        "\"ai\\u005fedit\": false",
+        "ai_edit : true",
+        "ai_edit: True",
+        "ai_edit: \"true\"",
+        "? ai_edit\n: false",
+        "ai_edit: true\r",
+        "ai_edit: true\r\r\r",
+        "ai_edit:",
+        "ai_edit: false # comment",
+        "# ai_edit: false",
+        "ai_edit: true # ok",
+        "\u0430i_edit: false",
+        "ai_edit\uff1a false",
+        "local_ai_allowed: true",
+        "local_ai_allowed: false",
+        "local_ai_allowed:\ttrue",
+        "  local_ai_allowed: false",
+        "{\"local\\u005fai_allowed\": false}",
+        "{s: 1, \"local\\u005fai_allowed\": false}",
+        "secure: true",
+        "secure: false",
+        "secure: \"true\"",
+        "  secure: true",
+        "secure:",
+        "{secure: true}",
+        "!!str secure: true",
+        "secureContext: true",
+        "locked: true",
+        "locked: false",
+        "locked: \"true\"",
+        "locked: True",
+        "{locked: true}",
+        "!!str locked: true",
+        "\"locked\": true",
+        "  locked: true",
+        "example: |\n  locked: true",
+        "example: >-\n  ai_edit: false",
+        "summary: Plan: phase two",
+        "links: [[Alpha]], [[Beta]]",
+        "links: [[Alpha]]",
+        "tags: [a, b]",
+        "tags:\n  - a\n  - b",
+        "summary: \"unclosed",
+        "summary: *bold* words",
+        "summary: Notes on C# and F#: overview",
+        "aliases: [\"Plan\"]",
+        "title: {{template}}",
+        "date created: 2024-01-01",
+        "date created:\t2024-01-01",
+        "date created : 2024",
+        "date created: Meeting: x",
+        "\tnested: tab",
+        "\t- a",
+        "c",
+        "- item",
+        "{a: 1,",
+        "\"a\\qb\": c",
+        "%YAML 1.2",
+        "  y: z",
+        "...",
+        "x: [unclosed",
+        "x: \"one",
+        "\"",
+        "a: &k one",
+        "b: *k",
+        "c: *nope",
+        "<<: {ai_edit: false}",
+        "base: &x {ai_edit: false}",
+        "<<: *x",
+        "<<: {locked: true}",
+        "\ufeffsummary: bom",
+        "summary: pasted\u0085text",
+        "? [a]\n: b",
+        "!!binary x: y",
+        "key: 'it''s'",
+        "multi: \"a\n  b\"",
+        "  - nested item",
+        "flow: {a: [1, {b: 2}]}",
+        "num: 1.0",
+        "1.0: a",
+        "1.00: b",
+        "x:\t[a]",
+        "empty:",
+        "  ",
+        "l:",
+        "  - a\u0085*b",
+        "  - a\ufeff*b",
+        "  - a *\u0085",
+        "  - a *\ufeff",
+        "  - a\u2028*b",
+        "  - a\u00a0*b",
+        "[\u0085*b]",
+        "{x:\ufeff*b}",
+        "x: 1\rsecure: true",
+        "x: 1\rai_edit: false",
+        "x: 1\rlocal_ai_allowed: false",
+        "x: 1\rlocked: true",
+        "x: a\u2028secure: true",
+        "x: a\u2029locked: true",
+        "x: a\u0085secure: true",
+        "x: a\u2028ai_edit: false",
+        "summary: nbsp\u00a0here",
+        "a\u00a0: b",
+        "ai_edit\u00a0: false",
+        "nul: a\u0000b",
+        "lone\r",
+        "\r",
+        "locked: yes",
+        "locked: on",
+        "locked: Y",
+        "locked: ~",
+        "locked: null",
+        "locked: no",
+        "locked: false # c",
+        "locked: 'false'",
+        "secure: no",
+        "secure: off",
+        "ai_edit: yes",
+        "ai_edit: on",
+        "local_ai_allowed: on",
+        "local_ai_allowed: ~",
+        "title: Plan: phase two",
+        "status: blocked",
+        "topic: insecure defaults",
+        "status: unlocked",
+        "path: C:\\x",
+        "math: \\(x\\)",
+        "  - a: b: c",
+        "items:",
+        "  - x *y*",
+        "  - `code`",
+        "  - @sam",
+        "k: \"\\u0061i_edit\"",
+        "\"\\x61i_edit\": false",
+        "note: \\u0073ecure"
+      ]
+    },
+    {
+      "name": "reviewers",
+      "kind": "pool",
+      "seed": 2611,
+      "count": 1000,
+      "maxLines": 4,
+      "pool": [
+        "ai_edit: true",
+        "created_by: agent",
+        "local_ai_allowed: true",
+        "secure: true",
+        "locked: false",
+        "  until friday",
+        "  - later",
+        "  ? maybe",
+        "  : x",
+        "  x: y",
+        "  # note",
+        "\tmore",
+        "? x",
+        ": y",
+        "?",
+        "  ",
+        "",
+        "ai_edit: true\u0085",
+        "secure: false\u0085",
+        "locked\u0085: true",
+        "locked\u2028: true",
+        "x: 1\u2029ai_edit: true",
+        "x: 1\u2028created_by: agent",
+        "local_ai_allowed: true\u2029",
+        "secure: false\rx: y",
+        "ai_edit: true\rx: y",
+        "x: 1\rsecure: false",
+        "\ufeffai_edit: false",
+        "\ufefflocked: true",
+        "ai_edit:\u00a0true",
+        "locked:\u00a0false",
+        "secure: \u00a0false",
+        "\u00a0ai_edit: false",
+        "ai_edit: tr\u0000ue",
+        "locked: false\u0000",
+        "secure: fal\rse",
+        "pinned: false",
+        "locked: yes",
+        "locked: on",
+        "locked: Y",
+        "locked: off",
+        "secure: True",
+        "secure: NO",
+        "ai_edit: yes",
+        "ai_edit: Y",
+        "local_ai_allowed: on",
+        "? locked\n: false",
+        "? secure",
+        "? \"ai_edit\"\n: true",
+        "? created_by\n: agent",
+        "{locked: false}",
+        "{secure: false, x: 1}",
+        "meta: {ai_edit: false}",
+        "[{local_ai_allowed: no}]",
+        "x: {a: 1}, locked: no",
+        "\"\\x6cocked\": true",
+        "'se''cure': true",
+        "\"secur\\u0065\": true",
+        "\"ai_edit\\ud800\": false",
+        "\"\\U0000006cocked\": true",
+        "- - locked: true",
+        "-\tsecure: true",
+        "?\tai_edit: false",
+        "!!str\tcreated_by: person",
+        "!custom locked: true",
+        "notes: |\n  ai_edit: true\n  locked: false",
+        "  created_by: agent\n    deeper",
+        "\"ai_edit\": true\n  until friday",
+        "lone\r",
+        "\r",
+        "x: 1\r\r",
+        "\u2028",
+        "summary: a, locked: no"
+      ]
+    },
+    {
+      "name": "structural",
+      "kind": "product",
+      "stride": 23,
+      "heads": [
+        [
+          "ai_edit: true"
+        ],
+        [
+          "ai_edit: false"
+        ],
+        [
+          "local_ai_allowed: true"
+        ],
+        [
+          "local_ai_allowed: false"
+        ],
+        [
+          "locked: true"
+        ],
+        [
+          "locked: false"
+        ],
+        [
+          "secure: true"
+        ],
+        [
+          "secure: false"
+        ],
+        [
+          "created_by: agent"
+        ],
+        [
+          "created_by: person"
+        ],
+        [
+          "created_by: agent",
+          "ai_edit: true"
+        ],
+        [
+          "created_by: agent",
+          "ai_edit: false"
+        ],
+        [
+          "created_by: agent",
+          "locked: true"
+        ],
+        [
+          "created_by: agent",
+          "locked: false"
+        ],
+        [
+          "created_by: agent",
+          "local_ai_allowed: true"
+        ],
+        [
+          "created_by: agent",
+          "local_ai_allowed: false"
+        ],
+        [
+          "created_by: agent",
+          "secure: true"
+        ],
+        [
+          "created_by: agent",
+          "secure: false"
+        ],
+        [
+          "secure: true",
+          "local_ai_allowed: true"
+        ],
+        [
+          "secure: true",
+          "local_ai_allowed: false"
+        ],
+        [
+          "secure: true",
+          "ai_edit: true"
+        ],
+        [
+          "secure: true",
+          "ai_edit: false"
+        ],
+        [
+          "secure: true",
+          "locked: true"
+        ],
+        [
+          "secure: true",
+          "locked: false"
+        ],
+        [
+          "ai_edit: true",
+          "created_by: agent"
+        ],
+        [
+          "ai_edit: true",
+          "created_by: person"
+        ],
+        [
+          "ai_edit: true",
+          "locked: true"
+        ],
+        [
+          "ai_edit: true",
+          "locked: false"
+        ],
+        [
+          "ai_edit: true",
+          "secure: true"
+        ],
+        [
+          "ai_edit: true",
+          "secure: false"
+        ],
+        [
+          "local_ai_allowed: true",
+          "secure: true"
+        ],
+        [
+          "local_ai_allowed: true",
+          "secure: false"
+        ],
+        [
+          "created_by: agent",
+          "ai_edit: true # x"
+        ],
+        [
+          "created_by: agent",
+          "\"ai_edit\": false"
+        ],
+        [
+          "created_by: agent",
+          "  ai_edit: false"
+        ],
+        [
+          "created_by: agent",
+          "- ai_edit: false"
+        ],
+        [
+          "secure: true",
+          "\"local_ai_allowed\": false"
+        ],
+        [
+          "secure: true",
+          "  local_ai_allowed: false"
+        ],
+        [
+          "\"secure\": true"
+        ],
+        [
+          "  secure: true"
+        ],
+        [
+          "secure: True"
+        ],
+        [
+          "created_by: agent",
+          "locked: True"
+        ],
+        [
+          "created_by: agent",
+          "\"locked\": true"
+        ],
+        [
+          "created_by: agent",
+          "  locked: true"
+        ],
+        [
+          "created_by: librarian"
+        ],
+        [
+          "created_by: chat"
+        ],
+        [
+          "created_by: agent",
+          "ai_edit: true",
+          "locked: false"
+        ],
+        [
+          "created_by: agent",
+          "ai_edit: true",
+          "secure: false"
+        ]
+      ],
+      "tails": [
+        "",
+        "x",
+        "x: y",
+        "a b",
+        "?",
+        "? x",
+        "? x: y",
+        "? a b",
+        ":",
+        ": x",
+        ": x: y",
+        ": a b",
+        "-",
+        "- x",
+        "- x: y",
+        "- a b",
+        "",
+        "  x",
+        "  x: y",
+        "  a b",
+        "  ?",
+        "  ? x",
+        "  ? x: y",
+        "  ? a b",
+        "  :",
+        "  : x",
+        "  : x: y",
+        "  : a b",
+        "  -",
+        "  - x",
+        "  - x: y",
+        "  - a b"
+      ]
+    },
+    {
+      "name": "spelling",
+      "kind": "spelling",
+      "templates": [
+        [
+          "canonical",
+          "$K: $V"
+        ],
+        [
+          "indented",
+          "  $K: $V"
+        ],
+        [
+          "nested_under_meta",
+          "meta:\n  $K: $V"
+        ],
+        [
+          "double_quoted_key",
+          "\"$K\": $V"
+        ],
+        [
+          "single_quoted_key",
+          "'$K': $V"
+        ],
+        [
+          "list_item",
+          "- $K: $V"
+        ],
+        [
+          "explicit_key",
+          "? $K\n: $V"
+        ],
+        [
+          "space_before_colon",
+          "$K : $V"
+        ],
+        [
+          "tab_after_colon",
+          "$K:\t$V"
+        ],
+        [
+          "two_spaces_after_colon",
+          "$K:  $V"
+        ],
+        [
+          "trailing_comment",
+          "$K: $V # set by hand"
+        ],
+        [
+          "crlf",
+          "$K: $V\r"
+        ],
+        [
+          "root_flow_map",
+          "{$K: $V}"
+        ],
+        [
+          "flow_under_meta",
+          "meta: {$K: $V}"
+        ],
+        [
+          "str_tag",
+          "!!str $K: $V"
+        ],
+        [
+          "escaped_key",
+          "\"$E\": $V"
+        ],
+        [
+          "merge_key",
+          "<<: {$K: $V}"
+        ],
+        [
+          "uppercase_key",
+          "$U: $V"
+        ]
+      ],
+      "values": {
+        "bool": [
+          "true",
+          "false",
+          "True",
+          "FALSE",
+          "yes",
+          "no",
+          "on",
+          "off",
+          "\"true\"",
+          "'false'",
+          "1",
+          "0",
+          "",
+          "~",
+          "null"
+        ],
+        "creator": [
+          "agent",
+          "chat",
+          "librarian",
+          "person",
+          "\"agent\"",
+          "Agent",
+          ""
+        ]
+      },
+      "keys": [
+        {
+          "key": "ai_edit",
+          "values": "bool",
+          "contexts": [
+            [],
+            [
+              "created_by: agent"
+            ],
+            [
+              "ai_edit: true"
+            ]
+          ]
+        },
+        {
+          "key": "local_ai_allowed",
+          "values": "bool",
+          "contexts": [
+            [
+              "secure: true"
+            ],
+            [
+              "secure: true",
+              "local_ai_allowed: true"
+            ]
+          ]
+        },
+        {
+          "key": "created_by",
+          "values": "creator",
+          "contexts": [
+            [],
+            [
+              "created_by: agent"
+            ]
+          ]
+        },
+        {
+          "key": "locked",
+          "values": "bool",
+          "contexts": [
+            [],
+            [
+              "created_by: agent"
+            ]
+          ]
+        },
+        {
+          "key": "secure",
+          "values": "bool",
+          "contexts": [
+            [],
+            [
+              "secure: true"
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "verdicts": {
+    "pool303": "lu11lu10ru00ru00lu10ru00pu00lu10pu00pu00lu10lu10lu10au00pu00ru00lu10lt11lu10lf10lu10ru01ru00pu00pu00pu01au01pu01pf00af00pu00ru01ru00lu10pu00pu00pu01lu10pu00au00ru00pu00lu10ru00lu10pu00lf10lu10lu10lu10au00au00ru00ru01ru00ru00pu00ru00lf10pu00pf00pu00pu00lu11lu10ru00pu01pu00ru00pu00lu10ru00lu10au00au00ru01pu00ru00pu00lu11lu10lu10au00lt10ru00lf11pt00pu00ru00pu00rf00pu00ru00pu00rf01lu10lu10pu01au00lu10ru00lu10pu00lu10rf00pu00pu00pt01ru01pu01lu10lu10lf10ru00lu11rf00au00lu10lu10lu10lu10ru00lu10pu01au00au01pu00pu00au00lu10ru01lu10pu00pu00rt00au00au00pf00pu00pu00pu01lu10pu00pu00lu10ru00pf00pf00pt00lu10pu00lu10rf00pu00pu00pu00ru01ru00ru00pu01pu00lt10pf00au00ru01pu00lu10ru00au00au01lu10lf11pu01lu10pu00pu01lu10pu00pu00pu00pu00pu00ru00lu11ru00lf10pf00lu10lu11ru00ru00lu10lf10pu01pu01pu00lu10ru00pu01au00pf00ru00pu00pu00pu00ru00pu00au01lu10pu00lf10pu00rf00rf00pu00lu10pu01pu01ru00af00lu10pu00pu00au00pf00lu11lu11pu01lu10lu10lu10au00ru00lu11pu00ru00ru00pu01lu10lf10ru00ru00ru00lu10pu00lu10lu10au00lu11rf00lu10au00lu11ru01ru00pu00pu00lu10pu01pu00ru00pu00pu01lu11ru00pu00pu00au00lu10lf10lu10au00ru00au01pu00lu10ru00lu11lu10pu00ru00lu10au00pf00pu00lu11ru01lu10ru00lu10ru00lu10pu00lu11ru01lf10af01pu00pu00lu10lf11rf00pu00pf00pu01af00lu10ru01lu10ru00lu10pu00lu10lu10lu10lu10lu10pu00pu00lu10rf00pu00pu01ru01pu00pu00au00rt00au00pu00pu00au00pu00ru00rf00lu11ru00lu10ru00pu00ru00ru00pu00pf01ru00pu01ru00lu11pu00lu10lu10au00lu10pu00au00pu00pu00lu10pu00lu10lu10au01pu01ru00rf00lu10lu10pu01pu00lu10au00lt10pu01lf11au00lu11pu00pu00ru00pu00lu10lu11lu10lu11lu10lu10pf00ru00pf01au00ru00au01lu10rf00pu00ru01pu01pf00lu10ru00ru01lf10pu00ru00lu10au01ru00lu10lu10lu10pf00pu00pu01pt00ru01lf10lu10lu10ru00lu10lu10pu00pu01lu11lf10pt01au00pu00lu10lu10lf10pu00lf10ru00ru00ru00lf10pu00pu00pu00ru00lu10pu00lu10lu10pu00lf11lu11pu00lu11ru00ru00lf11rf00ru00au00lu10lf10pu01rf00pu01ru00pu00au00ru00pu00lu10lu10ru00ru00au00lu11lu10au01rf00ru00au00pu00lu10lu11ru01pu00au00ru00pu01pf00pu01lu10lu11lu11lu10rf00pu00rf00af01rf01pu00ru00pt00pu00ru01lu10au01pu01lu11ru00lu10ru00ru00lu10lu10lu10rf01pu00ru00pu00pu00pu01ru00rf01pu00au00pu01ru00ru00ru00ru00ru00ru00lu10pu00pu01lt10ru01ru00pf00ru01pf00pf01ru00lu10pu00pf00lu11lu10rf00pu00lu10pu00af00lu10au01lu10ru00lu11rf00pf00lu10ru00lu10lu10pu00pu00ru00pu00pu00rf00pu00rf01pu00pf00pu00lu10pu00au00pu01lu10pu00lu10pu00pu00ru00ru00lu10pu00pu00au01lu10pu00pu00pu00lu10lu10pu01ru01rf01ru01pu01pu00pf00pu00pu00pu00pu00lu10pu01pu00lu11lu10pu00lu10lu10lu10rf00ru00lu10pu00ru00lu10lu10ru00ru00ru00rf00pu01lu11ru00pu00pf00af00pu00ru00lu10ru00au00ru01lu10pu00pu01au00pu00pu00ru00ru00ru00au00pu01pu00lu10ru00lf10ru00au00lf10au01ru00ru00pu00ru00lu10ru01lf10ru01au00lu10lu10lu10ru00ru00ru00pf00pu00lu11ru00pu00au01lu10pu00ru00lu10rf00pt00ru01lu10lu11ru00ru01pu00lu10pu00pu01pu00ru00lu10ru00pu00lu11lu10au01af00ru00lf10pu00ru00pt00ru00lu10pu00lu10pu00pu00pu00lu10ru00ru00lu10pu00pu00pu01ru01lu10pu01ru01lf10lf10lu10ru00au00lu10rt00lf10lu10ru01rt01pu00ru00lu10pu00rt00lu10lu10rf00pu00pu00ru01rt00ru00lu10lu10lu10rf01pu00pu00ru01lt10lu10lu10lu10au01pu01pu00lu10rf01lu10lf10pu00au00pu00lu10lu10ru00lu10pu01lu10lu10ru01lu10pu00lf11pu00pu00pu00lu10lu10au00pu00ru00pu00pu01pu00ru00ru01ru00rf00au00pu01lu10au00lu10ru00au00pu00pu00pf00lu10au00ru00ru01pu00lu11lu10ru00lu10pf00at01lu10ru00rf00lu11lu11pu00pf00ru00pu00pu00pu00au01rf00pu00ru00ru00lu10ru01pu00pu00au00ru00lu10lu10lu10ru00pu00rf00au00pu00au00pu00pu00ru00pu00lu10pf00rf00pu00lu10lu10pf00pu00lf10lu10ru00ru01rt00lu10lu10pu00pu00lu11lu10lu10rf00ru00ru00ru00rt00pu00pt00lf10lu10ru00pu00pu00pu00lu10lu10lu10lf10lu11ru00pt00ru00rf00pu00lu10ru00ru01lu10pu00pu00lu11ru01lu11pu00pu00ru00lu10rf00pf01lu11lu10ru00pu00au00pu00pu00lu11pu00lf10lu10ru00pu01pu00ru00lu10ru01rf00lu10pu00pu00lu11lu10pu00pu01lu10lu10pu00pu00lu11pu00at00lu10lf11lu10pu00lu11pu01ru00ru00pu00ru00pu00lu10pf00pf00lu10lf10ru01ru00ru00pt00pu00ru00lf11lu10ru01pu00lu10pt00au00lu10pu00pu00ru00pu00pu01pu00pu01pu01ru00lu10pu00ru01lu10pu00lu10ru00lu11pu00ru00lu10lf10ru01pu01lu11pf00au00pu00ru00pu00pu00lu10pu00pu01lu10lu10pu00ru00lf10rf00ru00lu10pu01pu00rf00lu10lu11lu10lu11pu00pu00pu00lu10ru00lu10ru01lu10au00rf00pu00pu00pu00lu10lu10ru00lu10pt00ru01ru00au00lu10ru01pu00ru00lu10pu00pu01rf00lu10lf10lu10lu10pu00lu10lu10lu10lu10au00pu00pu00lu10lf10ru00ru00pu01lu10lf10lt11ru00ru00pu00pu00au00pu00pu01af01lu11lu11lu10rt00pu00ru01pu00pu00ru00lu11au00rf00pu00rf01lu10lu10lt10rf00ru00pu00lu11ru00pu00pf00lu10ru00lf10lu11ru00lu10lu10lu10pf00au00au01pu00pu00pf01lu10lu10lu10lf10lu10pf00pu01ru00pu00lf10lu10ru01ru01pu01lu10rt00pu00lf10pu00pf00lu10lt10ru00pf00lu11pu01pu00pu01lu10lu10ru00pu00ru00pu00lu10lu10lu10ru00pu00ru01lf10pu00pu00lu10lu10ru00ru01au01lu10ru00rf01pu00ru00lu10lu10lu10ru00lu11pf00pu01ru01lu10pu00rf00au00lu10lu10pu01pu00pu00pf00lu10pu00pt00lu10lu10pu00pu00lu10ru00lu10pu00pu00pu00pt01lu10ru00au00pu00pu00lu11ru00pu00ru00lu10pu00rt00au00lf11ru00pu00ru00lu10lu10lu10pu00pf00lu10ru00pu00lu10ru00pu00lu10au00lf11lu10pu00lt10pu01pf00pu00lu10pu00pu00lu10lu10lf10lu10lf10lu10lu10lf10au00lu10ru00ru00pf01pu01pf01lu10ru00pu01ru01lu10lt10pu00lf10lu10pu00ru00lu10ru00lu11ru01lu11lu10pf01pu01ru00ru01ru00ru00ru00ru00pu01pu00pu00pu00lu10ru00pu00pu00pf00lu11lu10rf01lu10lu10lu10pu00lt10lu10pu00ru00lu10lt10pu01lf10pf00lf10ru01lu10ru00pu00lf10lu10rf00ru00pu00ru00ru00lt10lf10pu01lu10pu00pu00au00ru01rf00au00pf00lu10lu10lu11au00rf01rt00pu01lu10pf00lu10pu00rf00lu11lu10lu10ru01pu00pu00ru00pf00ru00ru00pu00lu10lu10au01pu00pu01pu00lu11lu10pu01pf00pu00ru01pu00lu10lu10pu00au00ru00pu00au01au01lu10pu01au00lu11pu01lu10lu10pu00pu00ru00ru00pu00lu10pu00rf00lf11lu10pu00ru00pt00lu10pu00pu01ru00lf10af00ru00ru01ru00lu10lu10ru01ru00ru00pu01lu10lu10rf00lu10lt11pu00rf01lu10pu00pu00pu00lf10lu10lf10pu01lu10pf00rt00au01pu00pu00pu01pu00ru01lf10pu00ru01lf10lu10lu10pu00lu11lu10pu01ru00pu01lu10pu00ru00lu10pu00lu10pu00ru00ru00rt00pu00au00ru00lu10pf00af00ru00pu00pu01lu10lu10lu11lu10pu00lu10ru01ru00pu00ru00lu10lu10ru01pf00ru00ru01lu10pu00lu11pf00pu01pf00pu00lu10lu10lu10pf01lf10pu00pu00ru00lf10lf10ru00ru00lu11ru00pu01pu00pf00",
+    "reviewers": "ru01pf00pu00lu11pu00pu00lu11ru00lu11at00ru01lu10pu00rf00pu00lu10lu10rf01pu00pu00ru01ru00lf10lu10ru00pu01ru01lu10pu00rf00pu00au00pu00lu10af01lu10lu10pu00ru00lu10ru00lu10ru01pu00lu10ru01ru01au01ru00lu10lu10lu10ru00lu10pf00au00lu10ru00pu00lu11lu11lu10lu10pu01ru00ru00ru00lu10lf10lf10ru00pf01lf10pu00lu11lu10lu10lu10pu00lu10lf11pu00pf00pu00pf00lu10lu10lf10lu11rf00lu10pf00pu00lu10lu10lu11lt10lu10lu10pu00pf01lu10pu01lu10au01ru00pu00lu10pf00lu10lu10pt01pu01ru00lu10pf00rf00lu10lu11ru00lu10ru00pf00pf00lu11rf00ru00au00ru01ru00pu00lu11lu10pu00ru00lu10lu10pu00lu10ru00ru00ru00ru00ru00lu10ru00pu01pu00ru00lu10ru00lu11lf10ru00lf10lu10pu01lu10pf00pf00lu10ru00lu10lu10pu01lu10pf01pu01pu00lu10ru00rf00lu11lu11pu01pu00ru01lu10ru00lu11lu11lu10ru00lu10lu10ru00ru01pu00lu11pu01lu10pu00lu10lf10ru00ru00lu11ru00lu10ru01lu10ru01lu10ru00ru00lu11lu10au01pu01ru00ru00ru01lu11ru00ru00lu10au00ru00ru00lu11lu10ru00lu11pu00lu10lu10lu10pt00pf00af00lu10lu10lu11lu10pu00pu01lu11pu00pu01au00lu10lu10lu11pu00lu10pf00ru00lu11pu00lu10lf11ru01pu01lu10lu10pu01pu00lu11rf00lu11lu10lu10lf10ru00pu00pu01ru00lu10lu10lu11lu11lu10lt11lu11ru00lt11pu01pu01lu11lu11pu01lu11lu10lu10pu01lu10lu10pu01pu01ru00pf00pu00lu11ru00lu11lf10ru00lu10lu10ru01lu10pu00lt10pu01ru01lu10rf01pu00lu10pu00pu00lu10ru00lu10lu11lu10lu10pu01ru00pu00lu11pu01lu11pu01ru00ru00lu10lu10pf00pu00lu11ru01lu10pu00lu11pu00pu01pt01lf10pf00pu00pu00au00lu11lu11ru00pu01pu01ru00pu00rf00lf10pu00pu00ru00lu10lu11ru00lu11lu10lf10pu00lu10ru00lu11lu10lu10pu01rf00rf00ru01lu11pu00pf01pu01pu00pu00lu10pu00lu10lf11lu10ru01rt00lu10lu10lu10pf00lu11pu00pu01lu11lu10ru01pu00pu00lu11pu01ru00af01pf00lu10lu10lu10lu10pf00pf01pu00pu00lu10lu10lu10lu10ru00lu10lu10pu00lu10ru00lu10pu00pu00rf00lu10lu10pu01pu01ru01lu10lu10pu00au01ru01lu10pf00lu10ru00pu01lu10pu00pu00ru01pu01pu00pu00pu00pu01pu00pu00lu11pu00lu10pt00pu00ru00lu10lu10pu00pu00pu00ru00pu00lf10lt10lu10pu00rf00lu10ru01lf10pu00ru00ru01pu01au00lu10ru00lu10pu01lf10lu10lu10au00pu00lu10lu11pu00lu10lu10lu11ru00ru00pt00lu10lu10lf10ru00ru00lu11lu10lu10lu10pu01pu01lu10lu10lu10lu10pu00pt00au01ru01pu01lu10lf10pu01pf00lu10ru00ru00ru01lu10ru00lu10pu00pu00ru01pu00pu01lu10lu10lu11ru00lu10ru00lu11lu10pt00lu11ru00lu11pu00lu11lu10lu10pu00lu10ru00pu01pu00lu10lu10pu01pu00pu01ru00pf01pu01pu01pu00pu00pu00au00au00ru01ru01lu10ru01lu10lu10lu10ru00pu01ru00pu00pu00ru00lu10lu11au01ru00ru00pu00pu00lu10lu11pf00pu00pu00lu10lu10pu00lf10lu11pu00lu10lu10lu10pu01lu10ru00lu10pu01lu10pu00ru00lu10ru00rt01lu10lu11lu10lu10pu00pf00lu10lu10pu00lu10ru00lu10ru00rf01lu10ru00pu00lu10lu10pt00ru01pf01lu10pu01ru00pu01pu00pu00pu01lu10lu10lu10pu01lu10lu10au00lu10lu10pu00pu01pu01lu10ru01pt00lu10pu00lu10lu10lu11ru01ru00pu01lu10lu10lu11pu00lu11pu00lu10lf10ru00lu10ru00lu10ru00lf10lu10lu10af01lu10pu00lu11ru01lu11lu11pu00lu10lu10lu10pu01ru00pu01lu10pu00lu10ru00lu10lu10au00lu10pf00ru00lu10lu11pu01lu10lu10ru00lu10lu10pu00lf10pu01lu10lu11lu10lf10ru00lu10ru00pu00pu00pu00lu10au00ru01pu00pu00rt00pu01lu10lu11lu10pu01lu11lu10au01pu00lu10lu11lu10rf00pu00lu10au00ru01lu10lu10lu10lu10ru01au00lu10lu10pu00ru00ru00lu10pu01lu10lu10pf01lu10ru00lu10lu10lu10ru01pu00lf10pu01ru01pu00lu10pu01rt00pu00lu10lu10lt11lf11lu10pu01lu11pu01lu11lu10pu01pu01pu00rt00rf01ru01pu01lu10lf10pt00lu11ru00lu10lu10lf10lu10rt00lu10pu00pu00lu10ru01lu11au00lu10ru00pu01lu10lu10ru00lu11pu00pu01ru00pf01pu01pu00pu00lu11lu10pt01ru00lu11lu10pf00lf10lu10pu00ru00pu01lu11lu10lu10lu11pu00lf11lu10pf00pu00pu00lu10ru00lu10pu01lu10lu10lu10lu10lu10lu10ru00rf00lu10ru01pu00ru00lu11pu00ru01lu10pu00pu01pu00pu00pu00lu11lu10lu10lt11ru01au01pf00lu10ru00lu10ru00lu11lt10lu11pu00lu11pf00pu00pf00ru00au01ru00lu10lu11lu10lu10lu11lu11lf10lu11pu00pu00ru00au00ru01lu10lu10pu01lf10pu00ru00lu10pu00af01lu10pu00pu00lu10lu10ru00lu11ru00pf00lu10rt00lu10ru00ru00pu01lu10lu10lu10ru00ru00pu00ru00ru01lu10rf01lu10ru00rf00pu00lu10lu10pu00lu10lu11pu01lu11ru00pf00lu10pf00rf00ru01lu10lu10pu01ru01lf10ru00pu01au00pu00lu10lu10pu00pu01lu10pf00lu10rt00lu10lu11ru00lu10lu11pu00ru01af01lu10pu00ru01pu00pu00pu00pu01lu10rf00pu01ru00lu10lu10ru01pu01lu10lu10lf10",
+    "structural": "au00ru00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00ru00ru00au00ru00ru00ru00ru00au00au00ru00au00au00au00au00au00au00ru00ru00ru00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pf00pf00pt00pf00pf00pf00pf00pt00pt00pf00pt00pt00pt00pt00pt00pt00pf00pf00pt00pt00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00pf00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00pu00au00au00pu00pu00pu00pu00au00pu00pu00au00au00au00au00au00pu00pu00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00ru00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00ru00ru00au00ru00ru00ru00ru00ru00au00ru00au00au00au00au00au00au00ru00ru00ru00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00at00af00af00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00at00af00af00at00af00af00af00af00at00at00af00at00at00at00at00at00at00af00af00at00at00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00af00au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pf01pf01pt01pt01pf01pf01pf01pf01pt01pf01pf01pt01pt01pt01pt01pt01pf01pf01pf01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01ru01au01ru01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01ru01au01au01ru01ru01ru01ru01au01ru01ru01au01au01au01au01au01ru01ru01ru01au01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01ru01lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11lu11pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au01au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt01pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00pt00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00pu00au00pu00pu00pu00pu00pu00au00pu00au00au00au00au00au00au00pu00pu00pu00au00pu00pu00pu00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00pu00pu00au00pu00pu00pu00pu00pu00au00pu00au00au00au00au00au00au00pu00pu00pu00au00pu00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00au00",
+    "spelling": "au00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00au00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00au00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00au00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00ru00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pu00au00au00pt01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pt01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pt01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pt01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pf01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01pu01pt01au00au00au00au00au00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00au00au00au00au00au00au00pu00pu00pu00pu00pu00pu00pu00pu00au00au00au00au00au00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00au00au00au00au00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00pu00pu00pu00pu00pu00pu00pu00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10lu10pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu00au00pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01pu00pu01"
+  }
+}

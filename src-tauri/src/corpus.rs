@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
+use crate::frontmatter_lines::{refuse_if_still_on, sets_key};
 use crate::note_dates::{stamp_to_ms, today_stamp};
 use ulid::Ulid;
 
@@ -1253,6 +1254,10 @@ fn parse_fields(head: &str) -> Frontmatter {
     for raw in head.lines() {
         let line = raw.trim_end_matches('\r');
         let known = (|| {
+            // a broken line is never an owned fact (frontmatter_lines.rs rule 4)
+            if !crate::frontmatter_lines::segments(line).1 {
+                return None;
+            }
             let (key, value) = line.split_once(':')?;
             let value = value.trim();
             match key {
@@ -1338,12 +1343,10 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
     out
 }
 
-/// A frontmatter line setting the per-note AI lock — `Some(true/false)` when the
-/// line is `locked: …`, else `None`. Shared with the organizer daemon, whose
-/// locked-skip must read the same line the same way.
+/// The per-note AI lock on one line, in any spelling (frontmatter_lines.rs).
+/// Shared with the organizer daemon, whose locked-skip must read it the same way.
 pub(crate) fn locked_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "locked").then(|| v.trim() == "true")
+    crate::frontmatter_lines::flag_field(line, "locked")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
@@ -1391,12 +1394,10 @@ pub(crate) const AI_KEYS: [&str; 9] = [
     "anchors",
 ];
 
-/// A frontmatter line setting the per-note SECURE flag. Only literal `false`
-/// opens the ordinary lane; malformed values fail closed as secure.
-/// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
+/// The per-note SECURE flag on one line, in any spelling (frontmatter_lines.rs):
+/// only an exact `false` opens the ordinary lane. Shared with the organizer.
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
-    let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() != "false")
+    crate::frontmatter_lines::flag_field(line, "secure")
 }
 
 /// Does this whole document carry `locked: true`? The lock check written once,
@@ -3195,12 +3196,16 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| locked_field(l).is_none());
+            fm.foreign.retain(|l| !sets_key(l, "locked"));
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            let out = self.compose_for(&text, &fm, body);
+            if !locked {
+                refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "locked")?;
+            }
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3377,11 +3382,15 @@ impl CorpusStore {
             // 2026-10-13): no move, so no id to key one by, and no Rotli fields
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
+            let out = with_secure_line_only(&text, secure);
+            if !secure {
+                refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "secure")?;
+            }
             if secure {
                 self.gitignore_add(rel)?;
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            atomic_write(&path, &out)?;
             if !secure {
                 self.gitignore_remove(rel)?;
             }
@@ -3409,7 +3418,7 @@ impl CorpusStore {
             {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
-            fm.foreign.retain(|line| secure_field(line).is_none());
+            fm.foreign.retain(|line| !sets_key(line, "secure"));
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
@@ -3424,7 +3433,8 @@ impl CorpusStore {
 
         // Move while the secure flag + ignore are still active; only then drop
         // protection at the destination. A failed move therefore never exposes
-        // the file at an unignored path.
+        // the file at an unignored path. A spelling it can't remove refuses first.
+        refuse_if_still_on(&fm.foreign.iter().filter(|l| !sets_key(l, "secure")).collect::<Vec<_>>(), "secure")?;
         let restore_home = fm
             .foreign
             .iter()
@@ -3442,7 +3452,7 @@ impl CorpusStore {
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
         final_fm.foreign.retain(|line| {
-            secure_field(line).is_none()
+            !sets_key(line, "secure")
                 && local_ai_allowed_field(line).is_none()
                 && secure_origin_field(line).is_none()
         });
@@ -8874,6 +8884,10 @@ mod ai_file_tests;
 #[cfg(test)]
 #[path = "corpus_adopted_tests.rs"]
 mod adopted_tests;
+
+#[cfg(test)]
+#[path = "corpus_permission_line_tests.rs"]
+mod permission_line_tests;
 
 #[cfg(test)]
 #[path = "corpus_in_place_marked_tests.rs"]

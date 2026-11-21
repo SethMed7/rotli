@@ -46,6 +46,8 @@ mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
+#[cfg(test)]
+mod permission_differential_tests;
 mod ai_files;
 mod ai_office_text;
 mod pinned_site;
@@ -76,6 +78,7 @@ mod web;
 mod web_page;
 mod web_search;
 mod frontmatter_keys;
+mod frontmatter_lines;
 mod mcp_arguments;
 mod workspace;
 mod workspace_help;

@@ -25,6 +25,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **A lock or secure flag holds however it was typed.** Rotli used to read
+  `locked: true` and `secure: true` only when typed exactly that way, so a lock
+  written as `locked: True`, `locked: yes`, `"locked": true`, `- locked: true`,
+  `locked: true # my note` or `meta: {locked: true}` left the note open to AI
+  edits, and `"secure": true` let remote models read it. Now `locked` and
+  `secure` count in any spelling: indented, quoted, after `- ` or `? `, after a
+  tag such as `!!str`, inside `{…}`, or with escapes in a quoted key. Any value
+  except exactly `false` turns them on, including an empty value, `yes`, `on`,
+  `no`, `'false'` and `false # comment`. Rotli Web now reads `secure` the same
+  way as the desktop app.
+- **AI edit and on-device permissions deny in every spelling too.** A quoted,
+  flow-map, tagged or escaped `ai_edit` or `local_ai_allowed` that says
+  anything but `true` now denies, as an indented one already did. A
+  `created_by` spelled that way that doesn't name `chat`, `agent` or
+  `librarian` makes the note person-written. A grant continued onto an
+  indented line (`ai_edit: true`, then `  until friday`) no longer grants,
+  because it no longer reads `true`.
+- **Odd line breaks can't hide a flag.** A lone carriage return, U+0085,
+  U+2028 or U+2029 inside a metadata line used to let `x: 1`, then a hidden
+  `secure: true`, read as an ordinary note. These now split the line. A broken
+  line never grants AI access, and an `id:` or `pinned:` line can't carry a
+  flag past the readers.
+- **Unlock and "remove secure" tell you when they can't.** If a lock or
+  secure flag is spelled where the switch can't remove it (for example inside
+  another key's `{…}`), the switch now names the line to delete instead of
+  reporting success while the note stays protected.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

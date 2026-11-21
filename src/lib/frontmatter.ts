@@ -7,6 +7,8 @@
 //
 // Pure: no host, no vault, no services.
 
+import { lockedOn, secureOn, segments } from "./frontmatterLines";
+
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
 export interface NoteFrontmatter {
@@ -40,7 +42,10 @@ function parseFields(head: string): NoteFrontmatter {
     // Rust splits on the FIRST ':' and matches the key UNTRIMMED, so " id: x"
     // and "id : x" are foreign lines. Only the value is trimmed.
     const colon = line.indexOf(":");
-    const key = colon < 0 ? null : line.slice(0, colon);
+    // a line a lone CR, U+0085, U+2028 or U+2029 breaks is never an owned
+    // fact: `pinned: false` + CR + `secure: true` stays foreign, where the
+    // permission readers see its `secure` (frontmatterLines.ts, rule 4)
+    const key = colon < 0 || !segments(line).whole ? null : line.slice(0, colon);
     const value = colon < 0 ? "" : line.slice(colon + 1).trim();
     // First occurrence wins; a second `id:` line falls through to foreign.
     if (key === "id" && fm.id === null) fm.id = value;
@@ -122,21 +127,15 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-function flagField(fm: NoteFrontmatter, key: string): boolean {
-  return fm.foreign.some((line) => {
-    const colon = line.indexOf(":");
-    if (colon < 0) return false;
-    return line.slice(0, colon).trim() === key && line.slice(colon + 1).trim() === "true";
-  });
-}
-
-/** A foreign `secure: true` line — the note is categorically unavailable to
+/** Any spelling of `secure` whose value isn't exactly `false`
+ * (frontmatterLines.ts, rule 1): the note is categorically unavailable to
  * remote models. The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "secure");
+  return secureOn(fm.foreign);
 }
 
-/** A foreign `locked: true` line — no AI may edit the note, every class reads it. */
+/** Any spelling of `locked` whose value isn't exactly `false` — no AI may
+ * edit the note, every class reads it. */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "locked");
+  return lockedOn(fm.foreign);
 }
