@@ -45,7 +45,7 @@ fn cases(set: &Value) -> Vec<Vec<String>> {
             let stride = set["stride"].as_u64().unwrap() as usize;
             let mut index = 0usize;
             let mut keep = |fields: Vec<String>| {
-                if index % stride == 0 {
+                if index.is_multiple_of(stride) {
                     out.push(fields);
                 }
                 index += 1;
