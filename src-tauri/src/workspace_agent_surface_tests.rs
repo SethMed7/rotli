@@ -334,7 +334,7 @@ fn cli_commands() -> Vec<String> {
 
 /// One argv, owned.
 fn words(argv: &[&str]) -> Vec<String> {
-    argv.to_vec().into_iter().map(str::to_owned).collect()
+    argv.iter().copied().map(String::from).collect()
 }
 
 /// The argv for each command and what it must give. Some(None): not run,
