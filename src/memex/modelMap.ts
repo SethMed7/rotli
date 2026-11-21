@@ -44,7 +44,7 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
 /** C0/C1 controls, line/paragraph separators, and bidi embeddings/overrides/
  * isolates: none of them may reach model-facing text. */
 export function isModelUnsafeCodeUnit(code: number): boolean {
-  return breaksALine(code) || isBidiControl(code);
+  return code === 0x09 || breaksALine(code) || isBidiControl(code);
 }
 
 /** Each model-unsafe UTF-16 code unit becomes U+FFFD; everything else is kept. */

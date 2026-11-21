@@ -3,6 +3,7 @@ import { looksSecret } from "../ai/guard";
 import {
   composeNoteDocument,
   emptyFrontmatter,
+  isLockedFrontmatter,
   isSecureFrontmatter,
   parseNoteDocument,
   type NoteFrontmatter,
@@ -45,13 +46,29 @@ function assertSecureRemoval(body: string): void {
     throw new Error("Remove the detected secret from the note before removing secure protection");
 }
 
+/** A setting another line still decides (an indented one, which setters never
+ * touch) didn't take: say so, having changed nothing (review 2026-11-20). */
+const notTaken = (key: string) =>
+  new Error(
+    `another \`${key}:\` line in this note's metadata still decides it; change it in Show file metadata`,
+  );
+
 /** Returns the resulting path for relocation bookkeeping. Identity is stable;
  * protect the target BEFORE moving, and leave the old ignore on any failure. */
 export async function setFolderSecure(dir: VaultDir, path: string, secure: boolean): Promise<string> {
   const opened = await readVersionedFile(dir, path);
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
-  if (!secure) assertSecureRemoval(body);
+  if (!secure) {
+    assertSecureRemoval(body);
+    // checked before the note moves or its ignore line goes: a note that
+    // still reads secure must keep both (review of 305/306)
+    const cleared = ["secure", "local_ai_allowed", "secure_origin"].reduce(
+      (f, key) => withField(f, key, null),
+      fm,
+    );
+    if (isSecureFrontmatter(cleared)) throw notTaken("secure");
+  }
   if (!(await vaultHasRotliMarker(dir)) || (await vaultFolderRoles(dir))) {
     // A folder opened in place — and an imported copy, whose folders are the
     // person's — keeps the note where it is (owner rule
@@ -139,11 +156,10 @@ export async function setFolderProtection(
   const took =
     key === "ai_edit"
       ? (ownedKey(fm.foreign, "ai_edit", (v) => v === "true").says === "grant") === allowed
-      : key !== "local_ai_allowed" || localAiAllowedOverride(fm.foreign) === allowed;
-  if (!took)
-    throw new Error(
-      `another \`${key}:\` line in this note's metadata still decides it; change it in Show file metadata`,
-    );
+      : key === "locked"
+        ? isLockedFrontmatter(fm) === allowed
+        : localAiAllowedOverride(fm.foreign) === allowed;
+  if (!took) throw notTaken(key);
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);

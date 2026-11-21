@@ -99,7 +99,8 @@ pub(crate) fn require_owned_not_looser(old: &str, new: &str) -> Result<(), Strin
 /// extra metadata lines, `ai_edit: true` among them (review 2026-11-20: a
 /// model's tag reached the Filer that way).
 pub(crate) fn refuse_line_breaks(text: &str) -> Result<(), String> {
-    if text.chars().any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}')) {
+    // a tab breaks no line for any reader, and a hand-typed one must survive an undo
+    if text.chars().any(|c| (c.is_control() && c != '\t') || matches!(c, '\u{2028}' | '\u{2029}')) {
         return Err("refused: a metadata field can't hold a line break or control character".into());
     }
     Ok(())
@@ -161,7 +162,7 @@ pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &s
     out
 }
 
-/// Is `path` a note or a board, the files whose text carries protection?
+/// Is `path` a note or a board, the files with writers of their own?
 pub(crate) fn is_note_path(path: &std::path::Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
@@ -169,9 +170,11 @@ pub(crate) fn is_note_path(path: &std::path::Path) -> bool {
 }
 
 /// The file save lane (`corpus_write_file_bytes`) is for sheets, documents
-/// and other binaries. A note or a board carries its protection in its own
-/// text, and a raw overwrite dropped `locked`/`secure` without asking (review
-/// 2026-11-20), so those save through their own writers.
+/// and other binaries. A note carries its protection in its own frontmatter,
+/// and a raw overwrite dropped `locked`/`secure` without asking (review
+/// 2026-11-20). A board has no frontmatter (its protection comes from its path
+/// or a secure keyword); it is refused here because it saves through
+/// `corpus_write_board`, its own revision-checked writer.
 pub(crate) fn refuse_note_bytes(rel: &str) -> Result<(), String> {
     if is_note_path(std::path::Path::new(rel)) {
         return Err(format!(

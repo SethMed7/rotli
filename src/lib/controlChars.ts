@@ -17,8 +17,9 @@ export function isBidiControl(code: number): boolean {
   return (code >= 0x202a && code <= 0x202e) || (code >= 0x2066 && code <= 0x2069);
 }
 
-/** A line break (CR, LF, U+0085, U+2028, U+2029) or another C0/C1 control:
- * what a frontmatter value may not hold, or it writes extra metadata lines. */
+/** A line break (CR, LF, U+0085, U+2028, U+2029) or another C0/C1 control
+ * other than tab: what a frontmatter value may not hold, or it writes extra
+ * metadata lines. A tab breaks no line, so a hand-typed one survives undo. */
 export function breaksALine(code: number): boolean {
-  return isC0OrC1Control(code) || code === 0x2028 || code === 0x2029;
+  return (isC0OrC1Control(code) && code !== 0x09) || code === 0x2028 || code === 0x2029;
 }

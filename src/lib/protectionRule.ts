@@ -5,7 +5,7 @@
 // rewrite, so an unchanged line always passes. Pure: text in, verdict out.
 
 import { type AiBodyEdit, bodyEdit, field } from "./aiEditPolicy";
-import { parseNoteDocument } from "./frontmatter";
+import { parseNoteDocument, securesNote } from "./frontmatter";
 import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "./frontmatterBlock";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 
@@ -29,11 +29,7 @@ export function protection(text: string): Protection {
   const local = localAiAllowedOverride(foreign);
   return {
     locked: foreign.some((line) => field(line, "locked") === "true"),
-    // Rust's secure_field: only a literal `false` opens the ordinary lane
-    secure: foreign.some((line) => {
-      const value = field(line, "secure");
-      return value !== null && value !== "false";
-    }),
+    secure: foreign.some(securesNote),
     secureContext: protectionMark(text, "secureContext"),
     localAi: local === false ? 0 : local === null ? 1 : 2,
     bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => field(line, "locked") === null))],

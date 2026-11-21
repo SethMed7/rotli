@@ -6,8 +6,8 @@ import { expect, test } from "bun:test";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { breaksALine } from "../lib/controlChars";
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
-import { cleanTags } from "../lib/librarianActions";
-import { corpusSetAiEdit } from "../lib/noteProtection";
+import { addAnchor, cleanTags, parseAnchors } from "../lib/librarianActions";
+import { corpusSetAiEdit, corpusSetLocked, corpusSetSecure } from "../lib/noteProtection";
 import { corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
@@ -86,4 +86,36 @@ test("Web reads secure the way Rust does: anything but false is on", () => {
   for (const value of ["true", '"true"', "yes", "True", "1"])
     expect(isSecureFrontmatter(parseNoteDocument(`---\nsecure: ${value}\n---\n`).frontmatter!)).toBe(true);
   expect(isSecureFrontmatter(parseNoteDocument("---\nsecure: false\n---\n").frontmatter!)).toBe(false);
+});
+
+// review of 305/306 (2026-11-20)
+
+test("Unlock says so, and changes nothing, when an indented locked: line still decides it", async () => {
+  const text = "---\nid: lk\nlocked: true\nexample: |\n  locked: true\n---\n# Locked\n\nwords\n";
+  const { dir, note } = await vault("rotli", "wiki/locked.md", text);
+  await expect(corpusSetLocked(note.id, false)).rejects.toThrow(/locked/);
+  expect(await dir.readText("wiki/locked.md")).toBe(text);
+});
+
+test("Remove protection checks it took before moving the note or touching .gitignore", async () => {
+  const text = "---\nid: sx\nexample: |\n  secure: true\n---\n# Secret plan\n\nwords\n";
+  const { dir, notes, note } = await vault("rotli", "wiki/_inbox/plan.md", text);
+  await corpusSetSecure(note.id, true);
+  const securedPath = await notes.filePathOf(note.id);
+  const secured = await dir.readText(securedPath);
+  const ignore = (await dir.exists(".gitignore")) ? await dir.readText(".gitignore") : "";
+  await expect(corpusSetSecure(note.id, false)).rejects.toThrow(/secure/);
+  expect(await notes.filePathOf(note.id)).toBe(securedPath);
+  expect(await dir.readText(securedPath)).toBe(secured);
+  expect((await dir.exists(".gitignore")) ? await dir.readText(".gitignore") : "").toBe(ignore);
+});
+
+test("a mark on a passage with a line separator stays on one line", () => {
+  const value = addAnchor("", { exact: "one two\u0085three four", prefix: "", suffix: "" });
+  expect([...value].some((char) => breaksALine(char.charCodeAt(0)))).toBe(false);
+  expect(parseAnchors(value)[0]?.exact).toBe("one two\u0085three four");
+});
+
+test("a tab in a tag is kept, since it breaks no line", () => {
+  expect(breaksALine(0x09)).toBe(false);
 });

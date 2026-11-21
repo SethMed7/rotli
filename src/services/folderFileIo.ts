@@ -116,8 +116,9 @@ export async function folderWriteFileBytes(
   backup: boolean,
   revision: string,
 ): Promise<string> {
-  // sheets and binaries only: a note or a board keeps its protection in its own
-  // text, and a raw overwrite would drop it (review 2026-11-20; Rust refuses too)
+  // sheets and binaries only: a note keeps its protection in its frontmatter,
+  // which a raw overwrite would drop (review 2026-11-20), and a board saves
+  // through its own writer (Rust refuses both too)
   if (isNotePath(path))
     throw new Error(`refused: the file save is not for notes or boards (${path}); save it from its editor`);
   const memex = await assertSurfacedPath(dir, path);

@@ -209,28 +209,41 @@ second user-visible product or storage location.
   the bytes it replaced, or an empty body that deletes the file) is refused if
   it would loosen. The file save lane (`corpus_write_file_bytes` and the web's
   `folderWriteFileBytes`) is for sheets, documents and other binaries: it
-  refuses `.md` and `.excalidraw` in any letter case, which save through
-  their own writers.
+  refuses `.md` and `.excalidraw` in any letter case. A note keeps its
+  protection in its frontmatter, which a raw overwrite would drop; a board
+  has none (its protection comes from its path or a secure keyword) and saves
+  through its own writer.
 - The metadata setters keep each field on its own line and touch only
   top-level lines (review 2026-11-20). A key or value holding a line break
   (CR, LF, U+0085, U+2028, U+2029) or another control character is refused
-  by `set_field` and the Filer's `set_ai_field`, and a model's tags are
-  cleaned of them before they reach the Filer. A quoted spelling of a key
-  Rust owns (`"ai_edit"`) is refused by the field editor like the plain one,
-  and both setters run the tighten-only rule on what they write. A setter
-  never deletes or rewrites an indented line (a block scalar's text or a
-  nested map); when such a line still decides the key, "Let AI edit" or the
-  local-AI toggle writes nothing and says so. The raw metadata editor may
-  change `locked` and `secure`, but may not loosen `ai_edit`,
+  by `set_field` and the Filer's `set_ai_field`; a tab breaks no line and is
+  kept, so an undo restores a hand-typed one. A model's tags are cleaned of
+  them before they reach the Filer (the organizer drops just the bad tag),
+  and a Librarian mark escapes them inside its JSON. A quoted spelling of a
+  key Rust owns (`"ai_edit"`) is refused by the field editor like the plain
+  one, and both setters run the tighten-only rule on what they write. A
+  setter never deletes or rewrites an indented line (a block scalar's text or
+  a nested map); on Rotli Web, when such a line still decides the key, "Let
+  AI edit", the local-AI toggle, Unlock and Remove protection write nothing,
+  move nothing, keep the `.gitignore` line, and say so. The raw metadata
+  editor may change `locked` and `secure`, but may not loosen `ai_edit`,
   `local_ai_allowed`, `created_by` or `secureContext` in any spelling;
   `secureContext` can be added from there and never removed. An AI body edit
   ranks revoked below person-written below allowed, so dropping a deliberate
-  `ai_edit: false` counts as loosening. On Rotli Web, a fenceless note whose
-  new text starts with a `---` block gains its own metadata block in a Rotli
-  vault, so the pasted block stays body text as on the Mac, and in a folder
-  opened in place that save is refused. Rotli Web reads `secure:` as on for
-  any value but `false`, as Rust does. Loosening a flag is the person's act, through the note's own
-  controls (`set_locked`, `set_secure`, the local-AI and AI-edit toggles). The
+  `ai_edit: false` counts as loosening.
+- A note with no metadata block may not gain one from its new text, on the
+  Mac and on Rotli Web: in a folder opened in place that save is refused,
+  whoever makes it (a `/ai` insert or "Allow once" reply that opens with
+  `---` would otherwise become a standing AI grant); in a Rotli vault the
+  note gains its own block, so the pasted one stays body text. Every Mac body
+  save also runs the tighten-only rule. The organizer leaves an area's
+  generated overview alone, without an error, when regenerating it would
+  loosen a protection the person put on it.
+- `secure:` reads the same in Rust and on Rotli Web: the key is named when
+  either side's trim names it (Rust trims U+0085, JavaScript U+FEFF), and
+  only a value that reads `false` under both opens the note. Loosening a
+  flag is the person's act, through the note's own controls (`set_locked`,
+  `set_secure`, the local-AI and AI-edit toggles). The
   vault format is unchanged, so the contract version does not move.
 - A successful direct chat-note write invalidates the owning `CorpusStore`
   generation before returning. Its initiating webview can therefore read the

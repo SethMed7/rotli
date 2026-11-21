@@ -66,6 +66,30 @@ pub(crate) fn with_secure_line_only(text: &str, secure: bool) -> String {
 /// note's frontmatter before (`original`) with the one a Rotli action built
 /// (`next`), and apply only the keys that differ. `id`, `created`, and
 /// `updated` are Rotli's own facts and are never written here.
+/// Decision B (owner, 2026-10-13): in a folder opened in place only the words
+/// the person changed are written. Their frontmatter block (or its absence)
+/// and its separator line come back byte-for-byte; Rotli's own facts stay in
+/// memory and `.rotli/`. A note with no block may not gain one from its new
+/// text: an `/ai` insert or "Allow once" reply that opens with `---` would
+/// otherwise become the note's metadata, a standing AI grant among it (review
+/// of 305/306, 2026-11-20). Rotli Web refuses the same save.
+pub(crate) fn in_place_text(existing: &str, old_raw: &str, had_fence: bool, body: &str) -> Result<String, String> {
+    if !had_fence && parse_document(body).0.is_some() {
+        return Err("This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or edit the file outside Rotli.".into());
+    }
+    let block = raw_frontmatter_block(existing);
+    let separator = if !had_fence {
+        ""
+    } else if old_raw.starts_with("\r\n") {
+        "\r\n"
+    } else if old_raw.starts_with('\n') {
+        "\n"
+    } else {
+        ""
+    };
+    Ok(format!("{block}{separator}{body}"))
+}
+
 pub(crate) fn compose_in_place(original: &str, next: &Frontmatter) -> String {
     let before = parse_document(original).0.unwrap_or_default();
     let key_of = |line: &str| line.split_once(':').map(|(k, _)| k.to_string());

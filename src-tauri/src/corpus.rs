@@ -1396,7 +1396,10 @@ pub(crate) const AI_KEYS: [&str; 9] = [
 /// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() != "false")
+    // Rust trims U+0085 and JavaScript U+FEFF: either trim names the key, and
+    // only `false` under both opens it, so the two sides agree (review of 305/306)
+    let js_trim = crate::frontmatter_keys::js_trim;
+    (k.trim() == "secure" || js_trim(k) == "secure").then(|| !(v.trim() == "false" && js_trim(v) == "false"))
 }
 
 /// Does this whole document carry `locked: true`? The lock check written once,
@@ -4920,21 +4923,7 @@ impl CorpusStore {
             foreign: old_fm.foreign,
         };
         let text = if as_written {
-            // Decision B (owner, 2026-10-13): in a folder opened in place only the
-            // words the person changed are written. Their frontmatter block (or
-            // its absence) and its separator line come back byte-for-byte; Rotli's
-            // own facts stay in memory and `.rotli/`.
-            let block = raw_frontmatter_block(&existing);
-            let separator = if !had_fence {
-                ""
-            } else if old_raw.starts_with("\r\n") {
-                "\r\n"
-            } else if old_raw.starts_with('\n') {
-                "\n"
-            } else {
-                ""
-            };
-            format!("{block}{separator}{body}")
+            in_place::in_place_text(&existing, old_raw, had_fence, body)?
         } else {
             compose_document(&fm, &format!("\n{body}"))
         };
@@ -4978,6 +4967,8 @@ impl CorpusStore {
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
+        // every lane's save may only tighten (review of 305/306, 2026-11-20)
+        crate::note_protection::require_not_looser(&existing, &text)?;
         self.suppress.mark(&abs);
         self.suppress.mark(&target_abs);
         // Rewrite in place first, then use the filesystem's rename operation.

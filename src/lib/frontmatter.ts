@@ -133,11 +133,31 @@ function flagField(fm: NoteFrontmatter, key: string): boolean {
 /** A foreign `secure: true` line — the note is categorically unavailable to
  * remote models. The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  // Rust's secure_field: only a literal `false` opens the ordinary lane
-  return fm.foreign.some((line) => {
-    const colon = line.indexOf(":");
-    return colon >= 0 && line.slice(0, colon).trim() === "secure" && line.slice(colon + 1).trim() !== "false";
-  });
+  return fm.foreign.some(securesNote);
+}
+
+/** Rust's `str::trim`: JavaScript's whitespace without U+FEFF, plus U+0085. */
+function rustTrim(text: string): string {
+  const space = (char: string) => char === "\u0085" || (char !== "\uFEFF" && /\s/.test(char));
+  const chars = [...text];
+  let start = 0;
+  let end = chars.length;
+  while (start < end && space(chars[start]!)) start += 1;
+  while (end > start && space(chars[end - 1]!)) end -= 1;
+  return chars.slice(start, end).join("");
+}
+
+/** Rust's secure_field: a `secure:` line that doesn't read `false` keeps the
+ * note out of the ordinary lane. Rust trims U+0085 and JavaScript U+FEFF, so
+ * either trim names the key and only `false` under both opens it (review of
+ * 305/306); scripts/fixtures/protection-rule.json pins both sides. */
+export function securesNote(line: string): boolean {
+  const colon = line.indexOf(":");
+  if (colon < 0) return false;
+  const key = line.slice(0, colon);
+  const value = line.slice(colon + 1);
+  if (key.trim() !== "secure" && rustTrim(key) !== "secure") return false;
+  return !(value.trim() === "false" && rustTrim(value) === "false");
 }
 
 /** A foreign `locked: true` line — no AI may edit the note, every class reads it. */

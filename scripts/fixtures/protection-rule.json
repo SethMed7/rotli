@@ -1,5 +1,5 @@
 {
-  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case. AI body edits rank revoked < person-written < allowed, read without the `locked` line (locked is its own flag).",
+  "about": "Which note rewrites loosen protection, as ONE rule both sides implement: src-tauri/src/note_protection.rs `loosened` and src/lib/protectionRule.ts `loosened` (review 2026-11-20: writers replaced a note's text and dropped `locked`, `secure` or `secureContext`). A rewrite may not turn off locked, secure or secureContext, gain local_ai_allowed, or newly allow an AI body edit. `notePaths` is the file-save lane's refusal (`is_note_path` / `isNotePath`). Both sides' tests run every case. AI body edits rank revoked < person-written < allowed, read without the `locked` line (locked is its own flag). Rust and JavaScript trim different characters (Rust U+0085, JavaScript U+FEFF), so `secure` is named when either trim names it and off only for a value that reads `false` under both.",
   "cases": [
     {
       "name": "dropping the block drops every flag",
@@ -132,6 +132,38 @@
     {
       "name": "secure: \"true\" is secure",
       "old": "---\nsecure: \"true\"\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "secure"
+      ]
+    },
+    {
+      "name": "secure: false then U+FEFF stays secure",
+      "old": "---\nsecure: false\ufeff\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "secure"
+      ]
+    },
+    {
+      "name": "U+FEFF before the key still names secure",
+      "old": "---\n\ufeffsecure: true\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "secure"
+      ]
+    },
+    {
+      "name": "secure: false then U+0085 stays secure",
+      "old": "---\nsecure: false\u0085\n---\n",
+      "new": "---\n---\n",
+      "loosened": [
+        "secure"
+      ]
+    },
+    {
+      "name": "U+0085 before the key still names secure",
+      "old": "---\n\u0085secure: true\n---\n",
       "new": "---\n---\n",
       "loosened": [
         "secure"

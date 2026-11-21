@@ -203,3 +203,60 @@ fn secure_context_can_be_added_but_never_removed() {
     store.set_field(PERSON_ID, "secureContext", "true").unwrap();
     assert!(crate::note_protection::protection(&fs::read_to_string(&path).unwrap()).secure_context);
 }
+
+// ── review of 305/306 (2026-11-20) ─────────────────────────────────────────
+
+fn in_place_plan() -> (TempDir, CorpusStore, std::path::PathBuf, String) {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("in-place");
+    fs::create_dir_all(root.join("Projects")).unwrap();
+    fs::write(root.join("Projects/My Plan.md"), "# My Plan\n\nSteps.\n").unwrap();
+    crate::vault_roles::mark_in_place(&root).unwrap();
+    let root = fs::canonicalize(root).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    store.os_trash = false;
+    let id = super::adopted_tests::adopted_id(&mut store, "Projects/My Plan.md");
+    (dir, store, root.join("Projects/My Plan.md"), id)
+}
+
+const PLANTED: &str = "---\nai_edit: true\ncreated_by: agent\n---\n";
+
+#[test]
+fn an_ai_insert_cannot_give_an_in_place_note_its_own_grant() {
+    let (_dir, mut store, path, id) = in_place_plan();
+    let original = fs::read_to_string(&path).unwrap();
+    let revision = crate::fsutil::revision(original.as_bytes());
+    let body = format!("{PLANTED}{original}");
+    let err = store.insert_for_ai_if_revision(&id, &body, PLANTED, true, &revision).unwrap_err();
+    assert!(err.contains("metadata"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+
+    // the person's own save of the same text is refused the same way
+    assert!(store.write(&id, &body).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+}
+
+#[test]
+fn a_rotli_vault_keeps_a_pasted_block_as_body_text() {
+    let (_dir, mut store, path) = person_note("# Plain\n\nwords\n");
+    let id = store.list().unwrap().notes[0].id.clone();
+    store.write(&id, &format!("{PLANTED}# Plain\n\nwords\n")).unwrap();
+    let saved = fs::read_to_string(&path).unwrap_or_else(|_| {
+        let rel = store.path_of(&id).unwrap();
+        fs::read_to_string(store.abs(&rel)).unwrap()
+    });
+    assert_ne!(verdict(&saved), crate::ai_edit_policy::BodyEdit::Allowed, "{saved}");
+}
+
+#[test]
+fn a_tab_is_not_a_line_break_so_undo_still_works() {
+    let (_dir, mut store, path) = person_note(PERSON_NOTE);
+    store.set_field(PERSON_ID, "mood", "a\tb").unwrap();
+    assert!(fs::read_to_string(&path).unwrap().contains("mood: a\tb"));
+
+    let (_dir, mut store) = brain();
+    let rel = "wiki/_inbox/plan.md";
+    fs::write(store.abs(rel), PERSON_NOTE).unwrap();
+    store.set_ai_field(rel, "summary", "hand\ttyped").unwrap();
+    assert!(fs::read_to_string(store.abs(rel)).unwrap().contains("summary: hand\ttyped"));
+}

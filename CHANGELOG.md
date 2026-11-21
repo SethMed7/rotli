@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pasted at the top of a note without metadata stays part of the text, and
   any `secure:` value other than `false` now counts as secure, as it does on
   the Mac.
+- **An AI reply can't turn itself into a note's settings.** In a folder
+  opened in place, an AI insert or an "Allow once" edit that starts with a
+  `---` block could become the metadata of a note that had none, and let AI
+  edit it from then on. Rotli now refuses that save, on the Mac as on the
+  web. On Rotli Web, Unlock and Remove protection now tell you when another
+  line in the note's metadata still keeps it locked or secure, instead of
+  reporting success and moving the note out of its secure folder.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

@@ -70,7 +70,18 @@ export function parseAnchors(value: string): Anchor[] {
 export function addAnchor(value: string, anchor: Anchor): string {
   const same = (a: Anchor) => a.exact === anchor.exact && a.prefix === anchor.prefix;
   const list = [...parseAnchors(value).filter((a) => !same(a)), anchor];
-  return JSON.stringify(list.slice(-ANCHOR_LIMITS.perNote));
+  return oneLineJson(list.slice(-ANCHOR_LIMITS.perNote));
+}
+
+/** JSON on one line: `JSON.stringify` leaves U+0085, U+2028 and U+2029 raw,
+ * and a frontmatter value holding one is refused (review of 305/306). */
+function oneLineJson(value: unknown): string {
+  return [...JSON.stringify(value)]
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      return breaksALine(code) ? `\\u${code.toString(16).padStart(4, "0")}` : char;
+    })
+    .join("");
 }
 
 function occurrences(doc: string, text: string): number[] {
