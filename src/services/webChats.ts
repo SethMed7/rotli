@@ -162,7 +162,7 @@ export interface ChatStore {
  * tighten it (review 2026-11-20): Rust's write_chat_at does the same. */
 function guardedChatText(existing: string, contents: string): string {
   const next = keepProtection(existing, contents);
-  requireNotLooser(existing, next);
+  requireNotLooser(existing, next, true);
   return next;
 }
 

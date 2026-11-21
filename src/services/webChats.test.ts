@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
+import { protectionMark } from "../lib/frontmatterBlock";
 import { loosened, protection } from "../lib/protectionRule";
 import { appendMessages, composeNewChat } from "../memex/contract";
 import { MemoryVaultDir } from "./vaultDir";
@@ -254,6 +255,35 @@ describe("a chat re-save keeps its protection (review 2026-11-20)", () => {
       await expect(
         store.write("granting", "---\nlocal_ai_allowed: true\n---\n", opened.revision),
       ).rejects.toThrow(/local_ai_allowed/);
+    });
+  }
+});
+
+describe("chat restores after the self-review at d0c659dd", () => {
+  for (const [name, make] of [
+    ["browser", () => createWebChatStore(new MemoryVaultStore())],
+    ["folder", () => new FolderChatStore(new MemoryVaultDir())],
+  ] as const) {
+    test(`${name}: an unclosed taint stays on a rewrite`, async () => {
+      const store: ChatStore = make();
+      await store.write("open-taint", "---\ntitle: Web open\nsecureContext: true\n\nyou: hi\n", null);
+      const opened = await store.read("open-taint");
+      await store.write("open-taint", "you: hi\n", opened.revision);
+      expect(protectionMark((await store.read("open-taint")).contents, "secureContext")).toBe(true);
+    });
+
+    test(`${name}: a restore never rewrites block text`, async () => {
+      const store: ChatStore = make();
+      await store.write("web-block", "---\ntitle: Web block\nlocked: true\n---\n\nyou: hi\n", null);
+      const opened = await store.read("web-block");
+      await store.write(
+        "web-block",
+        "---\ntitle: Web block\nnote: |\n  locked: false\n---\n\nyou: hi\n",
+        opened.revision,
+      );
+      const saved = (await store.read("web-block")).contents;
+      expect(saved).toContain("note: |\n  locked: false\n");
+      expect(protection(saved).locked).toBe(true);
     });
   }
 });

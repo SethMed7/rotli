@@ -242,7 +242,9 @@ second user-visible product or storage location.
   CLI and MCP) also runs the tighten-only rule; the person's own saves
   (typing, paste, undo) are never refused for how protection reads. A
   `secureContext` mark counts as a note's protection only inside a block that
-  closes: an unclosed `---` at the top is a horizontal rule. The organizer leaves an area's
+  closes: an unclosed `---` at the top is a horizontal rule. A chat's taint
+  stays fail-closed: a chat rewrite reads an unclosed block as marked and
+  keeps the mark, and its restored lines never replace an indented line. The organizer leaves an area's
   generated overview alone, without an error, when regenerating it would
   loosen a protection the person put on it.
 - `secure:` and `locked:` read the same in Rust and on Rotli Web: the key is

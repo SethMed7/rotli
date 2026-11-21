@@ -24,22 +24,24 @@ export interface Protection {
 
 const BODY_RANK: Record<AiBodyEdit, 0 | 1 | 2> = { revoked: 0, locked: 0, "person-written": 1, allowed: 2 };
 
-export function protection(text: string): Protection {
+/** `chat`: a chat's taint stays fail-closed (an unclosed block reads marked),
+ * where a note's unclosed `---` is a horizontal rule (self-review of 306). */
+export function protection(text: string, chat = false): Protection {
   const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
   const local = localAiAllowedOverride(foreign);
   return {
     locked: foreign.some(locksNote),
     secure: foreign.some(securesNote),
-    secureContext: protectionMark(text, "secureContext", false),
+    secureContext: protectionMark(text, "secureContext", chat),
     localAi: local === false ? 0 : local === null ? 1 : 2,
     bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => !namesLocked(line)))],
   };
 }
 
 /** The protections `next` gives up that `old` had, by key. */
-export function loosened(old: string, next: string): string[] {
-  const a = protection(old);
-  const b = protection(next);
+export function loosened(old: string, next: string, chat = false): string[] {
+  const a = protection(old, chat);
+  const b = protection(next, chat);
   const out: string[] = [];
   if (a.locked && !b.locked) out.push("locked");
   if (a.secure && !b.secure) out.push("secure");
@@ -50,8 +52,8 @@ export function loosened(old: string, next: string): string[] {
 }
 
 /** Throw when rewriting `old` (`""` for a new file) as `next` loosens it. */
-export function requireNotLooser(old: string, next: string): void {
-  const keys = loosened(old, next);
+export function requireNotLooser(old: string, next: string, chat = false): void {
+  const keys = loosened(old, next, chat);
   if (keys.length)
     throw new Error(
       `refused: this write would remove the note's protection (${keys.join(", ")}); change it from the note's own controls`,
@@ -75,7 +77,8 @@ function withLine(contents: string, key: string, value: string): string {
   const block = frontmatterBlock(contents);
   if (!block) return `---\n${key}: ${value}\n---\n\n${contents}`;
   const lines = block.inner.split("\n");
-  const at = lines.findIndex((line) => field(line, key) !== null);
+  // an indented line is block text, never the key (self-review of 306)
+  const at = lines.findIndex((line) => !/^[ \t]/.test(line) && field(line, key) !== null);
   if (at >= 0) lines[at] = `${key}: ${value}`;
   else lines.push(`${key}: ${value}`);
   return withFrontmatterBlock(contents, block, lines.join("\n"));
@@ -93,9 +96,10 @@ const RESTORES: [(had: Protection, now: Protection) => boolean, string, string][
  * a chat rewrite does, so a re-save keeps them. A new grant `old` never had is
  * left for `requireNotLooser` to refuse. */
 export function keepProtection(old: string, next: string): string {
-  const had = protection(old);
+  const had = protection(old, true);
   let out = next;
-  for (const [lost, key, value] of RESTORES) if (lost(had, protection(out))) out = withLine(out, key, value);
+  for (const [lost, key, value] of RESTORES)
+    if (lost(had, protection(out, true))) out = withLine(out, key, value);
   return out;
 }
 

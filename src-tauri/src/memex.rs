@@ -887,7 +887,7 @@ fn write_chat_at(
         // a rewrite keeps every protection the chat had and may only tighten
         // it (review 2026-11-20: re-saves dropped `secure` and `locked`)
         let next = crate::note_protection::keep_protection(&existing, contents, set_chat_line);
-        crate::note_protection::require_not_looser(&existing, &next)?;
+        crate::note_protection::require_chat_not_looser(&existing, &next)?;
         atomic_write(&path, &next)
     })?;
     Ok(path.to_string_lossy().to_string())
@@ -931,10 +931,8 @@ fn set_chat_line(contents: &str, key: &str, value: &str) -> String {
     let mut lines: Vec<&str> = block.lines().collect();
     let mut replaced = false;
     for line in &mut lines {
-        if line
-            .split_once(':')
-            .is_some_and(|(name, _)| name.trim() == key)
-        {
+        // an indented line is block text, never the key (self-review of 306)
+        if !line.starts_with([' ', '\t']) && line.split_once(':').is_some_and(|(name, _)| name.trim() == key) {
             *line = &mark;
             replaced = true;
         }

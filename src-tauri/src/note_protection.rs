@@ -32,12 +32,22 @@ fn body_rank(foreign: &[String]) -> u8 {
 }
 
 pub(crate) fn protection(text: &str) -> Protection {
+    protection_read(text, false)
+}
+
+/// `chat`: a chat's taint stays fail-closed (an unclosed block reads marked),
+/// where a note's unclosed `---` is a horizontal rule (self-review of 306).
+fn protection_read(text: &str, chat: bool) -> Protection {
     let fm = parse_document(text).0.unwrap_or_default();
     let foreign = &fm.foreign;
     Protection {
         locked: foreign.iter().any(|l| locked_field(l) == Some(true)),
         secure: foreign.iter().any(|l| secure_field(l) == Some(true)),
-        secure_context: crate::protection_mark::marked_in_closed_block(text, "secureContext"),
+        secure_context: if chat {
+            crate::protection_mark::marked(text, "secureContext")
+        } else {
+            crate::protection_mark::marked_in_closed_block(text, "secureContext")
+        },
         local_ai: match crate::frontmatter_keys::local_ai_allowed(foreign) {
             Some(false) => 0,
             None => 1,
@@ -49,7 +59,11 @@ pub(crate) fn protection(text: &str) -> Protection {
 
 /// The protections `new` gives up that `old` had, by key.
 pub(crate) fn loosened(old: &str, new: &str) -> Vec<&'static str> {
-    let (a, b) = (protection(old), protection(new));
+    loosened_read(old, new, false)
+}
+
+fn loosened_read(old: &str, new: &str, chat: bool) -> Vec<&'static str> {
+    let (a, b) = (protection_read(old, chat), protection_read(new, chat));
     let mut out = Vec::new();
     if a.locked && !b.locked {
         out.push("locked");
@@ -72,7 +86,15 @@ pub(crate) fn loosened(old: &str, new: &str) -> Vec<&'static str> {
 /// Refuse a rewrite of a note (`old` → `new`) that loosens its protection.
 /// `old` is "" for a file that doesn't exist yet.
 pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
-    let keys = loosened(old, new);
+    refuse_loosened(loosened(old, new))
+}
+
+/// `require_not_looser` for a chat rewrite, reading its taint fail-closed.
+pub(crate) fn require_chat_not_looser(old: &str, new: &str) -> Result<(), String> {
+    refuse_loosened(loosened_read(old, new, true))
+}
+
+fn refuse_loosened(keys: Vec<&str>) -> Result<(), String> {
     if keys.is_empty() {
         return Ok(());
     }
@@ -141,7 +163,7 @@ type Restore = (fn(&Protection, &Protection) -> bool, &'static str, &'static str
 /// so a re-save keeps its flags and denials (review 2026-11-20). A new grant
 /// `old` never had is left for `require_not_looser` to refuse.
 pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &str) -> String) -> String {
-    let had = protection(old);
+    let had = protection_read(old, true);
     let mut out = next.to_string();
     let restores: [Restore; 5] = [
         (|had, now| had.secure_context && !now.secure_context, "secureContext", "true"),
@@ -155,7 +177,7 @@ pub(crate) fn keep_protection(old: &str, next: &str, set_line: fn(&str, &str, &s
         ),
     ];
     for (lost, key, value) in restores {
-        if lost(&had, &protection(&out)) {
+        if lost(&had, &protection_read(&out, true)) {
             out = set_line(&out, key, value);
         }
     }
