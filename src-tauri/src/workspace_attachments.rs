@@ -234,11 +234,9 @@ impl Workspace {
             out["reason"] = json!("not available to agents");
             out
         };
-        let stem = Path::new(rel).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-        if !self.store.agent_listable(rel)
-            || self.store.secure_by_name(stem, rel)
-            || self.store.in_secure_home(rel)
-        {
+        // agent_listable asks protected_path: a secure home or keyword in any
+        // component, in any spelling
+        if !self.store.agent_listable(rel) {
             return refused(out);
         }
         // a linked note passes the very gate a remote read of it would

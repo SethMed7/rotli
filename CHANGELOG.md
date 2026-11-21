@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notes agents can't read, and count an extensionless note as a note. Your
   own sidebar is unchanged.
 
+- **Agents can no longer find private folders through other spellings.** The
+  CLI, the MCP workspace and the agent bridge now protect a secure folder or
+  a secure keyword however the path is written: in another case or letter
+  form (`_SECURE`, `_ſecure`, `STRASSE` for `Straße`), on any parent folder,
+  through a symlink, or named in a note's shelf or in where an archived
+  note came from. Your own sidebar, the Librarian and the organizer are
+  unchanged.
+
 ## [1.9.4] - 2026-11-20
 
 ### Added

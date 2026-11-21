@@ -138,6 +138,14 @@ fn document_rel(request: &BridgeRequest) -> Result<String, String> {
     Ok(rel)
 }
 
+/// The bridge's whole gate on one document, for the agent-surface harness
+/// (which never asks the running app).
+#[cfg(test)]
+pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel: &str) -> Result<(), String> {
+    let path = document_records_gate(store, rel, false)?;
+    document_contents_gate(&path)
+}
+
 /// What a remote reader may never receive, by the vault's own records (held
 /// under the corpus lock): a document hidden from agents or named with a
 /// secure keyword, and, for an edit, one no AI made. Returns its path.
@@ -146,11 +154,11 @@ fn document_records_gate(
     rel: &str,
     editing: bool,
 ) -> Result<PathBuf, String> {
+    if store.protected_path(rel) {
+        return Err("blocked: that document is secure; Rotli never gives it to an agent".into());
+    }
     if !store.agent_listable(rel) {
         return Err("that document isn't available to agents".into());
-    }
-    if store.file_is_protected(rel) {
-        return Err("blocked: that document is secure; Rotli never gives it to an agent".into());
     }
     let path = store.guard_rel(rel)?;
     if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
@@ -200,7 +208,7 @@ pub(crate) fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value,
     if request.tool == "create_document" {
         let title = request.args.get("title").and_then(Value::as_str).unwrap_or_default().trim().to_string();
         let rel = format!("storage/rotli/{title}.docx");
-        if corpus.route(&root_id, |store| Ok(store.secure_by_name(&title, &rel)))? {
+        if corpus.route(&root_id, |store| Ok(store.secure_title(&title) || store.protected_path(&rel)))? {
             return Err("blocked: that name is one of the vault's secure keywords; agents don't make documents named as secure".into());
         }
     } else {
