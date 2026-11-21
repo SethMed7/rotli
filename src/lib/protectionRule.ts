@@ -5,7 +5,7 @@
 // rewrite, so an unchanged line always passes. Pure: text in, verdict out.
 
 import { type AiBodyEdit, bodyEdit, field } from "./aiEditPolicy";
-import { parseNoteDocument } from "./frontmatter";
+import { locksNote, namesLocked, parseNoteDocument, securesNote } from "./frontmatter";
 import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "./frontmatterBlock";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 
@@ -15,45 +15,59 @@ export interface Protection {
   secureContext: boolean;
   /** `local_ai_allowed`: 0 denied, 1 follows the vault, 2 granted. */
   localAi: 0 | 1 | 2;
-  /** Who may edit the body (`locked`, `ai_edit`, `created_by` decide). */
-  bodyEdit: AiBodyEdit;
+  /** Who may edit the body, by `ai_edit` and `created_by` alone (`locked` is
+   * its own flag): 0 revoked, 1 person-written, 2 allowed. Revoked is stricter
+   * than a person's note: consent to one `/ai` insertion never overrides a
+   * deliberate "no". */
+  bodyEdit: 0 | 1 | 2;
 }
 
-export function protection(text: string): Protection {
+const BODY_RANK: Record<AiBodyEdit, 0 | 1 | 2> = { revoked: 0, locked: 0, "person-written": 1, allowed: 2 };
+
+/** `chat`: a chat's taint stays fail-closed (an unclosed block reads marked),
+ * where a note's unclosed `---` is a horizontal rule (self-review of 306). */
+export function protection(text: string, chat = false): Protection {
   const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
   const local = localAiAllowedOverride(foreign);
   return {
-    locked: foreign.some((line) => field(line, "locked") === "true"),
-    // Rust's secure_field: only a literal `false` opens the ordinary lane
-    secure: foreign.some((line) => {
-      const value = field(line, "secure");
-      return value !== null && value !== "false";
-    }),
-    secureContext: protectionMark(text, "secureContext"),
+    locked: foreign.some(locksNote),
+    secure: foreign.some(securesNote),
+    secureContext: protectionMark(text, "secureContext", chat),
     localAi: local === false ? 0 : local === null ? 1 : 2,
-    bodyEdit: bodyEdit(foreign),
+    bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => !namesLocked(line)))],
   };
 }
 
 /** The protections `next` gives up that `old` had, by key. */
-export function loosened(old: string, next: string): string[] {
-  const a = protection(old);
-  const b = protection(next);
+export function loosened(old: string, next: string, chat = false): string[] {
+  const a = protection(old, chat);
+  const b = protection(next, chat);
   const out: string[] = [];
   if (a.locked && !b.locked) out.push("locked");
   if (a.secure && !b.secure) out.push("secure");
   if (a.secureContext && !b.secureContext) out.push("secureContext");
   if (b.localAi > a.localAi) out.push("local_ai_allowed");
-  if (b.bodyEdit === "allowed" && a.bodyEdit !== "allowed") out.push("ai_edit");
+  if (b.bodyEdit > a.bodyEdit) out.push("ai_edit");
   return out;
 }
 
 /** Throw when rewriting `old` (`""` for a new file) as `next` loosens it. */
-export function requireNotLooser(old: string, next: string): void {
-  const keys = loosened(old, next);
+export function requireNotLooser(old: string, next: string, chat = false): void {
+  const keys = loosened(old, next, chat);
   if (keys.length)
     throw new Error(
       `refused: this write would remove the note's protection (${keys.join(", ")}); change it from the note's own controls`,
+    );
+}
+
+/** Throw when `next` loosens a key the raw metadata editor may not: the ones
+ * only Rust writes and the one-way chat taint (`locked` and `secure` are the
+ * person's to type there). Rust's require_owned_not_looser. */
+export function requireOwnedNotLooser(old: string, next: string): void {
+  const keys = loosened(old, next).filter((key) => key !== "locked" && key !== "secure");
+  if (keys.length)
+    throw new Error(
+      `refused: this would remove the note's ${keys.join(", ")} setting; use the note's own controls`,
     );
 }
 
@@ -63,8 +77,10 @@ function withLine(contents: string, key: string, value: string): string {
   const block = frontmatterBlock(contents);
   if (!block) return `---\n${key}: ${value}\n---\n\n${contents}`;
   const lines = block.inner.split("\n");
-  const at = lines.findIndex((line) => field(line, key) !== null);
-  if (at >= 0) lines[at] = `${key}: ${value}`;
+  // every top-level `key:` line is replaced, as Rust's set_chat_line does; an
+  // indented line is block text, never the key (self-review of 306)
+  const top = (line: string) => !/^[ \t]/.test(line) && field(line, key) !== null;
+  if (lines.some(top)) lines.forEach((line, at) => top(line) && (lines[at] = `${key}: ${value}`));
   else lines.push(`${key}: ${value}`);
   return withFrontmatterBlock(contents, block, lines.join("\n"));
 }
@@ -74,20 +90,27 @@ const RESTORES: [(had: Protection, now: Protection) => boolean, string, string][
   [(had, now) => had.secure && !now.secure, "secure", "true"],
   [(had, now) => had.locked && !now.locked, "locked", "true"],
   [(had, now) => had.localAi === 0 && now.localAi !== 0, "local_ai_allowed", "false"],
-  [(had, now) => had.bodyEdit === "revoked" && now.bodyEdit === "allowed", "ai_edit", "false"],
+  [(had, now) => had.bodyEdit === 0 && now.bodyEdit > 0, "ai_edit", "false"],
 ];
 
 /** `next` with every protection `old` had put back, flags and denials: what
  * a chat rewrite does, so a re-save keeps them. A new grant `old` never had is
  * left for `requireNotLooser` to refuse. */
 export function keepProtection(old: string, next: string): string {
-  const had = protection(old);
+  const had = protection(old, true);
   let out = next;
-  for (const [lost, key, value] of RESTORES) if (lost(had, protection(out))) out = withLine(out, key, value);
+  for (const [lost, key, value] of RESTORES)
+    if (lost(had, protection(out, true))) out = withLine(out, key, value);
   return out;
 }
 
 /** A note or a board: the files whose own text carries protection. */
 export function isNotePath(path: string): boolean {
-  return /\.(md|excalidraw)$/i.test(path);
+  // Rust's `Path::extension`: trailing slashes go, and a leading-dot name
+  // (`.md`) has no extension (shared fixture, protection-rule.json)
+  const name = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return false;
+  const ext = name.slice(dot + 1).toLowerCase();
+  return ext === "md" || ext === "excalidraw";
 }

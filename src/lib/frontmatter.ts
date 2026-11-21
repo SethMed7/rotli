@@ -7,6 +7,8 @@
 //
 // Pure: no host, no vault, no services.
 
+import { protectionMark } from "./frontmatterBlock";
+
 /** The four facts Rotli owns, plus `origin` and every line it does not.
  * `foreign` lines are preserved verbatim, in order — never reformatted. */
 export interface NoteFrontmatter {
@@ -122,21 +124,59 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
   return { ...fm, foreign };
 }
 
-function flagField(fm: NoteFrontmatter, key: string): boolean {
-  return fm.foreign.some((line) => {
-    const colon = line.indexOf(":");
-    if (colon < 0) return false;
-    return line.slice(0, colon).trim() === key && line.slice(colon + 1).trim() === "true";
-  });
-}
-
 /** A foreign `secure: true` line — the note is categorically unavailable to
  * remote models. The vault file is the truth; this only reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "secure");
+  return fm.foreign.some(securesNote);
+}
+
+/** Rust's `str::trim`: JavaScript's whitespace without U+FEFF, plus U+0085. */
+function rustTrim(text: string): string {
+  const space = (char: string) => char === "\u0085" || (char !== "\uFEFF" && /\s/.test(char));
+  const chars = [...text];
+  let start = 0;
+  let end = chars.length;
+  while (start < end && space(chars[start]!)) start += 1;
+  while (end > start && space(chars[end - 1]!)) end -= 1;
+  return chars.slice(start, end).join("");
+}
+
+/** Rust's secure_field: a `secure:` line that doesn't read `false` keeps the
+ * note out of the ordinary lane. Rust trims U+0085 and JavaScript U+FEFF, so
+ * either trim names the key and only `false` under both opens it (review of
+ * 305/306); scripts/fixtures/protection-rule.json pins both sides. */
+export function securesNote(line: string): boolean {
+  const colon = line.indexOf(":");
+  if (colon < 0) return false;
+  const key = line.slice(0, colon);
+  const value = line.slice(colon + 1);
+  if (key.trim() !== "secure" && rustTrim(key) !== "secure") return false;
+  return !(value.trim() === "false" && rustTrim(value) === "false");
+}
+
+/** Does the line name `locked`, by either side's trim (Rust's locked_field)? */
+export function namesLocked(line: string): boolean {
+  const colon = line.indexOf(":");
+  if (colon < 0) return false;
+  const key = line.slice(0, colon);
+  return key.trim() === "locked" || rustTrim(key) === "locked";
+}
+
+/** A `locked:` line reading `true` under either trim: failing closed, so the
+ * Mac and the web agree on a U+FEFF or U+0085 around it (re-check of 306). */
+export function locksNote(line: string): boolean {
+  if (!namesLocked(line)) return false;
+  const value = line.slice(line.indexOf(":") + 1);
+  return value.trim() === "true" || rustTrim(value) === "true";
+}
+
+/** A note's own secure reading: its `secure:` line, or a chat's taint mark
+ * read as Rust's native read does (lane check of 306). */
+export function secureNoteText(text: string, fm: NoteFrontmatter | null): boolean {
+  return (!!fm && isSecureFrontmatter(fm)) || protectionMark(text, "secureContext");
 }
 
 /** A foreign `locked: true` line — no AI may edit the note, every class reads it. */
 export function isLockedFrontmatter(fm: NoteFrontmatter): boolean {
-  return flagField(fm, "locked");
+  return fm.foreign.some(locksNote);
 }

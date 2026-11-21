@@ -11,6 +11,7 @@
 // A locked note refuses every AI; otherwise the grant decides, and with no
 // grant only an AI-made note is editable.
 
+import { locksNote } from "./frontmatter";
 import { ownedKey } from "./frontmatterKeys";
 
 export const AI_CREATORS = ["chat", "agent", "librarian"] as const;
@@ -29,7 +30,7 @@ export function field(line: string, key: string): string | null {
  * `created_by` typed in any spelling still denies or restricts, and only the
  * spelling Rust writes grants. */
 export function bodyEdit(foreign: readonly string[]): AiBodyEdit {
-  if (foreign.some((line) => field(line, "locked") === "true")) return "locked";
+  if (foreign.some(locksNote)) return "locked";
   const grant = ownedKey(foreign, "ai_edit", (value) => value === "true");
   if (grant.says !== "unset") return grant.says === "grant" ? "allowed" : "revoked";
   const creator = ownedKey(foreign, "created_by", (value) =>
