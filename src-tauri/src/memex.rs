@@ -887,7 +887,7 @@ fn write_chat_at(
         // a rewrite keeps every protection the chat had and may only tighten
         // it (review 2026-11-20: re-saves dropped `secure` and `locked`)
         let next = crate::note_protection::keep_protection(&existing, contents, set_chat_line);
-        crate::note_protection::require_chat_not_looser(&existing, &next)?;
+        crate::note_protection::require_not_looser_fail_closed(&existing, &next)?;
         atomic_write(&path, &next)
     })?;
     Ok(path.to_string_lossy().to_string())

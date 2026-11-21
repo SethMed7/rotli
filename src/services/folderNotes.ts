@@ -20,6 +20,7 @@ import {
   isLockedFrontmatter,
   isSecureFrontmatter,
 } from "../lib/frontmatter";
+import { protectionMark } from "../lib/frontmatterBlock";
 import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
@@ -216,9 +217,12 @@ export class FolderNotesService implements NotesService {
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
+      // a chat's taint mark counts too, by the grammar Rust's native read
+      // shares (lane check of 306: the web read gate left it out)
       secure:
         under(withoutSinkPrefix(path), WIKI_SECURE) ||
-        (frontmatter ? isSecureFrontmatter(frontmatter) : false),
+        (frontmatter ? isSecureFrontmatter(frontmatter) : false) ||
+        protectionMark(text, "secureContext"),
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
       suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),

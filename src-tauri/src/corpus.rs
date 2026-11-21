@@ -4929,7 +4929,7 @@ impl CorpusStore {
             // carry both through from disk.
             pinned: old_fm.pinned,
             origin: old_fm.origin,
-            foreign: old_fm.foreign,
+            foreign: crate::note_protection::with_unparsed_taint(&existing, had_fence, old_fm.foreign),
         };
         let text = if as_written {
             in_place::in_place_text(&existing, old_raw, had_fence, body)?
@@ -4976,7 +4976,7 @@ impl CorpusStore {
         // an AI or agent save may only tighten; the person's own save is never
         // refused for how protection reads (review and re-check of 305/306)
         if ai {
-            crate::note_protection::require_not_looser(&existing, &text)?;
+            crate::note_protection::require_not_looser_fail_closed(&existing, &text)?;
         }
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
@@ -5409,7 +5409,7 @@ impl CorpusStore {
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
-            self.write_tightened(&path, &text, &self.compose_for(&text, &fm, body))
+            self.write_ai_tightened(&path, &text, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -5439,7 +5439,7 @@ impl CorpusStore {
             // either way it may only tighten what the person set on it
             // (review 2026-11-20)
             let current = read_existing_text(&path)?;
-            crate::note_protection::require_not_looser(&current, body)?;
+            crate::note_protection::require_not_looser_fail_closed(&current, body)?;
             if body.is_empty() {
                 self.suppress.mark(&path);
                 if path.exists() {

@@ -89,14 +89,32 @@ pub(crate) fn require_not_looser(old: &str, new: &str) -> Result<(), String> {
     refuse_loosened(loosened(old, new))
 }
 
-/// `require_not_looser` for a chat rewrite, reading its taint fail-closed.
-pub(crate) fn require_chat_not_looser(old: &str, new: &str) -> Result<(), String> {
+/// `require_not_looser` reading the `secureContext` taint fail-closed, the
+/// way the AI read gate does: for chat rewrites and every AI or agent write
+/// (lane check of 306: a closed-block reading let a local-model edit strip a
+/// marker the read gate honoured, opening the note to remote models).
+pub(crate) fn require_not_looser_fail_closed(old: &str, new: &str) -> Result<(), String> {
     refuse_loosened(loosened_read(old, new, true))
+}
+
+/// A person's save in a Rotli vault rebuilds the metadata block. When the old
+/// text had no block the parser sees but the marker reader saw a taint (a
+/// leading blank line, an unclosed block), the taint rides into the new block,
+/// so the save keeps it instead of being refused (lane check of 306).
+pub(crate) fn with_unparsed_taint(existing: &str, had_fence: bool, mut foreign: Vec<String>) -> Vec<String> {
+    if !had_fence && crate::protection_mark::marked(existing, "secureContext") {
+        foreign.push("secureContext: true".into());
+    }
+    foreign
 }
 
 fn refuse_loosened(keys: Vec<&str>) -> Result<(), String> {
     if keys.is_empty() {
         return Ok(());
+    }
+    if keys == ["secureContext"] {
+        // no control turns this mark off, so don't point at one
+        return Err("refused: this note is marked as holding secure content (secureContext), and an edit never removes that mark".into());
     }
     Err(format!(
         "refused: this write would remove the note's protection ({}); change it from the note's own controls",

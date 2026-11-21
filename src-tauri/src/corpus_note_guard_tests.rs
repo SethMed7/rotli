@@ -376,3 +376,108 @@ fn rotli_vault_unlock_and_remove_protection_never_touch_block_text() {
     assert!(saved.contains("example: |\n  locked: false\n"), "{saved}");
     assert!(crate::note_protection::protection(&saved).locked, "{saved}");
 }
+
+// ── lane check of 306 at 5a4deb57 (2026-11-20) ─────────────────────────────
+
+const UNCLOSED_MARK: &str = "---\nsecureContext: true\nwords\n";
+
+#[test]
+fn a_local_model_edit_never_opens_a_marked_note_to_remote_models() {
+    // S1: the AI backstop read the marker closed-block only, the read gate
+    // fail-closed, so a local edit dropping it made the note remote-readable
+    let (_dir, mut store, path, id) = in_place_note("Unclosed.md", UNCLOSED_MARK);
+    let rel = store.path_of(&id).unwrap();
+    assert!(store.read_for_ai(&rel, false).is_err());
+    let revision = crate::fsutil::revision(UNCLOSED_MARK.as_bytes());
+    let err = store.write_for_ai_as(&id, "words\n", true, &revision, AiWrite::ConsentedReplace).unwrap_err();
+    assert!(err.contains("secureContext"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), UNCLOSED_MARK);
+    assert!(store.read_for_ai(&rel, false).is_err());
+
+    // a Rotli vault keeps the taint in its own block (N1), so the edit may land
+    let (_dir, mut store, _path) = person_note(UNCLOSED_MARK);
+    let id = first_id(&mut store);
+    let rel = store.path_of(&id).unwrap();
+    let revision = crate::fsutil::revision(fs::read(store.abs(&rel)).unwrap().as_slice());
+    let _ = store.write_for_ai_as(&id, "words\n", true, &revision, AiWrite::ConsentedReplace);
+    let rel = store.path_of(&id).unwrap();
+    assert!(store.read_for_ai(&rel, false).is_err(), "{}", fs::read_to_string(store.abs(&rel)).unwrap());
+}
+
+#[test]
+fn a_filer_field_never_drops_an_unclosed_mark() {
+    let (_dir, mut store) = brain();
+    let rel = "wiki/_inbox/marked.md";
+    fs::write(store.abs(rel), UNCLOSED_MARK).unwrap();
+    assert!(store.set_ai_field(rel, "tags", "[plans]").is_err());
+    assert_eq!(fs::read_to_string(store.abs(rel)).unwrap(), UNCLOSED_MARK);
+}
+
+#[test]
+fn an_index_rewrite_never_drops_an_unclosed_mark() {
+    let (_dir, mut store) = brain();
+    fs::create_dir_all(store.abs("wiki/Projects")).unwrap();
+    let marked = "---\nsecureContext: true\n# Projects\n";
+    fs::write(store.abs("wiki/Projects/_index.md"), marked).unwrap();
+    assert!(store.write_index("Projects", "# Projects\n\n- regenerated\n").is_err());
+    assert_eq!(fs::read_to_string(store.abs("wiki/Projects/_index.md")).unwrap(), marked);
+}
+
+#[test]
+fn the_editor_save_lets_the_person_edit_their_own_text() {
+    // Q4: the real editor lane (corpus_write → write_if_revision_with_body_base)
+    let (_dir, mut store, path, id) = in_place_note("Marked.md", MARKED);
+    let revision = crate::fsutil::revision(MARKED.as_bytes());
+    store.write_if_revision_with_body_base(&id, "\nwords\n", &revision, None).unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), "\nwords\n");
+}
+
+#[test]
+fn every_body_save_names_its_lane() {
+    // Q4: the AI/agent saves run the backstop, the person's never. Two of
+    // them can't reach it by behaviour (the remote lane refuses a person's
+    // note first; a task tick can't loosen), so their lane is pinned here.
+    let source = include_str!("corpus.rs");
+    let want = [
+        ("write_for_ai", "true"),
+        ("write_for_ai_as", "true"),
+        ("write_for_remote_agent", "true"),
+        ("write_for_remote_agent_if_revision", "true"),
+        ("toggle_task", "false"),
+        ("write", "false"),
+        ("write_if_revision_with_body_base", "false"),
+    ];
+    let mut found = Vec::new();
+    let mut current = "";
+    for line in source.lines() {
+        let trimmed = line.trim_start();
+        for prefix in ["pub(crate) fn ", "pub fn ", "fn "] {
+            if let Some(rest) = trimmed.strip_prefix(prefix) {
+                current = rest.split(['(', '<']).next().unwrap_or("");
+            }
+        }
+        if line.contains("self.write_resolved(") {
+            let lane = if line.contains(", true)") { "true" } else if line.contains(", false)") { "false" } else { "?" };
+            found.push((current.to_string(), lane));
+        }
+    }
+    let found: Vec<(&str, &str)> = found.iter().map(|(f, l)| (f.as_str(), *l)).collect();
+    assert_eq!(found.len(), want.len(), "{found:?}");
+    for pair in want {
+        assert!(found.contains(&pair), "{pair:?} not in {found:?}");
+    }
+}
+
+#[test]
+fn a_persons_save_keeps_a_taint_only_the_marker_reader_saw() {
+    // N1: a Rotli vault rebuilds the block; the taint rides into it
+    for text in [UNCLOSED_MARK, MARKED] {
+        let (_dir, mut store, _path) = person_note(text);
+        let id = first_id(&mut store);
+        store.write(&id, "words, edited\n").unwrap();
+        let rel = store.path_of(&id).unwrap();
+        let saved = fs::read_to_string(store.abs(&rel)).unwrap();
+        assert!(crate::note_protection::protection(&saved).secure_context, "{text:?} → {saved}");
+        assert!(store.read_for_ai(&rel, false).is_err(), "{saved}");
+    }
+}

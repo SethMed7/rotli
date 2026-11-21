@@ -3,6 +3,7 @@
 // or be refused with the file untouched.
 import { expect, test } from "bun:test";
 
+import marks from "../../scripts/fixtures/protection-marks.json";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { breaksALine } from "../lib/controlChars";
 import { isSecureFrontmatter, parseNoteDocument } from "../lib/frontmatter";
@@ -143,4 +144,31 @@ test("in place: the refusal for a typed --- block points to Show file metadata",
   await expect(notes.updateNote(note.id, "---\ntags: [x]\n---\n# Plain\n", note.revision)).rejects.toThrow(
     /Show file metadata/,
   );
+});
+
+// lane check of 306 at 5a4deb57 (2026-11-20)
+
+test("rotli vault: a pasted closed block with no title keeps the note listed, as untitled.md", async () => {
+  const { dir, notes, note } = await vault("rotli", "wiki/plain.md", "words\n");
+  await notes.updateNote(note.id, "---\nai_edit: true\n---\n\nwords\n", note.revision);
+  const listed = await notes.listAll();
+  expect(listed).toHaveLength(1);
+  expect(await notes.filePathOf(listed[0]!.id)).toBe("wiki/untitled.md");
+  expect(await dir.exists("wiki/.md")).toBe(false);
+});
+
+test.each(marks.cases.map((c) => [c.name, c.contents, c.marked] as const))(
+  "the web read gate counts a note's taint by the shared grammar: %s",
+  async (_name, contents, marked) => {
+    const { notes, note } = await vault("rotli", "Inbox/chat.md", contents);
+    expect((await notes.getNote(note.id))?.secure).toBe(marked);
+  },
+);
+
+test("rotli vault: a titled note retitled to an empty title stays listed, as untitled.md", async () => {
+  const { notes, note } = await vault("rotli", "wiki/plan.md", "---\nid: n2b\n---\n# Plan\n\nwords\n");
+  await notes.updateNote(note.id, "---\n\nwords after a rule\n", note.revision);
+  const listed = await notes.listAll();
+  expect(listed).toHaveLength(1);
+  expect(await notes.filePathOf(listed[0]!.id)).toBe("wiki/untitled.md");
 });

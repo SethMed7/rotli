@@ -1708,7 +1708,7 @@ fn refresh_indexes(
         }
         // the person protected the overview (a denial regeneration would
         // drop): leave the area alone, without an error each pass
-        if crate::note_protection::require_not_looser(&disk, &body).is_err() {
+        if crate::note_protection::require_not_looser_fail_closed(&disk, &body).is_err() {
             continue;
         }
         let apply = auto_applies(trust, Verb::Index, false);
@@ -4926,6 +4926,25 @@ mod tests {
             assert_eq!(report.errors, 0);
             assert_eq!(fs::read_to_string(&path).unwrap(), denied);
         }
+    }
+
+    #[test]
+    fn an_overview_with_an_unclosed_mark_is_skipped_quietly() {
+        // lane check of 306: the skip reads the marker fail-closed, as the read gate does
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        let a = place_note(&state, "# Alpha\n\none", "Projects");
+        handle.enqueue(&root, &[root.join(&a)]);
+        let transport = |_: &str| Ok("nope".to_string());
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        let path = root.join("wiki/Projects/_index.md");
+        let marked = format!("---\nsecureContext: true\n{}", fs::read_to_string(&path).unwrap());
+        fs::write(&path, &marked).unwrap();
+        let b = place_note(&state, "# Beta\n\ntwo", "Projects");
+        handle.enqueue(&root, &[root.join(&b)]);
+        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        assert_eq!(report.errors, 0);
+        assert_eq!(fs::read_to_string(&path).unwrap(), marked);
     }
 
     #[test]

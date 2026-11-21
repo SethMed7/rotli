@@ -239,10 +239,17 @@ second user-visible product or storage location.
   `---` would otherwise become a standing AI grant); in a Rotli vault the
   note gains its own block, so the pasted one stays body text. On the Mac,
   every AI or agent body save (`/ai`, "Allow once", Hand to AI, chat edits,
-  CLI and MCP) also runs the tighten-only rule; the person's own saves
-  (typing, paste, undo) are never refused for how protection reads. A
-  `secureContext` mark counts as a note's protection only inside a block that
-  closes: an unclosed `---` at the top is a horizontal rule. A chat's taint
+  CLI and MCP), the Filer's fields, the Librarian's overview and the
+  organizer's overview check also run the tighten-only rule, reading a
+  `secureContext` mark fail-closed as the AI read gate does, so a
+  local-model edit can't strip a mark and open the note to remote models.
+  The person's own saves (typing, paste, undo) are never refused for how
+  protection reads: for them a mark counts only inside a block that closes
+  (an unclosed `---` at the top is a horizontal rule), and in a Rotli vault a
+  mark only the marker reader saw rides into the rebuilt metadata block as
+  `secureContext: true`. Rotli Web's notes count the mark too, by the same
+  shared grammar (`protection-marks.json`), and a note whose title is empty
+  is named `untitled.md` on both sides. A chat's taint
   stays fail-closed: a chat rewrite reads an unclosed block as marked and
   keeps the mark, and its restored lines never replace an indented line. The organizer leaves an area's
   generated overview alone, without an error, when regenerating it would

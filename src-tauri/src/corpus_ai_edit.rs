@@ -49,6 +49,13 @@ impl CorpusStore {
         atomic_write(path, out)
     }
 
+    /// `write_tightened` for an AI writer (the Filer's fields): the taint is
+    /// read fail-closed, as the AI read gate reads it (lane check of 306).
+    pub(crate) fn write_ai_tightened(&self, path: &std::path::Path, old: &str, out: &str) -> Result<(), String> {
+        crate::note_protection::require_not_looser_fail_closed(old, out)?;
+        self.write_tightened(path, old, out)
+    }
+
     pub(crate) fn set_ai_edit(&mut self, id_or_rel: &str, allowed: bool) -> Result<(), String> {
         self.mutation_allowed()?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
