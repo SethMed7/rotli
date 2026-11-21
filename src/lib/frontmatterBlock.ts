@@ -52,7 +52,7 @@ export function afterFrontmatter(contents: string): string {
  * scripts/fixtures/protection-marks.json; where it can't be sure, it says
  * marked (seventh review of pull request 267: the two sides disagreed on a
  * byte-order mark, an unclosed block, `key : true`, an indented key, TRUE). */
-export function protectionMark(contents: string, key: string): boolean {
+export function protectionMark(contents: string, key: string, unclosed = true): boolean {
   const lines = contents
     .replace(/^\uFEFF/, "")
     .split("\n")
@@ -72,5 +72,8 @@ export function protectionMark(contents: string, key: string): boolean {
       .toLowerCase();
     if (!["false", "no", "off"].includes(value)) found = true;
   }
-  return true; // a block that never closes can't show the mark absent
+  // a block that never closes can't show the mark absent; a note's *old*
+  // protection passes `unclosed = false`, since an unclosed `---` at the top
+  // is a horizontal rule there (Rust's marked_in_closed_block)
+  return unclosed;
 }

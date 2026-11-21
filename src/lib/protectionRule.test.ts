@@ -27,3 +27,10 @@ describe("note protection only tightens", () => {
     expect(keepProtection("plain\n", "---\ntitle: t\n---\n")).toBe("---\ntitle: t\n---\n");
   });
 });
+
+test("a lock doesn't hide a revoked grant: a rewrite dropping both gets both back", () => {
+  const old = "---\ntitle: Budget\nai_edit: false\ncreated_by: agent\nlocked: true\n---\n\nyou: numbers\n";
+  const kept = keepProtection(old, "---\ntitle: Budget\ncreated_by: agent\n---\n\nyou: numbers\n");
+  expect(loosened(old, kept)).toEqual([]);
+  expect(kept).toContain("ai_edit: false");
+});

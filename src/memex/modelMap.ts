@@ -1,4 +1,4 @@
-import { isBidiControl, isC0OrC1Control } from "../lib/controlChars";
+import { breaksALine, isBidiControl } from "../lib/controlChars";
 
 export interface ModelMapNote {
   id: string;
@@ -44,7 +44,7 @@ export function priorityOrder(a: ModelMapNote, b: ModelMapNote): number {
 /** C0/C1 controls, line/paragraph separators, and bidi embeddings/overrides/
  * isolates: none of them may reach model-facing text. */
 export function isModelUnsafeCodeUnit(code: number): boolean {
-  return isC0OrC1Control(code) || code === 0x2028 || code === 0x2029 || isBidiControl(code);
+  return code === 0x09 || breaksALine(code) || isBidiControl(code);
 }
 
 /** Each model-unsafe UTF-16 code unit becomes U+FFFD; everything else is kept. */

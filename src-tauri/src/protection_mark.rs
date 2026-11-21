@@ -7,27 +7,39 @@
 
 /// Does `contents` carry `key` as a protection mark?
 pub(crate) fn marked(contents: &str, key: &str) -> bool {
+    scan(contents, key).unwrap_or(true)
+}
+
+/// `marked`, but only a block that closes counts: what a note's *old*
+/// protection reads, where an unclosed `---` at the top is a horizontal rule
+/// in the person's text, not a taint to keep (re-check of 306, 2026-11-20).
+pub(crate) fn marked_in_closed_block(contents: &str, key: &str) -> bool {
+    scan(contents, key).unwrap_or(false)
+}
+
+/// The mark, or None for a block that never closes.
+fn scan(contents: &str, key: &str) -> Option<bool> {
     let text = contents.strip_prefix('\u{feff}').unwrap_or(contents);
     let mut lines = text.split('\n').map(|l| l.strip_suffix('\r').unwrap_or(l));
     let fence = loop {
         match lines.next() {
-            None => return false,
+            None => return Some(false),
             Some(line) if line.trim().is_empty() => continue,
             Some(line) => break line,
         }
     };
     if fence.trim_end() != "---" {
-        return false;
+        return Some(false);
     }
     let mut found = false;
     for line in lines {
         if line.trim_end() == "---" {
-            return found;
+            return Some(found);
         }
         found |= marks(line, key);
     }
     // a block that never closes can't show the mark absent
-    true
+    None
 }
 
 /// Does this one line set `key` as a mark (rules 4 and 5)? Also what the
