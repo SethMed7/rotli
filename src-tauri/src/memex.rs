@@ -879,19 +879,15 @@ fn write_chat_at(
             (Some(_), None) => return Err(format!("chat no longer exists: {safe}")),
             (None, None) => {}
         }
-        let existing_tainted = match existing {
-            Some(bytes) => {
-                let text = String::from_utf8(bytes)
-                    .map_err(|_| format!("existing chat is not valid UTF-8: {safe}"))?;
-                chat_secure_context(&text)
-            }
-            None => false,
+        let existing = match existing {
+            Some(bytes) => String::from_utf8(bytes)
+                .map_err(|_| format!("existing chat is not valid UTF-8: {safe}"))?,
+            None => String::new(),
         };
-        let next = if existing_tainted {
-            ensure_chat_secure_context(contents)
-        } else {
-            contents.to_string()
-        };
+        // a rewrite keeps every protection the chat had and may only tighten
+        // it (review 2026-11-20: re-saves dropped `secure` and `locked`)
+        let next = crate::note_protection::keep_protection(&existing, contents, set_chat_line);
+        crate::note_protection::require_not_looser_fail_closed(&existing, &next)?;
         atomic_write(&path, &next)
     })?;
     Ok(path.to_string_lossy().to_string())
@@ -911,26 +907,33 @@ fn chat_frontmatter_bounds(contents: &str) -> Option<(usize, usize, &'static str
 
 /// The chat's taint mark, by the grammar TypeScript shares
 /// (protection_mark.rs; seventh review of pull request 267).
+#[cfg(test)]
 fn chat_secure_context(contents: &str) -> bool {
     crate::protection_mark::marked(contents, "secureContext")
 }
 
+#[cfg(test)]
 fn ensure_chat_secure_context(contents: &str) -> String {
     if chat_secure_context(contents) {
         return contents.to_string();
     }
+    set_chat_line(contents, "secureContext", "true")
+}
+
+/// `contents` with `key: value` in its frontmatter: an existing `key:` line is
+/// replaced, otherwise one is added (and a block made when there is none).
+fn set_chat_line(contents: &str, key: &str, value: &str) -> String {
     let Some((start, end, eol)) = chat_frontmatter_bounds(contents) else {
-        return format!("---\nsecureContext: true\n---\n\n{contents}");
+        return format!("---\n{key}: {value}\n---\n\n{contents}");
     };
+    let mark = format!("{key}: {value}");
     let block = &contents[start..end];
     let mut lines: Vec<&str> = block.lines().collect();
     let mut replaced = false;
     for line in &mut lines {
-        if line
-            .split_once(':')
-            .is_some_and(|(key, _)| key.trim() == "secureContext")
-        {
-            *line = "secureContext: true";
+        // an indented line is block text, never the key (self-review of 306)
+        if !line.starts_with([' ', '\t']) && line.split_once(':').is_some_and(|(name, _)| name.trim() == key) {
+            *line = &mark;
             replaced = true;
         }
     }
@@ -939,7 +942,7 @@ fn ensure_chat_secure_context(contents: &str) -> String {
         if !block.is_empty() {
             block.push_str(eol);
         }
-        block.push_str("secureContext: true");
+        block.push_str(&mark);
     }
     format!("{}{}{}", &contents[..start], block, &contents[end..])
 }
@@ -1316,6 +1319,10 @@ pub async fn memex_pick_folder(app: tauri::AppHandle, title: Option<String>) -> 
 #[cfg(all(test, unix))]
 #[path = "memex_hard_link_tests.rs"]
 mod hard_link_tests;
+
+#[cfg(test)]
+#[path = "memex_chat_guard_tests.rs"]
+mod chat_guard_tests;
 
 #[cfg(test)]
 mod tests {

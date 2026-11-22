@@ -25,6 +25,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Saving a chat or a spreadsheet can no longer unlock or unprotect a
+  note.** Some saves replaced a note's whole text and quietly dropped its
+  Locked or Secure setting, or a chat's mark that it holds secure content.
+  A chat save now keeps those settings, the spreadsheet save refuses to write
+  over a note or a board, and the Librarian's area overviews can't remove a
+  setting you put on them. Turning a protection off still works from the
+  note's own controls.
+- **A tag or a pasted block can no longer switch on AI editing.** A
+  Librarian tag, or a metadata field, holding a line break could add hidden
+  lines such as "let AI edit this note". Those values are now cleaned or
+  refused. The raw metadata view keeps a note's AI-edit and on-device
+  settings and its secure-chat mark, and "Let AI edit" no longer deletes
+  indented text in a note's metadata. If another line still decides the
+  setting, it tells you instead of saying it worked. On Rotli Web, a `---` block
+  pasted at the top of a note without metadata stays part of the text, and
+  any `secure:` value other than `false` now counts as secure, as it does on
+  the Mac.
+- **An AI reply can't turn itself into a note's settings.** In a folder
+  opened in place, an AI insert or an "Allow once" edit that starts with a
+  `---` block could become the metadata of a note that had none, and let AI
+  edit it from then on. Rotli now refuses that save, on the Mac as on the
+  web. Unlock and Remove protection now tell you when another line in the
+  note's metadata still keeps it locked or secure, instead of reporting
+  success, moving the note out of its secure folder or dropping its
+  `.gitignore` line.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

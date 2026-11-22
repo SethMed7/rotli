@@ -1343,7 +1343,10 @@ pub fn compose_document(fm: &Frontmatter, raw_body: &str) -> String {
 /// locked-skip must read the same line the same way.
 pub(crate) fn locked_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
-    (k.trim() == "locked").then(|| v.trim() == "true")
+    // either side's trim names the key and reads `true` (the secure_field rule,
+    // failing closed to locked; re-check of 306)
+    let js_trim = crate::frontmatter_keys::js_trim;
+    (k.trim() == "locked" || js_trim(k) == "locked").then(|| v.trim() == "true" || js_trim(v) == "true")
 }
 
 /// The key of a `key: value` frontmatter line (trimmed), if any.
@@ -1396,7 +1399,10 @@ pub(crate) const AI_KEYS: [&str; 9] = [
 /// Shared with the organizer daemon (its secure-skip is in-memory, never a write).
 pub(crate) fn secure_field(line: &str) -> Option<bool> {
     let (k, v) = line.split_once(':')?;
-    (k.trim() == "secure").then(|| v.trim() != "false")
+    // Rust trims U+0085 and JavaScript U+FEFF: either trim names the key, and
+    // only `false` under both opens it, so the two sides agree (review of 305/306)
+    let js_trim = crate::frontmatter_keys::js_trim;
+    (k.trim() == "secure" || js_trim(k) == "secure").then(|| !(v.trim() == "false" && js_trim(v) == "false"))
 }
 
 /// Does this whole document carry `locked: true`? The lock check written once,
@@ -2872,6 +2878,7 @@ impl CorpusStore {
     /// content, so the exact pre-Rotli package remains recoverable.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         self.guard_rel(rel)?;
         // the contract gate — unless this is the sanctioned in-place edit of an
         // existing storage office file, which the note lanes
@@ -2916,6 +2923,7 @@ impl CorpusStore {
         expected_revision: &str,
     ) -> Result<String, String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         let abs = self.guard_rel(rel)?;
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
@@ -3195,12 +3203,14 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| locked_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || locked_field(l).is_none());
             if locked {
                 fm.foreign.push("locked: true".to_string());
             }
+            let out = self.compose_for(&text, &fm, body);
+            crate::note_protection::took(crate::note_protection::protection(&out).locked == locked, "locked")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            atomic_write(&path, &out)
         })
     }
 
@@ -3239,6 +3249,7 @@ impl CorpusStore {
         if key.is_empty() {
             return Err("a field needs a name".into());
         }
+        crate::note_protection::refuse_field(key, value, &[&RESERVED_KEYS[..], &AI_KEYS[..]].concat())?;
         if RESERVED_KEYS.contains(&key) {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
@@ -3254,13 +3265,12 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
-            self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            self.write_tightened(&path, &text, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -3313,6 +3323,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
+            crate::note_protection::require_owned_not_looser(&text, &out)?;
             if out == text {
                 return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
             }
@@ -3377,11 +3388,13 @@ impl CorpusStore {
             // 2026-10-13): no move, so no id to key one by, and no Rotli fields
             // minted. The person asked for the flag; the ignore line protects
             // its path. Protect the path before the write, unprotect after.
+            let out = with_secure_line_only(&text, secure);
+            crate::note_protection::took(crate::note_protection::protection(&out).secure == secure, "secure")?;
             if secure {
                 self.gitignore_add(rel)?;
             }
             self.suppress.mark(&path);
-            atomic_write(&path, &with_secure_line_only(&text, secure))?;
+            atomic_write(&path, &out)?;
             if !secure {
                 self.gitignore_remove(rel)?;
             }
@@ -3409,7 +3422,7 @@ impl CorpusStore {
             {
                 fm.foreign.push(format!("secure_origin: {current_folder}"));
             }
-            fm.foreign.retain(|line| secure_field(line).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || secure_field(l).is_none());
             fm.foreign.push("secure: true".to_string());
             // Protect the CURRENT path before any write or move. relocate adds
             // the target ignore before moving and removes this old line after.
@@ -3425,6 +3438,12 @@ impl CorpusStore {
         // Move while the secure flag + ignore are still active; only then drop
         // protection at the destination. A failed move therefore never exposes
         // the file at an unignored path.
+        // un-securing takes before anything moves; setters never touch an indented line
+        let cleared = |fm: &mut Frontmatter| fm.foreign.retain(|l| !crate::note_protection::top_level(l)
+            || (secure_field(l).is_none() && local_ai_allowed_field(l).is_none() && secure_origin_field(l).is_none()));
+        let mut check = fm.clone();
+        cleared(&mut check);
+        crate::note_protection::took(!crate::note_protection::protection(&compose_document(&check, body)).secure, "secure")?;
         let restore_home = fm
             .foreign
             .iter()
@@ -3441,11 +3460,7 @@ impl CorpusStore {
         let final_text = crate::fsutil::read_own_text(&final_path).map_err(|e| e.to_string())?;
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
-        final_fm.foreign.retain(|line| {
-            secure_field(line).is_none()
-                && local_ai_allowed_field(line).is_none()
-                && secure_origin_field(line).is_none()
-        });
+        cleared(&mut final_fm);
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
@@ -3594,7 +3609,7 @@ impl CorpusStore {
             if !secure {
                 return Err("Local AI access is only meaningful for a secure note".into());
             }
-            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || local_ai_allowed_field(l).is_none());
             // pin the classification either way: a detector-secure note that now
             // carries an explicit access decision must carry the flag it decides on
             if !explicitly_secure {
@@ -3602,6 +3617,7 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            crate::note_protection::took(crate::frontmatter_keys::local_ai_allowed(&fm.foreign) == Some(allowed), "local_ai_allowed")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
@@ -3834,7 +3850,7 @@ impl CorpusStore {
             return Err(refusal.into());
         }
         self.writable(&rel)?;
-        self.write_resolved(id_or_rel, body, rel)
+        self.write_resolved(id_or_rel, body, rel, true)
     }
 
     pub(crate) fn write_for_ai_if_revision(
@@ -3900,7 +3916,7 @@ impl CorpusStore {
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
-            let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
+            let meta = self.write_resolved(id_or_rel, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -3944,7 +3960,7 @@ impl CorpusStore {
         } else {
             self.writable(&rel)?;
         }
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, true)
     }
 
     pub(crate) fn write_for_remote_agent_if_revision(
@@ -3974,7 +3990,7 @@ impl CorpusStore {
                 return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4700,7 +4716,7 @@ impl CorpusStore {
             .and_then(|f| f.id.clone())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| rel.clone());
-        self.write_resolved(&wire_id, &new_body, rel).map(|_| ())
+        self.write_resolved(&wire_id, &new_body, rel, false).map(|_| ())
     }
 
     /// Resolve an id through the index; on a miss (stale index, external
@@ -4820,7 +4836,7 @@ impl CorpusStore {
     pub fn write(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, false)
     }
 
     /// Human/interactive whole-body save with optimistic concurrency. The
@@ -4857,7 +4873,7 @@ impl CorpusStore {
                     crate::fsutil::compare_revision(expected_revision, &current)?;
                 }
             }
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), false)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4868,7 +4884,7 @@ impl CorpusStore {
         })
     }
 
-    fn write_resolved(&mut self, id: &str, body: &str, rel: String) -> Result<NoteMeta, String> {
+    fn write_resolved(&mut self, id: &str, body: &str, rel: String, ai: bool) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
         // an unreadable existing file must abort the save — regenerating
@@ -4913,24 +4929,10 @@ impl CorpusStore {
             // carry both through from disk.
             pinned: old_fm.pinned,
             origin: old_fm.origin,
-            foreign: old_fm.foreign,
+            foreign: crate::note_protection::with_unparsed_taint(&existing, had_fence, old_fm.foreign),
         };
         let text = if as_written {
-            // Decision B (owner, 2026-10-13): in a folder opened in place only the
-            // words the person changed are written. Their frontmatter block (or
-            // its absence) and its separator line come back byte-for-byte; Rotli's
-            // own facts stay in memory and `.rotli/`.
-            let block = raw_frontmatter_block(&existing);
-            let separator = if !had_fence {
-                ""
-            } else if old_raw.starts_with("\r\n") {
-                "\r\n"
-            } else if old_raw.starts_with('\n') {
-                "\n"
-            } else {
-                ""
-            };
-            format!("{block}{separator}{body}")
+            in_place::in_place_text(&existing, old_raw, had_fence, body)?
         } else {
             compose_document(&fm, &format!("\n{body}"))
         };
@@ -4971,6 +4973,11 @@ impl CorpusStore {
         // the Librarian rules: a save that gives the note a secure keyword in its
         // title or file name protects it now, not at the next metadata read
         let name_secure = !is_secure && self.secure_by_name(&title, &target_rel);
+        // an AI or agent save may only tighten; the person's own save is never
+        // refused for how protection reads (review and re-check of 305/306)
+        if ai {
+            crate::note_protection::require_not_looser_fail_closed(&existing, &text)?;
+        }
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
@@ -5389,6 +5396,7 @@ impl CorpusStore {
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
         }
+        crate::note_protection::refuse_line_breaks(value)?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
@@ -5396,13 +5404,12 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
-            self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            self.write_ai_tightened(&path, &text, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -5427,6 +5434,12 @@ impl CorpusStore {
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
             self.filer_writable(&rel)?;
+            // the generated overview carries no frontmatter, but an undo puts
+            // back whatever was on disk, and an empty body deletes the file;
+            // either way it may only tighten what the person set on it
+            // (review 2026-11-20)
+            let current = read_existing_text(&path)?;
+            crate::note_protection::require_not_looser_fail_closed(&current, body)?;
             if body.is_empty() {
                 self.suppress.mark(&path);
                 if path.exists() {
@@ -8894,6 +8907,10 @@ mod write_race_tests;
 #[cfg(test)]
 #[path = "corpus_save_lock_tests.rs"]
 mod save_lock_tests;
+
+#[cfg(test)]
+#[path = "corpus_note_guard_tests.rs"]
+mod note_guard_tests;
 
 #[cfg(test)]
 mod tests {
