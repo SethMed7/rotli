@@ -330,12 +330,12 @@
     },
     {
       "id": "source-guard-idiom-0bdb48435a",
-      "fingerprint": "0bdb48435afa9cecac9dd8e71c35c7684ee8e473be8c44fdd209832568657be0",
+      "fingerprint": "fd03b42e1571429a12631d26e6c0f911aa4a0b67bf8b32b2ed3d16799d5480de",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
       "id": "source-guard-idiom-59ceb15716",
-      "fingerprint": "59ceb1571618ef2fe913427c503ec5fddf3ae383f93032ad34356e7d2c236864",
+      "fingerprint": "4b974fd0af074dd09a2103b004a44233f546d2e8e51c567591a7ee6e56eb4fdc",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {

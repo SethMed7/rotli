@@ -229,7 +229,7 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
         (rule, "fn agent_doc(", "agent_folder("),
         (rule, "fn agent_folder(", "protected_path("),
         (include_str!("corpus_ai_rows.rs"), "fn parse_approved(", "agent_row("),
-        (include_str!("corpus.rs"), "fn read_doc_for_ai(", "agent_doc("),
+        (include_str!("corpus_ai_gate.rs"), "fn read_doc_for_ai(", "agent_doc("),
         (include_str!("workspace.rs"), "fn open_target(", "set_agent_lane()"),
         (include_str!("workspace.rs"), "fn read_board_for_remote(", "protected_path("),
         (include_str!("workspace_file_visibility.rs"), "fn file_visible_to_remote(", "protected_path("),
