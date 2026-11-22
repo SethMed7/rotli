@@ -154,10 +154,19 @@ impl Workspace {
         let current = self.read_note(local_id)?;
         let rows = self.journal_rows_for(local_id)?;
         let undoable = undo_target(&rows, &current.revision).map(|row| row.id.clone());
+        let here = self.store.resolve_note_rel(local_id)?;
         let entries = rows
             .into_iter()
             .take(limit.clamp(1, 100))
             .map(|mut row| {
+                // where the note was when the edit landed is shown only when the
+                // path rule allows it, else where it is now; keys this build
+                // doesn't know are dropped (Opus re-check of #304: an on-device
+                // edit of a secure note journals its secure path)
+                if !crate::corpus::protected_path::is_clean(&row.path) || self.store.names_protected_path(&row.path) {
+                    row.path = here.clone();
+                }
+                row.extra.clear();
                 let diff = row
                     .patch
                     .take()

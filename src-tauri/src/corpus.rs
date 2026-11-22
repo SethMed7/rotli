@@ -2463,6 +2463,8 @@ pub struct CorpusStore {
     adopted: bool,
     /// A file opened from Finder (corpus_raw.rs): sidecar redirected, one file seen.
     raw: Option<raw::RawMount>,
+    /// A workspace agent's store: its AI gates also ask `protected_path`.
+    agent: protected_path::AgentLane,
     /// The memoized walk (perf audit 2026-07-30, #1/#5): valid while the
     /// suppress-set generation is unchanged. Holds the sorted list AND each
     /// note's parsed text so search()/tasks() stop re-reading every file.
@@ -2641,6 +2643,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: false,
+            agent: Default::default(),
             adopted: true,
             raw: None,
             list_cache: None,
@@ -2698,6 +2701,7 @@ impl CorpusStore {
             layout: Layout::LegacyRotli,
             band_read_only: false,
             perms_read_only: read_only,
+            agent: Default::default(),
             adopted: false,
             raw: None,
             list_cache: None,
@@ -2745,6 +2749,7 @@ impl CorpusStore {
             layout,
             band_read_only,
             perms_read_only: read_only,
+            agent: Default::default(),
             // the marker, not the registry, says "connected in place": every
             // open path (startup, switch, refresh, reconnect) lands here
             adopted,
@@ -2876,6 +2881,7 @@ impl CorpusStore {
     /// content, so the exact pre-Rotli package remains recoverable.
     pub fn write_file_bytes(&mut self, rel: &str, bytes: &[u8], bak: bool) -> Result<(), String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         self.guard_rel(rel)?;
         // the contract gate — unless this is the sanctioned in-place edit of an
         // existing storage office file, which the note lanes
@@ -2920,6 +2926,7 @@ impl CorpusStore {
         expected_revision: &str,
     ) -> Result<String, String> {
         validate_rel(rel)?;
+        crate::note_protection::refuse_note_bytes(rel)?;
         let abs = self.guard_rel(rel)?;
         if !abs.is_file() {
             return Err(format!("not a file: {rel}"));
@@ -3204,6 +3211,7 @@ impl CorpusStore {
             if !locked {
                 refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "locked")?;
             }
+            crate::note_protection::took(crate::note_protection::protection(&out).locked == locked, "locked")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &out)
         })
@@ -3244,6 +3252,7 @@ impl CorpusStore {
         if key.is_empty() {
             return Err("a field needs a name".into());
         }
+        crate::note_protection::refuse_field(key, value, &[&RESERVED_KEYS[..], &AI_KEYS[..]].concat())?;
         if RESERVED_KEYS.contains(&key) {
             return Err(format!("`{key}` is managed by rotli, not editable here"));
         }
@@ -3259,13 +3268,12 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
-            self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            self.write_tightened(&path, &text, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -3318,6 +3326,7 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let out = merge_raw_frontmatter(&text, block)?;
+            crate::note_protection::require_owned_not_looser(&text, &out)?;
             if out == text {
                 return Ok(crate::fsutil::revision(text.as_bytes())); // no write, no watcher echo
             }
@@ -3381,6 +3390,7 @@ impl CorpusStore {
             if !secure {
                 refuse_if_still_on(&parse_document(&out).0.unwrap_or_default().foreign, "secure")?;
             }
+            crate::note_protection::took(crate::note_protection::protection(&out).secure == secure, "secure")?;
             if secure {
                 self.gitignore_add(rel)?;
             }
@@ -3447,7 +3457,10 @@ impl CorpusStore {
         let (final_fm, final_body) = parse_document(&final_text);
         let mut final_fm = final_fm.unwrap_or_default();
         final_fm.foreign = without_flag(&final_fm.foreign, "secure");
-        final_fm.foreign.retain(|line| local_ai_allowed_field(line).is_none() && secure_origin_field(line).is_none());
+        // setters never touch an indented line (block text or a nested map)
+        final_fm.foreign.retain(|l| {
+            !crate::note_protection::top_level(l) || (local_ai_allowed_field(l).is_none() && secure_origin_field(l).is_none())
+        });
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
@@ -3596,7 +3609,7 @@ impl CorpusStore {
             if !secure {
                 return Err("Local AI access is only meaningful for a secure note".into());
             }
-            fm.foreign.retain(|l| local_ai_allowed_field(l).is_none());
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || local_ai_allowed_field(l).is_none());
             // pin the classification either way: a detector-secure note that now
             // carries an explicit access decision must carry the flag it decides on
             if !explicitly_secure {
@@ -3604,115 +3617,10 @@ impl CorpusStore {
                 self.gitignore_add(rel)?;
             }
             fm.foreign.push(format!("local_ai_allowed: {allowed}"));
+            crate::note_protection::took(crate::frontmatter_keys::local_ai_allowed(&fm.foreign) == Some(allowed), "local_ai_allowed")?;
             self.suppress.mark(&path); // Rotli's own write: no external-change echo
             atomic_write(&path, &self.compose_for(&text, &fm, body))
         })
-    }
-
-    /// Read a note FOR an AI model — the ONE read gate every AI lane passes
-    /// (docs/design/ai-visibility-matrix.md).
-    ///
-    /// * A `Hidden` path is refused outright: vault plumbing is not knowledge,
-    ///   and no model has a reason to read `memex.json` or `STRUCTURE.md`. A
-    ///   `Reference` path (identity/, personality/, history/, MAP.md, inbox.md)
-    ///   IS readable — that is the 2026-08-01 flip.
-    /// * A SECURE note is ALWAYS refused to a remote/frontier model. No knob
-    ///   changes that and none will exist.
-    /// * A SECURE note is readable by a registered on-device model BY DEFAULT
-    ///   (the maintainer, 2026-08-01: "only local AI can see secure notes" — see, not
-    ///   "see if separately permitted"). Two knobs can still say no: the note's
-    ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
-    ///   The per-note bit wins over the vault default in BOTH directions.
-    ///
-    /// Location in either secure home is checked even without frontmatter.
-    /// The secret DETECTOR also runs on the body (#21, audit 2026-07) — the auto-flag only fires when
-    /// the metadata panel is opened, so a never-inspected note with detectable
-    /// secrets must not slip through on the flag alone.
-    /// Takes a wire id OR a rel path (resolve_note_rel — same bridge as the filer lane).
-    pub(crate) fn read_for_ai(
-        &mut self,
-        id_or_rel: &str,
-        model_is_local: bool,
-    ) -> Result<String, String> {
-        let rel = &self.resolve_note_rel(id_or_rel)?;
-        if surfaced(self.layout, rel) == Surface::Hidden {
-            return Err(format!("not available to AI: {rel}"));
-        }
-        let abs = self.guard_rel(rel)?;
-        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
-        self.judge_for_ai(rel, &text, model_is_local)?;
-        Ok(text)
-    }
-
-    /// An agent's whole read in ONE read of the file: the gate judges these
-    /// bytes, and the document and its revision are built from the same bytes.
-    /// Gating one read and returning another let a file swapped in between
-    /// (secure ↔ plain) reach a remote model (audit 2026-11-08).
-    pub(crate) fn read_doc_for_ai(&mut self, id: &str, model_is_local: bool) -> Result<NoteDoc, String> {
-        let rel = self.path_of(id)?;
-        if surfaced(self.layout, &rel) == Surface::Hidden {
-            return Err(format!("not available to AI: {rel}"));
-        }
-        let abs = self.guard_rel(&rel)?;
-        let text = crate::fsutil::read_own_text(&abs).map_err(|e| format!("read {rel}: {e}"))?;
-        self.judge_for_ai(&rel, &text, model_is_local)?;
-        Ok(self.doc_from_text(id, &rel, &abs, &text))
-    }
-
-    /// The AI read gate over one file's text (see `read_for_ai`).
-    fn judge_for_ai(&mut self, rel: &str, text: &str, model_is_local: bool) -> Result<(), String> {
-        let (fm, body) = parse_document(text);
-        let fm = fm.unwrap_or_default();
-        let secure = self.file_is_protected(rel)
-            || secure_on(&fm.foreign)
-            || fm
-                .foreign
-                .iter()
-                .any(|l| secure_context_field(l) == Some(true))
-            || crate::protection_mark::marked(text, "secureContext")
-            || looks_secure(body)
-            || self.secure_by_name(&title_of(editor_body(body)), rel);
-        if secure {
-            // remote FIRST and unconditionally — the refusal must never depend
-            // on, or leak the state of, a local-visibility knob
-            if !model_is_local {
-                return Err("This note is secure and can never be sent to a remote model.".into());
-            }
-            if !self.secure_readable_locally(&fm) {
-                return Err(
-                    "This secure note is hidden from AI — turn Local AI access back on for it (or for this vault) to use it here."
-                        .into(),
-                );
-            }
-            // The read is ALLOWED, and it is about to put secure prose into an
-            // on-device model's context. Remember it: from here on, every egress
-            // seam refuses outbound text that quotes this body, whatever the
-            // (untrusted) agent loop asks for. This is the ONE recording site —
-            // the same choke point that decided the read.
-            crate::secret::remember_secure_text(body);
-        }
-        Ok(())
-    }
-
-    /// AI-purpose access to a frontmatter-free file. The editor's file reads
-    /// remain separate; this check runs before any AI decoder sees bytes.
-    pub(crate) fn file_for_ai(&self, rel: &str, model_is_local: bool) -> Result<PathBuf, String> {
-        validate_rel(rel)?;
-        if surfaced(self.layout, rel) == Surface::Hidden {
-            return Err("not available to AI".into());
-        }
-        let secure = self.file_is_protected(rel);
-        if secure && !model_is_local {
-            return Err("blocked: a secure file cannot be sent to a remote model".into());
-        }
-        if secure && !self.secure_local_ai() {
-            return Err("blocked: local AI access to secure files is off for this vault".into());
-        }
-        let abs = self.guard_rel(rel)?;
-        if !abs.is_file() {
-            return Err("not a file".into());
-        }
-        Ok(abs)
     }
 
     /// The person's editor reading a surfaced file (a sheet, a Word document,
@@ -3833,7 +3741,7 @@ impl CorpusStore {
             return Err(refusal.into());
         }
         self.writable(&rel)?;
-        self.write_resolved(id_or_rel, body, rel)
+        self.write_resolved(id_or_rel, body, rel, true)
     }
 
     pub(crate) fn write_for_ai_if_revision(
@@ -3896,7 +3804,7 @@ impl CorpusStore {
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
-            let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
+            let meta = self.write_resolved(id_or_rel, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -3937,7 +3845,7 @@ impl CorpusStore {
         } else {
             self.writable(&rel)?;
         }
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, true)
     }
 
     pub(crate) fn write_for_remote_agent_if_revision(
@@ -3964,7 +3872,7 @@ impl CorpusStore {
                 return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), true)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4690,7 +4598,7 @@ impl CorpusStore {
             .and_then(|f| f.id.clone())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| rel.clone());
-        self.write_resolved(&wire_id, &new_body, rel).map(|_| ())
+        self.write_resolved(&wire_id, &new_body, rel, false).map(|_| ())
     }
 
     /// Resolve an id through the index; on a miss (stale index, external
@@ -4810,7 +4718,7 @@ impl CorpusStore {
     pub fn write(&mut self, id: &str, body: &str) -> Result<NoteMeta, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
-        self.write_resolved(id, body, rel)
+        self.write_resolved(id, body, rel, false)
     }
 
     /// Human/interactive whole-body save with optimistic concurrency. The
@@ -4847,7 +4755,7 @@ impl CorpusStore {
                     crate::fsutil::compare_revision(expected_revision, &current)?;
                 }
             }
-            let meta = self.write_resolved(id, body, rel.clone())?;
+            let meta = self.write_resolved(id, body, rel.clone(), false)?;
             let landed_rel = self.path_of(id)?;
             let landed = crate::fsutil::read_own_bytes(&self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
@@ -4858,7 +4766,7 @@ impl CorpusStore {
         })
     }
 
-    fn write_resolved(&mut self, id: &str, body: &str, rel: String) -> Result<NoteMeta, String> {
+    fn write_resolved(&mut self, id: &str, body: &str, rel: String, ai: bool) -> Result<NoteMeta, String> {
         let abs = self.abs(&rel);
 
         // an unreadable existing file must abort the save — regenerating
@@ -4903,24 +4811,10 @@ impl CorpusStore {
             // carry both through from disk.
             pinned: old_fm.pinned,
             origin: old_fm.origin,
-            foreign: old_fm.foreign,
+            foreign: crate::note_protection::with_unparsed_taint(&existing, had_fence, old_fm.foreign),
         };
         let text = if as_written {
-            // Decision B (owner, 2026-10-13): in a folder opened in place only the
-            // words the person changed are written. Their frontmatter block (or
-            // its absence) and its separator line come back byte-for-byte; Rotli's
-            // own facts stay in memory and `.rotli/`.
-            let block = raw_frontmatter_block(&existing);
-            let separator = if !had_fence {
-                ""
-            } else if old_raw.starts_with("\r\n") {
-                "\r\n"
-            } else if old_raw.starts_with('\n') {
-                "\n"
-            } else {
-                ""
-            };
-            format!("{block}{separator}{body}")
+            in_place::in_place_text(&existing, old_raw, had_fence, body)?
         } else {
             compose_document(&fm, &format!("\n{body}"))
         };
@@ -4961,6 +4855,11 @@ impl CorpusStore {
         // the Librarian rules: a save that gives the note a secure keyword in its
         // title or file name protects it now, not at the next metadata read
         let name_secure = !is_secure && self.secure_by_name(&title, &target_rel);
+        // an AI or agent save may only tighten; the person's own save is never
+        // refused for how protection reads (review and re-check of 305/306)
+        if ai {
+            crate::note_protection::require_not_looser_fail_closed(&existing, &text)?;
+        }
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
@@ -5376,6 +5275,7 @@ impl CorpusStore {
         if !AI_KEYS.contains(&key) {
             return Err(format!("`{key}` is not a filer-writable field"));
         }
+        crate::note_protection::refuse_line_breaks(value)?;
         let rel = &self.resolve_note_rel(id_or_rel)?;
         self.filer_writable(rel)?;
         let path = self.abs(rel);
@@ -5383,13 +5283,12 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
-            fm.foreign.retain(|l| field_key(l) != Some(key));
+            fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
                 fm.foreign.push(format!("{key}: {value}"));
             }
-            self.suppress.mark(&path);
-            atomic_write(&path, &self.compose_for(&text, &fm, body))
+            self.write_ai_tightened(&path, &text, &self.compose_for(&text, &fm, body))
         })
     }
 
@@ -5414,6 +5313,12 @@ impl CorpusStore {
             // note writer. A user or another process may have locked/secured
             // the generated note while this operation was waiting.
             self.filer_writable(&rel)?;
+            // the generated overview carries no frontmatter, but an undo puts
+            // back whatever was on disk, and an empty body deletes the file;
+            // either way it may only tighten what the person set on it
+            // (review 2026-11-20)
+            let current = read_existing_text(&path)?;
+            crate::note_protection::require_not_looser_fail_closed(&current, body)?;
             if body.is_empty() {
                 self.suppress.mark(&path);
                 if path.exists() {
@@ -8819,6 +8724,10 @@ pub(crate) use files::is_canvas_path;
 /// The Librarian rules' store side (secure keywords, the batch) — a child module.
 #[path = "corpus_rules.rs"]
 pub mod rules_store;
+#[path = "corpus_protected_path.rs"]
+pub mod protected_path;
+#[path = "corpus_ai_gate.rs"]
+mod ai_gate;
 
 /// The rows an AI lane may show, built from the one read the gate judged.
 #[path = "corpus_ai_rows.rs"]
@@ -8885,6 +8794,10 @@ mod write_race_tests;
 #[cfg(test)]
 #[path = "corpus_save_lock_tests.rs"]
 mod save_lock_tests;
+
+#[cfg(test)]
+#[path = "corpus_note_guard_tests.rs"]
+mod note_guard_tests;
 
 #[cfg(test)]
 mod tests {

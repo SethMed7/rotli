@@ -133,10 +133,16 @@ pub(crate) fn is_pure_insertion(before: &str, after: &str, text: &str) -> bool {
 
 /// The one body-edit verdict, from a note's foreign frontmatter lines.
 pub(crate) fn body_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
-    if crate::corpus::locked_on(foreign)
-    {
+    if crate::corpus::locked_on(foreign) {
         return BodyEdit::Locked;
     }
+    granted_edit(foreign)
+}
+
+/// The body-edit verdict from `ai_edit` and `created_by` alone, whatever
+/// `locked` says: the protection rule ranks the lock as its own flag
+/// (note_protection.rs; TypeScript `grantedEdit`). Never `Locked`.
+pub(crate) fn granted_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
     // fail closed both ways (frontmatter_keys::owned_key): a denial in any
     // spelling holds, and only Rust's own spelling grants
     use crate::frontmatter_keys::{owned_key, Says};

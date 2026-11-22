@@ -160,6 +160,31 @@ fn guide(skill: Option<&str>) -> Result<Value, String> {
     Ok(json!({ "skill": name, "markdown": text, "skills": SKILLS.iter().map(|(n, _)| *n).collect::<Vec<_>>() }))
 }
 
+/// Turn the route on and consent to it for the vault at `root`, keeping the
+/// vault's other settings (the agent-surface harness).
+#[cfg(test)]
+pub(super) fn switch_on_for_test(root: &Path) {
+    let settings = root.join(".rotli/settings.json");
+    let mut value: Value = fs::read_to_string(&settings).ok().and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_else(|| json!({}));
+    value["librarianMcp"] = json!(true);
+    fs::create_dir_all(root.join(".rotli")).unwrap();
+    fs::write(&settings, value.to_string()).unwrap();
+    record_consent(root, true).unwrap();
+}
+
+/// Run `body` with this thread's Librarian server bound to `target`, as
+/// `serve` binds it at start, with the route switched on and consented to
+/// for that vault (the agent-surface harness).
+#[cfg(test)]
+pub(super) fn with_bound<T>(target: RootTarget, body: impl FnOnce() -> T) -> T {
+    switch_on_for_test(&target.path);
+    let identity = crate::containment::folder_identity(&target.path);
+    BOUND.with(|slot| *slot.borrow_mut() = Some(Bound { target, identity }));
+    let out = body();
+    BOUND.with(|slot| *slot.borrow_mut() = None);
+    out
+}
+
 /// `rotli mcp --librarian [--vault PATH]`: bind once, then serve stdio.
 pub(super) fn serve(args: &[String]) -> Result<(), String> {
     if option(args, "--root").is_some() {

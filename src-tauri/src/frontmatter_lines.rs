@@ -46,7 +46,9 @@ pub(crate) struct Mention<'a> {
     next: usize,
 }
 
-fn is_break(c: char) -> bool {
+/// A line break the permission readers split at (rule 4): CR, LF, U+0085,
+/// U+2028, U+2029. Shared with note_protection.rs `refuse_line_breaks`.
+pub(crate) fn is_break(c: char) -> bool {
     matches!(c, '\r' | '\n' | '\u{85}' | '\u{2028}' | '\u{2029}')
 }
 

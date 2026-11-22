@@ -24,7 +24,12 @@ impl CorpusStore {
 
     /// Missing settings mean the documented empty keyword list. An unreadable
     /// or malformed settings file cannot prove that a name is public.
-    fn secure_keywords_for_classification(&self) -> Result<Vec<String>, String> {
+    pub(super) fn secure_keywords_for_classification(&self) -> Result<Vec<String>, String> {
+        // an agent's store reads them once per call (agent_keywords)
+        self.agent_keywords().unwrap_or_else(|| self.read_keywords_for_classification())
+    }
+
+    pub(super) fn read_keywords_for_classification(&self) -> Result<Vec<String>, String> {
         let settings = self.dot_read("settings")?;
         crate::librarian_rules::classifiable_secure_keywords(&settings)
     }
@@ -53,15 +58,21 @@ impl CorpusStore {
         in_secure_home_path(rel)
     }
 
+    /// Is this title (never a path: paths go through `protected_path`) named
+    /// with one of the vault's secure keywords?
+    pub(crate) fn secure_title(&self, title: &str) -> bool {
+        self.secure_by_name(title, "")
+    }
+
     /// May a remote agent SEE that this path exists at all? Folders and
     /// surfaced files carry no frontmatter, so nothing per-item marks them —
-    /// the surface predicate is the only policy they have, and the workspace
-    /// listing lane was applying none (audit 2026-08-01, GAP 8). Nothing in a
-    /// secure home is, not even a folder's name (Codex review of pull request
-    /// 302: `wiki/_secure/<name>` was listed). The corpus root ("") always is;
-    /// it is the tree the agent was handed.
+    /// the surface predicate and `protected_path` are the policy they have
+    /// (audit 2026-08-01, GAP 8). `protected_path` judges the path as given,
+    /// before any wire prefix or note id can redirect it (`wiki/_secure/x:`
+    /// read as the vault root). The corpus root ("") is always listable; it is
+    /// the tree the agent was handed.
     pub(crate) fn agent_listable(&mut self, id_or_rel: &str) -> bool {
-        if self.in_secure_home(&super::lifecycle_disk_folder(self.layout, id_or_rel)) {
+        if self.protected_path(id_or_rel) {
             return false;
         }
         let (_, rel) = super::split_root_id(id_or_rel);
@@ -72,22 +83,20 @@ impl CorpusStore {
         !matches!(
             super::surfaced(self.layout, &rel),
             super::Surface::Hidden | super::Surface::Reference
-        ) && !self.in_secure_home(&super::lifecycle_disk_folder(self.layout, &rel))
+        ) && !self.protected_path(&rel)
     }
 
-    /// May a remote agent see this folder's name? A folder carries no
-    /// frontmatter, so it gets a file's protection: no secure home and no
-    /// secure keyword in its name, judged on the vault-relative path itself,
-    /// never through a wire prefix or a note id (Codex re-check of pull
-    /// request 302: `PrivateProject:` and a note whose id is the path
-    /// both slipped past). Nothing under it is read. It never shows what the
-    /// shipped check, `agent_listable`, hid.
+    /// May a remote agent see this folder's name? `agent_listable` judges the
+    /// path with `protected_path` (any component, any spelling, through
+    /// symlinks), and the folder's own path must not be a hidden or reference
+    /// surface: the id is never split at a `:` or redirected through a note
+    /// id (Codex re-checks of pull request 302). Nothing under it is read.
     pub(crate) fn agent_listable_folder(&mut self, folder_id: &str) -> bool {
         self.agent_listable(folder_id)
             && !matches!(
-            super::surfaced(self.layout, folder_id),
-            super::Surface::Hidden | super::Surface::Reference
-        ) && !self.file_is_protected(&super::lifecycle_disk_folder(self.layout, folder_id))
+                super::surfaced(self.layout, folder_id),
+                super::Surface::Hidden | super::Surface::Reference
+            )
     }
 
     /// Frontmatter-free file visibility for AI in either vault layout.
@@ -103,6 +112,9 @@ impl CorpusStore {
             || self.secure_keywords_for_classification().map_or(true, |keywords| {
                 crate::librarian_rules::secure_by_name(title, rel, &keywords)
             })
+            // a workspace agent's store also asks the one path rule (it is
+            // also what judge_for_ai and file_for_ai ask, through here)
+            || (self.is_agent_lane() && self.protected_path(rel))
     }
 
     /// Protect every Library note already named with a secure keyword (the

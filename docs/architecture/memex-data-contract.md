@@ -197,6 +197,70 @@ second user-visible product or storage location.
 - Saved chat updates use the same rule. Creation refuses an existing slug, and
   `secureContext` is a one-way transition inside the same locked write window,
   so concurrent windows cannot erase taint or overwrite a newer transcript.
+- A rewrite never loosens a note's protection by accident (review
+  2026-11-20). The rule is one function per side, `note_protection.rs` and
+  `src/lib/protectionRule.ts`: a write may not turn off `locked`, `secure` or
+  `secureContext`, give the note a `local_ai_allowed` it didn't have, or make
+  an AI body edit allowed that wasn't (`ai_edit`, `created_by`). Each flag is
+  read the same way before and after, so an unchanged line always passes. A
+  chat re-save puts back a dropped `locked`, `secure`, `secureContext`,
+  `local_ai_allowed: false` or `ai_edit: false`, and refuses a grant the chat
+  never had. A Librarian `_index.md` write (generated text, an undo restoring
+  the bytes it replaced, or an empty body that deletes the file) is refused if
+  it would loosen. The file save lane (`corpus_write_file_bytes` and the web's
+  `folderWriteFileBytes`) is for sheets, documents and other binaries: it
+  refuses `.md` and `.excalidraw` in any letter case. A note keeps its
+  protection in its frontmatter, which a raw overwrite would drop; a board
+  has none (its protection comes from its path or a secure keyword) and saves
+  through its own writer.
+- The metadata setters keep each field on its own line and touch only
+  top-level lines (review 2026-11-20). A key or value holding a line break
+  (CR, LF, U+0085, U+2028, U+2029) or another control character is refused
+  by `set_field` and the Filer's `set_ai_field`; a tab breaks no line and is
+  kept, so an undo restores a hand-typed one. A model's tags are cleaned of
+  them before they reach the Filer (the organizer drops just the bad tag),
+  and a Librarian mark escapes them inside its JSON. A quoted spelling of a
+  key Rust owns (`"ai_edit"`) is refused by the field editor like the plain
+  one, and both setters run the tighten-only rule on what they write. A
+  setter, Lock, Unlock and Remove protection among them, never deletes or
+  rewrites an indented line (a block scalar's text or a nested map). "Let AI edit", the local-AI toggle, Unlock and Remove
+  protection check the exact text they would write, on the Mac and on Rotli
+  Web, in both vault kinds: when another line still decides the key (an
+  indented one, `secure : true`, a U+FEFF before the key) they write
+  nothing, move nothing, keep the `.gitignore` line, and say so. The raw metadata
+  editor may change `locked` and `secure`, but may not loosen `ai_edit`,
+  `local_ai_allowed`, `created_by` or `secureContext` in any spelling;
+  `secureContext` can be added from there and never removed. An AI body edit
+  ranks revoked below person-written below allowed, so dropping a deliberate
+  `ai_edit: false` counts as loosening.
+- A note with no metadata block may not gain one from its new text, on the
+  Mac and on Rotli Web: in a folder opened in place that save is refused,
+  whoever makes it (a `/ai` insert or "Allow once" reply that opens with
+  `---` would otherwise become a standing AI grant); in a Rotli vault the
+  note gains its own block, so the pasted one stays body text. On the Mac,
+  every AI or agent body save (`/ai`, "Allow once", Hand to AI, chat edits,
+  CLI and MCP), the Filer's fields, the Librarian's overview and the
+  organizer's overview check also run the tighten-only rule, reading a
+  `secureContext` mark fail-closed as the AI read gate does, so a
+  local-model edit can't strip a mark and open the note to remote models.
+  The person's own saves (typing, paste, undo) are never refused for how
+  protection reads: for them a mark counts only inside a block that closes
+  (an unclosed `---` at the top is a horizontal rule), and in a Rotli vault a
+  mark only the marker reader saw rides into the rebuilt metadata block as
+  `secureContext: true`. Rotli Web's notes count the mark too, by the same
+  shared grammar (`protection-marks.json`), and a note whose title is empty
+  is named `untitled.md` on both sides. A chat's taint
+  stays fail-closed: a chat rewrite reads an unclosed block as marked and
+  keeps the mark, and its restored lines never replace an indented line. The organizer leaves an area's
+  generated overview alone, without an error, when regenerating it would
+  loosen a protection the person put on it.
+- `secure:` and `locked:` read the same in Rust and on Rotli Web: the key is
+  named when either side's trim names it (Rust trims U+0085, JavaScript
+  U+FEFF); `secure` is off only for a value that reads `false` under both,
+  and `locked` is on for a value that reads `true` under either. Loosening a
+  flag is the person's act, through the note's own controls (`set_locked`,
+  `set_secure`, the local-AI and AI-edit toggles). The
+  vault format is unchanged, so the contract version does not move.
 - A successful direct chat-note write invalidates the owning `CorpusStore`
   generation before returning. Its initiating webview can therefore read the
   new note immediately instead of waiting for a watcher echo. Watcher delivery

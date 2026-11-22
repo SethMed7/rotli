@@ -225,7 +225,12 @@ impl CorpusStore {
     /// link: nothing edits a locked note, so the move is refused instead.
     pub(crate) fn refuse_breaking_locked_links(&mut self, rel: &str) -> Result<(), String> {
         match self.linkers_of(rel)?.into_iter().find(|(_, locked)| *locked) {
-            Some((linker, _)) => Err(format!("a locked note links to it by path ({linker}) — it stays where it is")),
+            // an agent is told which note only when it may read that note
+            // (Opus re-check of #304: a secure linker's path was named)
+            Some((linker, _)) if !self.is_agent_lane() || self.read_for_ai(&linker, false).is_ok() => {
+                Err(format!("a locked note links to it by path ({linker}) — it stays where it is"))
+            }
+            Some(_) => Err("a locked note links to it by path — it stays where it is".into()),
             None => Ok(()),
         }
     }

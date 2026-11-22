@@ -8,9 +8,10 @@ import {
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
-import { frontmatterField } from "../lib/frontmatterKeys";
-import { flagLine, withoutFlag } from "../lib/frontmatterLines";
+import { frontmatterField, localAiAllowedOverride } from "../lib/frontmatterKeys";
+import { flagLine, lockedOn, ownedKey, withoutFlag } from "../lib/frontmatterLines";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import { requireOwnedNotLooser } from "../lib/protectionRule";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { assertVaultFilePath, readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { updateGitExclusions } from "./folderMemexNotes";
@@ -32,8 +33,10 @@ const valueOf = (fm: NoteFrontmatter, key: string): string | undefined => {
 const withField = (fm: NoteFrontmatter, key: string, value: string | null): NoteFrontmatter => ({
   ...fm,
   foreign: [
-    // every spelling of the key goes, so a typed denial never outlives the person's setting
-    ...fm.foreign.filter((line) => frontmatterField(line)?.key.name !== key),
+    // every top-level spelling of the key goes, so a typed denial never
+    // outlives the person's setting; an indented line belongs to a block
+    // scalar or a nested map, which a setter never touches (review 2026-11-20)
+    ...fm.foreign.filter((line) => /^[ \t]/.test(line) || frontmatterField(line)?.key.name !== key),
     ...(value === null ? [] : [`${key}: ${value}`]),
   ],
 });
@@ -73,27 +76,47 @@ function assertSecureRemoval(body: string): void {
     throw new Error("Remove the detected secret from the note before removing secure protection");
 }
 
+/** A setting another line still decides (an indented one, which setters never
+ * touch) didn't take: say so, having changed nothing (review 2026-11-20). */
+const notTaken = (key: string) =>
+  new Error(
+    `another \`${key}:\` line in this note's metadata still decides it; change it in Show file metadata`,
+  );
+
 /** Returns the resulting path for relocation bookkeeping. Identity is stable;
  * protect the target BEFORE moving, and leave the old ignore on any failure. */
 export async function setFolderSecure(dir: VaultDir, path: string, secure: boolean): Promise<string> {
   const opened = await readVersionedFile(dir, path);
   const { frontmatter, body } = parseNoteDocument(opened.contents);
   let fm = frontmatter ?? emptyFrontmatter();
-  if (!secure) assertSecureRemoval(body);
+  if (!secure) {
+    assertSecureRemoval(body);
+    // checked before the note moves or its ignore line goes: a note that
+    // still reads secure must keep both (review of 305/306)
+    const cleared = ["local_ai_allowed", "secure_origin"].reduce(
+      (f, key) => withField(f, key, null),
+      withFlag(fm, "secure", null),
+    );
+    refuseIfFlagged(cleared.foreign, "secure");
+  }
   if (!(await vaultHasRotliMarker(dir)) || (await vaultFolderRoles(dir))) {
     // A folder opened in place — and an imported copy, whose folders are the
     // person's — keeps the note where it is (owner rule
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
-    const out = withSecureLineOnly(opened.contents, secure);
-    if (!secure) refuseIfStillOn(out, "secure");
+    // the exact text to be written must read as asked before the ignore
+    // line changes (re-check of 306: `secure : true` survived); a spelling
+    // the in-place writer can't remove refuses by name
+    const next = withSecureLineOnly(opened.contents, secure);
+    if (!secure) refuseIfStillOn(next, "secure");
+    if (isSecureFrontmatter(parseNoteDocument(next).frontmatter ?? emptyFrontmatter()) !== secure)
+      throw notTaken("secure");
     if (secure) await updateGitExclusions(dir, [path]);
-    await writeVersionedFile(dir, path, out, opened.revision);
+    await writeVersionedFile(dir, path, next, opened.revision);
     if (!secure) await updateGitExclusions(dir, [], [path]);
     return path;
   }
   if (!fm.id) throw new Error("secure notes require a stable frontmatter id");
-  if (!secure) refuseIfStillOn(composeNoteDocument(withFlag(fm, "secure", null), body), "secure");
   const home = (await vaultIsMemex(dir)) ? "wiki/_secure" : SECURE_NOTES_FOLDER;
   const current = parentPath(path);
   const inHome = current === home || current.startsWith(`${home}/`);
@@ -176,6 +199,17 @@ export async function setFolderProtection(
     );
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
   if (key === "locked" && !allowed) refuseIfStillOn(text, "locked");
+  // the exact text to be written must read as asked: another line that still
+  // decides the key (indented, or a spelling the in-place writer leaves) means
+  // the setting can't take, so say so rather than report it done
+  const written = parseNoteDocument(text).frontmatter?.foreign ?? [];
+  const took =
+    key === "ai_edit"
+      ? (ownedKey(written, "ai_edit", (v) => v === "true").says === "grant") === allowed
+      : key === "locked"
+        ? lockedOn(written) === allowed
+        : localAiAllowedOverride(written) === allowed;
+  if (!took) throw notTaken(key);
   await writeVersionedFile(dir, path, text, opened.revision);
 }
 
@@ -205,6 +239,7 @@ export async function writeFolderRawMetadata(
     throw new Error("revision conflict: note changed after metadata was opened");
   const next = mergeRawFrontmatter(opened.contents, block);
   if (next === opened.contents) return opened.revision;
+  requireOwnedNotLooser(opened.contents, next);
   const was = parseNoteDocument(opened.contents).frontmatter;
   const after = parseNoteDocument(next).frontmatter;
   const beforeSecure = !!was && isSecureFrontmatter(was);

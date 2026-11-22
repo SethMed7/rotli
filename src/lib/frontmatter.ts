@@ -7,6 +7,7 @@
 //
 // Pure: no host, no vault, no services.
 
+import { protectionMark } from "./frontmatterBlock";
 import { BlockText, lockedOn, namesPermissionKey, secureOn, segments } from "./frontmatterLines";
 
 /** The four facts Rotli owns, plus `origin` and every line it does not.
@@ -145,6 +146,12 @@ export function withShelf(fm: NoteFrontmatter, shelf: string[]): NoteFrontmatter
  * reads it. */
 export function isSecureFrontmatter(fm: NoteFrontmatter): boolean {
   return secureOn(fm.foreign);
+}
+
+/** A note's own secure reading: its `secure:` line, or a chat's taint mark
+ * read as Rust's native read does (lane check of 306). */
+export function secureNoteText(text: string, fm: NoteFrontmatter | null): boolean {
+  return (!!fm && isSecureFrontmatter(fm)) || protectionMark(text, "secureContext");
 }
 
 /** Any spelling of `locked` whose value doesn't say off (the same rule) — no

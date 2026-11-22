@@ -25,6 +25,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Saving a chat or a spreadsheet can no longer unlock or unprotect a
+  note.** Some saves replaced a note's whole text and quietly dropped its
+  Locked or Secure setting, or a chat's mark that it holds secure content.
+  A chat save now keeps those settings, the spreadsheet save refuses to write
+  over a note or a board, and the Librarian's area overviews can't remove a
+  setting you put on them. Turning a protection off still works from the
+  note's own controls.
+- **A tag or a pasted block can no longer switch on AI editing.** A
+  Librarian tag, or a metadata field, holding a line break could add hidden
+  lines such as "let AI edit this note". Those values are now cleaned or
+  refused. The raw metadata view keeps a note's AI-edit and on-device
+  settings and its secure-chat mark, and "Let AI edit" no longer deletes
+  indented text in a note's metadata. If another line still decides the
+  setting, it tells you instead of saying it worked. On Rotli Web, a `---` block
+  pasted at the top of a note without metadata stays part of the text, and
+  a `secure:` value now counts as secure unless it says off (`false`, `no` or
+  `off`), as it does on the Mac.
+- **An AI reply can't turn itself into a note's settings.** In a folder
+  opened in place, an AI insert or an "Allow once" edit that starts with a
+  `---` block could become the metadata of a note that had none, and let AI
+  edit it from then on. Rotli now refuses that save, on the Mac as on the
+  web. Unlock and Remove protection now tell you when another line in the
+  note's metadata still keeps it locked or secure, instead of reporting
+  success, moving the note out of its secure folder or dropping its
+  `.gitignore` line.
 - **A lock or secure flag holds however it was typed.** Rotli used to read
   `locked: true` and `secure: true` only when typed exactly that way, so a lock
   written as `locked: True`, `locked: yes`, `"locked": true`, `- locked: true`,
@@ -69,6 +94,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still being closed. Agent metrics also stopped counting the shelves of
   notes agents can't read, and count an extensionless note as a note. Your
   own sidebar is unchanged.
+
+- **Agents can no longer find private folders through other spellings.** The
+  CLI, the MCP workspace and the agent bridge now protect a secure folder or
+  a secure keyword however the path is written: in another case or letter
+  form (`_SECURE`, `_ſecure`, `STRASSE` for `Straße`), on any parent folder,
+  through a symlink, or named in a note's shelf or in where an archived
+  note came from. Your own sidebar, the Librarian and the organizer are
+  unchanged.
 
 ## [1.9.4] - 2026-11-20
 

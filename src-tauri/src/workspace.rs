@@ -238,6 +238,7 @@ impl Workspace {
             CorpusStore::open(root.path.clone())?
         };
         store.set_perms_read_only(root.read_only);
+        store.set_agent_lane();
         Ok(Self { root, store })
     }
 
@@ -296,14 +297,6 @@ impl Workspace {
         folder
     }
 
-    fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
-        match meta.kind {
-            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
-            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
-            NoteKind::File => self.file_visible_to_remote(&meta.id),
-        }
-    }
-
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
         // include_reference: false — the headless workspace keeps its narrower
         // surface. The 2026-08-01 reference lane is the interactive chat's
@@ -341,6 +334,12 @@ impl Workspace {
             }
             let mut visible_metadata = metadata;
             visible_metadata.remove("text");
+            // a frontmatter value that names a protected path (a shelf, an
+            // origin, a wikilink), in any quoting or prefix, is not shown;
+            // URLs and other values are (final check of #304, B3 and S4)
+            for values in visible_metadata.values_mut() {
+                values.retain(|value| !value.contains(['/', '\\']) || !self.store.names_protected_path(value));
+            }
             let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
                 deep_link: self.deep_link_of(&wire_id, "note"),
@@ -592,6 +591,12 @@ impl Workspace {
     }
 
     fn reference_visible_to_remote(&mut self, wire_id: &str) -> bool {
+        // the id is shown as written: a path-shaped one must pass the rule
+        // itself, not only the note it resolves to (Opus re-check of #304)
+        let local = wire_id.split_once(':').map_or(wire_id, |(_, local)| local);
+        if !self.store.agent_id_shown(wire_id) || !self.store.agent_id_shown(local) {
+            return false;
+        }
         if !self.root.is_default || !wire_id.contains(':') {
             let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
                 return false;
@@ -934,7 +939,7 @@ impl Workspace {
 
     fn read_board_for_remote(&mut self, local_id: &str) -> Result<CorpusBoardDoc, String> {
         let rel = self.store.resolve_note_rel(local_id)?;
-        if self.store.file_is_protected(&rel) {
+        if self.store.protected_path(&rel) {
             return Err("blocked: a secure board cannot be sent to a remote agent".into());
         }
         let board = self.store.read_board(&rel)?;
@@ -3031,6 +3036,12 @@ mod ai_lane_tests;
 #[cfg(test)]
 #[path = "workspace_listing_tests.rs"]
 mod listing_tests;
+#[cfg(test)]
+#[path = "workspace_path_protection_tests.rs"]
+mod path_protection_tests;
+#[cfg(test)]
+#[path = "workspace_agent_surface_tests.rs"]
+mod agent_surface_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
