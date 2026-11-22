@@ -18,7 +18,7 @@ import {
   parseNoteDocument,
   withShelf,
   isLockedFrontmatter,
-  isSecureFrontmatter,
+  secureNoteText,
 } from "../lib/frontmatter";
 import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
@@ -216,9 +216,7 @@ export class FolderNotesService implements NotesService {
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
-      secure:
-        under(withoutSinkPrefix(path), WIKI_SECURE) ||
-        (frontmatter ? isSecureFrontmatter(frontmatter) : false),
+      secure: under(withoutSinkPrefix(path), WIKI_SECURE) || secureNoteText(text, frontmatter),
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
       suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),

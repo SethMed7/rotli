@@ -1,6 +1,11 @@
 // Owned metadata on a hand-written fenced note, matching the Rust corpus
 // write_resolved / relocate paths. The browser has mtime but no birth time.
-import { composeNoteDocument, type NoteFrontmatter } from "../lib/frontmatter";
+import {
+  composeNoteDocument,
+  emptyFrontmatter,
+  type NoteFrontmatter,
+  parseNoteDocument,
+} from "../lib/frontmatter";
 import { composeInPlace } from "../lib/frontmatterInPlace";
 import { stampToMs, today, ulid } from "../memex/contract";
 
@@ -30,7 +35,21 @@ export function savedNoteText(
   modified: number | undefined,
   asWritten: boolean,
 ): string {
-  if (asWritten) return `${original.slice(0, original.length - currentBody.length)}${body}`;
+  // a --- block at the top of a fenceless note's new text would turn into
+  // metadata, `ai_edit: true` and all (review 2026-11-20). In place, where
+  // Rotli adds no metadata of its own, that save is refused; in a Rotli vault
+  // the note gains its own block, so the pasted one stays body text (as on
+  // the Mac).
+  const pastedBlock = !frontmatter && parseNoteDocument(body).frontmatter !== null;
+  if (asWritten) {
+    if (pastedBlock)
+      throw new Error(
+        "This note has no metadata block, so a --- block at its top would become its metadata. Add a line above it, or add metadata from Show file metadata.",
+      );
+    return `${original.slice(0, original.length - currentBody.length)}${body}`;
+  }
+  if (pastedBlock)
+    return composeNoteDocument(ownedNoteFacts(emptyFrontmatter(), modified ?? Date.now(), true), body);
   return frontmatter ? composeNoteDocument(ownedNoteFacts(frontmatter, modified!, true), body) : body;
 }
 

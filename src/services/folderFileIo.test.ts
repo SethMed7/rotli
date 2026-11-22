@@ -137,3 +137,16 @@ test("a connected-folder file enables Archive and Trash in its menu", async () =
   const trashed = await notes.moveNote(restored.id, "Trash");
   expect(trashed.id).toBe("trash/storage/rotli/Plan.docx");
 });
+
+test("the web byte-save lane refuses notes and boards (review 2026-11-20)", async () => {
+  const dir = new MemoryVaultDir();
+  const note = "---\nsecure: true\nlocked: true\n---\n\n# Web budget notes\n";
+  for (const path of ["budget.md", "LOUD.Md", "flow.excalidraw"]) {
+    await dir.writeText(path, note);
+    const opened = await folderFileStat(dir, path);
+    await expect(folderWriteFileBytes(dir, path, btoa("replaced"), false, opened!.revision)).rejects.toThrow(
+      /not for notes/,
+    );
+    expect(await dir.readText(path)).toBe(note);
+  }
+});

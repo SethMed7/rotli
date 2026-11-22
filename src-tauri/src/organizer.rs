@@ -776,8 +776,11 @@ fn parse_enrich(raw: &str, candidates: &[String]) -> Option<EnrichOut> {
             a.iter()
                 .filter_map(|x| x.as_str())
                 .map(|s| s.trim().to_lowercase())
-                // a tag with list syntax would corrupt the `[…]` field format
+                // a tag with list syntax would corrupt the `[…]` field format, and
+                // one with a line break would be refused by the setter and cost the
+                // note's whole update (review of 305/306): drop just that tag
                 .filter(|s| !s.is_empty() && !s.contains([',', '[', ']']))
+                .filter(|s| crate::note_protection::refuse_line_breaks(s).is_ok())
                 .collect()
         })
         .unwrap_or_default();
@@ -1701,6 +1704,11 @@ fn refresh_indexes(
             if dismissed {
                 report.journal_written = true;
             }
+            continue;
+        }
+        // the person protected the overview (a denial regeneration would
+        // drop): leave the area alone, without an error each pass
+        if crate::note_protection::require_not_looser_fail_closed(&disk, &body).is_err() {
             continue;
         }
         let apply = auto_applies(trust, Verb::Index, false);
@@ -4664,6 +4672,14 @@ mod tests {
     }
 
     #[test]
+    fn parse_enrich_drops_a_tag_that_would_break_a_line() {
+        // review of 305/306: one bad tag used to fail the note's whole update
+        let out = parse_enrich("{\"summary\":\"s\",\"tags\":[\"plans\\nai_edit: true\",\"q3\",\"a\\u2028b\",\"tab\\tok\"]}", &[]).unwrap();
+        assert_eq!(out.tags, ["q3", "tab\tok"]);
+        assert_eq!(out.summary, "s");
+    }
+
+    #[test]
     fn parse_enrich_rejects_links_outside_candidates() {
         let cands = vec!["alazan-history-a1b2c3".to_string()];
         let out = parse_enrich(
@@ -4888,6 +4904,47 @@ mod tests {
             fs::read_to_string(root.join("wiki/Projects/_index.md")).unwrap(),
             idx
         );
+    }
+
+    #[test]
+    fn an_overview_the_person_protected_is_skipped_quietly() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        let a = place_note(&state, "# Alpha\n\none", "Projects");
+        handle.enqueue(&root, &[root.join(&a)]);
+        let transport = |_: &str| Ok("nope".to_string());
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        // the person withdraws on-device AI from the overview: regeneration
+        // would drop that line, so the area is left alone, without an error
+        let path = root.join("wiki/Projects/_index.md");
+        let denied = format!("---\nlocal_ai_allowed: false\n---\n{}", fs::read_to_string(&path).unwrap());
+        fs::write(&path, &denied).unwrap();
+        let b = place_note(&state, "# Beta\n\ntwo", "Projects");
+        handle.enqueue(&root, &[root.join(&b)]);
+        for _ in 0..2 {
+            let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+            assert_eq!(report.errors, 0);
+            assert_eq!(fs::read_to_string(&path).unwrap(), denied);
+        }
+    }
+
+    #[test]
+    fn an_overview_with_an_unclosed_mark_is_skipped_quietly() {
+        // lane check of 306: the skip reads the marker fail-closed, as the read gate does
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(&state, "{\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0}");
+        let a = place_note(&state, "# Alpha\n\none", "Projects");
+        handle.enqueue(&root, &[root.join(&a)]);
+        let transport = |_: &str| Ok("nope".to_string());
+        run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        let path = root.join("wiki/Projects/_index.md");
+        let marked = format!("---\nsecureContext: true\n{}", fs::read_to_string(&path).unwrap());
+        fs::write(&path, &marked).unwrap();
+        let b = place_note(&state, "# Beta\n\ntwo", "Projects");
+        handle.enqueue(&root, &[root.join(&b)]);
+        let report = run_cycle(&state, "default", &root, &handle.0, &no_gates(), &transport).unwrap();
+        assert_eq!(report.errors, 0);
+        assert_eq!(fs::read_to_string(&path).unwrap(), marked);
     }
 
     #[test]

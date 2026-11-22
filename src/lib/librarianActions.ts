@@ -3,6 +3,8 @@
 // tags merged into `tags`, and text-quote pointers to passages in `anchors`.
 // Nothing here calls a model or touches a file.
 
+import { breaksALine } from "./controlChars";
+
 /** A pointer to a passage: its words, a little text on each side, and an
  * optional short name. It finds the passage again without changing the note. */
 export interface Anchor {
@@ -68,7 +70,18 @@ export function parseAnchors(value: string): Anchor[] {
 export function addAnchor(value: string, anchor: Anchor): string {
   const same = (a: Anchor) => a.exact === anchor.exact && a.prefix === anchor.prefix;
   const list = [...parseAnchors(value).filter((a) => !same(a)), anchor];
-  return JSON.stringify(list.slice(-ANCHOR_LIMITS.perNote));
+  return oneLineJson(list.slice(-ANCHOR_LIMITS.perNote));
+}
+
+/** JSON on one line: `JSON.stringify` leaves U+0085, U+2028 and U+2029 raw,
+ * and a frontmatter value holding one is refused (review of 305/306). */
+function oneLineJson(value: unknown): string {
+  return [...JSON.stringify(value)]
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      return breaksALine(code) ? `\\u${code.toString(16).padStart(4, "0")}` : char;
+    })
+    .join("");
 }
 
 function occurrences(doc: string, text: string): number[] {
@@ -96,8 +109,11 @@ export function resolveAnchor(
 
 // ── tags ─────────────────────────────────────────────────────────────────────
 
+// a line break or control character would write extra metadata lines through
+// the Filer, `ai_edit: true` among them (review 2026-11-20)
 function cleanTag(tag: string): string {
-  return tag.replace(/[,[\]]/g, "").trim();
+  const oneLine = [...tag].map((char) => (breaksALine(char.charCodeAt(0)) ? " " : char)).join("");
+  return oneLine.replace(/[,[\]]/g, "").trim();
 }
 
 /** A model's tag list, cleaned: strings only, no commas or brackets, no

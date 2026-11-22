@@ -1,5 +1,6 @@
 // Connected-folder file I/O. Native callers keep using the Rust corpus.
 import { extOf, imageMimeOf, VIDEO_EXTS } from "../lib/fileKind";
+import { isNotePath } from "../lib/protectionRule";
 import type { FileStat, VersionedText } from "../lib/tauri";
 import { type VaultDir, bytesRevision, contentRevision, vaultIsMemex } from "./vaultDir";
 
@@ -115,6 +116,11 @@ export async function folderWriteFileBytes(
   backup: boolean,
   revision: string,
 ): Promise<string> {
+  // sheets and binaries only: a note keeps its protection in its frontmatter,
+  // which a raw overwrite would drop (review 2026-11-20), and a board saves
+  // through its own writer (Rust refuses both too)
+  if (isNotePath(path))
+    throw new Error(`refused: the file save is not for notes or boards (${path}); save it from its editor`);
   const memex = await assertSurfacedPath(dir, path);
   const stat = await folderFileStat(dir, path);
   if (!fileWritable(memex, path)) throw new Error("file is not writable");
