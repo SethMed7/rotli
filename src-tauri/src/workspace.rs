@@ -304,13 +304,21 @@ impl Workspace {
         // surface. The 2026-08-01 reference lane is the interactive chat's
         // retrieval scope; widening an external agent's reach is a separate
         // decision (docs/design/ai-visibility-matrix.md).
-        let hits = self
-            .store
-            .search(query, limit.saturating_mul(4).max(limit), false)?;
-        // each hit is gated and shown from one read (review 2026-11-09)
-        let mut hits: Vec<SearchHit> =
-            hits.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false).map(|marked| marked.row)).collect();
-        hits.truncate(limit.min(100));
+        // each hit is gated and shown from one read (review 2026-11-09); the
+        // window widens until `limit` hits pass or the index runs out, so how
+        // many come back never counts the hidden ones ranked above them
+        let limit = limit.min(100);
+        let mut window = limit.saturating_mul(4).max(1);
+        let mut hits: Vec<SearchHit> = loop {
+            let found = self.store.search(query, window, false)?;
+            let exhausted = found.len() < window;
+            let shown: Vec<SearchHit> =
+                found.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false).map(|marked| marked.row)).take(limit).collect();
+            if shown.len() >= limit || exhausted {
+                break shown;
+            }
+            window = window.saturating_mul(4);
+        };
         for hit in &mut hits {
             hit.id = self.wire(&hit.id);
             hit.folder_id = self.wire(&hit.folder_id);
