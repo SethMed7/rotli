@@ -52,6 +52,10 @@ pub(super) fn call(name: &str, args: &Value) -> Option<Result<Value, String>> {
 fn dispatch(name: &str, args: &Value) -> Result<Value, String> {
     let id = arg_required(args, "id")?;
     let (mut workspace, local) = Workspace::open_for_item(id, arg_string(args, "rootId"))?;
+    // a rename names its note by title too; its selector answers alike itself
+    if name != RENAME {
+        workspace.admit(&local)?;
+    }
     let expected = arg_string(args, "expectedRevision");
     match name {
         RENAME => json_value(workspace.rename_note(&local, arg_required(args, "title")?, expected)?),
@@ -79,7 +83,7 @@ pub(super) fn notes_cli(sub: &str, args: &[String], root_id: Option<&str>) -> Op
     }
     Some((|| {
         let id = positional(args, 2, &format!("notes {sub} needs an id"))?;
-        let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+        let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
         match sub {
             "attachments" => {
                 let text = flag(args, "--text")
@@ -132,13 +136,14 @@ impl Workspace {
     }
 
     /// This note's journal rows, folded (last line per id wins), newest first.
+    /// A row is this note's by its note id alone: the note's own id, or its
+    /// path for a note without one. Matching by path also showed the rows of
+    /// another note that once lived at the same path, a secure one included.
     fn journal_rows_for(&mut self, local_id: &str) -> Result<Vec<AiEditRow>, String> {
         let text = self.store.read_for_ai(local_id, false)?;
         let rel = self.store.resolve_note_rel(local_id)?;
-        let ulid = crate::corpus::parse_document(&text).0.and_then(|fm| fm.id);
-        let mine = |row: &AiEditRow| {
-            Some(row.note_id.as_str()) == ulid.as_deref() || row.note_id == local_id || row.path == rel
-        };
+        let own = crate::corpus::parse_document(&text).0.and_then(|fm| fm.id).unwrap_or(rel);
+        let mine = |row: &AiEditRow| row.note_id == own;
         let mut latest: Vec<AiEditRow> = Vec::new();
         for row in self.store.ai_journal_rows()?.into_iter().filter(mine) {
             match latest.iter_mut().find(|seen| seen.id == row.id) {

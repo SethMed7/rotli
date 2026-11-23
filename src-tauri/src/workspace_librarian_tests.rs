@@ -58,6 +58,12 @@ pub(super) fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
 }
 
 /// The refusal a failed call carries, all its text parts joined.
+/// The refusal every agent gets for an id it may not see, or that names
+/// nothing (row 16k).
+pub(super) fn not_found(id: &str) -> String {
+    format!("Error: {}", crate::corpus::note_not_found(id))
+}
+
 pub(super) fn refusal(result: &Value) -> String {
     assert!(result.get("isError").and_then(Value::as_bool).unwrap_or(false), "expected a refusal: {result}");
     let parts = result.get("content").and_then(Value::as_array).cloned().unwrap_or_default();
@@ -146,7 +152,7 @@ fn secure_notes_are_never_read_searched_or_proposed() {
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
     let secure = ws.store.create_as("Secure notes", "# Bank login\n\nmarigold", true, Some(Creator::Agent)).unwrap();
-    assert!(refusal(&mcp(&temp, READ, json!({"id": secure.id}))).contains("secure"));
+    assert_eq!(refusal(&mcp(&temp, READ, json!({"id": secure.id}))), not_found(&secure.id));
     let hits = ok(mcp(&temp, SEARCH, json!({"query":"marigold"})));
     assert_eq!(hits["items"].as_array().unwrap().len(), 0, "{hits}");
     assert_eq!(mcp(&temp, FILE, json!({"id": secure.id, "folder":"projects","reason":"x"}))["isError"], true);

@@ -11,7 +11,7 @@ use tempfile::TempDir;
 use super::super::tests::test_workspace;
 use super::super::{handle_mcp_request_for_root, MAIN_ROOT};
 use super::review_tests::hits;
-use super::tests::{body_of, make_secure, mcp, ok, public_build, refusal, turn_on};
+use super::tests::{body_of, make_secure, mcp, not_found, ok, public_build, refusal, turn_on};
 use super::*;
 
 fn pages(temp: &TempDir) -> Value {
@@ -76,9 +76,10 @@ fn a_write_refuses_an_id_the_agent_cannot_read() {
     let public = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
     let secure = ws.store.create_as("Secure notes", "# Bank login\n\nmarigold", true, None).unwrap();
     let both = json!([{"id": public.id, "summary": "fine"}, {"id": secure.id, "summary": "no"}]);
-    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": both}))).contains("not a note you can read"));
-    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": "01NOSUCHNOTE", "summary": "x"}]}))).contains("read"));
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "x", "ids": [secure.id]}))).contains("not a note you can read"));
+    // a secure note answers as a missing one does (row 16k)
+    assert_eq!(refusal(&mcp(&temp, INDEX, json!({"entries": both}))), not_found(&secure.id));
+    assert_eq!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": "01NOSUCHNOTE", "summary": "x"}]}))), not_found("01NOSUCHNOTE"));
+    assert_eq!(refusal(&mcp(&temp, LOG, json!({"entry": "x", "ids": [secure.id]}))), not_found(&secure.id));
     assert!(mcp(&temp, INDEX, json!({"entries": [{"id": public.id, "summary": "card 4242 4242 4242 4242"}]}))["isError"] == true);
     assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": public.id, "summary": "two\nlines"}]}))).contains("one line"));
     assert_eq!(sidecar(&temp, "index.jsonl"), "", "a refused call writes nothing, the readable entry included");
@@ -199,9 +200,34 @@ fn an_entry_naming_a_note_that_is_now_secure_is_hidden() {
     let log: Vec<&str> = shown["log"].as_array().unwrap().iter().map(|line| line["text"].as_str().unwrap()).collect();
     assert_eq!(log, ["Tidied intake"], "{shown}");
     assert!(!shown.to_string().to_lowercase().contains("cobalt"), "{shown}");
-    let why = refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Cobalt acquisition follow-up"}]})));
-    assert!(why.contains("by id"), "{why}");
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "about cobalt acquisition"}))).contains("by id"));
+    // text naming a note the agent can't read answers as text naming no
+    // note: refusing it told the agent such a note exists (row 16k)
+    let hidden = mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Cobalt acquisition follow-up"}]}));
+    let absent = mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Zincite acquisition follow-up"}]}));
+    assert_eq!(ok(hidden), ok(absent));
+    ok(mcp(&temp, LOG, json!({"entry": "about cobalt acquisition"})));
+}
+
+/// A line names the notes the agent could read when it wrote it; it hides
+/// once one of those turns secure, and a name it never could read changes
+/// nothing.
+#[test]
+fn a_line_hides_when_a_note_it_named_turns_secure() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    let cobalt = ws.create_note("Cobalt acquisition", "terms", MAIN_ROOT).unwrap();
+    ws.store.create_as("Secure notes", "# Zincite plan\n\nmarigold", true, None).unwrap();
+    ok(mcp(&temp, LOG, json!({"entry": "Read the Zincite plan", "ids": [dock.id]})));
+    assert_eq!(pages(&temp)["log"][0]["text"], "Read the Zincite plan");
+    ok(mcp(&temp, LOG, json!({"entry": "Read Cobalt acquisition", "ids": [dock.id]})));
+    assert_eq!(pages(&temp)["log"].as_array().unwrap().len(), 2);
+    make_secure(&mut ws, &cobalt.id);
+    let log = pages(&temp)["log"].clone();
+    assert_eq!(log.as_array().unwrap().len(), 1, "{log}");
+    assert_eq!(log[0]["text"], "Read the Zincite plan");
 }
 
 /// Codex review of 7f542f5b: a sidecar row with a field Rotli never writes
