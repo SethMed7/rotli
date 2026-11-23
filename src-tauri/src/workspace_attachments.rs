@@ -190,10 +190,12 @@ impl Workspace {
         let mut files = Vec::new();
         for source in link_targets(&note.note.body) {
             // the vault-root reading when that file exists (as the editor), else
-            // the reading from the note's folder
+            // the reading from the note's folder. A protected path never
+            // "exists" here: which reading is chosen must not depend on it
             let from_root = attachment_rel(&source);
             let from_note = attachment_rel_from(&source, &folder);
-            let exists = |rel: &String| self.store.guard_rel(rel).is_ok_and(|path| path.is_file());
+            let store = &mut self.store;
+            let mut exists = |rel: &String| store.agent_listable(rel) && store.guard_rel(rel).is_ok_and(|path| path.is_file());
             let chosen = match (from_root, from_note) {
                 (Some(root), _) if exists(&root) => Some(root),
                 (_, Some(note_rel)) if exists(&note_rel) => Some(note_rel),

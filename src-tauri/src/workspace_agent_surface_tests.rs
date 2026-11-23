@@ -523,8 +523,14 @@ fn no_agent_tool_opens_a_protected_item_asked_for_by_another_spelling() {
     put(temp.path(), "wiki/Projects/links.md", &format!("---\nid: 01SURFLINKS0000000000000000\n---\n# Links\n\n{links}\n"));
     let attachments = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_note_attachments", json!({"id": "01SURFLINKS0000000000000000", "includeText": true})));
     opened("rotli_note_attachments", "links", &attachments);
-    if attachments.contains(r#""available":true"#) {
-        found.push(format!("rotli_note_attachments: a protected link is available in {attachments}"));
+    // a link may resolve, from the note's folder, to a public file of the
+    // same name (wiki/Projects/wiki/Link/f.csv); never to the protected one
+    let answer: Value = serde_json::from_str(&attachments).unwrap();
+    let listed: Value = serde_json::from_str(answer["result"]["content"][0]["text"].as_str().unwrap_or("{}")).unwrap_or_default();
+    for item in listed["attachments"].as_array().into_iter().flatten().filter(|item| item["available"] == json!(true)) {
+        if PROTECTED_REQUESTS.iter().any(|rel| item["path"] == json!(rel.trim_matches('"'))) {
+            found.push(format!("rotli_note_attachments: a protected link is available: {item}"));
+        }
     }
     assert!(found.is_empty(), "a protected item opened:\n{}", found.join("\n\n"));
 }
