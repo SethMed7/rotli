@@ -134,3 +134,77 @@ fn an_id_with_a_colon_that_names_no_root_answers_and_returns() {
     let renamed = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_rename", json!({"id": "Plan: Q3", "title": "Plan: Q4"})));
     assert!(succeeded(&renamed) && renamed.contains("Plan: Q4"), "{renamed}");
 }
+
+/// Hundreds of hidden notes that match a search, ranked above the visible
+/// ones: the answer must not change, nor the server fall over (it widened
+/// the index window until a clamp panicked, only when they were there).
+#[test]
+fn a_search_answers_alike_with_hundreds_of_hidden_matches() {
+    let vault = |hidden: bool| {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("memex.json"), "{\"id\":\"mx_many\",\"contract\":\"3.4\",\"apps\":{}}\n").unwrap();
+        put(temp.path(), "wiki/Projects/open.md", "---\nid: 01SURFMANYOPEN0000000000000\n---\n# Accounts\n\nthe zebra sits among many other words here\n");
+        if hidden {
+            for n in 0..450 {
+                put(temp.path(), &format!("wiki/Projects/z{n}.md"), &format!("---\nid: 01SURFMANY{n:04}00000000000000\nsecure: true\n---\n# Zebra {n}\n\nzebra zebra zebra\n"));
+            }
+        }
+        same_times(temp.path());
+        temp
+    };
+    let mut found = Vec::new();
+    for (name, args) in [("rotli_search", json!({"query": "zebra", "limit": 100})), ("rotli_search", json!({"query": "zebra", "limit": 30}))] {
+        let run = |hidden: bool| {
+            let temp = vault(hidden);
+            observe(&temp, || {
+                let answer = pinned(&temp, || call(&WORKSPACE_SERVER, name, args.clone()));
+                (succeeded(&answer), answer)
+            })
+        };
+        differ(&format!("{name} {args}"), run(true), run(false), &mut found);
+    }
+    for limit in ["50", "100"] {
+        let run = |hidden: bool| {
+            let temp = vault(hidden);
+            let argv: Vec<String> = ["notes", "search", "zebra", "--limit", limit].map(String::from).to_vec();
+            observe(&temp, || {
+                pinned(&temp, || match run_cli(&argv) {
+                    Ok(value) => (true, value.to_string()),
+                    Err(error) => (false, error),
+                })
+            })
+        };
+        differ(&format!("notes search zebra --limit {limit}"), run(true), run(false), &mut found);
+    }
+    assert!(found.is_empty(), "{}", found.join("\n\n"));
+}
+
+/// A tool that panics answers a generic error; the server lives on.
+#[test]
+fn a_tool_that_panics_answers_an_error_and_the_server_lives_on() {
+    fn boom(_: &str, _: &Value) -> Result<Value, String> {
+        panic!("a tool fell over")
+    }
+    let server = McpServer { name: "panics", instructions: "", tools: || vec![json!({"name": "boom", "inputSchema": {"type": "object"}})], call: boom };
+    let request = json!({"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "boom", "arguments": {}}});
+    let answer = handle_mcp_with(&request, &server).unwrap();
+    assert_eq!(answer["result"]["isError"], json!(true), "{answer}");
+    assert!(!answer.to_string().contains("fell over"), "{answer}");
+    assert_eq!(handle_mcp_with(&json!({"jsonrpc": "2.0", "id": 8, "method": "ping"}), &server).unwrap()["result"], json!({}));
+}
+
+/// Placing an item in Main takes the admit gate: a secure note answers as a
+/// missing one and Main is left as it was.
+#[test]
+fn placing_a_hidden_item_in_main_answers_as_missing_and_writes_nothing() {
+    for id in [HIDDEN_FM, "01SURFBANK00000000000000000", "01SURFNONE00000000000000000"] {
+        let temp = world(true);
+        let main = fs::read_to_string(temp.path().join(".rotli/main.json")).unwrap();
+        let answer = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_place_in_main", json!({"id": id})));
+        assert!(answer.contains(&format!("note not found: {id}")), "{id}: {answer}");
+        let argv: Vec<String> = ["main", "add", id].map(String::from).to_vec();
+        let cli = pinned(&temp, || run_cli(&argv));
+        assert_eq!(cli.unwrap_err(), format!("note not found: {id}"));
+        assert_eq!(fs::read_to_string(temp.path().join(".rotli/main.json")).unwrap(), main, "{id}");
+    }
+}

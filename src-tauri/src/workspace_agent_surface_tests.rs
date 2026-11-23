@@ -15,7 +15,7 @@ use super::*;
 use tempfile::TempDir;
 
 /// Names that exist only in protected places of the seeded vault.
-pub(super) const PROTECTED: [&str; 12] = [
+pub(super) const PROTECTED: [&str; 13] = [
     "_secure",
     "ſecure",
     "Juniper",
@@ -28,6 +28,7 @@ pub(super) const PROTECTED: [&str; 12] = [
     "Hidden note",
     "OldHome",
     "01SURFBANK",
+    "4242",
 ];
 
 pub(super) const OPEN: &str = "01SURFOPEN00000000000000000";
@@ -36,6 +37,18 @@ pub(super) const AGENT_FREE: &str = "01SURFFREE00000000000000000";
 pub(super) const BOARD: &str = "wiki/Projects/b.excalidraw";
 pub(super) const PUBLIC_DOCX: &str = "wiki/Projects/plan.docx";
 pub(super) const TOP: &str = "01SURFTOP000000000000000000";
+pub(super) const HIDDEN_FM: &str = "01SURFFMSECURE0000000000000";
+/// Items `seeded` hides where they are (an ordinary folder), not by path.
+pub(super) const HIDDEN_IN_PLACE: [&str; 8] = [
+    "wiki/Projects/fm.md",
+    "wiki/Projects/detected.md",
+    "wiki/Projects/trip.md",
+    "wiki/Projects/cards.csv",
+    "wiki/Projects/secret.excalidraw",
+    "wiki/Projects/broken.docx",
+    "wiki/Projects/carddoc.docx",
+    "wiki/Projects/hard.md",
+];
 
 pub(super) fn docx() -> Vec<u8> {
     crate::ai_files::tests::zip_with(&[("word/document.xml", crate::ai_files::tests::XML.as_bytes())], true)
@@ -58,11 +71,22 @@ pub(super) fn seeded() -> TempDir {
     // public: a note, two agent-made notes, a board, a file, a document
     // the second link reads from the vault root through a symlink into the
     // secure home, and from the note's folder as a public file
-    put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv) [g](wiki/Link/f.csv)"));
+    put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv) [g](wiki/Link/f.csv) [c](wiki/Projects/cards.csv)"));
     put(root, "wiki/Projects/wiki/Link/f.csv", "a,b\n3,4\n");
     // one public match for a word five secure notes repeat in their titles
     // and bodies (they rank first)
     put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "", "Accounts", "the ledger sits among many other plain words here"));
+    // items hidden where they are, in an ordinary folder: by frontmatter, by
+    // what they hold (the secret detector), by a keyword in the title; a
+    // file, a board, and two documents (one unreadable) that listing hides
+    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, "secure: true\n", "Hidden note eight", "words"));
+    put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "", "Hidden note nine", "card 4242 4242 4242 4242"));
+    put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "", "Juniper trip", "words"));
+    put(root, "wiki/Projects/cards.csv", "card,4242 4242 4242 4242\n");
+    put(root, "wiki/Projects/secret.excalidraw", "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[{\"id\":\"t\",\"type\":\"text\",\"text\":\"card 4242 4242 4242 4242\",\"x\":0,\"y\":0,\"width\":10,\"height\":10}]}");
+    put_bytes(root, "wiki/Projects/broken.docx", b"PK not a package");
+    let card = crate::ai_files::tests::XML.replace("Launch &amp; land", "card 4242 4242 4242 4242");
+    put_bytes(root, "wiki/Projects/carddoc.docx", &crate::ai_files::tests::zip_with(&[("word/document.xml", card.as_bytes())], true));
     // a note in `wiki` whose links read, from its folder, into the secure
     // home (and through the symlink); from the vault root they name nothing.
     // Past the snippet's length, so no listing shows them

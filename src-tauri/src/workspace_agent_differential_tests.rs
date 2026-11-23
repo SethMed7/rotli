@@ -45,6 +45,13 @@ fn protected_ids() -> Vec<(&'static str, &'static str)> {
         ("wiki/_secure/PrivateProject", "wiki/Projects/Nothing"),
         ("trash/wiki/_secure/trashed plan.md", "trash/wiki/Nothing/trashed plan.md"),
         (HARD_LINK, "wiki/Projects/none.md"),
+        // hidden where they are: by frontmatter, content, title keyword
+        ("wiki/Projects/fm.md", "wiki/Projects/none.md"),
+        (HIDDEN_FM, "01SURFNONE30000000000000000"),
+        ("wiki/Projects/detected.md", "wiki/Projects/none.md"),
+        ("wiki/Projects/trip.md", "wiki/Projects/none.md"),
+        ("wiki/Projects/cards.csv", "wiki/Projects/none.csv"),
+        ("wiki/Projects/secret.excalidraw", "wiki/Projects/none.excalidraw"),
         ("\"wiki/_secure/Bank plan.md\"", "\"wiki/Projects/Nothing/none.md\""),
         ("default:wiki/_secure/Bank plan.md", "default:wiki/Projects/Nothing/none.md"),
     ];
@@ -134,9 +141,11 @@ fn world(protected: bool) -> TempDir {
         for rel in PROTECTED_ITEMS {
             fs::remove_dir_all(temp.path().join(rel)).unwrap();
         }
-        // a hard link of a secure note is that note, and the journal's rows
-        // of a removed note go with it
-        fs::remove_file(temp.path().join(HARD_LINK)).unwrap();
+        // items hidden where they are (a hard link of a secure note is that
+        // note), and the journal's rows of a removed note go with them
+        for rel in HIDDEN_IN_PLACE {
+            fs::remove_file(temp.path().join(rel)).unwrap();
+        }
         let journal = temp.path().join(".rotli/ai-edit-journal.jsonl");
         let kept: String = fs::read_to_string(&journal).unwrap().lines().filter(|row| !row.contains("01SURFBANK")).map(|row| format!("{row}\n")).collect();
         fs::write(&journal, kept).unwrap();
@@ -404,7 +413,7 @@ fn open_differential(found: &mut Vec<String>) {
 /// The document tools, through the bridge's own gate (the app's side): a
 /// protected document and a missing one are refused alike.
 fn document_differential(found: &mut Vec<String>) {
-    let mut files = vec!["wiki/_secure/p.docx", "wiki/Projects/jUNIPER/p.docx", "wiki/Link/p.docx", "default:wiki/_secure/p.docx"];
+    let mut files = vec!["wiki/_secure/p.docx", "wiki/Projects/jUNIPER/p.docx", "wiki/Link/p.docx", "default:wiki/_secure/p.docx", "wiki/Projects/broken.docx", "wiki/Projects/carddoc.docx"];
     if cfg!(target_os = "macos") {
         files.extend(["wiki/_SECURE/p.docx", "wiki/_\u{17f}ecure/p.docx"]);
     }
