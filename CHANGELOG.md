@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.6] - 2026-11-23
+
+### Fixed
+
+- **A search can no longer stop an agent's connection.** A search where
+  hundreds of hidden notes matched crashed `rotli mcp`, and
+  `rotli notes search --limit 200` crashed the command; both now page
+  through the results. Any tool that fails unexpectedly answers an error instead of
+  ending the server.
+
+
 ### Security
 
 - **An agent can no longer tell whether a secure note or folder exists.**
@@ -33,10 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vault, an attachment the listing already hid from agents (a file over
   16 MB, or an image whose raw bytes happen to look like a card number) now
   answers "not available to agents" instead of showing its size and type.
-- **A search can no longer stop an agent's connection.** A search where
-  hundreds of hidden notes matched crashed `rotli mcp`; it now pages through
-  the results. Any tool that fails unexpectedly answers an error instead of
-  ending the server.
 
 ## [1.9.5] - 2026-11-23
 
