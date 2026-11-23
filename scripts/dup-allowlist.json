@@ -289,8 +289,8 @@
       "reason": "Not a mirror: the same reported path spellings (_ſecure, STRASSE for Straße, a keyword on a parent folder, a symlink into the secure home) are checked twice on purpose, once against the protected_path rule and once end to end through the agent listing, search, metrics and reads. Sharing the fixture strings would couple the two layers' tests."
     },
     {
-      "id": "source-guard-idiom-fa8f469859",
-      "fingerprint": "fa8f469859db591738efe46552f421eee0620c0ad27762225b43315a9bd2dcd0",
+      "id": "source-guard-idiom-2a1ca34db4",
+      "fingerprint": "2a1ca34db494673c6d34ea80f6e10c44f800e454fc128f346859b4bdc8247d8b",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
@@ -331,8 +331,8 @@
       "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
     },
     {
-      "id": "source-guard-idiom-0bdb48435a",
-      "fingerprint": "fd03b42e1571429a12631d26e6c0f911aa4a0b67bf8b32b2ed3d16799d5480de",
+      "id": "source-guard-idiom-ba9688ecae",
+      "fingerprint": "ba9688ecaec643debe9dcfb5422c50dfa16a5862339696a0957765d6890e199a",
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
