@@ -605,22 +605,25 @@ impl Workspace {
         if !self.store.agent_id_shown(wire_id) || !self.store.agent_id_shown(local) {
             return false;
         }
-        if !self.root.is_default || !wire_id.contains(':') {
-            let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
-                return false;
-            };
-            if rel.to_ascii_lowercase().ends_with(".md") {
-                return self.store.read_for_ai(wire_id, false).is_ok();
+        // another root's item is judged there; an id whose prefix names no
+        // root (`Plan: Q3`) is judged as itself, never re-entered
+        if self.root.is_default && wire_id.contains(':') {
+            match Workspace::open_for_item(wire_id, None) {
+                Ok((mut workspace, local)) if local != wire_id => return workspace.reference_visible_to_remote(&local),
+                Ok(_) => {}
+                Err(_) => return false,
             }
-            if rel.to_ascii_lowercase().ends_with(".excalidraw") {
-                return self.read_board_for_remote(wire_id).is_ok();
-            }
-            return self.file_visible_to_remote(&rel);
         }
-        let Ok((mut workspace, local)) = Workspace::open_for_item(wire_id, None) else {
+        let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
             return false;
         };
-        workspace.reference_visible_to_remote(&local)
+        if rel.to_ascii_lowercase().ends_with(".md") {
+            return self.store.read_for_ai(wire_id, false).is_ok();
+        }
+        if rel.to_ascii_lowercase().ends_with(".excalidraw") {
+            return self.read_board_for_remote(wire_id).is_ok();
+        }
+        self.file_visible_to_remote(&rel)
     }
 
     fn filter_reference_nodes(&mut self, nodes: Vec<MainNode>) -> Vec<MainNode> {

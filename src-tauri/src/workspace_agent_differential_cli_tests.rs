@@ -119,3 +119,18 @@ fn the_secure_notes_folder_answers_alike_whether_it_holds_a_namesake_or_not() {
     differ("folder Secure notes", run(true, &call), run(false, &call), &mut found);
     assert!(found.is_empty(), "{}", found.join("\n\n"));
 }
+
+/// An id with a `:` that names no root (a title such as `Plan: Q3`, a Main
+/// folder id) is judged as itself: the admit gate once re-entered itself
+/// for it without end.
+#[test]
+fn an_id_with_a_colon_that_names_no_root_answers_and_returns() {
+    let temp = world(true);
+    put(temp.path(), "wiki/Projects/q3.md", "---\nid: 01SURFQTHREE000000000000000\ncreated_by: agent\n---\n# Plan: Q3\n\nplain words\n");
+    for id in ["x:y", "main:Outer", "Plan: Q3", "x:wiki/_secure/Bank plan.md"] {
+        let answer = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_read_note", json!({"id": id})));
+        assert!(answer.contains("note not found"), "{id}: {answer}");
+    }
+    let renamed = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_rename", json!({"id": "Plan: Q3", "title": "Plan: Q4"})));
+    assert!(succeeded(&renamed) && renamed.contains("Plan: Q4"), "{renamed}");
+}
