@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **An agent can no longer tell whether a secure note or folder exists.**
+  Outside agents (the `rotli` CLI, MCP and the Librarian) could not see
+  secure names, but some answers still differed when a secure item was
+  there: a different error for a secure note than a missing one, a `(2)`
+  added when moving a note beside a secure namesake, "already exists" when
+  making a folder inside a secure folder, a short page of search results
+  when hidden notes ranked first, a query that matched on a hidden value, a
+  note's history showing another note's edits, and a document request
+  naming another vault. Each now answers exactly as it would if the secure
+  item weren't there: "not found" for anything an agent may not see, and a
+  refusal for any move, new folder, or filing into a secure place. A
+  Librarian summary that mentions a note's name is no longer refused when
+  that note is secure; it is hidden later only if a note it named turns
+  secure.
+
 ## [1.9.5] - 2026-11-23
 
 ### Changed

@@ -472,6 +472,30 @@ roots carry their root-prefixed wire id in the link.
   behaviour harness `workspace_agent_surface_tests.rs`: every MCP tool and CLI
   command, against one vault seeded with every decoy kind. (`docs/architecture/egress-threat-model.md`, row 16k, with its
   residuals.)
+- An agent can't tell whether a protected item exists. Every id it names
+  (a note, board, file, Main reference, index or log entry, or the note a
+  history, attachment, trash, undo, rename, view, or Librarian call works on)
+  passes one admit gate first (`workspace_unseen.rs`): an item that is
+  protected, hidden from agents, refused by the remote read gate (a secure
+  note, a hard-linked file), or simply not there gets the same answer,
+  `note not found: <id>`, word for word, and nothing changes on disk. A
+  folder named as a move target, a new folder's parent, or a Librarian filing
+  is refused (`folder not available to agents: <folder>`) when the path rule
+  protects it, whether it exists or not. The document bridge answers a
+  protected document as a missing one and refuses a `file` whose prefix names
+  any root but the open vault. Search keeps reading the index until it has
+  `limit` visible hits or the index runs out, so a short page never counts
+  hidden matches; query clauses see only the metadata the answer shows;
+  history matches journal rows by note id, never by path; and an attachment
+  link never resolves to a protected file, so which reading it takes doesn't
+  depend on one. Librarian index and log text is judged only against notes
+  the agent can read: the notes it names then are recorded, and the line
+  stops showing when one of them turns hidden. The guard is the
+  differential harness `workspace_agent_differential_tests.rs`: every tool
+  and command, with ordinary arguments and with each protected id, folder,
+  and title swapped in, run in the seeded vault and in the same vault with
+  every protected item removed, must answer and change files identically;
+  each protected id must also answer as an ordinary missing id does.
 - A folder row is listed to an agent only when `agent_listable` allows it
   and its own path is not a hidden or reference surface
   (`agent_listable_folder`).
