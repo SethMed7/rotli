@@ -163,7 +163,7 @@ pub(crate) fn document_request_gate_for_test(store: &mut crate::corpus::CorpusSt
     let rel = document_rel(&json!({ "file": file }), crate::corpus::DEFAULT_ROOT_ID)?;
     let path = document_records_gate(store, &rel)?;
     document_contents_gate(&path)?;
-    document_edit_gate(&store.root().to_path_buf(), &rel, editing)
+    document_edit_gate(store.root(), &rel, editing)
 }
 
 /// The listing's path checks, by the vault's own records, held under the
@@ -444,7 +444,7 @@ mod tests {
     fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: bool) -> Result<(), String> {
         let path = document_records_gate(store, rel)?;
         document_contents_gate(&path)?;
-        document_edit_gate(&store.root().to_path_buf(), rel, editing)
+        document_edit_gate(store.root(), rel, editing)
     }
 
     #[test]
