@@ -221,7 +221,7 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
     // call fails here even when no forbidden spelling is added (Opus review
     // of pull request 304: removing it from read_board_for_remote kept this
     // guard green)
-    let gates: [(&'static str, &str, &str); 13] = [
+    let gates: [(&'static str, &str, &str); 14] = [
         (rules, "fn file_is_protected(", "protected_path("),
         (rules, "fn agent_listable(", "protected_path("),
         (rules, "fn agent_listable_folder(", "agent_listable("),
@@ -234,7 +234,8 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
         (include_str!("workspace.rs"), "fn read_board_for_remote(", "protected_path("),
         (include_str!("workspace_file_visibility.rs"), "fn file_visible_to_remote(", "file_visible("),
         (include_str!("workspace_file_visibility.rs"), "fn file_visible(", "protected_path("),
-        (bridge, "fn document_records_gate(", "file_visible("),
+        (bridge, "fn document_records_gate(", "protected_path("),
+        (bridge, "fn document_contents_gate(", "content_visible("),
     ];
     for (text, start, call) in gates {
         assert!(body(text, start).contains(call), "{start} no longer calls {call}");

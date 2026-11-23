@@ -151,7 +151,7 @@ fn document_rel(args: &Value, root_id: &str) -> Result<String, String> {
 /// (which never asks the running app).
 #[cfg(test)]
 pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel: &str) -> Result<(), String> {
-    let path = document_records_gate(store, rel, false)?;
+    let path = document_records_gate(store, rel)?;
     document_contents_gate(&path)
 }
 
@@ -161,41 +161,44 @@ pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel
 #[cfg(test)]
 pub(crate) fn document_request_gate_for_test(store: &mut crate::corpus::CorpusStore, file: &str, editing: bool) -> Result<(), String> {
     let rel = document_rel(&json!({ "file": file }), crate::corpus::DEFAULT_ROOT_ID)?;
-    let path = document_records_gate(store, &rel, editing)?;
-    document_contents_gate(&path)
+    let path = document_records_gate(store, &rel)?;
+    document_contents_gate(&path)?;
+    document_edit_gate(&store.root().to_path_buf(), &rel, editing)
 }
 
-/// What a remote reader may never receive, by the vault's own records (held
-/// under the corpus lock): a document hidden from agents or named with a
-/// secure keyword, and, for an edit, one no AI made. Returns its path.
-fn document_records_gate(
-    store: &mut crate::corpus::CorpusStore,
-    rel: &str,
-    editing: bool,
-) -> Result<PathBuf, String> {
-    // anything the listing hides (by path, or by what it holds: secret-shaped,
-    // unreadable, too large) answers as missing does, before any parse or
-    // secret check can word it differently (row 16k)
-    if !crate::workspace::file_visibility::file_visible(store, rel) {
+/// The listing's path checks, by the vault's own records, held under the
+/// corpus lock: a document hidden from agents by its path, or not there,
+/// answers as missing. Nothing here reads or parses the file, so the lock is
+/// never held across an unzip an agent chose (review of #311, S2). Returns
+/// its path.
+fn document_records_gate(store: &mut crate::corpus::CorpusStore, rel: &str) -> Result<PathBuf, String> {
+    if store.protected_path(rel) || !store.agent_listable(rel) {
         return Err(NO_DOCUMENT.into());
     }
-    let path = store.guard_rel(rel).ok().filter(|path| path.is_file()).ok_or(NO_DOCUMENT)?;
-    if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
-        return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
-    }
-    Ok(path)
+    store.file_for_ai(rel, false).ok().filter(|path| path.is_file()).ok_or_else(|| NO_DOCUMENT.into())
 }
 
-/// ...and by its contents (read outside the corpus lock): too large for the
-/// editor, or holding secret-shaped text.
+/// ...then the listing's content check, outside the corpus lock: anything
+/// the listing hides for what it holds (secret-shaped, unreadable, a hard
+/// link, over its size cap) answers as missing does, before any other word
+/// could tell it apart (row 16k). A document the listing shows may still be
+/// too large for the editor.
 fn document_contents_gate(path: &Path) -> Result<(), String> {
+    if !crate::workspace::file_visibility::content_visible(path) {
+        return Err(NO_DOCUMENT.into());
+    }
     let meta = std::fs::metadata(path).map_err(|_| NO_DOCUMENT.to_string())?;
     if meta.len() > DOCX_MAX_BYTES {
         return Err("that document is too large for an agent".into());
     }
-    let bytes = crate::fsutil::read_own_bytes(path).map_err(|e| e.to_string())?;
-    if crate::secret::blocked_for_remote(&crate::ai_files::docx_text(&bytes)?) {
-        return Err("blocked: that document holds secret-shaped text; Rotli never gives it to an agent".into());
+    Ok(())
+}
+
+/// ...and, for an edit, last: only a document an AI made, so the refusal
+/// never comes before the document is known to be one an agent may see.
+fn document_edit_gate(root: &Path, rel: &str, editing: bool) -> Result<(), String> {
+    if editing && !crate::ai_files::ai_may_edit(root, rel) {
+        return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
     }
     Ok(())
 }
@@ -233,8 +236,9 @@ pub(crate) fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value,
     } else {
         let rel = document_rel(&request.args, &root_id)?;
         let editing = request.tool == "apply_document";
-        let path = corpus.route(&root_id, |store| document_records_gate(store, &rel, editing))?;
+        let path = corpus.route(&root_id, |store| document_records_gate(store, &rel))?;
         document_contents_gate(&path)?;
+        document_edit_gate(&app_root, &rel, editing)?;
     }
     egress(app.state::<Pending>().ask(app, &request))
 }
@@ -358,7 +362,8 @@ mod tests {
         let vault = tempfile::TempDir::new().unwrap();
         let abs = vault.path().join("Docs/linked.docx");
         let _outside = crate::fsutil::hard_link_outside(&abs, b"PK outside the vault");
-        assert!(document_contents_gate(&abs).unwrap_err().contains("hard link"));
+        // the listing hides a hard link too: it answers as a missing one
+        assert_eq!(document_contents_gate(&abs).unwrap_err(), NO_DOCUMENT);
     }
 
     fn request(tool: &str, root: &Path, read_only: bool) -> BridgeRequest {
@@ -437,8 +442,9 @@ mod tests {
 
     /// Both halves of the document check, as dispatch runs them.
     fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: bool) -> Result<(), String> {
-        let path = document_records_gate(store, rel, editing)?;
-        document_contents_gate(&path)
+        let path = document_records_gate(store, rel)?;
+        document_contents_gate(&path)?;
+        document_edit_gate(&store.root().to_path_buf(), rel, editing)
     }
 
     #[test]
@@ -478,10 +484,37 @@ mod tests {
         )
         .unwrap();
         assert!(document_gate(&mut store, &plan, true).is_ok());
-        // over the editor's own cap: refused before it is read
+        // a real document over the editor's own cap (the listing still shows
+        // it) is too large; one past the listing's cap answers as missing
+        let filler = vec![b'a'; DOCX_MAX_BYTES as usize];
         let big = root.join("storage/rotli/big.docx");
-        std::fs::File::create(&big).unwrap().set_len(DOCX_MAX_BYTES + 1).unwrap();
+        std::fs::write(&big, zip_with(&[("word/document.xml", XML.as_bytes()), ("word/media/filler.bin", &filler)], false)).unwrap();
         assert!(document_contents_gate(&big).unwrap_err().contains("too large"));
+        let huge = root.join("storage/rotli/huge.docx");
+        std::fs::File::create(&huge).unwrap().set_len(16 * 1024 * 1024 + 1).unwrap();
+        assert_eq!(document_contents_gate(&huge).unwrap_err(), NO_DOCUMENT);
+    }
+
+    /// Review of #311, S2: the part of the gate that runs under the app's
+    /// corpus lock never reads or parses the file. A document hidden for what
+    /// it holds passes it, and only the contents gate, after the lock is
+    /// released, refuses it.
+    #[test]
+    fn the_locked_part_of_the_gate_never_reads_the_document() {
+        use crate::ai_files::tests::{zip_with, XML};
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        std::fs::create_dir_all(root.join(".rotli")).unwrap();
+        std::fs::write(root.join("memex.json"), r#"{"id":"mx_bridge_lock","contract":"3.4","apps":{}}"#).unwrap();
+        let mut store = crate::corpus::CorpusStore::open(root.clone()).unwrap();
+        let card = XML.replace("Launch &amp; land", "card 4242 4242 4242 4242");
+        let keys = store.create_managed_file("cards.docx", &zip_with(&[("word/document.xml", card.as_bytes())], true)).unwrap();
+        std::fs::write(root.join("storage/rotli/broken.docx"), b"PK not a package").unwrap();
+        for rel in [keys.as_str(), "storage/rotli/broken.docx"] {
+            let path = document_records_gate(&mut store, rel).expect("the locked part reads no contents");
+            assert_eq!(document_contents_gate(&path).unwrap_err(), NO_DOCUMENT, "{rel}");
+        }
+        assert_eq!(document_records_gate(&mut store, "storage/rotli/missing.docx").unwrap_err(), NO_DOCUMENT);
     }
 
     #[test]
