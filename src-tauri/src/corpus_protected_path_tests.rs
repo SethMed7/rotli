@@ -221,7 +221,7 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
     // call fails here even when no forbidden spelling is added (Opus review
     // of pull request 304: removing it from read_board_for_remote kept this
     // guard green)
-    let gates: [(&'static str, &str, &str); 12] = [
+    let gates: [(&'static str, &str, &str); 13] = [
         (rules, "fn file_is_protected(", "protected_path("),
         (rules, "fn agent_listable(", "protected_path("),
         (rules, "fn agent_listable_folder(", "agent_listable("),
@@ -232,14 +232,16 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
         (include_str!("corpus_ai_gate.rs"), "fn read_doc_for_ai(", "agent_doc("),
         (include_str!("workspace.rs"), "fn open_target(", "set_agent_lane()"),
         (include_str!("workspace.rs"), "fn read_board_for_remote(", "protected_path("),
-        (include_str!("workspace_file_visibility.rs"), "fn file_visible_to_remote(", "protected_path("),
-        (bridge, "fn document_records_gate(", "protected_path("),
+        (include_str!("workspace_file_visibility.rs"), "fn file_visible_to_remote(", "file_visible("),
+        (include_str!("workspace_file_visibility.rs"), "fn file_visible(", "protected_path("),
+        (bridge, "fn document_records_gate(", "file_visible("),
     ];
     for (text, start, call) in gates {
         assert!(body(text, start).contains(call), "{start} no longer calls {call}");
     }
     assert!(body(rule, "fn agent_row(").contains("agent_origin(") && body(rule, "fn agent_doc(").contains("agent_origin("));
-    assert!(body(include_str!("workspace_attachments.rs"), "fn describe_attachment(").contains("agent_listable("));
+    // an attachment target passes the admit gate's own visibility test
+    assert!(body(include_str!("workspace_attachments.rs"), "fn describe_attachment(").contains("reference_visible_to_remote("));
     // the agent-lane functions in corpus*.rs never compare a path themselves
     let corpus_lanes = [
         (rules, "fn agent_listable("),
