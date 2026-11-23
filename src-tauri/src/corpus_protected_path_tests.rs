@@ -315,20 +315,20 @@ fn meta(id: &str, folder: &str, disk: &str, origin: Option<&str>) -> NoteMeta {
 #[test]
 fn no_path_field_an_agent_sees_names_a_protected_place() {
     let (_temp, store) = vault(&["Juniper"]);
-    for secret in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double", "wiki\\x"] {
+    for place in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double", "wiki\\x"] {
         let rows = [
-            meta(secret, "wiki/Projects", "wiki/Projects", None),
-            meta("01ID", secret, "wiki/Projects", None),
-            meta("01ID", "wiki/Projects", secret, None),
-            meta("01ID", "wiki/Projects", "wiki/Projects", Some(secret)),
+            meta(place, "wiki/Projects", "wiki/Projects", None),
+            meta("01ID", place, "wiki/Projects", None),
+            meta("01ID", "wiki/Projects", place, None),
+            meta("01ID", "wiki/Projects", "wiki/Projects", Some(place)),
         ];
         for row in rows {
             if let Some(shown) = store.agent_row(row.clone()) {
                 // the folder a note lives in comes from the walk: unprotected
                 // is enough; every other path must also be clean
-                assert!(!store.protected_path(&shown.disk_folder_id), "{secret}: {row:?}");
+                assert!(!store.protected_path(&shown.disk_folder_id), "{place}: {row:?}");
                 for path in [Some(shown.id.clone()), Some(shown.folder_id.clone()), shown.origin.clone()].into_iter().flatten() {
-                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret}: {row:?} showed {path:?}");
+                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{place}: {row:?} showed {path:?}");
                 }
             }
         }
@@ -351,18 +351,18 @@ fn no_path_field_of_a_read_note_names_a_protected_place() {
         secure: false,
         locked: false,
     };
-    for secret in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double"] {
+    for place in ["wiki/_secure/x", "wiki/Projects/Juniper", "wiki/../up", "wiki//double"] {
         let docs = [
-            doc(secret, "wiki/Projects", "wiki/Projects", None),
-            doc("01ID", secret, "wiki/Projects", None),
-            doc("01ID", "wiki/Projects", secret, None),
-            doc("01ID", "wiki/Projects", "wiki/Projects", Some(secret)),
+            doc(place, "wiki/Projects", "wiki/Projects", None),
+            doc("01ID", place, "wiki/Projects", None),
+            doc("01ID", "wiki/Projects", place, None),
+            doc("01ID", "wiki/Projects", "wiki/Projects", Some(place)),
         ];
         for read in docs {
             if let Ok(shown) = store.agent_doc(read) {
-                assert!(!store.protected_path(&shown.disk_folder_id), "{secret}");
+                assert!(!store.protected_path(&shown.disk_folder_id), "{place}");
                 for path in [Some(shown.id), Some(shown.folder_id), shown.origin].into_iter().flatten() {
-                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{secret} showed {path:?}");
+                    assert!(path == "01ID" || (is_clean(&path) && !store.protected_path(&path)), "{place} showed {path:?}");
                 }
             }
         }
