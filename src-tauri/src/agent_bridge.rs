@@ -123,13 +123,23 @@ fn admit(request: &BridgeRequest, app_root: &Path, app_read_only: bool) -> Resul
     Ok(())
 }
 
-/// A document's file id inside the vault, or why it isn't one.
-fn document_rel(args: &Value) -> Result<String, String> {
+/// What an agent hears for a document it may not have and for one that
+/// isn't there: the same words, so it never learns which.
+const NO_DOCUMENT: &str = "that document doesn't exist";
+
+/// A document's file id inside the open vault, `root_id`, or why it isn't
+/// one. The app opens `file` as written, so a prefix naming another root, or
+/// a second prefix, is refused: the gate would judge one file and the app
+/// open another.
+fn document_rel(args: &Value, root_id: &str) -> Result<String, String> {
     let file = args
         .get("file")
         .and_then(Value::as_str)
         .ok_or("name the document's file id (from rotli_list)")?;
-    let (_, rel) = crate::corpus::split_root_id(file);
+    let (root, rel) = crate::corpus::split_root_id(file);
+    if root != root_id || rel.contains(':') {
+        return Err("name a document in the vault Rotli has open, by the file id rotli_list gave".into());
+    }
     crate::corpus::validate_rel(&rel)?;
     if !rel.to_ascii_lowercase().ends_with(".docx") {
         return Err("Rotli's agents read and edit Word documents (.docx)".into());
@@ -150,7 +160,7 @@ pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel
 /// be refused alike).
 #[cfg(test)]
 pub(crate) fn document_request_gate_for_test(store: &mut crate::corpus::CorpusStore, file: &str, editing: bool) -> Result<(), String> {
-    let rel = document_rel(&json!({ "file": file }))?;
+    let rel = document_rel(&json!({ "file": file }), crate::corpus::DEFAULT_ROOT_ID)?;
     let path = document_records_gate(store, &rel, editing)?;
     document_contents_gate(&path)
 }
@@ -163,13 +173,11 @@ fn document_records_gate(
     rel: &str,
     editing: bool,
 ) -> Result<PathBuf, String> {
-    if store.protected_path(rel) {
-        return Err("blocked: that document is secure; Rotli never gives it to an agent".into());
+    // protected or hidden answers as missing does (row 16k)
+    if store.protected_path(rel) || !store.agent_listable(rel) {
+        return Err(NO_DOCUMENT.into());
     }
-    if !store.agent_listable(rel) {
-        return Err("that document isn't available to agents".into());
-    }
-    let path = store.guard_rel(rel)?;
+    let path = store.guard_rel(rel).ok().filter(|path| path.is_file()).ok_or(NO_DOCUMENT)?;
     if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
         return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
     }
@@ -179,7 +187,7 @@ fn document_records_gate(
 /// ...and by its contents (read outside the corpus lock): too large for the
 /// editor, or holding secret-shaped text.
 fn document_contents_gate(path: &Path) -> Result<(), String> {
-    let meta = std::fs::metadata(path).map_err(|_| "that document doesn't exist".to_string())?;
+    let meta = std::fs::metadata(path).map_err(|_| NO_DOCUMENT.to_string())?;
     if meta.len() > DOCX_MAX_BYTES {
         return Err("that document is too large for an agent".into());
     }
@@ -221,7 +229,7 @@ pub(crate) fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value,
             return Err("blocked: that name is one of the vault's secure keywords; agents don't make documents named as secure".into());
         }
     } else {
-        let rel = document_rel(&request.args)?;
+        let rel = document_rel(&request.args, &root_id)?;
         let editing = request.tool == "apply_document";
         let path = corpus.route(&root_id, |store| document_records_gate(store, &rel, editing))?;
         document_contents_gate(&path)?;
@@ -408,12 +416,19 @@ mod tests {
         let mut bad = request("read_document", Path::new("/v"), false);
         for file in ["../outside.docx", "/etc/passwd", "storage/rotli/notes.md"] {
             bad.args = json!({ "file": file });
-            assert!(document_rel(&bad.args).is_err(), "{file}");
+            assert!(document_rel(&bad.args, "default").is_err(), "{file}");
         }
         bad.args = json!({});
-        assert!(document_rel(&bad.args).is_err());
+        assert!(document_rel(&bad.args, "default").is_err());
+        // the app opens `file` as written: another root's prefix is refused
+        for file in ["other:storage/rotli/plan.docx", "default:x:plan.docx"] {
+            bad.args = json!({ "file": file });
+            assert!(document_rel(&bad.args, "default").is_err(), "{file}");
+        }
+        bad.args = json!({ "file": "default:storage/rotli/plan.docx" });
+        assert_eq!(document_rel(&bad.args, "default").unwrap(), "storage/rotli/plan.docx");
         assert_eq!(
-            document_rel(&request("read_document", Path::new("/v"), false).args).unwrap(),
+            document_rel(&request("read_document", Path::new("/v"), false).args, "default").unwrap(),
             "storage/rotli/plan.docx"
         );
     }
@@ -446,7 +461,9 @@ mod tests {
         std::fs::write(root.join("wiki/_secure/plan.docx"), docx(XML)).unwrap();
 
         assert!(document_gate(&mut store, &plan, false).is_ok());
-        assert!(document_gate(&mut store, &bank, false).unwrap_err().contains("secure"));
+        // a document named with a secure keyword answers as a missing one
+        assert_eq!(document_gate(&mut store, &bank, false).unwrap_err(), NO_DOCUMENT);
+        assert_eq!(document_gate(&mut store, "storage/rotli/missing.docx", false).unwrap_err(), NO_DOCUMENT);
         assert!(document_gate(&mut store, &keys, false).unwrap_err().contains("secret-shaped"));
         assert!(document_gate(&mut store, "wiki/_secure/plan.docx", false).is_err());
         assert!(document_gate(&mut store, "storage/rotli/missing.docx", false).is_err());
