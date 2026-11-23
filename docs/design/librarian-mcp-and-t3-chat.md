@@ -278,7 +278,10 @@ builds until that review has checked these fixes:
    before `named` was kept is still checked against every note's names,
    failing closed. Rows parse strictly: a row with a field Rotli never
    writes is skipped, so a build before `named` skips the rows that carry
-   it. `remove` takes
+   it: there a note whose latest summary carries `named` shows its earlier
+   summary, and log lines the newer build wrote don't show. Text naming a
+   note that is already hidden saves, and later sessions see it; the write
+   no longer confirms that note exists (an accepted residual, row 16j). `remove` takes
    only an entry the index holds, for a note the agent may still read. `.rotli/` is outside
    the walk, so neither file is ever listed, searched, or read as a note.
    Page discovery, `pages.jsonl`, the marker checks, withdrawal, the
