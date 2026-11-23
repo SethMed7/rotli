@@ -190,15 +190,14 @@ impl Workspace {
         let mut files = Vec::new();
         for source in link_targets(&note.note.body) {
             // the vault-root reading when that file exists (as the editor), else
-            // the reading from the note's folder. A protected path never
-            // "exists" here: which reading is chosen must not depend on it
+            // the reading from the note's folder. Only an item an agent may see
+            // "exists" here (the listing's own test): which reading is chosen
+            // must not depend on a hidden one
             let from_root = attachment_rel(&source);
             let from_note = attachment_rel_from(&source, &folder);
-            let store = &mut self.store;
-            let mut exists = |rel: &String| store.agent_listable(rel) && store.guard_rel(rel).is_ok_and(|path| path.is_file());
             let chosen = match (from_root, from_note) {
-                (Some(root), _) if exists(&root) => Some(root),
-                (_, Some(note_rel)) if exists(&note_rel) => Some(note_rel),
+                (Some(root), _) if self.reference_visible_to_remote(&root) => Some(root),
+                (_, Some(note_rel)) if self.reference_visible_to_remote(&note_rel) => Some(note_rel),
                 (root, note_rel) => root.or(note_rel),
             };
             let Some(rel) = chosen else {
@@ -228,27 +227,20 @@ impl Workspace {
     ) -> Value {
         let mut out = json!({ "source": source, "path": rel });
         let mime = mime_of(rel);
-        // A refused target answers with its link and nothing else — no size,
-        // no absolute path, and no "missing" for a linked note, so the answer
-        // never tells existing secure notes from absent ones.
+        // A target an agent may not see, and one that isn't there, answer
+        // alike with the link and nothing else: no size, no absolute path. The
+        // test is the listing's own (a note's read gate, a board's, a file's
+        // content check), so a linked file `rotli_list` hides never shows here
         let refused = |mut out: Value| {
             out["available"] = json!(false);
             out["reason"] = json!("not available to agents");
             out
         };
-        // agent_listable asks protected_path: a secure home or keyword in any
-        // component, in any spelling
-        if !self.store.agent_listable(rel) {
-            return refused(out);
-        }
-        // a linked note passes the very gate a remote read of it would
-        if mime == "text/markdown" && self.store.read_for_ai(rel, false).is_err() {
+        if !self.reference_visible_to_remote(rel) {
             return refused(out);
         }
         let Some(path) = self.store.guard_rel(rel).ok().filter(|path| path.is_file()) else {
-            out["available"] = json!(false);
-            out["reason"] = json!("missing");
-            return out;
+            return refused(out);
         };
         let size = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or_default();
         out["available"] = json!(true);
@@ -347,8 +339,13 @@ mod tests {
         assert!(files[0].get("text").is_none(), "binaries are never inlined");
         assert!(files[0]["absPath"].as_str().unwrap().ends_with("storage/pic.png"));
         assert_eq!(files[1]["text"], "a,b\n1,2\n");
-        assert_eq!(files[2]["withheld"], "secret-shaped text");
-        assert_eq!(files[3]["reason"], "missing");
+        // a file the listing hides (secret-shaped) and a missing one answer
+        // alike, with the link alone (review of #311, B3)
+        for file in [&files[2], &files[3]] {
+            assert_eq!(file["reason"], "not available to agents", "{file}");
+            assert!(file.get("size").is_none() && file.get("withheld").is_none(), "{file}");
+        }
+        assert_eq!(files[2].as_object().unwrap().len(), files[3].as_object().unwrap().len());
         assert_eq!(out["external"], json!(["https://e.test"]));
 
         // a remote caller gets no absolute path
