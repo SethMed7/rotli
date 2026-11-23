@@ -173,8 +173,10 @@ fn document_records_gate(
     rel: &str,
     editing: bool,
 ) -> Result<PathBuf, String> {
-    // protected or hidden answers as missing does (row 16k)
-    if store.protected_path(rel) || !store.agent_listable(rel) {
+    // anything the listing hides (by path, or by what it holds: secret-shaped,
+    // unreadable, too large) answers as missing does, before any parse or
+    // secret check can word it differently (row 16k)
+    if !crate::workspace::file_visibility::file_visible(store, rel) {
         return Err(NO_DOCUMENT.into());
     }
     let path = store.guard_rel(rel).ok().filter(|path| path.is_file()).ok_or(NO_DOCUMENT)?;
@@ -464,7 +466,8 @@ mod tests {
         // a document named with a secure keyword answers as a missing one
         assert_eq!(document_gate(&mut store, &bank, false).unwrap_err(), NO_DOCUMENT);
         assert_eq!(document_gate(&mut store, "storage/rotli/missing.docx", false).unwrap_err(), NO_DOCUMENT);
-        assert!(document_gate(&mut store, &keys, false).unwrap_err().contains("secret-shaped"));
+        // one the listing hides for what it holds answers as missing too (B4)
+        assert_eq!(document_gate(&mut store, &keys, false).unwrap_err(), NO_DOCUMENT);
         assert!(document_gate(&mut store, "wiki/_secure/plan.docx", false).is_err());
         assert!(document_gate(&mut store, "storage/rotli/missing.docx", false).is_err());
         // a person's document reads, but never edits

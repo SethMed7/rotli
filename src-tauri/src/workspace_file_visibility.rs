@@ -13,33 +13,40 @@ impl Workspace {
     }
 
     pub(super) fn file_visible_to_remote(&mut self, rel: &str) -> bool {
-        if !self.store.agent_listable(rel) || self.store.protected_path(rel) {
-            return false;
-        }
-        let Ok(path) = self.store.file_for_ai(rel, false) else {
-            return false;
-        };
-        let Ok(metadata) = fs::metadata(&path) else {
-            return false;
-        };
-        if metadata.len() > 16 * 1024 * 1024 {
-            return false;
-        }
-        let Ok(bytes) = crate::fsutil::read_own_bytes(&path) else {
-            return false;
-        };
-        let ext = Path::new(rel)
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        let text = if crate::corpus::DOCX_PACKAGE_EXTS.contains(&ext.as_str()) {
-            crate::ai_files::docx_text(&bytes)
-        } else if crate::corpus::SHEET_PACKAGE_EXTS.contains(&ext.as_str()) {
-            crate::ai_files::xlsx_text(&bytes)
-        } else {
-            Ok(String::from_utf8_lossy(&bytes).into_owned())
-        };
-        text.is_ok_and(|text| !crate::secret::blocked_for_remote(&text))
+        file_visible(&mut self.store, rel)
     }
+}
+
+/// Whether a remote agent may see this ordinary file at all: the listing's
+/// test, which the document bridge asks too, so a document the listing hides
+/// answers there exactly as a missing one (review of #311, B4).
+pub(crate) fn file_visible(store: &mut CorpusStore, rel: &str) -> bool {
+    if !store.agent_listable(rel) || store.protected_path(rel) {
+        return false;
+    }
+    let Ok(path) = store.file_for_ai(rel, false) else {
+        return false;
+    };
+    let Ok(metadata) = fs::metadata(&path) else {
+        return false;
+    };
+    if metadata.len() > 16 * 1024 * 1024 {
+        return false;
+    }
+    let Ok(bytes) = crate::fsutil::read_own_bytes(&path) else {
+        return false;
+    };
+    let ext = Path::new(rel)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let text = if crate::corpus::DOCX_PACKAGE_EXTS.contains(&ext.as_str()) {
+        crate::ai_files::docx_text(&bytes)
+    } else if crate::corpus::SHEET_PACKAGE_EXTS.contains(&ext.as_str()) {
+        crate::ai_files::xlsx_text(&bytes)
+    } else {
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    };
+    text.is_ok_and(|text| !crate::secret::blocked_for_remote(&text))
 }

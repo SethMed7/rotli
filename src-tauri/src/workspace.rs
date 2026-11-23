@@ -30,7 +30,7 @@ use crate::loopback_http::{
 #[path = "workspace_attachments.rs"]
 pub(crate) mod attachments;
 #[path = "workspace_file_visibility.rs"]
-mod file_visibility;
+pub(crate) mod file_visibility;
 #[path = "workspace_listing.rs"]
 mod listing;
 #[path = "workspace_note_ops.rs"]
