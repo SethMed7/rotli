@@ -52,6 +52,10 @@ pub(super) fn call(name: &str, args: &Value) -> Option<Result<Value, String>> {
 fn dispatch(name: &str, args: &Value) -> Result<Value, String> {
     let id = arg_required(args, "id")?;
     let (mut workspace, local) = Workspace::open_for_item(id, arg_string(args, "rootId"))?;
+    // a rename names its note by title too; its selector answers alike itself
+    if name != RENAME {
+        workspace.admit(&local)?;
+    }
     let expected = arg_string(args, "expectedRevision");
     match name {
         RENAME => json_value(workspace.rename_note(&local, arg_required(args, "title")?, expected)?),
@@ -79,7 +83,7 @@ pub(super) fn notes_cli(sub: &str, args: &[String], root_id: Option<&str>) -> Op
     }
     Some((|| {
         let id = positional(args, 2, &format!("notes {sub} needs an id"))?;
-        let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+        let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
         match sub {
             "attachments" => {
                 let text = flag(args, "--text")

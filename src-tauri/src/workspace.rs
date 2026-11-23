@@ -35,6 +35,8 @@ mod file_visibility;
 mod listing;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
+#[path = "workspace_unseen.rs"]
+mod unseen;
 #[path = "workspace_librarian.rs"]
 pub(crate) mod librarian;
 
@@ -401,10 +403,8 @@ impl Workspace {
         // `update_note` into a CONTENT-CHANGE oracle over notes the agent may not
         // read: a remote agent could poll a secure note's revision and watch it
         // change. With the gate first, a secure note refuses before its hash is
-        // ever computed. (The coarser path-EXISTENCE bit — "not found" vs
-        // "secure" — remains, as it does for every read-by-id lane; that residual
-        // is conceded in docs/architecture/egress-threat-model.md. What closes
-        // here is the change-detection oracle, which is the part that leaked.)
+        // ever computed. (Whether it exists at all is the admit gate's:
+        // workspace_unseen.rs.)
         self.store
             .write_for_remote_agent_if_revision(local_id, body, expected_revision, None)
             .map(|result| self.prefix_meta(result.meta))
@@ -456,9 +456,7 @@ impl Workspace {
     }
 
     fn resolve_note_selector(&mut self, selector: &str) -> Result<String, String> {
-        if self.store.resolve_note_rel(selector).is_ok()
-            && self.store.read_for_ai(selector, false).is_ok()
-        {
+        if self.admit(selector).is_ok() {
             return Ok(selector.to_string());
         }
 
@@ -568,6 +566,8 @@ impl Workspace {
     }
 
     fn move_note(&mut self, local_id: &str, folder: &str) -> Result<NoteMeta, String> {
+        self.admit(local_id)?;
+        self.admit_folder(folder)?;
         let meta = self.store.move_for_remote_agent(local_id, folder)?;
         Ok(self.prefix_meta(meta))
     }
@@ -577,6 +577,7 @@ impl Workspace {
         name: &str,
         parent: Option<&str>,
     ) -> Result<FolderMeta, String> {
+        self.admit_folder(&parent.map_or(name.to_string(), |parent| format!("{parent}/{name}")))?;
         self.store
             .create_folder(name, parent)
             .map(|folder| self.prefix_folder(folder))
@@ -776,11 +777,9 @@ impl Workspace {
         // Hidden lane note the matrix says no lane ever writes. The gate runs
         // FIRST — it resolves the id itself (through `read_for_ai`), so a typo
         // still cannot become a durable orphan and nothing touches disk before
-        // the read verdict. NOTE the residual: `read_for_ai` must resolve a path
-        // to read its frontmatter, so a non-existent id errors "not found" while
-        // a secure one errors "secure" — a path-EXISTENCE differential (never a
-        // content one). It is pervasive across every AI lane that reads by id and
-        // is accepted as low-severity; see docs/architecture/egress-threat-model.md.
+        // the read verdict. The admit gate answers an item the agent may not
+        // see exactly as a missing one (workspace_unseen.rs).
+        self.admit(item_id)?;
         self.view_writable(item_id)?;
         if target.is_some() {
             self.main_add(item_id, MAIN_ROOT)?;
@@ -883,7 +882,8 @@ impl Workspace {
         })
     }
 
-    fn main_move(&self, item_id: &str, parent_id: &str) -> Result<(), String> {
+    fn main_move(&mut self, item_id: &str, parent_id: &str) -> Result<(), String> {
+        self.main_item_shown(item_id)?;
         if item_id == parent_id || parent_id.starts_with(&format!("{item_id}/")) {
             return Err("a Main folder cannot move into itself".into());
         }
@@ -899,7 +899,8 @@ impl Workspace {
         })
     }
 
-    fn main_remove(&self, item_id: &str) -> Result<(), String> {
+    fn main_remove(&mut self, item_id: &str) -> Result<(), String> {
+        self.main_item_shown(item_id)?;
         self.update_main(|manifest| {
             main_remove(&mut manifest.tree, item_id, MAIN_ROOT)
                 .ok_or_else(|| format!("Main item not found: {item_id}"))?;
@@ -1891,7 +1892,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
         "open" => {
             let id = positional(args, 1, "open needs an item id")?;
             let kind = option(args, "--kind").unwrap_or("note");
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             workspace.queue_open(&local, kind)
         }
         _ => Err(format!("unknown command: {command}")),
@@ -1930,7 +1931,7 @@ fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String
         }
         "read" => {
             let id = positional(args, 2, "notes read needs an id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             json_value(workspace.read_note(&local)?)
         }
         "create" => {
@@ -1953,7 +1954,7 @@ fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String
             let id = positional(args, 2, "notes update needs an id")?;
             let body = input_text(args, "--body")?;
             let expected = required_option(args, "--revision")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             workspace.update_note(&local, &body, expected)?;
             json_value(workspace.read_note(&local)?)
         }
@@ -1962,14 +1963,14 @@ fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String
             let old_text = required_option(args, "--old")?;
             let new_text = required_option(args, "--new")?;
             let expected = required_option(args, "--revision")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             workspace.patch_note(&local, old_text, new_text, expected)?;
             json_value(workspace.read_note(&local)?)
         }
         "move" => {
             let id = positional(args, 2, "notes move needs an id")?;
             let folder = required_option(args, "--folder")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             json_value(workspace.move_note(&local, folder)?)
         }
         _ => Err(format!("unknown notes command: {sub}")),
@@ -2102,7 +2103,7 @@ fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, Strin
         }
         "read" => {
             let id = positional(args, 2, "boards read needs an id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             json_value(workspace.read_board(&local)?)
         }
         "create" => {
@@ -2127,7 +2128,7 @@ fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, Strin
             let id = positional(args, 2, "boards update needs an id")?;
             let body = input_text(args, "--body")?;
             let revision = required_option(args, "--revision")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             workspace.update_board(&local, &body, revision)?;
             json_value(workspace.read_board(&local)?)
         }
@@ -2137,7 +2138,7 @@ fn run_boards_cli(args: &[String], root_id: Option<&str>) -> Result<Value, Strin
             let actions: Vec<Value> = serde_json::from_str(&actions_raw)
                 .map_err(|error| format!("actions must be a JSON array: {error}"))?;
             let revision = required_option(args, "--revision")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root_id)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root_id)?;
             workspace.apply_board(
                 &local,
                 &actions,
@@ -2797,7 +2798,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_read_note" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             let result = workspace.read_note(&local)?;
             paged_note(
                 result,
@@ -2824,7 +2825,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_update_note" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             workspace.update_note(
                 &local,
                 arg_required(args, "body")?,
@@ -2834,7 +2835,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_patch_note" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             workspace.patch_note(
                 &local,
                 arg_required(args, "oldText")?,
@@ -2845,7 +2846,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_move_note" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             json_value(workspace.move_note(&local, arg_required(args, "folder")?)?)
         }
         "rotli_list_main" => {
@@ -2927,7 +2928,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_read_board" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             let mut value = json_value(workspace.read_board(&local)?)?;
             if let Some(board) = value.get_mut("board").and_then(Value::as_object_mut) {
                 board.remove("body");
@@ -2962,7 +2963,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
                 .get("actions")
                 .and_then(Value::as_array)
                 .ok_or("actions must be an array")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             workspace.apply_board(
                 &local,
                 actions,
@@ -2978,7 +2979,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_open" => {
             let id = arg_required(args, "id")?;
-            let (mut workspace, local) = Workspace::open_for_item(id, root)?;
+            let (mut workspace, local) = Workspace::open_for_visible(id, root)?;
             workspace.queue_open(&local, arg_string(args, "kind").unwrap_or("note"))
         }
         _ => Err(format!("unknown tool: {name}")),
@@ -3823,7 +3824,7 @@ mod tests {
         let err = workspace
             .view_assign(&secure.id, Some("Reading"), MAIN_ROOT)
             .unwrap_err();
-        assert!(err.contains("secure"), "{err}");
+        assert_eq!(err, format!("note not found: {}", secure.id));
 
         let locked = workspace.create_note("Locked", "body", MAIN_ROOT).unwrap();
         let rel = workspace.store.resolve_note_rel(&locked.id).unwrap();
@@ -3837,14 +3838,12 @@ mod tests {
             .unwrap_err();
         assert!(err.contains("locked"), "{err}");
 
-        // a guessed non-existent path is also refused — no view tag lands, no
-        // frontmatter is written. It does NOT hide the path-existence differential
-        // (this errors "not found" where an existing secure path errors "secure");
-        // that residual is conceded in the threat model, not claimed closed here.
-        // What matters is that neither reveals CONTENT and neither writes.
-        assert!(workspace
-            .view_assign("Secure notes/Guessed.md", Some("Reading"), MAIN_ROOT)
-            .is_err());
+        // a guessed path answers alike whether a secure note is there or not
+        let rel = workspace.store.resolve_note_rel(&secure.id).unwrap();
+        for guess in [rel.as_str(), "Secure notes/Guessed.md"] {
+            let err = workspace.view_assign(guess, Some("Reading"), MAIN_ROOT).unwrap_err();
+            assert_eq!(err, format!("note not found: {guess}"));
+        }
 
         // an ordinary note still assigns
         let open = workspace.create_note("Open", "body", MAIN_ROOT).unwrap();

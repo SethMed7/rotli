@@ -64,6 +64,7 @@ fn owns_its_id(ws: &mut Workspace, local: &str) -> Result<(), String> {
 /// The local id of a note an agent may read now, carrying its own id.
 fn readable(ws: &mut Workspace, id: &str) -> Result<String, String> {
     let local = ws.local_id(id)?;
+    ws.admit(&local)?;
     owns_its_id(ws, &local).map_err(|why| format!("{id} is {why}"))?;
     Ok(local)
 }

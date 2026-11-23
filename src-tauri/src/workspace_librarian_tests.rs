@@ -146,7 +146,7 @@ fn secure_notes_are_never_read_searched_or_proposed() {
     turn_on(&temp);
     let mut ws = test_workspace(&temp);
     let secure = ws.store.create_as("Secure notes", "# Bank login\n\nmarigold", true, Some(Creator::Agent)).unwrap();
-    assert!(refusal(&mcp(&temp, READ, json!({"id": secure.id}))).contains("secure"));
+    assert_eq!(refusal(&mcp(&temp, READ, json!({"id": secure.id}))), format!("Error: note not found: {}", secure.id));
     let hits = ok(mcp(&temp, SEARCH, json!({"query":"marigold"})));
     assert_eq!(hits["items"].as_array().unwrap().len(), 0, "{hits}");
     assert_eq!(mcp(&temp, FILE, json!({"id": secure.id, "folder":"projects","reason":"x"}))["isError"], true);

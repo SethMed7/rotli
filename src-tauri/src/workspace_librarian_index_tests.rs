@@ -76,9 +76,10 @@ fn a_write_refuses_an_id_the_agent_cannot_read() {
     let public = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
     let secure = ws.store.create_as("Secure notes", "# Bank login\n\nmarigold", true, None).unwrap();
     let both = json!([{"id": public.id, "summary": "fine"}, {"id": secure.id, "summary": "no"}]);
-    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": both}))).contains("not a note you can read"));
-    assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": "01NOSUCHNOTE", "summary": "x"}]}))).contains("read"));
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "x", "ids": [secure.id]}))).contains("not a note you can read"));
+    // a secure note answers as a missing one does (row 16k)
+    assert_eq!(refusal(&mcp(&temp, INDEX, json!({"entries": both}))), format!("Error: note not found: {}", secure.id));
+    assert_eq!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": "01NOSUCHNOTE", "summary": "x"}]}))), "Error: note not found: 01NOSUCHNOTE");
+    assert_eq!(refusal(&mcp(&temp, LOG, json!({"entry": "x", "ids": [secure.id]}))), format!("Error: note not found: {}", secure.id));
     assert!(mcp(&temp, INDEX, json!({"entries": [{"id": public.id, "summary": "card 4242 4242 4242 4242"}]}))["isError"] == true);
     assert!(refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": public.id, "summary": "two\nlines"}]}))).contains("one line"));
     assert_eq!(sidecar(&temp, "index.jsonl"), "", "a refused call writes nothing, the readable entry included");

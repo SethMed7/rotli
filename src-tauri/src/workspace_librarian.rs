@@ -135,6 +135,7 @@ fn call(name: &str, args: &Value) -> Result<Value, String> {
         SEARCH => json_value(ws.search_remote(arg_required(args, "query")?, arg_usize(args, "limit", 20).min(50))?),
         READ => {
             let local = ws.local_id(arg_required(args, "id")?)?;
+            ws.admit(&local)?;
             paged_note(ws.read_note(&local)?, arg_usize(args, "offset", 0), 20_000)
         }
         CAPTURE => capture(&mut ws, arg_required(args, "title")?, arg_required(args, "body")?, arg_string(args, "source")),

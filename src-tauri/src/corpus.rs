@@ -1162,6 +1162,12 @@ pub fn forget_root(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
 ///   "vault:wiki/foo"   → ("vault", "wiki/foo")
 ///   "vault:"           → ("vault", "")
 ///   "01J…ULID…"        → ("default", "01J…ULID…")
+/// The answer for an id that names no note. A workspace agent gets exactly
+/// this for an item it may not see, too (`workspace_unseen.rs`).
+pub(crate) fn note_not_found(id: &str) -> String {
+    format!("note not found: {id}")
+}
+
 pub fn split_root_id(folder_id: &str) -> (String, String) {
     match folder_id.split_once(':') {
         Some((root, rel)) => (root.to_string(), rel.to_string()),
@@ -4613,7 +4619,7 @@ impl CorpusStore {
         self.index
             .get(id)
             .cloned()
-            .ok_or_else(|| format!("note not found: {id}"))
+            .ok_or_else(|| note_not_found(id))
     }
 
     /// The ULID→rel bridge: a `.md` note travels the wire as its frontmatter
@@ -4654,7 +4660,7 @@ impl CorpusStore {
             .iter()
             .find(|(_, r)| **r == rel)
             .map(|(id, _)| id.clone())
-            .ok_or_else(|| format!("note not found: {id_or_rel}"))
+            .ok_or_else(|| note_not_found(id_or_rel))
     }
 
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
