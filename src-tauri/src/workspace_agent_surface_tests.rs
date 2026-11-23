@@ -60,13 +60,16 @@ pub(super) fn seeded() -> TempDir {
     // secure home, and from the note's folder as a public file
     put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv) [g](wiki/Link/f.csv)"));
     put(root, "wiki/Projects/wiki/Link/f.csv", "a,b\n3,4\n");
-    // one public match for a word five secure notes repeat (they rank first)
-    put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "", "Ledger", "the ledger sits among many other plain words here"));
-    // a note at the vault's top level whose link reads, from its folder,
-    // through the symlink into the secure home
-    put(root, "wiki/top.md", &note(TOP, "", "Top", "plain words [h](Link/f.csv)"));
+    // one public match for a word five secure notes repeat in their titles
+    // and bodies (they rank first)
+    put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "", "Accounts", "the ledger sits among many other plain words here"));
+    // a note in `wiki` whose links read, from its folder, into the secure
+    // home (and through the symlink); from the vault root they name nothing.
+    // Past the snippet's length, so no listing shows them
+    let filler = "words to fill the start of this note well past the length a listing snippet shows. ".repeat(3);
+    put(root, "wiki/top.md", &note(TOP, "", "Top", &format!("{filler}\n\n[h](Link/f.csv) [i](_secure/f.csv) [j](_SECURE/f.csv)")));
     for n in 1..=5 {
-        put(root, &format!("wiki/_secure/PrivateProject/l{n}.md"), &note(&format!("01SURFLEDGERS{n}0000000000000"), "", &format!("Hidden note L{n}"), "ledger ledger ledger"));
+        put(root, &format!("wiki/_secure/PrivateProject/l{n}.md"), &note(&format!("01SURFLEDGERS{n}0000000000000"), "", &format!("Hidden note ledger L{n}"), "ledger ledger ledger"));
     }
     put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\n", "Agent", "plain words"));
     put(root, "wiki/Projects/free.md", &note(AGENT_FREE, "created_by: agent\n", "Free", "plain words"));
