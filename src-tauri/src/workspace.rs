@@ -3043,6 +3043,9 @@ mod path_protection_tests;
 #[path = "workspace_agent_surface_tests.rs"]
 mod agent_surface_tests;
 #[cfg(test)]
+#[path = "workspace_agent_differential_tests.rs"]
+mod agent_differential_tests;
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::net::TcpStream;

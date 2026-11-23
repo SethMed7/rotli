@@ -124,9 +124,8 @@ fn admit(request: &BridgeRequest, app_root: &Path, app_read_only: bool) -> Resul
 }
 
 /// A document's file id inside the vault, or why it isn't one.
-fn document_rel(request: &BridgeRequest) -> Result<String, String> {
-    let file = request
-        .args
+fn document_rel(args: &Value) -> Result<String, String> {
+    let file = args
         .get("file")
         .and_then(Value::as_str)
         .ok_or("name the document's file id (from rotli_list)")?;
@@ -143,6 +142,16 @@ fn document_rel(request: &BridgeRequest) -> Result<String, String> {
 #[cfg(test)]
 pub(crate) fn document_gate_for_test(store: &mut crate::corpus::CorpusStore, rel: &str) -> Result<(), String> {
     let path = document_records_gate(store, rel, false)?;
+    document_contents_gate(&path)
+}
+
+/// The gate a document request meets, from the agent's `file` argument on
+/// (the differential harness: a protected document and a missing one must
+/// be refused alike).
+#[cfg(test)]
+pub(crate) fn document_request_gate_for_test(store: &mut crate::corpus::CorpusStore, file: &str, editing: bool) -> Result<(), String> {
+    let rel = document_rel(&json!({ "file": file }))?;
+    let path = document_records_gate(store, &rel, editing)?;
     document_contents_gate(&path)
 }
 
@@ -212,7 +221,7 @@ pub(crate) fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value,
             return Err("blocked: that name is one of the vault's secure keywords; agents don't make documents named as secure".into());
         }
     } else {
-        let rel = document_rel(&request)?;
+        let rel = document_rel(&request.args)?;
         let editing = request.tool == "apply_document";
         let path = corpus.route(&root_id, |store| document_records_gate(store, &rel, editing))?;
         document_contents_gate(&path)?;
@@ -399,12 +408,12 @@ mod tests {
         let mut bad = request("read_document", Path::new("/v"), false);
         for file in ["../outside.docx", "/etc/passwd", "storage/rotli/notes.md"] {
             bad.args = json!({ "file": file });
-            assert!(document_rel(&bad).is_err(), "{file}");
+            assert!(document_rel(&bad.args).is_err(), "{file}");
         }
         bad.args = json!({});
-        assert!(document_rel(&bad).is_err());
+        assert!(document_rel(&bad.args).is_err());
         assert_eq!(
-            document_rel(&request("read_document", Path::new("/v"), false)).unwrap(),
+            document_rel(&request("read_document", Path::new("/v"), false).args).unwrap(),
             "storage/rotli/plan.docx"
         );
     }
