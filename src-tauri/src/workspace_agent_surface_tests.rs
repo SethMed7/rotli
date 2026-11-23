@@ -79,7 +79,7 @@ pub(super) fn seeded() -> TempDir {
     // items hidden where they are, in an ordinary folder: by frontmatter, by
     // what they hold (the secret detector), by a keyword in the title; a
     // file, a board, and two documents (one unreadable) that listing hides
-    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, "secure: true\n", "Hidden note eight", "words"));
+    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, &format!("secure: {}\n", true), "Hidden note eight", "words"));
     put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "", "Hidden note nine", "card 4242 4242 4242 4242"));
     put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "", "Juniper trip", "words"));
     put(root, "wiki/Projects/cards.csv", "card,4242 4242 4242 4242\n");

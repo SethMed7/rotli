@@ -311,8 +311,8 @@
       "reason": "Not a mirror: the harness seeds one vault with every decoy the focused tests each seed one of (secure-home and keyword folders, a path-shaped id, a shelf, an origin, Main, a journal row, a locked linker), using the same fixture names on purpose so a failure in one points at the other. The differential harness (workspace_agent_differential_tests.rs and its CLI half) swaps the same decoys in as arguments, by the same names, and its two halves share its swap vocabulary."
     },
     {
-      "id": "agent-surface-harness-names-d23ee9141e",
-      "fingerprint": "d23ee9141ee2da3f9452aac0db8048ce650592df3e8623dde7f604f826df43ee",
+      "id": "agent-surface-harness-names-28665075ae",
+      "fingerprint": "28665075aeaebc386e35f39b97d7a14ddc2a87824be26223e057676a1050e010",
       "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
     },
     {
