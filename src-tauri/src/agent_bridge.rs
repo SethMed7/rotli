@@ -509,7 +509,7 @@ mod tests {
         let mut store = crate::corpus::CorpusStore::open(root.clone()).unwrap();
         let card = XML.replace("Launch &amp; land", "card 4242 4242 4242 4242");
         let keys = store.create_managed_file("cards.docx", &zip_with(&[("word/document.xml", card.as_bytes())], true)).unwrap();
-        std::fs::write(root.join("storage/rotli/broken.docx"), b"PK not a package").unwrap();
+        std::fs::write(root.join("storage/rotli/broken.docx"), b"PK, but no zip inside").unwrap();
         for rel in [keys.as_str(), "storage/rotli/broken.docx"] {
             let path = document_records_gate(&mut store, rel).expect("the locked part reads no contents");
             assert_eq!(document_contents_gate(&path).unwrap_err(), NO_DOCUMENT, "{rel}");
