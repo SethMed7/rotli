@@ -39,6 +39,7 @@ mod memex;
 mod memex_chat_scan;
 mod memex_query; mod native_drag; mod note_dates; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
 mod protection_mark;
+mod note_protection;
 /// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
 #[cfg(target_os = "macos")]
 mod native_drag_promise;
@@ -46,6 +47,8 @@ mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
+#[cfg(test)]
+mod permission_differential_tests;
 mod ai_files;
 mod ai_office_text;
 mod pinned_site;
@@ -76,6 +79,7 @@ mod web;
 mod web_page;
 mod web_search;
 mod frontmatter_keys;
+mod frontmatter_lines;
 mod mcp_arguments;
 mod workspace;
 mod workspace_help;

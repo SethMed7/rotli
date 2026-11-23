@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "1.9.4",
+  "version": "1.9.5",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",
@@ -14,6 +14,7 @@
   "type": "module",
   "scripts": {
     "deps": "bun scripts/dependency-workflow.mjs",
+    "perf:notes-list-vault": "bun scripts/perf-notes-list-vault.mjs",
     "dev": "vite",
     "dev:app": "bun --no-orphans scripts/tauri-dev-supervisor.ts",
     "dev:uat": "ROTLI_BUILD_CHANNEL=stable bun --no-orphans scripts/tauri-dev-supervisor.ts",

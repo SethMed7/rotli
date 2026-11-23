@@ -99,40 +99,7 @@ pub(crate) fn canonical_field(line: &str) -> Option<(&str, &str)> {
     Some((&line[..key.name.len()], value))
 }
 
-/// What a note's frontmatter says about one key only Rust writes.
-#[derive(Debug, PartialEq)]
-pub(crate) enum Says<'a> {
-    /// No line names the key in any spelling that grants or denies.
-    Unset,
-    /// Rust's own spelling grants, with this value, and nothing denies.
-    Grant(&'a str),
-    /// Some spelling of the key holds a value that doesn't grant.
-    Deny,
-}
-
-/// The one rule for keys only Rust writes (`created_by`, `ai_edit`,
-/// `local_ai_allowed`), failing closed both ways (Codex review of 7f542f5b):
-/// a line in ANY spelling (indented, quoted, a list item…) whose value isn't
-/// a grant denies, because a denial or restriction must hold however it was
-/// typed; only Rust's own spelling grants, because a grant typed any other
-/// way isn't Rust's; and a denial wins over a grant. TypeScript's twin is
-/// src/lib/frontmatterKeys.ts `ownedKey`.
-pub(crate) fn owned_key<'a, S: AsRef<str>>(fields: &'a [S], key: &str, grants: impl Fn(&str) -> bool) -> Says<'a> {
-    let mut grant = None;
-    for line in fields {
-        let Some((spelled, value)) = frontmatter_field(line.as_ref()) else { continue };
-        if spelled.name != key {
-            continue;
-        }
-        if !grants(value) {
-            return Says::Deny;
-        }
-        if spelled.canonical && grant.is_none() {
-            grant = Some(value);
-        }
-    }
-    grant.map_or(Says::Unset, Says::Grant)
-}
+pub(crate) use crate::frontmatter_lines::{owned_key, Says};
 
 /// The note's own on-device permission: `Some(true)` only for Rust's
 /// `local_ai_allowed: true` with nothing saying otherwise, `Some(false)` when
@@ -335,6 +302,6 @@ mod tests {
             }
         }
         readers.sort();
-        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_in_place.rs"], "a new reader of a key only Rust writes: check it, then add it here");
+        assert_eq!(readers, ["ai_edit_policy.rs", "corpus.rs", "corpus_ai_edit.rs", "corpus_in_place.rs", "frontmatter_lines.rs", "note_protection.rs"], "a new reader of a key only Rust writes: check it, then add it here");
     }
 }

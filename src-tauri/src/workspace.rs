@@ -31,6 +31,8 @@ use crate::loopback_http::{
 pub(crate) mod attachments;
 #[path = "workspace_file_visibility.rs"]
 mod file_visibility;
+#[path = "workspace_listing.rs"]
+mod listing;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
 #[path = "workspace_librarian.rs"]
@@ -236,6 +238,7 @@ impl Workspace {
             CorpusStore::open(root.path.clone())?
         };
         store.set_perms_read_only(root.read_only);
+        store.set_agent_lane();
         Ok(Self { root, store })
     }
 
@@ -294,51 +297,6 @@ impl Workspace {
         folder
     }
 
-    fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
-        let notes = self.store.list()?.notes;
-        let mut kept = Vec::with_capacity(notes.len());
-        for meta in notes {
-            // a note's row is built from the one read the gate approved
-            // and a board's or a file's from its path, in its own lane
-            let shown = match meta.kind {
-                NoteKind::Note => self.store.note_row_for_ai(&meta.id, false),
-                _ if self.remote_meta_visible(&meta) => self.store.row_for_ai(&meta.id, false).map(|marked| marked.row),
-                _ => None,
-            };
-            kept.extend(shown);
-        }
-        // directories, and only the shelves of the rows shown
-        let folders = self.store.folders_for_ai(&kept)?;
-        let folders = folders.into_iter().filter(|folder| self.store.agent_listable(&folder.id)).collect();
-        let mut list = CorpusList {
-            notes: kept,
-            folders,
-            // an agent's listing names no file the person's own notice names
-            // (a hard-linked file's path may sit in a secure home)
-            skipped: Vec::new(),
-        };
-        list.notes.truncate(limit.min(500));
-        list.notes = list
-            .notes
-            .into_iter()
-            .map(|meta| self.prefix_meta(meta))
-            .collect();
-        list.folders = list
-            .folders
-            .into_iter()
-            .map(|folder| self.prefix_folder(folder))
-            .collect();
-        Ok(list)
-    }
-
-    fn remote_meta_visible(&mut self, meta: &NoteMeta) -> bool {
-        match meta.kind {
-            NoteKind::Note => self.store.read_for_ai(&meta.id, false).is_ok(),
-            NoteKind::Board => self.read_board_for_remote(&meta.id).is_ok(),
-            NoteKind::File => self.file_visible_to_remote(&meta.id),
-        }
-    }
-
     fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
         // include_reference: false — the headless workspace keeps its narrower
         // surface. The 2026-08-01 reference lane is the interactive chat's
@@ -376,6 +334,12 @@ impl Workspace {
             }
             let mut visible_metadata = metadata;
             visible_metadata.remove("text");
+            // a frontmatter value that names a protected path (a shelf, an
+            // origin, a wikilink), in any quoting or prefix, is not shown;
+            // URLs and other values are (final check of #304, B3 and S4)
+            for values in visible_metadata.values_mut() {
+                values.retain(|value| !value.contains(['/', '\\']) || !self.store.names_protected_path(value));
+            }
             let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
                 deep_link: self.deep_link_of(&wire_id, "note"),
@@ -545,8 +509,11 @@ impl Workspace {
 
     fn metrics(&mut self) -> Result<WorkspaceMetrics, String> {
         let mut list = self.store.list()?;
-        list.notes.retain(|meta| self.remote_meta_visible(meta));
-        list.folders.retain(|folder| self.store.agent_listable(&folder.id));
+        // each row counted as the listing shows it (an extensionless file is
+        // read as a note), and only the vault's own directories: never a shelf
+        list.notes = std::mem::take(&mut list.notes).iter().filter_map(|meta| self.remote_row(meta)).collect();
+        list.folders = self.store.folders_for_ai(&[])?;
+        list.folders.retain(|folder| self.store.agent_listable_folder(&folder.id));
         let visible_notes = list
             .notes
             .iter()
@@ -624,6 +591,12 @@ impl Workspace {
     }
 
     fn reference_visible_to_remote(&mut self, wire_id: &str) -> bool {
+        // the id is shown as written: a path-shaped one must pass the rule
+        // itself, not only the note it resolves to (Opus re-check of #304)
+        let local = wire_id.split_once(':').map_or(wire_id, |(_, local)| local);
+        if !self.store.agent_id_shown(wire_id) || !self.store.agent_id_shown(local) {
+            return false;
+        }
         if !self.root.is_default || !wire_id.contains(':') {
             let Ok(rel) = self.store.resolve_note_rel(wire_id) else {
                 return false;
@@ -966,7 +939,7 @@ impl Workspace {
 
     fn read_board_for_remote(&mut self, local_id: &str) -> Result<CorpusBoardDoc, String> {
         let rel = self.store.resolve_note_rel(local_id)?;
-        if self.store.file_is_protected(&rel) {
+        if self.store.protected_path(&rel) {
             return Err("blocked: a secure board cannot be sent to a remote agent".into());
         }
         let board = self.store.read_board(&rel)?;
@@ -3060,6 +3033,15 @@ mod secure_reference_tests;
 #[cfg(test)]
 #[path = "workspace_ai_lane_tests.rs"]
 mod ai_lane_tests;
+#[cfg(test)]
+#[path = "workspace_listing_tests.rs"]
+mod listing_tests;
+#[cfg(test)]
+#[path = "workspace_path_protection_tests.rs"]
+mod path_protection_tests;
+#[cfg(test)]
+#[path = "workspace_agent_surface_tests.rs"]
+mod agent_surface_tests;
 #[cfg(test)]
 mod tests {
     use super::*;

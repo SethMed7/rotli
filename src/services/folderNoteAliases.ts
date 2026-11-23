@@ -80,7 +80,9 @@ export async function prepareFolderTitleRename(
   if (oldTitle === newTitle || path === "Welcome to Rotli.md") return { path, text };
   const parsed = parseNoteDocument(text);
   if (!parsed.frontmatter?.id) return { path, text }; // path-addressed plain notes retain their durable selectors
-  const desired = `${noteSlugify(newTitle)}.md`;
+  // an empty title names the file `untitled.md`, as Rust's slugify does;
+  // `.md` alone is a dotfile the list never shows (lane check of 306)
+  const desired = `${noteSlugify(newTitle) || "untitled"}.md`;
   const target =
     baseName(path) === desired
       ? path

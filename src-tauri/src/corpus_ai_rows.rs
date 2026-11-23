@@ -78,7 +78,8 @@ impl CorpusStore {
         model_is_local && self.judge_for_ai(rel, text, false).is_err()
     }
 
-    fn parse_approved(&self, snapshot: Approved) -> Parsed {
+    /// None when an agent lane may not see the row (`agent_row`).
+    fn parse_approved(&self, snapshot: Approved) -> Option<Parsed> {
         let (fm, raw) = parse_document(&snapshot.text);
         let had_fm = fm.is_some();
         let body = if had_fm { editor_body(raw) } else { raw };
@@ -89,7 +90,7 @@ impl CorpusStore {
             note_row(self.layout, snapshot.id, &snapshot.rel, &snapshot.abs, &fm, body)
         };
         let metadata = if had_fm { searchable_metadata(&fm) } else { String::new() };
-        Parsed { row, body: body.to_string(), metadata }
+        Some(Parsed { row: self.agent_row(row)?, body: body.to_string(), metadata })
     }
 
     /// The listing row an AI lane may show for `id`, in its own lane: a
@@ -97,7 +98,7 @@ impl CorpusStore {
     /// its path alone, once the AI file policy allows it (the bytes are read
     /// later, through `read_file_bytes_for_ai`). None when refused.
     pub(crate) fn row_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<AiRow<NoteMeta>> {
-        if id.to_ascii_lowercase().ends_with(".md") || !id.contains('.') {
+        if reads_as_markdown(id) {
             return self.note_ai_row(id, model_is_local);
         }
         let abs = self.file_for_ai(id, model_is_local).ok()?;
@@ -127,7 +128,7 @@ impl CorpusStore {
     pub(crate) fn note_ai_row(&mut self, id: &str, model_is_local: bool) -> Option<AiRow<NoteMeta>> {
         let snapshot = self.approved(id, model_is_local)?;
         let on_device_only = snapshot.on_device_only;
-        Some(AiRow { row: self.parse_approved(snapshot).row, on_device_only })
+        Some(AiRow { row: self.parse_approved(snapshot)?.row, on_device_only })
     }
 
     /// Note `id`'s row and the very text the gate approved, from one read
@@ -136,7 +137,7 @@ impl CorpusStore {
     pub(crate) fn note_for_ai(&mut self, id: &str, model_is_local: bool) -> Option<(NoteMeta, String)> {
         let snapshot = self.approved(id, model_is_local)?;
         let text = snapshot.text.clone();
-        Some((self.parse_approved(snapshot).row, text))
+        Some((self.parse_approved(snapshot)?.row, text))
     }
 
     /// The search hit an AI lane may show for note `id` and `query`. A note the
@@ -146,7 +147,7 @@ impl CorpusStore {
     pub(crate) fn search_row_for_ai(&mut self, query: &str, id: &str, model_is_local: bool) -> Option<AiRow<SearchHit>> {
         let snapshot = self.approved(id, model_is_local)?;
         let on_device_only = snapshot.on_device_only;
-        let Parsed { row, body, metadata } = self.parse_approved(snapshot);
+        let Parsed { row, body, metadata } = self.parse_approved(snapshot)?;
         let aliases = row.aliases.join("\n");
         let found = search_match(query, &row.title, &body, &row.snippet)
             .or_else(|| search_match(query, &row.title, &metadata, &row.snippet))
@@ -193,6 +194,14 @@ impl CorpusStore {
         folders.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(folders)
     }
+}
+
+/// Does `row_for_ai` read this id as a Markdown note (its row, shelf
+/// included, from the note's text) rather than as a file from its path? An
+/// id with no extension anywhere is read as Markdown even when the walk
+/// listed it as a file.
+pub(crate) fn reads_as_markdown(id: &str) -> bool {
+    id.to_ascii_lowercase().ends_with(".md") || !id.contains('.')
 }
 
 /// The files (not notes, not boards) a model may name, each from its path in

@@ -12,7 +12,7 @@
 //! the store's walk cache and its one safe note rewrite.
 
 use super::link_convert::link_from;
-use super::{folder_of, locked_field, parse_document, CorpusStore, NoteKind};
+use super::{folder_of, locked_on, parse_document, CorpusStore, NoteKind};
 
 /// One body with every relative Markdown link outside code passed to `map`,
 /// which gets the vault path the link names and answers the new link (or
@@ -225,7 +225,12 @@ impl CorpusStore {
     /// link: nothing edits a locked note, so the move is refused instead.
     pub(crate) fn refuse_breaking_locked_links(&mut self, rel: &str) -> Result<(), String> {
         match self.linkers_of(rel)?.into_iter().find(|(_, locked)| *locked) {
-            Some((linker, _)) => Err(format!("a locked note links to it by path ({linker}) — it stays where it is")),
+            // an agent is told which note only when it may read that note
+            // (Opus re-check of #304: a secure linker's path was named)
+            Some((linker, _)) if !self.is_agent_lane() || self.read_for_ai(&linker, false).is_ok() => {
+                Err(format!("a locked note links to it by path ({linker}) — it stays where it is"))
+            }
+            Some(_) => Err("a locked note links to it by path — it stays where it is".into()),
             None => Ok(()),
         }
     }
@@ -239,7 +244,7 @@ fn names(body: &str, folder: &str, rel: &str) -> bool {
 fn is_locked(text: &str) -> bool {
     parse_document(text)
         .0
-        .is_some_and(|fm| fm.foreign.iter().any(|line| locked_field(line) == Some(true)))
+        .is_some_and(|fm| locked_on(&fm.foreign))
 }
 
 #[cfg(test)]
