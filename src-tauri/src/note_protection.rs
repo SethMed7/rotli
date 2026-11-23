@@ -5,8 +5,8 @@
 //! on both sides, so a line that comes back unchanged always passes, and only
 //! a change in what the app would do counts as loosening.
 
-use crate::ai_edit_policy::{body_edit, BodyEdit};
-use crate::corpus::{locked_field, parse_document, secure_field};
+use crate::ai_edit_policy::{granted_edit, BodyEdit};
+use crate::corpus::{locked_on, parse_document, secure_on};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Protection {
@@ -23,8 +23,7 @@ pub(crate) struct Protection {
 }
 
 fn body_rank(foreign: &[String]) -> u8 {
-    let unlocked: Vec<&String> = foreign.iter().filter(|l| locked_field(l).is_none()).collect();
-    match body_edit(&unlocked) {
+    match granted_edit(foreign) {
         BodyEdit::Revoked | BodyEdit::Locked => 0,
         BodyEdit::PersonWritten => 1,
         BodyEdit::Allowed => 2,
@@ -41,8 +40,9 @@ fn protection_read(text: &str, chat: bool) -> Protection {
     let fm = parse_document(text).0.unwrap_or_default();
     let foreign = &fm.foreign;
     Protection {
-        locked: foreign.iter().any(|l| locked_field(l) == Some(true)),
-        secure: foreign.iter().any(|l| secure_field(l) == Some(true)),
+        // the permission line rules (frontmatter_lines.rs), as every reader reads them
+        locked: locked_on(foreign),
+        secure: secure_on(foreign),
         secure_context: if chat {
             crate::protection_mark::marked(text, "secureContext")
         } else {
@@ -140,7 +140,7 @@ pub(crate) fn require_owned_not_looser(old: &str, new: &str) -> Result<(), Strin
 /// model's tag reached the Filer that way).
 pub(crate) fn refuse_line_breaks(text: &str) -> Result<(), String> {
     // a tab breaks no line for any reader, and a hand-typed one must survive an undo
-    if text.chars().any(|c| (c.is_control() && c != '\t') || matches!(c, '\u{2028}' | '\u{2029}')) {
+    if text.chars().any(|c| (c.is_control() && c != '\t') || crate::frontmatter_lines::is_break(c)) {
         return Err("refused: a metadata field can't hold a line break or control character".into());
     }
     Ok(())

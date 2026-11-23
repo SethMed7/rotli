@@ -44,10 +44,19 @@ test("a model's tag can't carry a line break into the metadata", () => {
 
 for (const kind of ["rotli", "in place"] as const) {
   test(`${kind}: Let AI edit never deletes a block-scalar line, and says when it can't take`, async () => {
+    // block-scalar text is text (permission line rules): the grant takes and
+    // the block's own line stays
     const text = "---\nexample: |\n  ai_edit: false\n  more prose\n---\n# Block\n\nwords\n";
     const { dir, note } = await vault(kind, "wiki/block.md", text);
-    await expect(corpusSetAiEdit(note.id, true)).rejects.toThrow(/ai_edit/);
-    expect(await dir.readText("wiki/block.md")).toBe(text);
+    await corpusSetAiEdit(note.id, true);
+    const saved = await dir.readText("wiki/block.md");
+    expect(saved).toContain("example: |\n  ai_edit: false\n  more prose\n");
+    expect(verdict(saved)).toBe("allowed");
+    // a nested denial the setter never touches: it says so and writes nothing
+    const nested = "---\nmeta:\n  ai_edit: false\n---\n# Nested\n\nwords\n";
+    const held = await vault(kind, "wiki/nested.md", nested);
+    await expect(corpusSetAiEdit(held.note.id, true)).rejects.toThrow(/ai_edit/);
+    expect(await held.dir.readText("wiki/nested.md")).toBe(nested);
   });
 
   test(`${kind}: the raw metadata save keeps a quoted denial and the chat taint`, async () => {
@@ -94,14 +103,15 @@ test("Web reads secure the way Rust does: anything but false is on", () => {
 // review of 305/306 (2026-11-20)
 
 test("Unlock says so, and changes nothing, when an indented locked: line still decides it", async () => {
-  const text = "---\nid: lk\nlocked: true\nexample: |\n  locked: true\n---\n# Locked\n\nwords\n";
+  // a nested key still decides it; block-scalar text wouldn't (it is text)
+  const text = "---\nid: lk\nlocked: true\nmeta:\n  locked: true\n---\n# Locked\n\nwords\n";
   const { dir, note } = await vault("rotli", "wiki/locked.md", text);
   await expect(corpusSetLocked(note.id, false)).rejects.toThrow(/locked/);
   expect(await dir.readText("wiki/locked.md")).toBe(text);
 });
 
 test("Remove protection checks it took before moving the note or touching .gitignore", async () => {
-  const text = "---\nid: sx\nexample: |\n  secure: true\n---\n# Secret plan\n\nwords\n";
+  const text = "---\nid: sx\nmeta:\n  secure: true\n---\n# Secret plan\n\nwords\n";
   const { dir, notes, note } = await vault("rotli", "wiki/_inbox/plan.md", text);
   await corpusSetSecure(note.id, true);
   const securedPath = await notes.filePathOf(note.id);
@@ -134,11 +144,13 @@ for (const text of ["---\nsecure : true\n---\n# S\n", "---\n\uFEFFsecure: true\n
     expect(await dir.readText(".gitignore")).toBe("Notes/secret.md\n");
   });
 
-test("in place: Unlock of `locked : true` takes, and is checked on the text it writes", async () => {
-  const { dir, note } = await vault("in place", "Notes/locked.md", "---\nlocked : true\n---\n# L\n");
-  await corpusSetLocked(note.id, false);
-  const saved = await dir.readText("Notes/locked.md");
-  expect(verdict(saved)).not.toBe("locked");
+test("in place: Unlock of `locked : true` refuses and writes nothing, as on the Mac", async () => {
+  // one rule for both platforms (review of PR 307, S2): in place, a switch
+  // changes only Rotli's own `locked:` line
+  const text = "---\nlocked : true\n---\n# L\n";
+  const { dir, note } = await vault("in place", "Notes/locked.md", text);
+  await expect(corpusSetLocked(note.id, false)).rejects.toThrow(/locked/);
+  expect(await dir.readText("Notes/locked.md")).toBe(text);
 });
 
 test("in place: the refusal for a typed --- block points to Show file metadata", async () => {

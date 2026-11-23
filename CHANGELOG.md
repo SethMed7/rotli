@@ -40,8 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   indented text in a note's metadata. If another line still decides the
   setting, it tells you instead of saying it worked. On Rotli Web, a `---` block
   pasted at the top of a note without metadata stays part of the text, and
-  any `secure:` value other than `false` now counts as secure, as it does on
-  the Mac.
+  a `secure:` value now counts as secure unless it says off (`false`, `no` or
+  `off`), as it does on the Mac.
 - **An AI reply can't turn itself into a note's settings.** In a folder
   opened in place, an AI insert or an "Allow once" edit that starts with a
   `---` block could become the metadata of a note that had none, and let AI
@@ -50,6 +50,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   note's metadata still keeps it locked or secure, instead of reporting
   success, moving the note out of its secure folder or dropping its
   `.gitignore` line.
+- **A lock or secure flag holds however it was typed.** Rotli used to read
+  `locked: true` and `secure: true` only when typed exactly that way, so a lock
+  written as `locked: True`, `locked: yes`, `"locked": true`, `- locked: true`,
+  `locked: true # my note` or `meta: {locked: true}` left the note open to AI
+  edits, and `"secure": true` let remote models read it. Now `locked` and
+  `secure` count in any spelling: indented, quoted, after `- ` or `? `, after a
+  tag such as `!!str` or an anchor such as `&a`, inside `{…}`, or with escapes
+  in a quoted key. They are on unless the value says off: `false`, `no` or
+  `off` in any case, quoted or not, with or without a `# comment`. Anything
+  else, including an empty value, `yes`, `on`, `~` or `null`, turns them on,
+  and so does an off value continued onto an indented line (`secure: false`,
+  then `  until friday`), which reads as the text "false until friday".
+  Rotli Web now reads `secure` the same way as the desktop app.
+- **Prose that mentions a flag stays prose.** A `description: |` (or `>`)
+  block whose text says `locked: true` or `secure: yes` no longer locks the
+  note or hides it from AI, on the desktop or in Rotli Web.
+- **AI edit and on-device permissions deny in every spelling too.** A quoted,
+  flow-map, tagged, anchored or escaped `ai_edit` or `local_ai_allowed` that
+  says anything but `true` now denies, as an indented one already did. A
+  `created_by` spelled that way that doesn't name `chat`, `agent` or
+  `librarian` makes the note person-written. A grant continued onto an
+  indented line (`ai_edit: true`, then `  until friday`) no longer grants,
+  because it no longer reads `true`.
+- **Odd line breaks and Rotli's own fields can't hide a flag.** A lone
+  carriage return, U+0085, U+2028 or U+2029 inside a metadata line used to let
+  `x: 1`, then a hidden `secure: true`, read as an ordinary note. These now
+  split the line, and a broken line never grants AI access. An `id:`,
+  `created:`, `updated:`, `pinned:` or `origin:` line that carries a flag
+  (`pinned: {secure: true}`) is now read for it.
+- **Unlock and "remove secure" never leave broken metadata, and tell you when
+  they can't.** They remove a lock or secure line only when it stands alone
+  at the top level. When the flag is spelled where removing it could break
+  the note's metadata (an explicit `? locked` key, a list item, inside
+  another key's `{…}`), the switch names the line to delete instead of
+  reporting success while the note stays protected. In a folder opened in
+  place, the switches change only Rotli's own `locked: true` or
+  `secure: true` line, on the desktop and in Rotli Web alike.
 - **Agents see fewer private folder names.** A folder directly under
   `wiki/_secure/` or `Secure notes/`, or one whose own name holds one of your
   secure keywords, is no longer listed to agents by name. This is a partial

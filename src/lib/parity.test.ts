@@ -55,6 +55,7 @@ import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
+import { permissionVerdict } from "./permissionVerdict";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
 
 const entries = fixture.entries;
@@ -129,6 +130,15 @@ describe("parity.json ↔ TS constants", () => {
   test("aiBodyEditCases", () => {
     for (const c of entries.aiBodyEditCases.value) {
       expect(bodyEdit(c.fields)).toBe(c.verdict as AiBodyEdit);
+    }
+  });
+
+  test("permissionLineCases", () => {
+    for (const c of entries.permissionLineCases.value) {
+      expect({ fields: c.fields, verdict: permissionVerdict(c.fields) }).toEqual({
+        fields: c.fields,
+        verdict: c.verdict,
+      });
     }
   });
 

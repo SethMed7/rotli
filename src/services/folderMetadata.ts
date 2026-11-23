@@ -4,12 +4,12 @@ import {
   composeNoteDocument,
   emptyFrontmatter,
   isSecureFrontmatter,
-  locksNote,
   parseNoteDocument,
   type NoteFrontmatter,
 } from "../lib/frontmatter";
 import { composeInPlace, rotliMade, withSecureLineOnly, withTopLevelLine } from "../lib/frontmatterInPlace";
-import { frontmatterField, localAiAllowedOverride, ownedKey } from "../lib/frontmatterKeys";
+import { frontmatterField, localAiAllowedOverride } from "../lib/frontmatterKeys";
+import { flagLine, lockedOn, ownedKey, withoutFlag } from "../lib/frontmatterLines";
 import { mergeRawFrontmatter, rawFrontmatterBlock } from "../lib/frontmatterRaw";
 import { requireOwnedNotLooser } from "../lib/protectionRule";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
@@ -41,6 +41,36 @@ const withField = (fm: NoteFrontmatter, key: string, value: string | null): Note
   ],
 });
 
+/** An off-switch refuses, rather than report success, when its flag is still
+ * on after it removed what it can: a `{locked: true}` flow entry inside
+ * another key, a key on a line a lone CR breaks, or (in a folder opened in
+ * place) a spelling other than Rotli's (Rust `refuse_if_still_on`). */
+function refuseIfStillOn(text: string, key: "locked" | "secure"): void {
+  refuseIfFlagged(parseNoteDocument(text).frontmatter?.foreign ?? [], key);
+}
+
+function refuseIfFlagged(foreign: readonly string[], key: "locked" | "secure"): void {
+  const line = foreign[flagLine(foreign, key)];
+  if (line !== undefined)
+    throw new Error(
+      `This note still turns ${key} on in a line the switch can't change (${line.trim()}). Remove that line in the note's metadata, then try again.`,
+    );
+}
+
+/** Rotli's own spelling of `key`: `key: value` at the start of the line. */
+const ownLine = (line: string, key: string) => {
+  const field = frontmatterField(line);
+  return field !== null && field.key.canonical && field.key.name === key;
+};
+
+/** `locked`/`secure` set to `value` (null clears it): an off-switch removes
+ * only the top-level single-line spellings, so the frontmatter stays YAML
+ * (frontmatterLines.ts `withoutFlag`); anything left refuses. */
+const withFlag = (fm: NoteFrontmatter, key: "locked" | "secure", value: string | null): NoteFrontmatter => ({
+  ...fm,
+  foreign: [...withoutFlag(fm.foreign, key), ...(value === null ? [] : [`${key}: ${value}`])],
+});
+
 function assertSecureRemoval(body: string): void {
   if (looksSecret(body))
     throw new Error("Remove the detected secret from the note before removing secure protection");
@@ -63,11 +93,11 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     assertSecureRemoval(body);
     // checked before the note moves or its ignore line goes: a note that
     // still reads secure must keep both (review of 305/306)
-    const cleared = ["secure", "local_ai_allowed", "secure_origin"].reduce(
+    const cleared = ["local_ai_allowed", "secure_origin"].reduce(
       (f, key) => withField(f, key, null),
-      fm,
+      withFlag(fm, "secure", null),
     );
-    if (isSecureFrontmatter(cleared)) throw notTaken("secure");
+    refuseIfFlagged(cleared.foreign, "secure");
   }
   if (!(await vaultHasRotliMarker(dir)) || (await vaultFolderRoles(dir))) {
     // A folder opened in place — and an imported copy, whose folders are the
@@ -75,8 +105,10 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
     // 2026-10-13): only the secure line changes, and its ignore line protects
     // the path. Protect before the write, unprotect after.
     // the exact text to be written must read as asked before the ignore
-    // line changes (re-check of 306: `secure : true` survived)
+    // line changes (re-check of 306: `secure : true` survived); a spelling
+    // the in-place writer can't remove refuses by name
     const next = withSecureLineOnly(opened.contents, secure);
+    if (!secure) refuseIfStillOn(next, "secure");
     if (isSecureFrontmatter(parseNoteDocument(next).frontmatter ?? emptyFrontmatter()) !== secure)
       throw notTaken("secure");
     if (secure) await updateGitExclusions(dir, [path]);
@@ -90,7 +122,7 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   const inHome = current === home || current.startsWith(`${home}/`);
   if (secure) {
     if (!inHome && valueOf(fm, "secure_origin") === undefined) fm = withField(fm, "secure_origin", current);
-    fm = withField(fm, "secure", "true");
+    fm = withFlag(fm, "secure", "true");
     await updateGitExclusions(dir, [path]);
     await writeVersionedFile(dir, path, composeNoteDocument(fm, body), opened.revision);
   }
@@ -121,9 +153,8 @@ export async function setFolderSecure(dir: VaultDir, path: string, secure: boole
   if (!secure) {
     const final = await readVersionedFile(dir, target);
     const parsed = parseNoteDocument(final.contents);
-    let cleared = parsed.frontmatter ?? emptyFrontmatter();
-    for (const key of ["secure", "local_ai_allowed", "secure_origin"])
-      cleared = withField(cleared, key, null);
+    let cleared = withFlag(parsed.frontmatter ?? emptyFrontmatter(), "secure", null);
+    for (const key of ["local_ai_allowed", "secure_origin"]) cleared = withField(cleared, key, null);
     await writeVersionedFile(dir, target, composeNoteDocument(cleared, parsed.body), final.revision);
     await updateGitExclusions(dir, [], [target]);
   }
@@ -151,15 +182,23 @@ export async function setFolderProtection(
     if (!isSecureFrontmatter(fm) && !looksSecret(body))
       throw new Error("Local AI access is only meaningful for a secure note");
     if (!isSecureFrontmatter(fm)) {
-      fm = withField(fm, "secure", "true");
+      fm = withFlag(fm, "secure", "true");
       await updateGitExclusions(dir, [path]);
     }
   }
-  fm = withField(fm, key, key === "locked" && !allowed ? null : String(allowed));
-
+  fm = key === "locked" ? withFlag(fm, key, allowed ? "true" : null) : withField(fm, key, String(allowed));
   // a person's note in a folder opened in place gains only the line asked for
   const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
+  // in a folder opened in place, a switch changes only Rotli's own
+  // `locked: …` line, as Rust's in-place writer does; any other spelling
+  // that still holds the lock refuses
+  if (key === "locked" && !allowed && inPlace)
+    refuseIfFlagged(
+      (frontmatter?.foreign ?? []).filter((line) => !ownLine(line, "locked")),
+      "locked",
+    );
   const text = inPlace ? composeInPlace(opened.contents, fm) : composeNoteDocument(fm, body);
+  if (key === "locked" && !allowed) refuseIfStillOn(text, "locked");
   // the exact text to be written must read as asked: another line that still
   // decides the key (indented, or a spelling the in-place writer leaves) means
   // the setting can't take, so say so rather than report it done
@@ -168,7 +207,7 @@ export async function setFolderProtection(
     key === "ai_edit"
       ? (ownedKey(written, "ai_edit", (v) => v === "true").says === "grant") === allowed
       : key === "locked"
-        ? written.some(locksNote) === allowed
+        ? lockedOn(written) === allowed
         : localAiAllowedOverride(written) === allowed;
   if (!took) throw notTaken(key);
   await writeVersionedFile(dir, path, text, opened.revision);

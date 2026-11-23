@@ -4,10 +4,11 @@
 // `secureContext`). Each flag is read the same way on both sides of a
 // rewrite, so an unchanged line always passes. Pure: text in, verdict out.
 
-import { type AiBodyEdit, bodyEdit, field } from "./aiEditPolicy";
-import { locksNote, namesLocked, parseNoteDocument, securesNote } from "./frontmatter";
+import { type AiBodyEdit, field, grantedEdit } from "./aiEditPolicy";
+import { parseNoteDocument } from "./frontmatter";
 import { frontmatterBlock, protectionMark, withFrontmatterBlock } from "./frontmatterBlock";
 import { localAiAllowedOverride } from "./frontmatterKeys";
+import { lockedOn, secureOn } from "./frontmatterLines";
 
 export interface Protection {
   locked: boolean;
@@ -30,11 +31,12 @@ export function protection(text: string, chat = false): Protection {
   const foreign = parseNoteDocument(text).frontmatter?.foreign ?? [];
   const local = localAiAllowedOverride(foreign);
   return {
-    locked: foreign.some(locksNote),
-    secure: foreign.some(securesNote),
+    // the permission line rules (frontmatterLines.ts), as every reader reads them
+    locked: lockedOn(foreign),
+    secure: secureOn(foreign),
     secureContext: protectionMark(text, "secureContext", chat),
     localAi: local === false ? 0 : local === null ? 1 : 2,
-    bodyEdit: BODY_RANK[bodyEdit(foreign.filter((line) => !namesLocked(line)))],
+    bodyEdit: BODY_RANK[grantedEdit(foreign)],
   };
 }
 

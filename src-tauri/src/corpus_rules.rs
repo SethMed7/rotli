@@ -8,7 +8,7 @@
 
 
 use super::{
-    editor_body, parse_document, secure_field, title_of, CorpusState, CorpusStore, Layout,
+    editor_body, parse_document, secure_on, title_of, CorpusState, CorpusStore, Layout,
 };
 
 impl CorpusStore {
@@ -144,7 +144,7 @@ impl CorpusStore {
             };
             let (fm, raw) = parse_document(&text);
             let Some(fm) = fm else { continue };
-            if fm.foreign.iter().any(|l| secure_field(l) == Some(true)) {
+            if secure_on(&fm.foreign) {
                 continue;
             }
             if self.secure_by_name(&title_of(editor_body(raw)), &rel) {

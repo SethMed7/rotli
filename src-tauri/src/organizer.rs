@@ -487,15 +487,9 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     let (fm, body) = corpus::parse_document(&text);
     let fm = fm.unwrap_or_default();
     let mut fields = BTreeMap::new();
-    let mut locked = false;
-    let mut secure = corpus::rules_store::in_secure_home_path(rel);
+    let locked = corpus::locked_on(&fm.foreign);
+    let mut secure = corpus::rules_store::in_secure_home_path(rel) || corpus::secure_on(&fm.foreign);
     for line in &fm.foreign {
-        if corpus::locked_field(line) == Some(true) {
-            locked = true;
-        }
-        if corpus::secure_field(line) == Some(true) {
-            secure = true;
-        }
         if let Some((k, v)) = line.split_once(':') {
             fields.insert(k.trim().to_string(), v.trim().to_string());
         }

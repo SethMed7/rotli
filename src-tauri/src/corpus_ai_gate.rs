@@ -65,7 +65,7 @@ impl CorpusStore {
         let (fm, body) = parse_document(text);
         let fm = fm.unwrap_or_default();
         let secure = self.file_is_protected(rel)
-            || fm.foreign.iter().any(|l| secure_field(l) == Some(true))
+            || secure_on(&fm.foreign)
             || fm
                 .foreign
                 .iter()

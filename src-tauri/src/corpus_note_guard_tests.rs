@@ -155,11 +155,21 @@ fn a_quoted_key_cannot_clear_or_replace_a_denial() {
 
 #[test]
 fn setting_ai_edit_never_touches_a_block_scalar_and_says_when_it_cannot_take() {
+    // block-scalar text is text (permission line rules): the grant takes and
+    // the block's own line stays
     let block = "---\nid: 01JFIELDGUARD0000000000000\nexample: |\n  ai_edit: false\n  more prose\n---\n\n# Field guard\n";
     let (_dir, mut store, path) = person_note(block);
+    store.set_ai_edit(PERSON_ID, true).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(saved.contains("example: |\n  ai_edit: false\n  more prose\n"), "{saved}");
+    assert_eq!(verdict(&saved), crate::ai_edit_policy::BodyEdit::Allowed);
+
+    // a nested denial the setter never touches: it says so and writes nothing
+    let nested = "---\nid: 01JFIELDGUARD0000000000000\nmeta:\n  ai_edit: false\n---\n\n# Field guard\n";
+    let (_dir, mut store, path) = person_note(nested);
     let err = store.set_ai_edit(PERSON_ID, true).unwrap_err();
     assert!(err.contains("ai_edit"), "{err}");
-    assert_eq!(fs::read_to_string(&path).unwrap(), block);
+    assert_eq!(fs::read_to_string(&path).unwrap(), nested);
 
     // a plain denial is still the setter's to change
     let (_dir, mut store, path) = person_note("---\nid: 01JFIELDGUARD0000000000000\nai_edit: false\n---\n\n# x\n");
@@ -324,7 +334,7 @@ fn ignore_of(store: &CorpusStore) -> String {
 #[test]
 fn in_place_remove_protection_says_so_when_another_line_keeps_it() {
     for text in [
-        "---\nsecure: true\nexample: |\n  secure: true\n---\n# S\n",
+        "---\nsecure: true\nmeta:\n  secure: true\n---\n# S\n",
         "---\nsecure : true\n---\n# S\n",
         "---\n\u{feff}secure: true\n---\n# S\n",
     ] {
@@ -340,7 +350,7 @@ fn in_place_remove_protection_says_so_when_another_line_keeps_it() {
 #[test]
 fn in_place_unlock_says_so_when_another_line_keeps_it() {
     for text in [
-        "---\nlocked: true\nexample: |\n  locked: true\n---\n# L\n",
+        "---\nlocked: true\nmeta:\n  locked: true\n---\n# L\n",
         "---\nlocked : true\n---\n# L\n",
     ] {
         let (_dir, mut store, path, id) = in_place_note("Locked.md", text);
@@ -352,21 +362,30 @@ fn in_place_unlock_says_so_when_another_line_keeps_it() {
 
 #[test]
 fn rotli_vault_unlock_and_remove_protection_never_touch_block_text() {
-    // self-review of 306 at d4a22c34: these two still deleted an indented
-    // `locked:` / `secure:` inside a block scalar
+    // self-review of 306 at d4a22c34: these two deleted an indented
+    // `locked:` / `secure:` inside a block scalar. Block-scalar text is text
+    // (permission line rules), so the switch takes and the block stays.
     let locked = "---\nid: 01JFIELDGUARD0000000000000\nlocked: true\nexample: |\n  locked: true\n---\n\n# L\n";
     let (_dir, mut store, path) = person_note(locked);
-    let err = store.set_locked(PERSON_ID, false).unwrap_err();
-    assert!(err.contains("locked"), "{err}");
-    assert_eq!(fs::read_to_string(&path).unwrap(), locked);
+    store.set_locked(PERSON_ID, false).unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    assert!(saved.contains("example: |\n  locked: true\n") && !crate::note_protection::protection(&saved).locked, "{saved}");
 
     let secure = "---\nid: 01JFIELDGUARD0000000000000\nsecure: true\nexample: |\n  secure: true\n---\n\n# S\n";
     let (_dir, mut store, path) = person_note(secure);
     fs::write(store.root().join(".gitignore"), "field-guard.md\n").unwrap();
-    let err = store.set_secure(PERSON_ID, false).unwrap_err();
-    assert!(err.contains("secure"), "{err}");
-    assert_eq!(fs::read_to_string(&path).unwrap(), secure);
-    assert_eq!(ignore_of(&store), "field-guard.md\n");
+    store.set_secure(PERSON_ID, false).unwrap();
+    let rel = store.resolve_note_rel(PERSON_ID).unwrap();
+    let saved = fs::read_to_string(store.root().join(&rel)).unwrap();
+    assert!(saved.contains("example: |\n  secure: true\n") && !crate::note_protection::protection(&saved).secure, "{saved}");
+    let _ = path;
+
+    // a nested flag no switch touches still refuses and writes nothing
+    let nested = "---\nid: 01JFIELDGUARD0000000000000\nlocked: true\nmeta:\n  locked: true\n---\n\n# L\n";
+    let (_dir, mut store, path) = person_note(nested);
+    let err = store.set_locked(PERSON_ID, false).unwrap_err();
+    assert!(err.contains("locked"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), nested);
 
     // locking keeps the block's own text
     let block = "---\nid: 01JFIELDGUARD0000000000000\nexample: |\n  locked: false\n---\n\n# B\n";

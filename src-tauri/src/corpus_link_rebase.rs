@@ -12,7 +12,7 @@
 //! the store's walk cache and its one safe note rewrite.
 
 use super::link_convert::link_from;
-use super::{folder_of, locked_field, parse_document, CorpusStore, NoteKind};
+use super::{folder_of, locked_on, parse_document, CorpusStore, NoteKind};
 
 /// One body with every relative Markdown link outside code passed to `map`,
 /// which gets the vault path the link names and answers the new link (or
@@ -244,7 +244,7 @@ fn names(body: &str, folder: &str, rel: &str) -> bool {
 fn is_locked(text: &str) -> bool {
     parse_document(text)
         .0
-        .is_some_and(|fm| fm.foreign.iter().any(|line| locked_field(line) == Some(true)))
+        .is_some_and(|fm| locked_on(&fm.foreign))
 }
 
 #[cfg(test)]
