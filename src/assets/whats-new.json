@@ -1,4 +1,22 @@
 {
+  "1.9.5": [
+    {
+      "title": "Your locks and private notes hold",
+      "body": "However a lock or secure setting is typed in a note's metadata (yes, True, quoted), Rotli now respects it, and saving a chat, a sheet or a tag can no longer quietly undo it."
+    },
+    {
+      "title": "AI can't grant itself edits",
+      "body": "An AI reply or a Librarian tag can no longer write its own permission into a note. Only you can open a note to AI editing."
+    },
+    {
+      "title": "Private folders stay private from agents",
+      "body": "Outside agents using the rotli CLI never see the names or notes of your secure folders, however the path is spelled, including copies in Trash and Archive."
+    },
+    {
+      "title": "rotli notes list in a blink",
+      "body": "Listing notes from the command line takes a second on large vaults instead of minutes."
+    }
+  ],
   "1.9.4": [
     {
       "title": "A calmer Tesven",
