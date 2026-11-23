@@ -10,7 +10,7 @@
     },
     {
       "title": "Private folders stay private from agents",
-      "body": "Outside agents using the rotli CLI never see the names or notes of your secure folders, however the path is spelled, including copies in Trash and Archive."
+      "body": "Outside agents using the rotli CLI no longer see the names or notes of your secure folders, however the path is spelled, including secure notes moved to Trash or Archive."
     },
     {
       "title": "rotli notes list in a blink",
