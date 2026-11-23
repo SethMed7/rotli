@@ -338,18 +338,17 @@ impl Workspace {
             let rel = self.store.resolve_note_rel(&meta.id)?;
             let (frontmatter, body) = crate::corpus::parse_document(&text);
             let frontmatter = frontmatter.unwrap_or_default();
-            let metadata = query_metadata(&meta, &rel, &frontmatter, body);
-            if !record_matches(&metadata, &query) {
+            // a frontmatter value that names a protected path (a shelf, an
+            // origin, a wikilink), in any quoting or prefix, is neither shown
+            // nor matched, so a clause can't confirm a guessed hidden value;
+            // URLs and other values are (final check of #304, B3 and S4)
+            let store = &mut self.store;
+            let mut shown = |value: &str| !value.contains(['/', '\\']) || !store.names_protected_path(value);
+            let mut visible_metadata = query_metadata(&meta, &rel, &frontmatter, body, &mut shown);
+            if !record_matches(&visible_metadata, &query) {
                 continue;
             }
-            let mut visible_metadata = metadata;
             visible_metadata.remove("text");
-            // a frontmatter value that names a protected path (a shelf, an
-            // origin, a wikilink), in any quoting or prefix, is not shown;
-            // URLs and other values are (final check of #304, B3 and S4)
-            for values in visible_metadata.values_mut() {
-                values.retain(|value| !value.contains(['/', '\\']) || !self.store.names_protected_path(value));
-            }
             let wire_id = self.wire(&meta.id);
             rows.push(NoteQueryRow {
                 deep_link: self.deep_link_of(&wire_id, "note"),
@@ -1114,6 +1113,7 @@ fn query_metadata(
     rel: &str,
     frontmatter: &Frontmatter,
     body: &str,
+    shown: &mut impl FnMut(&str) -> bool,
 ) -> BTreeMap<String, Vec<String>> {
     let mut fields = BTreeMap::new();
     for line in &frontmatter.foreign {
@@ -1123,7 +1123,7 @@ fn query_metadata(
         if key != key.trim() {
             continue;
         }
-        fields.insert(key.to_string(), query_value(value));
+        fields.insert(key.to_string(), query_value(value).into_iter().filter(|value| shown(value)).collect());
     }
     if let Some(id) = &frontmatter.id {
         fields.insert("id".into(), vec![id.clone()]);
