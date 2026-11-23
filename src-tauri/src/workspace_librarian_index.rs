@@ -36,6 +36,10 @@ struct IndexRow {
     id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     summary: Option<String>,
+    /// The notes the summary named (by title or alias) that the agent could
+    /// read when it wrote it. None on a row written before this was kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    named: Option<Vec<String>>,
 }
 
 /// One log line: what happened, when, and the notes it concerns, by id.
@@ -46,6 +50,9 @@ struct LogRow {
     text: String,
     #[serde(default)]
     ids: Vec<String>,
+    /// As `IndexRow::named`, for the line's text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    named: Option<Vec<String>>,
 }
 
 /// Whether the note an agent may read now under `local` carries that id in
@@ -102,14 +109,30 @@ fn names_a_hidden_note(ws: &mut Workspace, names: &[(String, String)], hidden: &
     })
 }
 
-/// The text a summary or log line may carry: one line, nothing secret-shaped,
-/// and no title or alias of a note the agent can't read.
-fn checked_text(ws: &mut Workspace, names: &[(String, String)], text: &str, what: &str) -> Result<String, String> {
+/// The text a summary or log line may carry: one line, nothing
+/// secret-shaped. What notes it names is judged only among the notes the
+/// agent may read now, and recorded: a note it can't read never changes the
+/// answer, so the answer never tells whether one with that name exists.
+fn checked_text(ws: &mut Workspace, names: &[(String, String)], text: &str, what: &str) -> Result<(String, Vec<String>), String> {
     let text = one_line(text, MAX_REASON, what)?;
-    if names_a_hidden_note(ws, names, &mut HashMap::new(), &text) {
-        return Err(format!("{what} can't be kept as written; name notes by id, not in the text"));
+    let normal_text = normal(&text);
+    let mut named: Vec<String> = Vec::new();
+    for (_, id) in names.iter().filter(|(name, _)| normal_text.contains(name.as_str())) {
+        if !named.contains(id) && ws.store.read_for_ai(id, false).is_ok() {
+            named.push(id.clone());
+        }
     }
-    Ok(text)
+    Ok((text, named))
+}
+
+/// Whether stored text may show now: every note it named when written is
+/// still readable. A row from before `named` was kept is judged as it was
+/// then, against every note's names, failing closed.
+fn still_shown(ws: &mut Workspace, names: &[(String, String)], hidden: &mut HashMap<String, bool>, text: &str, named: Option<&[String]>) -> bool {
+    match named {
+        Some(named) => named.iter().all(|id| !*hidden.entry(id.clone()).or_insert_with(|| ws.store.read_for_ai(id, false).is_err())),
+        None => !names_a_hidden_note(ws, names, hidden, text),
+    }
 }
 
 fn append(root: &Path, file: &str, row: &impl Serialize) -> Result<(), String> {
@@ -130,11 +153,11 @@ fn rows<T: for<'de> Deserialize<'de>>(root: &Path, file: &str) -> Vec<T> {
 }
 
 /// The index as it stands: each note's latest summary, `None` once removed.
-fn summaries(root: &Path) -> Vec<(String, Option<String>)> {
-    let mut out: Vec<(String, Option<String>)> = Vec::new();
+fn summaries(root: &Path) -> Vec<IndexRow> {
+    let mut out: Vec<IndexRow> = Vec::new();
     for row in rows::<IndexRow>(root, INDEX) {
-        out.retain(|(id, _)| *id != row.id);
-        out.push((row.id, row.summary));
+        out.retain(|seen| seen.id != row.id);
+        out.push(row);
     }
     out
 }
@@ -147,8 +170,8 @@ pub(super) fn write_index(ws: &mut Workspace, entries: &[Value], remove: &[Value
     let mut rows = Vec::new();
     for entry in entries {
         let id = readable(ws, entry["id"].as_str().unwrap_or_default())?;
-        let summary = checked_text(ws, &names, entry["summary"].as_str().unwrap_or_default(), "summary")?;
-        rows.push(IndexRow { id, summary: Some(summary) });
+        let (summary, named) = checked_text(ws, &names, entry["summary"].as_str().unwrap_or_default(), "summary")?;
+        rows.push(IndexRow { id, summary: Some(summary), named: Some(named) });
     }
     // a removal names an entry the index holds now, for a note the agent may
     // still read: no row is ever written for a secure or a missing note
@@ -156,10 +179,10 @@ pub(super) fn write_index(ws: &mut Workspace, entries: &[Value], remove: &[Value
     for id in remove {
         let given = id.as_str().unwrap_or_default();
         let local = readable(ws, given)?;
-        if !indexed.iter().any(|(entry, summary)| *entry == local && summary.is_some()) {
+        if !indexed.iter().any(|row| row.id == local && row.summary.is_some()) {
             return Err(format!("{given} is not in the index"));
         }
-        rows.push(IndexRow { id: local, summary: None });
+        rows.push(IndexRow { id: local, summary: None, named: None });
     }
     for row in &rows {
         append(&ws.root.path, INDEX, row)?;
@@ -172,9 +195,9 @@ pub(super) fn write_index(ws: &mut Workspace, entries: &[Value], remove: &[Value
 /// turns secure, an id is checked every time the log is read).
 pub(super) fn append_log(ws: &mut Workspace, entry: &str, ids: &[String]) -> Result<(), String> {
     let names = note_names(ws)?;
-    let text = checked_text(ws, &names, entry, "entry")?;
+    let (text, named) = checked_text(ws, &names, entry, "entry")?;
     let ids = ids.iter().map(|id| readable(ws, id)).collect::<Result<Vec<_>, _>>()?;
-    append(&ws.root.path, LOG, &LogRow { at: now_millis(), text, ids })
+    append(&ws.root.path, LOG, &LogRow { at: now_millis(), text, ids, named: Some(named) })
 }
 
 /// The index and the newest log lines as they may be shown now. An index
@@ -199,9 +222,9 @@ pub(super) fn render(ws: &mut Workspace, log_lines: usize) -> Result<Value, Stri
             .clone()
     };
     let mut index = Vec::new();
-    for (id, summary) in summaries(&ws.root.path) {
+    for IndexRow { id, summary, named } in summaries(&ws.root.path) {
         let Some(summary) = summary.and_then(|text| one_line(&text, MAX_REASON, "summary").ok()) else { continue };
-        if names_a_hidden_note(ws, &names, &mut hidden, &summary) {
+        if !still_shown(ws, &names, &mut hidden, &summary, named.as_deref()) {
             continue;
         }
         if let Some(mut entry) = note(ws, &id) {
@@ -215,7 +238,7 @@ pub(super) fn render(ws: &mut Workspace, log_lines: usize) -> Result<Value, Stri
             break;
         }
         let Ok(text) = one_line(&row.text, MAX_REASON, "entry") else { continue };
-        if names_a_hidden_note(ws, &names, &mut hidden, &text) {
+        if !still_shown(ws, &names, &mut hidden, &text, row.named.as_deref()) {
             continue;
         }
         let notes: Option<Vec<Value>> = row.ids.iter().map(|id| note(ws, id)).collect();

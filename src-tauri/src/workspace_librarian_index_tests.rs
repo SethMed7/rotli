@@ -200,9 +200,34 @@ fn an_entry_naming_a_note_that_is_now_secure_is_hidden() {
     let log: Vec<&str> = shown["log"].as_array().unwrap().iter().map(|line| line["text"].as_str().unwrap()).collect();
     assert_eq!(log, ["Tidied intake"], "{shown}");
     assert!(!shown.to_string().to_lowercase().contains("cobalt"), "{shown}");
-    let why = refusal(&mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Cobalt acquisition follow-up"}]})));
-    assert!(why.contains("by id"), "{why}");
-    assert!(refusal(&mcp(&temp, LOG, json!({"entry": "about cobalt acquisition"}))).contains("by id"));
+    // text naming a note the agent can't read answers as text naming no
+    // note: refusing it told the agent such a note exists (row 16k)
+    let hidden = mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Cobalt acquisition follow-up"}]}));
+    let absent = mcp(&temp, INDEX, json!({"entries": [{"id": dock.id, "summary": "Zincite acquisition follow-up"}]}));
+    assert_eq!(ok(hidden), ok(absent));
+    ok(mcp(&temp, LOG, json!({"entry": "about cobalt acquisition"})));
+}
+
+/// A line names the notes the agent could read when it wrote it; it hides
+/// once one of those turns secure, and a name it never could read changes
+/// nothing.
+#[test]
+fn a_line_hides_when_a_note_it_named_turns_secure() {
+    if public_build() { return; } // development-only; feature_policy tests the refusal
+    let temp = TempDir::new().unwrap();
+    turn_on(&temp);
+    let mut ws = test_workspace(&temp);
+    let dock = ws.create_note("Dock notes", "more", MAIN_ROOT).unwrap();
+    let cobalt = ws.create_note("Cobalt acquisition", "terms", MAIN_ROOT).unwrap();
+    ws.store.create_as("Secure notes", "# Zincite plan\n\nmarigold", true, None).unwrap();
+    ok(mcp(&temp, LOG, json!({"entry": "Read the Zincite plan", "ids": [dock.id]})));
+    assert_eq!(pages(&temp)["log"][0]["text"], "Read the Zincite plan");
+    ok(mcp(&temp, LOG, json!({"entry": "Read Cobalt acquisition", "ids": [dock.id]})));
+    assert_eq!(pages(&temp)["log"].as_array().unwrap().len(), 2);
+    make_secure(&mut ws, &cobalt.id);
+    let log = pages(&temp)["log"].clone();
+    assert_eq!(log.as_array().unwrap().len(), 1, "{log}");
+    assert_eq!(log[0]["text"], "Read the Zincite plan");
 }
 
 /// Codex review of 7f542f5b: a sidecar row with a field Rotli never writes
