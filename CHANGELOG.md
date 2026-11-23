@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   later only if a note it named turns secure. One difference remains by
   choice: creating, renaming, or making a board beside a hidden note of the
   same name still adds `(2)` to the new file's name.
+- **Attachments an agent can't list now say so the same way.** In any
+  vault, an attachment the listing already hid from agents (a file over
+  16 MB, or an image whose raw bytes happen to look like a card number) now
+  answers "not available to agents" instead of showing its size and type.
 - **A search can no longer stop an agent's connection.** A search where
   hundreds of hidden notes matched crashed `rotli mcp`; it now pages through
   the results. Any tool that fails unexpectedly answers an error instead of

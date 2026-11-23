@@ -485,10 +485,15 @@ roots carry their root-prefixed wire id in the link.
   document the listing hides (by path, or by what it holds: secret-shaped,
   unreadable, too large) exactly as a missing one, before any parse or
   secret check, and refuses a `file` whose prefix names any root but the
-  open vault. Search pages through the index until it has the first
-  4×`limit` matches an agent may see (or nothing more matches), then shows
-  the best `limit` of them, so hidden matches never shorten or change a
-  page; query clauses see only the metadata the answer shows; history
+  open vault; the path checks run under the corpus lock and the read,
+  unzip, and secret check after it is released. Search pages through the
+  index until it has the first 4×`limit` matches an agent may see (or
+  nothing more matches), then shows the best `limit` of them, so hidden
+  matches never shorten a page. Which visible notes make that first
+  4×`limit` follows the index's relevance scores, and those count every
+  note, hidden ones included (even ones that don't match), so hidden notes
+  can change which visible note ranks first for a quoted phrase (an
+  accepted residual, row 16k). Query clauses see only the metadata the answer shows; history
   matches journal rows by note id, never by path; and an attachment link
   answers with its link alone, `not available to agents`, both for a target
   the listing hides and for one that isn't there, and resolves only to items
@@ -504,7 +509,12 @@ roots carry their root-prefixed wire id in the link.
   change files identically; each protected id must also answer as an
   ordinary missing id does, and a search with 450 hidden matches must answer
   as one without them. Creating, renaming, or making a board beside a hidden
-  namesake still gets a `(2)`/`-2` name (a residual, row 16k).
+  namesake still gets a `(2)`/`-2` name (a residual, row 16k). Agent text
+  that quotes five or more consecutive words of a secure note word for word
+  (24+ characters) is still caught by the secure-prose guard (a Librarian
+  line is refused, an agent's own document or file is hidden, a history
+  diff is withheld), so such an exact phrase, guessed word for word, can be
+  confirmed (an accepted residual, row 16k).
 - A folder row is listed to an agent only when `agent_listable` allows it
   and its own path is not a hidden or reference surface
   (`agent_listable_folder`).
