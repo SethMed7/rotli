@@ -26,6 +26,37 @@ thread_local! {
 }
 
 impl Workspace {
+    /// `rotli_search`, `notes search`, `librarian_search`.
+    pub(super) fn search_remote(&mut self, query: &str, limit: usize) -> Result<Vec<SearchHit>, String> {
+        // include_reference: false — the headless workspace keeps its narrower
+        // surface. The 2026-08-01 reference lane is the interactive chat's
+        // retrieval scope; widening an external agent's reach is a separate
+        // decision (docs/design/ai-visibility-matrix.md).
+        // each hit is gated and shown from one read (review 2026-11-09). The
+        // page is the best `limit` of the first 4×limit hits that pass, in the
+        // index's order: the window widens until that many pass or nothing
+        // more matches, so hidden matches never shorten or change the page
+        let limit = limit.min(100);
+        let wanted = limit.saturating_mul(4).max(1);
+        let mut window = wanted;
+        let mut hits: Vec<SearchHit> = loop {
+            let (found, exhausted) = self.store.search_candidates(query, window)?;
+            let shown: Vec<SearchHit> =
+                found.into_iter().filter_map(|hit| self.store.search_row_for_ai(query, &hit.id, false).map(|marked| marked.row)).take(wanted).collect();
+            if shown.len() >= wanted || exhausted {
+                break shown;
+            }
+            window = window.saturating_mul(4);
+        };
+        crate::corpus::sort_hits(&mut hits);
+        hits.truncate(limit);
+        for hit in &mut hits {
+            hit.id = self.wire(&hit.id);
+            hit.folder_id = self.wire(&hit.folder_id);
+        }
+        Ok(hits)
+    }
+
     pub(super) fn list_remote(&mut self, limit: usize) -> Result<CorpusList, String> {
         let cap = limit.min(500);
         let notes = self.store.list()?.notes;
