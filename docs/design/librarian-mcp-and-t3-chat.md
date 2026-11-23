@@ -269,10 +269,16 @@ builds until that review has checked these fixes:
    own frontmatter (a note known only by its path: another file put at that
    path would inherit the id, Codex review of 7f542f5b); render follows the
    same rule. Summaries and log text pass `secret::blocked_for_remote` on
-   write and again on render, and an entry whose text contains the title or
-   an alias of a note the agent can't read (spaces collapsed, case aside) is
-   refused on write and hidden on render, failing closed. Rows parse
-   strictly: a row with a field Rotli never writes is skipped. `remove` takes
+   write and again on render. Text is judged only against the notes the
+   agent may read: the ones whose title or alias it contains (spaces
+   collapsed, case aside) are recorded with the row as `named`, and the row
+   is hidden on render once any of them can't be read. A note the agent
+   can't read never changes the answer, so a write never tells it such a
+   note exists (row 16k of the threat model, 2026-11-23); a row written
+   before `named` was kept is still checked against every note's names,
+   failing closed. Rows parse strictly: a row with a field Rotli never
+   writes is skipped, so a build before `named` skips the rows that carry
+   it. `remove` takes
    only an entry the index holds, for a note the agent may still read. `.rotli/` is outside
    the walk, so neither file is ever listed, searched, or read as a note.
    Page discovery, `pages.jsonl`, the marker checks, withdrawal, the
