@@ -1993,6 +1993,7 @@ fn run_main_cli(args: &[String]) -> Result<Value, String> {
         "list" => json_value(workspace.read_main_remote()?),
         "add" => {
             let id = positional(args, 2, "main add needs an item id")?;
+            workspace.admit(id)?;
             workspace.main_add(id, option(args, "--parent").unwrap_or(MAIN_ROOT))?;
             json_value(workspace.read_main_remote()?)
         }
@@ -2853,6 +2854,7 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         }
         "rotli_place_in_main" => {
             let mut workspace = Workspace::open(None)?;
+            workspace.admit(arg_required(args, "id")?)?;
             workspace.main_add(
                 arg_required(args, "id")?,
                 arg_string(args, "parent").unwrap_or(MAIN_ROOT),
