@@ -2599,7 +2599,9 @@ fn handle_mcp_with(request: &Value, server: &McpServer) -> Option<Value> {
                 .pointer("/params/arguments")
                 .cloned()
                 .unwrap_or_else(|| json!({}));
-            let result = crate::mcp_arguments::check(&(server.tools)(), name, &arguments).and_then(|()| (server.call)(name, &arguments));
+            // a tool that panics answers an error; it never takes the server down
+            let run = || std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (server.call)(name, &arguments))).unwrap_or_else(|_| Err("the tool stopped unexpectedly".into()));
+            let result = crate::mcp_arguments::check(&(server.tools)(), name, &arguments).and_then(|()| run());
             Some(mcp_success(
                 id,
                 match result {
