@@ -15,20 +15,46 @@ use super::*;
 use tempfile::TempDir;
 
 /// Names that exist only in protected places of the seeded vault.
-const PROTECTED: [&str; 11] =
-    ["_secure", "ſecure", "Juniper", "jUNIPER", "PrivateProject", "DirectExample", "Bank plan", "Diary", "STRASSE", "Hidden note", "OldHome"];
+pub(super) const PROTECTED: [&str; 13] = [
+    "_secure",
+    "ſecure",
+    "Juniper",
+    "jUNIPER",
+    "PrivateProject",
+    "DirectExample",
+    "Bank plan",
+    "Diary",
+    "STRASSE",
+    "Hidden note",
+    "OldHome",
+    "01SURFBANK",
+    "4242",
+];
 
-const OPEN: &str = "01SURFOPEN00000000000000000";
-const AGENT_NOTE: &str = "01SURFAGENT0000000000000000";
-const AGENT_FREE: &str = "01SURFFREE00000000000000000";
-const BOARD: &str = "wiki/Projects/b.excalidraw";
-const PUBLIC_DOCX: &str = "wiki/Projects/plan.docx";
+pub(super) const OPEN: &str = "01SURFOPEN00000000000000000";
+pub(super) const AGENT_NOTE: &str = "01SURFAGENT0000000000000000";
+pub(super) const AGENT_FREE: &str = "01SURFFREE00000000000000000";
+pub(super) const BOARD: &str = "wiki/Projects/b.excalidraw";
+pub(super) const PUBLIC_DOCX: &str = "wiki/Projects/plan.docx";
+pub(super) const TOP: &str = "01SURFTOP000000000000000000";
+pub(super) const HIDDEN_FM: &str = "01SURFFMSECURE0000000000000";
+/// Items `seeded` hides where they are (an ordinary folder), not by path.
+pub(super) const HIDDEN_IN_PLACE: [&str; 8] = [
+    "wiki/Projects/fm.md",
+    "wiki/Projects/detected.md",
+    "wiki/Projects/trip.md",
+    "wiki/Projects/cards.csv",
+    "wiki/Projects/secret.excalidraw",
+    "wiki/Projects/broken.docx",
+    "wiki/Projects/carddoc.docx",
+    "wiki/Projects/hard.md",
+];
 
-fn docx() -> Vec<u8> {
+pub(super) fn docx() -> Vec<u8> {
     crate::ai_files::tests::zip_with(&[("word/document.xml", crate::ai_files::tests::XML.as_bytes())], true)
 }
 
-fn put_bytes(root: &Path, rel: &str, bytes: &[u8]) {
+pub(super) fn put_bytes(root: &Path, rel: &str, bytes: &[u8]) {
     let path = root.join(rel);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::write(&path, bytes).unwrap();
@@ -36,14 +62,39 @@ fn put_bytes(root: &Path, rel: &str, bytes: &[u8]) {
 
 /// A vault with public notes, a board, a file and a document beside every
 /// kind of decoy.
-fn seeded() -> TempDir {
+pub(super) fn seeded() -> TempDir {
     let temp = TempDir::new().unwrap();
     let root = temp.path();
     fs::write(root.join("memex.json"), "{\"id\":\"mx_agent_surface\",\"contract\":\"3.4\",\"apps\":{}}\n").unwrap();
     put(root, ".rotli/settings.json", "{\"librarianRules\":{\"secureKeywords\":[\"Juniper\",\"Straße\"]}}\n");
     let note = |id: &str, extra: &str, title: &str, body: &str| format!("---\nid: {id}\n{extra}---\n# {title}\n\n{body}\n");
     // public: a note, two agent-made notes, a board, a file, a document
-    put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv)"));
+    // the second link reads from the vault root through a symlink into the
+    // secure home, and from the note's folder as a public file
+    put(root, "wiki/Projects/open.md", &note(OPEN, "", "Open", "plain words [f](wiki/Projects/pub.csv) [g](wiki/Link/f.csv) [c](wiki/Projects/cards.csv)"));
+    put(root, "wiki/Projects/wiki/Link/f.csv", "a,b\n3,4\n");
+    // one public match for a word five secure notes repeat in their titles
+    // and bodies (they rank first)
+    put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "", "Accounts", "the ledger sits among many other plain words here"));
+    // items hidden where they are, in an ordinary folder: by frontmatter, by
+    // what they hold (the secret detector), by a keyword in the title; a
+    // file, a board, and two documents (one unreadable) that listing hides
+    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, &format!("secure: {}\n", true), "Hidden note eight", "words"));
+    put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "", "Hidden note nine", "card 4242 4242 4242 4242"));
+    put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "", "Juniper trip", "words"));
+    put(root, "wiki/Projects/cards.csv", "card,4242 4242 4242 4242\n");
+    put(root, "wiki/Projects/secret.excalidraw", "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[{\"id\":\"t\",\"type\":\"text\",\"text\":\"card 4242 4242 4242 4242\",\"x\":0,\"y\":0,\"width\":10,\"height\":10}]}");
+    put_bytes(root, "wiki/Projects/broken.docx", b"PK not a package");
+    let card = crate::ai_files::tests::XML.replace("Launch &amp; land", "card 4242 4242 4242 4242");
+    put_bytes(root, "wiki/Projects/carddoc.docx", &crate::ai_files::tests::zip_with(&[("word/document.xml", card.as_bytes())], true));
+    // a note in `wiki` whose links read, from its folder, into the secure
+    // home (and through the symlink); from the vault root they name nothing.
+    // Past the snippet's length, so no listing shows them
+    let filler = "words to fill the start of this note well past the length a listing snippet shows. ".repeat(3);
+    put(root, "wiki/top.md", &note(TOP, "", "Top", &format!("{filler}\n\n[h](Link/f.csv) [i](_secure/f.csv) [j](_SECURE/f.csv)")));
+    for n in 1..=5 {
+        put(root, &format!("wiki/_secure/PrivateProject/l{n}.md"), &note(&format!("01SURFLEDGERS{n}0000000000000"), "", &format!("Hidden note ledger L{n}"), "ledger ledger ledger"));
+    }
     put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\n", "Agent", "plain words"));
     put(root, "wiki/Projects/free.md", &note(AGENT_FREE, "created_by: agent\n", "Free", "plain words"));
     put(root, BOARD, "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[]}");
@@ -56,6 +107,10 @@ fn seeded() -> TempDir {
     put(root, "wiki/_secure/f.csv", "a,b\nclassified,2\n");
     put_bytes(root, "wiki/_secure/p.docx", &docx());
     std::os::unix::fs::symlink(root.join("wiki/_secure"), root.join("wiki/Link")).unwrap();
+    // the agent's free.md has a namesake in the secure home, and a secure
+    // note has a hard link in a public folder
+    put(root, "wiki/_secure/free.md", &note("01SURFFREESECURE00000000000", "", "Hidden note seven", "plain words classified"));
+    fs::hard_link(root.join("wiki/_secure/Bank plan.md"), root.join("wiki/Projects/hard.md")).unwrap();
     // a locked secure note linking the agent's note by path (S2)
     put(root, "wiki/_secure/Diary of Juniper.md", &note("01SURFDIARY0000000000000000", "locked: true\n", "Diary", "see [a](../Projects/a.md)"));
     // keyword folders, in other spellings and as an ancestor
@@ -106,6 +161,11 @@ fn seeded() -> TempDir {
             serde_json::to_string(&row).unwrap()
         })
         .collect();
+    // and a row of the secure note that once lived at the open note's path:
+    // another note's edit, never the open note's history
+    let mut other = crate::corpus::ai_journal::AiEditRow::new("edit", "01SURFBANK00000000000000000", "wiki/Projects/open.md", &crate::corpus::ai_journal::AiEditor::agent(None), "fnv1a64:0");
+    other.patch = Some(crate::corpus::ai_journal::Hunk { line: 1, before: "Hidden note draft".into(), after: "Hidden note final".into() });
+    let rows = [rows, vec![serde_json::to_string(&other).unwrap()]].concat();
     put(root, ".rotli/ai-edit-journal.jsonl", &format!("{}\n", rows.join("\n")));
     temp
 }
@@ -113,12 +173,12 @@ fn seeded() -> TempDir {
 /// What a call must give: an answer that shows this text (so it reached the
 /// vault and did its work), or a refusal carrying this text.
 #[derive(Clone, Copy)]
-enum Expect {
+pub(super) enum Expect {
     Shows(&'static str),
     Refuses(&'static str),
 }
 
-fn met(answer: &str, ok: bool, expect: Expect) -> bool {
+pub(super) fn met(answer: &str, ok: bool, expect: Expect) -> bool {
     match expect {
         Expect::Shows(text) => ok && answer.contains(text),
         Expect::Refuses(text) => !ok && answer.contains(text),
@@ -126,7 +186,7 @@ fn met(answer: &str, ok: bool, expect: Expect) -> bool {
 }
 
 /// Each protected name in `answer`, with the text around it.
-fn leaks(from: &str, answer: &str) -> Vec<String> {
+pub(super) fn leaks(from: &str, answer: &str) -> Vec<String> {
     PROTECTED
         .iter()
         .filter_map(|name| {
@@ -138,7 +198,7 @@ fn leaks(from: &str, answer: &str) -> Vec<String> {
         .collect()
 }
 
-fn check(from: &str, answer: &str, ok: bool, expect: Expect, found: &mut Vec<String>) {
+pub(super) fn check(from: &str, answer: &str, ok: bool, expect: Expect, found: &mut Vec<String>) {
     if !met(answer, ok, expect) {
         let wanted = match expect {
             Expect::Shows(text) => format!("an answer showing {text:?}"),
@@ -149,18 +209,18 @@ fn check(from: &str, answer: &str, ok: bool, expect: Expect, found: &mut Vec<Str
     found.extend(leaks(from, answer));
 }
 
-fn revision(temp: &TempDir, id: &str) -> String {
+pub(super) fn revision(temp: &TempDir, id: &str) -> String {
     let mut ws = test_workspace(temp);
     ws.read_note(id).map(|read| read.revision).unwrap_or_default()
 }
 
-fn board_revision(temp: &TempDir) -> String {
+pub(super) fn board_revision(temp: &TempDir) -> String {
     let mut ws = test_workspace(temp);
     ws.read_board_for_remote(BOARD).map(|board| board.revision).unwrap_or_default()
 }
 
 /// An AI edit of the agent's note, journaled with its text, so undo has one.
-fn edited(temp: &TempDir) -> String {
+pub(super) fn edited(temp: &TempDir) -> String {
     let args = json!({"id": AGENT_NOTE, "oldText": "plain", "newText": "simple", "expectedRevision": revision(temp, AGENT_NOTE)});
     pinned(temp, || call(&WORKSPACE_SERVER, "rotli_patch_note", args));
     revision(temp, AGENT_NOTE)
@@ -169,7 +229,7 @@ fn edited(temp: &TempDir) -> String {
 /// The calls for each workspace MCP tool. None: the tool isn't known yet.
 /// An empty list: not called for real, with the reason; its payload is
 /// checked another way below.
-fn workspace_cases(name: &str, temp: &TempDir) -> Option<Vec<(Value, Expect)>> {
+pub(super) fn workspace_cases(name: &str, temp: &TempDir) -> Option<Vec<(Value, Expect)>> {
     use Expect::*;
     let one = |args: Value, expect: Expect| Some(vec![(args, expect)]);
     match name {
@@ -221,7 +281,7 @@ fn workspace_cases(name: &str, temp: &TempDir) -> Option<Vec<(Value, Expect)>> {
 
 /// The Librarian route's tools, in order, in one bound vault: the writes
 /// first, so index_read and review have something to show.
-fn librarian_cases() -> Vec<(&'static str, Value, Expect)> {
+pub(super) fn librarian_cases() -> Vec<(&'static str, Value, Expect)> {
     use Expect::*;
     vec![
         ("librarian_search", json!({"query": "plain"}), Shows(OPEN)),
@@ -236,29 +296,29 @@ fn librarian_cases() -> Vec<(&'static str, Value, Expect)> {
     ]
 }
 
-fn call(server: &McpServer, name: &str, arguments: Value) -> String {
+pub(super) fn call(server: &McpServer, name: &str, arguments: Value) -> String {
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": arguments}});
     handle_mcp_with(&request, server).map(|response| response.to_string()).unwrap_or_default()
 }
 
-fn succeeded(answer: &str) -> bool {
+pub(super) fn succeeded(answer: &str) -> bool {
     answer.contains("\"isError\":false")
 }
 
-fn listed(server: &McpServer) -> Vec<String> {
+pub(super) fn listed(server: &McpServer) -> Vec<String> {
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}});
     let response = handle_mcp_with(&request, server).unwrap();
     response["result"]["tools"].as_array().unwrap().iter().map(|tool| tool["name"].as_str().unwrap().to_string()).collect()
 }
 
-fn pinned<T>(temp: &TempDir, body: impl FnOnce() -> T) -> T {
+pub(super) fn pinned<T>(temp: &TempDir, body: impl FnOnce() -> T) -> T {
     CONNECTOR_ROOT.with(|value| *value.borrow_mut() = Some((temp.path().to_path_buf(), false)));
     let out = body();
     CONNECTOR_ROOT.with(|value| *value.borrow_mut() = None);
     out
 }
 
-fn bound_target(temp: &TempDir) -> RootTarget {
+pub(super) fn bound_target(temp: &TempDir) -> RootTarget {
     RootTarget { id: DEFAULT_ROOT_ID.into(), label: "T".into(), path: temp.path().to_path_buf(), read_only: false, is_default: true }
 }
 
@@ -328,7 +388,7 @@ fn no_agent_tool_names_a_protected_path() {
 }
 
 /// Every command `rotli help` names, by its first two words.
-fn cli_commands() -> Vec<String> {
+pub(super) fn cli_commands() -> Vec<String> {
     let mut out = Vec::new();
     for line in crate::workspace_help::CLI_HELP.lines().filter_map(|line| line.strip_prefix("rotli ")) {
         let words: Vec<&str> = line.split_whitespace().collect();
@@ -344,13 +404,13 @@ fn cli_commands() -> Vec<String> {
 }
 
 /// One argv, owned.
-fn words(argv: &[&str]) -> Vec<String> {
+pub(super) fn words(argv: &[&str]) -> Vec<String> {
     argv.iter().copied().map(String::from).collect()
 }
 
 /// The argv for each command and what it must give. Some(None): not run,
 /// with the reason.
-fn cli_case(command: &str, temp: &TempDir) -> Option<Option<(Vec<String>, Expect)>> {
+pub(super) fn cli_case(command: &str, temp: &TempDir) -> Option<Option<(Vec<String>, Expect)>> {
     use Expect::*;
     let agent_rev = || revision(temp, AGENT_NOTE);
     let plain = |text: &str| text.split(' ').map(String::from).collect::<Vec<_>>();
@@ -490,8 +550,14 @@ fn no_agent_tool_opens_a_protected_item_asked_for_by_another_spelling() {
     put(temp.path(), "wiki/Projects/links.md", &format!("---\nid: 01SURFLINKS0000000000000000\n---\n# Links\n\n{links}\n"));
     let attachments = pinned(&temp, || call(&WORKSPACE_SERVER, "rotli_note_attachments", json!({"id": "01SURFLINKS0000000000000000", "includeText": true})));
     opened("rotli_note_attachments", "links", &attachments);
-    if attachments.contains(r#""available":true"#) {
-        found.push(format!("rotli_note_attachments: a protected link is available in {attachments}"));
+    // a link may resolve, from the note's folder, to a public file of the
+    // same name (wiki/Projects/wiki/Link/f.csv); never to the protected one
+    let answer: Value = serde_json::from_str(&attachments).unwrap();
+    let listed: Value = serde_json::from_str(answer["result"]["content"][0]["text"].as_str().unwrap_or("{}")).unwrap_or_default();
+    for item in listed["attachments"].as_array().into_iter().flatten().filter(|item| item["available"] == json!(true)) {
+        if PROTECTED_REQUESTS.iter().any(|rel| item["path"] == json!(rel.trim_matches('"'))) {
+            found.push(format!("rotli_note_attachments: a protected link is available: {item}"));
+        }
     }
     assert!(found.is_empty(), "a protected item opened:\n{}", found.join("\n\n"));
 }

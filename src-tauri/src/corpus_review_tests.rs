@@ -278,7 +278,7 @@ fn no_cached_row_reaches_an_ai_row() {
         body(corpus, "fn search_ai_inner(", "\n}\n"),
         body(corpus, "fn notes_ai_inner(", "\n}\n"),
         body(listing, "    pub(super) fn list_remote(", "\n}\n"),
-        body(workspace, "    fn search_remote(", "\n    }\n"),
+        body(listing, "    pub(super) fn search_remote(", "\n    }\n"),
         body(workspace, "    fn query_remote(", "\n    }\n"),
     ] {
         for line in code(lane) {

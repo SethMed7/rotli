@@ -72,10 +72,13 @@ fn exact_target(ws: &mut Workspace, title: &str) -> Result<String, String> {
 pub(super) fn propose(ws: &mut Workspace, kind: &str, id: &str, value: &str, reason: &str) -> Result<Proposal, String> {
     let reason = one_line(reason, MAX_REASON, "reason")?;
     let local = ws.local_id(id)?;
+    ws.admit(&local)?;
     let note = ws.read_note(&local)?;
     let value = one_line(value, MAX_TARGET, if kind == "file" { "folder" } else { "target" })?;
     let (folder, target, target_id) = if kind == "file" {
-        (Some(plain_folder(&value)?), None, None)
+        let folder = plain_folder(&value)?;
+        ws.admit_folder(&folder)?;
+        (Some(folder), None, None)
     } else {
         let target_id = exact_target(ws, &value)?;
         (None, Some(value), Some(target_id))

@@ -472,6 +472,49 @@ roots carry their root-prefixed wire id in the link.
   behaviour harness `workspace_agent_surface_tests.rs`: every MCP tool and CLI
   command, against one vault seeded with every decoy kind. (`docs/architecture/egress-threat-model.md`, row 16k, with its
   residuals.)
+- An agent can't tell whether a protected item exists. Every id it names
+  (a note, board, file, Main reference, index or log entry, or the note a
+  history, attachment, trash, undo, rename, view, or Librarian call works on)
+  passes one admit gate first (`workspace_unseen.rs`): an item that is
+  protected, hidden from agents, refused by the remote read gate (a secure
+  note, a hard-linked file), or simply not there gets the same answer,
+  `note not found: <id>`, word for word, and nothing changes on disk. A
+  folder named as a move target, a new folder's parent, or a Librarian filing
+  is refused (`folder not available to agents: <folder>`) when the path rule
+  protects it, whether it exists or not. The document bridge answers any
+  document the listing hides (by path, or by what it holds: secret-shaped,
+  unreadable, too large) exactly as a missing one, before any parse or
+  secret check, and refuses a `file` whose prefix names any root but the
+  open vault; the path checks run under the corpus lock and the read,
+  unzip, and secret check after it is released. Search pages through the
+  index until it has the first 4×`limit` matches an agent may see (or
+  nothing more matches), then shows the best `limit` of them, so hidden
+  matches never shorten a page. Which visible notes make that first
+  4×`limit` follows the index's relevance scores, and those count every
+  note, hidden ones included (even ones that don't match), so hidden notes
+  can change which visible note ranks first for a quoted phrase (an
+  accepted residual, row 16k). Query clauses see only the metadata the answer shows; history
+  matches journal rows by note id, never by path; and an attachment link
+  answers with its link alone, `not available to agents`, both for a target
+  the listing hides and for one that isn't there, and resolves only to items
+  an agent may see. Librarian index and log text is judged only against
+  notes the agent can read: the notes it names then are recorded, and the
+  line stops showing when one of them turns hidden. A tool that panics
+  answers an error and never takes the MCP server down. The guard is the
+  differential harness `workspace_agent_differential_tests.rs`: every tool
+  and command, with ordinary arguments and with each protected id, folder,
+  and title swapped in, run in the seeded vault and in the same vault with
+  every protected item removed (path-protected items, and items hidden where
+  they are by frontmatter, content, or a title keyword), must answer and
+  change files identically; each protected id must also answer as an
+  ordinary missing id does, and a search with 450 hidden matches must answer
+  as one without them. Creating, renaming, or making a board beside a hidden
+  namesake still gets a `(2)`/`-2` name (a residual, row 16k). Agent text
+  that quotes five or more consecutive words of a secure note word for word
+  (24+ characters) is still caught by the secure-prose guard (a Librarian
+  line is refused, an agent's own document or file is hidden, a history
+  diff is withheld), so such an exact phrase, guessed word for word, can be
+  confirmed (an accepted residual, row 16k).
 - A folder row is listed to an agent only when `agent_listable` allows it
   and its own path is not a hidden or reference surface
   (`agent_listable_folder`).

@@ -1162,6 +1162,12 @@ pub fn forget_root(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
 ///   "vault:wiki/foo"   → ("vault", "wiki/foo")
 ///   "vault:"           → ("vault", "")
 ///   "01J…ULID…"        → ("default", "01J…ULID…")
+/// The answer for an id that names no note. A workspace agent gets exactly
+/// this for an item it may not see, too (`workspace_unseen.rs`).
+pub(crate) fn note_not_found(id: &str) -> String {
+    format!("note not found: {id}")
+}
+
 pub fn split_root_id(folder_id: &str) -> (String, String) {
     match folder_id.split_once(':') {
         Some((root, rel)) => (root.to_string(), rel.to_string()),
@@ -4312,6 +4318,16 @@ impl CorpusStore {
         limit: usize,
         include_reference: bool,
     ) -> Result<Vec<SearchHit>, String> {
+        // over-fetch so post-filtering (Trash, chats, reference) still fills
+        // the requested page; never past 500 unless more was asked for (a
+        // clamp here panicked when it was, review of #311)
+        let over = limit.saturating_mul(5).min(500).max(limit.max(1));
+        let ids = self.indexed_ids(query, over)?;
+        Ok(self.hits_from_ids(query, &ids, limit, include_reference))
+    }
+
+    /// The index's best `n` candidate ids for `query`, synced first.
+    fn indexed_ids(&mut self, query: &str, n: usize) -> Result<Vec<String>, String> {
         let mut idx = self.search_index.take().ok_or("no search index")?;
         let generation = self.suppress.generation();
         let outcome = (|| {
@@ -4319,15 +4335,28 @@ impl CorpusStore {
                 let docs = self.collect_index_docs();
                 idx.sync(generation, &docs)?;
             }
-            // over-fetch so post-filtering (Trash, chats, reference, and the AI
-            // per-hit gate upstream) still fills the requested page
-            let over = limit.saturating_mul(5).clamp(limit.max(1), 500);
-            idx.query(query, over)
+            idx.query(query, n)
         })();
         // ALWAYS restore the index, success or failure, before propagating.
         self.search_index = Some(idx);
-        let ids = outcome?;
-        Ok(self.hits_from_ids(query, &ids, limit, include_reference))
+        outcome
+    }
+
+    /// An agent's search candidates: up to `window` matching notes (never the
+    /// Reference lane) in the index's order, and whether no more match. The
+    /// workspace gates them and keeps reading until a page fills, so how many
+    /// come back never counts the hidden ones.
+    pub(crate) fn search_candidates(&mut self, query: &str, window: usize) -> Result<(Vec<SearchHit>, bool), String> {
+        self.ensure_walked()?;
+        if query.chars().any(char::is_alphanumeric) && self.search_index.is_some() {
+            if let Ok(ids) = self.indexed_ids(query, window.max(1)) {
+                let order: HashMap<&str, usize> = ids.iter().enumerate().map(|(at, id)| (id.as_str(), at)).collect();
+                let mut hits = self.hits_from_ids(query, &ids, usize::MAX, false);
+                hits.sort_by_key(|hit| order.get(hit.id.as_str()).copied().unwrap_or(usize::MAX));
+                return Ok((hits, ids.len() < window.max(1)));
+            }
+        }
+        Ok((self.search_substring(query, usize::MAX, false)?, true))
     }
 
     /// The searchable set, projected for indexing from the walk cache: kind Note,
@@ -4613,7 +4642,7 @@ impl CorpusStore {
         self.index
             .get(id)
             .cloned()
-            .ok_or_else(|| format!("note not found: {id}"))
+            .ok_or_else(|| note_not_found(id))
     }
 
     /// The ULID→rel bridge: a `.md` note travels the wire as its frontmatter
@@ -4654,7 +4683,7 @@ impl CorpusStore {
             .iter()
             .find(|(_, r)| **r == rel)
             .map(|(id, _)| id.clone())
-            .ok_or_else(|| format!("note not found: {id_or_rel}"))
+            .ok_or_else(|| note_not_found(id_or_rel))
     }
 
     pub fn read(&mut self, id: &str) -> Result<NoteDoc, String> {
