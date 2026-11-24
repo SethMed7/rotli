@@ -21,8 +21,10 @@ changelog entries, generated output, and Carl sessions are historical only.
   rebuildable projections and explicit settings.
 - One folder is one vault. Main and named views are reference projections, never
   stores. Rotli's portable metadata layer is not a content store or database.
-- Markdown is Rotli's primary knowledge surface and alone owns slash commands,
-  wikilinks, embed fences, frontmatter, and note-native workflows. DOCX, sheets,
+- Markdown is Rotli's primary knowledge surface. Markdown notes alone own slash
+  functions, wikilinks, embed fences, frontmatter, and note-native workflows;
+  the chat composer has its own command menu, which never writes Markdown
+  syntax into a note. DOCX, sheets,
   Excalidraw boards, and assets are secondary bonus work surfaces that keep
   conventional formats behind adapters; they are not parallel note systems.
 - Rotli is a workspace, not a preview catalog. Images and video are the only
