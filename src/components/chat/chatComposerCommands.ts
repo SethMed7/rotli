@@ -22,6 +22,10 @@ import {
  * so /tag stays hidden rather than writing tags down a second path. */
 const TAG_API = false;
 
+/** The pulled-out chat window hosts chats only: no board tab, no naming dialog. */
+const IN_CHAT_WINDOW =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).get("window") === "chat";
+
 export interface ChatCommandContext {
   instance: MemexInstance | null;
   writable: boolean;
@@ -42,7 +46,7 @@ export function availableChatCommands(
   ctx: Pick<ChatCommandContext, "instance" | "writable" | "messages" | "hasNote" | "canPickModel">,
 ): Set<ChatCommandId> {
   const ids = new Set<ChatCommandId>(["new"]);
-  if (boardsAvailable()) ids.add("board");
+  if (boardsAvailable() && !IN_CHAT_WINDOW) ids.add("board");
   if (ctx.instance && ctx.writable && latestReplyText(ctx.messages)) ids.add("note");
   if (!ctx.hasNote) ids.add("attach");
   if (ctx.canPickModel) ids.add("model");
@@ -101,10 +105,16 @@ export async function runChatCommand(id: ChatCommandId, ctx: ChatCommandContext)
  * stem and its secure verdict (frontmatter, secure folder or secure lane). */
 export async function pendingNoteFor(
   note: NoteSummary,
+  chatVaultId: string | null,
   notify: (text: string) => void,
 ): Promise<PendingAttachment | null> {
   try {
-    const { stem, secure } = await noteAttachment(note);
+    const { instance, stem, secure } = await noteAttachment(note);
+    // a chat pinned to another vault would record a stem that resolves elsewhere
+    if (chatVaultId && instance.id !== chatVaultId) {
+      notify("This chat belongs to another vault. Open that vault to talk about its notes.");
+      return null;
+    }
     return { noteId: note.id, title: note.title, stem, secure };
   } catch (error) {
     notify(error instanceof Error ? error.message : String(error));

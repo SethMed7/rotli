@@ -1627,6 +1627,8 @@ export function ChatSurface({
       sentPersisted = true;
       if (pendingNote && sentSlug) {
         rememberChatNote(sentSlug, pendingNote.noteId);
+        // the chat list catches up later; the secure verdict must not lapse meanwhile
+        if (pendingNote.secure) setSecureContext(true);
         setPendingNote(null);
       }
       setSaveErr(null);
@@ -2214,7 +2216,10 @@ export function ChatSurface({
     setText: (text) => setDraftMessage(tabId, text),
     onPick: (pick) => {
       if (pick.kind === "command") void runChatCommand(pick.id, commandContext);
-      else void pendingNoteFor(pick.note, commandContext.notify).then((note) => note && setPendingNote(note));
+      else
+        void pendingNoteFor(pick.note, active?.id ?? null, commandContext.notify).then(
+          (note) => note && setPendingNote(note),
+        );
     },
   });
 
