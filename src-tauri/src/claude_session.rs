@@ -202,7 +202,9 @@ fn run_session(
         .prefix("rotli-claude-")
         .tempdir()
         .map_err(|e| format!("couldn't create the claude scratch dir: {e}"))?;
-    let mut child = Command::new(&bin)
+    let mut cmd = Command::new(&bin);
+    crate::cli_isolation::apply_claude_env(&mut cmd);
+    let mut child = cmd
         .args(args)
         .current_dir(scratch.path())
         .stdin(Stdio::piped())

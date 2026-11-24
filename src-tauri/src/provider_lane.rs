@@ -68,6 +68,10 @@ pub(crate) fn complete_blocking_consented(
     }
     let bin = provider::resolve_bin(provider::spec(provider_id)?)
         .ok_or_else(|| format!("{provider_id} isn't installed (checked its usual homes)"))?;
+    // fail closed: a Codex that can't skip the user's config.toml never runs
+    if provider_id == "codex" {
+        crate::cli_isolation::codex_supported(&bin)?;
+    }
     // a discovered id the cache has not seen since launch is re-read from the
     // client before the argv builder (which reads the cache only) decides
     let _ = model_allowed(provider_id, model);
@@ -94,6 +98,9 @@ pub(crate) fn complete_blocking_consented(
     }
     let mut cmd = Command::new(&bin);
     cmd.args(&args);
+    if provider_id == "claude" {
+        crate::cli_isolation::apply_claude_env(&mut cmd);
+    }
     let payload = matches!(via, PromptVia::Stdin).then_some(prompt);
     let (stdout, stderr, ok) = provider::run_registered(children, request_id, cmd, payload, timeout)?;
     let parsed = match provider_id {

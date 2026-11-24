@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codex chats no longer start your own Codex tools.** A Codex chat used to
+  start every MCP server in your `~/.codex/config.toml` (and your Codex
+  skills) alongside it. It now runs with none of them and can only use what
+  Rotli gives it. Rotli now needs Codex 0.123.0 or newer; an older Codex
+  shows a message asking you to update it instead of answering.
+
+### Security
+
+- **A Codex chat can no longer reach a secure note through your own MCP
+  servers.** Codex was offered the tools of every MCP server in your Codex
+  config, which never pass Rotli's secure-note rules. Rotli now runs Codex
+  with `--ignore-user-config` and turns off its skills, apps and plugins,
+  and refuses to run a Codex older than 0.123.0, where that flag doesn't
+  keep MCP servers out.
+- **Claude starts from a clean environment.** Claude chats, model discovery
+  and the Settings status check no longer inherit Rotli's whole environment;
+  only system basics, locale, proxy and certificate settings and Claude's
+  own sign-in variables reach it. Variables left by a Claude Code or T3
+  session, and ones that run code inside the CLI, stay out. The one-shot
+  Claude lane also adds `--strict-mcp-config`.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

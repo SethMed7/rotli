@@ -9,9 +9,15 @@
 //! - A hardcoded ALLOWLIST of binaries (absolute candidate paths — a GUI app
 //!   doesn't inherit the login-shell PATH) and model ids. Nothing from the
 //!   webview reaches argv. Prompts ride stdin or ACP JSON-RPC only.
-//! - Every client is invoked TOOL-LESS / sandboxed: Claude has no tools, Codex
-//!   has a read-only sandbox plus no shell tool, and Cursor runs Ask mode from
-//!   an empty scratch workspace while every permission request is rejected.
+//! - No client gets a shell or write access, and none loads the user's own
+//!   tools: Claude runs `--safe-mode --strict-mcp-config` with built-in tools
+//!   off; Codex runs a read-only sandbox, no shell tool, and
+//!   `cli_isolation::CODEX_ISOLATION_ARGS` (no config.toml MCP servers, skills,
+//!   apps or plugins) — it still offers its built-in `apply_patch` (refused by
+//!   the sandbox), `view_image`, `web_search` and `request_user_input`, and
+//!   `$CODEX_HOME/AGENTS.md` still rides along. Cursor runs Ask mode from an
+//!   empty scratch workspace while every permission request is rejected; it
+//!   has no flag to skip `~/.cursor/mcp.json` (unverified, chat audit S6).
 //! - CLI models are REMOTE by definition: the secret egress backstop mirrors
 //!   chat.rs `egress_allowed` (secret-shaped transcripts are refused), and the
 //!   TS side already blocks `secure: true` note reads for them (`endpoint: ""`
@@ -213,8 +219,9 @@ pub(crate) fn build_args_for(
     let found = found.filter(|_| reported);
     let own = |xs: &[&str]| xs.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     match provider {
-        // print mode, safe mode (no ambient hooks/MCP/plugins/instructions),
-        // ALL tools off, JSON result envelope, no session litter — the loop
+        // print mode, safe mode (no ambient hooks/MCP/plugins/instructions —
+        // probed 2026-11-24) plus --strict-mcp-config, ALL tools off, JSON
+        // result envelope, no session litter — the loop
         // replays the transcript, so there is nothing to resume.
         // WITH images: the one concession is `--tools Read` + `--add-dir` scoped
         // to the staged image dir — the narrowest allowlist that can open a PNG,
@@ -226,7 +233,7 @@ pub(crate) fn build_args_for(
             if let Some(effort) = reasoning_effort.filter(|e| !effort_allowed(provider, model, e, found)) {
                 return Err(format!("reasoning effort \"{effort}\" isn't allowed for claude model \"{model}\""));
             }
-            let mut args = own(&["-p", "--safe-mode", "--tools"]);
+            let mut args = own(&["-p", "--safe-mode", "--strict-mcp-config", "--tools"]);
             args.push(if imgs.is_some() { "Read".into() } else { String::new() });
             // `default` = the account's own default: like cursor-auto, no flag
             if model != CLAUDE_DEFAULT_ID {
@@ -247,6 +254,8 @@ pub(crate) fn build_args_for(
         // --ask-for-approval flag here; verified against 0.137.0), read-only
         // sandbox, shell tool off, JSONL out, no session litter (--ephemeral);
         // "-" = prompt from stdin. --cd pins it to a scratch dir OUTSIDE any repo.
+        // CODEX_ISOLATION_ARGS keep the user's config.toml MCP servers, skills,
+        // apps and plugins out (S1); provider_lane refuses a Codex too old for them.
         "codex" => {
             if let Some(effort) = reasoning_effort.filter(|e| !effort_allowed(provider, model, e, found)) {
                 return Err(format!("reasoning effort \"{effort}\" isn't allowed for codex model \"{model}\""));
@@ -272,9 +281,9 @@ pub(crate) fn build_args_for(
                 scratch,
                 "-c".into(),
                 "features.shell_tool=false".into(),
-                "--model".into(),
-                model.into(),
             ];
+            args.extend(own(crate::cli_isolation::CODEX_ISOLATION_ARGS));
+            args.extend(own(&["--model", model]));
             if let Some(effort) = reasoning_effort {
                 args.push("-c".into());
                 args.push(format!("model_reasoning_effort=\"{effort}\""));
@@ -785,7 +794,7 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     }
     if matches!(provider, "claude" | "codex" | "cursor") {
         let bin = resolve_bin(spec(provider)?);
-        let version = bin.as_ref().and_then(|b| version_of(b, &["--version"]));
+        let version = bin.as_ref().and_then(|b| version_of(provider, b, &["--version"]));
         let auth_args: &[&str] = match provider {
             "claude" => &["auth", "status"],
             "codex" => &["login", "status"],
@@ -795,7 +804,7 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
         // a probe that hangs past the deadline counts as not signed in
         let authenticated = bin
             .as_ref()
-            .and_then(|b| crate::cli_probe::probe(b, auth_args, crate::cli_probe::PROBE_DEADLINE))
+            .and_then(|b| probe_as(provider, b, auth_args))
             .is_some_and(|out| out.status.success());
         return Ok(CliDetect {
             installed: bin.is_some(),
@@ -806,8 +815,18 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     Err(format!("unknown provider \"{provider}\""))
 }
 
-fn version_of(bin: &std::path::Path, args: &[&str]) -> Option<String> {
-    let out = crate::cli_probe::probe(bin, args, crate::cli_probe::PROBE_DEADLINE)?;
+/// Settings asks Claude under the same environment a chat turn gets, so
+/// "signed in" can't come from a variable the turn won't see.
+fn probe_as(provider: &str, bin: &std::path::Path, args: &[&str]) -> Option<std::process::Output> {
+    crate::cli_probe::probe_with(bin, args, crate::cli_probe::PROBE_DEADLINE, |cmd| {
+        if provider == "claude" {
+            crate::cli_isolation::apply_claude_env(cmd);
+        }
+    })
+}
+
+fn version_of(provider: &str, bin: &std::path::Path, args: &[&str]) -> Option<String> {
+    let out = probe_as(provider, bin, args)?;
     if !out.status.success() {
         return None;
     }
@@ -869,7 +888,7 @@ mod tests {
     #[test]
     fn claude_args_are_toolless_json_print_mode() {
         let (args, via) = build_args("claude", "sonnet", "ignored", 60, None).unwrap();
-        let expected = ["-p", "--safe-mode", "--tools", "", "--model", "sonnet", "--output-format", "json"];
+        let expected = ["-p", "--safe-mode", "--strict-mcp-config", "--tools", "", "--model", "sonnet", "--output-format", "json"];
         assert_eq!(&args[..expected.len()], expected);
         assert_eq!(args.last().unwrap(), "--no-session-persistence");
         assert_eq!(args.len(), expected.len() + 1);
@@ -886,6 +905,10 @@ mod tests {
         assert!(args.contains(&"--skip-git-repo-check".to_string()));
         assert!(args.contains(&"--ephemeral".to_string()));
         assert!(args.contains(&"features.shell_tool=false".to_string()));
+        // S1 (chat audit 2026-11-24): no MCP server, skill or plugin from the user's Codex setup
+        let at = args.iter().position(|a| a == "--ignore-user-config").expect("ambient config ignored");
+        let pinned = crate::cli_isolation::CODEX_ISOLATION_ARGS;
+        assert_eq!(args[at..at + pinned.len()], pinned.iter().map(|a| a.to_string()).collect::<Vec<_>>()[..]);
         // exec is non-interactive — this flag DOESN'T EXIST on `codex exec`
         // (0.137.0 rejects it; caught live 2026-07-02) — never reintroduce it
         assert!(!args.contains(&"--ask-for-approval".to_string()));
