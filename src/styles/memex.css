@@ -543,6 +543,14 @@
 .chat-modelrow:hover {
   background: var(--surface-2);
 }
+/* a paused lane's model (lib/lanePause.ts): listed, readable, not choosable */
+.chat-modelrow[aria-disabled="true"] {
+  color: var(--text-muted);
+  cursor: default;
+}
+.chat-modelrow[aria-disabled="true"]:hover {
+  background: none;
+}
 .chat-modelrow.sel {
   background: var(--surface-2);
   color: var(--text);

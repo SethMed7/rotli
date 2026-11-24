@@ -20,8 +20,10 @@ pub(crate) const CODEX_MIN_VERSION: (u32, u32, u32) = (0, 123, 0);
 /// add. `--ignore-user-config` skips `$CODEX_HOME/config.toml` (its MCP
 /// servers, profiles and providers) while auth still comes from
 /// `CODEX_HOME`. The `-c` keys turn off what that flag leaves on: the skills
-/// catalog, a planted `AGENTS.md` in the scratch dir, ChatGPT apps and
-/// plugins. Each was checked on 0.123.0, 0.137.0 and 0.169.0.
+/// catalog, a planted `AGENTS.md` in the scratch dir, ChatGPT apps, plugins
+/// and remote plugins. Each was checked on 0.123.0, 0.137.0, 0.169.0 and
+/// 0.172.0. System (`/etc/codex/config.toml`) and managed config layers still
+/// load; the threat model records that.
 pub(crate) const CODEX_ISOLATION_ARGS: &[&str] = &[
     "--ignore-user-config",
     "-c",
@@ -32,6 +34,8 @@ pub(crate) const CODEX_ISOLATION_ARGS: &[&str] = &[
     "features.apps=false",
     "-c",
     "features.plugins=false",
+    "-c",
+    "features.remote_plugin=false",
 ];
 
 pub(crate) fn codex_version_message() -> String {
@@ -41,26 +45,32 @@ pub(crate) fn codex_version_message() -> String {
     )
 }
 
-/// `codex --version` prints `codex-cli 0.169.0`; take the first
-/// `major.minor.patch` it carries. A pre-release suffix is ignored.
-pub(crate) fn parse_codex_version(line: &str) -> Option<(u32, u32, u32)> {
-    line.split_whitespace().find_map(|word| {
-        let core = word.split(['-', '+']).next()?;
-        let mut parts = core.split('.');
-        let version = (
-            parts.next()?.parse().ok()?,
-            parts.next()?.parse().ok()?,
-            parts.next()?.parse().ok()?,
-        );
-        parts.next().is_none().then_some(version)
-    })
+/// `codex --version` prints `codex-cli 0.169.0`. Only the version right after
+/// the `codex-cli` word counts, so a wrapper's own banner can't stand in for
+/// it; the flag says whether it carries a pre-release suffix.
+pub(crate) fn parse_codex_version(line: &str) -> Option<((u32, u32, u32), bool)> {
+    let mut words = line.split_whitespace();
+    words.by_ref().find(|word| *word == "codex-cli")?;
+    let word = words.next()?;
+    let (core, suffix) = match word.find(['-', '+']) {
+        Some(at) => (&word[..at], true),
+        None => (word, false),
+    };
+    let mut parts = core.split('.');
+    let version = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some((version, suffix))
 }
 
 /// Fail closed: no version, an unreadable one, or one below the floor all
 /// refuse the lane.
 pub(crate) fn codex_version_gate(version_line: Option<&str>) -> Result<(), String> {
     match version_line.and_then(parse_codex_version) {
-        Some(version) if version >= CODEX_MIN_VERSION => Ok(()),
+        // a pre-release of the floor itself may predate the fix
+        Some((version, pre)) if version > CODEX_MIN_VERSION || (version == CODEX_MIN_VERSION && !pre) => Ok(()),
         _ => Err(codex_version_message()),
     }
 }
@@ -87,6 +97,23 @@ pub(crate) fn codex_supported(bin: &Path) -> Result<(), String> {
 fn version_line(bin: &Path) -> Option<String> {
     let out = crate::cli_probe::probe(bin, &["--version"], crate::cli_probe::PROBE_DEADLINE)?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or("").to_string())
+}
+
+/// Variables to take out of a Codex process: ones that load code into it (an
+/// npm-installed `codex` is a Node script). Everything else stays, since
+/// Codex reads its own `CODEX_HOME`, proxy and sign-in variables.
+pub(crate) fn codex_env_removals<I>(keys: I) -> Vec<String>
+where
+    I: IntoIterator<Item = OsString>,
+{
+    const ALWAYS: &[&str] = &["NODE_OPTIONS", "DYLD_INSERT_LIBRARIES", "LD_PRELOAD"];
+    let mut removed: Vec<String> = ALWAYS.iter().map(|key| key.to_string()).collect();
+    for key in keys.into_iter().filter_map(|key| key.into_string().ok()) {
+        if (key.starts_with("DYLD_") || key.starts_with("LD_")) && !removed.contains(&key) {
+            removed.push(key);
+        }
+    }
+    removed
 }
 
 /// Whether one parent variable may reach a Claude Code process: the OS basics
@@ -132,8 +159,18 @@ pub(crate) fn apply_claude_env(cmd: &mut std::process::Command) {
     cmd.env_clear().envs(claude_env(std::env::vars_os()));
 }
 
+/// Banners the lane tests share (here and in provider_lane.rs).
+#[cfg(test)]
+pub(crate) mod test_banners {
+    /// The last Codex that accepts the flag and still starts MCP servers.
+    pub(crate) const BELOW_FLOOR: &str = "codex-cli 0.122.0";
+    /// What every refusal names.
+    pub(crate) const FLOOR: &str = "0.123.0";
+}
+
 #[cfg(test)]
 mod tests {
+    use super::test_banners::{BELOW_FLOOR, FLOOR};
     use super::*;
 
     fn os(pairs: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
@@ -142,12 +179,16 @@ mod tests {
 
     #[test]
     fn codex_versions_parse_from_the_cli_banner() {
-        assert_eq!(parse_codex_version("codex-cli 0.169.0"), Some((0, 169, 0)));
-        assert_eq!(parse_codex_version("codex-cli 0.170.0-alpha.2\n"), Some((0, 170, 0)));
-        assert_eq!(parse_codex_version("codex-cli 1.2.3"), Some((1, 2, 3)));
+        assert_eq!(parse_codex_version("codex-cli 0.169.0"), Some(((0, 169, 0), false)));
+        assert_eq!(parse_codex_version("codex-cli 0.170.0-alpha.2\n"), Some(((0, 170, 0), true)));
+        assert_eq!(parse_codex_version("codex-cli 1.2.3"), Some(((1, 2, 3), false)));
         assert_eq!(parse_codex_version("codex-cli"), None);
         assert_eq!(parse_codex_version("codex-cli 0.169"), None);
         assert_eq!(parse_codex_version(""), None);
+        // only the number after `codex-cli` counts: a wrapper's own banner
+        // can't lift an old Codex over the floor
+        assert_eq!(parse_codex_version("npm 10.9.9 codex-cli 0.122.0"), Some(((0, 122, 0), false)));
+        assert_eq!(parse_codex_version("wrapper 9.9.9"), None);
     }
 
     #[test]
@@ -156,13 +197,17 @@ mod tests {
         assert!(codex_version_gate(Some("codex-cli 0.169.0")).is_ok());
         assert!(codex_version_gate(Some("codex-cli 1.0.0")).is_ok());
         // 0.122.0 takes the flag and still starts config.toml MCP servers
-        for old in ["codex-cli 0.122.0", "codex-cli 0.121.0", "codex-cli 0.99.9"] {
+        for old in [BELOW_FLOOR, "codex-cli 0.121.0", "codex-cli 0.99.9"] {
             let refusal = codex_version_gate(Some(old)).unwrap_err();
-            assert!(refusal.contains("0.123.0"), "names the minimum: {refusal}");
+            assert!(refusal.contains(FLOOR), "names the minimum: {refusal}");
         }
         // no answer, or one Rotli can't read, is a refusal too
-        assert!(codex_version_gate(None).unwrap_err().contains("0.123.0"));
+        assert!(codex_version_gate(None).unwrap_err().contains(FLOOR));
         assert!(codex_version_gate(Some("codex dev build")).is_err());
+        assert!(codex_version_gate(Some("wrapper 9.9.9 codex-cli 0.122.0")).is_err());
+        // a pre-release of the floor may predate the fix; one past it is fine
+        assert!(codex_version_gate(Some("codex-cli 0.123.0-alpha.1")).is_err());
+        assert!(codex_version_gate(Some("codex-cli 0.124.0-alpha.1")).is_ok());
     }
 
     #[cfg(unix)]
@@ -178,9 +223,9 @@ mod tests {
     #[test]
     fn the_installed_codex_is_asked_its_version() {
         let old = tempfile::tempdir().unwrap();
-        assert!(codex_supported(&fake_codex(old.path(), "codex-cli 0.122.0"))
+        assert!(codex_supported(&fake_codex(old.path(), BELOW_FLOOR))
             .unwrap_err()
-            .contains("0.123.0"));
+            .contains(FLOOR));
         let new = tempfile::tempdir().unwrap();
         assert!(codex_supported(&fake_codex(new.path(), "codex-cli 0.169.0")).is_ok());
         let missing = tempfile::tempdir().unwrap();
@@ -196,10 +241,26 @@ mod tests {
             "project_doc_max_bytes=0",
             "features.apps=false",
             "features.plugins=false",
+            "features.remote_plugin=false",
         ] {
             let at = args.iter().position(|a| *a == key).unwrap_or_else(|| panic!("missing {key}"));
             assert_eq!(args[at - 1], "-c");
         }
+    }
+
+    #[test]
+    fn codex_never_gets_a_variable_that_runs_code_inside_it() {
+        let parent = os(&[
+            ("PATH", "/usr/bin"),
+            ("CODEX_HOME", "/Users/probe/.codex"),
+            ("DYLD_INSERT_LIBRARIES", "/tmp/x.dylib"),
+            ("LD_PRELOAD", "/tmp/x.so"),
+        ]);
+        let removed = codex_env_removals(parent.iter().map(|(k, _)| k.clone()));
+        let has = |key: &str| removed.iter().any(|k| k == key);
+        // fixed names go even when Rotli's own environment lacks them
+        assert!(has("NODE_OPTIONS") && has("DYLD_INSERT_LIBRARIES") && has("LD_PRELOAD"));
+        assert!(!has("PATH") && !has("CODEX_HOME"), "auth and lookup stay");
     }
 
     #[test]

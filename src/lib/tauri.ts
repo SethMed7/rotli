@@ -24,6 +24,7 @@ export type { FrontmatterView } from "./corpusFrontmatter";
 import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
 import { PLATFORM } from "./featurePolicy";
+import { PAUSED_MESSAGE, lanePaused } from "./lanePause";
 import { sameTaskRequest } from "./sameTaskRequest";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
 import {
@@ -657,15 +658,14 @@ export function cliComplete(args: {
   timeoutMs?: number;
   /** Provider-native frontier quality control. Rust validates the allowlist. */
   reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
-  /** Codex account routing. `standard` preserves the configured default. */
-  serviceTier?: "standard" | "fast";
-  /** Attached images as base64/data URLs. Rust stages them as real files and
-   * passes them on lanes with a native image flag (codex `-i`); other lanes
-   * ignore them rather than pretending to see (2026-08-04). */
+  serviceTier?: "standard" | "fast"; // Codex account routing; `standard` = the configured default
+  /** Attached images as base64/data URLs, staged by Rust for lanes with a native
+   * image flag (codex `-i`); other lanes ignore them rather than pretend (2026-08-04). */
   images?: string[];
   /** The person's own messages they chose to send anyway (src-tauri/src/remote_block.rs). */
   consent?: string[];
 }): Promise<string> {
+  if (lanePaused(args.provider)) return Promise.reject(new Error(PAUSED_MESSAGE)); // Rust refuses too
   return aiInvoke("cli_complete", { ...args });
 }
 

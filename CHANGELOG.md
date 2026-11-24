@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Cursor chats are paused while we check that they keep your notes
+  private.** Cursor can start the MCP servers you set up for it, and Rotli
+  can't yet turn them off for a chat. Cursor models stay in the picker,
+  marked "Paused for a privacy check", and a chat already set to Cursor
+  says so instead of answering. Pick another model to keep going.
+
 ### Fixed
 
 - **Codex chats no longer start your own Codex tools.** A Codex chat used to
@@ -26,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `--ignore-user-config` and turns off its skills, apps and plugins,
   and refuses to run a Codex older than 0.123.0, where that flag doesn't
   keep MCP servers out.
+- **Cursor can't reach your notes through its own MCP servers.** The
+  Cursor lane is off in both the app and its native side until a check
+  shows Cursor's own tools stay out of a chat.
 - **Claude starts from a clean environment.** Claude chats, model discovery
   and the Settings status check no longer inherit Rotli's whole environment;
   only system basics, locale, proxy and certificate settings and Claude's

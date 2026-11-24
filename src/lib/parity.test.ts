@@ -53,6 +53,7 @@ import { bytesRevision } from "./contentRevision";
 import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
 import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
+import { PAUSED_LABEL, PAUSED_MESSAGE, PAUSED_PROVIDERS } from "./lanePause";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { permissionVerdict } from "./permissionVerdict";
@@ -79,6 +80,12 @@ describe("parity.json ↔ TS constants", () => {
       extensions: [...MANAGED_FILE_EXTS] as string[],
     }).toEqual(entries.managedFileRules.value);
   });
+  test("pausedChatLanes", () => {
+    expect(PAUSED_PROVIDERS).toEqual(entries.pausedChatLanes.value.providers);
+    expect(PAUSED_LABEL).toBe(entries.pausedChatLanes.value.label);
+    expect(PAUSED_MESSAGE).toBe(entries.pausedChatLanes.value.message);
+  });
+
   test("documentEditMaxActions", () => {
     expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);
   });

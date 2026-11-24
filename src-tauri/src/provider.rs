@@ -17,7 +17,7 @@
 //!   the sandbox), `view_image`, `web_search` and `request_user_input`, and
 //!   `$CODEX_HOME/AGENTS.md` still rides along. Cursor runs Ask mode from an
 //!   empty scratch workspace while every permission request is rejected; it
-//!   has no flag to skip `~/.cursor/mcp.json` (unverified, chat audit S6).
+//!   has no flag to skip `~/.cursor/mcp.json`, so it is paused (lane_pause.rs).
 //! - CLI models are REMOTE by definition: the secret egress backstop mirrors
 //!   chat.rs `egress_allowed` (secret-shaped transcripts are refused), and the
 //!   TS side already blocks `secure: true` note reads for them (`endpoint: ""`
@@ -45,7 +45,7 @@ pub(crate) const CLOUD_IMAGE_POLICY_MESSAGE: &str =
 
 pub(crate) fn connected_provider_execution_allowed(provider: &str) -> Result<(), String> {
     match provider {
-        "claude" | "codex" | "cursor" | "antigravity" => Ok(()),
+        "claude" | "codex" | "cursor" | "antigravity" => crate::lane_pause::refuse_paused(provider),
         other => Err(format!("unknown provider \"{other}\"")),
     }
 }
@@ -846,7 +846,7 @@ mod tests {
     fn provider_policy_allows_only_official_claude_codex_cursor_and_antigravity_clients() {
         assert!(connected_provider_execution_allowed("claude").is_ok());
         assert!(connected_provider_execution_allowed("codex").is_ok());
-        assert!(connected_provider_execution_allowed("cursor").is_ok());
+        assert!(connected_provider_execution_allowed("cursor").is_err()); // paused (lane_pause.rs)
         assert!(connected_provider_execution_allowed("antigravity").is_ok());
         assert!(connected_provider_execution_allowed("gemini").is_err()); // never a raw Gemini CLI
     }

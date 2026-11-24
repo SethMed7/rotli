@@ -26,6 +26,13 @@ test("the connected lanes are listed in order with Antigravity last and off", as
     "false",
   );
 
+  // Cursor is paused for a privacy check (src/lib/lanePause.ts): its lane
+  // stays listed and says so instead of a readiness status
+  const cursorLane = page
+    .locator(".ailane")
+    .filter({ has: page.getByRole("switch", { name: "Use Cursor · Code chat" }) });
+  await expect(cursorLane.locator(".ailane-chip")).toHaveText("Paused for a privacy check");
+
   // the browser twin cannot run Google's runtime and says so, offering no
   // install or sign-in control
   await expect(

@@ -59,6 +59,7 @@ mod vault_marker;
 mod vault_roles;
 mod cli_probe;
 mod cli_isolation;
+mod lane_pause;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
