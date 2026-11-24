@@ -2999,46 +2999,9 @@
   color: var(--failure);
 }
 
-/* The sidebar, alive (2026-10-01, sidebarScenery.tsx): the theme's horizon as
-   a one-ink silhouette behind the header row and/or the footer. It must never
-   make anything harder to read (the owner: "more subtle, no visual clutter"):
-   every shape is the text ink at a few percent, no sky objects, no detail
-   strokes, never under the rows' middle. Still, never takes a click;
-   isolation keeps it above the sidebar's ground and under every control. */
+/* The sidebar anchors its absolutely placed children. */
 .sidebar {
   position: relative;
-  isolation: isolate;
-}
-.sb-scene {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  z-index: -1;
-  pointer-events: none;
-  color: var(--text);
-  opacity: 0.06;
-}
-.sb-scene :is(path, circle, ellipse, rect, polygon) {
-  fill: currentColor;
-  stroke: none;
-}
-/* still art (sidebarScenery.tsx): the Iris fireflies and Blossom petals share
-   the Settings art's infinite animations, which kept the sidebar repainting
-   for as long as it was on screen (audit 2026-10-12) */
-svg.sb-scene * {
-  animation: none;
-}
-.sb-scene-top {
-  top: 0;
-  height: 56px;
-  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
-  mask-image: linear-gradient(to bottom, black 60%, transparent);
-}
-.sb-scene-bottom {
-  bottom: 0;
-  height: 64px;
-  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
-  mask-image: linear-gradient(to top, black 55%, transparent);
 }
 
 /* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one
