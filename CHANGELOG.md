@@ -17,9 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A search can no longer stop an agent's connection.** A search where
   hundreds of hidden notes matched crashed `rotli mcp`, and
   `rotli notes search --limit 200` crashed the command; both now page
-  through the results. Any tool that fails unexpectedly answers an error instead of
-  ending the server.
-
+  through the results. Any tool that fails unexpectedly answers an error
+  instead of ending the server.
 
 ### Security
 
