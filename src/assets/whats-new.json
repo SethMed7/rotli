@@ -1,4 +1,18 @@
 {
+  "1.9.6": [
+    {
+      "title": "Secure notes stay invisible to agents",
+      "body": "An outside agent using the rotli CLI now gets the same answer for a secure note or folder as for one that doesn't exist. The one difference left: a new file beside a hidden one of the same name still gets a (2)."
+    },
+    {
+      "title": "Hidden attachments say so plainly",
+      "body": "An attachment agents can't list, such as a file over 16 MB or an image whose bytes look like a card number, now answers \"not available to agents\" instead of showing its size."
+    },
+    {
+      "title": "Big searches don't crash",
+      "body": "rotli notes search with a large limit, or a search that matches many private notes, no longer stops the command or an agent's connection."
+    }
+  ],
   "1.9.5": [
     {
       "title": "Your locks and private notes hold",
