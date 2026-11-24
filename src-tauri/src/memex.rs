@@ -604,40 +604,48 @@ pub async fn memex_list_chats(app: tauri::AppHandle, root: String) -> Result<Vec
 fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
     let dir = root.join(crate::vault_roles::chats_dir(root));
     let mut out = Vec::new();
-    if let Ok(rd) = fs::read_dir(&dir) {
-        for e in rd.flatten() {
-            let p = e.path();
-            if p.extension().and_then(|x| x.to_str()) != Some("md") {
-                continue;
-            }
-            let slug = p
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
-            if slug.eq_ignore_ascii_case("readme") {
-                continue;
-            }
-            let text = crate::memex_chat_scan::frontmatter_head(&p);
-            let modified_ms = fs::metadata(&p)
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
-            out.push(ChatSummary {
-                slug,
-                title: fm(&text, "title"),
-                source: fm(&text, "source"),
-                attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
-                path: p.to_string_lossy().to_string(),
-                modified_ms,
-                replied_ms: crate::memex_chat_scan::last_reply_ms(&p),
-                pinned: fm(&text, "pinned") == "true",
-                model: fm(&text, "model"),
-                provider: fm(&text, "provider"),
-            });
+    // A listing either finishes or says it failed: callers treat a successful
+    // list as complete (chat projects drop assignments for chats it lacks), so
+    // an unreadable folder must never read as "no chats". A missing folder is
+    // a complete, empty list.
+    let rd = match fs::read_dir(&dir) {
+        Ok(rd) => rd,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(out),
+        Err(e) => return Err(format!("couldn't list the chats folder: {e}")),
+    };
+    for e in rd {
+        let e = e.map_err(|e| format!("couldn't list the chats folder: {e}"))?;
+        let p = e.path();
+        if p.extension().and_then(|x| x.to_str()) != Some("md") {
+            continue;
         }
+        let slug = p
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        if slug.eq_ignore_ascii_case("readme") {
+            continue;
+        }
+        let text = crate::memex_chat_scan::frontmatter_head(&p);
+        let modified_ms = fs::metadata(&p)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        out.push(ChatSummary {
+            slug,
+            title: fm(&text, "title"),
+            source: fm(&text, "source"),
+            attached_to: unwrap_wikilink(&fm(&text, "attachedTo")),
+            path: p.to_string_lossy().to_string(),
+            modified_ms,
+            replied_ms: crate::memex_chat_scan::last_reply_ms(&p),
+            pinned: fm(&text, "pinned") == "true",
+            model: fm(&text, "model"),
+            provider: fm(&text, "provider"),
+        });
     }
     out.sort_by(|a, b| a.slug.cmp(&b.slug));
     Ok(out)
@@ -1323,6 +1331,10 @@ mod hard_link_tests;
 #[cfg(test)]
 #[path = "memex_chat_guard_tests.rs"]
 mod chat_guard_tests;
+
+#[cfg(test)]
+#[path = "memex_list_chats_tests.rs"]
+mod list_chats_tests;
 
 #[cfg(test)]
 mod tests {
