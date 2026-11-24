@@ -17,13 +17,13 @@ const NEW = "trash/storage/excalidraw/Plan.excalidraw";
 
 /** Rust's side: the move succeeds and answers the board's NEW path; the old
  * path no longer names anything. */
-function nativeBoardMove(calls: string[]) {
+function nativeBoardMove(calls: string[], kind: "board" | "file" = "board", oldId = OLD, newId = NEW) {
   host.__TAURI_INTERNALS__ = {
     invoke: async (cmd: string, args: { id?: string }) => {
       calls.push(`${cmd}:${args.id ?? ""}`);
       if (cmd === "corpus_move")
         return {
-          id: NEW,
+          id: newId,
           title: "Plan",
           snippet: "",
           folderId: "Trash",
@@ -31,8 +31,9 @@ function nativeBoardMove(calls: string[]) {
           createdAt: 1,
           updatedAt: 2,
           pinned: false,
-          kind: "board",
+          kind,
         };
+      void oldId;
       throw new Error(`note not found: ${args.id ?? ""}`);
     },
     transformCallback: () => 0,
@@ -75,4 +76,15 @@ test("a moved note is read back under the id the move answered", async () => {
   expect(moved.body).toBe("# T\n");
   expect(moved.revision).toBe("r1");
   expect(calls).toEqual(["corpus_move:work:01NOTE", "corpus_read:work:01NOTE"]);
+});
+
+test("archiving a surfaced file takes the same path lane as a board", async () => {
+  const calls: string[] = [];
+  const oldFile = "storage/docs/brief.pdf";
+  const newFile = "archive/storage/docs/brief.pdf";
+  nativeBoardMove(calls, "file", oldFile, newFile);
+  const moved = await new FsNotesService().archiveNote(oldFile);
+  expect(moved.id).toBe(newFile);
+  expect(moved.kind).toBe("file");
+  expect(calls).toEqual([`corpus_move:${oldFile}`]);
 });

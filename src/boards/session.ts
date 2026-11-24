@@ -212,14 +212,20 @@ export function createBoardSaver(
   let lastSaved: string | null = null;
   let queue: Promise<void> = Promise.resolve();
   const report = (e: unknown) => onResult?.(e instanceof Error ? e.message : String(e));
+  // The newest body whose write failed and that nothing newer has saved since.
+  // A later drain with no fresh change retries it, so flush (tab close, quit)
+  // can never report success while that scene is still off the disk.
+  let unsaved: string | null = null;
   const put = async (body: string): Promise<void> => {
     try {
       await write(body);
     } catch (e) {
+      unsaved = body;
       report(e);
       throw e;
     }
     lastSaved = body;
+    unsaved = null;
     onResult?.(null);
   };
   /** Run `step` after every earlier write settles; the returned promise is
@@ -234,15 +240,16 @@ export function createBoardSaver(
   const drain = async (): Promise<void> => {
     const build = pendingBuild;
     pendingBuild = null;
-    if (!build) return;
-    let body: string;
-    try {
-      body = build();
-    } catch (e) {
-      report(e);
-      throw e;
+    let body = unsaved;
+    if (build) {
+      try {
+        body = build();
+      } catch (e) {
+        report(e);
+        throw e;
+      }
     }
-    if (body === lastSaved) return; // viewport churn, selection, a no-op — skip
+    if (body === null || body === lastSaved) return; // viewport churn, selection, a no-op — skip
     await put(body);
   };
   const task = createDebouncedTask(BOARD_SAVE_DEBOUNCE_MS, () => enqueue(drain));

@@ -12,6 +12,7 @@ const realStore = { ...liveStore };
 let disk = { body: "v0", rev: "r0" };
 let revs = 0;
 let writeDelayMs = 0;
+let failNext = 0;
 let inFlight = 0;
 let maxInFlight = 0;
 
@@ -29,6 +30,10 @@ void mock.module("../services/boardStore", () => ({
       maxInFlight = Math.max(maxInFlight, inFlight);
       try {
         await new Promise((resolve) => setTimeout(resolve, writeDelayMs));
+        if (failNext > 0) {
+          failNext -= 1;
+          throw new Error("disk hiccup");
+        }
         if (expected !== disk.rev) {
           throw new Error(
             `revision conflict: expected ${expected}, found ${disk.rev}; the file changed after it was opened`,
@@ -59,6 +64,7 @@ beforeEach(() => {
   revs = 0;
   inFlight = 0;
   maxInFlight = 0;
+  failNext = 0;
   writeDelayMs = BOARD_SAVE_DEBOUNCE_MS + 300;
 });
 
@@ -99,4 +105,29 @@ test("a real outside edit is still refused and reported, never overwritten", asy
   await saver.flush().catch(() => {});
   expect(disk.body).toBe("agent-edit");
   expect(results.at(-1)).toContain("revision conflict");
+});
+
+test("a failed autosave is retried by flush, and flush only succeeds once the scene is on disk", async () => {
+  writeDelayMs = 0;
+  const results: (string | null)[] = [];
+  const saver = createCorpusBoardSaver("storage/excalidraw/x.excalidraw", (e) => results.push(e));
+  saver.prime("v0", "r0");
+  failNext = 1;
+  saver.schedule(() => "stroke-1");
+  await wait(BOARD_SAVE_DEBOUNCE_MS + 100); // the timer's save failed
+  expect(disk.body).toBe("v0");
+  await saver.flush(); // tab close / quit: retries the failed scene
+  expect(disk.body).toBe("stroke-1");
+  expect(results).toEqual(["disk hiccup", null]);
+});
+
+test("flush rejects while a failed scene still cannot be written", async () => {
+  writeDelayMs = 0;
+  const saver = createCorpusBoardSaver("storage/excalidraw/x.excalidraw");
+  saver.prime("v0", "r0");
+  failNext = 2;
+  saver.schedule(() => "stroke-1");
+  await wait(BOARD_SAVE_DEBOUNCE_MS + 100);
+  await expect(saver.flush()).rejects.toThrow("disk hiccup");
+  expect(disk.body).toBe("v0");
 });

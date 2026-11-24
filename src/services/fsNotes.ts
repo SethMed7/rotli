@@ -187,9 +187,11 @@ export class FsNotesService implements NotesService {
     await corpusDelete(id);
   }
 
-  // ——— lifecycle: Rust's corpus_move keeps the id/index and bakes the origin
-  // rule on disk; we read the body back so callers get a full Note (the move
-  // meta carries no body), exactly like getNote derives (the maintainer, 2026-06-13). ———
+  // ——— lifecycle: Rust's corpus_move keeps a note's id/index and bakes the
+  // origin rule on disk; for a NOTE we read the body back under the id the move
+  // returned so callers get a full Note (the move meta carries no body), exactly
+  // like getNote derives (the maintainer, 2026-06-13). A board or file comes back
+  // as the move's own answer, with an empty body. ———
 
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const meta = await corpusMove(id, targetFolder);
