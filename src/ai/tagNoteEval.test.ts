@@ -44,11 +44,14 @@ test("asked to tag a note, the model's tag_note call reaches the host and the an
 
 test("the arguments a model tends to send arrive as separate words", async () => {
   const { host, tagged } = tagHost([
-    '{"tool":"tag_note","args":{"id":"n1","add":"#launch, q3 roadmap","remove":["old"]}}',
+    '{"tool":"tag_note","args":{"id":"n1","add":"#launch, q3 roadmap","remove":["old","machine learning"]}}',
     '{"final":"done"}',
   ]);
   await run(host, { history: [], userText: person("retag n1"), web: false });
-  expect(tagged).toEqual([{ id: "n1", add: ["#launch", "q3", "roadmap"], remove: ["old"] }]);
+  // a tag to remove stays whole: one on disk may hold a space
+  expect(tagged).toEqual([
+    { id: "n1", add: ["#launch", "q3", "roadmap"], remove: ["old", "machine learning"] },
+  ]);
 });
 
 test("a call without an id or any tag is refused before the host is asked", async () => {

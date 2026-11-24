@@ -40,11 +40,17 @@ function argText(value: unknown): string {
   return "";
 }
 
-/** A model's tag list: an array of words, or one string of words split on
- * spaces and commas. Each is still an untrusted value the lane validates. */
+/** A model's tags to add: an array of words, or one string of words split
+ * on spaces and commas. Each is still an untrusted value the lane validates. */
 function argWords(value: unknown): string[] {
+  return argValues(value).flatMap((item) => item.split(/[\s,]+/u).filter(Boolean));
+}
+
+/** A model's tags to remove, each kept whole: a tag already on disk may hold
+ * a space (a Librarian tag), and removal matches it as written. */
+function argValues(value: unknown): string[] {
   const items = Array.isArray(value) ? value : [value];
-  return items.flatMap((item) => (typeof item === "string" ? item.split(/[\s,]+/u).filter(Boolean) : []));
+  return items.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : []));
 }
 
 /** Strip a LEADING frontmatter fence from a model-authored note body. The
@@ -468,7 +474,7 @@ export async function runTool(
     case "tag_note": {
       const id = argText(args.id).trim();
       const add = argWords(args.add);
-      const remove = argWords(args.remove);
+      const remove = argValues(args.remove);
       if (id === "" || add.length + remove.length === 0)
         return fixed('error: tag_note needs an "id" and tags to "add" and/or "remove" (lists of words).');
       if (!host.tagNote) return fixed("error: this host cannot tag notes.");
