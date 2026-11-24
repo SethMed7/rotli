@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`rotli agent config` now covers more clients and your vault folders.**
+  It prints a Claude Desktop entry and a T3 Code line, and, for each vault
+  Rotli knows, the rules that stop Claude Code, Cursor, Codex and Gemini CLI
+  from opening that folder with their own file tools. It says plainly where a
+  client has no such rule (Claude Desktop). Rotli still never edits a
+  client's settings; you copy what you want.
+- **"Use Rotli for your docs" files notes the safe way.** The instruction you
+  paste into Claude Code now uses `rotli notes create` instead of asking the
+  agent to write a file with frontmatter into your vault.
+- The command line ends quietly when you pipe it into something that stops
+  reading, such as `rotli notes list | head`, instead of printing an error.
+
+### Security
+
+- **Guidance for keeping an agent's own file tools out of your vault.**
+  Rotli's secure-note rules cover what an agent asks Rotli for. A client's
+  own `Read`, `Grep`, `Glob` and shell open files directly and skip them, so
+  an agent with those can read a secure note. `rotli agent config` now prints
+  a per-vault deny block (`permissions.deny` for Claude Code and T3 Code, and
+  the matching rules for Cursor, Codex and Gemini CLI), and says so plainly.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

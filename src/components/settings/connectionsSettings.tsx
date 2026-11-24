@@ -16,17 +16,17 @@ import { useCopyState } from "./useCopyState";
  * vault instead of the repo — planning + documentation you organize in rotli,
  * the README the only thing that stays in the repo. Copy-first; you refine the
  * wording to taste (the maintainer, 2026-07-07). */
-const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my Rotli
+export const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my Rotli
 vault — NOT this repo. The README is the ONLY doc that stays in the repo.
 
 • Before writing a new doc, ask me: "rotli or repo?" (the README always → repo).
-• When a doc goes to rotli, write the Markdown file into my rotli notes folder
-  under wiki/_inbox/<slug>.md with frontmatter:
-      ---
-      owner: rotli
-      shelf: [<Project>]     # this project's name, e.g. Rotli
-      ---
-  rotli files it, and I keep it under my <Project> folder in Main.
+• When a doc goes to rotli, never write a file into the vault yourself and never
+  write frontmatter (rotli owns it). Write the Markdown body to a temp file, then run:
+      /Applications/Rotli.app/Contents/MacOS/rotli notes create --title "<title>" \\
+        --body-file <temp file> --main main:<Project>
+  <Project> is this project's name, e.g. Rotli. If that Main folder doesn't exist
+  yet, make it first with the same binary: folders create --name <Project>. rotli files the note
+  and I keep it under my <Project> folder in Main.
 • Do not create or leave project docs in this repo's docs/ folder.`;
 
 /** Named connections a stable build withholds, in the provider list grammar. */

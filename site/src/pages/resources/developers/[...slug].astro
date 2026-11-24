@@ -96,7 +96,9 @@ const rules = [
         <pre><code>{`${BIN} agent config`}</code></pre>
         <p>
           It prints the exact executable path, ready-made <code>claude mcp add</code> and <code>codex mcp add</code>{' '}
-          commands, a Codex TOML alternative, and the commands to verify the result. Paste the one for your client.
+          commands, a Codex TOML alternative, Cursor, Gemini CLI, Claude Desktop and T3 Code entries, and the commands
+          to verify the result. Paste the one for your client. It also prints, for each vault, the deny rules that keep
+          a client’s own file tools out of the folder, because those tools skip rotli’s secure-note rules.
           rotli never edits an agent’s global configuration for you. The server is named{' '}
           <code>rotli-workspace</code>.
         </p>

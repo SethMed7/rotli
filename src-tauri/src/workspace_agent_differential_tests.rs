@@ -534,3 +534,6 @@ fn no_agent_tool_tells_a_protected_item_from_a_missing_one() {
 
 #[path = "workspace_agent_differential_cli_tests.rs"]
 mod cli;
+
+#[path = "workspace_agent_timing_tests.rs"]
+mod timing;

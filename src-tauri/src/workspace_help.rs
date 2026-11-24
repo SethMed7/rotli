@@ -2,6 +2,7 @@
 //! setups (`rotli agent config`). Kept beside the dispatcher in
 //! `workspace.rs`; edit both when a command is added or gated.
 
+use crate::workspace_vault_access::vault_access;
 use serde_json::{json, Value};
 pub(crate) const CLI_HELP: &str = r#"Rotli headless workspace (JSON output)
 
@@ -27,7 +28,7 @@ rotli views list|create|rename|delete|assign|unassign|create-folder ...
 rotli boards list|read|create|update|apply ...
 rotli open ID [--kind note|board|file] [--root ID]
 rotli agent doctor [--root ID]                                  # read-only boundary + metrics
-rotli agent config                                              # Claude/Codex/Cursor/Gemini + remote MCP setup
+rotli agent config                                              # client setups + each vault's deny rules for the clients' own file tools
 rotli agent self-test                                           # disposable end-to-end validation
 rotli mcp                                                        # stdio MCP server
 rotli mcp --http 127.0.0.1:43110 --token TOKEN                   # authenticated loopback HTTP
@@ -58,9 +59,11 @@ Agents edit a note's text only if an AI made it or the person turned on
 journaled in .rotli/ai-edit-journal.jsonl (secure notes without their text)."#;
 
 
-/// Every supported client's setup for the stdio server at `command`. Rotli
-/// only PRINTS these; it never edits a client's configuration itself.
-pub(crate) fn mcp_setup(command: &str) -> Value {
+/// Every supported client's setup for the stdio server at `command`, and the
+/// deny rules that keep each client's own file tools out of every vault in
+/// `vaults` (`(label, absolute path)`). Rotli only PRINTS these; it never
+/// edits a client's configuration itself.
+pub(crate) fn mcp_setup(command: &str, vaults: &[(String, String)]) -> Value {
     let quoted = shell_quote(command);
     // Cursor (`.cursor/mcp.json` or `~/.cursor/mcp.json`) and Gemini CLI
     // (`.gemini/settings.json` or `~/.gemini/settings.json`) both read an
@@ -89,6 +92,16 @@ pub(crate) fn mcp_setup(command: &str) -> Value {
             "file": "~/.gemini/settings.json (user) or .gemini/settings.json (project)",
             "json": server(json!({ "trust": false })),
         },
+        "claudeDesktop": {
+            "file": "~/Library/Application Support/Claude/claude_desktop_config.json",
+            "json": server(json!({})),
+            "note": "Add the entry, then quit and reopen Claude Desktop."
+        },
+        "t3Code": {
+            "command": format!("claude mcp add --transport stdio --scope user rotli-workspace -- {quoted} mcp"),
+            "why": "T3 Code runs Claude Code and loads its user, project and local settings, so the Claude Code line above, and the Claude Code deny rules under vaultAccess, apply to T3 threads. T3 has no tool setting of its own per project; in a vault thread also deny mcp__t3-code (docs/architecture/vault-thread-protocol.md, section 3)."
+        },
+        "vaultAccess": vault_access(vaults),
         "remoteHttp": {
             "transport": "streamable-http",
             "mcpUrl": "https://YOUR-RELAY.example/mcp",
@@ -103,7 +116,7 @@ pub(crate) fn mcp_setup(command: &str) -> Value {
             "gemini": "gemini mcp list",
             "cursor": "Cursor Settings > MCP lists rotli-workspace with its tools"
         },
-        "boundary": "Rotli prints setup instructions but never edits Claude, Codex, Cursor, or Gemini configuration itself. Use the installed app binary, not a temporary target/debug build."
+        "boundary": "Rotli prints setup instructions but never edits Claude, Codex, Cursor, Gemini, or T3 Code configuration itself. Use the installed app binary, not a temporary target/debug build."
     })
 }
 
@@ -117,8 +130,8 @@ mod tests {
 
     #[test]
     fn every_client_setup_names_the_same_server_and_command() {
-        let setup = mcp_setup("/Applications/Rotli.app/Contents/MacOS/rotli");
-        for client in ["cursor", "gemini"] {
+        let setup = mcp_setup("/Applications/Rotli.app/Contents/MacOS/rotli", &[]);
+        for client in ["cursor", "gemini", "claudeDesktop"] {
             let entry = &setup[client]["json"]["mcpServers"]["rotli-workspace"];
             assert_eq!(entry["command"], "/Applications/Rotli.app/Contents/MacOS/rotli", "{client}");
             assert_eq!(entry["args"], json!(["mcp"]), "{client}");
@@ -130,5 +143,32 @@ mod tests {
             "gemini mcp add --scope user rotli-workspace '/Applications/Rotli.app/Contents/MacOS/rotli' mcp"
         );
         assert_eq!(shell_quote("it's"), "'it'\\''s'");
+    }
+
+    #[test]
+    fn claude_desktop_and_t3_code_have_their_own_entries() {
+        let setup = mcp_setup("/Applications/Rotli.app/Contents/MacOS/rotli", &[]);
+        assert_eq!(
+            setup["claudeDesktop"]["json"],
+            json!({ "mcpServers": { "rotli-workspace": { "command": "/Applications/Rotli.app/Contents/MacOS/rotli", "args": ["mcp"] } } })
+        );
+        assert_eq!(setup["claudeDesktop"]["file"], "~/Library/Application Support/Claude/claude_desktop_config.json");
+        assert_eq!(
+            setup["t3Code"]["command"],
+            "claude mcp add --transport stdio --scope user rotli-workspace -- '/Applications/Rotli.app/Contents/MacOS/rotli' mcp"
+        );
+        assert!(setup["t3Code"]["why"].as_str().unwrap().contains("mcp__t3-code"));
+    }
+
+    #[test]
+    fn the_setup_carries_the_vault_deny_block_and_the_bypass_warning() {
+        let vaults = vec![("Notes".to_string(), "/Users/test/vault".to_string())];
+        let setup = mcp_setup("/Applications/Rotli.app/Contents/MacOS/rotli", &vaults);
+        let access = &setup["vaultAccess"];
+        assert_eq!(access["vaults"][0]["path"], "/Users/test/vault");
+        assert_eq!(access["claudeCode"]["anySession"]["settings"]["permissions"]["deny"][0], "Read(//Users/test/vault/**)");
+        assert!(access["warning"].as_str().unwrap().contains("bypass"));
+        // the setup still names no vault content: only the folder the person registered
+        assert!(!setup.to_string().contains("secure note title"));
     }
 }
