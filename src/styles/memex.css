@@ -1267,9 +1267,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chat-cmdmenu .slashmenu-empty q {
-  color: var(--text);
-}
 .chat-attach-chip {
   display: inline-flex;
   align-items: center;

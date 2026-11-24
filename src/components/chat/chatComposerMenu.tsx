@@ -191,19 +191,16 @@ export function ComposerMenuList({ menu }: { menu: ComposerMenu }) {
                   {note.secure ? <LockGlyph size={14} /> : "@"}
                 </span>
                 <span className="slashlabel">{note.title || "Untitled"}</span>
-                <span className="slashhint">
-                  {note.secure ? "Secure · on-device models only" : note.folderId}
-                </span>
+                {note.secure && <span className="slashhint">Secure · on-device models only</span>}
               </div>
             ))}
       </div>
       {count === 0 && (
         <div className="slashmenu-empty" aria-hidden="true">
-          No {noun} matches{" "}
-          <q>
-            {sigil}
-            {trigger.query}
-          </q>
+          <div>
+            No {noun} matches “{sigil}
+            {trigger.query}”
+          </div>
           {trigger.kind === "command" && <span>⏎ sends it as text</span>}
         </div>
       )}
