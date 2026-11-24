@@ -91,7 +91,10 @@ export function NoteTagRow({ noteId, disabled }: { noteId: string; disabled: boo
           placeholder="tag, another-tag"
           aria-label="New tags"
           aria-invalid={error ? true : undefined}
-          disabled={busy}
+          aria-busy={busy || undefined}
+          // read-only, never disabled, while saving: a disabled field drops
+          // focus, and the person's next Escape or edit would go elsewhere
+          readOnly={busy}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
           onBlur={() => void commit()}
