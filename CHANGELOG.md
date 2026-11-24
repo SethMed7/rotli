@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A new chat is always saved, even when its name matches an older one.**
+  Starting a second chat with the same opening words (two chats that begin
+  "hi", or two image-only chats) used to leave the whole conversation
+  unsaved. The new chat is now saved as `hi-2`, `hi-3`, and so on, and the
+  older chat is never touched.
+- **Deleting or archiving a chat never replaces one deleted or archived
+  earlier.** A second chat with the same name used to overwrite the first in
+  the hidden Trash or Archive folder. Each one is now kept, as `name`,
+  `name-2`, and so on. Renaming a chat also never lands on another chat.
+- **Stopping a reply keeps the saved chat the same as the screen.** Stopping
+  before any answer arrived took your message off the screen but left it in
+  the file, so it came back on reopen and was sent twice if you sent it
+  again; it now leaves the file too. A partial answer you stopped is now
+  saved instead of disappearing on reopen.
+- **A reply that quotes chat-like lines stays one reply.** Bold labels such
+  as `**Step 1** · setup — …`, or a quoted `**you** · … — …` line, used to
+  reload as extra turns, including fake turns from you that went back to the
+  model as your words. Those lines now stay inside the reply.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

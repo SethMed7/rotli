@@ -1,3 +1,7 @@
+import { projectChatWorkItems } from "../../lib/chatWork";
+import { parseTranscriptTurns } from "../../memex/chatTranscript";
+import { type ChatArtifact, parseChatArtifactTurns } from "../../memex/contract";
+
 /**
  * The Markdown chat file remains complete durable truth. The interactive
  * surface keeps only a recent window mounted so a years-long thread cannot
@@ -41,4 +45,41 @@ export function chatSelectionMarkdown(sources: readonly string[], indices: reado
     .map((index) => sources[index]?.trim() ?? "")
     .filter((text) => text.length > 0)
     .join("\n\n");
+}
+
+export interface ChatMessage {
+  speaker: string;
+  text: string;
+  at?: string;
+  images?: string[];
+  artifacts?: ChatArtifact[];
+}
+
+/** Parse a chat .md's `## Messages` block back into bubbles. The turn reader
+ * (memex/chatTranscript.ts) keeps reply text that looks like a turn inside
+ * the reply (chat audit 2026-11-24, D3). */
+export function parseChatMessages(body: string, rootPrefix = ""): ChatMessage[] {
+  const out: ChatMessage[] = parseTranscriptTurns(body).map(({ speaker, at, text }) => ({
+    speaker,
+    at,
+    text,
+  }));
+  const artifactTurns = new Map(parseChatArtifactTurns(body).map((turn) => [turn.assistant, turn.artifacts]));
+  let assistant = 0;
+  for (const message of out) {
+    if (message.speaker === "you") continue;
+    const artifacts = artifactTurns.get(assistant);
+    if (artifacts?.length) message.artifacts = artifacts;
+    assistant += 1;
+  }
+  for (const message of out) {
+    if (message.speaker !== "you") continue;
+    const attached = projectChatWorkItems({
+      rootPrefix,
+      messages: [message],
+      discoveredIds: [],
+    }).filter((item) => item.kind === "image" && item.source === "attachment");
+    if (attached.length) message.images = attached.map((item) => item.id);
+  }
+  return out;
 }

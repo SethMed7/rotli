@@ -69,17 +69,13 @@ import {
   onLocalQueue,
 } from "../../lib/tauri";
 import { CORPUS_INSTANCE_ID, activeInstance, storageDirOf } from "../../memex/config";
-import {
-  type ChatArtifact,
-  hasSecureContext,
-  parseChatArtifacts,
-  parseChatArtifactTurns,
-} from "../../memex/contract";
+import { type ChatArtifact, hasSecureContext, parseChatArtifacts } from "../../memex/contract";
 import {
   dropBlockedExchange,
   readChat,
   registerChatArtifact,
   registerChatArtifactTurn,
+  settleStoppedTurn,
 } from "../../memex/service";
 import {
   useInstanceChats,
@@ -170,7 +166,12 @@ import {
 } from "./chatReasoningModel";
 import { ChatReplyMedia } from "./chatReplyMedia";
 import { ChatSetupGuide } from "./chatSetupGuide";
-import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
+import {
+  CHAT_MESSAGE_WINDOW,
+  type ChatMessage as Msg,
+  parseChatMessages as parseMessages,
+  recentChatThread,
+} from "./chatThreadModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
   CHAT_TITLE_PLACEHOLDER,
@@ -184,53 +185,9 @@ import {
   type ChatWelcomeSuggestionKind,
 } from "./chatWelcomeModel";
 
-interface Msg {
-  speaker: string;
-  text: string;
-  at?: string;
-  images?: string[];
-  artifacts?: ChatArtifact[];
-}
-
 /** A turn's words as what they are: the person's, or a model's reply. */
 const said = (m: { speaker: string; text: string }) =>
   m.speaker === "you" ? personText(m.text) : modelText(m.text);
-
-/** Parse a chat .md's `## Messages` block back into bubbles — rotli writes the
- * `**speaker** · date — text` shape (contract.ts), so this round-trips its own. */
-function parseMessages(body: string, rootPrefix = ""): Msg[] {
-  const i = body.indexOf("## Messages");
-  if (i < 0) return [];
-  const section = body.slice(i + "## Messages".length);
-  const re = /\*\*([^*]+)\*\*\s*·\s*([^—\n]*?)\s*—\s*([\s\S]*?)(?=\n\*\*[^*]+\*\*\s*·|\s*$)/g;
-  const out: Msg[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(section)) !== null) {
-    out.push({
-      speaker: (m[1] ?? "").trim(),
-      at: (m[2] ?? "").trim(),
-      text: (m[3] ?? "").trim(),
-    });
-  }
-  const artifactTurns = new Map(parseChatArtifactTurns(body).map((turn) => [turn.assistant, turn.artifacts]));
-  let assistant = 0;
-  for (const message of out) {
-    if (message.speaker === "you") continue;
-    const artifacts = artifactTurns.get(assistant);
-    if (artifacts?.length) message.artifacts = artifacts;
-    assistant += 1;
-  }
-  for (const message of out) {
-    if (message.speaker !== "you") continue;
-    const attached = projectChatWorkItems({
-      rootPrefix,
-      messages: [message],
-      discoveredIds: [],
-    }).filter((item) => item.kind === "image" && item.source === "attachment");
-    if (attached.length) message.images = attached.map((item) => item.id);
-  }
-  return out;
-}
 
 /** Read an attached image file as a base64 data URL (the vision wire shape). */
 function readAsDataURL(file: File): Promise<string> {
@@ -1284,6 +1241,10 @@ export function ChatSurface({
   // must land NOWHERE (the local lane can't abort the HTTP mid-generation;
   // orphaning is the honest cancel: the UI is free, the result is discarded)
   const runSeq = useRef(0);
+  // Stop's outcome for the file (audit D4): the partial kept, or null; the
+  // running turn's settle exists once its own write is done
+  const stoppedRef = useRef<{ run: number; partial: string | null; at: string } | null>(null);
+  const settleStoppedRef = useRef<{ run: number; settle: () => Promise<void> } | null>(null);
   // what Stop gives back to the composer — the sent prompt returns intact
   const lastSentRef = useRef<{
     text: string;
@@ -1728,6 +1689,21 @@ export function ChatSurface({
       setSaveErr(e instanceof Error ? e.message : String(e));
     }
     const runKey = sentSlug ? chatKey(active.id, sentSlug, tabId) : chatKeyId;
+    const settleStopped = async () => {
+      const stop = stoppedRef.current;
+      if (stop?.run !== myRun || !sentPersisted || !sentSlug) return; // not stopped, or not on disk
+      stoppedRef.current = null;
+      try {
+        await settleStoppedTurn(active, sentSlug, { ...stop, userAt, secureContext: turnMark.marked });
+        ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
+        void chats.refetch();
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : String(e));
+      }
+    };
+    // Stop pressed while the turn was still being written: start no run
+    if (runSeq.current !== myRun) return void settleStopped();
+    settleStoppedRef.current = { run: myRun, settle: settleStopped };
     useChatRuns.getState().markRunning(runKey); // the sidebar row shows Working
 
     const requestId = crypto.randomUUID();
@@ -1843,6 +1819,7 @@ export function ChatSurface({
     }
     if (runSeq.current !== myRun) return; // stopped mid-generation — the reply lands nowhere
     requestRef.current = null;
+    settleStoppedRef.current = null;
     setStreaming(""); // the settled message row takes over from the live one
     setBusy(false);
     busyRef.current = false;
@@ -2092,8 +2069,10 @@ export function ChatSurface({
    * stream, and free the surface. If the on-device answer had already begun
    * streaming, KEEP that partial text as the answer (the user asked to stop, not
    * to erase what arrived); otherwise the turn never produced anything, so the
-   * optimistic user bubble comes off and the prompt returns to the composer. */
+   * optimistic user bubble comes off and the prompt returns to the composer.
+   * The chat file follows the screen either way (chat audit 2026-11-24, D4). */
   const stopTurn = () => {
+    const stoppedRun = runSeq.current;
     runSeq.current++;
     if (requestRef.current) {
       void cliCancel(requestRef.current).catch(() => {});
@@ -2108,11 +2087,16 @@ export function ChatSurface({
     busyRef.current = false;
     useChatRuns.getState().settleRun(chatKeyId, true); // a stop is watched by definition
     const partial = streamRef.current;
+    const at = new Date().toISOString();
     setStreaming("");
+    // the send this stops writes the outcome to the file once its own write is done
+    stoppedRef.current = { run: stoppedRun, partial: partial || null, at };
+    const pending = settleStoppedRef.current;
+    settleStoppedRef.current = null;
+    if (pending?.run === stoppedRun) void pending.settle();
     if (partial) {
-      // an answer was forming — settle it as the assistant turn (in-session only;
-      // a stopped turn isn't persisted, matching a failed one)
-      setMessages((p) => [...p, { speaker: "rotli", text: partial, at: new Date().toISOString() }]);
+      // an answer was forming — settle it as the assistant turn
+      setMessages((p) => [...p, { speaker: "rotli", text: partial, at }]);
       return;
     }
     setMessages((p) => (p.length > 0 && p[p.length - 1]?.speaker === "you" ? p.slice(0, -1) : p));

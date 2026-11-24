@@ -287,3 +287,46 @@ describe("chat restores after the self-review at d0c659dd", () => {
     });
   }
 });
+
+// Chat audit 2026-11-24, D1: a create is exclusive in every store, so two
+// writers racing for one name can't both win, and the loser hears the name is
+// taken (writeChat then moves to the next free name).
+for (const [name, make] of [
+  ["browser", () => createWebChatStore(new MemoryVaultStore())],
+  ["folder", () => new FolderChatStore(new MemoryVaultDir())],
+] as const) {
+  test(`${name}: two creates racing for one name keep the winner's file`, async () => {
+    const store: ChatStore = make();
+    const chat = (text: string) =>
+      composeNewChat({ title: "Hi", source: "rotli", slug: "hi" }, [{ speaker: "you", text }], DATE).contents;
+    const results = await Promise.allSettled([
+      store.write("hi", chat("one"), null),
+      store.write("hi", chat("two"), null),
+    ]);
+    const won = results.findIndex((r) => r.status === "fulfilled");
+    const lost = results.find((r) => r.status === "rejected");
+    expect(won).toBeGreaterThanOrEqual(0);
+    expect(String(lost?.reason)).toMatch(/chat already exists/);
+    expect((await store.read("hi")).contents).toContain(won === 0 ? "— one" : "— two");
+  });
+}
+
+// Chat audit 2026-11-24, D2 on the web: the browser store kept one Trash (and
+// one Archive) copy per name, so a second removal replaced the first.
+test("browser: removing a second chat with the same name keeps the first one's transcript", async () => {
+  const store = createWebChatStore(new MemoryVaultStore());
+  for (const bin of ["trash", "archive"] as const) {
+    for (const text of ["first", "second", "third"]) {
+      const chat = composeNewChat(
+        { title: "Plan", source: "rotli", slug: "plan" },
+        [{ speaker: "you", text }],
+        DATE,
+      );
+      await store.write("plan", chat.contents, null);
+      await store.remove("plan", bin);
+    }
+    expect(await store.recoverable("plan", bin)).toContain("— first");
+    expect(await store.recoverable("plan-2", bin)).toContain("— second");
+    expect(await store.recoverable("plan-3", bin)).toContain("— third");
+  }
+});
