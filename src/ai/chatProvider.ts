@@ -9,8 +9,19 @@ export type ConsultMention =
   | { kind: "error"; message: string }
   | { kind: "consult"; provider: ConsultProvider; modelId: string | null; prompt: string };
 
-const CONSULT_TAG =
-  /(^|\s)@(claude|gpt|chatgpt|codex|openai|cursor|antigravity|gemini|agy)(?::(?:\{([a-z0-9][a-z0-9._-]*(?:\[1m\])?)\}|([a-z0-9][a-z0-9._-]*(?:\[1m\])?)))?(?=$|\s|[),.!?;])/gi;
+const CONSULT_ALIASES = "claude|gpt|chatgpt|codex|openai|cursor|antigravity|gemini|agy";
+const CONSULT_ALIAS = new RegExp(`^(?:${CONSULT_ALIASES})$`, "i");
+const CONSULT_TAG = new RegExp(
+  `(^|\\s)@(${CONSULT_ALIASES})` +
+    /(?::(?:\{([a-z0-9][a-z0-9._-]*(?:\[1m\])?)\}|([a-z0-9][a-z0-9._-]*(?:\[1m\])?)))?(?=$|\s|[),.!?;])/
+      .source,
+  "gi",
+);
+
+/** `claude`, `gpt`, `agy`… — a word `@` turns into a provider consultation. */
+export function isConsultAlias(word: string): boolean {
+  return CONSULT_ALIAS.test(word);
+}
 
 function consultProvider(alias: string): ConsultProvider {
   if (/^(gpt|chatgpt|codex|openai)$/i.test(alias)) return "codex";

@@ -47,6 +47,16 @@ export function noteChatReady(): boolean {
  * (secure notes collapse to secure-note-<id6> so their name never leaks into
  * chats/), and every chat already attached to it. */
 async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
+  const { instance, stem, secure } = await noteAttachment(note);
+  const chats = await listChats(instance);
+  return { instance, stem, secure, chats, attached: findAttachedChats(chats, stem) };
+}
+
+/** The attachment a chat records for this note — the same stem and secure
+ * verdict "Chat with this note" uses, for the composer's @ picker. */
+export async function noteAttachment(
+  note: NoteSummary,
+): Promise<{ instance: MemexInstance; stem: string; secure: boolean }> {
   if (note.kind === "board" || note.kind === "file") {
     throw new Error("Chat with note is available for Markdown notes.");
   }
@@ -59,15 +69,14 @@ async function noteChatContext(note: NoteSummary): Promise<NoteChatContext> {
   if (!notePath) throw new Error("This note is no longer in the connected vault.");
   const folder = noteDiskFolder(note);
   const secure =
+    note.secure === true ||
     (await corpusFrontmatter(note.id).catch(() => null))?.secure === true ||
     isSecureBrainFolder(folder) ||
     isSecureNotesFolder(folder) ||
     /(?:^|\/)wiki\/_secure(?:\/|$)/.test(notePath.replace(/^[^:]+:/, ""));
   const stem = secure ? secureNoteStem(note.id) : noteStemFromPath(notePath);
   if (!stem) throw new Error("Rotli couldn’t resolve this note in the vault.");
-
-  const chats = await listChats(instance);
-  return { instance, stem, secure, chats, attached: findAttachedChats(chats, stem) };
+  return { instance, stem, secure };
 }
 
 /** The note's attached chats, newest work first — the chat chip's picker. */
