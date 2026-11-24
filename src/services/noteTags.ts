@@ -12,11 +12,13 @@ import { corpusFrontmatter } from "../lib/tauri";
 import { invalidateNotes } from "./hooks";
 import { queryClient } from "./query";
 
-// Under the ["note"] and ["notes"] umbrellas, so every write that refreshes
-// notes (a raw metadata edit, the Librarian, an external change) refreshes
-// tags too. A NUL-led segment never collides with a folder id or a note id.
-const noteTagsKey = (id: string) => ["note", id, "\u0000tags"] as const;
-const vaultTagsKey = ["notes", "\u0000tags"] as const;
+// Their own ["tags"] keys: the note caches' prefix patchers and cancels
+// (hooks.ts) assume note-shaped data. invalidateNotes refreshes this prefix
+// too, so a raw metadata edit, the Librarian, or an external change reaches
+// every tag view.
+const TAGS_KEY = ["tags"] as const;
+const noteTagsKey = (id: string) => [...TAGS_KEY, id] as const;
+const vaultTagsKey = [...TAGS_KEY, "\u0000vault"] as const;
 
 /** One note's tags, in the order they're written. */
 export function useNoteTags(noteId: string, enabled = true) {

@@ -375,6 +375,7 @@ export async function invalidateNotes(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
     // …and add or drop a wikilink — the Graph's Links projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.links }),
+    queryClient.invalidateQueries({ queryKey: ["tags"] }),
   ]);
 }
 

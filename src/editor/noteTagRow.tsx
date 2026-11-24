@@ -84,7 +84,6 @@ export function NoteTagRow({ noteId, disabled }: { noteId: string; disabled: boo
         <input
           className="ed-tag-input"
           // the person asked to type a tag: focus follows their click
-          // oxlint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           type="text"
           value={draft}
