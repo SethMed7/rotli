@@ -4941,7 +4941,7 @@ impl CorpusStore {
         // today reads as just edited, not as hours old (stamp_to_ms)
         let (_, saved_at) = file_stamps(&target_abs);
         Ok(NoteMeta {
-            secure: row_secure(&fm, &folder, &disk_folder),
+            secure: self.person_only(row_secure(&fm, &folder, &disk_folder)),
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
@@ -5209,7 +5209,7 @@ impl CorpusStore {
         self.persist_index();
 
         Ok(NoteMeta {
-            secure: row_secure(&fm, &project_lifecycle_folder(self.layout, target_folder), target_folder),
+            secure: self.person_only(row_secure(&fm, &project_lifecycle_folder(self.layout, target_folder), target_folder)),
             id: id.to_string(),
             title,
             snippet: snippet_of(&body),
@@ -5910,7 +5910,7 @@ impl CorpusStore {
         let aliases = note_aliases(&rel, &title, &id, &fm);
         let revision = crate::fsutil::revision(document.as_bytes());
         Ok((NoteMeta {
-            secure: row_secure(&fm, &project_folder(self.layout, disk_folder, &fm), disk_folder),
+            secure: self.person_only(row_secure(&fm, &project_folder(self.layout, disk_folder, &fm), disk_folder)),
             id,
             title,
             snippet: snippet_of(body),

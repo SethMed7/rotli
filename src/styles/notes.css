@@ -3111,6 +3111,12 @@ svg.sb-scene * {
   align-self: center;
   margin-left: -6px; /* the row gap already spaces it from the snippet */
 }
+/* the title shrinks and ellipsizes; the shield after it is never the part clipped */
+.fdr-name .fdr-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fdr-name .secure-mark {
   margin-left: 0;
 }

@@ -52,3 +52,36 @@ fn a_plain_row_leaves_the_key_off_the_wire() {
     let note = store.create("Inbox", "# Grocery run\n\nmilk\n").unwrap();
     assert!(!serde_json::to_string(&listed(&mut store, &note.id)).unwrap().contains("\"secure\""));
 }
+
+#[test]
+fn a_note_the_secret_detector_flags_is_marked_in_the_list_without_a_flag() {
+    let (_dir, mut store) = bare();
+    let note = store.create("Inbox", "# Notes\n\nkey: sk-ant-api03-EXAMPLE0EXAMPLE0EXAM\n").unwrap();
+    assert!(listed(&mut store, &note.id).secure);
+}
+
+/// Review of pull request 315: an agent's create, write and move answers come
+/// from builders the person's lane shares, so each must leave the mark off.
+#[test]
+fn an_agent_lanes_create_write_and_move_never_say_a_note_is_protected() {
+    let (_dir, mut store) = bare();
+    store.set_agent_lane();
+    let made = store.create_with_policy("Inbox", "# Passport scan\n\nnotes\n", true).unwrap();
+    let written = store.write(&made.id, "# Passport scan\n\nmore notes\n").unwrap();
+    let moved = store.move_note(&made.id, "Projects").unwrap();
+    for answer in [&made, &written, &moved] {
+        assert!(!answer.secure);
+        assert!(!serde_json::to_string(answer).unwrap().contains("secure"));
+    }
+}
+
+#[test]
+fn the_persons_create_write_and_move_still_carry_the_mark() {
+    let (_dir, mut store) = bare();
+    let made = store.create_with_policy("Inbox", "# Passport scan\n\nnotes\n", true).unwrap();
+    let written = store.write(&made.id, "# Passport scan\n\nmore notes\n").unwrap();
+    let moved = store.move_note(&made.id, "Projects").unwrap();
+    for answer in [&made, &written, &moved] {
+        assert!(answer.secure);
+    }
+}

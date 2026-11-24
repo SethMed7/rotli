@@ -418,15 +418,15 @@ export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): P
   const cancelled = beforePublish(note.id);
   queryClient.setQueryData(keys.note(note.id), stampRead(note));
   afterPublish(note.id, cancelled);
-  // the Graph and canvas cards read the Links projection. A save that makes
-  // the note secure, or no longer secure, refetches it for an open Graph or
-  // canvas now — secure notes fail closed (ROTLI review, PR 173). A save that
-  // only changed what the note links to marks it stale: no walk per keystroke,
-  // the next reader refetches (audit 2026-10-06)
+  // the Graph and canvas cards read the Links projection. A save that makes the
+  // note secure, or no longer secure, refetches it now, plus the lists and the
+  // Aa panel (secure notes fail closed, PR 173). A save that only changed what
+  // it links to marks it stale: no walk per keystroke (audit 2026-10-06)
   const secureOf = (each: Note | undefined) => !!each && (each.secure === true || looksSecret(each.body));
   // a first save with no cached copy counts as "was open": a secret in it refetches too
   if (secureOf(before) !== secureOf(note)) {
     void queryClient.invalidateQueries({ queryKey: keys.links });
+    void Promise.all([invalidateNoteProtection(), queryClient.invalidateQueries({ queryKey: ["notes"] })]);
   } else if (!before || bodyLinkTargets(before.body).join("\n") !== bodyLinkTargets(note.body).join("\n")) {
     void queryClient.invalidateQueries({ queryKey: keys.links, refetchType: "none" });
   }

@@ -682,7 +682,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               ) : (
                 glyphForNote(n, { size: 14, className: "fdr-row-icon" })
               )}
-              {n.title || "Empty note"}
+              <span className="fdr-title">{n.title || "Empty note"}</span>
               {isMarkedSecure(n) && <SecureMark />}
             </span>
             <span className="fdr-date">{longDateLabel(n.updatedAt)}</span>

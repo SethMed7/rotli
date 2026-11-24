@@ -78,23 +78,29 @@ export function AaPanel({
   const aiEdit: AiBodyEdit | null = protection?.aiBodyEdit ?? null;
   const [secureErr, setSecureErr] = useState<string | null>(null);
   const [aiEditErr, setAiEditErr] = useState<string | null>(null);
+  // a switch waits for its write AND the refreshed read: two quick presses must
+  // not run two read-modify-write toggles that land back on Off
+  const [writing, setWriting] = useState(false);
   const chord = currentChord(TOGGLE_SECURE_ACTION);
   const pickSecure = (want: boolean) => {
-    if (secure === null || secure === want) return;
+    if (secure === null || secure === want || writing) return;
     setSecureErr(null);
-    toggleNoteSecure(noteId).catch((error: unknown) =>
-      setSecureErr(error instanceof Error ? error.message : String(error)),
-    );
+    setWriting(true);
+    toggleNoteSecure(noteId)
+      .catch((error: unknown) => setSecureErr(error instanceof Error ? error.message : String(error)))
+      .finally(() => setWriting(false));
   };
 
   const aiMayEdit = aiEdit === "allowed";
   const pickAiEdit = (want: boolean) => {
-    if (aiEdit === null || aiEdit === "locked" || aiMayEdit === want) return;
+    if (aiEdit === null || aiEdit === "locked" || aiMayEdit === want || writing) return;
     setAiEditErr(null);
+    setWriting(true);
     // the read refreshes through invalidateNotes: Rust's verdict, not a guess
     corpusSetAiEdit(noteId, want)
       .then(invalidateNotes)
-      .catch((error: unknown) => setAiEditErr(error instanceof Error ? error.message : String(error)));
+      .catch((error: unknown) => setAiEditErr(error instanceof Error ? error.message : String(error)))
+      .finally(() => setWriting(false));
   };
 
   return (
@@ -180,7 +186,7 @@ export function AaPanel({
               type="button"
               className={secure === false ? "aaseg sel" : "aaseg"}
               aria-pressed={secure === false}
-              disabled={secure === null}
+              disabled={secure === null || writing}
               onClick={() => pickSecure(false)}
             >
               Off
@@ -189,7 +195,7 @@ export function AaPanel({
               type="button"
               className={secure === true ? "aaseg sel" : "aaseg"}
               aria-pressed={secure === true}
-              disabled={secure === null}
+              disabled={secure === null || writing}
               onClick={() => pickSecure(true)}
             >
               Secure
@@ -204,7 +210,7 @@ export function AaPanel({
               type="button"
               className={aiEdit !== null && !aiMayEdit ? "aaseg sel" : "aaseg"}
               aria-pressed={aiEdit !== null && !aiMayEdit}
-              disabled={aiEdit === null || aiEdit === "locked"}
+              disabled={aiEdit === null || aiEdit === "locked" || writing}
               onClick={() => pickAiEdit(false)}
             >
               Off
@@ -213,7 +219,7 @@ export function AaPanel({
               type="button"
               className={aiMayEdit ? "aaseg sel" : "aaseg"}
               aria-pressed={aiMayEdit}
-              disabled={aiEdit === null || aiEdit === "locked"}
+              disabled={aiEdit === null || aiEdit === "locked" || writing}
               onClick={() => pickAiEdit(true)}
             >
               Allowed
