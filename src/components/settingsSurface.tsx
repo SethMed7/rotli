@@ -2561,7 +2561,8 @@ function ModelsPane() {
           Model usage
         </h4>
         <p className="setnote">
-          Tokens, sessions, and the models you lean on, read from the local histories on this Mac. Also in ⌘K.
+          Tokens, sessions, and the models you lean on, read from the local histories on this Mac.
+          {hotkeyHint(" Also in ⌘K.")}
         </p>
         <button type="button" className="ghostbtn" onClick={openModelUsage}>
           Open model usage
