@@ -21,3 +21,8 @@ describe("Breve PDF design system", () => {
     ).toContain("Text needs more contrast");
   });
 });
+
+test("a PDF color that isn't hex is refused instead of measuring as black", () => {
+  const palette = { ...BREVE_PDF_PRESETS.paper, text: "oklch(20% 0 0)" };
+  expect(validateBrevePdfPalette(palette)).toBe("Every PDF color must be a #rrggbb color.");
+});

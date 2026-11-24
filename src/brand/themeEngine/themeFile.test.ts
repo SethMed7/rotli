@@ -163,3 +163,43 @@ test("a file over 64 KB is refused unread", () => {
     problems: ["This file is too large to be a theme."],
   });
 });
+
+test("a file right at the cap saves compact rather than locking itself out", () => {
+  const pad = "x".repeat(MAX_THEME_FILE_BYTES - JSON.stringify({ ...forest, pad: "" }).length - 1);
+  const atCap = `${JSON.stringify({ ...forest, pad })}\n`;
+  expect(new TextEncoder().encode(atCap).length).toBe(MAX_THEME_FILE_BYTES);
+  const read = ok(parseThemeFileText(atCap));
+  // pretty-printing would push it over the cap; the compact text still fits
+  const saved = serializeThemeFile({ ...read.theme, name: "Paper Forest" }, read);
+  expect(saved).not.toBeNull();
+  expect(new TextEncoder().encode(saved!).length).toBeLessThanOrEqual(MAX_THEME_FILE_BYTES);
+  expect(ok(parseThemeFileText(saved!)).theme.name).toBe("Paper Forest");
+  // a change that can't fit even compact is refused, never written over the cap
+  expect(serializeThemeFile({ ...read.theme, name: "Forest Paper, longer" }, read)).toBeNull();
+});
+
+test("a byte-order mark before the JSON is not a reason to refuse a theme", () => {
+  expect(ok(parseThemeFileText(`\uFEFF${JSON.stringify(forest)}`)).theme.name).toBe("Forest Paper");
+});
+
+test("an object whose properties throw when read is refused, not thrown", () => {
+  const hostile = Object.defineProperty({}, "rotliTheme", {
+    enumerable: true,
+    get() {
+      throw new Error("boom");
+    },
+  });
+  expect(readThemeFile(hostile)).toEqual({ ok: false, problems: ["This isn't a theme file."] });
+});
+
+test("a save drops an invalid id or base from the old file and re-emits colours from numbers", () => {
+  const read = ok(readThemeFile({ ...forest, id: "../etc", base: "<b>" }));
+  const written = JSON.parse(serializeThemeFile({ ...read.theme, id: null, base: null }, read)!);
+  expect(written.id).toBeUndefined();
+  expect(written.base).toBeUndefined();
+  const shouting = { ...read.theme, seeds: { light: { page: "#F6F1E7", accent: "#3F7D51" } } };
+  expect(JSON.parse(serializeThemeFile(shouting, read)!).seeds.light).toEqual(forest.seeds.light);
+  expect(
+    serializeThemeFile({ ...read.theme, seeds: { light: { page: "red", accent: "#3f7d51" } } }, read),
+  ).toBeNull();
+});

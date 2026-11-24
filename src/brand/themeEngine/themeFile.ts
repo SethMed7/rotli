@@ -86,8 +86,17 @@ function readHalf(value: unknown, label: string, problems: string[]): ModeSeeds 
   return seeds;
 }
 
-/** Read a theme file's parsed JSON. Never throws. */
+/** Read a theme file's parsed JSON. Never throws: an object whose properties
+ * can't even be read (a throwing getter) is not a theme. */
 export function readThemeFile(raw: unknown): ThemeFileRead {
+  try {
+    return readObject(raw);
+  } catch {
+    return { ok: false, problems: [NOT_A_THEME] };
+  }
+}
+
+function readObject(raw: unknown): ThemeFileRead {
   if (!isObject(raw)) return { ok: false, problems: [NOT_A_THEME] };
   const version = own(raw, "rotliTheme");
   if (typeof version !== "number" || !Number.isInteger(version) || version < 1)
@@ -122,11 +131,12 @@ export function readThemeFile(raw: unknown): ThemeFileRead {
 
 /** Read a theme file's text: over 64 KB or not JSON is refused unread. */
 export function parseThemeFileText(text: string): ThemeFileRead {
-  if (new TextEncoder().encode(text).length > MAX_THEME_FILE_BYTES)
+  if (byteLength(text) > MAX_THEME_FILE_BYTES)
     return { ok: false, problems: ["This file is too large to be a theme."] };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    // an editor may have saved a byte-order mark; it is not part of the JSON
+    parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
   } catch {
     return { ok: false, problems: [NOT_A_THEME] };
   }
@@ -139,32 +149,50 @@ export function canOverwrite(previous: ThemeFileRead | null): boolean {
   return previous === null || (previous.ok && !previous.readOnly);
 }
 
-function writeHalf(previous: unknown, seeds: ModeSeeds): JsonObject {
+const byteLength = (text: string): number => new TextEncoder().encode(text).length;
+
+/** A half's colours as numbers re-emitted, or null if one isn't a colour. */
+function writeHalf(previous: unknown, seeds: ModeSeeds): JsonObject | null {
+  const page = normHex(seeds.page);
+  const accent = normHex(seeds.accent);
+  if (!page || !accent) return null;
   const half: JsonObject = isObject(previous) ? { ...previous } : {};
-  half.page = seeds.page;
-  half.accent = seeds.accent;
-  if (seeds.ink) half.ink = seeds.ink;
+  half.page = page;
+  half.accent = accent;
+  const ink = normHex(seeds.ink);
+  if (ink) half.ink = ink;
   else delete half.ink;
   return half;
 }
 
 /** The file's text for a theme. Known fields are set at known paths on a copy
- * of the file's previous object, so unknown fields at every depth survive.
- * Refuses (null) where canOverwrite does. */
+ * of the file's previous object, so unknown fields at every depth survive; an
+ * id or base that isn't valid is dropped rather than carried over. A half the
+ * theme doesn't give stays in the file as it was: the app never removes one.
+ * The text is pretty-printed when that fits under the 64 KB cap and compact
+ * when only that fits, so a saved file always reads back. Refuses (null)
+ * where canOverwrite does, or when even the compact text is over the cap. */
 export function serializeThemeFile(theme: CustomTheme, previous: ThemeFileRead | null = null): string | null {
   if (!canOverwrite(previous)) return null;
   const base: JsonObject = previous?.ok ? (JSON.parse(JSON.stringify(previous.raw)) as JsonObject) : {};
   const out: JsonObject = { ...base, rotliTheme: ENGINE_VERSION };
-  if (theme.id) out.id = theme.id;
+  if (theme.id && THEME_ID_PATTERN.test(theme.id)) out.id = theme.id;
+  else if (!(typeof out.id === "string" && THEME_ID_PATTERN.test(out.id))) delete out.id;
   out.name = cleanThemeName(theme.name) || "Untitled theme";
-  if (theme.base) out.base = theme.base;
-  out.contrast = theme.contrast;
+  if (theme.base && BASE_PATTERN.test(theme.base)) out.base = theme.base;
+  else if (!(typeof out.base === "string" && BASE_PATTERN.test(out.base))) delete out.base;
+  out.contrast = asContrastLevel(theme.contrast);
   const previousSeeds = own(base, "seeds");
   const seeds: JsonObject = isObject(previousSeeds) ? { ...previousSeeds } : {};
   for (const mode of MODES) {
-    const half = theme.seeds[mode];
-    if (half) seeds[mode] = writeHalf(own(seeds, mode), half);
+    const given = theme.seeds[mode];
+    const half = given ? writeHalf(own(seeds, mode), given) : null;
+    if (given && !half) return null;
+    if (half) seeds[mode] = half;
   }
   out.seeds = seeds;
-  return `${JSON.stringify(out, null, 2)}\n`;
+  const pretty = `${JSON.stringify(out, null, 2)}\n`;
+  if (byteLength(pretty) <= MAX_THEME_FILE_BYTES) return pretty;
+  const compact = `${JSON.stringify(out)}\n`;
+  return byteLength(compact) <= MAX_THEME_FILE_BYTES ? compact : null;
 }

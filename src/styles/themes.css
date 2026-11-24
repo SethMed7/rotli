@@ -275,8 +275,8 @@
 }
 
 /* — MONO · paper (light) — also the complete fallback under a custom theme's
-   day half: the runtime sheet (brand/customThemeSheet.ts) paints over it, and
-   if that sheet never loads the attribute is still a whole environment — */
+   day half: the custom theme's runtime sheet paints over it, and if that
+   sheet never loads the attribute is still a whole environment — */
 :root[data-theme="paper"],
 :root[data-theme="custom-light"] {
   --ground: #fafaf9;

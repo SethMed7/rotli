@@ -315,14 +315,17 @@ for (const name of squareProviderMarks) {
 }
 
 // Custom properties written at runtime are runtime data in existing roles,
-// never a second token system: only these files may write them.
+// never a second token system. A tripwire, not a proof: it catches the DOM
+// APIs that write them directly (setProperty, cssText, adoptedStyleSheets,
+// insertRule) outside these named files. A React style object carrying a
+// custom property is not caught; its owner validates the value.
 const customPropertyWriters = new Set([
   "src/state/theme.ts", // --accent-hue, the Custom primary hue
   "src/editor/resultWidget.ts", // a result chip's validated label colour
   "src/editor/colorPicker.ts", // the label picker's validated swatch
   "src/components/chat/chatPromptNavigator.tsx", // the prompt menu's measured position, not a colour
 ]);
-const customPropertyWrite = /setProperty\(\s*["'`]--|adoptedStyleSheets|\.cssText\b/;
+const customPropertyWrite = /setProperty\(\s*["'`]--|adoptedStyleSheets|\.cssText\b|\.insertRule\(/;
 for (const file of walkSources(join(root, "src"))) {
   if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file) || customPropertyWriters.has(file)) continue;
   if (customPropertyWrite.test(read(file)))

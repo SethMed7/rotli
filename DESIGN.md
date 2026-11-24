@@ -18,8 +18,10 @@ line.
 Every product surface must work in every supported environment.
 
 One contrast gate (`src/brand/themeEngine/gate.ts`) measures every
-environment, built-in or custom, after compositing each translucent layer over
-its surface: text 4.5:1 on every surface and layered state, text on the page
+environment, built-in or custom, on the pairs it lists from `base.css`,
+`themes.css` and `canvas.css`, compositing each of those translucent layers
+over its surface first. The other stylesheets' `color-mix()` and `opacity`
+layers are not modelled yet. The floors: text 4.5:1 on every surface and layered state, text on the page
 9:1 at Standard, controls and marks 3:1, hairlines and other seams at their
 own lower floors. A custom theme is seeds (a page colour and an accent per
 mode, optional ink) that the engine derives into the same semantic roles, and

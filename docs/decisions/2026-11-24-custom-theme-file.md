@@ -60,7 +60,9 @@ out of the titlebar sun's cycle in v1.
 4. **Compatibility.** Reading never throws. Unknown fields at every depth
    survive a save. A newer `rotliTheme` is usable from the seeds this build
    understands but read-only. A file Rotli could not read is never
-   overwritten.
+   overwritten. A save always reads back: pretty-printed when that fits under
+   the cap, compact when only that fits, refused otherwise. A half the theme
+   doesn't give stays in the file as written; the app never removes one.
 5. **The built-ins are measured by the same gate** and their current failures
    are recorded in `builtinBaseline.json`, which may only shrink.
    `check:design-system` and `builtins.test.ts` fail on a new failure and on a
