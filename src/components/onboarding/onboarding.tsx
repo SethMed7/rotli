@@ -23,6 +23,7 @@ import {
 import { flushSettingsNow } from "../../state/persist";
 import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
+import { pickThemeFamily } from "../../themes/composition";
 import { Character } from "../character";
 import { AccentRow } from "../settingsSurface";
 import { LibrarianScreen } from "./librarianStep";
@@ -218,7 +219,7 @@ function YouScreen({ advance }: { advance: () => void }) {
       <SetupChoiceGroup
         label="Theme"
         value={family}
-        onChange={(next: ThemeFamily) => useUiStore.getState().setThemeFamily(next)}
+        onChange={(next: ThemeFamily) => pickThemeFamily(next)}
         options={THEME_FAMILY_PRESENTATIONS.map(({ family: optionFamily, label, lightLabel, darkLabel }) => ({
           value: optionFamily,
           title: label,

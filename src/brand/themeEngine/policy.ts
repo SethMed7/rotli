@@ -89,6 +89,13 @@ export const ACCENT_PRESETS: Readonly<Record<AccentPresetName, Readonly<Record<M
   amber: { light: "#9a6f1e", dark: "#dfb15f" },
 };
 
+/** The Custom primary hue's starting lightness and chroma per scheme, as
+ * themes.css paints it: `oklch(53% 0.145 var(--accent-hue))` by day. */
+export const CUSTOM_HUE_ACCENT: Readonly<Record<Mode, { l: number; c: number }>> = {
+  light: { l: 0.53, c: 0.145 },
+  dark: { l: 0.78, c: 0.13 },
+};
+
 /** What Excalidraw draws a default stroke with, per scheme. */
 export const BOARD_INK: Readonly<Record<Mode, string>> = { light: "#1e1e1e", dark: "#d3d3d3" };
 /** The chat buddy's automatic line colour, per scheme (themes.css). */

@@ -103,6 +103,15 @@ out of the titlebar sun's cycle in v1.
 - `themeFile.test.ts`: hostile and malformed files, unknown-field round trip,
   newer-version read-only, never overwriting an unreadable file.
 
+## Notes
+
+- 2026-11-24, applying and personal storage: a selected theme is the additive
+  `customTheme` app setting; `themeFamily` keeps the theme's base, so 1.9.6
+  shows the base and carries the key through. Personal files live in a
+  `themes` folder beside the app settings (`src-tauri/src/theme_files.rs`),
+  where the filename is the id. Import copies a file as written, so a newer
+  theme's fields survive; rename rewrites only `name`.
+
 ## Revisit triggers
 
 - Classing the remaining stylesheet layers changes a derived colour (engine v2).

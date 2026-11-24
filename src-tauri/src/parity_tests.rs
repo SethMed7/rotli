@@ -594,3 +594,5 @@ mod link_secret;
 mod vault;
 #[path = "parity_permission_tests.rs"]
 pub(crate) mod permission;
+#[path = "parity_theme_tests.rs"]
+mod theme;

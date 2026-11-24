@@ -65,6 +65,14 @@
         "maxNodes": 200000
       }
     },
+    "themeFileRules": {
+      "sourceOfTruth": "src/brand/themeEngine/themeFile.ts THEME_ID_PATTERN + MAX_THEME_FILE_BYTES ↔ src-tauri/src/theme_files.rs valid_theme_id + MAX_THEME_FILE_BYTES",
+      "value": {
+        "maxBytes": 65536,
+        "validIds": ["a", "forest-paper", "0-9", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        "invalidIds": ["", "-a", "A", "a_b", "../x", "a/b", "a.json", " a", "é", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+      }
+    },
     "documentConvertibleExts": {
       "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_CONVERTIBLE_EXTS ↔ src-tauri/src/corpus.rs DOCUMENT_CONVERTIBLE_EXTS",
       "value": [

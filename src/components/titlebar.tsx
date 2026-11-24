@@ -15,6 +15,7 @@ import { PLATFORM } from "../lib/featurePolicy";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { useAppearanceLook } from "../state/appearanceLook";
+import { useCustomTheme } from "../state/customTheme";
 import { useHidden } from "../state/hidden";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
@@ -74,15 +75,27 @@ export function Titlebar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const themeLabel = theme === "system" ? "System" : solidThemeLabel({ family: themeFamily, mode: theme });
+  // a custom theme stays out of the cycle: the sun names it and flips its halves
+  const customName = useCustomTheme((s) => (s.selection && !s.notice ? s.selection.name : null));
+  const half = (mode: "light" | "dark") => `${customName} ${mode === "light" ? "by day" : "at night"}`;
+  const themeLabel =
+    theme === "system"
+      ? "System"
+      : customName
+        ? half(theme)
+        : solidThemeLabel({ family: themeFamily, mode: theme });
   // the label says where the next click lands: it follows the cycle setting
   // and, under System, the mode the Mac shows now (the applied theme)
   const themeCycle = useAppearanceLook((s) => s.themeCycle);
   const themeCyclePicks = useAppearanceLook((s) => s.themeCyclePicks);
   const shownDark = useIsDarkTheme();
-  const nextLabel = solidThemeLabel(
-    nextTheme({ theme, themeFamily }, shownDark, themeCycle, themeCyclePicks),
+  const next = nextTheme(
+    { theme, themeFamily },
+    shownDark,
+    customName ? "family" : themeCycle,
+    themeCyclePicks,
   );
+  const nextLabel = customName ? half(next.mode) : solidThemeLabel(next);
 
   return (
     <header className="titlebar">

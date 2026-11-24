@@ -3861,3 +3861,50 @@
 .rules-reset:hover {
   text-decoration: underline;
 }
+
+/* Appearance → My themes: each custom theme is a family card with its own
+   actions under it. The preview roles come from the theme's derived tokens. */
+.mythemes .famrow {
+  margin-top: 4px;
+}
+.mytheme {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.mytheme-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.mytheme-actions .ghostbtn + .ghostbtn {
+  margin-left: 0;
+}
+.mytheme-actions .rules-input {
+  flex: 1;
+  min-width: 0;
+}
+.mytheme-unreadable {
+  cursor: default;
+}
+.mytheme-unreadable:hover {
+  background: var(--surface);
+}
+.mytheme-moved {
+  max-width: 640px;
+  margin-bottom: 10px;
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.mytheme-moved summary {
+  cursor: pointer;
+  color: var(--text);
+}
+.mytheme-moved ul {
+  margin: 6px 0 0 18px;
+}
+.mythemes > .ghostbtn {
+  margin-bottom: 12px;
+}

@@ -26,6 +26,7 @@ import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { nextThemeNow } from "./appearanceLook";
 import type { ChatKey, ChatMap } from "./chatMapKeys";
+import { isCustomThemeSelected } from "./customTheme";
 import type { Measure } from "./noteStyle";
 import type { OnboardingPhase } from "./onboardingPhase";
 import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
@@ -721,7 +722,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   // a "system" setting resolves to its current mode before stepping on.
   cycleTheme: () =>
     set((s) => {
-      const next = nextThemeNow(s);
+      // a custom theme stays out of the cycle: the sun flips its day and night
+      const next = nextThemeNow(s, isCustomThemeSelected());
       return { themeFamily: next.family, theme: next.mode };
     }),
 

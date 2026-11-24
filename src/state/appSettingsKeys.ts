@@ -15,6 +15,9 @@ export const APP_SETTINGS_KEYS = new Set([
   "v",
   "theme",
   "themeFamily",
+  // which personal custom theme is in use (state/customTheme.ts); themeFamily
+  // keeps its base, so an older build shows the base and carries this through
+  "customTheme",
   // Retired independent System pair. System now follows the OS within the one
   // selected theme family.
   "matchLightFamily",

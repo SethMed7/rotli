@@ -19,6 +19,7 @@ import fixture from "../../scripts/fixtures/parity.json";
 import { editableDocumentForAi } from "../ai/artifacts";
 import { containsPrivateDataOverlap, endpointIsLocal, looksSecret } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
+import { MAX_THEME_FILE_BYTES, THEME_ID_PATTERN } from "../brand/themeEngine/themeFile";
 import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
 import { decodeDocx } from "../documents/codec/docx";
 import { namedStyle } from "../documents/codec/paragraphStyles";
@@ -207,6 +208,13 @@ describe("parity.json ↔ TS constants", () => {
   test("boardLimits", () => {
     const limits: Record<string, number> = { ...BOARD_LIMITS };
     expect(limits).toEqual(entries.boardLimits.value);
+  });
+
+  test("themeFileRules", () => {
+    const rules = entries.themeFileRules.value;
+    expect(MAX_THEME_FILE_BYTES).toBe(rules.maxBytes);
+    for (const id of rules.validIds) expect(THEME_ID_PATTERN.test(id)).toBe(true);
+    for (const id of rules.invalidIds) expect(THEME_ID_PATTERN.test(id)).toBe(false);
   });
 
   test("documentConvertibleExts", () => {

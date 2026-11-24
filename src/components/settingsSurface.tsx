@@ -111,6 +111,7 @@ import { queryClient } from "../services/query";
 import { DEFAULT_RETENTION_DAYS, MAX_RETENTION_DAYS, parseRetentionDays } from "../services/retentionPolicy";
 import type { TaskArchiveAge } from "../services/tasksView";
 import { reconnectActiveVault } from "../state/activeVault";
+import { useCustomTheme } from "../state/customTheme";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
@@ -125,6 +126,7 @@ import {
   useUiStore,
 } from "../state/ui";
 import { useVaultView } from "../state/vaultView";
+import { pickThemeFamily } from "../themes/composition";
 import { AntigravitySetup } from "./antigravitySetup";
 import { type CharacterName, QuokkaMark } from "./character";
 import {
@@ -148,6 +150,7 @@ import { AppIconSettings } from "./settings/appIconSettings";
 import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { CustomThemeSettings, useCustomPreview } from "./settings/customThemeSettings";
 import { FinderQuickActionSettings } from "./settings/finderQuickActionSettings";
 import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
@@ -165,6 +168,7 @@ import { VaultPassSettings } from "./settings/vaultPass";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
+import { WorkspacePreview, previewEnvironment } from "./settings/workspacePreview";
 import { WelcomeSettings } from "./welcomeSettings";
 type SettingsPane =
   | "general"
@@ -840,58 +844,6 @@ function GeneralPane() {
   );
 }
 
-type PreviewEnvironment =
-  | "warm-light"
-  | "warm-dark"
-  | "paper"
-  | "charcoal"
-  | "ocean-light"
-  | "ocean-dark"
-  | "grove-light"
-  | "grove-dark"
-  | "iris-light"
-  | "iris-dark"
-  | "blossom-light"
-  | "blossom-dark"
-  | "midnight-light"
-  | "midnight-dark"
-  | "tesven-light"
-  | "tesven-dark";
-
-function previewEnvironment(family: ThemeFamily, mode: "light" | "dark"): PreviewEnvironment {
-  if (family === "warm") return mode === "light" ? "warm-light" : "warm-dark";
-  if (family === "mono") return mode === "light" ? "paper" : "charcoal";
-  return `${family}-${mode}`;
-}
-
-/** A tiny but believable workspace preview. Fixed preview palettes are defined
- * in themes.css so this component still consumes semantic custom properties. */
-function WorkspacePreview({ environments }: { environments: readonly PreviewEnvironment[] }) {
-  return (
-    <span
-      className={environments.length > 1 ? "workspace-preview split" : "workspace-preview"}
-      aria-hidden="true"
-    >
-      {environments.map((environment) => (
-        <span className={`workspace-preview-canvas preview-${environment}`} key={environment}>
-          <span className="workspace-preview-sidebar">
-            <i />
-            <i />
-            <i className="selected" />
-            <i />
-          </span>
-          <span className="workspace-preview-page">
-            <b />
-            <i />
-            <i />
-            <em />
-          </span>
-        </span>
-      ))}
-    </span>
-  );
-}
-
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
  * step (the maintainer, 2026-07-28: "charcoal theme with blue primary color"). Default
  * renders as the current theme's own accent. */
@@ -953,7 +905,6 @@ function AppearancePane() {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const setThemeFamily = useUiStore((s) => s.setThemeFamily);
   const sidebarSide = useUiStore((s) => s.sidebarSide);
   const setSidebarSide = useUiStore((s) => s.setSidebarSide);
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
@@ -965,7 +916,10 @@ function AppearancePane() {
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
-  const pickFamily = (family: ThemeFamily) => setThemeFamily(family);
+  // a built-in family is also the way out of a custom theme
+  const pickFamily = (family: ThemeFamily) => pickThemeFamily(family);
+  const customShown = useCustomTheme((s) => s.selection !== null && s.notice === null);
+  const customPreview = useCustomPreview();
   const pickMode = (mode: ThemeSetting) => setTheme(mode);
   return (
     <>
@@ -979,8 +933,9 @@ function AppearancePane() {
       <p className="lead">Choose a fixed mode, or let Rotli follow your Mac.</p>
       <div className="appearance-mode-grid" role="radiogroup" aria-label="Color scheme">
         {(["system", "light", "dark"] as const).map((mode) => {
-          const environments =
-            mode === "system"
+          const environments = customPreview
+            ? customPreview.filter((canvas) => mode === "system" || canvas.mode === mode)
+            : mode === "system"
               ? [previewEnvironment(themeFamily, "light"), previewEnvironment(themeFamily, "dark")]
               : [previewEnvironment(themeFamily, mode)];
           return (
@@ -1003,7 +958,7 @@ function AppearancePane() {
       <p className="lead">Each family includes a light and dark workspace, tuned as a pair.</p>
       <div className="famrow">
         {THEME_FAMILY_PRESENTATIONS.map(({ family, label, description, lightLabel, darkLabel }) => {
-          const selected = themeFamily === family;
+          const selected = themeFamily === family && !customShown;
           return (
             <button
               type="button"
@@ -1021,6 +976,7 @@ function AppearancePane() {
           );
         })}
       </div>
+      <CustomThemeSettings />
       <ThemeCycleSettings />
 
       <h4 className="sethead">Primary color</h4>

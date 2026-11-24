@@ -276,6 +276,7 @@ const tauriAllowlist = new Set([
   "src/lib/tauri.ts",
   "src/lib/vaultRepair.ts",
   "src/lib/finderBridge.ts",
+  "src/lib/themeFiles.ts",
 ]);
 function walkSource(dir) {
   for (const name of readdirSync(dir)) {

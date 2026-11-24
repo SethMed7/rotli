@@ -62,12 +62,13 @@ export function appearanceLookSnapshot(): AppearanceLook {
 }
 
 /** Where the sun's next click lands, under the saved cycle and the Mac's mode now. */
-export function nextThemeNow(current: {
-  theme: "light" | "dark" | "system";
-  themeFamily: ThemeFamily;
-}): SolidTheme {
+export function nextThemeNow(
+  current: { theme: "light" | "dark" | "system"; themeFamily: ThemeFamily },
+  dayAndNightOnly = false,
+): SolidTheme {
   const { themeCycle, themeCyclePicks } = useAppearanceLook.getState();
-  return nextTheme(current, current.theme === "system" && systemPrefersDark(), themeCycle, themeCyclePicks);
+  const cycle = dayAndNightOnly ? "family" : themeCycle;
+  return nextTheme(current, current.theme === "system" && systemPrefersDark(), cycle, themeCyclePicks);
 }
 
 /** The editor's image outline follows one root attribute (styles/editor.css). */

@@ -26,6 +26,9 @@ export const DATA_THEMES = [
   "midnight-dark",
   "tesven-light",
   "tesven-dark",
+  // a custom theme's two halves (src/brand/customThemeSheet.ts paints them)
+  "custom-light",
+  "custom-dark",
 ] as const;
 
 export type DataTheme = (typeof DATA_THEMES)[number];
@@ -39,6 +42,7 @@ export const DARK_DATA_THEMES: readonly DataTheme[] = [
   "blossom-dark",
   "midnight-dark",
   "tesven-dark",
+  "custom-dark",
 ];
 
 export function isDarkDataTheme(theme: string | undefined): boolean {
@@ -65,7 +69,10 @@ function subscribeDataTheme(listener: () => void): () => void {
     themeObserver = new MutationObserver(() => {
       for (const fn of themeListeners) fn();
     });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-theme-rev"],
+    });
   }
   return () => {
     themeListeners.delete(listener);
@@ -79,6 +86,19 @@ function subscribeDataTheme(listener: () => void): () => void {
 /** The applied `data-theme` value, live. */
 export function useDataTheme(): string {
   return useSyncExternalStore(subscribeDataTheme, readDataTheme, () => "light");
+}
+
+/** The applied theme plus its revision: changes when one custom theme
+ * replaces another under the same `data-theme` value, so anything that bakes
+ * colours (Mermaid, Breve's PDF palette) can rebake. */
+export function readThemeSignature(): string {
+  if (typeof document === "undefined") return "light";
+  const { theme = "light", themeRev } = document.documentElement.dataset;
+  return themeRev ? `${theme}#${themeRev}` : theme;
+}
+
+export function useThemeSignature(): string {
+  return useSyncExternalStore(subscribeDataTheme, readThemeSignature, () => "light");
 }
 
 /** Whether the applied theme is a dark environment, live across every environment. */
@@ -115,6 +135,40 @@ export const LAST_THEME_KEY = "rotli.lastDataTheme";
  * ocean-dark"): the boot script picks by the OS appearance at launch, which
  * may have changed since the theme above was applied. Absent otherwise. */
 export const LAST_SYSTEM_PAIR_KEY = "rotli.lastSystemThemes";
+/** A custom theme's last sheet for theme-boot.js: `{ id, base, css }`, where
+ * `base` is the base family's light and dark themes to paint instead if the
+ * sheet doesn't check out. Absent unless a custom theme is applied. */
+export const CUSTOM_THEME_BOOT_KEY = "rotli.customThemeBoot";
+
+/** The custom theme being painted. The theme feature installs its sheet
+ * first, then sets this, then re-applies the theme. */
+export interface CustomThemeTarget {
+  id: string;
+  rev: number;
+  /** The sheet's text, kept for the next launch's first paint. */
+  css: string;
+  /** Whether the next launch should paint it: false where theme files don't
+   * outlast a reload (a browser build), so a reload never flashes a theme
+   * that is gone. */
+  remembered: boolean;
+}
+let customTarget: CustomThemeTarget | null = null;
+
+export function setCustomThemeTarget(target: CustomThemeTarget | null): void {
+  customTarget = target;
+}
+
+/** Under a custom theme each mode resolves to its half; the family is the
+ * base, which supplies scenery and the fallback. */
+function themeFor(family: ThemeFamily, mode: "light" | "dark"): DataTheme {
+  if (customTarget) return mode === "light" ? "custom-light" : "custom-dark";
+  return resolveTheme(family, mode);
+}
+
+/** What the next launch paints for this mode. */
+function rememberedFor(family: ThemeFamily, mode: "light" | "dark"): DataTheme {
+  return customTarget && !customTarget.remembered ? resolveTheme(family, mode) : themeFor(family, mode);
+}
 
 let rememberThemes = false;
 
@@ -137,9 +191,17 @@ function remember(key: string, value: string | null): void {
   }
 }
 
-function setDataTheme(value: DataTheme): void {
-  document.documentElement.dataset.theme = value;
-  remember(LAST_THEME_KEY, value);
+function setDataTheme(value: DataTheme, rememberAs: DataTheme = value): void {
+  const root = document.documentElement;
+  if (customTarget && value.startsWith("custom-")) {
+    root.dataset.themeId = customTarget.id;
+    root.dataset.themeRev = String(customTarget.rev);
+  } else {
+    delete root.dataset.themeId;
+    delete root.dataset.themeRev;
+  }
+  root.dataset.theme = value;
+  remember(LAST_THEME_KEY, rememberAs);
 }
 
 export function applySyntaxPalette(value: SyntaxPalette): void {
@@ -167,16 +229,29 @@ export function applyTheme(setting: ThemeSetting, family: ThemeFamily): () => vo
   detachSystemListener();
   remember(
     LAST_SYSTEM_PAIR_KEY,
-    setting === "system" ? `${resolveTheme(family, "light")} ${resolveTheme(family, "dark")}` : null,
+    setting === "system" ? `${rememberedFor(family, "light")} ${rememberedFor(family, "dark")}` : null,
+  );
+  remember(
+    CUSTOM_THEME_BOOT_KEY,
+    customTarget?.remembered
+      ? JSON.stringify({
+          id: customTarget.id,
+          base: [resolveTheme(family, "light"), resolveTheme(family, "dark")],
+          css: customTarget.css,
+        })
+      : null,
   );
   if (setting === "system") {
-    const forOs = (dark: boolean) => resolveThemeSetting(setting, family, dark);
+    const paint = (dark: boolean) => {
+      const mode = dark ? "dark" : "light";
+      setDataTheme(themeFor(family, mode), rememberedFor(family, mode));
+    };
     media = window.matchMedia("(prefers-color-scheme: dark)"); // the listener needs the object
-    onChange = (event) => setDataTheme(forOs(event.matches));
-    setDataTheme(forOs(media.matches));
+    onChange = (event) => paint(event.matches);
+    paint(media.matches);
     media.addEventListener("change", onChange);
   } else {
-    setDataTheme(resolveTheme(family, setting));
+    setDataTheme(themeFor(family, setting), rememberedFor(family, setting));
   }
   return detachSystemListener;
 }

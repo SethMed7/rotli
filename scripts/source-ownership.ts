@@ -23,6 +23,7 @@ export const SOURCE_DIRECTORY_OWNERS = {
   sheets: "editable spreadsheet capability, codecs, engines, and session",
   state: "Zustand stores and persistence registration",
   styles: "application CSS consuming semantic brand tokens",
+  themes: "personal custom themes: listing, selection, import and apply workflow, and composition",
   voice: "speech segmentation and text-to-speech adapter",
 } as const;
 
@@ -125,6 +126,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
   "claudeSession.ts": "native Claude agent-protocol adapter: the tool-call Channel and its answers",
   "pinnedSiteShell.ts": "pinned sites' native pages (their own signed-in WebKit stores)",
+  "themeFiles.ts": "personal custom-theme files beside the app settings (src-tauri/src/theme_files.rs)",
   "agentBridge.ts": "the agent bridge's webview side: an admitted agent request in, the window's answer out",
   "aiFiles.ts": "the AI's Word-document lane: create (recorded as AI-made) and edit only those",
   "aiInsert.ts": "the /ai insert lane: an accepted passage added through corpus_insert_ai",
