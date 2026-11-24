@@ -2999,9 +2999,11 @@
   color: var(--failure);
 }
 
-/* The sidebar anchors its absolutely placed children. */
+/* The sidebar anchors its absolutely placed children and keeps their
+   z-index (the chat rows') inside it. */
 .sidebar {
   position: relative;
+  isolation: isolate;
 }
 
 /* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one
