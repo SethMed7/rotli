@@ -422,6 +422,27 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     expect(calls.appended[0]?.status).toBe("reverted");
   });
 
+  test("undoing a tags fill never drops a tag the person added since", async () => {
+    const a = row({
+      id: "01JTAGS",
+      action: "field",
+      field: "tags",
+      status: "applied",
+      noteId: "wiki/Projects/foo-a1b2c3.md",
+      noteUlid: "01ULID",
+      before: "[]",
+      after: "[deal, land]",
+    });
+    const added = fakeDeps("wiki/Projects/foo-a1b2c3.md", ["tags: [deal, land, mine]"]);
+    await expect(undoAction(a, added.deps)).rejects.toThrow("tags changed");
+    expect(added.calls.setAiField).toEqual([]);
+    expect(added.calls.appended).toEqual([]);
+
+    const untouched = fakeDeps("wiki/Projects/foo-a1b2c3.md", ["tags: [deal, land]"]);
+    await undoAction(a, untouched.deps);
+    expect(untouched.calls.setAiField).toEqual([["01ULID", "tags", "[]"]]);
+  });
+
   test("a note the Librarian created is undone by moving it to the Trash", async () => {
     const a = row({
       id: "01JMADE",
