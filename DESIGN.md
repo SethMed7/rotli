@@ -180,6 +180,14 @@ exception.
   front rather than inheriting Chat or Breve navigation from either vault. Breve
   changes only the Coffee/Quokka mode control in this row; New, New folder, and
   Collapse all do not move or disappear when the sidebar mode changes.
+- A secure note wears one quiet mark in its sidebar and list rows: a 12px
+  shield (`ShieldGlyph`, the same glyph as Quick Note's secure control) in the
+  muted ink, named “Secure note” for assistive tech and as a tooltip. It
+  follows the title, which keeps the row's flexible space, so truncation is
+  unchanged. It is always present on a secure note, so nothing appears, moves,
+  or competes with the Quick access star or pin on hover, and it never takes
+  accent. The padlock stays for *locked*; the two are different promises. It
+  reads the list's own `secure` flag and costs no read per row.
 - Provider/model marks in Chat use one 14px slot and an optically consistent
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.

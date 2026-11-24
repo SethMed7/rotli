@@ -73,6 +73,7 @@ import {
 } from "./glyphs";
 import { glyphForNote } from "./noteGlyph";
 import { NoteListRow } from "./noteListRow";
+import { SecureMark, isMarkedSecure } from "./secureMark";
 import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
@@ -682,6 +683,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                 glyphForNote(n, { size: 14, className: "fdr-row-icon" })
               )}
               {n.title || "Empty note"}
+              {isMarkedSecure(n) && <SecureMark />}
             </span>
             <span className="fdr-date">{longDateLabel(n.updatedAt)}</span>
             <span className="fdr-kind">{kindLabel(n)}</span>

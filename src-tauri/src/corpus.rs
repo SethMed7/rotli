@@ -1313,6 +1313,16 @@ fn searchable_metadata(fm: &Frontmatter) -> String {
         .join("\n")
 }
 
+/// The mark a write's answer carries for a note it just wrote: the flag, the
+/// chat taint, or a secure folder (the body detector needs the whole text, so
+/// only the walk applies it).
+fn row_secure(fm: &Frontmatter, folder: &str, disk_folder: &str) -> bool {
+    secure_on(&fm.foreign)
+        || fm.foreign.iter().any(|l| secure_context_field(l) == Some(true))
+        || links::in_secure_folder(folder)
+        || links::in_secure_folder(disk_folder)
+}
+
 /// Is this walked note protected content? The same three-way rule
 /// `read_for_ai` applies — the explicit flag, the chat taint marker, or the
 /// body detector for a note whose metadata panel was never opened.
@@ -2143,6 +2153,14 @@ pub struct NoteMeta {
     /// "note" (a `.md`) or "board" (a `.excalidraw`). Serde-defaults to note.
     #[serde(default)]
     pub kind: NoteKind,
+    /// Set ONLY on a row of the person's own walk: protected by the one rule
+    /// the Graph uses (the flag, the chat taint, the secret detector, or a
+    /// secure folder), so the sidebar can mark it without reading each note.
+    /// Every other builder leaves it false (and it is not serialized then); an
+    /// agent lane's row is cleared in `agent_row`, so no list wire tells an
+    /// agent which notes are protected.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub secure: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -4923,6 +4941,7 @@ impl CorpusStore {
         // today reads as just edited, not as hours old (stamp_to_ms)
         let (_, saved_at) = file_stamps(&target_abs);
         Ok(NoteMeta {
+            secure: row_secure(&fm, &folder, &disk_folder),
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
@@ -5035,6 +5054,7 @@ impl CorpusStore {
         let is_board = target_rel.to_ascii_lowercase().ends_with(".excalidraw");
         let folder = folder_of(&target_rel);
         Ok(NoteMeta {
+            secure: false,
             id: target_rel.clone(),
             title: if is_board {
                 board_title(&target_rel)
@@ -5189,6 +5209,7 @@ impl CorpusStore {
         self.persist_index();
 
         Ok(NoteMeta {
+            secure: row_secure(&fm, &project_lifecycle_folder(self.layout, target_folder), target_folder),
             id: id.to_string(),
             title,
             snippet: snippet_of(&body),
@@ -5889,6 +5910,7 @@ impl CorpusStore {
         let aliases = note_aliases(&rel, &title, &id, &fm);
         let revision = crate::fsutil::revision(document.as_bytes());
         Ok((NoteMeta {
+            secure: row_secure(&fm, &project_folder(self.layout, disk_folder, &fm), disk_folder),
             id,
             title,
             snippet: snippet_of(body),
@@ -5959,6 +5981,7 @@ impl CorpusStore {
         atomic_write(&abs, body)?;
         let (created_at, updated_at) = file_stamps(&abs);
         Ok(NoteMeta {
+            secure: false,
             id: id.to_string(),
             title: board_title(id),
             snippet: String::new(),
@@ -6043,6 +6066,7 @@ impl CorpusStore {
         atomic_write(&abs, body)?;
         let (created_at, updated_at) = file_stamps(&abs);
         Ok(NoteMeta {
+            secure: false,
             id: rel.clone(),
             title: board_title(&rel),
             snippet: String::new(),
@@ -6083,6 +6107,7 @@ impl CorpusStore {
             // same name — nothing to do, return current meta
             let (created_at, updated_at) = file_stamps(&old_abs);
             return Ok(NoteMeta {
+                secure: false,
                 id: id.to_string(),
                 title: board_title(id),
                 snippet: String::new(),
@@ -6104,6 +6129,7 @@ impl CorpusStore {
         fs::rename(&old_abs, &new_abs).map_err(|e| format!("rename board: {e}"))?;
         let (created_at, updated_at) = file_stamps(&new_abs);
         Ok(NoteMeta {
+            secure: false,
             id: new_rel.clone(),
             title: board_title(&new_rel),
             snippet: String::new(),
@@ -6378,6 +6404,7 @@ fn reference_row(rel: &str, abs: &Path, fm: &Frontmatter, body: &str) -> NoteMet
     let disk_folder = folder_of(rel);
     let (file_created, file_updated) = file_stamps(abs);
     NoteMeta {
+        secure: false,
         id: rel.to_string(),
         title: title_of(body),
         snippet: snippet_of(body),
@@ -6404,6 +6431,7 @@ fn note_row(layout: Layout, id: String, rel: &str, abs: &Path, fm: &Frontmatter,
     let title = title_of(body);
     let (file_created, file_updated) = file_stamps(abs);
     NoteMeta {
+        secure: false,
         aliases: note_aliases(rel, &title, &id, fm),
         folder_id: project_folder(layout, &disk_folder, fm),
         origin: if is_hidden_root(layout, &disk_folder) { fm.origin.clone() } else { None },
@@ -6698,6 +6726,7 @@ fn walk(
                 })
                 .unwrap_or_else(|| Ulid::new().to_string());
             new_index.insert(id.clone(), rel.clone());
+            let walked = walked_secure(&fm, body, &text);
             // cache the parsed text beside the meta — search()/tasks() read it
             // instead of a second full read+parse pass (audit 2026-07-30, #5)
             texts.insert(
@@ -6709,10 +6738,16 @@ fn walk(
                     } else {
                         String::new()
                     },
-                    secure: walked_secure(&fm, body, &text),
+                    secure: walked,
                 },
             );
-            notes.push(note_row(layout, id, &rel, &abs, &fm, body));
+            let mut row = note_row(layout, id, &rel, &abs, &fm, body);
+            // the person's own listing is the only place the mark is set: the
+            // one rule the Graph uses, from the text this walk already parsed
+            row.secure = walked
+                || links::in_secure_folder(&row.folder_id)
+                || links::in_secure_folder(&row.disk_folder_id);
+            notes.push(row);
         } else if kind.is_file() && name.to_ascii_lowercase().ends_with(".excalidraw") {
             // Boards: a parallel, frontmatter-free, path-as-id surface. NO
             // frontmatter parse, NO `.rotli` ulid index (id IS the relpath),
@@ -6735,6 +6770,7 @@ fn walk(
 pub(crate) fn board_row(rel: &str, prefix: &str, abs: &Path) -> NoteMeta {
     let (file_created, file_updated) = file_stamps(abs);
     NoteMeta {
+        secure: false,
         id: rel.to_string(),
         title: board_title(rel),
         snippet: String::new(),
@@ -6757,6 +6793,7 @@ pub(crate) fn board_row(rel: &str, prefix: &str, abs: &Path) -> NoteMeta {
 pub(crate) fn file_row(layout: Layout, rel: &str, name: String, prefix: &str, abs: &Path) -> NoteMeta {
     let (file_created, file_updated) = file_stamps(abs);
     NoteMeta {
+        secure: false,
         id: rel.to_string(),
         title: if is_canvas_path(rel) { board_title(rel) } else { name },
         snippet: String::new(),
@@ -8827,6 +8864,10 @@ mod save_lock_tests;
 #[cfg(test)]
 #[path = "corpus_note_guard_tests.rs"]
 mod note_guard_tests;
+
+#[cfg(test)]
+#[path = "corpus_list_secure_tests.rs"]
+mod list_secure_tests;
 
 #[cfg(test)]
 mod tests {

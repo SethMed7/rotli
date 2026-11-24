@@ -872,6 +872,14 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   line rules").
   AI reads classify the physical secure home even when a plain text file there
   has no frontmatter; the organizer independently skips the same location.
+- **The list carries a `secure` mark (2026-11-24).** The person's own
+  `corpus_list` rows set `secure: true` for a protected note by the one rule the
+  Graph uses (the flag, the chat taint, the secret detector, or a secure
+  folder), and leave the key off otherwise, so the sidebar can mark secure
+  notes without a read per row. Only the person's own walk sets it: every
+  agent-lane row is built without it and `agent_row` clears it, so no agent
+  listing says which notes are protected. Writer policy: the contract version
+  does not move.
 - Marking an existing note secure records its prior physical folder, moves the
   stable note id into `wiki/_secure/`, and updates its gitignore protection
   before either path changes. Removing protection moves it back before dropping

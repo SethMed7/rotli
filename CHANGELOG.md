@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A quiet shield on secure notes.** A secure note now wears a small muted
+  shield beside its title in the Main tree, in All notes and Recent, and in
+  the Library's List view, so you can see at a glance which notes are
+  protected. It has no colour, takes no space that moves on hover, and
+  appears or disappears as soon as a note is made secure or not. It carries
+  the accessible name "Secure note" and the same words as a tooltip.
+
+### Fixed
+
+- **The Aa panel now shows a note's real Secure and AI-edit state.** After
+  ⌘⇧L the header moved a note into Library › Secure notes while the open
+  panel kept showing its first reading. The panel now reads the same live
+  state as the rest of the window, so the shortcut, the row menu, the
+  panel's own switch, and a change made by another app all show in it at
+  once.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

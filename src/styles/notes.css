@@ -3090,3 +3090,27 @@ svg.sb-scene * {
   min-width: 0; height: 100%;
 }
 .tab-activation:focus-visible { outline: 1px solid var(--accent-text); outline-offset: -1px; }
+
+/* The quiet "Secure note" mark on a row: a small shield in the muted ink,
+   always present on a secure note (nothing appears or moves on hover), never
+   accent — it informs at a glance and asks for nothing. It follows the title,
+   which keeps the row's flexible space, so truncation is unchanged. */
+.secure-mark {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: 5px;
+  color: var(--text-muted);
+}
+.snrow.sel .secure-mark,
+.recent-row.sel .secure-mark,
+.fdr-row.sel .secure-mark {
+  color: var(--selected-icon);
+}
+.recent-row .secure-mark {
+  align-self: center;
+  margin-left: -6px; /* the row gap already spaces it from the snippet */
+}
+.fdr-name .secure-mark {
+  margin-left: 0;
+}

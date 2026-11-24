@@ -264,6 +264,9 @@ impl CorpusStore {
         }
         row.folder_id = self.agent_folder(&row.folder_id, &row.disk_folder_id)?;
         row.origin = self.agent_origin(row.origin);
+        // the sidebar's mark is for the person's own listing; an agent is never
+        // told which of the notes it may see are protected
+        row.secure = false;
         Some(row)
     }
 

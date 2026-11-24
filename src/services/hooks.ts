@@ -30,6 +30,7 @@ import { DEST, isChats, isChatsPath, isSink } from "./destinations";
 import { trashVirtualFolderItems } from "./folderTrash";
 import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
+import { invalidateNoteProtection } from "./noteProtectionQuery";
 import { afterPublish, beforePublish, registerReadHooks, startRead, stampRead } from "./noteReads";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
@@ -365,11 +366,10 @@ export function primeNote(note: Note): void {
 }
 
 export async function invalidateNotes(): Promise<void> {
-  // the three umbrellas hit independent Rust commands — refetch them together,
-  // not one after another (each await was a serialized IPC round trip)
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["notes"] }),
     queryClient.invalidateQueries({ queryKey: ["note"] }),
+    invalidateNoteProtection(), // the Aa panel's read of a note's protection
     queryClient.invalidateQueries({ queryKey: keys.skipped }),
     // a body edit can add/complete checkboxes — the Tasks projection re-derives
     queryClient.invalidateQueries({ queryKey: keys.tasks }),
