@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deleting a board no longer says "note not found".** The board did move
+  to Trash, but Rotli then looked for it at its old place and reported a
+  failure, so its tab stayed open and its row stayed in the sidebar. Archive
+  and Move to a folder had the same problem for boards.
+- **A board no longer loses your last strokes.** On a big board, a save
+  could still be writing when the next one started; the second was refused
+  as a "revision conflict" and what you drew in between was never saved.
+  Saves now wait their turn, and an edit made by something else is still
+  reported instead of being overwritten.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

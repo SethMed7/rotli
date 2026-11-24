@@ -193,7 +193,27 @@ export class FsNotesService implements NotesService {
 
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const meta = await corpusMove(id, targetFolder);
-    const { body, revision } = await corpusRead(id);
+    // A board or surfaced file is addressed by its path, which this move just
+    // changed, and it has no Markdown body to read back. Re-reading it under
+    // the old id reported a SUCCESSFUL trash as "note not found" and left its
+    // tab and sidebar row behind (the owner, 2026-11-24).
+    if (meta.kind && meta.kind !== "note") {
+      return {
+        id: meta.id,
+        title: meta.title,
+        snippet: meta.snippet,
+        bodyEmpty: false,
+        kind: meta.kind,
+        folderId: meta.folderId,
+        diskFolderId: meta.diskFolderId,
+        createdAt: meta.createdAt,
+        updatedAt: meta.updatedAt,
+        pinned: meta.pinned,
+        body: "",
+        revision: "",
+      };
+    }
+    const { body, revision } = await corpusRead(meta.id);
     return {
       id: meta.id,
       title: titleOf(body),
