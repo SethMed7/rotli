@@ -27,6 +27,7 @@ import { type NewItemKind, isNameFirstKind, isNewItemAvailable, withBetaLabel } 
 import { openChatForNoteId } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { focusChatWindow } from "../services/chatWindowShell";
+import { openModelUsage } from "../services/dashboardNav";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
@@ -783,6 +784,7 @@ export function registerDefaultActions(): void {
   };
   const views = [
     ["view.dashboard", "Rotli activity dashboard", () => openView("dashboard")],
+    ["view.modelUsage", "Model usage", openModelUsage],
     ["view.tasks", "Tasks", () => openView("tasks", TASKS)],
     ["view.allNotes", "All notes", () => openView("allNotes", ALL_NOTES)],
     ["browser.private", "Open a private browser", () => usePanesStore.getState().openBrowser()],

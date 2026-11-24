@@ -9,6 +9,7 @@
 // caller's job — only the final answer is written to the chat file.
 
 import { LAUNCH_FEATURES, PLATFORM, type Platform } from "../lib/featurePolicy";
+import { parseNoteDocument } from "../lib/frontmatter";
 import {
   externalText,
   fixed,
@@ -172,6 +173,32 @@ async function* generate(
   return { raw: step.value, extractor };
 }
 
+export const READING_PROJECT = "reading the project’s instructions…";
+
+/** The chat project's instructions note (services/chatProjects.ts), read
+ * through Host.readNote — the same gated read as any note, for THIS model: a
+ * secure note is refused to a remote model, and an on-device read of one
+ * taints the chat. Its frontmatter is dropped. A read that isn't the editor's
+ * saved version comes back as "error: …" rather than throwing; that is a
+ * failure too, never text for the system prompt. Throws with the reason. */
+export async function readProjectInstructions(host: Host, noteId: string): Promise<PromptText> {
+  const text = prompt`${await host.readNote(noteId)}`;
+  if (String(text).startsWith("error: ")) throw new Error(String(text).slice("error: ".length));
+  return reshape(text, (raw) => parseNoteDocument(raw).body.trim());
+}
+
+/** What the chat says when a project's instructions can't ride this turn:
+ * nothing is sent without them. */
+export function projectInstructionsRefusal(e: unknown): string {
+  return `⚠ This project’s instructions couldn’t be used with this model, so nothing was sent — ${errMsg(
+    e,
+    "the note couldn’t be read",
+  )}. Use an on-device model, or unlink the instructions on the project page.`;
+}
+
+/** The loop's own view of a turn: the input plus what it read for it. */
+type LoopInput = RunInput & { projectInstructions?: PromptText };
+
 export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<AgentEvent, void, void> {
   const clarification = artifactClarification(input.userText, {
     documentTool: input.documentTool === true && host.createDocument !== undefined,
@@ -198,6 +225,16 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   const allowed = allowedTools(input, adapter.webStrategy);
 
   const knowledge = await loadKnowledge(host, budget.maxIndexChars);
+  let projectInstructions: PromptText | undefined;
+  if (input.projectInstructionsNoteId) {
+    yield { type: "status", text: READING_PROJECT };
+    try {
+      projectInstructions = await readProjectInstructions(host, input.projectInstructionsNoteId);
+    } catch (e) {
+      yield { type: "final", text: projectInstructionsRefusal(e) };
+      return;
+    }
+  }
 
   // history is capped to the model's budget (#65) — newest turns win, so a
   // long-running chat degrades to "recent context" instead of a blown window
@@ -230,6 +267,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       ...(input.artifactTool && LAUNCH_FEATURES.sheets ? { sheetArtifacts: true } : {}),
       ...(input.boardTool ? { boardTool: true } : {}),
       ...(input.userName ? { userName: input.userName } : {}),
+      ...(projectInstructions ? { projectInstructions } : {}),
     });
 
     // every step is a fresh, stateless call: the turn's images ride each one,
@@ -379,7 +417,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   yield { type: "status", text: "wrapping up…" };
   const forced = yield* forceFinal(
     host,
-    { ...input, history },
+    { ...input, history, ...(projectInstructions ? { projectInstructions } : {}) },
     pruneScratch(scratch, budget.maxScratchChars),
     useStream && !researchAttempted,
     webEvidence,
@@ -392,7 +430,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
  * extracted the same way. Yields `delta` events; returns the answer text. */
 async function* forceFinal(
   host: Host,
-  input: RunInput,
+  input: LoopInput,
   scratch: ScratchStep[],
   useStream: boolean,
   webEvidence: ReadonlyMap<string, string>,
@@ -402,6 +440,7 @@ async function* forceFinal(
     userText: input.userText,
     scratch,
     ...(input.userName ? { userName: input.userName } : {}),
+    ...(input.projectInstructions ? { projectInstructions: input.projectInstructions } : {}),
   });
   try {
     // the wrap-up sees what every step saw: the cleaned history (the caller

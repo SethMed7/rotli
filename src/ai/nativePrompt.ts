@@ -19,6 +19,7 @@ export interface NativePromptCtx {
   offeredTools: ReadonlySet<ToolName>;
   web: boolean;
   userName?: PersonText;
+  projectInstructions?: PromptText;
   knowledge: PromptText;
   maxSteps: number;
 }

@@ -10,6 +10,7 @@ import { useCallback } from "react";
 import { discardBlankNote } from "../documents/draftComposition";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { noteDiskFolder } from "../lib/noteLocation";
+import { pinActionLabel } from "../lib/sidebarLook";
 import {
   corpusFileStat,
   corpusFrontmatter,
@@ -463,7 +464,7 @@ export function useNoteMenu() {
         if (isNote) {
           items.push({
             kind: "action" as const,
-            label: fm?.pinned ? "Unpin from top" : "Pin to top",
+            label: pinActionLabel(!!fm?.pinned),
             checked: !!fm?.pinned,
             onClick: () => runFm("pin", corpusSetPinned(note.id, !fm?.pinned)),
           });

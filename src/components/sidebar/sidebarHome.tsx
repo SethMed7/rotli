@@ -81,17 +81,9 @@ import { ALL_NOTES, SEC_SYSTEM, TASKS, useUiStore } from "../../state/ui";
 import { useVaultView } from "../../state/vaultView";
 import { useViewsStore } from "../../state/views";
 import type { NoteSummary } from "../../types";
-import {
-  ArchiveGlyph,
-  ChevronRight,
-  FolderGlyph,
-  NewFileGlyph,
-  NewFolderGlyph,
-  StorageGlyph,
-  TrashGlyph,
-} from "../glyphs";
+import { ArchiveGlyph, FolderGlyph, NewFileGlyph, NewFolderGlyph, StorageGlyph, TrashGlyph } from "../glyphs";
 import { useNoteMenu } from "../useNoteMenu";
-import { ViewSectionHeader } from "./chatViewPicker";
+import { DisclosureChevron } from "./disclosureChevron";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
 import { mainFolderMenuItems } from "./mainFolderMenu";
@@ -106,6 +98,7 @@ import { useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
 import { ViewNameEditor } from "./viewNameEditor";
+import { ViewSectionHeader } from "./viewSectionHeader";
 
 /** The fixed System destinations after Library. Switching vaults changes only
  * their contents and counts and, in an imported vault, the folder ids behind
@@ -718,9 +711,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   }}
                   {...rp({ id: f.id, kind: "folder" })}
                 >
-                  <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                    <ChevronRight size={10} />
-                  </span>
+                  <DisclosureChevron open={open} />
                   <FolderGlyph size={14} className="kind-folder" />
                   <span className="fname">{f.name}</span>
                   {/* NO inline remove-× here: it rendered unstyled mid-row on .frow

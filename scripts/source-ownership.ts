@@ -167,6 +167,8 @@ export const SERVICE_FILE_OWNERS = {
   "chatFolders.ts": "chat",
   "chatImages.ts": "chat",
   "chatModelMeta.ts": "chat",
+  "dashboardNav.ts": "model usage (the one way to open the dashboard's models lens)",
+  "chatProjects.ts": "chat (projects: a new chat joins its project; instructions ride each turn)",
   "chatRename.ts": "chat",
   "handToAi.ts": "notes",
   "inlineAi.ts": "notes (Ask AI: the gates around one model call and one accepted insertion)",

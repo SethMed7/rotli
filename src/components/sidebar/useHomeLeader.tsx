@@ -34,8 +34,6 @@ export function useHomeLeader(
   /** The view picker's items; `numbered` puts ⌘1–9 on its choices. */
   viewMenuItems: (numbered: boolean) => MenuSpec[],
   showView: (name: string | null) => void,
-  /** Which requests this front answers — Chat answers only the view menu. */
-  answers: readonly ("views" | "sidebar")[] = ["views", "sidebar"],
 ): {
   viewsButtonRef: RefObject<HTMLButtonElement | null>;
   openViewMenu: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -48,7 +46,7 @@ export function useHomeLeader(
     // read the LIVE request, not this render's: answered means cleared, so a
     // repeated effect run (StrictMode mounts twice) finds nothing to answer
     const request = useUiStore.getState().leaderRequest;
-    if (!request || !answers.includes(request.id)) return;
+    if (!request) return;
     useUiStore.getState().clearLeaderRequest();
     if (Date.now() - request.at > 1000) return;
     if (request.id === "sidebar") {
@@ -73,7 +71,7 @@ export function useHomeLeader(
       onEnd: () => useContextMenu.getState().close(),
     });
     // (re-running on every render is free: an answered request reads as none)
-  }, [leaderRequest, viewMenuItems, showView, answers]);
+  }, [leaderRequest, viewMenuItems, showView]);
 
   // The menu can also close on its own (a click, Esc inside it): the pending
   // leader goes with it, so ⌘1 is a tab jump again at once. Open → closed only:

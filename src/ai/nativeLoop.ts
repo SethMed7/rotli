@@ -17,8 +17,11 @@ import {
   egressBlock,
   errMsg,
   loadKnowledge,
+  projectInstructionsRefusal,
   READING_ATTACHED,
+  READING_PROJECT,
   readAttached,
+  readProjectInstructions,
   runToolSafely,
 } from "./loop";
 import { renderNativeSystem, renderNativeUser } from "./nativePrompt";
@@ -73,6 +76,16 @@ export async function* runNativeAgent(
   const knowledge = await loadKnowledge(host, budget.maxIndexChars);
   // what the model has seen from the vault: the private-prose guard reads it
   const scratch: ScratchStep[] = [];
+  let projectInstructions: PromptText | undefined;
+  if (input.projectInstructionsNoteId) {
+    yield { type: "status", text: READING_PROJECT };
+    try {
+      projectInstructions = await readProjectInstructions(host, input.projectInstructionsNoteId);
+    } catch (e) {
+      yield { type: "final", text: projectInstructionsRefusal(e) };
+      return;
+    }
+  }
   let attached: { id: PromptText; text: PromptText } | undefined;
   if (input.noteId) {
     yield { type: "status", text: READING_ATTACHED };
@@ -131,6 +144,7 @@ export async function* runNativeAgent(
       knowledge,
       maxSteps,
       ...(input.userName ? { userName: input.userName } : {}),
+      ...(projectInstructions ? { projectInstructions } : {}),
     }),
     userText: renderNativeUser(
       // a failed (⚠) reply and the turn it answered stay out, as in the

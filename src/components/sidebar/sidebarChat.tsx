@@ -1,8 +1,9 @@
-// The CHAT front (the maintainer's IA, 2026-08-01): a ChatGPT-style front over the
-// memex's chats/ — New chat, a searchable All, the virtual chat folders, then
-// every chat. It owns the whole sidebar body while it is the active front, so
-// there is no cap and no "+N more": the list just scrolls
-// (docs/design/sidebar-home-chat.md). Lifted wholesale out of sidebar.tsx.
+// The CHAT front (design A, 2026-11-24): New chat, Search chats, the Projects
+// list (sidebarChatProjects.tsx), then Recents — every chat once, by reply
+// recency, a chat in a project wearing a quiet project tag. It owns the whole
+// sidebar body while it is the active front, so the list just scrolls
+// (docs/design/sidebar-home-chat.md). Model usage and named views are not
+// here: usage opens from ⌘K and Settings, and views belong to Home.
 
 import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useEffectEvent, useRef, useState } from "react";
@@ -11,53 +12,38 @@ import { modelLabel, modelProvider } from "../../ai/models";
 import { createDragGhost } from "../../lib/dragGhost";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
-import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
+import { pinActionLabel } from "../../lib/sidebarLook";
+import { type MemexChatSummary, chatModels, isTauri } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
 import { chatsDirOf } from "../../memex/config";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
-import {
-  assignChatToFolder,
-  chatActivityMs,
-  createChatFolder,
-  deleteChatFolder,
-  renameChatFolder,
-  setChatFolderPinned,
-} from "../../services/chatFolders";
+import { assignChatToFolder, chatActivityMs, renameChatFolder } from "../../services/chatFolders";
 import { useChatRename } from "../../services/chatRename";
-import { assignChatToView, chatAssignedView, viewChats } from "../../services/viewTree";
 import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
-import { useIsHidden } from "../../state/hidden";
 import { leaves, useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
-import { useViewsStore } from "../../state/views";
 import { useChatFirstVisitDone } from "../chat/chatConnectModels";
-import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
+import { MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
-import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
 import { chatFileMenuItems, chatFinderMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
-import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
-import { OverviewCard } from "./overviewCard";
-import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
-import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
+import { ProjectTag } from "./projectRow";
+import { chatRowSignal, relativeChatAge } from "./sidebarChatProjection";
+import { SidebarChatProjects, createProject } from "./sidebarChatProjects";
+import type { SidebarChatData } from "./useChatFolders";
 import { useConnectVault } from "./useConnectVault";
 
-/** Where a dragged chat would land: a folder row (positional reordering retired 2026-08-03). */
-type ChatDrop = { kind: "folder"; id: string };
+/** Where a dragged chat would land: a project row. */
+type ChatDrop = { kind: "project"; id: string };
 
 export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: number }) {
   const now = useNow();
-  const { activeMemex, chatList, manifest, grouped, update } = chats;
+  const { activeMemex, chatList, manifest, update } = chats;
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
-  const dashboardSection = useUiStore((s) => s.dashboardSection);
-  const hideOverview = useIsHidden("overview");
-  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
-  const expandedDests = useUiStore((s) => s.expandedDests);
-  const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
   // no vault yet: connect one right here (the vault menu's Connect flow)
   const { connectVault } = useConnectVault();
@@ -103,63 +89,30 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
-  const localUsage = useQuery({
-    queryKey: ["modelUsage", "7d"],
-    queryFn: () => modelUsage("7d"),
-    staleTime: 60_000,
-  });
-  const usageSnapshot = modelUsageSnapshot(localUsage.data);
-  const usageFavorite = usageSnapshot.favorite;
-  const usageFavoriteMark = usageFavorite ? chatMark(usageFavorite.provider, usageFavorite.model) : null;
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const chatModelMap = useUiStore((s) => s.chatModel);
   const chatModelId = useUiStore((s) => s.chatModelId);
 
-  // Chats participate in named views (2026-08-03): a view lists only the chats
-  // assigned to it, even none (2026-09-21); Main lists every chat.
-  const activeView = useUiStore((s) => s.activeView);
-  const setActiveView = useUiStore((s) => s.setActiveView);
-  const viewsManifest = useViewsStore((s) => s.manifest);
-  const viewsWritable = useViewsStore((s) => s.writable && s.hydrated);
-  const setViewsManifest = useViewsStore((s) => s.setManifest);
-  const visibleChats = visibleSidebarChats(
-    chatList,
-    activeView ? viewChats(viewsManifest, activeView) : null,
-  );
-  const visibleSlugs = activeView ? new Set(visibleChats.map((c) => c.slug)) : null;
-  const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
-  const showAllChats = () => {
-    setActiveView(null);
-    setContentView("allChats");
-  };
+  // Search chats opens the searchable All chats list
+  const searchChats = () => setContentView("allChats");
 
   // the header's New-folder button, while Chat is the active front, mints a
-  // CHAT folder and opens its rename inline — the nonce is the seam between
+  // chat PROJECT and opens its rename inline — the nonce is the seam between
   // the shell's toolbar and the front that answers it (ui.requestSidebarFolder)
   const lastFolderNonce = useRef(sidebarFolderNonce);
   // `update` closes over the live manifest: an effect event, the nonce the trigger
   const createFolderFromToolbar = useEffectEvent((nonce: number) => {
     if (nonce === lastFolderNonce.current) return;
     lastFolderNonce.current = nonce;
-    let createdId: string | null = null;
-    update(
-      (m) => {
-        const created = createChatFolder(m, "New folder");
-        createdId = created.id;
-        return created.manifest;
-      },
-      () => {
-        if (createdId) setRenamingFolderId(createdId);
-      },
-    );
+    createProject(update, setRenamingFolderId);
   });
   useEffect(() => createFolderFromToolbar(sidebarFolderNonce), [sidebarFolderNonce]);
 
-  // — drag a chat INTO a folder (the maintainer, 2026-07-30: "drag chat into the folder
-  //   properly"): the Main tree's pointer-drag grammar (HTML5 DnD stays dead in
-  //   the WKWebView shell). Dropping on a folder row assigns through the same
-  //   manifest write the row menu uses; an in-folder row is a POSITION target;
-  //   anywhere else abandons. The dragged row dims, the hovered folder tints, the title rides as a ghost. —
+  // — drag a chat ONTO a project row: the Main tree's pointer-drag grammar
+  //   (HTML5 DnD stays dead in the WKWebView shell). Dropping on a project row
+  //   assigns through the same manifest write the row menu uses; anywhere else
+  //   abandons. The dragged row dims, the hovered project tints, the title
+  //   rides as a ghost. —
   const [dragSlug, setDragSlug] = useState<string | null>(null);
   const [drop, setDrop] = useState<ChatDrop | null>(null);
   const didDragRef = useRef(false);
@@ -178,14 +131,13 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
       },
       onMove: (x, y) => {
         const el = document.elementFromPoint(x, y) as HTMLElement | null;
-        const folderRow = el?.closest("[data-chatfolder-id]") as HTMLElement | null;
-        const folderId = folderRow?.dataset.chatfolderId;
-        target = folderId ? { kind: "folder", id: folderId } : null;
+        const projectRow = el?.closest("[data-chatproject-id]") as HTMLElement | null;
+        const projectId = projectRow?.dataset.chatprojectId;
+        target = projectId ? { kind: "project", id: projectId } : null;
         setDrop(target);
       },
       onDrop: () => {
-        // assignment only — positional reordering retired 2026-08-03 (response
-        // recency owns the order inside a folder now)
+        // assignment only — reply recency owns the order
         const d = target;
         if (d) update((m) => assignChatToFolder(m, slug, d.id));
       },
@@ -209,7 +161,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           ),
         );
     };
-    const assignedFolder = manifest.assignments[c.slug];
+    const assignedProject = manifest.assignments[c.slug];
     openContextMenu(x, y, [
       {
         kind: "action" as const,
@@ -229,7 +181,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
       { kind: "sep" as const },
       {
         kind: "action" as const,
-        label: c.pinned ? "Unpin from top" : "Pin to top",
+        label: pinActionLabel(c.pinned),
         checked: c.pinned,
         onClick: () => {
           if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
@@ -242,20 +194,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
       },
       {
         kind: "drill" as const,
-        label: "Move to folder",
+        label: "Add to project",
         items: [
           ...manifest.folders.map((folder) => ({
             kind: "action" as const,
             label: folder.name,
-            checked: assignedFolder === folder.id,
+            checked: assignedProject === folder.id,
             checkedMark: "highlight" as const,
             onClick: () => update((m) => assignChatToFolder(m, c.slug, folder.id)),
           })),
-          ...(assignedFolder
+          ...(assignedProject
             ? [
                 {
                   kind: "action" as const,
-                  label: "Remove from folder",
+                  label: "Remove from project",
                   onClick: () => update((m) => assignChatToFolder(m, c.slug, null)),
                 },
               ]
@@ -263,49 +215,11 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           ...(manifest.folders.length > 0 ? [{ kind: "sep" as const }] : []),
           {
             kind: "action" as const,
-            label: "New folder…",
-            onClick: () => {
-              let createdId: string | null = null;
-              update(
-                (m) => {
-                  const created = createChatFolder(m, "New folder");
-                  createdId = created.id;
-                  return assignChatToFolder(created.manifest, c.slug, created.id);
-                },
-                () => {
-                  if (createdId) setRenamingFolderId(createdId);
-                },
-              );
-            },
+            label: "New project…",
+            onClick: () => createProject(update, setRenamingFolderId, c.slug),
           },
         ],
       },
-      ...(viewsManifest.views.length > 0 && viewsWritable
-        ? [
-            {
-              kind: "drill" as const,
-              label: "Move to view",
-              items: [
-                ...viewsManifest.views.map((view) => ({
-                  kind: "action" as const,
-                  label: view.name,
-                  checked: chatAssignedView(viewsManifest, c.slug) === view.name,
-                  checkedMark: "highlight" as const,
-                  onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, view.name)),
-                })),
-                ...(chatAssignedView(viewsManifest, c.slug)
-                  ? [
-                      {
-                        kind: "action" as const,
-                        label: "Remove from view",
-                        onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, null)),
-                      },
-                    ]
-                  : []),
-              ],
-            },
-          ]
-        : []),
       ...chatFinderMenuItems(PLATFORM, isTauri(), () => {
         if (!activeMemex) return;
         setRowActionError(null);
@@ -343,12 +257,13 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     ]);
   };
 
-  // one chat row, shared by folder groups and the loose list below them. Each
-  // chat appears exactly once: the session Activity lane that hoisted copies
-  // to the top is retired (the owner, 2026-10-15) — the row's own dot says
-  // Working or Unread reply, and the reply-recency order lifts it.
-  const renderChatRow = (c: MemexChatSummary, folderId: string | null) => {
+  // one chat row. Each chat appears exactly once, in reply-recency order —
+  // its own dot says Working or Unread reply, and a chat in a project wears
+  // the project's name as a quiet tag.
+  const projectNames = new Map(manifest.folders.map((folder) => [folder.id, folder.name]));
+  const renderChatRow = (c: MemexChatSummary) => {
     const signal = chatRowSignal(runs[runKeyOf(c.slug)]);
+    const projectName = projectNames.get(manifest.assignments[c.slug] ?? "");
     const selected = contentView === "panes" && focusedChatSlug === c.slug;
     return chatRename.renamingChatSlug === c.slug ? (
       <InlineRenameInput
@@ -366,9 +281,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         /* a chat row lights only while the PANES actually show it — never
            alongside an active All-chats (or other) view (the maintainer, 2026-07-30:
            two highlights at once read as wrong) */
-        className={`sb-chatrow${folderId ? " in-folder" : ""}${selected ? " sel" : ""}${
-          dragSlug === c.slug ? " dragging" : ""
-        }`}
+        className={`sb-chatrow${selected ? " sel" : ""}${dragSlug === c.slug ? " dragging" : ""}`}
         onPointerDown={(e) => startChatDrag(e, c.slug, c.title || c.slug)}
         onClick={() => {
           if (didDragRef.current) return;
@@ -384,7 +297,9 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         <button
           type="button"
           className="sb-chatrow-open"
-          aria-label={`Open chat ${c.title || c.slug}${signal ? `, ${signal.label}` : ""}`}
+          aria-label={`Open chat ${c.title || c.slug}${projectName ? `, in ${projectName}` : ""}${
+            signal ? `, ${signal.label}` : ""
+          }`}
           aria-current={selected ? "page" : undefined}
           title={c.title || c.slug}
         />
@@ -410,6 +325,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           );
         })()}
         <span className="fname">{c.title || c.slug}</span>
+        {projectName && <ProjectTag name={projectName} />}
         {/* The right edge carries the live signal dot (Working pulses, an
             Unread reply holds still in accent) beside the age of the last
             reply; hovering or focusing swaps the age for one stable action
@@ -448,50 +364,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
       <div className="sb-chat">
-        {!hideOverview && (
-          <OverviewCard
-            variant="sb-model-dashboard"
-            label="Open model usage dashboard"
-            current={contentView === "dashboard" && dashboardSection === "models"}
-            onOpen={() => {
-              setDashboardSection("models");
-              setContentView("dashboard");
-            }}
-            head={["7 days", "Model usage"]}
-            rows={[
-              <>
-                <strong>Usage</strong>{" "}
-                <span>
-                  {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
-                </span>
-              </>,
-              <>
-                <strong>Top</strong>
-                <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
-                  {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
-                  <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
-                </span>{" "}
-                <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
-              </>,
-            ]}
-          />
-        )}
         <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={newChat}>
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
         <button
           type="button"
-          /* highlight "All chats" only when its content view is active — so it
-             never lights up alongside an open chat row (the maintainer, 2026-07-01) */
-          className={`sb-chatrow all${contentView === "allChats" && !activeView ? " sel" : ""}`}
+          /* lit only while the search list is open, never beside an open chat row */
+          className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
           data-hotkey="chat.all"
-          onClick={showAllChats}
+          onClick={searchChats}
         >
           <SearchGlyph size={14} />
-          <span className="fname">All chats</span>
+          <span className="fname">Search chats</span>
         </button>
-        <ChatViewPicker onNewChat={newChat} />
         {!activeMemex ? (
           <button
             type="button"
@@ -506,89 +392,21 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           >
             Connect vault
           </button>
-        ) : chatList.length === 0 ? (
-          <p className="sb-empty">No chats yet.</p>
-        ) : activeView && visibleChats.length === 0 ? (
-          <p className="sb-empty">
-            No chats in {activeView} yet — start one here, or move one in from its menu.
-          </p>
         ) : (
           <>
-            {grouped.folders.map(({ folder, chats: allFolderChats }) => {
-              // an active view narrows every group to its own chats; a folder
-              // with none simply doesn't render while the view is on
-              const folderChats = allFolderChats.filter(inView);
-              if (visibleSlugs !== null && folderChats.length === 0) return null;
-              const folderKey = chatFolderKey(folder.id);
-              const open = expandedDests[folderKey] ?? true;
-              return (
-                <div key={folder.id} className="sb-chatfolder">
-                  {renamingFolderId === folder.id ? (
-                    <InlineRenameInput
-                      className="sb-chatrename"
-                      defaultValue={folder.name}
-                      ariaLabel="Rename chat folder"
-                      onCommit={(value) => {
-                        setRenamingFolderId(null);
-                        update((m) => renameChatFolder(m, folder.id, value));
-                      }}
-                      onCancel={() => setRenamingFolderId(null)}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`sb-chatrow sb-chatfolder-row${
-                        drop?.kind === "folder" && drop.id === folder.id ? " chatdrop" : ""
-                      }`}
-                      data-chatfolder-id={folder.id}
-                      aria-expanded={open}
-                      onClick={() => setDestExpanded(folderKey, !open)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openContextMenu(e.clientX, e.clientY, [
-                          {
-                            kind: "action" as const,
-                            label: folder.pinned ? "Unpin from top" : "Pin to top",
-                            checked: folder.pinned === true,
-                            onClick: () => update((m) => setChatFolderPinned(m, folder.id, !folder.pinned)),
-                          },
-                          {
-                            kind: "action" as const,
-                            label: "Rename…",
-                            onClick: () => setRenamingFolderId(folder.id),
-                          },
-                          { kind: "sep" as const },
-                          {
-                            kind: "action" as const,
-                            // frees the chats back to the list — files never move
-                            label: "Delete folder",
-                            danger: true,
-                            onClick: () => update((m) => deleteChatFolder(m, folder.id)),
-                          },
-                        ]);
-                      }}
-                      title={folder.name}
-                    >
-                      {/* the Notes tree's disclosure grammar (the maintainer,
-                          2026-07-30: "needs to be clear what is a
-                          folder") — rotating chevron + folder glyph */}
-                      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                        <ChevronRight size={10} />
-                      </span>
-                      <FolderGlyph size={14} className="kind-folder" />
-                      <span className="fname">{folder.name}</span>
-                      {folder.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-                      <span className="sb-chatfolder-n">{folderChats.length}</span>
-                    </button>
-                  )}
-                  {open && folderChats.map((c) => renderChatRow(c, folder.id))}
-                </div>
-              );
-            })}
-            {/* every loose chat — the front owns the whole body, so the old
-                5/10/15 cap and its "+N more" row are retired (2026-08-01) */}
-            {grouped.loose.filter(inView).map((c) => renderChatRow(c, null))}
+            {/* projects show before the first chat exists */}
+            <SidebarChatProjects
+              chats={chats}
+              dropId={drop?.id ?? null}
+              renamingId={renamingFolderId}
+              setRenamingId={setRenamingFolderId}
+              onRename={(id, name) => update((m) => renameChatFolder(m, id, name))}
+            />
+            {chatList.length === 0 ? (
+              <p className="sb-empty">No chats yet.</p>
+            ) : (
+              chatList.map((c) => renderChatRow(c))
+            )}
           </>
         )}
       </div>

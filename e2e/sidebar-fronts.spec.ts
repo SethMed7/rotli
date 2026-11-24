@@ -30,7 +30,10 @@ test("the switcher hands the whole sidebar body to one front at a time", async (
   await expect(chatSeg(page)).toHaveAttribute("aria-pressed", "true");
   await expect(homeSeg(page)).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator(".sb-chatnew")).toBeVisible();
-  await expect(page.locator(".sb-chat .sb-chatrow", { hasText: "All chats" })).toBeVisible();
+  await expect(page.locator(".sb-chat .sb-chatrow", { hasText: "Search chats" })).toBeVisible();
+  // design A: no usage card and no view row on the Chat front
+  await expect(page.locator(".sb-chat .sb-home-dashboard")).toHaveCount(0);
+  await expect(page.locator(".sb-chat").getByRole("button", { name: /Current view:/ })).toHaveCount(0);
   await expect(page.locator(".sb-notes-tree")).toHaveCount(0);
   // the System zone belongs to Home — it leaves with it
   await expect(page.locator(".sb-system")).toHaveCount(0);
@@ -238,4 +241,16 @@ test("fronts turn off in Settings → Sidebar; one left hides the switcher and c
     "chat",
   );
   await expect(page.getByRole("button", { name: "Pull Chat out into its own window" })).toHaveCount(0);
+});
+
+// Design A (2026-11-24): the usage card left the Chat front; Model usage opens
+// from Settings → AI Models (and ⌘K), landing on the dashboard's models lens.
+test("Model usage opens from Settings now that the Chat front has no usage card", async ({ page }) => {
+  await gotoApp(page);
+  await chatSeg(page).click();
+  await expect(page.locator(".sb-chat .sb-home-dashboard")).toHaveCount(0);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  await page.getByRole("button", { name: "Open model usage", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Model usage range" })).toBeVisible();
 });

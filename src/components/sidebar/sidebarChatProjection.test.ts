@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+import { chatRowSignal, relativeChatAge } from "./sidebarChatProjection";
 
 describe("chat row signal", () => {
   test("a live run reads Working and an unseen answer reads Unread reply", () => {
@@ -11,20 +11,6 @@ describe("chat row signal", () => {
   test("an acknowledged or never-run chat carries no signal", () => {
     expect(chatRowSignal("done")).toBeNull();
     expect(chatRowSignal(undefined)).toBeNull();
-  });
-});
-
-const chats = [{ slug: "one" }, { slug: "two" }];
-
-describe("Chat-front projection", () => {
-  test("a named view with no chats of its own shows none — never every chat", () => {
-    expect(visibleSidebarChats(chats, [])).toEqual([]);
-    expect(visibleSidebarChats(chats, ["no-longer-present"])).toEqual([]);
-  });
-
-  test("a named view with chat membership still narrows the list", () => {
-    expect(visibleSidebarChats(chats, ["two"])).toEqual([{ slug: "two" }]);
-    expect(visibleSidebarChats(chats, null)).toEqual(chats);
   });
 });
 

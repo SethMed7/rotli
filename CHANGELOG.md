@@ -10,6 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Chat projects.** The Chat sidebar now has a short Projects list, and
+  below it every chat, newest reply first. A chat in a project shows the
+  project's name as a small tag. Clicking a project opens its page in a tab:
+  its name (click to rename), New chat in this project, its chats, and its
+  Instructions. A new chat opened from a chat or page in a project joins that
+  project. Drag a chat onto a project, or use Add to project in its menu.
+- **Project instructions, sent with every chat in the project.** They live in
+  a note of their own, so you can edit, search, and mark them secure or
+  locked like any note. A secure instructions note keeps the project's chats
+  on on-device models. Instructions shape how answers read; they never give
+  the AI more access, and no model rewrites the note without your say.
+
+### Changed
+
+- **A calmer Chat sidebar.** New chat, Search chats, a short Projects list
+  (three projects and All projects), then Recents: every chat once, newest
+  reply first. The model-usage card and the Main view picker left the Chat
+  front, and so did their extra New chat and New folder buttons. Section
+  labels read in plain sentence case.
+- **Model usage opens from ⌘K and Settings.** Search ⌘K for "Model usage", or
+  use Settings → AI Models → Open model usage.
+- **Named views are a Home feature.** Chat no longer filters by the active
+  view or offers Move to view; chats keep any view they had on disk. ⌘⇧W from
+  Chat now opens the view menu in Home.
+- **Chat folders are now projects.** Every folder you made is a project with
+  the same chats; nothing on disk moves, and the same
+  `.rotli/chat-folders.json` still opens in older builds. One limit: an older
+  build that edits projects drops an unpinned project's link to its
+  instructions note (the note stays; link it again from the project page).
+- **Projects forget chats you deleted.** A project edit now drops the chats
+  that are gone, but only when Rotli could list every chat; a chats folder
+  that can't be read is now an error instead of an empty list.
+
+### Fixed
+
+- **Ocean Light's selected rows are readable.** The age and quiet text on a
+  selected row measured 4.48:1, just under AA; they now read at 5.2:1.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

@@ -205,6 +205,12 @@ export interface RunInput {
   artifactTool?: boolean;
   /** The user's name for prompt personalization — omit when unset. */
   userName?: PersonText;
+  /** The note holding the chat project's instructions. The loop reads it
+   * through the host's gated read for this model and puts its text in the
+   * system prompt; it shapes the answer only — offered tools, web, and read
+   * gates are decided without it. Omit when the chat is in no project or the
+   * project has no instructions. */
+  projectInstructionsNoteId?: string;
   /** Stream the final answer token-by-token when the host supports it (default
    * true). The hybrid layer sets this false — its legs run to completion and
    * only the outer final is surfaced, so an inner leg mustn't stream deltas. */

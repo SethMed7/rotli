@@ -1,10 +1,8 @@
-// The chat world's data seam. Two callers need it and they must agree:
-//
-//   • the CHAT front renders the folders and their chats;
-//   • the sidebar SHELL's collapse-all needs the folder keys, because chat
-//     folders default OPEN and a wiped map would re-EXPAND them (#83).
-//
-// One react-query key means the second caller is a cache read, not a fetch.
+// The chat world's data seam: the vault's chats, sorted by reply recency, and
+// the projects manifest (`.rotli/chat-folders.json`) they are grouped through.
+// The Chat front, the chat window, the dashboard, project pages, and tab titles
+// all read it; one react-query key means every caller after the first is a
+// cache read, not a fetch.
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
@@ -19,17 +17,22 @@ import {
   EMPTY_CHAT_FOLDERS,
   type GroupedChats,
   groupChats,
-  invalidateChatFolders,
   loadChatFolders,
-  saveChatFolders,
   sortChatsByActivity,
+  updateChatProjects,
 } from "../../services/chatFolders";
 import { backfillChatModels } from "../../services/chatModelMeta";
 import { useUiStore } from "../../state/ui";
 
-/** The reserved expandedDests key a chat folder's disclosure lives under. */
-export function chatFolderKey(id: string): string {
-  return `chatfolder:${id}`;
+/** The projects manifest of one vault — the query every reader shares. */
+export function useChatProjectsManifest(activeMemex: MemexInstance | null) {
+  return useQuery({
+    queryKey: [...CHAT_FOLDERS_KEY, activeMemex?.root ?? ""],
+    // the vault answers on the desktop and in Rotli Web alike; only the
+    // in-memory twin has no chat projects
+    enabled: !!activeMemex && hasDurableCorpus(),
+    queryFn: () => loadChatFolders(activeMemex!),
+  });
 }
 
 export interface SidebarChatData {
@@ -41,11 +44,11 @@ export interface SidebarChatData {
   chatsLoaded: boolean;
   manifest: ChatFoldersManifest;
   grouped: GroupedChats<MemexChatSummary>;
-  /** Every folder's expandedDests key — the collapse-all default-open set. */
-  folderKeys: string[];
-  /** Read-modify-write from a FRESH load so two quick actions never clobber
-   * each other through a stale react-query snapshot. Failures land in the
-   * sidebar's inline error lane (the menu that launched them is long gone). */
+  /** The manifest could not be read (the sidebar shows it; chats still list). */
+  projectsError: boolean;
+  /** One project edit through services/chatFolders updateChatProjects (fresh
+   * load, edit, prune, revision-guarded save). Failures land in the sidebar's
+   * inline error lane (the menu that launched them is long gone). */
   update: (mutate: (manifest: ChatFoldersManifest) => ChatFoldersManifest, after?: () => void) => void;
 }
 
@@ -54,13 +57,7 @@ export function useChatFolders(): SidebarChatData {
   const activeMemex = memexCfg.data ? activeInstance(memexCfg.data) : null;
   const rawChats = useInstanceChats(activeMemex).data;
   const chatList = useMemo(() => sortChatsByActivity(rawChats ?? []), [rawChats]);
-  const foldersQuery = useQuery({
-    queryKey: [...CHAT_FOLDERS_KEY, activeMemex?.root ?? ""],
-    // the vault answers on the desktop and in Rotli Web alike; only the
-    // in-memory twin has no chat folders
-    enabled: !!activeMemex && hasDurableCorpus(),
-    queryFn: () => loadChatFolders(activeMemex!),
-  });
+  const foldersQuery = useChatProjectsManifest(activeMemex);
   const manifest = foldersQuery.data?.manifest ?? EMPTY_CHAT_FOLDERS;
   // chats from before `model:` lived in the file get it once, from this
   // device's settings map (2026-09-17) — then every copy of the vault agrees
@@ -78,21 +75,15 @@ export function useChatFolders(): SidebarChatData {
       .catch(() => {});
   }, [activeMemex, rawChats, chatModelMap, defaultModel, hybridPresets]);
   const grouped = useMemo(() => groupChats(chatList, manifest), [chatList, manifest]);
-  const folderKeys = useMemo(
-    () => manifest.folders.map((folder) => chatFolderKey(folder.id)),
-    [manifest.folders],
-  );
   const setRowActionError = useUiStore((s) => s.setRowActionError);
   const update: SidebarChatData["update"] = (mutate, after) => {
     if (!activeMemex) return;
     setRowActionError(null);
-    void loadChatFolders(activeMemex)
-      .then((fresh) => saveChatFolders(activeMemex, mutate(fresh.manifest), fresh.revision))
-      .then(() => invalidateChatFolders())
+    void updateChatProjects(activeMemex, mutate)
       .then(() => after?.())
       .catch((err) =>
         setRowActionError(
-          `Couldn’t update chat folders — ${err instanceof Error ? err.message : String(err)}`,
+          `Couldn’t update chat projects — ${err instanceof Error ? err.message : String(err)}`,
         ),
       );
   };
@@ -102,7 +93,7 @@ export function useChatFolders(): SidebarChatData {
     chatsLoaded: rawChats !== undefined,
     manifest,
     grouped,
-    folderKeys,
+    projectsError: foldersQuery.isError,
     update,
   };
 }

@@ -1043,7 +1043,8 @@ mark.hitmark {
 }
 
 /* All-chats list rows — the Chat-front twin of a note row (the maintainer, 2026-07-01). */
-.chatlist-row {
+.chatlist-row,
+.project-chatrow {
   width: 100%;
   display: flex;
   align-items: center;
@@ -1056,17 +1057,20 @@ mark.hitmark {
   cursor: pointer;
   color: var(--text);
 }
-.recent-list li:last-child .chatlist-row {
+.recent-list li:last-child .chatlist-row,
+.recent-list li:last-child .project-chatrow {
   border-bottom: none;
 }
-.chatlist-row:hover {
+.chatlist-row:hover,
+.project-chatrow:hover {
   background: var(--hov);
 }
 .chatlist-icon {
   flex: 0 0 auto;
   color: var(--text-muted);
 }
-.chatlist-title {
+.chatlist-title,
+.project-chattitle {
   flex: 1 1 auto;
   min-width: 0;
   font-weight: 600;
@@ -1075,7 +1079,8 @@ mark.hitmark {
   text-overflow: ellipsis;
 }
 .chatlist-src,
-.chatlist-attached {
+.chatlist-attached,
+.project-chatage {
   flex: 0 0 auto;
   margin-left: auto;
   padding-left: 16px;
@@ -1174,4 +1179,153 @@ mark.hitmark {
   margin: 8px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* — A chat project's page (components/projectSurface.tsx, 2026-11-24):
+   the board grammar — name, count, and the one primary action in the head;
+   chats and Instructions side by side when the pane is wide, stacked when
+   it is narrow (a pane, not the window, decides). — */
+.project-page {
+  container-type: inline-size;
+}
+.project-head {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.project-glyph {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.project-title {
+  min-width: 0;
+  margin: 0;
+}
+.project-name {
+  max-width: 100%;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-name:hover {
+  background: var(--hov);
+}
+.project-name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.project-rename {
+  min-width: 0;
+  flex: 1 1 200px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-text) 45%, var(--border));
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+}
+.project-newchat {
+  margin-left: auto;
+}
+.project-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  align-items: start;
+  gap: 28px;
+}
+@container (max-width: 640px) {
+  .project-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .project-instructions {
+    order: -1;
+  }
+  .project-newchat {
+    margin-left: 0;
+  }
+}
+.project-section {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.project-chats .project-chatrow {
+  padding: 11px 10px;
+}
+.project-empty {
+  padding: 14px 2px;
+}
+.project-empty .be-title {
+  margin: 0 0 4px;
+}
+.project-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.project-hint,
+.project-warn {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.project-warn {
+  color: var(--accent-text);
+}
+/* the instructions note, previewed as plain text — the note editor is where
+   it is written */
+.project-instr-preview {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.project-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.project-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.project-instr-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.project-quiet {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.project-instructions .ghostbtn + .ghostbtn {
+  margin-left: 0;
 }

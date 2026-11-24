@@ -10,10 +10,11 @@ import { extOf } from "../../lib/fileKind";
 import { FOLDER_ICON_KIND, iconKind } from "../../lib/sidebarLook";
 import { renameTargetFor } from "../../services/itemRename";
 import type { NoteSummary } from "../../types";
-import { ChevronRight, FolderGlyph } from "../glyphs";
+import { FolderGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { glyphForNote } from "../noteGlyph";
 import { useCommitRename } from "../renameDialog";
+import { DisclosureChevron } from "./disclosureChevron";
 
 /** A Main folder row as a text field — renaming a folder, or naming a new one
  * (`ariaLabel` "New folder in Main", `blur` "commit"), so the new folder's
@@ -37,9 +38,7 @@ export function FolderRenameRow({
 }) {
   return (
     <div className="frow child main-row renaming" style={style}>
-      <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-        <ChevronRight size={10} />
-      </span>
+      <DisclosureChevron open={open} />
       <FolderGlyph size={14} className={FOLDER_ICON_KIND} />
       <InlineRenameInput
         className="sb-rename-input"

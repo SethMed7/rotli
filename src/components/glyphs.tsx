@@ -686,3 +686,14 @@ export function NotesStackGlyph(props: GlyphProps) {
     </Glyph>
   );
 }
+
+/** A chat project — three stacked layers (the Chat front's Projects list). */
+export function ProjectGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M12 4 4 8l8 4 8-4-8-4Z" />
+      <path d="m4 12 8 4 8-4" />
+      <path d="m4 16 8 4 8-4" />
+    </Glyph>
+  );
+}

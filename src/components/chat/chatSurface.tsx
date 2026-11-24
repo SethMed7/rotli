@@ -93,17 +93,11 @@ import { formatChatTime } from "../../noteChat/chatTime";
 import { createNoteForChat } from "../../noteChat/composition";
 import { rememberedChatNote, rememberChatNote } from "../../noteChat/session";
 import { nameNewChat } from "../../services/chatAutoTitle";
-import {
-  assignChatToFolder,
-  invalidateChatFolders,
-  loadChatFolders,
-  saveChatFolders,
-} from "../../services/chatFolders";
 import { syncChatModelMeta } from "../../services/chatModelMeta";
+import { fileNewChat, projectPreflight, SECURE_PROJECT_NOTICE } from "../../services/chatProjects";
 import { useConnectedLanes } from "../../services/connectedModels";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
-import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
@@ -119,7 +113,6 @@ import {
   chatModelFor,
   useUiStore,
 } from "../../state/ui";
-import { useViewsStore } from "../../state/views";
 import { takeSentences } from "../../voice/sentences";
 import { speaker } from "../../voice/speech";
 import {
@@ -1035,7 +1028,6 @@ export function ChatSurface({
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const chatNaming = useUiStore((s) => s.chatNaming);
   const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
-  const activeView = useUiStore((s) => s.activeView);
   const userName = useUiStore((s) => s.userName);
   const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   const bindChat = usePanesStore((s) => s.bindChat);
@@ -1597,9 +1589,19 @@ export function ChatSurface({
       if (unsaved)
         return setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${unsaved}` }]);
     }
+    // the chat's project: its instructions note's security decides the lane
+    const born = chatSlug ? null : useUiStore.getState().newChatOrigin;
+    const project = await projectPreflight(active, chatSlug, born, saveFailure);
+    const refusal = "refusal" in project ? project.refusal : null;
+    const projectSecure = "secure" in project && project.secure;
+    if (refusal || (projectSecure && !modelIsOnDevice(turnModel)))
+      return setMessages((previous) => [
+        ...previous,
+        { speaker: "rotli", text: `⚠ ${refusal ?? SECURE_PROJECT_NOTICE}` },
+      ]);
     // the whole secure lineage, captured with this turn: every write it makes goes by
     // `turnMark`, which only this turn's own reads can raise (sixth review of PR 267)
-    const attachedSecure = attachmentIsSecure || secureReadRef.current,
+    const attachedSecure = attachmentIsSecure || projectSecure || secureReadRef.current,
       turnMark = { marked: attachedSecure };
     if (attachedSecure && !modelIsOnDevice(turnModel)) {
       setMessages((previous) => [
@@ -1676,36 +1678,8 @@ export function ChatSurface({
         });
         sentSlug = res.slug;
         bindChat(paneId, tabId, res.slug, active.id); // this tab IS that chat, from the send on
-        // view inheritance: a chat born while a named view is active belongs to
-        // that view (the maintainer, 2026-08-03: organize chats by work vs personal)
-        const bornInView = useUiStore.getState().activeView;
-        if (bornInView) {
-          const views = useViewsStore.getState();
-          if (views.hydrated && views.writable) {
-            views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
-          }
-        }
-        // folder inheritance (the maintainer, 2026-07-30): a new chat opened FROM a
-        // foldered chat files itself into the same folder. Best-effort — a
-        // manifest hiccup must never fail the send.
-        const originSlug = useUiStore.getState().newChatOrigin;
         useUiStore.getState().setNewChatOrigin(null);
-        if (originSlug) {
-          try {
-            const opened = await loadChatFolders(active);
-            const folderId = opened.manifest.assignments[originSlug];
-            if (folderId) {
-              await saveChatFolders(
-                active,
-                assignChatToFolder(opened.manifest, res.slug, folderId),
-                opened.revision,
-              );
-              await invalidateChatFolders();
-            }
-          } catch {
-            /* the chat still saved — folder filing is recoverable by hand */
-          }
-        }
+        await fileNewChat(active, res.slug, born); // it joins the project it came from
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
         const savedKey = chatKey(active.id, res.slug, tabId);
         if (globeOn) setChatWeb(savedKey, true); // carry the globe to the saved chat
@@ -1757,6 +1731,8 @@ export function ChatSurface({
       // bridge exists (the host re-checks the secure taint at call time)
       ...(isTauri() ? { boardTool: true } : {}),
       ...(userName ? { userName: personText(userName) } : {}),
+      // read inside the run through the gated read for this model (ai/loop.ts)
+      ...("noteId" in project && project.noteId ? { projectInstructionsNoteId: project.noteId } : {}),
     };
 
     // a preset pick routes through the hybrid layer; everything else is the
@@ -2347,7 +2323,7 @@ export function ChatSurface({
     >
       <header className="chat-head">
         <div className="chat-breadcrumb" aria-label="Chat location and title">
-          <span className="chat-context">{activeView || active?.label || "Chat"}</span>
+          <span className="chat-context">{active?.label || "Chat"}</span>
           <span className="chat-breadcrumb-separator" aria-hidden="true">
             /
           </span>

@@ -409,26 +409,6 @@
 .sb-home-dashboard-row > span:last-child {
   margin-left: auto;
 }
-.sb-model-dashboard {
-  margin-top: 3px;
-  margin-bottom: 10px;
-}
-.sb-model-favorite {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-}
-.sb-model-favorite .model-logo {
-  width: 12px;
-  height: 12px;
-}
-.sb-model-favorite > span {
-  max-width: 76px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .sb-home-favorite {
   display: inline-flex;
   align-items: center;
@@ -997,34 +977,86 @@
   position: relative;
   z-index: 1;
 }
-/* chat FOLDERS (the maintainer, 2026-07-30) — virtual grouping; the folder row is a
-   disclosure, its chats indent one step beneath it */
-.sb-chatfolder {
+/* chat PROJECTS (2026-11-24) — a short list of links above the recents; a row
+   opens the project's page, so there is no disclosure and nothing indents */
+.sb-chatprojects {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
+/* the quiet section labels: Projects, Recents — sentence case and muted,
+   never caps or bold (design A, 2026-11-24); Projects carries its "+" */
+.sb-chatsection {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  margin: 8px 0 0;
+  padding: 0 4px 0 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sb-chatsection-add {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-chatsection-add:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.sb-chatsection-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.sb-chatproject-glyph {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
 .sb-chatfolder-n {
   margin-left: auto;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
-/* the folder row wears the Notes tree's exact disclosure grammar — shared
-   .fchev slot, shared gap, no bold (the chevron + glyph carry folder-ness,
-   same as Main's folders); children indent past the chevron slot, exactly
-   the contentPad = rowPad + 18 rule the Main tree uses */
-.sb-chatrow.in-folder {
-  padding-left: 28px;
+.sb-chatproject-more {
+  color: var(--text-muted);
 }
-.sb-chatrow.in-folder::before {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: var(--border);
-  pointer-events: none;
+.sb-chatproject-more:hover {
+  color: var(--text);
+}
+/* a chat in a project wears the project's name as plain muted text: never
+   louder than the title, and it gives way first (flex-shrink 100, down to
+   3.5em) so the title keeps its letters */
+.sb-chattag {
+  flex: 0 100 auto;
+  min-width: 3.5em;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-chatrow.sel .sb-chattag {
+  color: var(--selected-muted);
+}
+/* a narrow sidebar has no room for it: the row's name and tooltip, and the
+   project page, still say which project */
+.sb-rows {
+  container: sb-rows / inline-size;
+}
+/* the content box: 16px of padding under a 220px sidebar */
+@container sb-rows (max-width: 203px) {
+  .sb-chattag {
+    display: none;
+  }
 }
 .main-branch-children {
   position: relative;
@@ -1049,7 +1081,7 @@
 .sb-chatrow.dragging {
   opacity: 0.4;
 }
-.sb-chatfolder-row.chatdrop {
+.sb-chatproject.chatdrop {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 /* inline rename over a chat row (the maintainer #4, 2026-07-08) — same footprint as the row */

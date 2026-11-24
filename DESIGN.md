@@ -163,8 +163,9 @@ exception.
   (docs/design/show-in-rotli.md).
 - The sidebar has one front switcher and one body. A two-segment pill under the
   vault header picks the active front — Home (the notes world: All notes,
-  Captures, Tasks, the Main/named-view tree) or Chat (New chat, All chats, chat
-  folders, every chat). Neither front collapses and neither is nested inside the
+  Captures, Tasks, the Main/named-view tree) or Chat (New chat, Search chats,
+  a short Projects list, then Recents: every chat once, by reply). Neither
+  front collapses and neither is nested inside the
   other: the chosen one owns the whole body and scrolls on its own. The pill is
   an ordered list of fronts, so a Home dashboard block or the parked email Inbox
   joins without another information-architecture change. Breve is a mode, not a
@@ -184,8 +185,10 @@ exception.
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.
 - Activity dashboards never blend unlike sources. Home's Rotli-activity card
-  and dashboard lens report vault notes/chats; Chat's model-usage card and lens
-  report aggregate provider session counters. Model tokens are not labeled as
+  and dashboard lens report vault notes/chats; the model-usage lens reports
+  aggregate provider session counters. It has no card on the Chat front (the
+  front's job is finding and starting conversations); ⌘K "Model usage" and
+  Settings → AI Models open it. Model tokens are not labeled as
   Rotli usage. Dollar values may use a dated, provider-published standard API
   price snapshot for comparison, but are never labeled as subscription charges
   or invoices; unknown model IDs remain unpriced. Browser mode never pretends
@@ -205,9 +208,13 @@ exception.
 - Assistant Markdown task lists render as quiet, read-only progress plans with
   pending/current/completed states and a compact completion count. They remain
   transcript projections, not controls for an external provider process.
-- When Chat inherits a named view selected on Home, it names that view in a
-  quiet inline context row and offers a direct return to all chats. Cross-front
-  filtering must never depend on remembering hidden state from another front.
+- Named views are a Home feature. The Chat front neither shows nor applies
+  them (2026-11-24): projects group chats, and two grouping systems over one
+  list read as one too many. Cross-front filtering must never depend on
+  remembering hidden state from another front.
+- The Chat front's section labels (Projects, Recents) are sentence case and
+  muted, never caps; a selected row's quiet text uses `--selected-muted`, tuned
+  per environment to read at AA on the selected wash.
 - The Librarian journal keeps a labeled, re-openable explanation of its file
   structure and rationale. It distinguishes physical Library folders from
   reference-only Main/named views and links directly to Librarian and Security

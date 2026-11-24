@@ -52,7 +52,7 @@ export const HIDEABLE = [
     id: "overview",
     group: "Sidebar",
     title: "Activity overview",
-    desc: "The “This week” card on Home and the Model usage card on Chat.",
+    desc: "The “This week” card on Home.",
     still: "in ⌘K, as the Rotli activity dashboard",
   },
   {

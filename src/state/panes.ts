@@ -36,6 +36,9 @@ import {
   makeChatTab,
   makeFileTab,
   makeActivityTab,
+  makeProjectTab,
+  isProjectTab,
+  newChatOriginFrom,
   makeNewItemTab,
   makeBrowserTab,
 } from "./paneTabs";
@@ -174,6 +177,7 @@ function duplicateTab(tab: Tab): Tab {
   if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug, tab.vaultId);
   if (tab.surfaceKind === "file") return makeFileTab(tab.fileId);
   if (tab.surfaceKind === "activity") return makeActivityTab();
+  if (tab.surfaceKind === "project") return makeProjectTab(tab.projectId, tab.vaultId);
   if (tab.surfaceKind === "newItem") return makeNewItemTab();
   if (tab.surfaceKind === "browser") return makeBrowserTab();
   return makeTab(tab.noteId);
@@ -444,7 +448,10 @@ interface PanesState {
   retargetNote: (oldId: PathId, newId: PathId) => void;
   /** Open a chat in the focused pane: reuse its open tab or open a new one
    * (`newTab` forces fresh). `chatSlug` null = a fresh unsent chat, always a new tab. */
-  openChat: (chatSlug: string | null, opts?: { newTab?: boolean; vaultId?: string }) => void;
+  openChat: (
+    chatSlug: string | null,
+    opts?: { newTab?: boolean; vaultId?: string; projectId?: string },
+  ) => void;
   /** Open a surfaced binary FILE (audio/pdf/image/text) in-app — mirrors openCanvas. */
   openFile: (fileId: string, opts?: { newTab?: boolean }) => void;
   /** Close every tab pointing at a file that left the corpus (for example after
@@ -455,6 +462,7 @@ interface PanesState {
   closeNoteTabs: (noteId: string) => void;
   /** Open the Brain Activity view (the AI-Filer change journal). Singleton per pane. */
   openActivity: () => void;
+  openProject: (projectId: string, vaultId?: string) => void;
   /** ⌘N — a blank NEW TAB with the type chooser (the maintainer, 2026-07-29). */
   openNewItemTab: () => void;
   /** ⌘T presentation phase: append and activate a tab before durable creation
@@ -558,18 +566,11 @@ export const usePanesStore = create<PanesState>((set, get) => {
     return first;
   };
 
-  const openAppSurface = (surfaceKind: "activity") => {
+  const openAppSurface = (same: (t: Tab) => boolean, make: () => Tab) => {
     useUiStore.getState().setContentView("panes");
     const leaf = focusedLeaf();
     set({
-      root: updateLeaf(get().root, leaf.id, (l) =>
-        placeTab(
-          l,
-          undefined,
-          (t) => t.surfaceKind === surfaceKind,
-          () => ({ id: ulid(), surfaceKind }),
-        ),
-      ),
+      root: updateLeaf(get().root, leaf.id, (l) => placeTab(l, undefined, same, make)),
     });
   };
 
@@ -734,10 +735,10 @@ export const usePanesStore = create<PanesState>((set, get) => {
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
       if (chatSlug === null) {
-        // remember WHERE the new chat came from: a chat focused right now
-        // seeds the new one's folder on first save (the maintainer, 2026-07-30)
-        const active = activeTabOf(focusedLeaf());
-        useUiStore.getState().setNewChatOrigin(active?.surfaceKind === "chat" ? active.chatSlug : null);
+        // where the new chat came from — it joins that project on first save
+        useUiStore
+          .getState()
+          .setNewChatOrigin(newChatOriginFrom(activeTabOf(focusedLeaf()), opts?.projectId));
       }
       useUiStore.getState().setContentView("panes");
       const leaf = focusedLeaf();
@@ -797,7 +798,8 @@ export const usePanesStore = create<PanesState>((set, get) => {
       );
     },
 
-    openActivity: () => openAppSurface("activity"),
+    openActivity: () => openAppSurface((t) => t.surfaceKind === "activity", makeActivityTab),
+    openProject: (id, vaultId) => openAppSurface(isProjectTab(id), () => makeProjectTab(id, vaultId)),
 
     openNewItemTab: () => {
       // ALWAYS a fresh tab — the chooser is a blank slate, never a reuse

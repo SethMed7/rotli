@@ -19,6 +19,7 @@ import {
   type PrivateBrowserSearchEngine,
 } from "../lib/privateBrowser";
 import { DEFAULT_NEW_ITEM_KIND, type NameFirstKind, type NewItemKind } from "../newItems/model";
+import type { NewChatOrigin } from "../services/chatProjects";
 import { inboxFolderId } from "../services/notes";
 import { DEFAULT_TASK_ARCHIVE_AGE, type TaskArchiveAge } from "../services/tasksView";
 import type { NoteSummary } from "../types";
@@ -409,7 +410,7 @@ interface UiState {
   requestSystemFolder: () => void;
   /** Bumped by the sidebar header's New-folder button when the panes (not a
    * System browser) are showing — the ACTIVE FRONT answers: Home opens its
-   * inline Main-folder input, Chat mints a chat folder and renames it inline.
+   * inline Main-folder input, Chat mints a chat project and renames it inline.
    * The header lives in the shell, the input lives in the front, so the nonce
    * is the seam (the requestSystemFolder pattern). Transient. */
   sidebarFolderNonce: number;
@@ -516,11 +517,11 @@ interface UiState {
   mainRenameRequest: string | null;
   setMainRenameRequest: (folderId: string | null) => void;
 
-  /** The chat that was focused when a NEW chat was opened (the maintainer, 2026-07-30:
-   * "this chat should default to folder I was in") — the first save reads it
-   * to file the new chat into the same folder, then clears it. Transient. */
-  newChatOrigin: string | null;
-  setNewChatOrigin: (slug: string | null) => void;
+  /** Where a NEW chat was opened from — the focused chat, or a project page.
+   * The first save reads it to file the new chat into that project, then
+   * clears it (services/chatProjects.ts). Transient. */
+  newChatOrigin: NewChatOrigin | null;
+  setNewChatOrigin: (origin: NewChatOrigin | null) => void;
 
   /** The user's name — onboarding's "What should rotli call you?" / Settings →
    * General. Personalizes AI chat (the prompt persona line). Persisted; "" = unset. */
@@ -950,7 +951,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setMainRenameRequest: (folderId) => set({ mainRenameRequest: folderId }),
 
   newChatOrigin: null,
-  setNewChatOrigin: (slug) => set({ newChatOrigin: slug }),
+  setNewChatOrigin: (origin) => set({ newChatOrigin: origin }),
 
   userName: "",
   setUserName: (name) => set({ userName: name }),

@@ -12,7 +12,7 @@ export function OverviewCard({
   head,
   rows,
 }: {
-  /** An extra class for the card's own look ("sb-model-dashboard"). */
+  /** An extra class for the card's own look. */
   variant?: string;
   label: string;
   /** Its dashboard is the page showing. */

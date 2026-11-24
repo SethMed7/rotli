@@ -103,6 +103,7 @@ import {
 } from "../memex/useMemex";
 import { availableNewItems, withBetaLabel } from "../newItems/model";
 import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
+import { openModelUsage } from "../services/dashboardNav";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { quickActionAvailable } from "../services/finderQuickAction";
 import { useFolders } from "../services/hooks";
@@ -2555,6 +2556,18 @@ function ModelsPane() {
   return (
     <>
       <PaneHead title="AI Models" char="knowledge" motif="models" />
+      <section className="aisection" aria-labelledby="model-usage-entry-title">
+        <h4 className="set-subhead" id="model-usage-entry-title">
+          Model usage
+        </h4>
+        <p className="setnote">
+          Tokens, sessions, and the models you lean on, read from the local histories on this Mac.
+          {hotkeyHint(" Also in ⌘K.")}
+        </p>
+        <button type="button" className="ghostbtn" onClick={openModelUsage}>
+          Open model usage
+        </button>
+      </section>
       <section className="aisection provider-transparency" aria-labelledby="provider-transparency-title">
         <p className="settings-eyebrow">Transparency &amp; account safety</p>
         <h4 className="set-subhead" id="provider-transparency-title">

@@ -10,7 +10,8 @@ import { type Destination, DEST } from "../../services/destinations";
 import { openSystemRoot } from "../../services/systemNav";
 import { SEC_SYSTEM, useUiStore } from "../../state/ui";
 import type { NoteSummary } from "../../types";
-import { ChevronRight, InboxGlyph, NotesStackGlyph } from "../glyphs";
+import { InboxGlyph, NotesStackGlyph } from "../glyphs";
+import { DisclosureChevron } from "./disclosureChevron";
 import type { useRovingList } from "./useRovingList";
 
 /** Trash rows at or past this count wear the alert badge — a quiet "worth
@@ -64,9 +65,7 @@ export function SidebarSystem({
         onClick={() => setDestExpanded(SEC_SYSTEM, !open)}
       >
         <span className="fsec">System</span>
-        <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-          <ChevronRight size={11} />
-        </span>
+        <DisclosureChevron open={open} size={11} />
       </button>
 
       {open && (
