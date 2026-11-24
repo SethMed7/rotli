@@ -1,6 +1,6 @@
 // The Chat front's Projects list (docs/design/sidebar-home-chat.md,
-// "Projects"): a short list of project rows above the flat list of recent
-// chats. A row opens the project's page in a tab; it is also where a dragged
+// "Projects"): a "Projects" label with its "+", the first few projects and
+// an "All projects (n)" disclosure, above the flat Recents list. A row opens the project's page in a tab; it is also where a dragged
 // chat is dropped to join the project. Pinned projects come first, then the
 // one with the newest chat activity (services/chatFolders groupChats). This is
 // the wiring; the rows' look is projectRow.tsx.
@@ -20,8 +20,8 @@ import { useFocusedTab, usePanesStore } from "../../state/panes";
 import { ProjectListAction, ProjectRenameField, ProjectRow, ProjectsHeading } from "./projectRow";
 import type { SidebarChatData } from "./useChatFolders";
 
-/** How many projects show before "Show more". */
-export const PROJECTS_SHOWN = 5;
+/** How many projects show before "All projects" is opened (design A). */
+export const PROJECTS_SHOWN = 3;
 
 /** The projects a collapsed list shows: the first few, plus the open one if
  * it sits further down (so the selected row is never hidden). */
@@ -81,24 +81,15 @@ export function SidebarChatProjects({
       </p>
     );
   }
-  if (grouped.folders.length === 0) {
-    // the empty state teaches the feature where it lives
-    return (
-      <ProjectListAction
-        kind="new"
-        label="New project"
-        onClick={() => createProject(update, setRenamingId)}
-      />
-    );
-  }
-
   const ids = grouped.folders.map(({ folder }) => folder.id);
   const shown = new Set(shownProjectIds(ids, expanded, openId));
-  const hidden = ids.length - shown.size;
+  const newProject = { label: "New project", onClick: () => createProject(update, setRenamingId) };
   return (
     <>
       <div className="sb-chatprojects" role="group" aria-label="Projects">
-        <ProjectsHeading label="Projects" hidden />
+        {/* the label carries the one in-list create; with no projects it is
+            the whole section, so "+" is where a first project starts */}
+        <ProjectsHeading label="Projects" hidden action={newProject} />
         {grouped.folders
           .filter(({ folder }) => shown.has(folder.id))
           .map(({ folder, chats: projectChats }) =>
@@ -158,13 +149,8 @@ export function SidebarChatProjects({
               />
             ),
           )}
-        {ids.length > PROJECTS_SHOWN && (hidden > 0 || expanded) && (
-          <ProjectListAction
-            kind="more"
-            label={expanded ? "Show fewer" : `Show ${hidden} more`}
-            expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-          />
+        {ids.length > PROJECTS_SHOWN && (
+          <ProjectListAction count={ids.length} expanded={expanded} onClick={() => setExpanded(!expanded)} />
         )}
       </div>
       {/* the flat list below the projects: every chat, newest reply first */}

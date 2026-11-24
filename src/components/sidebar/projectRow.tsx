@@ -2,12 +2,13 @@
 // tag a chat in a project wears. Props in, intents out: the wiring (opening,
 // menus, drag targets, writes) lives in sidebarChatProjects.tsx and
 // sidebarChat.tsx, so a sidebar redesign restyles or replaces this file alone.
-// Classes: sb-chatproject*, sb-chattag in styles/notes.css.
+// Classes: sb-chatproject*, sb-chattag, sb-chatsection* in styles/notes.css.
 
 import type { MouseEvent } from "react";
 
-import { FolderGlyph, PinGlyph, PlusGlyph } from "../glyphs";
+import { PinGlyph, PlusGlyph, ProjectGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
+import { DisclosureChevron } from "./disclosureChevron";
 
 export function ProjectRow({
   id,
@@ -45,37 +46,37 @@ export function ProjectRow({
         onMenu(e);
       }}
     >
-      <FolderGlyph size={14} className="kind-folder" />
+      <ProjectGlyph size={14} className="sb-chatproject-glyph" />
       <span className="fname">{name}</span>
       {pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-      <span className="sb-chatfolder-n" aria-hidden="true">
-        {chatCount}
-      </span>
     </button>
   );
 }
 
-/** A quiet text row under the projects: "New project", "Show 3 more". */
+/** "All projects (n)": opens the rest of the list in place, its chevron
+ * turning with it — the row says what it holds, never "Show 4 more". */
 export function ProjectListAction({
-  label,
-  kind,
+  count,
   expanded,
   onClick,
 }: {
-  label: string;
-  kind: "new" | "more";
-  expanded?: boolean;
+  count: number;
+  expanded: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`sb-chatrow sb-chatproject-${kind}`}
-      aria-expanded={kind === "more" ? expanded : undefined}
+      className="sb-chatrow sb-chatproject-more"
+      aria-expanded={expanded}
+      aria-label={`All projects, ${count}`}
       onClick={onClick}
     >
-      {kind === "new" && <PlusGlyph size={14} />}
-      <span className="fname">{label}</span>
+      <DisclosureChevron open={expanded} />
+      <span className="fname">All projects</span>
+      <span className="sb-chatfolder-n" aria-hidden="true">
+        {count}
+      </span>
     </button>
   );
 }
@@ -112,12 +113,32 @@ export function ProjectRenameField({
   );
 }
 
-/** The quiet section labels of the Chat front: Projects, Recents. `hidden`
- * when a group's own label already names it for assistive tech. */
-export function ProjectsHeading({ label, hidden = false }: { label: string; hidden?: boolean }) {
+/** The quiet section labels of the Chat front: Projects, Recents — sentence
+ * case, never caps. `hidden` when a group's own label already names it for
+ * assistive tech; `action` is the label's one quiet button ("+"). */
+export function ProjectsHeading({
+  label,
+  hidden = false,
+  action,
+}: {
+  label: string;
+  hidden?: boolean;
+  action?: { label: string; onClick: () => void };
+}) {
   return (
-    <p className="sb-chatsection" aria-hidden={hidden ? "true" : undefined}>
-      {label}
-    </p>
+    <div className="sb-chatsection">
+      <span aria-hidden={hidden ? "true" : undefined}>{label}</span>
+      {action && (
+        <button
+          type="button"
+          className="sb-chatsection-add"
+          aria-label={action.label}
+          title={action.label}
+          onClick={action.onClick}
+        >
+          <PlusGlyph size={13} />
+        </button>
+      )}
+    </div>
   );
 }

@@ -243,9 +243,9 @@ test("a folder waiting on the browser's permission is reconnected by name — no
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
   await expect(vaultGate(page)).toHaveCount(0);
 });
-// The owner, 2026-09-21: "chats need to respect the view too — this view should
-// have no chats". A view lists only its own chats, even none; Main lists all.
-test("a view with no chats of its own shows none in Chat, and Main shows every chat", async ({ page }) => {
+// Named views are a Home feature (design A, 2026-11-24): an active view does
+// not narrow the Chat front, and Chat shows no view row of its own.
+test("an active Home view leaves the Chat front whole, with no view row", async ({ page }) => {
   await fakeHelper(page);
   await plantFolder(page);
   await page.reload();
@@ -257,15 +257,12 @@ test("a view with no chats of its own shows none in Chat, and Main shows every c
   await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await pairAndOpenChat(page);
-  const rows = page.locator(".sidebar .sb-chatrow:not(.all)");
-  await expect(page.locator(".sidebar .sb-empty")).toHaveText(/No chats in Demos yet/);
-  await expect(rows.filter({ hasText: "Sonnet chat" })).toHaveCount(0);
-
-  const context = page.getByRole("group", { name: "Chat view context" });
-  await context.getByRole("button", { name: /Current view: Demos/ }).click();
-  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all chats" }).click();
+  const rows = page.locator(".sidebar .sb-chatrow[data-chat-slug]");
   await expect(rows.filter({ hasText: "Sonnet chat" })).toBeVisible();
   await expect(rows.filter({ hasText: "Gemma chat" })).toBeVisible();
+  await expect(page.locator(".sidebar .sb-chat").getByRole("button", { name: /Current view:/ })).toHaveCount(
+    0,
+  );
 });
 
 // An EMPTY folder connected from the gate becomes a vault: the Welcome folder

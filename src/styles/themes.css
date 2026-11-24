@@ -343,6 +343,9 @@
 
 /* — OCEAN · cool blue without neon chrome — */
 :root[data-theme="ocean-light"] {
+  /* muted text on the selected wash measured 4.48:1 with --text-muted;
+     tuned on its own so a selected row's age and project tag read at AA */
+  --selected-muted: #435b66;
   --ground: #dfebf3;
   --surface: #f3f8fb;
   --surface-2: #d3e3ee;

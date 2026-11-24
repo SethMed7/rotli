@@ -1,8 +1,9 @@
-// The CHAT front: a front over the vault's chats/ — New chat, a searchable
-// All, the Projects list (sidebarChatProjects.tsx), then every chat by reply
-// recency, a chat in a project wearing a quiet project tag. It owns the whole sidebar body while it is the active front, so
-// there is no cap and no "+N more": the list just scrolls
-// (docs/design/sidebar-home-chat.md). Lifted wholesale out of sidebar.tsx.
+// The CHAT front (design A, 2026-11-24): New chat, Search chats, the Projects
+// list (sidebarChatProjects.tsx), then Recents — every chat once, by reply
+// recency, a chat in a project wearing a quiet project tag. It owns the whole
+// sidebar body while it is the active front, so the list just scrolls
+// (docs/design/sidebar-home-chat.md). Model usage and named views are not
+// here: usage opens from ⌘K and Settings, and views belong to Home.
 
 import { useQuery } from "@tanstack/react-query";
 import { type PointerEvent as ReactPointerEvent, useEffect, useEffectEvent, useRef, useState } from "react";
@@ -12,31 +13,25 @@ import { createDragGhost } from "../../lib/dragGhost";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { pinActionLabel } from "../../lib/sidebarLook";
-import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
+import { type MemexChatSummary, chatModels, isTauri } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
 import { chatsDirOf } from "../../memex/config";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import { assignChatToFolder, chatActivityMs, renameChatFolder } from "../../services/chatFolders";
 import { useChatRename } from "../../services/chatRename";
-import { assignChatToView, chatAssignedView, viewChats } from "../../services/viewTree";
 import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
-import { useIsHidden } from "../../state/hidden";
 import { leaves, useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
-import { useViewsStore } from "../../state/views";
 import { useChatFirstVisitDone } from "../chat/chatConnectModels";
 import { MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
-import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
 import { chatFileMenuItems, chatFinderMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
-import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
-import { OverviewCard } from "./overviewCard";
 import { ProjectTag } from "./projectRow";
-import { chatRowSignal, relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
+import { chatRowSignal, relativeChatAge } from "./sidebarChatProjection";
 import { SidebarChatProjects, createProject } from "./sidebarChatProjects";
 import type { SidebarChatData } from "./useChatFolders";
 import { useConnectVault } from "./useConnectVault";
@@ -49,9 +44,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const { activeMemex, chatList, manifest, update } = chats;
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
-  const dashboardSection = useUiStore((s) => s.dashboardSection);
-  const hideOverview = useIsHidden("overview");
-  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   const setRowActionError = useUiStore((s) => s.setRowActionError);
   // no vault yet: connect one right here (the vault menu's Connect flow)
   const { connectVault } = useConnectVault();
@@ -97,33 +89,12 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
-  const localUsage = useQuery({
-    queryKey: ["modelUsage", "7d"],
-    queryFn: () => modelUsage("7d"),
-    staleTime: 60_000,
-  });
-  const usageSnapshot = modelUsageSnapshot(localUsage.data);
-  const usageFavorite = usageSnapshot.favorite;
-  const usageFavoriteMark = usageFavorite ? chatMark(usageFavorite.provider, usageFavorite.model) : null;
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const chatModelMap = useUiStore((s) => s.chatModel);
   const chatModelId = useUiStore((s) => s.chatModelId);
 
-  // Chats participate in named views (2026-08-03): a view lists only the chats
-  // assigned to it, even none (2026-09-21); Main lists every chat.
-  const activeView = useUiStore((s) => s.activeView);
-  const setActiveView = useUiStore((s) => s.setActiveView);
-  const viewsManifest = useViewsStore((s) => s.manifest);
-  const viewsWritable = useViewsStore((s) => s.writable && s.hydrated);
-  const setViewsManifest = useViewsStore((s) => s.setManifest);
-  const visibleChats = visibleSidebarChats(
-    chatList,
-    activeView ? viewChats(viewsManifest, activeView) : null,
-  );
-  const showAllChats = () => {
-    setActiveView(null);
-    setContentView("allChats");
-  };
+  // Search chats opens the searchable All chats list
+  const searchChats = () => setContentView("allChats");
 
   // the header's New-folder button, while Chat is the active front, mints a
   // chat PROJECT and opens its rename inline — the nonce is the seam between
@@ -249,32 +220,6 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           },
         ],
       },
-      ...(viewsManifest.views.length > 0 && viewsWritable
-        ? [
-            {
-              kind: "drill" as const,
-              label: "Move to view",
-              items: [
-                ...viewsManifest.views.map((view) => ({
-                  kind: "action" as const,
-                  label: view.name,
-                  checked: chatAssignedView(viewsManifest, c.slug) === view.name,
-                  checkedMark: "highlight" as const,
-                  onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, view.name)),
-                })),
-                ...(chatAssignedView(viewsManifest, c.slug)
-                  ? [
-                      {
-                        kind: "action" as const,
-                        label: "Remove from view",
-                        onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, null)),
-                      },
-                    ]
-                  : []),
-              ],
-            },
-          ]
-        : []),
       ...chatFinderMenuItems(PLATFORM, isTauri(), () => {
         if (!activeMemex) return;
         setRowActionError(null);
@@ -419,50 +364,20 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
       <div className="sb-chat">
-        {!hideOverview && (
-          <OverviewCard
-            variant="sb-model-dashboard"
-            label="Open model usage dashboard"
-            current={contentView === "dashboard" && dashboardSection === "models"}
-            onOpen={() => {
-              setDashboardSection("models");
-              setContentView("dashboard");
-            }}
-            head={["7 days", "Model usage"]}
-            rows={[
-              <>
-                <strong>Usage</strong>{" "}
-                <span>
-                  {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
-                </span>
-              </>,
-              <>
-                <strong>Top</strong>
-                <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
-                  {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
-                  <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
-                </span>{" "}
-                <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
-              </>,
-            ]}
-          />
-        )}
         <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={newChat}>
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
         <button
           type="button"
-          /* highlight "All chats" only when its content view is active — so it
-             never lights up alongside an open chat row (the maintainer, 2026-07-01) */
-          className={`sb-chatrow all${contentView === "allChats" && !activeView ? " sel" : ""}`}
+          /* lit only while the search list is open, never beside an open chat row */
+          className={`sb-chatrow all${contentView === "allChats" ? " sel" : ""}`}
           data-hotkey="chat.all"
-          onClick={showAllChats}
+          onClick={searchChats}
         >
           <SearchGlyph size={14} />
-          <span className="fname">All chats</span>
+          <span className="fname">Search chats</span>
         </button>
-        <ChatViewPicker onNewChat={newChat} />
         {!activeMemex ? (
           <button
             type="button"
@@ -479,8 +394,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           </button>
         ) : (
           <>
-            {/* projects belong to the vault, so they show under every view
-                and before the first chat exists */}
+            {/* projects show before the first chat exists */}
             <SidebarChatProjects
               chats={chats}
               dropId={drop?.id ?? null}
@@ -490,12 +404,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             />
             {chatList.length === 0 ? (
               <p className="sb-empty">No chats yet.</p>
-            ) : activeView && visibleChats.length === 0 ? (
-              <p className="sb-empty">
-                No chats in {activeView} yet — start one here, or move one in from its menu.
-              </p>
             ) : (
-              visibleChats.map((c) => renderChatRow(c))
+              chatList.map((c) => renderChatRow(c))
             )}
           </>
         )}

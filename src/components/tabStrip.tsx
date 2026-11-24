@@ -66,7 +66,7 @@ import {
   ClockGlyph,
   ExcalidrawGlyph,
   FileGlyph,
-  FolderGlyph,
+  ProjectGlyph,
   PlusGlyph,
   SpeakerGlyph,
   XGlyph,
@@ -421,7 +421,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     ) : tab.surfaceKind === "activity" ? (
                       <ClockGlyph size={13} className="tglyph" />
                     ) : tab.surfaceKind === "project" ? (
-                      <FolderGlyph size={13} className="tglyph" />
+                      <ProjectGlyph size={13} className="tglyph" />
                     ) : tab.surfaceKind === "browser" ? (
                       <BrowserGlyph size={13} className="tglyph" />
                     ) : (

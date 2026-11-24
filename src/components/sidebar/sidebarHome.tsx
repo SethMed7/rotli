@@ -83,7 +83,6 @@ import { useViewsStore } from "../../state/views";
 import type { NoteSummary } from "../../types";
 import { ArchiveGlyph, FolderGlyph, NewFileGlyph, NewFolderGlyph, StorageGlyph, TrashGlyph } from "../glyphs";
 import { useNoteMenu } from "../useNoteMenu";
-import { ViewSectionHeader } from "./chatViewPicker";
 import { DisclosureChevron } from "./disclosureChevron";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
@@ -99,6 +98,7 @@ import { useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 import { useVaultVisibility } from "./useVaultVisibility";
 import { ViewNameEditor } from "./viewNameEditor";
+import { ViewSectionHeader } from "./viewSectionHeader";
 
 /** The fixed System destinations after Library. Switching vaults changes only
  * their contents and counts and, in an imported vault, the folder ids behind

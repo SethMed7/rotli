@@ -41,9 +41,13 @@ Now the sidebar has **one top switcher and one body**:
   saved chat activity. It contains no provider/token telemetry. Rotli does not estimate word authorship: a
   human-vs-AI split requires an edit-provenance contract the corpus does not yet
   record.
-- **Chat** is the chat world: New chat · All chats · a short **Projects** list
-  · every chat by reply recency (a chat in a project wears its name as a quiet
-  tag), then the footer. See [Projects](#projects) below. Each chat appears exactly once; the
+- **Chat** is the chat world (design A, 2026-11-24): **New chat** · **Search
+  chats** (opens the searchable All chats list) · **Projects** (a label with
+  "+", three projects, "All projects (n)") · **Recents**, every chat once by
+  reply recency (a chat in a project wears its name as a quiet tag), then the
+  footer. See [Projects](#projects) below. The model-usage card and the view
+  picker left this front; so did the picker's duplicate New chat and New
+  folder icons. Each chat appears exactly once; the
   session Activity lane that hoisted copies to the top is retired (2026-10-15).
   Since 2026-08-03 the front carries live signals and organization:
   - **Run signals** — a dot beside the row's age, never a word: an accent ring
@@ -83,13 +87,17 @@ Now the sidebar has **one top switcher and one body**:
     Web chat headers accept LF and CRLF line endings equally, keeping saved
     titles, pins, attached-note labels, and provider metadata without rewriting
     the file.
-  - **Views** — chats join named views (`chats: [slug]` on the view in
-    `views.json`, singular membership like notes): the row menu's "Move to
-    view", an active view narrows the front to its chats, and a chat born
-  while a view is active belongs to it.
-  - **Model-usage overview** — the compact top card reads aggregate token,
-    session, and top-model facts from provider-owned local histories and opens
-    the Model usage dashboard lens. It never shares a card with vault activity.
+  - **No named views in Chat** (2026-11-24) — views are a Home feature. The
+    Chat front shows no view row, an active view never narrows it, a chat's
+    menu has no "Move to view", and a new chat no longer joins the active
+    view. Projects group chats instead. Existing `chats: [slug]` lists on
+    views in `views.json` stay on disk untouched (durable files evolve
+    additively, and a rename still updates them); Chat just stops reading
+    them. `⌘⇧W` from Chat brings Home forward and opens its view menu there.
+  - **Model usage is not on the Chat front** (2026-11-24) — the 7-day card
+    left; the lens opens from ⌘K "Model usage" and Settings → AI Models
+    ("Open model usage", `services/dashboardNav.ts`). The card component
+    stays for Home's Rotli-activity overview.
 - Neither view is collapsible. Each owns the whole body and scrolls on its own
   (`.sb-rows`) — the "infinite scroll" in the maintainer's words.
 - **System** (Library · Assets · Archive · Trash, plus any added external
@@ -115,14 +123,16 @@ Claude.ai does, replacing the old chat folders. The word "Projects" appears
 only inside the Chat front: the Brain's Projects area and the `/project list`
 slash function are different things and keep their names.
 
-- **Sidebar.** A short Projects list (pinned first, then the project with the
-  newest chat; five show, "Show N more" reveals the rest, and the open
-  project's row always shows), then **Recents**: every chat, flat, newest
-  reply first. A chat in a project carries the project's name as a small
-  tag; its row's accessible name says "in <project>". With no projects the
-  list is one quiet "New project" row. The title bar's New-folder button and
-  the view picker's second action both read **New project** while Chat is the
-  front. Projects belong to the vault, so they show under every named view.
+- **Sidebar.** A **Projects** label (sentence case, muted) with its "+",
+  then three projects (pinned first, then the project with the newest chat;
+  the open project's row always shows) and **All projects (n)**, a
+  disclosure that opens the rest in place. Then **Recents**: every chat,
+  flat, newest reply first. A chat in a project carries the project's name
+  as plain muted text that gives way before the title does, and steps out
+  entirely when the sidebar is under 220px (the row's accessible name, its
+  tooltip, and the project page still name it). Project rows carry no count;
+  only All projects does. The title bar's New-folder button reads **New
+  project** while Chat is the front.
 - **A project row opens the project's page in a tab** (`surfaceKind:
   "project"`, restored across relaunch like chat and canvas tabs). The page
   has the project's name (click to rename), **New chat in this project**, its
@@ -215,9 +225,10 @@ second IA change:
   switcher and any note or chat hidden underneath it remain unselected. The
   current front still renders the sidebar body, so this is a presentation rule,
   not a third persisted front or a change to navigation history. Switching the
-  full dashboard lens keeps the corresponding Home or Chat overview card in
-  view, and picking Home/Chat while there changes the lens rather than creating
-  a second simultaneous selection.
+  full dashboard lens keeps Home's overview card in view (Chat has no card
+  since 2026-11-24: while the model-usage lens is open nothing in the Chat
+  sidebar is selected), and picking Home/Chat while there changes the lens
+  rather than creating a second simultaneous selection.
 
 ### Rotli activity and model usage are different sources
 

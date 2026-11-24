@@ -98,7 +98,6 @@ import { fileNewChat, projectPreflight, SECURE_PROJECT_NOTICE } from "../../serv
 import { useConnectedLanes } from "../../services/connectedModels";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
-import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
@@ -114,7 +113,6 @@ import {
   chatModelFor,
   useUiStore,
 } from "../../state/ui";
-import { useViewsStore } from "../../state/views";
 import { takeSentences } from "../../voice/sentences";
 import { speaker } from "../../voice/speech";
 import {
@@ -1030,7 +1028,6 @@ export function ChatSurface({
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const chatNaming = useUiStore((s) => s.chatNaming);
   const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
-  const activeView = useUiStore((s) => s.activeView);
   const userName = useUiStore((s) => s.userName);
   const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   const bindChat = usePanesStore((s) => s.bindChat);
@@ -1681,15 +1678,6 @@ export function ChatSurface({
         });
         sentSlug = res.slug;
         bindChat(paneId, tabId, res.slug, active.id); // this tab IS that chat, from the send on
-        // view inheritance: a chat born while a named view is active belongs to
-        // that view (the maintainer, 2026-08-03: organize chats by work vs personal)
-        const bornInView = useUiStore.getState().activeView;
-        if (bornInView) {
-          const views = useViewsStore.getState();
-          if (views.hydrated && views.writable) {
-            views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
-          }
-        }
         useUiStore.getState().setNewChatOrigin(null);
         await fileNewChat(active, res.slug, born); // it joins the project it came from
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
@@ -2335,7 +2323,7 @@ export function ChatSurface({
     >
       <header className="chat-head">
         <div className="chat-breadcrumb" aria-label="Chat location and title">
-          <span className="chat-context">{activeView || active?.label || "Chat"}</span>
+          <span className="chat-context">{active?.label || "Chat"}</span>
           <span className="chat-breadcrumb-separator" aria-hidden="true">
             /
           </span>

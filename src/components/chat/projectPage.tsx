@@ -3,7 +3,7 @@
 // ../projectSurface.tsx, so a redesign of the page replaces this file alone.
 // Classes are the board grammar plus project-* rules in styles/board.css.
 
-import { FolderGlyph, PlusGlyph } from "../glyphs";
+import { PlusGlyph, ProjectGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 
 export interface ProjectPageChat {
@@ -74,7 +74,7 @@ export function ProjectPage(p: ProjectPageProps) {
   return (
     <div className="board project-page">
       <header className="board-head project-head">
-        <FolderGlyph size={18} className="project-glyph" />
+        <ProjectGlyph size={18} className="project-glyph" />
         {p.renaming ? (
           <InlineRenameInput
             className="project-rename"

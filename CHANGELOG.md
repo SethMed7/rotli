@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A calmer Chat sidebar.** New chat, Search chats, a short Projects list
+  (three projects and All projects), then Recents: every chat once, newest
+  reply first. The model-usage card and the Main view picker left the Chat
+  front, and so did their extra New chat and New folder buttons. Section
+  labels read in plain sentence case.
+- **Model usage opens from ⌘K and Settings.** Search ⌘K for "Model usage", or
+  use Settings → AI Models → Open model usage.
+- **Named views are a Home feature.** Chat no longer filters by the active
+  view or offers Move to view; chats keep any view they had on disk. ⌘⇧W from
+  Chat now opens the view menu in Home.
 - **Chat folders are now projects.** Every folder you made is a project with
   the same chats; nothing on disk moves, and the same
   `.rotli/chat-folders.json` still opens in older builds. One limit: an older
@@ -34,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Projects forget chats you deleted.** A project edit now drops the chats
   that are gone, but only when Rotli could list every chat; a chats folder
   that can't be read is now an error instead of an empty list.
+
+### Fixed
+
+- **Ocean Light's selected rows are readable.** The age and quiet text on a
+  selected row measured 4.48:1, just under AA; they now read at 5.2:1.
 
 ## [1.9.6] - 2026-11-23
 
