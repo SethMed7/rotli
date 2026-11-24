@@ -33,6 +33,18 @@ and picks its own pose; full-body quokkas appear only in Chat, Settings, and
 first-run setup (DESIGN.md). None of these choices may alter the compact
 product mark, provider identities, tray icon, or app icon.
 
+## Custom-theme engine
+
+`themeEngine/` turns a custom theme's seeds (a page colour and an accent per
+mode, optional ink) into a full semantic token set in OKLCH, then measures it
+with a separate gate (`gate.ts`). It is pure and has no DOM. Its fixed inputs
+mirror the stylesheets and are pinned to them by `policy.test.ts`; its v1
+output is frozen by `goldens.json`. The theme file contract (`themeFile.ts`) is
+recorded in `docs/decisions/2026-11-24-custom-theme-file.md`. The built-in
+environments go through the same gate against `builtinBaseline.json`, which
+may only shrink (`check:design-system`). `contrastRatio` in
+`brevePdfThemes.ts` is the engine's `contrast`.
+
 ## Product boundary
 
 Components consume semantic roles composed in `src/styles/base.css` and

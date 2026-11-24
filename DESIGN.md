@@ -17,6 +17,16 @@ blue. Its geometric scenery is hexagon plates, even seams, and a calm water
 line.
 Every product surface must work in every supported environment.
 
+One contrast gate (`src/brand/themeEngine/gate.ts`) measures every
+environment, built-in or custom, after compositing each translucent layer over
+its surface: text 4.5:1 on every surface and layered state, text on the page
+9:1 at Standard, controls and marks 3:1, hairlines and other seams at their
+own lower floors. A custom theme is seeds (a page colour and an accent per
+mode, optional ink) that the engine derives into the same semantic roles, and
+it applies only if the gate passes. Today's built-in shortfalls are recorded in
+`builtinBaseline.json`, which may only shrink; the gate is never loosened to
+let a built-in through.
+
 Light, Dark, and System are a separate mode choice. System follows the OS within
 the selected family: macOS light uses that family's tuned light environment and
 macOS dark uses its tuned dark environment. It never owns a second mapping UI.

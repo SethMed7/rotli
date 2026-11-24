@@ -1,5 +1,5 @@
 {
-  "comment": "Suppresses known-good duplication from check-duplication.mjs. Two matcher forms: `fingerprint` (exact cluster — churns on edit, which deliberately resurfaces the cluster for re-triage) or `files` (every site of the cluster must live in the listed files — for permanent do-not-fix decisions that must survive edits). Optional `signal` narrows a files matcher.",
+  "comment": "Suppresses known-good duplication from check-duplication.mjs. Two matcher forms: `fingerprint` (exact cluster \u2014 churns on edit, which deliberately resurfaces the cluster for re-triage) or `files` (every site of the cluster must live in the listed files \u2014 for permanent do-not-fix decisions that must survive edits). Optional `signal` narrows a files matcher.",
   "entries": [
     {
       "id": "organizer-vs-breve-retry",
@@ -18,7 +18,7 @@
         "src-tauri/src/helper.rs",
         "src-tauri/src/loopback_http.rs"
       ],
-      "reason": "Not a mirror: loopback_http.rs owns the status → reason-phrase map for every loopback adapter, and helper.rs is a router that necessarily names the statuses it answers with (204/403/404 …). The shared literals are a caller using its own transport's vocabulary; collapsing them would mean inventing a constant per status code for no behavioural gain. The reading, bearer, refusal-document, and body-bound policy IS shared (loopback_http.rs read_http_head / bearer_authorized / unauthorized / not_found / read_http_body)."
+      "reason": "Not a mirror: loopback_http.rs owns the status \u2192 reason-phrase map for every loopback adapter, and helper.rs is a router that necessarily names the statuses it answers with (204/403/404 \u2026). The shared literals are a caller using its own transport's vocabulary; collapsing them would mean inventing a constant per status code for no behavioural gain. The reading, bearer, refusal-document, and body-bound policy IS shared (loopback_http.rs read_http_head / bearer_authorized / unauthorized / not_found / read_http_body)."
     },
     {
       "id": "egress-policy-mirror",
@@ -27,7 +27,7 @@
         "breve-runtime/scripts/safe-fetch.ts",
         "src-tauri/src/web.rs"
       ],
-      "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
+      "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json \u2014 shared literals (private ranges, redirect caps) are the fixture working as designed."
     },
     {
       "id": "endpoint-locality-parity",
@@ -46,7 +46,7 @@
         "breve-runtime/scripts/render-document.ts",
         "src-tauri/src/document_conversion.rs"
       ],
-      "reason": "TS↔Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
+      "reason": "TS\u2194Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
     },
     {
       "id": "antigravity-manage-contract",
@@ -55,7 +55,7 @@
         "src-tauri/src/antigravity.rs",
         "src/lib/tauri.ts"
       ],
-      "reason": "TS↔Rust IPC contract: the five Antigravity action words are spelled once by the command that dispatches them and once by the wrapper that sends them (2026-09-03)."
+      "reason": "TS\u2194Rust IPC contract: the five Antigravity action words are spelled once by the command that dispatches them and once by the wrapper that sends them (2026-09-03)."
     },
     {
       "id": "antigravity-settings-card-vocabulary",
@@ -73,7 +73,7 @@
         "src/services/search.test.ts"
       ],
       "signal": "literal",
-      "reason": "MIRROR-NOT-IMPORT: the Rust search grammar tests and the TS twin's vectors share their literals ON PURPOSE (Groceries/sourdough/Launch checklist…) — the same inputs asserted on both sides of the app/shell boundary are the lockstep proof, not a copy to extract (docs/design/tantivy-search.md)."
+      "reason": "MIRROR-NOT-IMPORT: the Rust search grammar tests and the TS twin's vectors share their literals ON PURPOSE (Groceries/sourdough/Launch checklist\u2026) \u2014 the same inputs asserted on both sides of the app/shell boundary are the lockstep proof, not a copy to extract (docs/design/tantivy-search.md)."
     },
     {
       "id": "web-connect-dialog-shares-rename-card",
@@ -84,7 +84,7 @@
         "src/components/webVaultConnectDialog.tsx",
         "src/components/webChatSetupDialog.tsx"
       ],
-      "reason": "All are instances of the one small modal grammar (.rename-overlay/.rename-card/.rename-btn, Cancel + primary action) from the design system — the web dialogs share WebDialogFrame; the remaining shared literals are its class names and labels, not copied logic (2026-09-16)."
+      "reason": "All are instances of the one small modal grammar (.rename-overlay/.rename-card/.rename-btn, Cancel + primary action) from the design system \u2014 the web dialogs share WebDialogFrame; the remaining shared literals are its class names and labels, not copied logic (2026-09-16)."
     },
     {
       "id": "web-connect-dialog-shares-rename-card-escape",
@@ -148,7 +148,7 @@
         "src/services/folderBoards.ts",
         "src/services/folderBoards.test.ts"
       ],
-      "reason": "Deliberate TS twin of the Rust board rules: Rotli Web has no Rust, so services/folderBoards.ts must name, place, and collide boards exactly as corpus.rs board_name_stem / create_board_with_stem / free_name do (Project/Map → Project-Map, name-2.excalidraw, storage/excalidraw). The literals ARE the on-disk contract; the test mirrors the Rust cases so the two cannot drift silently. parity.json pins the empty scene and the lane."
+      "reason": "Deliberate TS twin of the Rust board rules: Rotli Web has no Rust, so services/folderBoards.ts must name, place, and collide boards exactly as corpus.rs board_name_stem / create_board_with_stem / free_name do (Project/Map \u2192 Project-Map, name-2.excalidraw, storage/excalidraw). The literals ARE the on-disk contract; the test mirrors the Rust cases so the two cannot drift silently. parity.json pins the empty scene and the lane."
     },
     {
       "id": "vault-scaffold-ts-twin",
@@ -223,7 +223,7 @@
         "src-tauri/src/provider_models_tests.rs",
         "src/ai/models.test.ts"
       ],
-      "reason": "Deliberate twin test vectors: the Rust argv gate (provider.rs build_args_for + provider_models::valid_model_id) and its TS mirror (isModelIdShape) are proven against the same refusal ids (--help, opus[2m], …) and the same codex/cursor argv literals, so drift in either side fails a test."
+      "reason": "Deliberate twin test vectors: the Rust argv gate (provider.rs build_args_for + provider_models::valid_model_id) and its TS mirror (isModelIdShape) are proven against the same refusal ids (--help, opus[2m], \u2026) and the same codex/cursor argv literals, so drift in either side fails a test."
     },
     {
       "id": "quick-note-cycle-shares-main-history-chords",
@@ -232,7 +232,7 @@
         "src/keys/actions.ts",
         "src/keys/quickNoteActions.ts"
       ],
-      "reason": "Same gesture, two keyboard surfaces: ⌘[ / ⌘] are main's Back/Forward and the Quick Note window's previous/next note. Each surface's dispatcher fires only its own actions, so the shared default chords are deliberate, not a copy to extract."
+      "reason": "Same gesture, two keyboard surfaces: \u2318[ / \u2318] are main's Back/Forward and the Quick Note window's previous/next note. Each surface's dispatcher fires only its own actions, so the shared default chords are deliberate, not a copy to extract."
     },
     {
       "id": "claude-cli-argv-vocabulary",
@@ -241,7 +241,7 @@
         "src-tauri/src/claude_session.rs",
         "src-tauri/src/provider.rs"
       ],
-      "reason": "Not a mirror: both lanes spawn the same Claude Code binary, so each names the CLI's own flags (--output-format, --effort, ...). The policy is already shared — session_args calls provider::build_args_tuned and copies its model/effort flags, so one model and effort allowlist gates both the one-shot lane and the native session."
+      "reason": "Not a mirror: both lanes spawn the same Claude Code binary, so each names the CLI's own flags (--output-format, --effort, ...). The policy is already shared \u2014 session_args calls provider::build_args_tuned and copies its model/effort flags, so one model and effort allowlist gates both the one-shot lane and the native session."
     },
     {
       "id": "mcp-tool-schema-vocabulary",
@@ -277,7 +277,7 @@
         "src-tauri/src/mcp_arguments.rs",
         "src-tauri/src/workspace_documents.rs"
       ],
-      "reason": "Not a mirror: mcp_arguments.rs is the checker that enforces JSON Schema keywords (minItems, minLength, …) on every MCP tool call, and workspace_documents.rs declares a tool schema using those keywords. A checker and the schemas it checks necessarily name the same keywords; a test fails on any keyword the checker doesn't enforce."
+      "reason": "Not a mirror: mcp_arguments.rs is the checker that enforces JSON Schema keywords (minItems, minLength, \u2026) on every MCP tool call, and workspace_documents.rs declares a tool schema using those keywords. A checker and the schemas it checks necessarily name the same keywords; a test fails on any keyword the checker doesn't enforce."
     },
     {
       "id": "protected-path-rule-and-end-to-end-tests",
@@ -286,7 +286,7 @@
         "src-tauri/src/corpus_protected_path_tests.rs",
         "src-tauri/src/workspace_path_protection_tests.rs"
       ],
-      "reason": "Not a mirror: the same reported path spellings (_ſecure, STRASSE for Straße, a keyword on a parent folder, a symlink into the secure home) are checked twice on purpose, once against the protected_path rule and once end to end through the agent listing, search, metrics and reads. Sharing the fixture strings would couple the two layers' tests."
+      "reason": "Not a mirror: the same reported path spellings (_\u017fecure, STRASSE for Stra\u00dfe, a keyword on a parent folder, a symlink into the secure home) are checked twice on purpose, once against the protected_path rule and once end to end through the agent listing, search, metrics and reads. Sharing the fixture strings would couple the two layers' tests."
     },
     {
       "id": "source-guard-idiom-88ecc258d5",
@@ -349,6 +349,29 @@
       "id": "agent-surface-harness-names-d14ff35066",
       "fingerprint": "d14ff35066352f67ca40d42125f0f1a00e64e82360ce166a796078d54f6d003c",
       "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+    },
+    {
+      "id": "theme-engine-solver-vs-gate",
+      "signal": "literal",
+      "files": [
+        "src/brand/themeEngine/derive.ts",
+        "src/brand/themeEngine/gate.ts"
+      ],
+      "reason": "By design, not a copy: the gate measures the roles the solver writes, and it reads them by name on its own so a token set from a file, an override or the built-in stylesheets goes through the same list (docs/decisions/2026-11-24-custom-theme-file.md). Sharing the solver's code with the gate would let a solver bug pass its own check."
+    },
+    {
+      "id": "theme-engine-css-mirror-test",
+      "signal": "literal",
+      "files": [
+        "src/brand/themeEngine/derive.ts",
+        "src/brand/themeEngine/policy.test.ts"
+      ],
+      "reason": "policy.test.ts reads the state layers (--hov, --act) back out of base.css to pin the engine's mirrored alphas; naming the same roles is the test working as designed."
+    },
+    {
+      "id": "theme-engine-vs-force-layout-numbers",
+      "fingerprint": "758647feb662104ac4321cb95e17a04d252a73206d13183fc323d27eae4e6b75",
+      "reason": "Coincidence: 0.035 and 0.045 are OKLCH lightness steps in the theme solver and unrelated physics constants in the graph's force layout. Nothing to share."
     }
   ]
 }

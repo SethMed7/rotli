@@ -4,6 +4,11 @@ import { join, relative } from "node:path";
 import sharp from "sharp";
 
 import { BREVE_PDF_PRESETS, contrastRatio, validateBrevePdfPalette } from "../src/brand/brevePdfThemes.ts";
+import { builtInFailures, compareWithBaseline } from "../src/brand/themeEngine/builtins.ts";
+import { appliedTokenNames } from "../src/brand/themeEngine/derive.ts";
+import { failures } from "../src/brand/themeEngine/gate.ts";
+import { CONTRAST_LEVELS, MODES } from "../src/brand/themeEngine/policy.ts";
+import { resolveSeeds } from "../src/brand/themeEngine/resolve.ts";
 import { flatCssViolations } from "./design-system-policy.mjs";
 
 const root = process.cwd();
@@ -75,6 +80,61 @@ for (const [theme, selector] of Object.entries(themeSelectors)) {
   const ground = /--ground\s*:\s*(#[0-9a-f]{6})/i.exec(body)?.[1];
   if (syntaxBlue && ground && contrastRatio(syntaxBlue, ground) < 4.5) {
     violations.push(`${theme}: --syntax-blue needs 4.5:1 contrast against --ground`);
+  }
+}
+
+// A custom theme's two environments. The runtime sheet paints the derived
+// tokens; Paper's and Charcoal's blocks are the complete fallback beneath it,
+// so the attribute is a whole environment even if the sheet never loads.
+const customSelectors = {
+  "custom-light": ':root[data-theme="custom-light"]',
+  "custom-dark": ':root[data-theme="custom-dark"]',
+};
+for (const [theme, selector] of Object.entries(customSelectors)) {
+  const body = allBlocks
+    .filter((block) => block.selectors.includes(selector))
+    .map((block) => block.body)
+    .join("\n");
+  for (const token of requiredTokens) {
+    if (!new RegExp(`--${token}\\s*:`).test(body)) violations.push(`${theme}: missing --${token}`);
+  }
+}
+
+// The engine may only paint roles the token layer already defines: it can
+// never invent one.
+const tokenLayerNames = new Set(
+  allBlocks
+    .filter((block) => block.selectors.some((selector) => selector.startsWith(":root")))
+    .flatMap((block) => [...block.body.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1])),
+);
+for (const name of appliedTokenNames()) {
+  if (!tokenLayerNames.has(name))
+    violations.push(`theme engine: ${name} is not a role the token layer defines`);
+}
+
+// The built-ins through the custom-theme gate, against a baseline that may
+// only shrink (src/brand/themeEngine/builtinBaseline.json).
+const builtInBaseline = JSON.parse(read("src/brand/themeEngine/builtinBaseline.json"));
+const { added, fixed } = compareWithBaseline(
+  builtInFailures(`${colors}\n${base}\n${themes}`),
+  builtInBaseline,
+);
+for (const pair of added) violations.push(`built-in gate regression: ${pair}`);
+for (const pair of fixed)
+  violations.push(
+    `built-in gate: ${pair} passes now — delete it from builtinBaseline.json so it stays fixed`,
+  );
+
+// Fixed seed fixtures through the whole engine, at every level.
+const seedFixtures = JSON.parse(read("src/brand/themeEngine/goldens.json")).named;
+for (const [name, fixture] of Object.entries(seedFixtures)) {
+  for (const level of CONTRAST_LEVELS) {
+    const resolved = resolveSeeds(fixture.seeds, level);
+    for (const mode of MODES)
+      for (const row of failures(resolved[mode].rows))
+        violations.push(
+          `theme fixture ${name} (${level}, ${mode}): ${row.role} on ${row.on} ${row.ratio.toFixed(2)}:1`,
+        );
   }
 }
 
@@ -252,6 +312,23 @@ for (const name of squareProviderMarks) {
       `provider mark ${name}: optical footprint ${width}x${height}, ${opaquePixels} alpha-pixels; expected at least 12x12 and 32`,
     );
   }
+}
+
+// Custom properties written at runtime are runtime data in existing roles,
+// never a second token system: only these files may write them.
+const customPropertyWriters = new Set([
+  "src/state/theme.ts", // --accent-hue, the Custom primary hue
+  "src/editor/resultWidget.ts", // a result chip's validated label colour
+  "src/editor/colorPicker.ts", // the label picker's validated swatch
+  "src/components/chat/chatPromptNavigator.tsx", // the prompt menu's measured position, not a colour
+]);
+const customPropertyWrite = /setProperty\(\s*["'`]--|adoptedStyleSheets|\.cssText\b/;
+for (const file of walkSources(join(root, "src"))) {
+  if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file) || customPropertyWriters.has(file)) continue;
+  if (customPropertyWrite.test(read(file)))
+    violations.push(
+      `${file}: writes CSS custom properties at runtime; only the named writers in check-design-system.mjs may`,
+    );
 }
 
 // Every `var(--x)` names a token that exists. A missing definition with no
