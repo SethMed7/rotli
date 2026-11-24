@@ -5312,6 +5312,9 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
+            if key == "tags" {
+                crate::note_tags::whole_value_replaceable(&fm.foreign)?;
+            }
             fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {

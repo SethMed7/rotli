@@ -253,6 +253,17 @@ pub(crate) fn tag_values(foreign: &[String]) -> Vec<String> {
     read_field(foreign).map(|field| field.items.into_iter().map(|item| item.value).collect()).unwrap_or_default()
 }
 
+/// May a whole-value writer (the Librarian's `set_ai_field`) replace this
+/// note's `tags:` line? Not when its tags are a block list or a shape this
+/// reader can't follow: replacing only the key line would leave the list's
+/// item lines behind as text under the new value.
+pub(crate) fn whole_value_replaceable(foreign: &[String]) -> Result<(), String> {
+    match read_field(foreign)?.form {
+        Form::Block => Err(UNREADABLE.into()),
+        _ => Ok(()),
+    }
+}
+
 fn folded(tag: &str) -> String {
     tag.to_lowercase()
 }

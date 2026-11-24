@@ -82,8 +82,8 @@ pub(super) fn seeded() -> TempDir {
     // file, a board, and two documents (one unreadable) that listing hides
     // a tag only a hidden note carries, and one it shares with a public note
     put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, &format!("secure: {}\ntags: [PrivateProject, plain-tag]\n", true), "Hidden note eight", "words"));
-    put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "", "Hidden note nine", "card 4242 4242 4242 4242"));
-    put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "", "Juniper trip", "words"));
+    put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "tags: [DirectExample, plain-tag]\n", "Hidden note nine", "card 4242 4242 4242 4242"));
+    put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "tags:\n  - OldHome\n  - plain-tag\n", "Juniper trip", "words"));
     put(root, "wiki/Projects/cards.csv", "card,4242 4242 4242 4242\n");
     put(root, "wiki/Projects/secret.excalidraw", "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[{\"id\":\"t\",\"type\":\"text\",\"text\":\"card 4242 4242 4242 4242\",\"x\":0,\"y\":0,\"width\":10,\"height\":10}]}");
     put_bytes(root, "wiki/Projects/broken.docx", b"PK not a package");
@@ -97,14 +97,15 @@ pub(super) fn seeded() -> TempDir {
     for n in 1..=5 {
         put(root, &format!("wiki/_secure/PrivateProject/l{n}.md"), &note(&format!("01SURFLEDGERS{n}0000000000000"), "", &format!("Hidden note ledger L{n}"), "ledger ledger ledger"));
     }
-    put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\ntags: [plain-tag]\n", "Agent", "plain words"));
+    // the agent's own note carries a tag that names a protected path
+    put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\ntags: [plain-tag, wiki/_secure/PrivateProject]\n", "Agent", "plain words"));
     put(root, "wiki/Projects/free.md", &note(AGENT_FREE, "created_by: agent\n", "Free", "plain words"));
     put(root, BOARD, "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[]}");
     put(root, "wiki/Projects/pub.csv", "a,b\n1,2\n");
     put_bytes(root, PUBLIC_DOCX, &docx());
     // the secure home, in its canonical spelling
     put(root, "wiki/_secure/PrivateProject/s.md", &note("01SURFSECRET000000000000000", "", "Hidden note", "plain words classified"));
-    put(root, "wiki/_secure/Bank plan.md", &note("01SURFBANK00000000000000000", "", "Hidden note two", "plain words classified"));
+    put(root, "wiki/_secure/Bank plan.md", &note("01SURFBANK00000000000000000", "tags: [Diary, plain-tag]\n", "Hidden note two", "plain words classified"));
     put(root, "wiki/_secure/b.excalidraw", "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[{\"id\":\"t\",\"type\":\"text\",\"text\":\"classified\",\"x\":0,\"y\":0,\"width\":10,\"height\":10}]}");
     put(root, "wiki/_secure/f.csv", "a,b\nclassified,2\n");
     put_bytes(root, "wiki/_secure/p.docx", &docx());

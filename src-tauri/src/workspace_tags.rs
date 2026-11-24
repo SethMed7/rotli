@@ -123,7 +123,15 @@ impl Workspace {
 
     pub(super) fn tag_note(&mut self, local_id: &str, change: &TagChange, expected: &str) -> Result<NoteTagged, String> {
         let tagged = self.store.change_tags_for_ai(local_id, change, AiTagger::Agent, expected)?;
-        Ok(NoteTagged { id: self.wire(local_id), tags: tagged.tags, revision: tagged.revision })
+        // the note's tags as the list and query show them: one that names a
+        // protected path stays out of the answer
+        let mut tags = Vec::new();
+        for tag in tagged.tags {
+            if !(tag.contains(['/', '\\']) && self.store.names_protected_path(&tag)) {
+                tags.push(tag);
+            }
+        }
+        Ok(NoteTagged { id: self.wire(local_id), tags, revision: tagged.revision })
     }
 }
 

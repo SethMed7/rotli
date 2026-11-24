@@ -182,3 +182,22 @@ fn a_hand_made_note_gains_only_its_tags_line() {
     store.change_tags_as_person("01JTAGHAND0000000000000000", &add(&["q3"]), None).unwrap();
     assert_eq!(fs::read_to_string(&path).unwrap(), text.replace("# kept\r\n---", "# kept\r\ntags: [q3]\r\n---"));
 }
+
+#[test]
+fn the_librarians_whole_value_write_never_orphans_a_block_list() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("brain");
+    super::super::tests::seed_memex(&root);
+    fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    let rel = "wiki/_inbox/plan.md";
+    let block = doc("tags:\n  - mine\n");
+    fs::write(root.join(rel), &block).unwrap();
+    let err = store.set_ai_field(rel, "tags", "[mine, filed]").unwrap_err();
+    assert!(err.contains("Show file metadata"), "{err}");
+    assert_eq!(fs::read_to_string(root.join(rel)).unwrap(), block);
+    // a flow list is still the Librarian's to replace
+    fs::write(root.join(rel), doc("tags: [mine]\n")).unwrap();
+    store.set_ai_field(rel, "tags", "[mine, filed]").unwrap();
+    assert!(fs::read_to_string(root.join(rel)).unwrap().contains("tags: [mine, filed]"));
+}

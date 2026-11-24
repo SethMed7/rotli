@@ -76,3 +76,15 @@ fn a_persons_note_and_a_locked_one_refuse_an_agent() {
     let refused = mcp(&temp, TAG_NOTE, json!({ "id": "01TAGLOCKED000000000000000", "remove": ["x"], "expectedRevision": revision }));
     assert!(error_text(&refused).contains("locked"));
 }
+
+#[test]
+fn query_finds_every_note_the_list_counts_block_lists_included() {
+    let temp = TempDir::new().unwrap();
+    test_workspace(&temp);
+    put(&temp, "Inbox/flow.md", "---\nid: 01TAGFLOW00000000000000000\ntags: [shared]\n---\n# Flow\n\nwords\n");
+    put(&temp, "Inbox/block.md", "---\nid: 01TAGBLOCK0000000000000000\ntags:\n  - shared\n---\n# Block\n\nwords\n");
+    let listed = mcp(&temp, LIST_TAGS, json!({}));
+    assert_eq!(listed["structuredContent"]["tags"], json!([{ "tag": "shared", "count": 2 }]));
+    let found = mcp(&temp, "rotli_query", json!({ "query": "tags:shared" }));
+    assert_eq!(found["structuredContent"]["count"], 2, "{found}");
+}

@@ -1103,6 +1103,13 @@ fn query_metadata(
         }
         fields.insert(key.to_string(), query_value(value).into_iter().filter(|value| shown(value)).collect());
     }
+    // tags read the way the tag tools read them, a block list included, so
+    // `tags:NAME` finds every note rotli_list_tags counts
+    let tags: Vec<String> =
+        crate::note_tags::tag_values(&frontmatter.foreign).into_iter().filter(|value| shown(value)).collect();
+    if !tags.is_empty() {
+        fields.insert("tags".into(), tags);
+    }
     if let Some(id) = &frontmatter.id {
         fields.insert("id".into(), vec![id.clone()]);
     } else {

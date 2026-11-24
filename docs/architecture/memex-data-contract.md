@@ -678,7 +678,8 @@ The Rust corpus boundary independently validates every write.
   the vault's `secureLocalAi` default", `true` pins on-device access on, `false`
   pins it off. It is written only on a secure note.
 - The Librarian owns only its declared fields (`AI_KEYS`, Rust and TS): the
-  enrichment fields `area`, `summary`, `tags`, and `links`, and its filing
+  enrichment fields `area`, `summary`, `tags` (shared with the person since
+  2026-11-24, below), and `links`, and its filing
   record `suggested_area`, `area_confidence`, `filed_by`, and `filed_at`,
   and `anchors` (2026-09-28): pointers to passages, written only when the
   person applies a `/librarian` "mark" (the organizer never writes it). Its
@@ -698,7 +699,10 @@ The Rust corpus boundary independently validates every write.
   - **The Librarian** only adds: the organizer fills an empty `tags`, the
     `/librarian` bar merges, and an approval or undo of a `tags` change only
     lands while the field is exactly as the proposal or the action left it,
-    so it never drops a tag the person added since.
+    so it never drops a tag the person added since. Its writer replaces the
+    whole `tags:` value (`set_ai_field`), so it refuses a note whose tags are
+    a block list rather than leave the list's items behind (residual: the
+    Librarian can't tag such a note; the person and the tag tools can).
   - **An AI** (chat's `tag_note`, an agent's `rotli_tag_note`) adds and
     removes only where it could rewrite the body: the AI read gate first (a
     remote model never tags a secure note, nor learns its revision), never
@@ -707,7 +711,10 @@ The Rust corpus boundary independently validates every write.
     explicit `ai_edit: false`), the laundering rule on the tag text, and a
     fresh revision, all under the note's file lock
     (`CorpusStore::change_tags_for_ai`, `corpus_change_tags_ai`). Metadata
-    is not exempt from the grant: the owner's default, 2026-11-24.
+    is not exempt from the grant: the owner's default, 2026-11-24. An AI
+    tag write is not journaled in `.rotli/ai-edit-journal.jsonl` (that
+    journal holds body edits and their undo); the person sees and changes
+    tags in the note's header.
 
   A new tag is letters and numbers (Unicode), `-`, `_` and `/`, at most 40
   characters, one leading `#` dropped, NFC; it may not start with `-` or `/`,

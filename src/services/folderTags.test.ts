@@ -85,3 +85,11 @@ test("a hand-made note in a Rotli vault gains only its tags line", async () => {
   await corpusChangeTags("wiki/garden.md", { add: ["harvest"] });
   expect(await dir.readText("wiki/garden.md")).toBe(text.replace("# kept\n", "# kept\ntags: [harvest]\n"));
 });
+
+test("a fenceless note in a folder opened in place gains only a tags block", async () => {
+  // no Rotli marker: an Obsidian or Markdown folder the person brought
+  const text = "# Plan\n\nSteps.\n";
+  await dir.writeText("Projects/Plan.md", text);
+  await corpusChangeTags("Projects/Plan.md", { add: ["plans"] });
+  expect(await dir.readText("Projects/Plan.md")).toBe(`---\ntags: [plans]\n---\n${text}`);
+});

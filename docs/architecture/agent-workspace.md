@@ -136,11 +136,13 @@ notes the remote read gate passes (not Trash, Archive, or chats), most used
 first, as `{count, tags: [{tag, count}]}`. A secure note is not counted, so a
 tag only secure notes carry is never named; a tag that names a protected
 path is left out, as a query leaves such a value out. Find a tag's notes
-with `rotli notes query 'tags:NAME'`.
+with `rotli notes query 'tags:NAME'`, which reads tags the same way (a block
+list included), so it finds every note the list counted.
 
 `rotli tags add|remove ID TAG… --revision REV` and MCP `rotli_tag_note {id,
 add?, remove?, expectedRevision}` (`destructiveHint`) change one note's
-shared `tags:` metadata and answer `{id, tags, revision}`. The id passes the
+shared `tags:` metadata and answer `{id, tags, revision}` (a tag naming a
+protected path is left out of `tags`). The id passes the
 admit gate first (a hidden note answers as a missing one), then the AI tag
 lane's gates in order under the note's file lock: the remote read gate, the
 lock, the body-edit policy (a person's note needs "Let AI edit"), the
