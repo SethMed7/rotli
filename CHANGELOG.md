@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "+ Tag". It works on locked and secure notes too, and says right there why
   a value can't be a tag. All notes lists the vault's tags, most used first;
   pick one to see only the notes that carry it.
+- **Chat can tag a note.** Ask any chat model to tag a note and it adds or
+  removes tags with a new `tag_note` tool, under the same rules as editing
+  the note's text: never a locked note, never a secure one for a remote
+  model, and on a note you wrote it asks first ("Allow once").
 
 ### Fixed
 

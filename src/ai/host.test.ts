@@ -26,6 +26,7 @@ import {
   LOCAL,
   readable,
   type Row,
+  tagWrites,
   webRequests,
   writes,
 } from "./host.fixtures";
@@ -55,6 +56,7 @@ function updateVia(host: Host, id: string, body: string): Promise<string> {
 beforeEach(() => {
   fake.probeThrows = false;
   writes.length = 0;
+  tagWrites.length = 0;
   webRequests.length = 0;
   cliRequests.length = 0;
   fake.rows = [
@@ -248,6 +250,7 @@ test("every registered vault-content tool refuses secure-home content for a remo
     "search_notes",
     "read_note",
     "update_note",
+    "tag_note",
     "read_file",
     "edit_document",
   ]);
@@ -295,6 +298,10 @@ test("every registered vault-content tool refuses secure-home content for a remo
     update_note: async () => {
       expect(await updateVia(host, "Secure notes/plan.txt", "changed")).toMatch(/^blocked:/);
       expect(writes).toEqual([]);
+    },
+    tag_note: async () => {
+      expect(await host.tagNote!("Secure notes/plan.txt", ["x"], [])).toMatch(/^blocked:/);
+      expect(tagWrites).toEqual([]);
     },
     read_file: async () => {
       expect(await host.readFile("wiki/_secure/plan.csv")).toMatch(/^blocked:/);

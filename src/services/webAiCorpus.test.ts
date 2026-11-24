@@ -208,6 +208,7 @@ describe("every web AI entry point decides and answers from one read", () => {
   test("the corpus has exactly the entry points this test covers", async () => {
     const { corpus } = await alternating(false);
     expect(Object.keys(corpus).sort()).toEqual([
+      "changeTags",
       "frontmatter",
       "list",
       "read",

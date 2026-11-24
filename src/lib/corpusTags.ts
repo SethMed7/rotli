@@ -5,8 +5,8 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-import { isTauri, usesWebVaultIo } from "./tauri";
-import { currentWebVaultIo } from "./webAiSeam";
+import { type ChatModelInfo, isTauri, usesWebVaultIo } from "./tauri";
+import { currentWebAiCorpus, currentWebVaultIo, type WebAiCorpusShape } from "./webAiSeam";
 
 /** Tags to add (each normalized, or the change is refused) and tags to take
  * off (matched as written, any case). */
@@ -53,4 +53,32 @@ export async function corpusListTags(): Promise<TagCount[]> {
   if (!isTauri() && usesWebVaultIo()) return currentWebVaultIo().listTags();
   if (!isTauri()) return [];
   return invoke<TagCount[]>("corpus_list_tags");
+}
+
+/** A CHAT MODEL's tag change: the AI write lane's gates, enforced in Rust
+ * (corpus_change_tags_ai) whatever the host already refused, and on the web
+ * by the web AI corpus. Use this for every AI tag write; `corpusChangeTags`
+ * is the person's lane. `consented`: the person's "Allow once" (desktop). */
+export function corpusChangeTagsAi(
+  id: string,
+  change: NoteTagChange,
+  model: Pick<ChatModelInfo, "id" | "endpoint">,
+  expectedRevision: string,
+  consented = false,
+): Promise<NoteTagsResult> {
+  if (!isTauri()) {
+    const web = currentWebAiCorpus<WebAiCorpusShape<unknown, unknown, unknown, unknown, unknown>>();
+    return web
+      ? web.changeTags(id, change, expectedRevision)
+      : Promise.reject(new Error("No vault is open."));
+  }
+  return invoke<NoteTagsResult>("corpus_change_tags_ai", {
+    id,
+    add: change.add ?? [],
+    remove: change.remove ?? [],
+    modelId: model.id,
+    endpoint: model.endpoint,
+    expectedRevision,
+    consented,
+  });
 }

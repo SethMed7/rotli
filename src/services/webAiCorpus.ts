@@ -10,8 +10,10 @@
 import { looksSecret } from "../ai/guard";
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
 import type { CorpusNoteMeta, CorpusWriteResult, FrontmatterView, WebAiCorpus } from "../lib/tauri";
+import { currentWebVaultIo, hasWebVaultIo } from "../lib/webAiSeam";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import type { Note, NoteSummary, SearchHit } from "../types";
+import { normalizedAdd, type NoteTagChange } from "./folderTags";
 import type { NotesService } from "./notesPort";
 import { searchMatch } from "./search";
 
@@ -107,6 +109,21 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
         throw new Error("This text looks like it holds a secret, so it can't be written into an open note.");
       const saved = await notes().updateNote(id, body, expectedRevision);
       return { ...meta(saved), revision: saved.revision };
+    },
+    async changeTags(id: string, change: NoteTagChange, expectedRevision: string) {
+      // the web twin of corpus_change_tags_ai: the same gates as a body write
+      // (read gate, locked, the grant, the revision), then no secret in a tag
+      const note = await readable(id);
+      if (note.revision !== expectedRevision)
+        throw new Error("The note changed since it was read. Read it again before editing.");
+      const refusal = bodyEditRefusal(
+        note.locked === true ? "locked" : (note.aiBodyEdit ?? "person-written"),
+      );
+      if (refusal) throw new Error(refusal);
+      if (normalizedAdd(change).some((tag) => looksSecret(tag)))
+        throw new Error("refused: that tag looks like a secret");
+      if (!hasWebVaultIo()) throw new Error("Tags can be changed only in a connected folder.");
+      return currentWebVaultIo().changeTags(id, change, expectedRevision);
     },
     async frontmatter(id: string): Promise<FrontmatterView | null> {
       const note = await notes().getNote(id);

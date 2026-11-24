@@ -7,8 +7,8 @@ import { createEditableBoardFromMermaid } from "../boards/composition";
 import { memoryKeywords, mergeKeywordHits } from "../chatMemory/retrieval";
 import { documentImageFromBase64 } from "../documents/images";
 import type { DocumentImage } from "../documents/model";
+import { corpusChangeTagsAi } from "../lib/corpusTags";
 import { extOf, fileName } from "../lib/fileKind";
-import { corpusSetAiEdit } from "../lib/noteProtection";
 import { externalText, fixed, modelText, prompt } from "../lib/promptText";
 import {
   type ChatModelInfo,
@@ -44,8 +44,9 @@ import {
 } from "./approvedRead";
 import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
-import { askToEdit, type EditAnswer, type EditRequest, UNREADABLE_PROTECTION } from "./editGate";
+import type { EditAnswer, EditRequest } from "./editGate";
 import { endpointIsLocal, modelIsOnDevice } from "./guard";
+import { makeEditGate } from "./hostEditGate";
 import { aiFileAccessById, makeFileTools } from "./hostFiles";
 import { aiReadableHits, assertAiNoteLocation, noteLocationIsProtected } from "./hostReadGate";
 import { completeOnCli } from "./hostRemote";
@@ -140,6 +141,8 @@ export function makeTauriHost(
     const only = new Set(rows.filter((row) => row.onDeviceOnly === true).map((row) => row.id));
     marked(shown.some((hit) => only.has(hit.id)));
   };
+
+  const editGate = makeEditGate(model, opts);
 
   const host: Host = {
     complete({ messages, formatJson }) {
@@ -326,56 +329,35 @@ export function makeTauriHost(
     async updateNote(id, body) {
       // EDIT rides the AI write lane (corpus_write_ai: the read gate, then the
       // LOCKED refusal, then the ordinary write — frontmatter preserved, updated
-      // bumped, aliases follow a retitle) — but ONLY after the same read gate
-      // every AI read passes: Rust's corpus_read_ai refuses secure notes to
-      // remote models and knob-denied local ones, and its refusal is final here
-      // too. The read also marks the chat's secure taint exactly like read_note.
-      let readRevision: string;
-      let readTitle = "this note";
-      let protectedLocation: boolean;
-      try {
-        protectedLocation = await assertAiNoteLocation(id, model);
-        const read = await approvedNote(id, model);
-        readRevision = read.revision;
-        readTitle = read.title || readTitle;
-      } catch (e) {
-        return prompt`blocked: ${errorText(e)}`;
-      }
-      // ONE frontmatter read serves the taint marking, the LOCK check, and the
-      // secure-context check below (Greptile PR #19: the second fetch doubled
-      // the IPC hop on exactly the "edit a private note" path). Unknowable =
-      // secure AND locked — fail closed on both axes.
-      const frontmatter = await corpusFrontmatter(id).catch(() => null);
-      // unreadable, LOCKED, or a person's note without a grant: a person's
-      // note asks them first (editGate.ts askToEdit)
-      const gate = await askToEdit(frontmatter, { id, title: readTitle }, opts?.confirmEdit, (note) =>
-        corpusSetAiEdit(note, true),
-      );
-      if (gate.block || !frontmatter) return prompt`${externalText(gate.block ?? UNREADABLE_PROTECTION)}`;
-      if (opts?.onSecureNoteRead && (frontmatter.secure === true || protectedLocation)) {
-        opts.onSecureNoteRead();
-      }
-      // the create_note taint law's edit twin (PR #4 P1): a chat carrying
-      // secure-note content must not launder prose into an OPEN note — it may
-      // only edit notes that are THEMSELVES secure. (Re-evaluated AFTER the
-      // taint call above, against the same one frontmatter read.)
-      if (opts?.isSecureContext?.() === true && frontmatter.secure !== true && !protectedLocation) {
-        return fixed(
-          "blocked: this chat carries secure-note content, so it can only edit notes that are themselves secure. Use create_note instead — the new note will be marked secure.",
-        );
-      }
+      // bumped, aliases follow a retitle) — but ONLY after editGate's checks
+      const gate = await editGate(id);
+      if (typeof gate === "string") return gate;
       // the model reads full file text (fences included) and often echoes the
       // CONTENT crosses (a passed-through fence would duplicate inside the body)
       const content = stripLeadingFrontmatter(body);
       if (!content.trim())
         return fixed("error: the new body was only metadata — send the note's full content.");
       try {
-        await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model, readRevision, gate.consented);
+        await corpusWriteAi(id, `${content}\n`.replace(/\n+$/, "\n"), model, gate.revision, gate.consented);
       } catch (e) {
         return prompt`blocked: ${errorText(e)}`;
       }
       await Promise.all([invalidateNotes(), invalidateMemex()]);
       return prompt`updated note ${modelText(id)} — its content is replaced with your new text. If the note changed after the model read it, Rotli refuses the stale write. Tell the user what you changed.`;
+    },
+    async tagNote(id, add, remove) {
+      // tags ride the AI tag lane (corpus_change_tags_ai), which Rust holds to
+      // the body write's gates; the same editGate checks run here first
+      const gate = await editGate(id);
+      if (typeof gate === "string") return gate;
+      try {
+        const tagged = await corpusChangeTagsAi(id, { add, remove }, model, gate.revision, gate.consented);
+        await Promise.all([invalidateNotes(), invalidateMemex()]);
+        const now = tagged.tags.length ? tagged.tags.map((tag) => `#${tag}`).join(" ") : "no tags";
+        return prompt`tagged note ${modelText(id)} — its tags are now: ${externalText(now)}. Tell the user what you changed.`;
+      } catch (e) {
+        return prompt`blocked: ${errorText(e)}`;
+      }
     },
     async openNote(id) {
       usePanesStore.getState().openNote(id);
