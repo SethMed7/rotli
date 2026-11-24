@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { readOpfsFile, startWithVault } from "./support";
+import { listOpfsFiles, plantOpfsFiles, readOpfsFile, startWithVault } from "./support";
 
 const PORT = 43111;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
@@ -461,4 +461,125 @@ test("the chat list holds still while a reply runs, lifts the answered chat, and
   // opening it acknowledges the reply: the dot goes
   await firstRow.click();
   await expect(firstRow.getByRole("img", { name: "Unread reply" })).toHaveCount(0);
+});
+
+// The chat composer's command menu and note mentions (the owner, 2026-11-24):
+// "/" at the start or after a space opens chat commands, "@" opens a note
+// picker; both are keyboard-first, and anything else stays literal text.
+const composerOf = (page: import("@playwright/test").Page) => page.getByPlaceholder(/Message rotli/).first();
+
+test("typing /boa in the chat composer and pressing Enter starts a new board", async ({ page }) => {
+  await fakeHelper(page, []);
+  await pairAndOpenChat(page);
+  const composer = composerOf(page);
+  await composer.click();
+  await composer.pressSequentially("/boa");
+  const list = page.getByRole("listbox", { name: "Chat commands" });
+  await expect(list.getByRole("option").first()).toContainText("board");
+  await expect(list.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  await expect(composer).toHaveAttribute("aria-activedescendant", /.+/);
+
+  await composer.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
+  await expect(dialog).toBeVisible();
+  await expect(composer).toHaveValue("");
+  await dialog.getByRole("textbox", { name: "Board name" }).fill("From chat");
+  await dialog.getByRole("button", { name: "Create board" }).click();
+  await expect
+    .poll(() => listOpfsFiles(page, "storage/excalidraw"), { timeout: 10_000 })
+    .toContain("From chat.excalidraw");
+});
+
+test("the chat command menu filters, closes with Escape, and leaves unknown or mid-word slashes as text", async ({
+  page,
+}) => {
+  const calls: { cmd: string; args: unknown }[] = [];
+  await fakeHelper(page, calls);
+  await pairAndOpenChat(page);
+  const composer = composerOf(page);
+  const list = page.getByRole("listbox", { name: "Chat commands" });
+  await composer.click();
+
+  // Tab completes the name; Escape closes the menu and keeps the text
+  await composer.pressSequentially("/mo");
+  await composer.press("Tab");
+  await expect(composer).toHaveValue("/model");
+  await composer.press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(composer).toHaveValue("/model");
+
+  // mid-word, a URL or an email: never a menu
+  await composer.fill("");
+  await composer.pressSequentially("and/or https://rotli.co/ me@example.com");
+  await expect(list).toHaveCount(0);
+  await expect(page.getByRole("listbox", { name: "Notes to talk about" })).toHaveCount(0);
+
+  // nothing matches: the menu says so, and Enter sends the text as typed
+  await composer.fill("");
+  await composer.pressSequentially("/zzz");
+  await expect(page.locator(".chat-cmdmenu .slashmenu-empty")).toContainText("No command matches");
+  await expect(page.locator(".chat-cmdmenu [role=status]")).toHaveText("No command matches /zzz");
+  await expect(list.getByRole("option")).toHaveCount(0);
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+  const sent = calls.find((c) => c.cmd === "cli_complete");
+  expect(JSON.stringify(sent?.args)).toContain("/zzz");
+});
+
+test("@ picks a note to talk about: a removable chip, saved on the chat when it sends", async ({ page }) => {
+  const calls: { cmd: string; args: unknown }[] = [];
+  await fakeHelper(page, calls);
+  await pairAndOpenChat(page);
+  await plantOpfsFiles(page, { "wiki/_inbox/roadmap-plan.md": "# Roadmap plan\n\nShip the beta first.\n" });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const composer = composerOf(page);
+  await composer.click();
+  await composer.pressSequentially("Summarise @roadm");
+  const notes = page.getByRole("listbox", { name: "Notes to talk about" });
+  await expect(notes.getByRole("option").first()).toContainText("Roadmap plan", { timeout: 10_000 });
+  await composer.press("Enter");
+
+  // the token leaves the draft; the note rides as a chip
+  await expect(composer).toHaveValue("Summarise ");
+  const chip = page.locator(".chat-attach-chip");
+  await expect(chip).toContainText("Roadmap plan");
+  await chip.getByRole("button", { name: "Remove Roadmap plan" }).click();
+  await expect(chip).toHaveCount(0);
+
+  // pick it again through /attach, then send
+  await composer.pressSequentially("/att");
+  await composer.press("Enter");
+  await expect(composer).toHaveValue("Summarise @");
+  await composer.pressSequentially("roadm");
+  await composer.press("Enter");
+  await expect(chip).toContainText("Roadmap plan");
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+  await expect(chip).toHaveCount(0);
+  const chats = await listOpfsFiles(page, "chats");
+  const texts = await Promise.all(chats.map((name) => readOpfsFile(page, `chats/${name}`)));
+  expect(texts.some((text) => text.includes("attachedTo: [[roadmap-plan]]"))).toBe(true);
+});
+
+test("a secure note picked with @ never reaches a remote model", async ({ page }) => {
+  const calls: { cmd: string; args: unknown }[] = [];
+  await fakeHelper(page, calls);
+  await pairAndOpenChat(page);
+  await plantOpfsFiles(page, {
+    "wiki/_inbox/payroll-figures.md": "---\nsecure: true\n---\n# Payroll figures\n\nConfidential.\n",
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const composer = composerOf(page);
+  await composer.click();
+  await composer.pressSequentially("@payroll");
+  const notes = page.getByRole("listbox", { name: "Notes to talk about" });
+  await expect(notes.getByRole("option").first()).toContainText("Payroll figures", { timeout: 10_000 });
+  await composer.press("Enter");
+  await expect(page.locator(".chat-attach-chip")).toContainText("on-device only");
+
+  // only a remote model is connected: the send stops before anything leaves
+  await composer.pressSequentially("What is in it?");
+  await composer.press("Enter");
+  await expect(page.locator(".cmsg").filter({ hasText: "⚠" }).last()).toBeVisible();
+  expect(calls.filter((c) => c.cmd === "cli_complete")).toHaveLength(0);
 });

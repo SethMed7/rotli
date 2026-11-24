@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The chat composer has a command menu.** Type `/` at the start of a
+  message to make a board from the latest diagram (`/board`), save the latest
+  reply as a note (`/note`), pick a note to talk about (`/attach`), switch
+  the model (`/model`) or start a new chat (`/new`). The list filters as you
+  type and works from the keyboard. Type `@` to pick a note to talk about: it
+  shows as a chip you can remove, and a secure note is never sent to a
+  remote model. Slashes and at-signs inside words, links and email addresses
+  stay text.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

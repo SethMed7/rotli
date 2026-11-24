@@ -113,6 +113,12 @@ imports.
   (`yes / no`), and a command that matches (`/usr`). A command that belongs in
   a sentence (**Link note**, **Link chat**, **Inline code**) inserts in place;
   any other lands on a continuation line beneath, leaving the text whole.
+- The chat composer is not a note. Its `/` opens chat commands (`/board`,
+  `/note`, `/attach`, `/model`, `/new`) and its `@` picks a note to talk
+  about, both only at the start of the message or after whitespace, so
+  `and/or`, a URL and `name@example.com` stay text. `@claude`, `@gpt` and the
+  other provider tags keep their consult meaning. A command never inserts
+  Markdown syntax; it runs an app action and leaves the rest of the draft.
 - **Link chat** lists your chats and inserts an ordinary wikilink
   (`[[Chat title]]`, or its slug when the title is not unique). A chat is a
   transcript file in the vault, so the link resolves like any other; clicking

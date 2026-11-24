@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-10-05T22:25:03.344Z",
+  "last_modified": "2026-11-24T22:27:36.576Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -731,6 +731,15 @@
       "rationale": "2026-10-05 the owner chose consented insertion for /ai. Rule 2 says every AI write rides corpus_write_ai; the insert lane is a second, narrower entry to the same write path (corpus_ai_edit.rs, AiWrite::Insert), so the summary should name it and its limits.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-10-05T22:25:03.343Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-011",
+      "proposed_domain": "ROTLI_DOCUMENTS",
+      "rule_text": "Markdown notes alone own slash functions, wikilinks, typed embed fences, frontmatter and note-native workflows. The chat composer has its own / command menu and @ note picker, which run app actions and never write Markdown syntax into a note. DOCX files remain conventional documents; sheets and boards use their native editor boundaries.",
+      "rationale": "Owner decision 2026-11-24: the chat composer gets a command menu separate from the note editor's slash functions. Replaces ROTLI_DOCUMENTS rule 0, which said Markdown alone owns slash commands.",
+      "source": "AGENTS.md; docs/design/sidebar-home-chat.md",
+      "proposed_at": "2026-11-24T22:27:36.574Z",
       "status": "pending"
     }
   ]

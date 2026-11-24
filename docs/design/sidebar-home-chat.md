@@ -334,6 +334,39 @@ front first, or the reveal silently does nothing.
   front on launch is never overridden, and switching fronts by hand while a tab
   stays focused is never undone.
 
+## The composer's command menu (2026-11-24)
+
+The chat composer has its own `/` command menu, separate from the note
+editor's slash functions: Markdown notes own slash functions, and a chat
+command never writes Markdown syntax into a note.
+
+- `/` at the start of the message or after whitespace opens the menu; `@`
+  in the same places opens a note picker. Mid-word slashes and at-signs,
+  URLs, email addresses and the provider tags (`@claude`, `@gpt`, `@agy`…)
+  stay literal. Rules: `src/components/chat/chatComposerMenuModel.ts`.
+- Keys: ↑/↓ move, ⏎ runs, Tab completes a command name (or picks a note),
+  Esc closes and keeps the text. With nothing matching, ⏎ sends the text as
+  typed. Focus stays in the textarea (`aria-activedescendant` into a
+  listbox) and a polite live region says how many rows match.
+- Commands, each through an existing action
+  (`src/components/chat/chatComposerCommands.ts`):
+  - `/board`: the latest reply's Mermaid diagram becomes an editable board;
+    with none, the new-board dialog opens. A chat carrying secure-note
+    content refuses the conversion, as the model's board tool does.
+  - `/note`: the latest reply becomes a new note through the normal
+    note-create lane, secure when the chat is.
+  - `/attach`: hands over to the `@` picker.
+  - `/model`: opens this chat's model picker.
+  - `/new`: a new chat (`chat.new`).
+  - `/tag` is registered but hidden until the Rust-owned tag API exists.
+    `/project`, `/clear` and `/compact` have no backing action yet.
+- `@note` attaches a Markdown note as the chat's context, through the same
+  stem and secure verdict as **Chat with this note**. It shows as a removable
+  chip and is written to the chat's `attachedTo` when the message sends. A
+  picked note counts as attached from the pick: a secure one strips remote
+  models from the picker and the send refuses them before anything leaves.
+  A chat that already has a note offers neither `@` nor `/attach`.
+
 ## File map
 
 `sidebar.tsx` was a 2,180-line mega-component and the standing refactor
