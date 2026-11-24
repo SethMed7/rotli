@@ -28,7 +28,7 @@ export interface ChatCommandContext {
   chatTitle: string;
   messages: readonly { speaker: string; text: string }[];
   /** The chat carries secure-note content (attached, pending or read). */
-  isSecure: () => boolean;
+  secure: boolean;
   /** The chat already has a saved note; @ never swaps it for another. */
   hasNote: boolean;
   canPickModel: boolean;
@@ -58,7 +58,7 @@ async function run(id: ChatCommandId, ctx: ChatCommandContext): Promise<void> {
     case "board": {
       const mermaid = latestReplyMermaid(ctx.messages);
       if (!mermaid) return dispatch("boards.new");
-      if (ctx.isSecure()) return ctx.notify(SECURE_BOARD);
+      if (ctx.secure) return ctx.notify(SECURE_BOARD);
       await createEditableBoardFromMermaid(mermaid, {
         name: ctx.chatTitle || "Diagram",
         ...(ctx.rootId ? { rootId: ctx.rootId } : {}),
@@ -73,7 +73,7 @@ async function run(id: ChatCommandId, ctx: ChatCommandContext): Promise<void> {
         ctx.instance,
         body,
         undefined,
-        ctx.isSecure() ? { secure: true } : undefined,
+        ctx.secure ? { secure: true } : undefined,
       );
       await invalidateNotes();
       ctx.openNote(noteId);

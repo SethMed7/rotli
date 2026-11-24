@@ -2200,7 +2200,8 @@ export function ChatSurface({
   const commandContext: ChatCommandContext = {
     ...commandState,
     chatTitle: storedTitle ?? displayTitle,
-    isSecure: () => secureChat || secureReadRef.current,
+    // secureContext mirrors every raise of the live mark, so this is the same verdict
+    secure: secureChat,
     rootId: active ? (active.id === CORPUS_INSTANCE_ID ? "default" : active.id) : null,
     openModelPicker: () => setModelPickerRequest((n) => n + 1),
     openNote: (noteId) => openAttachedNote(noteId),
