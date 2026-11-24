@@ -41,8 +41,9 @@ Now the sidebar has **one top switcher and one body**:
   saved chat activity. It contains no provider/token telemetry. Rotli does not estimate word authorship: a
   human-vs-AI split requires an edit-provenance contract the corpus does not yet
   record.
-- **Chat** is the chat world: New chat · All chats · reply-recency-sorted chat
-  folders · every chat, then the footer. Each chat appears exactly once; the
+- **Chat** is the chat world: New chat · All chats · a short **Projects** list
+  · every chat by reply recency (a chat in a project wears its name as a quiet
+  tag), then the footer. See [Projects](#projects) below. Each chat appears exactly once; the
   session Activity lane that hoisted copies to the top is retired (2026-10-15).
   Since 2026-08-03 the front carries live signals and organization:
   - **Run signals** — a dot beside the row's age, never a word: an accent ring
@@ -57,8 +58,7 @@ Now the sidebar has **one top switcher and one body**:
     durable truth. Navigating away no longer cancels a queued turn; it
     completes, persists, and flips its row.
   - **Order is reply recency** — pinned chats first, then the time of each
-    chat's newest REPLY, inside folders too ("the moment I get a response it
-    moves to the top"). Sending writes your turn at once but leaves the chat
+    chat's newest REPLY ("the moment I get a response it moves to the top"). Sending writes your turn at once but leaves the chat
     where it is; the arriving answer lifts it (2026-10-15). The reply time is
     read from the transcript's last non-`you` message line (Rust
     `memex_chat_scan.rs`, the TS twin `src/memex/chatRecency.ts` for Rotli Web; a chat with
@@ -66,10 +66,10 @@ Now the sidebar has **one top switcher and one body**:
     transcript they read for reply time, independently of the 41-line metadata
     header, so long conversations retain their newest reply. The row's age shows
     the same time. The old per-folder manual drag order is retired (the manifest field still
-    parses for older builds); dragging a chat onto a folder still files it
+    parses for older builds); dragging a chat onto a project row still files it
     there.
-  - **Pinned and recent folders** — an explicit pin wins; otherwise the folder
-    containing the newest chat floats first (`pinned` stays on the
+  - **Pinned and recent projects** — an explicit pin wins; otherwise the
+    project containing the newest chat floats first (`pinned` stays on the
     `chat-folders.json` entry, while recency remains derived from chat files).
   - **Provider mark + recency** — the left mark identifies the model provider;
     the right edge shows compact last activity (`now`, `4h`, `8d`) rather than
@@ -103,10 +103,100 @@ Now the sidebar has **one top switcher and one body**:
 ## Why Home owns System, and Chat does not
 
 Library, Assets, Archive and Trash are stores of _notes and files_. A chat is
-not filed into any of them (chats live in `chats/` and are grouped by the
-virtual chat-folder sidecar). Putting the System zone in Chat would show four
+not filed into any of them (chats live in `chats/` and are grouped into
+projects by the `.rotli/chat-folders.json` sidecar). Putting the System zone in Chat would show four
 rows that answer no question the Chat view can ask. The footer, by contrast,
 is about the app and the vault, so it stays everywhere.
+
+## Projects
+
+Since 2026-11-24 the Chat front groups chats into **projects** the way
+Claude.ai does, replacing the old chat folders. The word "Projects" appears
+only inside the Chat front: the Brain's Projects area and the `/project list`
+slash function are different things and keep their names.
+
+- **Sidebar.** A short Projects list (pinned first, then the project with the
+  newest chat; five show, "Show N more" reveals the rest, and the open
+  project's row always shows), then **Recents**: every chat, flat, newest
+  reply first. A chat in a project carries the project's name as a small
+  tag; its row's accessible name says "in <project>". With no projects the
+  list is one quiet "New project" row. The title bar's New-folder button and
+  the view picker's second action both read **New project** while Chat is the
+  front. Projects belong to the vault, so they show under every named view.
+- **A project row opens the project's page in a tab** (`surfaceKind:
+  "project"`, restored across relaunch like chat and canvas tabs). The page
+  has the project's name (click to rename), **New chat in this project**, its
+  chats by reply recency, and **Instructions**. Its states: no vault, another
+  vault's project, loading, unreadable manifest (with Try again), a deleted
+  project, no chats, and a narrow pane (chats and Instructions stack).
+- **Menus.** A chat's "Move to folder" is now **Add to project** (each
+  project, Remove from project, New project…). A project's menu: Open, Pin to
+  top, Rename…, and **Delete project…**, which asks a second click; the
+  project's chats stay in the list and its instructions note stays a note.
+  Dragging a chat onto a project row still adds it.
+- **A new chat inherits its project** from the focused chat, from a focused
+  project page, or from the page's own button; it is filed on its first save.
+
+### Instructions are a note
+
+A project's instructions are the person's prose, so they are not kept in
+`.rotli/` (which holds rebuildable projections and settings). **Add
+instructions** makes an ordinary Markdown note — through the same intake lane
+as a chat's own note, created as the person's (no AI creator) — and the
+project stores only its id (`instructionsNote`). The note is portable and
+searchable, the Librarian may file it like any note (its frontmatter id
+survives the move), and it can be marked `secure:` or `locked:` from the note
+editor, which is where it is written: the page previews it, shows Secure and
+Locked badges, and offers Edit instructions and Unlink.
+
+Every turn in the project carries the note's text:
+
+- The agent loop reads it through `Host.readNote` — `corpus_read_ai` for the
+  turn's model — and puts it in the system prompt inside a
+  `<project-instructions>` frame that says it never changes tools, notes, or
+  web access. Rust's `remote_block` scans that prompt like any other.
+- Before the run, the chat reads the note's `secure:` flag. A secure
+  instructions note makes the project on-device only: a remote model is
+  refused with a notice, and the web stays off. An on-device read taints the
+  chat (`secureContext`), as any secure read does.
+- A note that can't be read, or whose editor hasn't saved, refuses the turn
+  rather than sending it without its instructions; the page then offers
+  Unlink.
+- No model rewrites the note without the person's grant, and none once it is
+  locked.
+
+### On disk, and older builds
+
+The manifest is the same `.rotli/chat-folders.json`, so **every folder an
+older build made is already a project with the same chats** — nothing moves,
+and chats stay flat in `chats/*.md`. Projects add two optional keys, the way
+`pinned` was added: nothing for folders without instructions, and
+`instructionsNote` once instructions exist. Unknown keys, top level and per
+project, survive every edit.
+
+One known loss path: builds up to 1.9.6 rebuild an unpinned project as
+`{id, name}` when they write the manifest, so a write from one of them drops
+the `instructionsNote` link (a pinned project keeps it). The note itself is
+untouched; the project page can link a new one. `chatFolders.test.ts` pins
+this.
+
+Every project edit goes through one write path (`updateChatProjects`): a
+fresh manifest load, then a fresh chat listing, the edit, and a
+revision-guarded save. Assignments for chats the listing lacks are pruned —
+but only when the listing is complete: a failed listing, or an empty one,
+prunes nothing. The Rust chat listing reports an unreadable chats folder as
+an error rather than as an empty list (a missing folder is an empty one).
+
+### Built to be restyled
+
+The look is separate from the wiring, so a sidebar redesign replaces small
+files instead of re-plumbing: `sidebar/projectRow.tsx` (a project row, the
+project tag, the rename field, the section labels, the quiet list actions)
+and `chat/projectPage.tsx` (the page) take props and send intents;
+`sidebar/sidebarChatProjects.tsx` and `projectSurface.tsx` own data and
+writes. Their classes are `sb-chatproject*`, `sb-chattag`, `sb-chatsection`
+(`styles/notes.css`) and `project-*` (`styles/board.css`), all on semantic
+tokens.
 
 ## Home dashboard
 
@@ -302,7 +392,8 @@ to Chat.
 
 The two-stage collapse survives with sections gone:
 
-1. **First press** folds the trees — Main / named-view folders, chat folders,
+1. **First press** folds the trees — Main / named-view folders (chat projects
+   are links, not disclosures, since 2026-11-24),
    and any expanded destination row. Unchanged.
 2. **Second press** (everything inside already folded) folds the **System
    zone** — `sec:system`. It used to fold `sec:chat` + `sec:notes`, which no
@@ -345,11 +436,14 @@ new IA — each piece owns one front or one zone.
 | `src/components/sidebar.tsx`                 | The shell: `<aside>`, the vault header row + create/collapse icons, the error lane, the switcher, front routing, the front auto-switch effect |
 | `src/components/sidebar/sidebarSwitcher.tsx` | The two-segment pill (presentational)                                                                                                         |
 | `src/components/sidebar/sidebarHome.tsx`     | The Home body: smart rows, view switcher + editors, the Main tree with its pointer-drag and multi-select, the roving list, the reveal effects |
-| `src/components/sidebar/sidebarChat.tsx`     | The Chat body: New chat, All chats, chat folders, chat rows, chat drag + rename                                                               |
+| `src/components/sidebar/sidebarChat.tsx`     | The Chat body: New chat, All chats, the Projects list, the recents, chat drag + rename                                                        |
+| `src/components/sidebar/sidebarChatProjects.tsx` | The Projects list's wiring: open, menus, pin, delete, create, drop targets                                                               |
+| `src/components/sidebar/projectRow.tsx`      | The look of a project row, the project tag, the rename field, and the section labels                                                          |
+| `src/components/projectSurface.tsx`          | A project's page: its data and writes. `chat/projectPage.tsx` is its look                                                                     |
 | `src/components/sidebar/sidebarRenameRows.tsx` | Rename in place: a Main folder's or note's row becomes a same-size field (the folder's contents stay in view); Enter saves, Esc cancels. The note menu's `renameInline` option picks this over the Rename dialog, which stays for tabs and search |
 | `src/components/sidebar/sidebarSystem.tsx`   | The invariant System zone: its disclosure header and Library · Assets · Archive · Trash rows                                                |
 | `src/components/sidebar/sidebarFooter.tsx`   | Files · Librarian · Settings, and the Librarian's badges + working dot                                                                        |
-| `src/components/sidebar/useChatFolders.ts`   | The chat-folder query + read-modify-write helper, shared by the Chat body and the shell's collapse-all                                        |
+| `src/components/sidebar/useChatFolders.ts`   | The vault's chats and projects manifest, and the one project write path, shared by the Chat body, the chat window, the dashboard, and project pages |
 | `src/services/systemNav.ts`                  | `openSystemRoot(id)` — the one way to open the System browser at a root                                                                       |
 
 ## What this does not do

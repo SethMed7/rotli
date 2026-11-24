@@ -997,34 +997,57 @@
   position: relative;
   z-index: 1;
 }
-/* chat FOLDERS (the maintainer, 2026-07-30) — virtual grouping; the folder row is a
-   disclosure, its chats indent one step beneath it */
-.sb-chatfolder {
+/* chat PROJECTS (2026-11-24) — a short list of links above the recents; a row
+   opens the project's page, so there is no disclosure and nothing indents */
+.sb-chatprojects {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
+/* the quiet section labels: Projects, Recents — the .fsec voice, tighter */
+.sb-chatsection {
+  margin: 0;
+  padding: 10px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .sb-chatfolder-n {
   margin-left: auto;
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
 }
-/* the folder row wears the Notes tree's exact disclosure grammar — shared
-   .fchev slot, shared gap, no bold (the chevron + glyph carry folder-ness,
-   same as Main's folders); children indent past the chevron slot, exactly
-   the contentPad = rowPad + 18 rule the Main tree uses */
-.sb-chatrow.in-folder {
-  padding-left: 28px;
+.sb-chatproject-new,
+.sb-chatproject-more {
+  color: var(--text-muted);
+  font-size: 12px;
 }
-.sb-chatrow.in-folder::before {
-  content: "";
-  position: absolute;
-  left: 17px;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: var(--border);
-  pointer-events: none;
+.sb-chatproject-new:hover,
+.sb-chatproject-more:hover {
+  color: var(--text);
+}
+/* a chat in a project wears the project's name: quiet, never louder than the
+   title, and cut short before it can crowd the title out */
+.sb-chattag {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 38%;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-chatrow.sel .sb-chattag {
+  color: var(--selected-ink);
+  border-color: color-mix(in srgb, var(--selected-ink) 30%, transparent);
 }
 .main-branch-children {
   position: relative;
@@ -1049,7 +1072,7 @@
 .sb-chatrow.dragging {
   opacity: 0.4;
 }
-.sb-chatfolder-row.chatdrop {
+.sb-chatproject.chatdrop {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 /* inline rename over a chat row (the maintainer #4, 2026-07-08) — same footprint as the row */

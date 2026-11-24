@@ -37,6 +37,7 @@ import { ChatSurface } from "./chat/chatSurface";
 import { FileSurface } from "./fileSurface";
 import { NewItemSurface } from "./newItemSurface";
 import { PaneEmptyState } from "./paneEmptyState";
+import { ProjectSurface } from "./projectSurface";
 import { TabStrip } from "./tabStrip";
 
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
@@ -186,6 +187,13 @@ function LeafView({ node }: { node: LeafNode }) {
           );
         })}
         {tab?.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
+        {tab?.surfaceKind === "project" && (
+          <ProjectSurface
+            key={tab.id}
+            projectId={tab.projectId}
+            {...(tab.vaultId ? { vaultId: tab.vaultId } : {})}
+          />
+        )}
         {tab?.surfaceKind === "newItem" &&
           (tab.pendingNote ? (
             <PendingNoteSurface key={tab.id} paneId={node.id} tabId={tab.id} />

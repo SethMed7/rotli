@@ -92,9 +92,8 @@ export function Sidebar() {
   const setRowActionError = useUiStore((s) => s.setRowActionError);
   const openContextMenu = useContextMenu((s) => s.open);
 
-  // the chat world's data — the Chat front renders it, and collapse-all needs
-  // its folder keys here (chat folders default OPEN, so wiping the map would
-  // re-EXPAND them, #83). One react-query key: the second read is the cache.
+  // the chat world's data — the Chat front renders it (one react-query key, so
+  // every other reader is a cache read)
   const chats = useChatFolders();
   const activeTree = useActiveTree();
 
@@ -193,7 +192,7 @@ export function Sidebar() {
     if (focusedTabKey === lastTabKey.current) return;
     lastTabKey.current = focusedTabKey;
     if (!focusedSurfaceKind) return;
-    if (focusedSurfaceKind === "chat") setSidebarView("chat");
+    if (focusedSurfaceKind === "chat" || focusedSurfaceKind === "project") setSidebarView("chat");
     else if (focusedSurfaceKind !== "activity") setSidebarView("home");
   }, [focusedTabKey, focusedSurfaceKind, setSidebarView]);
   const visibleSidebarView = sidebarFrontBody(sidebarView, contentView, dashboardSection);
@@ -389,11 +388,11 @@ export function Sidebar() {
         <button
           type="button"
           className="icobtn tb-trail"
-          aria-label={visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+          aria-label={visibleSidebarView === "chat" ? "New project" : "New folder"}
           onClick={() => {
             // the System browser open? create a real folder at its cwd; else the
             // ACTIVE FRONT answers — Home opens its Main-folder input, Chat mints
-            // a chat folder (the inline notes-tree input died with the 2026-07-26
+            // a chat project (the inline notes-tree input died with the 2026-07-26
             // System fold and left this button a silent no-op, P0)
             if (contentView === "system") requestSystemFolder();
             else requestSidebarFolder();
@@ -401,7 +400,7 @@ export function Sidebar() {
         >
           <NewFolderGlyph size={16} />
           <span className="tip" aria-hidden="true">
-            {visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+            {visibleSidebarView === "chat" ? "New project" : "New folder"}
           </span>
         </button>
         {/* New board lives in the New… dropdown (the maintainer, 2026-07-28) — its own
@@ -414,9 +413,9 @@ export function Sidebar() {
           type="button"
           className="icobtn tb-trail"
           aria-label="Collapse all folders"
-          /* default-OPEN rows (Main folders, CHAT folders) need an explicit
-             false — wiping the map alone re-EXPANDED them (#83, audit 2026-07;
-             chat folders were missed until 2026-07-31). "Brain" is NOT passed:
+          /* default-OPEN rows (Main folders) need an explicit false — wiping
+             the map alone re-EXPANDED them (#83, audit 2026-07). Chat projects
+             are links, not disclosures, so they pass nothing. "Brain" is NOT passed:
              nothing renders it as default-open anymore, and treating it as
              open made the first press a no-op on a fully-folded sidebar. A
              Main too large to open by default is already folded unless a
@@ -425,7 +424,6 @@ export function Sidebar() {
           onClick={() =>
             collapseAllDests([
               ...(mainFoldersOpenByDefault(mainTreeSize(activeTree)) ? mainFolderIds(activeTree) : []),
-              ...chats.folderKeys,
             ])
           }
         >

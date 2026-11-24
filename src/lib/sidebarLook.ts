@@ -53,3 +53,8 @@ export function iconKind(note: {
   if (IMAGE_EXTS.has(ext)) return "image";
   return "note";
 }
+
+/** The one wording of a pin toggle in a row's menu — notes, chats, projects. */
+export function pinActionLabel(pinned: boolean): string {
+  return pinned ? "Unpin from top" : "Pin to top";
+}

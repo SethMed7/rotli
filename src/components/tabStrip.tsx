@@ -66,12 +66,14 @@ import {
   ClockGlyph,
   ExcalidrawGlyph,
   FileGlyph,
+  FolderGlyph,
   PlusGlyph,
   SpeakerGlyph,
   XGlyph,
 } from "./glyphs";
 import { InlineRenameInput } from "./inlineRenameInput";
 import { glyphForNote } from "./noteGlyph";
+import { useChatProjectsManifest } from "./sidebar/useChatFolders";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
 function boardLabel(boardId: string): string {
@@ -81,7 +83,12 @@ function boardLabel(boardId: string): string {
 /** Narrow title accessor — an O(1) view over the note index, never a copy. */
 type TitleLookup = { get: (id: string) => string | undefined };
 
-function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string, string>): string {
+function tabLabel(
+  tab: Tab,
+  titles: TitleLookup,
+  chatTitles: ReadonlyMap<string, string>,
+  projectNames: ReadonlyMap<string, string>,
+): string {
   switch (tab.surfaceKind) {
     case "note":
       return titles.get(tab.noteId) ?? "Untitled";
@@ -97,6 +104,8 @@ function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string,
         : fileName(tab.fileId);
     case "activity":
       return "Librarian Activity";
+    case "project":
+      return projectNames.get(tab.projectId) ?? "Project";
     case "newItem":
       return tab.pendingLabel ?? "New…";
     case "browser":
@@ -162,6 +171,11 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const chatTitles = useMemo(
     () => new Map((chats.data ?? []).map((chat) => [chat.slug, chat.title])),
     [chats.data],
+  );
+  const projects = useChatProjectsManifest(activeMemex).data?.manifest.folders;
+  const projectNames = useMemo(
+    () => new Map((projects ?? []).map((project) => [project.id, project.name])),
+    [projects],
   );
 
   const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
@@ -323,7 +337,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         >
           {pane.tabs.map((tab, i) => {
             const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
-            const label = tabLabel(tab, titles, chatTitles);
+            const label = tabLabel(tab, titles, chatTitles, projectNames);
             const renaming =
               (tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId) ||
               (tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug);
@@ -406,6 +420,8 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       )
                     ) : tab.surfaceKind === "activity" ? (
                       <ClockGlyph size={13} className="tglyph" />
+                    ) : tab.surfaceKind === "project" ? (
+                      <FolderGlyph size={13} className="tglyph" />
                     ) : tab.surfaceKind === "browser" ? (
                       <BrowserGlyph size={13} className="tglyph" />
                     ) : (
@@ -414,7 +430,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     {tab.surfaceKind === "canvas" && renamingBoardId === tab.boardId ? (
                       <InlineRenameInput
                         className="tab-rename"
-                        defaultValue={tabLabel(tab, titles, chatTitles)}
+                        defaultValue={tabLabel(tab, titles, chatTitles, projectNames)}
                         ariaLabel="Rename board"
                         onCommit={(value) => commitRename(tab.boardId, value)}
                         onCancel={cancelRename}
@@ -422,7 +438,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     ) : tab.surfaceKind === "chat" && !!tab.chatSlug && renamingChatSlug === tab.chatSlug ? (
                       <InlineRenameInput
                         className="tab-rename"
-                        defaultValue={tabLabel(tab, titles, chatTitles)}
+                        defaultValue={tabLabel(tab, titles, chatTitles, projectNames)}
                         ariaLabel="Rename chat"
                         onCommit={(value) => commitChatRename(tab.chatSlug ?? "", value)}
                         onCancel={cancelChatRename}

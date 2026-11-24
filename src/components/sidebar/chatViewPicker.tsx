@@ -131,7 +131,8 @@ export function ChatViewPicker({ onNewChat }: { onNewChat: () => void }) {
       actions={[
         { label: `New chat in ${current}`, glyph: <NewChatGlyph size={13} />, onClick: onNewChat },
         {
-          label: `New chat folder in ${current}`,
+          // projects belong to the vault, not to a view
+          label: "New project",
           glyph: <NewFolderGlyph size={13} />,
           onClick: requestSidebarFolder,
         },

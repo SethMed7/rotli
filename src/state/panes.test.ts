@@ -407,6 +407,34 @@ describe("openActivity appends, never replaces", () => {
   });
 });
 
+describe("project pages open like Activity, and seed a new chat's project", () => {
+  beforeEach(() => {
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+    useUiStore.getState().setNewChatOrigin(null);
+  });
+
+  test("one tab per project: a second open activates it; another project gets its own", () => {
+    usePanesStore.getState().openProject("cf-a", "vault");
+    usePanesStore.getState().activateTab("p1", "A");
+    usePanesStore.getState().openProject("cf-a", "vault");
+    usePanesStore.getState().openProject("cf-b", "vault");
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.map((t) => (t.surfaceKind === "project" ? t.projectId : t.surfaceKind))).toEqual([
+      "note",
+      "cf-a",
+      "cf-b",
+    ]);
+  });
+
+  test("New chat from a project page or with an explicit project records that project", () => {
+    usePanesStore.getState().openProject("cf-a", "vault");
+    usePanesStore.getState().openChat(null);
+    expect(useUiStore.getState().newChatOrigin).toEqual({ projectId: "cf-a" });
+    usePanesStore.getState().openChat(null, { projectId: "cf-b" });
+    expect(useUiStore.getState().newChatOrigin).toEqual({ projectId: "cf-b" });
+  });
+});
+
 describe("openBrowser appends a transient browser surface", () => {
   beforeEach(() => {
     usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });

@@ -211,9 +211,9 @@ test("Chat switches views without leaving Chat, and ⌘T there files into that v
   // and Chat follows Home back to Main — with New chat and New folder beside it
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   await expect(context.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
-  // the same request as the title bar's New chat folder (a chat folder is
-  // written through the Mac app's corpus — the owner's native check)
-  await expect(context.getByRole("button", { name: "New chat folder in Main" })).toBeEnabled();
+  // the same request as the title bar's New project (a project is written
+  // through the Mac app's corpus — the owner's native check)
+  await expect(context.getByRole("button", { name: "New project" })).toBeEnabled();
   await context.getByRole("button", { name: "New chat in Main" }).click();
   await expect(page.locator(".pane.focused [data-chat-pane]")).toBeVisible();
 });

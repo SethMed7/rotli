@@ -159,6 +159,15 @@ export interface ActivityTab {
   surfaceKind: "activity";
 }
 
+/** A chat project's page: its name, its chats, its instructions. projectId is
+ * the project's id in the vault's `.rotli/chat-folders.json`. */
+export interface ProjectTab {
+  id: string;
+  surfaceKind: "project";
+  projectId: string;
+  vaultId?: string;
+}
+
 /** The ⌘N chooser — a blank new tab with NO type yet (the maintainer, 2026-07-29:
  * "you have to choose board / md / doc etc"); picking a kind replaces it
  * with the created item's real surface. */
@@ -180,7 +189,15 @@ export interface BrowserTab {
   surfaceKind: "browser";
 }
 
-export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab | NewItemTab | BrowserTab;
+export type Tab =
+  | NoteTab
+  | CanvasTab
+  | ChatTab
+  | FileTab
+  | ActivityTab
+  | ProjectTab
+  | NewItemTab
+  | BrowserTab;
 
 /** The kinds a single-click browse may open as a preview tab. */
 export type PreviewableTab = NoteTab | CanvasTab | FileTab;

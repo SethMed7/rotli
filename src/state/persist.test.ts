@@ -546,6 +546,8 @@ describe("validTab — durable surface kinds survive a relaunch (#34)", () => {
       fileId: "storage/report.xlsx",
     });
     roundTrips({ id: "t6", surfaceKind: "activity" });
+    roundTrips({ id: "t7", surfaceKind: "project", projectId: "cf-launch1", vaultId: "vault-a" });
+    roundTrips({ id: "t8", surfaceKind: "project", projectId: "cf-launch1" });
   });
 
   test("drops a private browser tab instead of persisting browsing state", () => {
@@ -557,6 +559,8 @@ describe("validTab — durable surface kinds survive a relaunch (#34)", () => {
     expect(validTab({ id: "x", surfaceKind: "note", noteId: "gone" }, alive)).toBeNull();
     expect(validTab({ id: "x", surfaceKind: "hologram" }, alive)).toBeNull();
     expect(validTab({ surfaceKind: "activity" }, alive)).toBeNull(); // no id
+    expect(validTab({ id: "x", surfaceKind: "project", projectId: "" }, alive)).toBeNull();
+    expect(validTab({ id: "x", surfaceKind: "project" }, alive)).toBeNull();
   });
 
   test("a chat keeps its exact vault owner across relaunch", () => {

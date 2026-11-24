@@ -954,6 +954,11 @@ export function validTab(v: unknown, alive: Set<string>): Tab | null {
   if (o.surfaceKind === "activity") {
     return { id: o.id, surfaceKind: "activity" };
   }
+  if (o.surfaceKind === "project") {
+    if (typeof o.projectId !== "string" || !o.projectId) return null;
+    const vault = typeof o.vaultId === "string" && o.vaultId ? { vaultId: o.vaultId } : {};
+    return { id: o.id, surfaceKind: "project", projectId: o.projectId, ...vault };
+  }
   // Private browser tabs are session-only by product contract. Explicitly
   // discard them at hydration so URLs/history can never survive a relaunch.
   if (o.surfaceKind === "browser") return null;
