@@ -138,11 +138,20 @@ import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatBuddy, ChatLiveEdge, useJustFinished } from "./chatBuddy";
 import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
+import {
+  availableChatCommands,
+  type ChatCommandContext,
+  pendingNoteFor,
+  runChatCommand,
+} from "./chatComposerCommands";
+import { ComposerMenuList, PendingNoteChip, useComposerMenu } from "./chatComposerMenu";
+import { composerAttachment, mentionableNotes, type PendingAttachment } from "./chatComposerMenuModel";
 import { ChatFirstVisit, firstVisitShows, useChatFirstVisitDone } from "./chatConnectModels";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
 import { ChatNoVault, ChatUnavailable } from "./chatEmptyStates";
+import { ClipGlyph, GlobeGlyph, NoteGlyph, PlusGlyph, SendGlyph, StopGlyph, WidthGlyph } from "./chatGlyphs";
 import { UserMessageText } from "./chatImageRefs";
 import {
   WEB_IMAGES_NEED_THE_MAC_APP,
@@ -244,121 +253,6 @@ function readAsDataURL(file: File): Promise<string> {
     r.readAsDataURL(file);
   });
 }
-
-/** Composer affordance glyphs — line-art, theme-aware (currentColor). */
-function GlobeGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.2" />
-      <ellipse cx="8" cy="8" rx="2.6" ry="6.2" />
-      <path d="M2 8h12M3.2 5h9.6M3.2 11h9.6" />
-    </svg>
-  );
-}
-function ClipGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M11.7 5.6 6.4 10.9a2 2 0 0 1-2.8-2.8l5.4-5.4a3 3 0 0 1 4.3 4.3l-5.4 5.4" />
-    </svg>
-  );
-}
-
-function PlusGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M8 2.5v11M2.5 8h11" />
-    </svg>
-  );
-}
-
-function NoteGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 1.8h5.5L13 5.3v8.9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1z" />
-      <path d="M9.5 1.8v3.5H13M5.5 8.5h5M5.5 11h5" />
-    </svg>
-  );
-}
-function WidthGlyph() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2.2 2.5v11M13.8 2.5v11" />
-      <path d="M4.6 8h6.8M4.6 8l1.8-1.8M4.6 8l1.8 1.8M11.4 8l-1.8-1.8M11.4 8l-1.8 1.8" />
-    </svg>
-  );
-}
-function SendGlyph() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M8 12.5v-9M4 7l4-3.5L12 7" />
-    </svg>
-  );
-}
-function StopGlyph() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-      <rect x="3" y="3" width="10" height="10" rx="2" />
-    </svg>
-  );
-}
-
 /** Chat measure widths — comfort keeps the tuned 740 column (the maintainer, 2026-07-01);
  * narrow/wide step around it. Same Aa vocabulary as notes, chat-tuned values. */
 const CHAT_MEASURE_PX: Record<Measure, number> = {
@@ -1118,10 +1012,11 @@ export function ChatSurface({
   }, [chatSlug, displayTitle]);
 
   const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
-  const attachedNoteId =
+  const savedNoteId =
     rememberedChatNote(chatSlug) ??
     (attachedStem ? resolveAttachedNoteId(attachedStem, noteIndex.values()) : null);
-  const secureAttachmentHint = attachedStem.startsWith("secure-note-");
+  // a note picked with @ counts as attached from the pick, not from the send
+  const [pendingNote, setPendingNote] = useState<PendingAttachment | null>(null);
 
   // a runtime that can answer: the Mac app's Rust side, or Rotli Helper paired
   // with this page — subscribed, so pairing mid-session flips the surface
@@ -1151,7 +1046,11 @@ export function ChatSurface({
   // secureContext taint, audit 2026-07-29 #7). The exact frontmatter is
   // rechecked on send as the authoritative backstop.
   const [secureContext, setSecureContext] = useState(false);
-  const secureChat = secureAttachmentHint || secureContext;
+  const {
+    noteId: attachedNoteId,
+    secureHint: secureAttachmentHint,
+    secureChat,
+  } = composerAttachment({ savedStem: attachedStem, savedNoteId, pending: pendingNote, secureContext });
   const groups: ModelGroups = secureChat ? { ...allGroups, connected: [], presets: [] } : allGroups;
   const modelList = flattenModels(groups);
   // THIS chat's model — its own pick, or the new-chat seed until it has one.
@@ -1667,12 +1566,15 @@ export function ChatSurface({
           messages: [{ speaker: "you", text: userText, at: userAt }],
           secureContext: attachedSecure,
         });
+        if (pendingNote)
+          await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem: pendingNote.stem });
       } else {
         const res = await write.mutateAsync({
           instance: active,
           title: sentTitle,
           messages: [{ speaker: "you", text: userText, at: userAt }],
           secureContext: attachedSecure,
+          ...(pendingNote ? { attachedTo: pendingNote.stem } : {}),
         });
         sentSlug = res.slug;
         bindChat(paneId, tabId, res.slug, active.id); // this tab IS that chat, from the send on
@@ -1723,6 +1625,10 @@ export function ChatSurface({
         setChatServiceTier(webKey, null);
       }
       sentPersisted = true;
+      if (pendingNote && sentSlug) {
+        rememberChatNote(sentSlug, pendingNote.noteId);
+        setPendingNote(null);
+      }
       setSaveErr(null);
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : String(e));
@@ -2282,6 +2188,35 @@ export function ChatSurface({
   });
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
+  const [modelPickerRequest, setModelPickerRequest] = useState(0);
+  const mentionNotes = useMemo(() => mentionableNotes(noteIndex.values()), [noteIndex]);
+  const commandState = {
+    instance: active,
+    writable,
+    messages,
+    hasNote: !!attachedStem,
+    canPickModel: modelList.length > 0 && !waitingForSavedPick,
+  };
+  const commandContext: ChatCommandContext = {
+    ...commandState,
+    chatTitle: storedTitle ?? displayTitle,
+    isSecure: () => secureChat || secureReadRef.current,
+    rootId: active ? (active.id === CORPUS_INSTANCE_ID ? "default" : active.id) : null,
+    openModelPicker: () => setModelPickerRequest((n) => n + 1),
+    openNote: (noteId) => openAttachedNote(noteId),
+    notify: (text) => setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${text}` }]),
+  };
+  const composerMenu = useComposerMenu({
+    text: message,
+    available: availableChatCommands(commandState),
+    notes: attachedStem ? null : mentionNotes,
+    setText: (text) => setDraftMessage(tabId, text),
+    onPick: (pick) => {
+      if (pick.kind === "command") void runChatCommand(pick.id, commandContext);
+      else void pendingNoteFor(pick.note, commandContext.notify).then((note) => note && setPendingNote(note));
+    },
+  });
+
   /** Open the attached note per the Settings choice: a new tab here, or a
    * right split beside the chat. The split path carves the pane WITH the note
    * tab directly (openToSide) — splitRight() duplicates the active tab, so the
@@ -2740,6 +2675,14 @@ export function ChatSurface({
                       }}
                     />
                     <div className="chat-box">
+                      {composerMenu.open && <ComposerMenuList menu={composerMenu.open} />}
+                      {pendingNote && (
+                        <PendingNoteChip
+                          title={pendingNote.title}
+                          secure={pendingNote.secure}
+                          onRemove={() => setPendingNote(null)}
+                        />
+                      )}
                       <textarea
                         ref={msgRef}
                         className="chat-msg"
@@ -2748,10 +2691,16 @@ export function ChatSurface({
                           working ? "Write your next message…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"
                         }
                         value={message}
-                        onChange={(e) => setDraftMessage(tabId, e.target.value)}
+                        {...composerMenu.inputProps}
+                        onChange={(e) => {
+                          setDraftMessage(tabId, e.target.value);
+                          composerMenu.sync(e.target);
+                        }}
+                        onSelect={(e) => composerMenu.sync(e.currentTarget)}
                         onPaste={onComposerPaste}
                         onKeyDown={(e) => {
                           e.stopPropagation();
+                          if (composerMenu.onKeyDown(e)) return;
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             void send();
@@ -2778,6 +2727,7 @@ export function ChatSurface({
                             groups={groups}
                             picked={picked ?? null}
                             fallbackFrom={fallbackFrom}
+                            openRequest={modelPickerRequest}
                             onPick={(id) => {
                               pickModel(id);
                               setVisionHint(false);

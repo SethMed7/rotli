@@ -68,13 +68,17 @@ export function ModelPicker({
   picked,
   fallbackFrom,
   onPick,
+  openRequest = 0,
 }: {
   groups: ModelGroups;
   picked: ChatModelInfo | null;
   fallbackFrom?: string | null;
   onPick: (id: string) => void;
+  /** Bumped to open the picker from elsewhere (the composer's /model). */
+  openRequest?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const [seenRequest, setSeenRequest] = useState(openRequest);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -118,6 +122,12 @@ export function ModelPicker({
     },
   ].filter((s) => s.items.length > 0);
   const selectedSection = sections.find((section) => section.items.some((item) => item.id === picked?.id));
+  if (openRequest !== seenRequest) {
+    setSeenRequest(openRequest);
+    setActiveSection(selectedSection?.key ?? sections[0]?.key ?? null);
+    setQuery("");
+    setOpen(true);
+  }
   const currentSection =
     sections.find((section) => section.key === activeSection) ?? selectedSection ?? sections[0];
   const normalizedQuery = query.trim().toLocaleLowerCase();
