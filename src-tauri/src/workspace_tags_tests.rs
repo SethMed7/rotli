@@ -4,7 +4,7 @@
 
 use std::fs;
 
-use serde_json::{json, Value};
+use serde_json::json;
 use tempfile::TempDir;
 
 use super::super::tests::test_workspace;
