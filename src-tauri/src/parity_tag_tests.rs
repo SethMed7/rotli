@@ -33,3 +33,17 @@ fn note_tag_limits_match_fixture() {
     assert_eq!(limits["tagsPerChangeMax"], TAGS_PER_CHANGE_MAX);
     assert_eq!(limits["tagsPerNoteMax"], TAGS_PER_NOTE_MAX);
 }
+
+#[test]
+fn note_tag_block_cases_match_fixture() {
+    for case in entry("noteTagBlockCases").as_array().expect("cases") {
+        let block = case["block"].as_str().unwrap();
+        let got = crate::note_tags::apply_to_block(block, &string_list(&case["add"]), &string_list(&case["remove"]));
+        match &case["result"] {
+            serde_json::Value::Null => assert!(got.is_err(), "{case} → {got:?}"),
+            serde_json::Value::String(s) if s == "unchanged" => assert_eq!(got, Ok(None), "{case}"),
+            serde_json::Value::String(s) => assert_eq!(got, Ok(Some(s.clone())), "{case}"),
+            other => panic!("unexpected result {other}"),
+        }
+    }
+}

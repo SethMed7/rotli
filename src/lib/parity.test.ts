@@ -57,6 +57,7 @@ import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import {
   applyTagChange,
+  applyTagChangeToBlock,
   normalizeTag,
   TAG_MAX_CHARS,
   TAGS_PER_CHANGE_MAX,
@@ -429,4 +430,12 @@ test("noteTagLimits", () => {
     tagsPerChangeMax: TAGS_PER_CHANGE_MAX,
     tagsPerNoteMax: TAGS_PER_NOTE_MAX,
   }).toEqual(entries.noteTagLimits.value);
+});
+
+test("noteTagBlockCases", () => {
+  for (const c of entries.noteTagBlockCases.value) {
+    const got = applyTagChangeToBlock(c.block, c.add, c.remove);
+    const result = !got.ok ? null : got.block === null ? "unchanged" : got.block;
+    expect({ block: c.block, result }).toEqual({ block: c.block, result: c.result });
+  }
 });

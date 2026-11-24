@@ -77,3 +77,11 @@ test("the list counts each note once, under the most common spelling, outside Tr
   ]);
   expect(tags[0]!.ids.length).toBe(3);
 });
+
+test("a hand-made note in a Rotli vault gains only its tags line", async () => {
+  await dir.writeText("memex.json", '{"id":"mx_tagsunit0001","contract":"3.4"}\n');
+  const text = "---\nlocked: true\nweather: grey # kept\n---\n# Garden\n";
+  await dir.writeText("wiki/garden.md", text);
+  await corpusChangeTags("wiki/garden.md", { add: ["harvest"] });
+  expect(await dir.readText("wiki/garden.md")).toBe(text.replace("# kept\n", "# kept\ntags: [harvest]\n"));
+});

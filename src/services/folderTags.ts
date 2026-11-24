@@ -6,7 +6,14 @@
 
 import { composeNoteDocument, emptyFrontmatter, parseNoteDocument } from "../lib/frontmatter";
 import { composeInPlace, rotliMade } from "../lib/frontmatterInPlace";
-import { applyTagChange, normalizeTag, TAGS_PER_CHANGE_MAX, tagValues } from "../lib/noteTags";
+import { rawFrontmatterBlock } from "../lib/frontmatterRaw";
+import {
+  applyTagChange,
+  applyTagChangeToBlock,
+  normalizeTag,
+  TAGS_PER_CHANGE_MAX,
+  tagValues,
+} from "../lib/noteTags";
 import { protection } from "../lib/protectionRule";
 import { readVersionedFile, writeVersionedFile } from "./folderFileIo";
 import { type VaultDir, vaultOpenedInPlace } from "./vaultDir";
@@ -43,14 +50,25 @@ export async function taggedText(
   add: readonly string[],
   remove: readonly string[],
 ): Promise<string | null> {
-  const { frontmatter, body } = parseNoteDocument(text);
-  const fm = frontmatter ?? emptyFrontmatter();
-  const edit = applyTagChange(fm.foreign, add, remove);
-  if (!edit.ok) throw new Error(edit.reason);
-  if (!edit.fields) return null;
-  const next = { ...fm, foreign: edit.fields };
-  const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
-  const out = inPlace ? composeInPlace(text, next) : composeNoteDocument(next, body);
+  // a note with frontmatter changes only its `tags:` lines; one without gets
+  // the fence a note of this vault is written with
+  const block = rawFrontmatterBlock(text);
+  let out: string;
+  if (block) {
+    const spliced = applyTagChangeToBlock(block, add, remove);
+    if (!spliced.ok) throw new Error(spliced.reason);
+    if (spliced.block === null) return null;
+    out = spliced.block + text.slice(block.length);
+  } else {
+    const { frontmatter, body } = parseNoteDocument(text);
+    const fm = frontmatter ?? emptyFrontmatter();
+    const edit = applyTagChange(fm.foreign, add, remove);
+    if (!edit.ok) throw new Error(edit.reason);
+    if (!edit.fields) return null;
+    const next = { ...fm, foreign: edit.fields };
+    const inPlace = !rotliMade(frontmatter) && (await vaultOpenedInPlace(dir));
+    out = inPlace ? composeInPlace(text, next) : composeNoteDocument(next, body);
+  }
   if (JSON.stringify(protection(text)) !== JSON.stringify(protection(out)))
     throw new Error("refused: changing tags may not change how this note is protected");
   return out;

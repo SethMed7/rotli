@@ -174,3 +174,11 @@ fn a_remote_tag_list_never_names_or_counts_a_tag_only_a_secure_note_carries() {
     let names: Vec<(&str, usize)> = mine.iter().map(|c| (c.tag.as_str(), c.count)).collect();
     assert_eq!(names, [("public", 3), ("shared", 2), ("hidden-merger", 1)]);
 }
+
+#[test]
+fn a_hand_made_note_gains_only_its_tags_line() {
+    let text = "---\r\nid: 01JTAGHAND0000000000000000\r\nmood: calm # kept\r\n---\r\n# Hand made\r\n";
+    let (_dir, mut store, path) = note(text);
+    store.change_tags_as_person("01JTAGHAND0000000000000000", &add(&["q3"]), None).unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), text.replace("# kept\r\n---", "# kept\r\ntags: [q3]\r\n---"));
+}

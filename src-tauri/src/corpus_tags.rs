@@ -160,18 +160,29 @@ impl CorpusStore {
         remove: &[String],
         ai: bool,
     ) -> Result<NoteTags, String> {
-        let (fm, body) = parse_document(text);
-        let mut fm = fm.unwrap_or_default();
         let answer = |text: &str, tags: Vec<String>| NoteTags {
             id: id_or_rel.to_string(),
             tags,
             revision: crate::fsutil::revision(text.as_bytes()),
         };
-        let Some(next) = crate::note_tags::apply_change(&fm.foreign, add, remove)? else {
-            return Ok(answer(text, crate::note_tags::tag_values(&fm.foreign)));
+        let unchanged = || answer(text, crate::note_tags::tag_values(&parse_document(text).0.unwrap_or_default().foreign));
+        // a note with frontmatter changes only its `tags:` lines; one without
+        // gets the fence a note of this vault is written with
+        let block = super::raw_frontmatter_block(text);
+        let out = if block.is_empty() {
+            let (fm, body) = parse_document(text);
+            let mut fm = fm.unwrap_or_default();
+            let Some(next) = crate::note_tags::apply_change(&fm.foreign, add, remove)? else {
+                return Ok(unchanged());
+            };
+            fm.foreign = next;
+            self.compose_for(text, &fm, body)
+        } else {
+            let Some(next) = crate::note_tags::apply_to_block(block, add, remove)? else {
+                return Ok(unchanged());
+            };
+            format!("{next}{}", &text[block.len()..])
         };
-        fm.foreign = next;
-        let out = self.compose_for(text, &fm, body);
         // a tag is never a permission: the note reads exactly as protected after
         if crate::note_protection::protection(text) != crate::note_protection::protection(&out) {
             return Err("refused: changing tags may not change how this note is protected".into());

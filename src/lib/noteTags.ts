@@ -238,7 +238,8 @@ export function applyTagChange(
       if (index === last) out.push(...added.map((item) => `${prefix}- ${item.raw}${ending}`));
     });
   } else if (field.form === "absent" || at === null) {
-    out.push(...fields, flow([...kept, ...added]));
+    const ending = fields.at(-1)?.endsWith("\r") ? "\r" : "";
+    out.push(...fields, `${flow([...kept, ...added])}${ending}`);
   } else {
     const itemLines = new Set(field.items.flatMap((item) => (item.line === null ? [] : [item.line])));
     const ending = fields[at]!.endsWith("\r") ? "\r" : "";
@@ -249,4 +250,27 @@ export function applyTagChange(
     });
   }
   return { ok: true, fields: out };
+}
+
+/** A note's whole frontmatter block (fences included, as rawFrontmatterBlock
+ * cuts it) with the change applied to its lines and every other byte kept:
+ * the tags write touches only `tags:` lines, never the typed facts a full
+ * recompose would fill in. `block: null` when nothing changes. */
+export function applyTagChangeToBlock(
+  block: string,
+  add: readonly string[],
+  remove: readonly string[],
+): { ok: true; block: string | null } | { ok: false; reason: string } {
+  const pieces = block.split(/(?<=\n)/);
+  const fence = (piece: string | undefined) => piece !== undefined && piece.replace(/[\r\n]+$/, "") === "---";
+  if (pieces.length < 2 || !fence(pieces[0]) || !fence(pieces.at(-1)))
+    return { ok: false, reason: UNREADABLE };
+  const inner = pieces.slice(1, -1).map((line) => (line.endsWith("\n") ? line.slice(0, -1) : line));
+  const edit = applyTagChange(inner, add, remove);
+  if (!edit.ok) return edit;
+  if (!edit.fields) return { ok: true, block: null };
+  return {
+    ok: true,
+    block: `${pieces[0]}${edit.fields.map((line) => `${line}\n`).join("")}${pieces.at(-1)}`,
+  };
 }

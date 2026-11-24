@@ -309,7 +309,8 @@ pub(crate) fn apply_change(foreign: &[String], add: &[String], remove: &[String]
         (Form::Absent, _) | (_, None) => {
             out.extend(foreign.iter().cloned());
             kept.extend(added);
-            out.push(flow(&kept));
+            let ending = if foreign.last().is_some_and(|l| l.ends_with('\r')) { "\r" } else { "" };
+            out.push(format!("{}{ending}", flow(&kept)));
         }
         (_, Some(at)) => {
             let item_lines: Vec<usize> = field.items.iter().filter_map(|i| i.line).collect();
@@ -325,6 +326,27 @@ pub(crate) fn apply_change(foreign: &[String], add: &[String], remove: &[String]
         }
     }
     Ok(Some(out))
+}
+
+/// A note's whole frontmatter block (fences included, as
+/// `raw_frontmatter_block` cuts it) with the change applied to its lines and
+/// every other byte kept: the tags write touches only `tags:` lines, never the
+/// typed facts a full recompose would fill in. Ok(None) when nothing changes.
+pub(crate) fn apply_to_block(block: &str, add: &[String], remove: &[String]) -> Result<Option<String>, String> {
+    let pieces: Vec<&str> = block.split_inclusive('\n').collect();
+    let fence = |piece: &str| piece.trim_end_matches(['\n', '\r']) == "---";
+    let (Some(head), Some(foot)) = (pieces.first(), pieces.last()) else {
+        return Err(UNREADABLE.into());
+    };
+    if pieces.len() < 2 || !fence(head) || !fence(foot) {
+        return Err(UNREADABLE.into());
+    }
+    let inner: Vec<String> =
+        pieces[1..pieces.len() - 1].iter().map(|line| line.strip_suffix('\n').unwrap_or(line).to_string()).collect();
+    Ok(apply_change(&inner, add, remove)?.map(|lines| {
+        let body: String = lines.iter().map(|line| format!("{line}\n")).collect();
+        format!("{head}{body}{foot}")
+    }))
 }
 
 #[cfg(test)]

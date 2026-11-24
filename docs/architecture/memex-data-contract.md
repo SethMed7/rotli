@@ -719,11 +719,14 @@ The Rust corpus boundary independently validates every write.
   a space included; removal matches any case. A `tags:` field in another
   spelling or shape (quoted key, a second `tags:` line, a trailing comment,
   a nested map) is never rewritten: the change is refused and the person is
-  sent to Show file metadata. A block list stays a block list. A tag write
-  never bumps `updated`, and the note's protection reads the same before and
-  after, or nothing is written. `src-tauri/src/note_tags.rs` and
-  `src/lib/noteTags.ts` are twins pinned by `noteTagCases`,
-  `noteTagEditCases`, and `noteTagLimits` in parity.json.
+  sent to Show file metadata. A block list stays a block list. A note with
+  frontmatter changes only its `tags:` lines, every other byte kept (no
+  typed fact is filled in); one without gets the fence a note of its vault
+  is written with. A tag write never bumps `updated`, and the note's
+  protection reads the same before and after, or nothing is written.
+  `src-tauri/src/note_tags.rs` and `src/lib/noteTags.ts` are twins pinned
+  by `noteTagCases`, `noteTagEditCases`, `noteTagBlockCases`, and
+  `noteTagLimits` in parity.json.
 - `area` names a top-level Library area, `People/<group>` for a group the
   vault's rules name (2026-09-28, the Librarian rules), or a folder that
   already exists inside an area, such as `Work/Clients` (slice 4c-2,
