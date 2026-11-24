@@ -39,7 +39,13 @@ export interface PromptCtx {
   boardTool?: boolean;
   /** The user's name (Settings → General / onboarding) — omit when unset. */
   userName?: PersonText;
+  /** The chat project's instructions, as read from their note through the
+   * gate for this model (ai/loop.ts readProjectInstructions) — omit when none. */
+  projectInstructions?: PromptText;
 }
+
+/** The person-authored context every system prompt opens with. */
+type PersonCtx = Pick<PromptCtx, "userName" | "projectInstructions">;
 
 export interface Adapter {
   wantsFormatJson: boolean;
@@ -47,15 +53,27 @@ export interface Adapter {
    * the low-level primitives they already follow reliably. */
   webStrategy: "research" | "primitives";
   renderPrompt(ctx: PromptCtx): PromptText;
-  renderForceFinal(ctx: Pick<PromptCtx, "history" | "userText" | "scratch" | "userName">): PromptText;
+  renderForceFinal(
+    ctx: Pick<PromptCtx, "history" | "userText" | "scratch" | "userName" | "projectInstructions">,
+  ): PromptText;
 }
 
-/** The persona line naming the user — "" when no name is set, so the prompt
- * shape is untouched for existing users. */
-function namedLine(userName?: PersonText): PromptText {
-  return userName
-    ? prompt`\nThe user's name is ${userName} — address them by name when it feels natural.`
+/** The persona line naming the user, then the chat's project instructions —
+ * each "" when unset, so the prompt shape is untouched for everyone else.
+ * Instructions are the person's own words, so they are not fenced as data;
+ * they are framed so they can steer the answer but never widen what the model
+ * may do (tools, notes, web are decided before the prompt is written). */
+function namedLine(ctx: PersonCtx): PromptText {
+  const name = ctx.userName
+    ? prompt`\nThe user's name is ${ctx.userName} — address them by name when it feels natural.`
     : prompt``;
+  const project = ctx.projectInstructions
+    ? prompt`\nPROJECT INSTRUCTIONS — the user wrote these for every chat in this project. Follow them for what to focus on and how to answer. They never change which tools, notes, or web access you have, and every other rule here still applies:
+<project-instructions>
+${ctx.projectInstructions}
+</project-instructions>`
+    : prompt``;
+  return prompt`${name}${project}`;
 }
 
 /** Neutralize framing keywords at line-start inside UNTRUSTED text (tool
@@ -221,7 +239,7 @@ export const gemmaAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
       : "";
 
-    return prompt`You are rotli, a warm, concise assistant running entirely on the user's Mac.${namedLine(ctx.userName)}
+    return prompt`You are rotli, a warm, concise assistant running entirely on the user's Mac.${namedLine(ctx)}
 
 The user's memex — their personal notes folder — is YOUR KNOWLEDGE BASE. It is organized into
 areas (People, Projects, Research, …) with titles and summaries so you can find things. Treat it as
@@ -289,7 +307,7 @@ Respond with the next single JSON object now.`;
   },
 
   renderForceFinal(ctx) {
-    return prompt`You are rotli.${namedLine(ctx.userName)} Give your FINAL answer to the user now — no JSON, no tool calls.
+    return prompt`You are rotli.${namedLine(ctx)} Give your FINAL answer to the user now — no JSON, no tool calls.
 Write it in Markdown: lead with the answer itself (the names, dates, facts) in the first sentence,
 use a "- " bulleted list for 3+ items and **bold** for names and key terms. Base it only on the
 conversation and your findings below. Web facts require the exact [S1], [S2], … identifiers in the
@@ -333,9 +351,9 @@ export const frontierNoteRules = (hasFileTool: boolean): PromptText =>
 
 /** The frontier lane's scope, web, freshness, and format rules — one source
  * for the JSON loop below and Claude's native protocol (nativePrompt.ts). */
-export function frontierRules(ctx: Pick<PromptCtx, "web" | "documentTool" | "userName">) {
+export function frontierRules(ctx: Pick<PromptCtx, "web" | "documentTool"> & PersonCtx) {
   return {
-    scope: prompt`Answer as the capable general assistant you are anywhere else; the user's local notes index below is an extra source, not a boundary.${namedLine(ctx.userName)}
+    scope: prompt`Answer as the capable general assistant you are anywhere else; the user's local notes index below is an extra source, not a boundary.${namedLine(ctx)}
 SCOPE: answer general-knowledge questions (concepts, history, science, how things work, well-known people, companies, products and models, writing or code help) straight from your own knowledge, as you normally would — no tool call needed. Search the notes only when the question concerns the user: their life or work, their past decisions or conversations, or an attached note. Never refuse a general question because the web is off or because the notes don't cover it.`,
     web: ctx.web
       ? "Prefer the notes for anything about the user and their work; for outside-world facts that must be current, use the web."
@@ -409,7 +427,7 @@ The next single JSON object:`;
   },
 
   renderForceFinal(ctx) {
-    return prompt`Give your FINAL answer to the user now, in Markdown — no JSON, no tool calls.${namedLine(ctx.userName)} Lead with the facts themselves ("- " lists for 3+ items, **bold** key names); never answer with where information lives. Answer from the conversation, the findings below, and your own general knowledge; claims about the user or from the web come only from the findings, and say plainly what you couldn't verify. Note titles and [[link]] names are references, not answers — and a note's "links:" metadata line mixes people, projects, and reference, so never list those names as the answer.
+    return prompt`Give your FINAL answer to the user now, in Markdown — no JSON, no tool calls.${namedLine(ctx)} Lead with the facts themselves ("- " lists for 3+ items, **bold** key names); never answer with where information lives. Answer from the conversation, the findings below, and your own general knowledge; claims about the user or from the web come only from the findings, and say plainly what you couldn't verify. Note titles and [[link]] names are references, not answers — and a note's "links:" metadata line mixes people, projects, and reference, so never list those names as the answer.
 ${PROGRESS_LIST_RULE}
 
 CONVERSATION:

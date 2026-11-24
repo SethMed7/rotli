@@ -11,9 +11,127 @@ import {
   parseChatFolders,
   renameChatFolder,
   serializeChatFolders,
+  pruneAssignments,
+  setChatFolderInstructionsNote,
   setChatFolderPinned,
   sortChatsByActivity,
 } from "./chatFolders";
+
+// A manifest exactly as builds up to 1.9.6 wrote it: folders, a pinned one,
+// assignments, and the retired per-folder order.
+const OLDER_BUILD = JSON.stringify(
+  {
+    version: 1,
+    folders: [
+      { id: "cf-work0001", name: "Work" },
+      { id: "cf-home0002", name: "Home", pinned: true },
+    ],
+    assignments: { "quarterly-plan": "cf-work0001", "garden-notes": "cf-home0002" },
+    order: { "cf-work0001": ["quarterly-plan"] },
+  },
+  null,
+  2,
+);
+
+/** The 1.9.6 parser, verbatim in behavior: what an older build keeps when it
+ * reads a manifest this build wrote, before writing it back. */
+function olderBuildParse(raw: string) {
+  const parsed = JSON.parse(raw) as {
+    folders: { id: string; name: string; pinned?: boolean }[];
+    assignments: Record<string, string>;
+    order: Record<string, string[]>;
+  };
+  return {
+    version: 1,
+    folders: parsed.folders.map((folder) =>
+      folder.pinned === true ? folder : { id: folder.id, name: folder.name },
+    ),
+    assignments: parsed.assignments,
+    order: parsed.order,
+  };
+}
+
+describe("folders become projects (the 2026-11-24 migration)", () => {
+  test("an older build's manifest reads as projects with the same chats, unchanged", () => {
+    const projects = parseChatFolders(OLDER_BUILD);
+    expect(projects.folders.map((f) => f.name)).toEqual(["Work", "Home"]);
+    expect(projects.assignments).toEqual({ "quarterly-plan": "cf-work0001", "garden-notes": "cf-home0002" });
+    expect(projects.order).toEqual({ "cf-work0001": ["quarterly-plan"] });
+    // nothing to migrate on disk: re-serializing yields the same document
+    expect(JSON.parse(serializeChatFolders(projects))).toEqual(JSON.parse(OLDER_BUILD));
+  });
+
+  test("unknown keys survive parse, every edit, and serialize — top level and per project", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      folders: [
+        { id: "cf-a", name: "Alpha", color: "teal", future: { nested: true } },
+        { id: "cf-b", name: "Beta", pinned: true, icon: "star" },
+      ],
+      assignments: { one: "cf-a" },
+      order: {},
+      layout: "grid",
+    });
+    let m = parseChatFolders(raw);
+    m = renameChatFolder(m, "cf-a", "Alpha 2");
+    m = setChatFolderPinned(m, "cf-b", false);
+    m = setChatFolderInstructionsNote(m, "cf-a", "vault:01KPROJECTNOTE0000000001");
+    m = assignChatToFolder(m, "two", "cf-b");
+    m = deleteChatFolder(m, "cf-gone");
+    const back = JSON.parse(serializeChatFolders(m)) as Record<string, unknown>;
+    expect(back.layout).toBe("grid");
+    expect(back.folders).toEqual([
+      {
+        id: "cf-a",
+        name: "Alpha 2",
+        color: "teal",
+        future: { nested: true },
+        instructionsNote: "vault:01KPROJECTNOTE0000000001",
+      },
+      { id: "cf-b", name: "Beta", icon: "star" },
+    ]);
+  });
+
+  test("the instructions link is additive: set, cleared, and junk reads as none", () => {
+    const { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Launch");
+    const linked = setChatFolderInstructionsNote(manifest, id, "vault:01KNOTE");
+    expect(linked.folders[0]?.instructionsNote).toBe("vault:01KNOTE");
+    expect(parseChatFolders(serializeChatFolders(linked))).toEqual(linked);
+    expect(setChatFolderInstructionsNote(linked, id, null).folders[0]).toEqual({ id, name: "Launch" });
+    expect(setChatFolderInstructionsNote(manifest, "cf-gone", "vault:01KNOTE")).toBe(manifest);
+    const junk = parseChatFolders(
+      '{"version":1,"folders":[{"id":"a","name":"A","instructionsNote":42},{"id":"b","name":"B","instructionsNote":""}]}',
+    );
+    expect(junk.folders).toEqual([
+      { id: "a", name: "A" },
+      { id: "b", name: "B" },
+    ]);
+  });
+
+  test("unpinning or deleting another project keeps a project's instructions link", () => {
+    let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Launch");
+    const other = createChatFolder(manifest, "Other");
+    manifest = setChatFolderInstructionsNote(other.manifest, id, "vault:01KNOTE");
+    manifest = setChatFolderPinned(manifest, id, true);
+    manifest = setChatFolderPinned(manifest, id, false);
+    manifest = deleteChatFolder(manifest, other.id);
+    expect(manifest.folders).toEqual([{ id, name: "Launch", instructionsNote: "vault:01KNOTE" }]);
+  });
+
+  test("KNOWN LOSS: a write from a 1.9.6-or-older build drops an unpinned project's instructions LINK", () => {
+    // older builds keep the chats and names, and a pinned project whole; an
+    // unpinned project comes back as {id, name}. The instructions themselves
+    // are a note, so nothing written is lost — only the link, which the
+    // project page can make again. Documented in docs/design/sidebar-home-chat.md.
+    let m = parseChatFolders(OLDER_BUILD);
+    m = setChatFolderInstructionsNote(m, "cf-work0001", "vault:01KWORKNOTE");
+    m = setChatFolderInstructionsNote(m, "cf-home0002", "vault:01KHOMENOTE");
+    const rewritten = parseChatFolders(JSON.stringify(olderBuildParse(serializeChatFolders(m))));
+    expect(rewritten.assignments).toEqual(m.assignments);
+    expect(rewritten.folders.find((f) => f.id === "cf-work0001")?.instructionsNote).toBeUndefined();
+    expect(rewritten.folders.find((f) => f.id === "cf-home0002")?.instructionsNote).toBe("vault:01KHOMENOTE");
+  });
+});
 
 describe("chat folders (virtual grouping over flat chats/)", () => {
   test("round-trips through serialize/parse and survives garbage", () => {
@@ -191,5 +309,30 @@ describe("pinned chat folders", () => {
       `{"version":1,"folders":[{"id":"cf-1","name":"W","pinned":"yes"}],"assignments":{}}`,
     );
     expect(junk.folders[0]?.pinned).toBeUndefined();
+  });
+});
+
+describe("assignments for deleted chats are pruned, only on a complete listing", () => {
+  const withThree = () => {
+    const { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Launch");
+    let m = assignChatToFolder(manifest, "kept", id);
+    m = assignChatToFolder(m, "deleted-chat", id);
+    return assignChatToFolder(m, "also-kept", id);
+  };
+
+  test("a complete listing drops the chats it lacks and keeps the rest", () => {
+    const pruned = pruneAssignments(withThree(), ["kept", "also-kept", "loose-chat"]);
+    expect(Object.keys(pruned.assignments).sort()).toEqual(["also-kept", "kept"]);
+  });
+
+  test("no listing, a failed one, or an empty one prunes nothing", () => {
+    const m = withThree();
+    expect(pruneAssignments(m, null)).toBe(m);
+    expect(pruneAssignments(m, [])).toBe(m);
+  });
+
+  test("a listing that holds every assigned chat returns the manifest untouched", () => {
+    const m = withThree();
+    expect(pruneAssignments(m, ["kept", "deleted-chat", "also-kept"])).toBe(m);
   });
 });

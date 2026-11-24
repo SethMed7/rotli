@@ -229,6 +229,7 @@ way a compromised loop would.
 | 22 | Tainted transcript → remote model | **GAP → FIXED** | the matrix (T2 step 5) promises Rust refuses a `secureContext: true` transcript "regardless" of the TS filter. It did not: `protected_for_remote` knew `secure: true` but not the longer key. It does now |
 | 23 | Tainted transcript → headless agent | **GAP → FIXED** | in a memex root `chats/**.md` are ordinary notes, so the remote-by-policy workspace agent could read a tainted transcript straight out of the notes lane. `read_for_ai` now treats the taint marker as secure |
 | 24 | Per-turn memory note sync | SAFE | routes through `write_for_ai`; locked refused, laundering refused |
+| 25 | Chat-project instructions → every turn in the project (2026-11-24) | SAFE | the instructions are an ordinary note named by the project (`instructionsNote` in `.rotli/chat-folders.json`); the loop reads it through `Host.readNote` — `corpus_read_ai` for the turn's model, the same gate as row 10 — so a secure note is refused to a remote model and an on-device read taints the chat. The chat's pre-flight reads the note's `secure:` first, so a secure instructions note makes the project on-device only and keeps the web off. The text rides the system prompt that `remote_block` already scans (`claude_session.rs`, `provider_lane.rs`, `provider.rs`), never a side channel. A read that fails, or isn't the editor's saved version, refuses the turn rather than sending it without them |
 
 ---
 

@@ -26,6 +26,22 @@ fn consent_covers_only_what_the_person_typed() {
 }
 
 #[test]
+fn project_instructions_shaped_like_a_secret_stay_held_when_the_typed_message_is_consented() {
+    // a chat project's instructions ride the system prompt of every turn; the
+    // app withholds secret-shaped ones from remote models, and this is the
+    // backstop: consent covers what the person typed this turn, never them
+    let message = "draft the launch email".to_string();
+    let system = format!(
+        "PROJECT INSTRUCTIONS:\n<project-instructions>\nBill the sandbox card {CARD}.\n</project-instructions>"
+    );
+    assert_eq!(
+        first_block(&[&system, &format!("you: {message}")], std::slice::from_ref(&message)),
+        Some(RemoteBlock::Pattern)
+    );
+    assert_eq!(remote_block_given(true, &system, &[message]), Some(RemoteBlock::Pattern));
+}
+
+#[test]
 fn secure_note_text_is_never_overridable() {
     let note = "---\nsecure: true\n---\nthe launch plan";
     let consent = vec![note.to_string()];
