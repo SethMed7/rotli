@@ -245,4 +245,4 @@ fn undo_target<'a>(rows: &'a [AiEditRow], current_revision: &str) -> Option<&'a 
 
 #[cfg(test)]
 #[path = "workspace_note_ops_tests.rs"]
-mod tests;
+pub(super) mod tests;

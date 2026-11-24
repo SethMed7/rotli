@@ -13,13 +13,13 @@ use crate::ai_edit_policy::Creator;
 use crate::corpus::AiWrite;
 use crate::corpus::ai_journal::{AiEditor, APPLIED, EDIT, REVERTED, TRASH, UNDO};
 
-fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
+pub(in crate::workspace) fn mcp(temp: &TempDir, name: &str, arguments: Value) -> Value {
     let request = json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": name, "arguments": arguments } });
     let response = handle_mcp_request_for_root(&request, temp.path().to_path_buf(), false).unwrap();
     response["result"].clone()
 }
 
-fn error_text(result: &Value) -> String {
+pub(in crate::workspace) fn error_text(result: &Value) -> String {
     assert_eq!(result["isError"], true, "{result}");
     result["content"][0]["text"].as_str().unwrap_or_default().to_string()
 }

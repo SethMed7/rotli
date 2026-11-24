@@ -35,6 +35,23 @@
       ]
     },
     {
+      "id": "note-tags",
+      "status": "web",
+      "reason": "The person's tag change and the vault tag list run on the connected folder through the same noteTags.ts policy Rust's note_tags.rs is pinned to.",
+      "sources": [
+        "src/services/folderTags.ts",
+        "src/services/webVaultIo.ts",
+        "src/lib/noteTags.ts"
+      ],
+      "tests": [
+        "src/services/folderTags.test.ts"
+      ],
+      "commands": [
+        "corpus_change_tags",
+        "corpus_list_tags"
+      ]
+    },
+    {
       "id": "boards-and-canvas",
       "status": "web",
       "reason": "Boards have connected-folder editing and byte-backed import. JSON Canvas creation is available only in development builds on both shells.",

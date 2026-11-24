@@ -75,11 +75,13 @@ pub(super) fn seeded() -> TempDir {
     put(root, "wiki/Projects/wiki/Link/f.csv", "a,b\n3,4\n");
     // one public match for a word five secure notes repeat in their titles
     // and bodies (they rank first)
-    put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "", "Accounts", "the ledger sits among many other plain words here"));
+    // a public note's tag that names a protected path
+    put(root, "wiki/Projects/ledger.md", &note("01SURFLEDGER000000000000000", "tags: [wiki/_secure/PrivateProject]\n", "Accounts", "the ledger sits among many other plain words here"));
     // items hidden where they are, in an ordinary folder: by frontmatter, by
     // what they hold (the secret detector), by a keyword in the title; a
     // file, a board, and two documents (one unreadable) that listing hides
-    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, &format!("secure: {}\n", true), "Hidden note eight", "words"));
+    // a tag only a hidden note carries, and one it shares with a public note
+    put(root, "wiki/Projects/fm.md", &note(HIDDEN_FM, &format!("secure: {}\ntags: [PrivateProject, plain-tag]\n", true), "Hidden note eight", "words"));
     put(root, "wiki/Projects/detected.md", &note("01SURFDETECTED0000000000000", "", "Hidden note nine", "card 4242 4242 4242 4242"));
     put(root, "wiki/Projects/trip.md", &note("01SURFTRIP00000000000000000", "", "Juniper trip", "words"));
     put(root, "wiki/Projects/cards.csv", "card,4242 4242 4242 4242\n");
@@ -95,7 +97,7 @@ pub(super) fn seeded() -> TempDir {
     for n in 1..=5 {
         put(root, &format!("wiki/_secure/PrivateProject/l{n}.md"), &note(&format!("01SURFLEDGERS{n}0000000000000"), "", &format!("Hidden note ledger L{n}"), "ledger ledger ledger"));
     }
-    put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\n", "Agent", "plain words"));
+    put(root, "wiki/Projects/a.md", &note(AGENT_NOTE, "created_by: agent\ntags: [plain-tag]\n", "Agent", "plain words"));
     put(root, "wiki/Projects/free.md", &note(AGENT_FREE, "created_by: agent\n", "Free", "plain words"));
     put(root, BOARD, "{\"type\":\"excalidraw\",\"version\":2,\"elements\":[]}");
     put(root, "wiki/Projects/pub.csv", "a,b\n1,2\n");
@@ -268,6 +270,8 @@ pub(super) fn workspace_cases(name: &str, temp: &TempDir) -> Option<Vec<(Value, 
         "rotli_trash_note" => one(json!({"id": AGENT_FREE, "expectedRevision": revision(temp, AGENT_FREE)}), Shows("free.md")),
         "rotli_note_history" => one(json!({"id": OPEN}), Shows("wiki/Projects/open.md")),
         "rotli_note_attachments" => one(json!({"id": OPEN, "includeText": true}), Shows("pub.csv")),
+        "rotli_list_tags" => one(json!({}), Shows("plain-tag")),
+        "rotli_tag_note" => one(json!({"id": AGENT_NOTE, "add": ["fresh"], "remove": ["plain-tag"], "expectedRevision": revision(temp, AGENT_NOTE)}), Shows("fresh")),
         "rotli_undo_ai_edit" => one(json!({"id": AGENT_NOTE, "expectedRevision": edited(temp)}), Shows("plain")),
         // `open -a rotli` would launch the app: its payload is checked through
         // queue_open_request, which writes the request and launches nothing
@@ -433,6 +437,9 @@ pub(super) fn cli_case(command: &str, temp: &TempDir) -> Option<Option<(Vec<Stri
         "notes attachments" => (words(&["notes", "attachments", OPEN, "--text"]), Shows("pub.csv")),
         "notes trash" => (words(&["notes", "trash", AGENT_FREE, "--revision", &revision(temp, AGENT_FREE)]), Shows("free.md")),
         "notes history" => (words(&["notes", "history", OPEN]), Shows("wiki/Projects/open.md")),
+        "tags list" => (plain("tags list"), Shows("plain-tag")),
+        "tags add" => (words(&["tags", "add", AGENT_NOTE, "fresh", "--revision", &agent_rev()]), Shows("fresh")),
+        "tags remove" => (words(&["tags", "remove", AGENT_NOTE, "plain-tag", "--revision", &agent_rev()]), Shows(AGENT_NOTE)),
         "notes undo-ai-edit" => (words(&["notes", "undo-ai-edit", AGENT_NOTE, "--revision", &edited(temp)]), Shows("plain")),
         "folders create" => (words(&["folders", "create", "--disk", "--name", "Fresh", "--parent", "wiki/Projects"]), Shows("Fresh")),
         "main add" => (words(&["main", "add", AGENT_NOTE]), Shows(AGENT_NOTE)),

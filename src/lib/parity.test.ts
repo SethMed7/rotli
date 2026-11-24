@@ -55,6 +55,13 @@ import { localAiAllowedOverride } from "./frontmatterKeys";
 import { RAW_IMMUTABLE_KEYS } from "./frontmatterRaw";
 import { PEOPLE_AREA } from "./librarianActions";
 import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
+import {
+  applyTagChange,
+  normalizeTag,
+  TAG_MAX_CHARS,
+  TAGS_PER_CHANGE_MAX,
+  TAGS_PER_NOTE_MAX,
+} from "./noteTags";
 import { permissionVerdict } from "./permissionVerdict";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
 
@@ -395,4 +402,31 @@ test("wordStyleLabels", () => {
     });
     expect(view).toBe(`[1] ${label}: sample`);
   }
+});
+
+test("noteTagCases", () => {
+  for (const c of entries.noteTagCases.value) {
+    const verdict = normalizeTag(c.input);
+    expect({ input: c.input, tag: verdict.ok ? verdict.tag : null }).toEqual({ input: c.input, tag: c.tag });
+  }
+});
+
+test("noteTagEditCases", () => {
+  for (const c of entries.noteTagEditCases.value) {
+    const got = applyTagChange(c.fields, c.add, c.remove);
+    const result = !got.ok ? null : got.fields === null ? "unchanged" : got.fields;
+    expect({ fields: c.fields, add: c.add, result }).toEqual({
+      fields: c.fields,
+      add: c.add,
+      result: c.result,
+    });
+  }
+});
+
+test("noteTagLimits", () => {
+  expect({
+    tagMaxChars: TAG_MAX_CHARS,
+    tagsPerChangeMax: TAGS_PER_CHANGE_MAX,
+    tagsPerNoteMax: TAGS_PER_NOTE_MAX,
+  }).toEqual(entries.noteTagLimits.value);
 });

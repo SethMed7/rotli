@@ -89,6 +89,14 @@ export interface WebVaultIoShape<Frontmatter, Stat, Versioned> {
   writeMetadata(id: string, block: string, revision: string): Promise<string>;
   frontmatter(id: string): Promise<Frontmatter | null>;
   setPinned(id: string, pinned: boolean): Promise<void>;
+  /** The person's tag change (folderTags.ts): add/remove, optionally revision-gated. */
+  changeTags(
+    id: string,
+    change: { add?: readonly string[]; remove?: readonly string[] },
+    revision?: string,
+  ): Promise<{ id: string; tags: string[]; revision: string }>;
+  /** Every tag on the vault's notes, most used first. */
+  listTags(): Promise<{ tag: string; count: number; ids: string[] }[]>;
   protection(
     id: string,
     key: "locked" | "ai_edit" | "secure" | "local_ai_allowed",

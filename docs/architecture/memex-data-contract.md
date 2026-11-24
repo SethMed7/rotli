@@ -689,6 +689,41 @@ The Rust corpus boundary independently validates every write.
   `prefix + exact + suffix`, then by `exact` alone, and reports "moved" rather
   than guessing when those words appear more than once
   (`src/lib/librarianActions.ts`).
+- **Tags are one shared key (2026-11-24).** A note's tags live in the
+  top-level `tags:` field that Obsidian and every Markdown tool read; the
+  person's tags and the Librarian's are not told apart. Who may change them:
+  - **The person**, anything, on any note they can open, locked and secure
+    notes included (the note header's chips, `/tag`, the sidebar filter
+    reads them). `corpus_change_tags` / Rotli Web `changeFolderTags`.
+  - **The Librarian** only adds: the organizer fills an empty `tags`, the
+    `/librarian` bar merges, and an approval or undo of a `tags` change only
+    lands while the field is exactly as the proposal or the action left it,
+    so it never drops a tag the person added since.
+  - **An AI** (chat's `tag_note`, an agent's `rotli_tag_note`) adds and
+    removes only where it could rewrite the body: the AI read gate first (a
+    remote model never tags a secure note, nor learns its revision), never
+    a locked note, the body-edit grant (`created_by` an AI or `ai_edit:
+    true`; chat may ask "Allow once", which never covers a lock or an
+    explicit `ai_edit: false`), the laundering rule on the tag text, and a
+    fresh revision, all under the note's file lock
+    (`CorpusStore::change_tags_for_ai`, `corpus_change_tags_ai`). Metadata
+    is not exempt from the grant: the owner's default, 2026-11-24.
+
+  A new tag is letters and numbers (Unicode), `-`, `_` and `/`, at most 40
+  characters, one leading `#` dropped, NFC; it may not start with `-` or `/`,
+  end with `/`, hold `//`, or be a bare YAML word (`yes`, `no`, `true`,
+  `false`, `on`, `off`, `null`, `y`, `n`) or a number, so no tag can carry a
+  line break, colon, bracket, quote, comma, or control character into the
+  frontmatter. Tags already on disk read leniently (`[a, b]`, `a, b`, a
+  block list) and are written back exactly as spelled, a Librarian tag with
+  a space included; removal matches any case. A `tags:` field in another
+  spelling or shape (quoted key, a second `tags:` line, a trailing comment,
+  a nested map) is never rewritten: the change is refused and the person is
+  sent to Show file metadata. A block list stays a block list. A tag write
+  never bumps `updated`, and the note's protection reads the same before and
+  after, or nothing is written. `src-tauri/src/note_tags.rs` and
+  `src/lib/noteTags.ts` are twins pinned by `noteTagCases`,
+  `noteTagEditCases`, and `noteTagLimits` in parity.json.
 - `area` names a top-level Library area, `People/<group>` for a group the
   vault's rules name (2026-09-28, the Librarian rules), or a folder that
   already exists inside an area, such as `Work/Clients` (slice 4c-2,

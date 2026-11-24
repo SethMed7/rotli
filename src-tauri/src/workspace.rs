@@ -35,6 +35,8 @@ pub(crate) mod file_visibility;
 mod listing;
 #[path = "workspace_note_ops.rs"]
 mod note_ops;
+#[path = "workspace_tags.rs"]
+mod tags;
 #[path = "workspace_unseen.rs"]
 mod unseen;
 #[path = "workspace_librarian.rs"]
@@ -1871,6 +1873,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
         "folders" => run_folders_cli(args, root_id),
         "main" => run_main_cli(args),
         "views" => run_views_cli(args),
+        "tags" => tags::cli(args, root_id),
         "boards" => run_boards_cli(args, root_id),
         "librarian" => librarian::cli(args, root_id),
         "open" => {
@@ -2706,6 +2709,7 @@ fn mcp_tools() -> Vec<Value> {
         tool("rotli_open", "Open a note, board, or file in the Rotli app. An item in a connected vault switches the app to that vault first; a connected folder that isn't a vault is refused.", json!({"type":"object","properties":{"id":{"type":"string"},"kind":{"type":"string","enum":["note","board","file"]},"rootId":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
     ];
     tools.extend(note_ops::tools(tool));
+    tools.extend(tags::tools(tool));
     tools.extend(crate::workspace_documents::tools(tool));
     tools
 }
@@ -2725,6 +2729,7 @@ fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> 
             | "rotli_apply_document"
             | "rotli_trash_note"
             | "rotli_undo_ai_edit"
+            | "rotli_tag_note"
     );
     json!({
         "name": name,
@@ -2756,6 +2761,9 @@ fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
         return result;
     }
     if let Some(result) = note_ops::call(name, args) {
+        return result;
+    }
+    if let Some(result) = tags::call(name, args) {
         return result;
     }
     let root = arg_string(args, "rootId");

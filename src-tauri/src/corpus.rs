@@ -8747,6 +8747,8 @@ mod gitignore;
 /// The one-time "move your Archive and Trash?" question in a copy.
 #[path = "corpus_person_sinks.rs"]
 pub mod person_sinks;
+#[path = "corpus_tags.rs"]
+pub mod tags;
 #[path = "corpus_raw.rs"]
 pub mod raw;
 pub(crate) use files::is_canvas_path;

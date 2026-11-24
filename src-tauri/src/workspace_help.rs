@@ -19,6 +19,8 @@ rotli notes attachments ID [--text] [--max-bytes N]            # linked files: p
 rotli notes trash ID --revision REV                            # to Rotli's Trash, never deleted
 rotli notes history ID [--limit N]                             # journaled AI body edits + diffs
 rotli notes undo-ai-edit ID --revision REV                     # only while the note is as it left it
+rotli tags list [--root ID] [--limit N]                        # tags on agent-readable notes, with counts
+rotli tags add|remove ID TAG... --revision REV                 # a note's shared tags: metadata
 rotli folders list [--root ID]
 rotli folders create --name NAME [--parent main:FOLDER]          # Main folder
 rotli folders create --disk --name NAME [--parent PATH]         # physical folder, policy-gated

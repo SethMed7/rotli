@@ -40,6 +40,7 @@ mod memex_chat_scan;
 mod memex_query; mod native_drag; mod note_dates; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
 mod protection_mark;
 mod note_protection;
+mod note_tags;
 /// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
 #[cfg(target_os = "macos")]
 mod native_drag_promise;
@@ -2190,6 +2191,8 @@ pub fn run() {
             corpus::corpus_set_pinned,
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,
+            corpus::tags::corpus_change_tags,
+            corpus::tags::corpus_list_tags,
             corpus::corpus_file_note,
             corpus::corpus_filer_move,
             corpus::corpus_note_path,
