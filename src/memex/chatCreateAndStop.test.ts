@@ -112,17 +112,35 @@ const KEPT = `${HEAD}**you** · 2026-11-24T10:00:00.000Z — hi\n**rotli** · 20
 test("D4: Stop before any reply takes this send's turn off the file, and nothing else", async () => {
   const sent = `${KEPT}**you** · 2026-11-24T10:01:00.000Z — plan my week\n`;
   files.set("t", { contents: sent, revision: 1 });
-  await dropStoppedTurn(INSTANCE, "t", "2026-11-24T10:01:00.000Z");
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:01:00.000Z", text: "plan my week" });
   expect(files.get("t")!.contents).toBe(KEPT);
+});
+
+test("D4: a turn-shaped line pasted into the stopped message can't keep it in the file", async () => {
+  const text = "from the old chat:\n**you** · 2026-11-24T10:00:30.000Z — what about Friday?";
+  files.set("t", { contents: `${KEPT}**you** · 2026-11-24T10:01:00.000Z — ${text}\n`, revision: 1 });
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:01:00.000Z", text });
+  expect(files.get("t")!.contents).toBe(KEPT);
+});
+
+test("D4: Stop leaves the file alone when anything was written after its turn", async () => {
+  const sent = `${KEPT}**you** · 2026-11-24T10:01:00.000Z — plan my week\n**rotli** · 2026-11-24T10:01:04.000Z — Monday\n`;
+  files.set("t", { contents: sent, revision: 1 });
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:01:00.000Z", text: "plan my week" });
+  expect(files.get("t")!.contents).toBe(sent);
+  const edited = `${KEPT}**you** · 2026-11-24T10:01:00.000Z — plan my week, with Friday off\n`;
+  files.set("t", { contents: edited, revision: 1 });
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:01:00.000Z", text: "plan my week" });
+  expect(files.get("t")!.contents).toBe(edited);
 });
 
 test("D4: Stop leaves the file alone when its last turn is not this send's", async () => {
   const sent = `${KEPT}**you** · 2026-11-24T10:01:00.000Z — plan my week\n`;
   files.set("t", { contents: sent, revision: 1 });
-  await dropStoppedTurn(INSTANCE, "t", "2026-11-24T10:02:00.000Z");
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:02:00.000Z", text: "plan my week" });
   expect(files.get("t")!.contents).toBe(sent);
   files.set("t", { contents: KEPT, revision: 1 });
-  await dropStoppedTurn(INSTANCE, "t", "2026-11-24T10:00:05.000Z");
+  await dropStoppedTurn(INSTANCE, "t", { at: "2026-11-24T10:00:05.000Z", text: "hello" });
   expect(files.get("t")!.contents).toBe(KEPT);
 });
 
@@ -131,6 +149,7 @@ test("D4: a partial answer Stop kept on screen is saved as the reply, with the t
   files.set("t", { contents: sent, revision: 1 });
   await settleStoppedTurn(INSTANCE, "t", {
     userAt: "2026-11-24T10:01:00.000Z",
+    userText: "plan my week",
     partial: "Monday: write",
     at: "2026-11-24T10:01:09.000Z",
     secureContext: true,
@@ -142,6 +161,7 @@ test("D4: a partial answer Stop kept on screen is saved as the reply, with the t
   expect(saved).toMatch(/^secureContext: true$/m);
   await settleStoppedTurn(INSTANCE, "t", {
     userAt: "2026-11-24T10:01:00.000Z",
+    userText: "plan my week",
     partial: null,
     at: "2026-11-24T10:01:10.000Z",
     secureContext: false,

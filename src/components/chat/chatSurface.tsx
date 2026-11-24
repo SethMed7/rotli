@@ -1694,7 +1694,12 @@ export function ChatSurface({
       if (stop?.run !== myRun || !sentPersisted || !sentSlug) return; // not stopped, or not on disk
       stoppedRef.current = null;
       try {
-        await settleStoppedTurn(active, sentSlug, { ...stop, userAt, secureContext: turnMark.marked });
+        await settleStoppedTurn(active, sentSlug, {
+          ...stop,
+          userAt,
+          userText,
+          secureContext: turnMark.marked,
+        });
         ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
         void chats.refetch();
       } catch (e) {

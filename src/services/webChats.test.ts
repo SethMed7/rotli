@@ -117,10 +117,10 @@ describe("web chat store", () => {
   });
 });
 
-test("trashing a second chat with the same name keeps the first one's file", async () => {
+test("trashing chats with the same name keeps each file under a name a chat can have", async () => {
   const dir = new MemoryVaultDir();
   const store = new FolderChatStore(dir);
-  for (const text of ["first", "second"]) {
+  for (const text of ["first", "second", "third"]) {
     const chat = composeNewChat(
       { title: "Plan", source: "rotli", slug: "plan" },
       [{ speaker: "you", text }],
@@ -130,7 +130,32 @@ test("trashing a second chat with the same name keeps the first one's file", asy
     await store.remove("plan", "trash");
   }
   expect(await dir.readText("chats/trash/plan.md")).toContain("first");
-  expect(await dir.readText("chats/trash/plan (another).md")).toContain("second");
+  expect(await dir.readText("chats/trash/plan-2.md")).toContain("second");
+  expect(await dir.readText("chats/trash/plan-3.md")).toContain("third");
+});
+
+test("a Trash name taken between the look and the move moves on, and other refusals are reported", async () => {
+  const dir = new MemoryVaultDir();
+  const store = new FolderChatStore(dir);
+  const chat = composeNewChat(
+    { title: "Plan", source: "rotli", slug: "plan" },
+    [{ speaker: "you", text: "mine" }],
+    DATE,
+  );
+  await store.write("plan", chat.contents, null);
+  await dir.writeText("chats/trash/plan.md", "another tab's chat");
+  await store.remove("plan", "trash");
+  expect(await dir.readText("chats/trash/plan.md")).toBe("another tab's chat");
+  expect(await dir.readText("chats/trash/plan-2.md")).toContain("mine");
+
+  await store.write("plan", chat.contents, null);
+  const move = dir.move.bind(dir);
+  dir.move = async () => {
+    throw new Error("disk is read-only");
+  };
+  await expect(store.remove("plan", "trash")).rejects.toThrow("disk is read-only");
+  dir.move = move;
+  expect(await dir.exists("chats/plan.md")).toBe(true);
 });
 
 test("folder listings find a reply beyond the metadata head, ignoring a later pending send", async () => {

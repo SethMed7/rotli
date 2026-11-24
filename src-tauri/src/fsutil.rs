@@ -485,24 +485,48 @@ mod lock_tests {
 /// `AlreadyExists` and both files stay as they were: the refusal is part of
 /// the move itself, so nothing that appears at `to` after a caller looked is
 /// ever replaced (chat audit 2026-11-24, D2 and D6). Where the filesystem
-/// can't refuse in a rename, a hard link (which refuses a taken name too) and
-/// an unlink stand in; there is never a fallback to a replacing rename.
+/// can't refuse in a rename (exFAT, FAT, some network volumes), the move is a
+/// copy into a file created only where nothing is, then the original is
+/// removed (`copy_no_replace`); there is never a fallback to a replacing
+/// rename, and the file never has two names, so it stays readable throughout.
 pub(crate) fn rename_no_replace(from: &Path, to: &Path) -> std::io::Result<()> {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "linux", target_os = "android"))]
     {
         use rustix::fs::{renameat_with, RenameFlags, CWD};
         use rustix::io::Errno;
+        // a guard, not a pattern: NOTSUP and OPNOTSUPP are one value on Linux
+        const NO_SUCH_RENAME: [Errno; 4] = [Errno::NOSYS, Errno::INVAL, Errno::NOTSUP, Errno::OPNOTSUPP];
         match renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE) {
             Ok(()) => return Ok(()),
-            Err(Errno::NOSYS | Errno::INVAL | Errno::NOTSUP | Errno::OPNOTSUPP) => {}
+            Err(error) if NO_SUCH_RENAME.contains(&error) => {}
             Err(error) => return Err(error.into()),
         }
     }
-    std::fs::hard_link(from, to)?;
-    if let Err(error) = std::fs::remove_file(from) {
-        // the file must keep exactly one name: take back the one just added
+    copy_no_replace(from, to)
+}
+
+/// `rename_no_replace` for a filesystem that can't refuse in a rename: the
+/// bytes go into a file created only where nothing is (`create_new` refuses a
+/// taken name on every filesystem), synced, then the original is removed. Any
+/// failure removes the copy and keeps the original; a failed cleanup leaves
+/// two whole copies, never none.
+pub(crate) fn copy_no_replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut source = open_own_file(from)?;
+    let modified = source.metadata()?.modified().ok();
+    let mut target = std::fs::OpenOptions::new().write(true).create_new(true).open(to)?;
+    let copied = std::io::copy(&mut source, &mut target).and_then(|_| target.sync_all());
+    if let Some(time) = modified.filter(|_| copied.is_ok()) {
+        // a renamed chat keeps its place in a list sorted by last change
+        let _ = target.set_modified(time);
+    }
+    drop(target);
+    if let Err(error) = copied.and_then(|_| std::fs::remove_file(from)) {
         let _ = std::fs::remove_file(to);
         return Err(error);
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "fsutil_no_replace_tests.rs"]
+mod no_replace_tests;

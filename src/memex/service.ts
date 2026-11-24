@@ -45,6 +45,7 @@ import {
   type ChatArtifact,
   type ChatMsg,
   chatSlug,
+  composeMessageLines,
   composeNewChat,
   composeNote,
   type NoteMeta,
@@ -216,18 +217,30 @@ export async function dropBlockedExchange(instance: MemexInstance, slug: string)
   await rewriteChat(instance, slug, withoutTrailingBlockedExchange);
 }
 
-/** Take the person's turn stamped `at` off the end of a chat file, when it is
- * still the last turn. Anything else at the end: unchanged. */
-export function withoutStoppedTurn(contents: string, at: string): string {
-  const last = parseTranscriptTurns(contents).at(-1);
-  return last?.speaker === "you" && last.at === at ? contents.slice(0, last.start) : contents;
+/** Take the person's turn stamped `at` off the end of a chat file, when the
+ * file ends with exactly that turn as it was written. A turn-shaped line
+ * pasted into the message can't hide it, and anything written after it (a
+ * reply, another send) keeps the file unchanged. */
+export function withoutStoppedTurn(contents: string, at: string, text: string): string {
+  const written = composeMessageLines([{ speaker: "you", text, at }], at).trimEnd();
+  const turn = parseTranscriptTurns(contents).find(
+    (candidate) =>
+      candidate.speaker === "you" &&
+      candidate.at === at &&
+      contents.slice(candidate.start).trimEnd() === written,
+  );
+  return turn ? contents.slice(0, turn.start) : contents;
 }
 
 /** Stop before any reply arrived: the turn leaves the screen and goes back to
  * the composer, so it leaves the file too. Otherwise it came back on reopen
  * with no reply, and sending it again doubled it (chat audit 2026-11-24, D4). */
-export async function dropStoppedTurn(instance: MemexInstance, slug: string, at: string): Promise<void> {
-  await rewriteChat(instance, slug, (contents) => withoutStoppedTurn(contents, at));
+export async function dropStoppedTurn(
+  instance: MemexInstance,
+  slug: string,
+  turn: { at: string; text: string },
+): Promise<void> {
+  await rewriteChat(instance, slug, (contents) => withoutStoppedTurn(contents, turn.at, turn.text));
 }
 
 /** Make a stopped turn's file match the screen: a partial answer Stop kept is
@@ -235,9 +248,9 @@ export async function dropStoppedTurn(instance: MemexInstance, slug: string, at:
 export async function settleStoppedTurn(
   instance: MemexInstance,
   slug: string,
-  turn: { userAt: string; partial: string | null; at: string; secureContext: boolean },
+  turn: { userAt: string; userText: string; partial: string | null; at: string; secureContext: boolean },
 ): Promise<void> {
-  if (!turn.partial) return dropStoppedTurn(instance, slug, turn.userAt);
+  if (!turn.partial) return dropStoppedTurn(instance, slug, { at: turn.userAt, text: turn.userText });
   await writeChat({
     instance,
     existingSlug: slug,

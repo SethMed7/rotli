@@ -12,7 +12,7 @@ import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { CHAT_NAME_ATTEMPTS, numberedChatSlug } from "../memex/chatNames";
 import { lastReplyMs } from "../memex/chatRecency";
-import { type VaultDir, freeSiblingPath, vaultFolderRoles } from "./vaultDir";
+import { type VaultDir, vaultFolderRoles } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
@@ -285,12 +285,21 @@ export class FolderChatStore implements ChatStore {
   async remove(slug: string, bin: "trash" | "archive"): Promise<void> {
     const path = await this.path(slug);
     if (!(await this.dir.exists(path))) return;
-    // a chat already archived under this name keeps its file: take the next free name
-    const direct = `${await this.chatsDir()}/${bin}/${safeSlug(slug)}.md`;
-    const target = (await this.dir.exists(direct))
-      ? await freeSiblingPath(this.dir, direct, "another")
-      : direct;
-    await this.dir.move(path, target);
+    // an earlier chat kept under this name stays: take the first free one,
+    // `<slug>`, `<slug>-2`, … as Rust does, so a copy moved back by hand is a
+    // valid chat again. Every VaultDir move refuses a taken name itself, so a
+    // second tab trashing the same name moves on instead of failing (audit D2)
+    const base = safeSlug(slug);
+    const bucket = `${await this.chatsDir()}/${bin}`;
+    for (let n = 1; n <= CHAT_NAME_ATTEMPTS; n += 1) {
+      try {
+        await this.dir.move(path, `${bucket}/${numberedChatSlug(base, n)}.md`);
+        return;
+      } catch (error) {
+        if (!/\balready exists\b/i.test(error instanceof Error ? error.message : String(error))) throw error;
+      }
+    }
+    throw new Error(`no free ${bin} name is left for ${base}`);
   }
 
   async folders(): Promise<{ contents: string; revision: string }> {
