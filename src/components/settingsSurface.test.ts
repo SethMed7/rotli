@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { BUILTIN_NAV } from "./settings/settingsNav";
+
 const settingsSource = readFileSync(new URL("settingsSurface.tsx", import.meta.url), "utf8");
 const browserSource = readFileSync(new URL("browserSurface.tsx", import.meta.url), "utf8");
 // the relay pairing section lives in its own file (development builds only)
@@ -8,7 +10,7 @@ const remoteAgentsSource = readFileSync(new URL("remoteAgentsSection.tsx", impor
 
 describe("private browser presentation", () => {
   test("gives browser preferences their own settings pane and explains the narrow private purpose", () => {
-    expect(settingsSource).toContain('{ id: "browser", label: "Browser"');
+    expect(BUILTIN_NAV.find((pane) => pane.id === "browser")?.label).toBe("Browser");
     expect(settingsSource).toContain("Every browser tab is private");
     expect(settingsSource).toMatch(/quick\s+research without leaving Rotli/);
     expect(settingsSource).toMatch(/not a replacement for your everyday browser/);

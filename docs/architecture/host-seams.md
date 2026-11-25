@@ -7,10 +7,10 @@ own and adds parts of its own from another repository. This repository holds
 only the neutral seams. It contains no host's code, names or art, and a host
 supplies its own bundle ID and wording.
 
-With no host, nothing in this document changes what a Rotli user sees. The
-Settings screenshots of every pane match pixel for pixel before and after the
-seams were added. That was proved in the browser lane on synthetic data, on
-2026-11-24.
+With no host, nothing in this document changes what a Rotli user sees. That
+was checked in the browser lane on synthetic data, on 2026-11-24, by comparing
+screenshots of every Settings pane taken before and after the seams were added.
+The commit that adds the seams records the result.
 
 ## The identity
 
@@ -66,13 +66,19 @@ in two places, each on its own.
   downward walk stops at 50,000 folders, and refuses when it does.
 - **Exceptions.** The build's own scratch vault and the roots in its own
   registry are allowed. A registry that exists but can't be read refuses.
-- **Where Rust checks.** The check runs inside `reject_privileged_root`, which
-  every path that binds a folder goes through: the folder panel, choosing or
+- **Where Rust checks.** The check runs inside `reject_privileged_root`. The
+  app's folder bindings all go through it: the folder panel, choosing or
   creating a vault, connecting a library, switching vaults, adding a folder,
   folder windows, and both sides of a vault copy. It runs before anything
   writes to the folder; the heal in `corpus_choose_folder` comes after it. The
   CLI's `ROTLI_CORPUS_ROOT` pin meets the same rule
   (`app_identity::refuse_pinned_root`).
+- **Paths that never reach a host build.** Files and folders opened from Finder
+  arrive only through the deep-link plugin, which a host build doesn't
+  register. The relay's MCP root is the vault the app already has open, and
+  pairing needs the Keychain, which a host build refuses.
+- **Not covered.** `rotli-helper` is a separate binary with its own vault lane
+  and its own config. Nothing here gates it.
 - **The UI** (`src/memex/service.ts pickVaultFolderAs`) inspects the folder,
   read-only, right after it's picked. It refuses a folder that reads as a Rotli
   vault, and shows the host's sentence. First run's folder step, Settings ›
@@ -126,12 +132,20 @@ on its first read, so a late registration throws. A host can give:
 
 ## Proof
 
+This list says only what was run. The app was never launched under a host
+identity, so the scratch-vault first run, the exit-78 mismatch and the plugin
+gating are proven by code and unit tests only. The notes-off window and a host
+pane are proven by server-side rendering only.
+
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
 - **Rust, under a host identity:** from `src-tauri`, run
   `ROTLI_APP_IDENTIFIER=com.example.host CARGO_TARGET_DIR=<its own dir> cargo
-  test --lib`. Under that identity, the vault refusal and the shared-state
-  refusals run for real.
+  test --lib` (and `cargo clippy --all-targets -- -D warnings` the same way).
+  Under that identity, the vault refusal and the shared-state refusals run for
+  real. Tests that need the Keychain return early there, as the Keychain's own
+  host test covers the refusal. The Antigravity path parity test compares the
+  fixture's standalone path with the host ID swapped in.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
   `src/components/settings/settingsNav.test.ts`,
   `src/components/settings/settingsSurfaceHost.test.tsx` and
