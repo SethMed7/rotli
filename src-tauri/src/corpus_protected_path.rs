@@ -251,6 +251,12 @@ impl CorpusStore {
         }
     }
 
+    /// The sidebar's secure mark belongs to the person's own answers: a write,
+    /// create or move an agent lane makes never says the note is protected.
+    pub(crate) fn person_only(&self, mark: bool) -> bool {
+        mark && !self.agent.on
+    }
+
     /// An agent lane's row, made safe to show: refused when its id is a path
     /// in a protected place; its `folderId` (a shelf from frontmatter) falls
     /// back to the folder the note lives in when the shelf isn't clean or is
@@ -264,6 +270,9 @@ impl CorpusStore {
         }
         row.folder_id = self.agent_folder(&row.folder_id, &row.disk_folder_id)?;
         row.origin = self.agent_origin(row.origin);
+        // the sidebar's mark is for the person's own listing; an agent is never
+        // told which of the notes it may see are protected
+        row.secure = false;
         Some(row)
     }
 

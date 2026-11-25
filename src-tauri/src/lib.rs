@@ -58,6 +58,8 @@ mod quick_window;
 mod vault_marker;
 mod vault_roles;
 mod cli_probe;
+mod cli_isolation;
+mod lane_pause;
 mod provider;
 mod provider_lane; mod provider_models;
 mod child_run;
@@ -83,6 +85,7 @@ mod frontmatter_lines;
 mod mcp_arguments;
 mod workspace;
 mod workspace_help;
+mod workspace_vault_access;
 mod workspace_documents;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};

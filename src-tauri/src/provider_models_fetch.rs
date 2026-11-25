@@ -91,6 +91,7 @@ fn scratch_dir() -> Result<tempfile::TempDir, String> {
 pub(crate) const CLAUDE_DISCOVERY_ARGS: &[&str] = &[
     "-p",
     "--safe-mode",
+    "--strict-mcp-config",
     "--tools",
     "",
     "--no-session-persistence",
@@ -103,7 +104,9 @@ pub(crate) const CLAUDE_DISCOVERY_ARGS: &[&str] = &[
 
 fn discover_claude(bin: &Path) -> Result<Vec<DiscoveredModel>, String> {
     let scratch = scratch_dir()?;
-    let mut child = Command::new(bin)
+    let mut cmd = Command::new(bin);
+    crate::cli_isolation::apply_claude_env(&mut cmd);
+    let mut child = cmd
         .args(CLAUDE_DISCOVERY_ARGS)
         .current_dir(scratch.path())
         .stdin(Stdio::piped())

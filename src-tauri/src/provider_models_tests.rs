@@ -214,7 +214,7 @@ fn discovery_refuses_an_unknown_provider_before_any_spawn() {
 
 #[test]
 fn the_claude_discovery_spawn_keeps_the_chat_lanes_isolation() {
-    for flag in ["-p", "--safe-mode", "--no-session-persistence"] {
+    for flag in ["-p", "--safe-mode", "--strict-mcp-config", "--no-session-persistence"] {
         assert!(CLAUDE_DISCOVERY_ARGS.contains(&flag), "{flag}");
     }
     let tools = CLAUDE_DISCOVERY_ARGS.iter().position(|a| *a == "--tools").unwrap();
@@ -291,7 +291,7 @@ fn a_reported_id_of_the_wrong_shape_never_reaches_argv() {
 fn claude_default_runs_without_a_model_flag_and_1m_ids_pass_verbatim() {
     let (args, _) = build_args_for("claude", "default", None, None, None, None).unwrap();
     assert!(!args.iter().any(|a| a == "--model"), "the account's default needs no flag");
-    assert_eq!(&args[..4], ["-p", "--safe-mode", "--tools", ""]);
+    assert_eq!(&args[..5], ["-p", "--safe-mode", "--strict-mcp-config", "--tools", ""]);
     let opus = reported("opus[1m]", &["low", "max"], false);
     let (args, _) = build_args_for("claude", "opus[1m]", Some("max"), None, None, Some(&opus)).unwrap();
     let at = args.iter().position(|a| a == "--model").unwrap();

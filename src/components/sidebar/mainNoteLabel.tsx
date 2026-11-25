@@ -7,6 +7,7 @@ import { useUiStore } from "../../state/ui";
 import type { NoteSummary } from "../../types";
 import { PinGlyph, StarGlyph } from "../glyphs";
 import { glyphForNote } from "../noteGlyph";
+import { SecureMark, isMarkedSecure } from "../secureMark";
 import { MainSlotHint } from "./useHomeLeader";
 
 // A tab switch changes two row highlights, not every note's label and glyph.
@@ -24,6 +25,7 @@ export const MainNoteLabel = memo(function MainNoteLabel({
     <>
       {glyphForNote(note, { size: 14, className: `snicon kind-${iconKind(note)}` })}
       <span className="snt">{title}</span>
+      {isMarkedSecure(note) && <SecureMark />}
       {slot !== undefined && <MainSlotHint slot={slot} />}
       {note.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
     </>

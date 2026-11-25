@@ -45,7 +45,6 @@ import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
 import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
-import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { SkippedFilesNotice } from "./sidebar/skippedFilesNotice";
 import { useActiveTree } from "./sidebar/useActiveTree";
@@ -226,7 +225,6 @@ export function Sidebar() {
           openContextMenu(event.clientX, event.clientY, sidebarPlacementMenu());
       }}
     >
-      <SidebarScenery />
       {/* ONE header row: the active vault never disappears. Breve routines and
           notifications are owned by that vault, so hiding the switcher made
           the mode look detached from its durable home. Only the Coffee/Quokka

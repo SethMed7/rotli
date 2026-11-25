@@ -29,7 +29,13 @@ const EXITED_READ_GRACE: Duration = Duration::from_millis(250);
 /// on a thread, so a chatty CLI can't block on a full pipe, and a process the
 /// CLI left holding stdout costs only the output.
 pub(crate) fn probe(bin: &Path, args: &[&str], deadline: Duration) -> Option<Output> {
+    probe_with(bin, args, deadline, |_| {})
+}
+
+/// `probe`, with a hook to shape the command first (a lane's environment).
+pub(crate) fn probe_with(bin: &Path, args: &[&str], deadline: Duration, prepare: impl FnOnce(&mut Command)) -> Option<Output> {
     let mut command = Command::new(bin);
+    prepare(&mut command);
     command.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
     #[cfg(unix)]
     {

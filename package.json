@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "1.9.6",
+  "version": "1.9.7",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",
@@ -27,6 +27,7 @@
     "build:mac": "bun scripts/build-tray-icon.mjs && bash scripts/predmg-clean.sh && bun run tauri build --bundles app",
     "release": "bash scripts/release.sh",
     "verify": "bash scripts/verify.sh",
+    "probe:codex": "bash scripts/probe-codex-isolation.sh",
     "test": "bun run test:unit && bun run test:breve && bun run test:tooling && bun run test:relay",
     "test:unit": "bun test --parallel --isolate src",
     "test:changed": "bun test --changed --isolate",

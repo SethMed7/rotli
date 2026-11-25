@@ -1,4 +1,26 @@
 {
+  "1.9.7": [
+    {
+      "title": "Boards keep every stroke",
+      "body": "Deleting a board no longer shows \"note not found\", and on a big board a save that overlapped the next one no longer loses what you drew in between."
+    },
+    {
+      "title": "See secure notes at a glance",
+      "body": "A quiet shield now sits beside every secure note's title, and the Aa panel always shows a note's real Secure and AI-edit state, including after ⌘⇧L."
+    },
+    {
+      "title": "Chats are never lost",
+      "body": "A new chat whose name matches an older one is always saved, deleting or archiving a chat never replaces another, and a stopped reply saves exactly what you saw."
+    },
+    {
+      "title": "AI chats keep your setup out",
+      "body": "Codex and Claude chats no longer start your own MCP servers or file tools, so a secure note can't reach them that way. Cursor chats are paused while we check the same for Cursor."
+    },
+    {
+      "title": "A plainer sidebar",
+      "body": "The faint scenery behind the sidebar is gone."
+    }
+  ],
   "1.9.6": [
     {
       "title": "Secure notes stay invisible to agents",

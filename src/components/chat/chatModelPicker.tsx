@@ -8,6 +8,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { PROVIDER_IDS, PROVIDER_LABELS, type ModelGroups, type ProviderId } from "../../ai/models";
+import { PAUSED_LABEL, lanePaused } from "../../lib/lanePause";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import { refreshShownLanes } from "../../services/connectedModels";
 import { CloudGlyph, EyeGlyph, LaptopGlyph, SearchGlyph } from "../glyphs";
@@ -50,6 +51,68 @@ function modelKindGlyph(kind: ModelKind) {
     <span className="chat-modelrow-route" aria-hidden="true">
       ⇢
     </span>
+  );
+}
+
+/** Pick `m` unless its lane is paused (lib/lanePause.ts); says whether it did. */
+export function chooseModel(m: ChatModelInfo, onPick: (id: string) => void): boolean {
+  if (lanePaused(m.provider)) return false;
+  onPick(m.id);
+  return true;
+}
+
+/** One model in the open picker. A paused lane's model stays listed, reads as
+ * paused, and can't be chosen; it keeps its place in the arrow-key order so
+ * the list doesn't jump. */
+export function ModelRow({
+  m,
+  selected,
+  focusable,
+  owner,
+  showOwner,
+  buttonRef,
+  onActivate,
+  onChoose,
+}: {
+  m: ChatModelInfo;
+  selected: boolean;
+  focusable: boolean;
+  owner: string;
+  showOwner: boolean;
+  buttonRef?: (node: HTMLButtonElement | null) => void;
+  onActivate?: () => void;
+  onChoose: (id: string) => void;
+}) {
+  const mark = chatMark(m.provider, m.label);
+  const paused = lanePaused(m.provider);
+  return (
+    <button
+      type="button"
+      ref={buttonRef}
+      className={selected ? "chat-modelrow sel" : "chat-modelrow"}
+      role="radio"
+      aria-checked={selected}
+      aria-disabled={paused || undefined}
+      tabIndex={focusable ? 0 : -1}
+      onFocus={onActivate}
+      onMouseEnter={onActivate}
+      onClick={() => chooseModel(m, onChoose)}
+    >
+      <span className="chat-modelrow-logo">
+        {mark.logo ? <ModelLogo logo={mark.logo} /> : <span aria-hidden="true">{mark.initial}</span>}
+      </span>
+      <span className="chat-modelrow-copy">
+        <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
+        {/* browsing a provider already names it in the heading */}
+        {paused ? <small>{PAUSED_LABEL}</small> : showOwner && <small>{owner}</small>}
+      </span>
+      {m.vision && !paused && (
+        <span className="chat-modelrow-tag" title="Can see attached images">
+          <EyeGlyph size={13} />
+        </span>
+      )}
+      {(m.localDefault || m.isDefault) && !paused && <span className="chat-modelrow-tag def">default</span>}
+    </button>
   );
 }
 
@@ -318,48 +381,24 @@ export function ModelPicker({
                   <p className="chat-model-empty">No models match “{query.trim()}”.</p>
                 ) : (
                   flatItems.map((m, index) => {
-                    const sel = m.id === picked?.id;
-                    const mark = chatMark(m.provider, m.label);
                     const owner = sectionFor(m)?.label ?? m.provider;
                     return (
-                      <button
-                        type="button"
+                      <ModelRow
                         key={`${m.provider}:${m.id}`}
-                        ref={(node) => {
+                        m={m}
+                        selected={m.id === picked?.id}
+                        focusable={activeIndex === index}
+                        owner={owner}
+                        showOwner={!!normalizedQuery}
+                        buttonRef={(node) => {
                           rowRefs.current[index] = node;
                         }}
-                        className={sel ? "chat-modelrow sel" : "chat-modelrow"}
-                        role="radio"
-                        aria-checked={sel}
-                        tabIndex={activeIndex === index ? 0 : -1}
-                        onFocus={() => setActiveIndex(index)}
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => {
-                          onPick(m.id);
+                        onActivate={() => setActiveIndex(index)}
+                        onChoose={(id) => {
+                          onPick(id);
                           setOpen(false);
                         }}
-                      >
-                        <span className="chat-modelrow-logo">
-                          {mark.logo ? (
-                            <ModelLogo logo={mark.logo} />
-                          ) : (
-                            <span aria-hidden="true">{mark.initial}</span>
-                          )}
-                        </span>
-                        <span className="chat-modelrow-copy">
-                          <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
-                          {/* browsing a provider already names it in the heading */}
-                          {normalizedQuery && <small>{owner}</small>}
-                        </span>
-                        {m.vision && (
-                          <span className="chat-modelrow-tag" title="Can see attached images">
-                            <EyeGlyph size={13} />
-                          </span>
-                        )}
-                        {(m.localDefault || m.isDefault) && (
-                          <span className="chat-modelrow-tag def">default</span>
-                        )}
-                      </button>
+                      />
                     );
                   })
                 )}

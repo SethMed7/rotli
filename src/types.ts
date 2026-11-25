@@ -46,7 +46,10 @@ export interface NoteSummary {
   kind?: "note" | "board" | "file";
   /** `secure: true` in the file's frontmatter (auto-flagged or by hand): never
    * shown to a remote model. Set by adapters that read the file themselves
-   * (folder mode, the in-memory twin); the Rust adapter enforces it in Rust. */
+   * (folder mode, the in-memory twin); the Rust adapter enforces it in Rust.
+   * The Mac list carries it too, from the same walk (the flag, the chat taint,
+   * the secret detector, or a secure folder), so a row can wear its quiet mark
+   * without a read of its own. Read it strictly: absent is not secure. */
   secure?: boolean;
   /** `locked: true` in the file's frontmatter — set by adapters that read the
    * file themselves (Rotli Web); the Rust adapter enforces it in Rust. */
