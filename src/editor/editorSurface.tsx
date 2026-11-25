@@ -48,6 +48,7 @@ import { LibrarianBar } from "./librarianBar";
 import { LibrarianChat, librarianLane } from "./librarianChat";
 import { CharCount, FocusWordCount } from "./liveCounts";
 import { adoptReadNote, retainedNote, useDocumentDirty, useDocumentSaveError, useGoneNotes } from "./model";
+import { NoteTagRow } from "./noteTagRow";
 import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
@@ -529,6 +530,8 @@ export function EditorSurface({
           </button>
         </div>
       </div>
+      {/* the main editor only: the Quick window stays a bare capture */}
+      {!focusMode && !autoFocus && <NoteTagRow key={`tags:${noteId}`} noteId={noteId} disabled={pending} />}
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
       {saveError && (
         <div className="ed-saveerr" role="alert">

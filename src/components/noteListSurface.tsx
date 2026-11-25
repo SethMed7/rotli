@@ -12,6 +12,7 @@ import { type ReactNode, useCallback, useMemo, useState } from "react";
 
 import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
+import { useVaultTags } from "../services/noteTags";
 import { isBodyHit } from "../services/search";
 import { assignedView } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
@@ -20,6 +21,7 @@ import type { NoteSummary, SearchHit } from "../types";
 import { SearchGlyph } from "./glyphs";
 import { MatchText } from "./matchText";
 import { NoteListRow } from "./noteListRow";
+import { TagFilter } from "./tagFilter";
 import { useNoteMenu } from "./useNoteMenu";
 
 interface ListRow {
@@ -47,6 +49,16 @@ export function NoteListSurface({
   const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
   const [query, setQuery] = useState("");
+  // All notes' tag filter: the vault's tags, and the one picked (if any)
+  const vaultTags = useVaultTags(searchable).data;
+  const [tag, setTag] = useState<string | null>(null);
+  // a picked tag that leaves the vault is unpicked, so it can't quietly turn
+  // the filter back on when a note carries it again
+  if (tag !== null && vaultTags && !vaultTags.some((entry) => entry.tag === tag)) setTag(null);
+  const tagged = useMemo(() => {
+    const picked = tag === null ? undefined : vaultTags?.find((entry) => entry.tag === tag);
+    return picked ? new Set(picked.ids) : null;
+  }, [tag, vaultTags]);
   // full-text hits (debounced, min 2 chars) — gated on the LIVE query so a
   // keepPreviousData placeholder never rides under a shorter/cleared box
   const searchData = useNoteSearch(query).data;
@@ -98,6 +110,10 @@ export function NoteListSurface({
       ...local.filter((n) => !seen.has(n.id)).map((note) => ({ note })),
     ];
   }, [sorted, byId, q, hits]);
+  const shown = useMemo(
+    () => (tagged ? rows.filter((row) => tagged.has(row.note.id)) : rows),
+    [rows, tagged],
+  );
 
   return (
     <div className="board allnotes">
@@ -120,21 +136,27 @@ export function NoteListSurface({
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {searchable && <TagFilter tags={vaultTags ?? []} selected={tagged ? tag : null} onSelect={setTag} />}
+
+      {shown.length === 0 ? (
         <div className="list-empty">
-          <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
+          <p className="be-title">
+            {notes.length === 0 ? "No notes yet" : tagged && !q ? `No notes tagged #${tag}` : "No matches"}
+          </p>
           <p className="be-sub">
             {notes.length === 0
               ? SHOW_HOTKEYS
                 ? "Press ⌘T, or your Quick capture shortcut (⌥C), to start one."
                 : "Use the + in the tab strip to start one."
-              : "Try a different search."}
+              : tagged && !q
+                ? "Pick All to see every note."
+                : "Try a different search."}
           </p>
         </div>
       ) : (
         <div className="board-scroll">
           <ul className="recent-list">
-            {rows.map((r) => (
+            {shown.map((r) => (
               <NoteListRow
                 key={r.note.id}
                 note={r.note}

@@ -276,3 +276,9 @@ export function applyTagChangeToBlock(
     block: `${pieces[0]}${edit.fields.map((line) => `${line}\n`).join("")}${pieces.at(-1)}`,
   };
 }
+
+/** What a person typed into a tag field, as separate tags: split on spaces
+ * and commas, each still a raw input for `normalizeTag`. */
+export function splitTagInput(text: string): string[] {
+  return text.split(/[\s,]+/u).filter(Boolean);
+}

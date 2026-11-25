@@ -8,6 +8,7 @@ import "./styles/quick.css";
 import "./styles/onboarding.css";
 import "./styles/theme-orbs.css";
 import "./styles/board.css";
+import "./styles/tags.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
 import { Suspense, lazy, useEffect, useState } from "react";

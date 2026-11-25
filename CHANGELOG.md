@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on every note, locked and secure ones included. Tags share the one `tags:`
   field Obsidian and the Librarian use; a new tag is letters, numbers, `-`,
   `_` and `/`, so it can never write other metadata.
+- **Tag a note yourself, and filter All notes by tag.** A note shows its
+  tags under its header: remove one with its ×, or add one or several with
+  "+ Tag". It works on locked and secure notes too, and says right there why
+  a value can't be a tag. All notes lists the vault's tags, most used first;
+  pick one to see only the notes that carry it.
 
 ### Fixed
 
