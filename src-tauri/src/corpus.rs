@@ -2705,7 +2705,8 @@ impl CorpusStore {
         let fresh = !root.exists()
             || fs::read_dir(&root)
                 .map(|mut d| d.next().is_none())
-                .unwrap_or(false);
+                .unwrap_or(false)
+            || crate::app_identity::holds_only_marks(&root); // a host's new scratch vault
         if read_only && !root.is_dir() {
             return Err(format!(
                 "read-only corpus does not exist: {}",

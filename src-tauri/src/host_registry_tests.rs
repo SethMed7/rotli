@@ -184,3 +184,37 @@ fn a_host_keeps_its_own_vault_however_the_registry_spells_it() {
     let roots = launch(HOST, &support);
     assert!(!roots.contains(&vault), "{roots:?}");
 }
+
+/// A fresh scratch vault holds only this build's mark, and its first open
+/// must still be a first run: the same folders, notes and sidecars as an
+/// empty folder gets.
+#[test]
+fn a_marked_scratch_vault_opens_like_an_empty_one() {
+    let tree = |root: &Path| -> Vec<String> {
+        let mut paths: Vec<String> = walkdir(root)
+            .into_iter()
+            .map(|path| path.strip_prefix(root).unwrap().to_string_lossy().into_owned())
+            .filter(|path| !path.starts_with(".rotli/bound-by") && !path.starts_with(".rotli/search"))
+            .collect();
+        paths.sort();
+        paths
+    };
+    let empty = tempfile::tempdir().unwrap();
+    let marked = tempfile::tempdir().unwrap();
+    claim_for(HOST, marked.path()).unwrap();
+    crate::corpus::CorpusStore::open(empty.path().to_path_buf()).unwrap();
+    crate::corpus::CorpusStore::open(marked.path().to_path_buf()).unwrap();
+    assert!(tree(empty.path()).len() > 1, "{:?}", tree(empty.path()));
+    assert_eq!(tree(marked.path()), tree(empty.path()));
+}
+
+fn walkdir(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(root).unwrap().flatten() {
+        out.push(entry.path());
+        if entry.file_type().unwrap().is_dir() {
+            out.extend(walkdir(&entry.path()));
+        }
+    }
+    out
+}

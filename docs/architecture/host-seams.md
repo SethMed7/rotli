@@ -161,7 +161,8 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
 - **The rule.** A root stays only when the folder behind it carries this
   build's mark and the vault refusal passes for it, including the walk below
   it. A refused library or folder is dropped. A refused primary falls back to
-  the scratch vault, which is made again if it is gone.
+  the scratch vault, which is made again if it is gone. A scratch vault
+  holding only the mark still opens as a first run.
 - **What happens to the file.** A registry that would change is set aside
   whole as `<name> (set aside <time>)` and the vetted version is written in
   its place, so nothing is lost. A registry that won't parse is set aside too,
@@ -286,13 +287,20 @@ on its first read, so a late registration throws. A host can give:
   bind (TOCTOU) that only a same-user process can race.
 - **The helper and the headless CLI** re-check the mark and the folders
   around each root on every load or call, but don't walk below it. The helper
-  walks when a folder is chosen; the CLI relies on the app's launch walk.
+  walks when a folder is chosen; the CLI relies on the app's launch walk. The
+  CLI reads the scratch vault (and walks it) only when its registry's primary
+  is refused.
 - **Repinning a host.** Folders a host bound before the mark existed carry
   none. At the first launch on this version, the scratch vault, if not empty,
   is set aside and replaced. Registry roots are dropped (the registry is set
   aside first), and the helper stops serving its folder until it is chosen
   again. Nothing is deleted. A folder that has gone missing (an unmounted
   drive, say) is dropped from the registry the same way.
+- **The mark travels with the folder.** A copy or a synced replica of a
+  host's vault carries it, so the host treats that copy as its own too.
+- **A link to a Rotli vault inside the host's own notes** gets that folder
+  refused at the next launch. In the scratch vault, the whole scratch vault
+  is set aside and replaced; nothing is deleted.
 - **A read-only folder** can't take the mark, so a host build can't bind it.
 - **A folder that grows past the walk's limit** (50,000 folders) after it was
   chosen is refused at the next launch and dropped like any other refused

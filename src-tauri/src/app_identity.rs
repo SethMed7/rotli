@@ -252,6 +252,17 @@ pub(crate) fn claim_for(identifier: &str, folder: &Path) -> Result<(), String> {
     claimed_by(folder, identifier).then_some(()).ok_or_else(unmarkable)
 }
 
+/// Whether `folder` holds nothing but host marks: a fresh scratch vault,
+/// whose first open is still a first run.
+pub(crate) fn holds_only_marks(folder: &Path) -> bool {
+    let names = |dir: &Path| -> Option<Vec<std::ffi::OsString>> {
+        std::fs::symlink_metadata(dir).ok().filter(|meta| meta.is_dir())?;
+        Some(std::fs::read_dir(dir).ok()?.flatten().map(|entry| entry.file_name()).collect())
+    };
+    names(folder).is_some_and(|names| names == [".rotli"])
+        && names(&folder.join(".rotli")).is_some_and(|names| names == ["bound-by"])
+}
+
 /// `claim_for` this build.
 pub(crate) fn claim(folder: &Path) -> Result<(), String> {
     claim_for(APP_IDENTIFIER, folder)

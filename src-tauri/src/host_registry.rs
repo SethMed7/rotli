@@ -28,13 +28,13 @@ fn may_bind_for(identifier: &str, root: &Path) -> bool {
 /// becomes `scratch`, or refuses when there is none. The standalone build's
 /// config is returned as it is.
 pub(crate) fn vet_config_for(identifier: &str, config: CorpusConfig, scratch: Option<&Path>) -> Result<CorpusConfig, String> {
-    vet_with(identifier, config, scratch, |root| may_bind_for(identifier, root))
+    vet_with(identifier, config, || scratch.map(Path::to_path_buf), |root| may_bind_for(identifier, root))
 }
 
 fn vet_with(
     identifier: &str,
     mut config: CorpusConfig,
-    scratch: Option<&Path>,
+    scratch: impl FnOnce() -> Option<std::path::PathBuf>,
     may_bind: impl Fn(&Path) -> bool,
 ) -> Result<CorpusConfig, String> {
     if owns_shared_state_for(identifier) {
@@ -46,8 +46,8 @@ fn vet_with(
         config.active_brain_id = None;
     }
     if !may_bind(&config.corpus.abs_path) {
-        let scratch = scratch.ok_or_else(crate::app_identity::existing_vault_refusal)?;
-        config.corpus = CorpusRef { abs_path: scratch.to_path_buf(), adopted: false };
+        let scratch = scratch().ok_or_else(crate::app_identity::existing_vault_refusal)?;
+        config.corpus = CorpusRef { abs_path: scratch, adopted: false };
     }
     Ok(config)
 }
@@ -60,9 +60,8 @@ pub(crate) fn vet_config(config: CorpusConfig) -> Result<CorpusConfig, String> {
     if owns_shared_state() {
         return Ok(config);
     }
-    let scratch = crate::app_identity::trusted_scratch_at_home();
     let owned = |root: &Path| std::fs::canonicalize(root).is_ok_and(|root| crate::app_identity::still_owned_for(APP_IDENTIFIER, &root));
-    vet_with(APP_IDENTIFIER, config, scratch.as_deref(), owned)
+    vet_with(APP_IDENTIFIER, config, crate::app_identity::trusted_scratch_at_home, owned)
 }
 
 /// Before anything reads a root at launch, every registry file in `support`
