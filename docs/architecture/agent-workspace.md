@@ -10,7 +10,9 @@
 > of MCP (2026-11-09): it stays in development builds until the review findings
 > in [`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)
 > are fixed and reviewed. `feature_policy::cli_gate` decides it once for every
-> agent command. `rotli --version` answers headlessly.
+> agent command. `rotli --version` answers headlessly. What the workspace
+> server must pass before it ships in a public build is written down in
+> "[Before the workspace MCP ships in public builds](#before-the-workspace-mcp-ships-in-public-builds)".
 
 Rotli exposes one headless workspace application service through the packaged
 CLI, local stdio MCP, authenticated loopback HTTP, and the opt-in remote relay
@@ -545,6 +547,88 @@ roots carry their root-prefixed wire id in the link.
 - The CLI/MCP compatibility and migration law is
   [`compatibility-and-migrations.md`](compatibility-and-migrations.md).
 
+## Before the workspace MCP ships in public builds
+
+Written 2026-11-24 from the agent-readiness audit of that day (rows 1, 9
+and 13 of its recommendations). The owner asked for a written bar covering
+tiers (read-only first), harnesses, paging and speed, per-vault consent and
+review. The tier split, the numbers and the reviewer rule below are the audit's
+proposals until the owner signs this section off. The workspace server
+(`rotli mcp`) stays in development builds behind `feature_policy::cli_gate`.
+A tier ships only when every item under it, and under "Every tier", is met on
+the exact commit that ships. The Librarian route keeps its own bar
+([`../design/librarian-mcp-and-t3-chat.md`](../design/librarian-mcp-and-t3-chat.md#before-this-route-leaves-development-builds)).
+The plain JSON CLI is already public and already carries full write
+authority; the tiers add what the CLI lacks: per-tool approval prompts and
+destructive hints in the host, and the setup and diagnostic commands.
+
+**Tiers**
+
+| Tier | What ships | Also needs |
+|---|---|---|
+| 1. Read-only | A proposed `rotli mcp --read-only` (the flag does not exist yet) over stdio, with only the twelve read tools (`rotli_status`, `rotli_metrics`, `rotli_list`, `rotli_search`, `rotli_query`, `rotli_read_note`, `rotli_list_main`, `rotli_list_views`, `rotli_read_board`, `rotli_note_attachments`, `rotli_note_history`, `rotli_read_document`), plus `agent doctor`, `agent config` and `--version` ungated | Per-vault read consent; paging; the speed targets; a missing id answered as fast as a hidden one |
+| 2. Note writes | create, update, patch, rename, move, trash and undo of an AI edit | A second per-vault switch ("Let agents edit"); a per-session write budget; create, move and rename journaled (the journal records only edits, undo and trash today) |
+| 3. The rest | Main and named views, boards, Word documents, `rotli_open` | Each group's own journal rows and harness entries |
+| Development only | the loopback HTTP mode, the relay connector, the Librarian route | A separate decision each (the relay needs the Keychain pairing token) |
+
+Stdio is the signed app binary started by the client: no listener, no
+Keychain. That is why it can ship before the two that need more thought.
+
+**Every tier**
+
+1. **Harnesses**, all green on the shipping commit in CI, none skipped:
+   - `cargo test --lib workspace::`, which runs the surface harness
+     (`workspace_agent_surface_tests.rs`) and the differential harness
+     (`workspace_agent_differential_tests.rs`, `…_cli_tests.rs`);
+   - the timing check (`workspace_agent_timing_tests.rs`), **un-ignored**.
+     It is `#[ignore]`d while a missing id still waits seconds longer than a
+     hidden one (threat model row 16k). The first tier can't ship until it
+     passes;
+   - `cargo test --lib mcp_arguments` and `feature_policy`, with a
+     feature-policy test that pins the exact tool list the read-only tier
+     serves (a new tool is refused until it is added there on purpose);
+   - `cargo test --lib permission_differential`, and
+     `bun scripts/permission-differential.ts --score` with 0 misses;
+   - `rotli agent self-test` on the signed build;
+   - `bun run verify`.
+2. **A client smoke test** on a synthetic vault holding a secure note, a
+   locked note and a person-written note: a real Claude Code session and a
+   real Codex session each connect with the printed `agent config` line, list
+   the tools, read a note, and are refused the three protected ones in the
+   words of a missing note. Record the client versions and the date in the
+   PR that lifts the gate.
+3. **The client's own file tools are named, not hidden.** `rotli agent config`
+   prints the vault's `permissions.deny` block and the warning that a client's
+   own `Read`, `Grep`, `Glob` and `Bash` bypass Rotli's secure-note rules. The
+   onboarding that sets up a client shows the same warning.
+4. **Paging and speed**, measured on an idle machine, release build, a
+   synthetic 5,000-note vault, warm session:
+   - `rotli_list`, `rotli_search` and `rotli_query` take a cursor (or
+     offset), return `total` and `truncated`, and `count` means matches. Any
+     page fits well under the 512 KB response cap with titles of 90
+     characters, and a result is not sent twice;
+   - list, search and query answer in under 100 ms and metrics in under 500
+     ms (the audit's targets), and a read in under 50 ms (proposed);
+   - a missing id answers within twice a hidden id's time plus 25 ms
+     (proposed; it is the timing check's own bar).
+5. **Per-vault consent**, off by default:
+   - the read-only switch is first; writes stay off until the person turns
+     on "Let agents edit" for that vault;
+   - the record is keyed by the vault folder's identity (device and inode),
+     as `.rotli/librarian-consent.jsonl` is, so a copied vault starts off;
+   - the person sets it in Rotli's Settings. A switch an agent's shell can
+     flip (a CLI command run as the person) is not consent;
+   - the host's own approval prompts stay on; the printed Codex entry keeps
+     `default_tools_approval_mode = "writes"`.
+6. **Review.** The owner decides when a tier ships. Before that, a reviewer
+   who did not write the change, on a different model family or a person,
+   re-checks the shipping commit against this list and the differential
+   harness. The owner names the reviewer in the PR that lifts the gate; a
+   Greptile pass on the PR is not that review (the Librarian route's lesson,
+   2026-11-09). The same PR updates the status note at the top of this page,
+   `site/src/agents.ts` (`llms.txt` says MCP is coming soon), the Settings
+   rows in `connectionsSettings.tsx`, and the CHANGELOG.
+
 ## Configuration
 
 The agent surface is deliberately grouped and discoverable:
@@ -568,8 +652,40 @@ for `~/.cursor/mcp.json` or `.cursor/mcp.json`), a Gemini CLI
 `gemini mcp add --scope user` command plus its `settings.json` `mcpServers`
 snippet (`trust: false`, so Gemini keeps confirming calls), remote Grok Bot
 URL/header instructions, and verification commands
-(`workspace_help.rs::mcp_setup`). Rotli does not silently edit global
-agent configuration. Use the packaged app binary; a `target/debug` path is only
+(`workspace_help.rs::mcp_setup`). It also prints a Claude Desktop
+`claude_desktop_config.json` entry and a T3 Code line (T3 runs Claude Code, so
+the `claude mcp add` line and Claude Code's settings apply to its threads).
+Rotli does not silently edit global agent configuration.
+
+`vaultAccess` in the same output is the answer to a gap in the guarantee: Rotli's
+secure-note rules cover what an agent asks Rotli for, and a client's own
+`Read`, `Grep`, `Glob` and `Bash` skip them. For every vault the Mac has
+registered (`workspace_vault_access.rs`) it prints, in each client's own
+syntax, the deny rules its documentation gives: Claude Code and T3 Code
+(`Read(//abs/vault/**)` and `Edit(...)` in `~/.claude/settings.json`, with `*?[]\` escaped, and a
+whole-tool deny for sessions started inside the vault, the Librarian
+protocol's own list), Cursor (`Read`/`Write` in `.cursor/cli.json`) and Codex
+(a permission profile with `"<path>" = "deny"`, which its docs describe for sandboxed
+commands; the absolute-path entry is built from its path forms, not a quoted example). Grep and Glob get no path rule
+of their own because Claude Code's `Read` deny covers them and a `Grep(path)`
+rule matches nothing. Gemini CLI gets policy rules that deny `read_file`,
+`write_file`, `replace`, `list_directory`, `glob` and `grep_search` under the
+vault (both `path` and `dir_path` for the last two, since its two docs pages
+disagree), and `read_many_files`, which `@` paths use, denied whole because its
+`include` globs can't be fenced by a folder; they are built from its documented
+rule fields (its docs have no path example), and the output says that a shell
+can't be fenced. Every rule is printed for the registered path and, where it
+differs, the canonical one (symlinks resolved; another casing of the folder is
+not covered). Cursor
+gets no rule for a path holding `*` or `?`, which its globs would read as
+wildcards. The vault-session settings are the Librarian protocol's own deny
+list, `mcp__t3-code` included, and a test reads
+`vault-thread-protocol.md` so the two can't drift. Claude Desktop has no such
+rule, and the output says so. A Bash deny cannot be limited to a folder, so a shell stays
+the one hole the whole-tool deny closes. The syntax of each client was read
+from its documentation on 2026-11-24; the module's header records the sources,
+and `workspace_vault_access.rs` pins the output. The CLI ends quietly when the
+reader of its output closes the pipe. Use the packaged app binary; a `target/debug` path is only
 appropriate during development.
 
 `agent doctor` forces the selected root open in read-only mode and counts only

@@ -85,6 +85,7 @@ mod frontmatter_lines;
 mod mcp_arguments;
 mod workspace;
 mod workspace_help;
+mod workspace_vault_access;
 mod workspace_documents;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};

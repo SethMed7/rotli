@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
-import { COMING_SOON_CONNECTIONS, ConnectionsSettings } from "./connectionsSettings";
+import { CLAUDE_DOCS_COMMAND, COMING_SOON_CONNECTIONS, ConnectionsSettings } from "./connectionsSettings";
 
 test("a stable build lists Grok Bot and MCP as inert coming-soon rows beside web research", () => {
   const markup = renderToStaticMarkup(<ConnectionsSettings agents={false} braveKeyRow={null} />);
@@ -29,4 +29,14 @@ test("web research copy keeps its privacy facts", () => {
     "never switches providers after a failure",
   ])
     expect(markup.includes(fact)).toBe(true);
+});
+
+test("the docs extension files notes through `rotli notes create`, never raw frontmatter", () => {
+  expect(CLAUDE_DOCS_COMMAND).toContain("rotli notes create");
+  expect(CLAUDE_DOCS_COMMAND).toContain("--body-file");
+  // Rotli owns frontmatter: an agent never writes it, and the CLI refuses a body that holds it
+  expect(CLAUDE_DOCS_COMMAND).not.toContain("owner: rotli");
+  expect(CLAUDE_DOCS_COMMAND).not.toContain("shelf:");
+  expect(CLAUDE_DOCS_COMMAND).not.toContain("wiki/_inbox");
+  expect(CLAUDE_DOCS_COMMAND).not.toContain("---");
 });
