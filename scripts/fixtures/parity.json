@@ -8,6 +8,16 @@
         "revision": "fnv1a64:4475de7f98e17855"
       }
     },
+    "pausedChatLanes": {
+      "sourceOfTruth": "src/lib/lanePause.ts PAUSED_PROVIDERS/PAUSED_LABEL/PAUSED_MESSAGE ↔ src-tauri/src/lane_pause.rs PAUSED_PROVIDERS/PAUSED_LABEL/PAUSED_MESSAGE",
+      "value": {
+        "providers": [
+          "cursor"
+        ],
+        "label": "Paused for a privacy check",
+        "message": "Cursor chats are paused for a privacy check. Rotli is making sure Cursor can't reach your notes through tools of its own. Pick another model to keep going."
+      }
+    },
     "documentEditMaxActions": {
       "sourceOfTruth": "src/documents/aiEdit.ts MAX_EDIT_ACTIONS ↔ src-tauri/src/workspace_documents.rs MAX_ACTIONS",
       "value": 40

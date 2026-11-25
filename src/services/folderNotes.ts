@@ -9,6 +9,7 @@
 // are listed and moved here the way the Mac corpus lists them — id = path, no
 // frontmatter, never read to be indexed; their scene I/O is folderBoards.ts.
 
+import { looksSecret } from "../ai/guard";
 import { metadataLinkTargets } from "../graph/linkTargets";
 import { bodyEdit } from "../lib/aiEditPolicy";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
@@ -23,7 +24,7 @@ import {
 import { rotliMade, withTopLevelLine } from "../lib/frontmatterInPlace";
 import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteStem, stampToMs, today, ulid } from "../memex/contract";
-import type { NoteCreationPolicy } from "../security/secureNotes";
+import { type NoteCreationPolicy, inSecureHome } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit, SkippedFile } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import {
@@ -216,7 +217,7 @@ export class FolderNotesService implements NotesService {
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
-      secure: under(withoutSinkPrefix(path), WIKI_SECURE) || secureNoteText(text, frontmatter),
+      secure: inSecureHome(withoutSinkPrefix(path)) || secureNoteText(text, frontmatter) || looksSecret(body),
       locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
       aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
       suggestedLinks: metadataLinkTargets((frontmatter?.foreign ?? []).join("\n")),

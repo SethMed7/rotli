@@ -130,14 +130,15 @@ export async function openChatForNote(note: NoteSummary, opts?: OpenChatOptions)
       // last 6 chars are all digits would read as an ordinal (Greptile, PR #21)
       const ordinal = slug !== base ? slug.slice(base.length + 1) : null;
       const baseTitle = secure ? "Chat about a secure note" : `Chat about ${note.title || "Untitled"}`;
-      await writeChat({
+      // a name taken since the list was read moves on to the next free one
+      ({ slug } = await writeChat({
         instance,
         slug,
         title: ordinal ? `${baseTitle} · ${ordinal}` : baseTitle,
         attachedTo: stem,
         messages: [],
         ...(opts?.secureContext ? { secureContext: true } : {}),
-      });
+      }));
     }
     await invalidateMemex();
   }

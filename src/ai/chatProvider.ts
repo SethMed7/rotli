@@ -1,3 +1,4 @@
+import { PAUSED_MESSAGE, lanePaused } from "../lib/lanePause";
 import type { ChatModelInfo } from "../lib/tauri";
 import { PROVIDER_LABELS, type ProviderId, findModel, providerDefaultModel } from "./models";
 
@@ -85,6 +86,7 @@ export function resolveConsultModel(
   modelId: string | null,
   defaults: Readonly<Partial<Record<ProviderId, string>>>,
 ): ConsultModelResolution {
+  if (lanePaused(requested)) return { ok: false, message: PAUSED_MESSAGE };
   const providerModels = available.filter((model) => providerFamilyFor(model) === requested);
   if (providerModels.length === 0) {
     return {

@@ -592,5 +592,7 @@ fn note_filename_slugs_match_fixture() {
 mod link_secret;
 #[path = "parity_vault_tests.rs"]
 mod vault;
+#[path = "parity_lane_tests.rs"]
+mod lane;
 #[path = "parity_permission_tests.rs"]
 pub(crate) mod permission;

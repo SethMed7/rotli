@@ -270,7 +270,7 @@ fn agent_lanes_compare_paths_only_through_protected_path() {
 /// classified, and, if it is a path, cleaned (Opus review of pull request
 /// 304: `origin` was a path nobody cleaned).
 const FIELDS: [(&str, &[&str], &[&str]); 3] = [
-    ("NoteMeta", &["id", "folder_id", "disk_folder_id", "origin"], &["title", "snippet", "body_empty", "aliases", "created_at", "updated_at", "pinned", "kind"]),
+    ("NoteMeta", &["id", "folder_id", "disk_folder_id", "origin"], &["title", "snippet", "body_empty", "aliases", "created_at", "updated_at", "pinned", "kind", "secure"]),
     ("NoteDoc", &["id", "folder_id", "disk_folder_id", "origin"], &["body", "revision", "created_at", "updated_at", "pinned", "secure", "locked"]),
     ("FolderMeta", &["id", "parent_id"], &["name"]),
 ];
@@ -312,6 +312,7 @@ fn meta(id: &str, folder: &str, disk: &str, origin: Option<&str>) -> NoteMeta {
         pinned: false,
         origin: origin.map(Into::into),
         kind: crate::corpus::NoteKind::Note,
+        secure: false,
     }
 }
 

@@ -195,38 +195,64 @@ export interface BoardSaver {
 /** Debounced writer behind every board save path, so pending-body semantics and
  * failure surfacing can't drift between surfaces. `onResult` receives the write
  * (or serialization) error — or null on success — when the caller shows save
- * state. Unchanged bodies never hit the disk. */
+ * state. Unchanged bodies never hit the disk.
+ *
+ * Writes run ONE AT A TIME (the owner, 2026-11-24). A big board's save can
+ * outlast the debounce; a second save started alongside it carried the old
+ * revision, Rust refused it as a conflict, and the strokes it carried were
+ * never written again. Now the next drain waits for the write in flight and
+ * builds its body when its turn comes, so it always saves the freshest scene
+ * against the revision the previous save returned. With our own writes in
+ * order, a conflict means a real outside edit — reported, never overwritten. */
 export function createBoardSaver(
   write: (body: string) => Promise<void>,
   onResult?: (error: string | null) => void,
 ): BoardSaver {
   let pendingBuild: (() => string) | null = null;
   let lastSaved: string | null = null;
-  const put = (body: string): Promise<void> =>
-    write(body).then(
-      () => {
-        lastSaved = body;
-        onResult?.(null);
-      },
-      (e: unknown) => {
-        onResult?.(e instanceof Error ? e.message : String(e));
-        throw e;
-      },
-    );
-  const task = createDebouncedTask(BOARD_SAVE_DEBOUNCE_MS, () => {
-    const build = pendingBuild;
-    pendingBuild = null;
-    if (!build) return;
-    let body: string;
+  let queue: Promise<void> = Promise.resolve();
+  const report = (e: unknown) => onResult?.(e instanceof Error ? e.message : String(e));
+  // The newest body whose write failed and that nothing newer has saved since.
+  // A later drain with no fresh change retries it, so flush (tab close, quit)
+  // can never report success while that scene is still off the disk.
+  let unsaved: string | null = null;
+  const put = async (body: string): Promise<void> => {
     try {
-      body = build();
+      await write(body);
     } catch (e) {
-      onResult?.(e instanceof Error ? e.message : String(e));
+      unsaved = body;
+      report(e);
       throw e;
     }
-    if (body === lastSaved) return; // viewport churn, selection, a no-op — skip
-    return put(body);
-  });
+    lastSaved = body;
+    unsaved = null;
+    onResult?.(null);
+  };
+  /** Run `step` after every earlier write settles; the returned promise is
+   * THIS step's outcome, while the queue itself never stays rejected. */
+  const enqueue = (step: () => Promise<void>): Promise<void> => {
+    const run = queue.then(step);
+    queue = run.catch(() => {});
+    return run;
+  };
+  // the builder runs when the drain's turn comes, so it serializes the
+  // freshest scene, not the one current when the timer fired
+  const drain = async (): Promise<void> => {
+    const build = pendingBuild;
+    pendingBuild = null;
+    let body = unsaved;
+    if (build) {
+      try {
+        body = build();
+      } catch (e) {
+        report(e);
+        throw e;
+      }
+    }
+    if (body === null || body === lastSaved) return; // viewport churn, selection, a no-op — skip
+    await put(body);
+  };
+  const task = createDebouncedTask(BOARD_SAVE_DEBOUNCE_MS, () => enqueue(drain));
   return {
     prime(body) {
       lastSaved = body;
@@ -236,10 +262,12 @@ export function createBoardSaver(
       task.schedule();
     },
     saveNow(body) {
-      void put(body).catch(() => {});
+      // skips the debounce, never the line: it waits for a write in flight
+      void enqueue(() => put(body)).catch(() => {});
     },
     flush() {
-      return task.flush();
+      task.cancel();
+      return enqueue(drain);
     },
   };
 }

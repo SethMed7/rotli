@@ -52,6 +52,7 @@ import {
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
+import { PAUSED_LABEL, lanePaused } from "../lib/lanePause";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import { personText } from "../lib/promptText";
 import {
@@ -2114,7 +2115,9 @@ function LaneCard({ id }: { id: ProviderId }) {
     <div className={enabled ? "ailane on" : "ailane"}>
       <div className="ailane-head">
         <span className="ailane-name">{PROVIDER_LABELS[id]}</span>
-        <span className={ready ? "ailane-chip ok" : "ailane-chip"}>{status}</span>
+        <span className={ready && !lanePaused(id) ? "ailane-chip ok" : "ailane-chip"}>
+          {lanePaused(id) ? PAUSED_LABEL : status}
+        </span>
         <span className="chat-box-grow" />
         <LaneSwitch on={enabled} onToggle={onToggle} label={`Use ${PROVIDER_LABELS[id]}`} />
       </div>

@@ -33,7 +33,7 @@ export function SettingsBanner({
 }
 
 /** A horizon band's frame: wide, its ground on the bottom edge (the page
- * scenery here, and the sidebar's bottom scene). */
+ * scenery here, and first run's thanks banner). */
 export const HORIZON_FRAME = { viewBox: "0 0 1200 150", preserveAspectRatio: "xMidYMax slice" } as const;
 
 /** A page's scenery: the theme's sky ornament and its horizon, pinned behind

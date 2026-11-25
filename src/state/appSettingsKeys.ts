@@ -6,7 +6,7 @@
 export const APP_SETTINGS_KEYS = new Set([
   // pinned sites (2026-10-01): name, https address, slot, and store id
   "pinnedSites",
-  // the sidebar's scenery and icons (2026-10-01)
+  // the sidebar's icons (2026-10-01)
   "sidebarLook",
   // what the titlebar sun cycles, and the editor's image outline (state/appearanceLook.ts)
   "themeCycle",

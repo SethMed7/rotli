@@ -1816,18 +1816,27 @@ pub(crate) fn run_if_requested(args: &[String]) -> Option<i32> {
     }
     let result = run_cli(&args[1..]);
     match result {
-        Ok(value) => {
-            if !value.is_null() {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&value).unwrap_or_else(|_| "null".into())
-                );
-            }
-            Some(0)
-        }
+        Ok(value) => Some(print_result(&mut std::io::stdout().lock(), &value)),
         Err(error) => {
             eprintln!("{}", json!({ "ok": false, "error": error }));
             Some(1)
+        }
+    }
+}
+
+/// Writes a command's answer and returns the exit code. A reader that closes
+/// the pipe early (`| head`) ends it quietly; `println!` would panic there.
+fn print_result(out: &mut impl std::io::Write, value: &Value) -> i32 {
+    if value.is_null() {
+        return 0;
+    }
+    let text = serde_json::to_string_pretty(value).unwrap_or_else(|_| "null".into());
+    match writeln!(out, "{text}").and_then(|()| out.flush()) {
+        Ok(()) => 0,
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => 0,
+        Err(error) => {
+            eprintln!("{}", json!({ "ok": false, "error": format!("could not write the answer: {error}") }));
+            1
         }
     }
 }
@@ -1843,7 +1852,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
     crate::feature_policy::cli_gate(command)?;
     if command == "mcp" {
         if args.get(1).map(String::as_str) == Some("config") {
-            return mcp_config();
+            return agent_config();
         }
         if flag(args, "--librarian") {
             librarian::serve(args)?;
@@ -1886,7 +1895,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
 fn run_agent_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
     match args.get(1).map(String::as_str).unwrap_or("doctor") {
         "doctor" | "status" => agent_doctor(root_id),
-        "config" | "setup" => mcp_config(),
+        "config" | "setup" => agent_config(),
         "self-test" | "test" => agent_self_test(),
         command => Err(format!("unknown agent command: {command}")),
     }
@@ -2189,9 +2198,22 @@ fn input_text(args: &[String], direct_name: &str) -> Result<String, String> {
     Ok(String::new())
 }
 
-fn mcp_config() -> Result<Value, String> {
+/// `rotli agent config`: the client setups and each vault's deny rules.
+fn agent_config() -> Result<Value, String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    Ok(crate::workspace_help::mcp_setup(&executable.display().to_string()))
+    let vaults: Vec<(String, String)> = root_targets()
+        .map(|roots| roots.into_iter().map(|root| (root.label, root.path.display().to_string())).collect())
+        .unwrap_or_default();
+    Ok(crate::workspace_help::mcp_setup(&executable.display().to_string(), &vaults))
+}
+
+/// What `agent doctor` shows: the client entries without the vault paths.
+fn mcp_config() -> Result<Value, String> {
+    let mut setup = agent_config()?;
+    if let Some(map) = setup.as_object_mut() {
+        map.remove("vaultAccess");
+    }
+    Ok(setup)
 }
 
 fn workspace_policy() -> Value {
@@ -3015,6 +3037,9 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
     }))
 }
 
+#[cfg(test)]
+#[path = "workspace_cli_output_tests.rs"]
+mod cli_output_tests;
 #[cfg(test)]
 #[path = "workspace_secure_reference_tests.rs"]
 mod secure_reference_tests;
