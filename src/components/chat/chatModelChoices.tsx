@@ -14,6 +14,7 @@ import {
   providerCatalog,
   providerDefaultModel,
 } from "../../ai/models";
+import { PAUSED_LABEL, lanePaused } from "../../lib/lanePause";
 import {
   type ChatModelInfo,
   type CliDetect,
@@ -358,7 +359,9 @@ export function ChatModelChoices({ onOpenSettings }: { onOpenSettings: () => voi
                           <SetupModelMark provider={provider} label={PROVIDER_LABELS[provider]} />
                           <span className="setup-model-copy">
                             <strong>{PROVIDER_LABELS[provider]}</strong>
-                            <small>{providerSetupStatus(detection)}</small>
+                            <small>
+                              {lanePaused(provider) ? PAUSED_LABEL : providerSetupStatus(detection)}
+                            </small>
                           </span>
                         </span>
                         {ready ? (

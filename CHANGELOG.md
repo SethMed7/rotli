@@ -64,6 +64,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reload as extra turns, including fake turns from you that went back to the
   model as your words. Those lines now stay inside the reply.
 
+### Changed
+
+- **Cursor chats are paused while we check that they keep your notes
+  private.** Cursor can start the MCP servers you set up for it, and Rotli
+  can't yet turn them off for a chat. Cursor models stay in the picker,
+  marked "Paused for a privacy check", and a chat already set to Cursor
+  says so instead of answering. Pick another model to keep going.
+
+### Fixed
+
+- **Codex chats no longer start your own Codex tools.** A Codex chat used to
+  start every MCP server in your `~/.codex/config.toml` (and your Codex
+  skills) alongside it. It now runs with none of them and can only use what
+  Rotli gives it. Rotli now needs Codex 0.147.0 or newer; an older Codex
+  shows a message asking you to update it instead of answering.
+
+### Security
+
+- **A Codex chat can no longer reach a secure note through your own MCP
+  servers.** Codex was offered the tools of every MCP server in your Codex
+  config, which never pass Rotli's secure-note rules. Rotli now runs Codex
+  with `--ignore-user-config` and turns off its skills, apps and plugins,
+  and refuses to run a Codex older than 0.147.0, the first that can turn
+  off every built-in tool able to read a file.
+- **A Codex chat can no longer read files with Codex's own tools.** Newer
+  Codex offered image reading, sub-agents, image generation and its own web
+  search even with the shell off. Rotli now turns those off; web access in
+  a Codex chat goes through Rotli's own web tools and follows the chat's
+  web setting.
+- **Cursor can't reach your notes through its own MCP servers.** The
+  Cursor lane is off in both the app and its native side until a check
+  shows Cursor's own tools stay out of a chat.
+- **Claude starts from a clean environment.** Claude chats, model discovery
+  and the Settings status check no longer inherit Rotli's whole environment;
+  only system basics, locale, proxy and certificate settings and Claude's
+  own sign-in variables reach it. Variables left by a Claude Code or T3
+  session, and ones that run code inside the CLI, stay out. The one-shot
+  Claude lane also adds `--strict-mcp-config`.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

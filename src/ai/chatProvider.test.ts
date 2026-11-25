@@ -90,9 +90,14 @@ describe("explicit cross-provider consultation", () => {
       ok: true,
       model: opus,
     });
-    expect(resolveConsultModel([opus], "cursor", null, defaults)).toEqual({
+    expect(resolveConsultModel([opus], "antigravity", null, defaults)).toEqual({
       ok: false,
       message: expect.stringContaining("not enabled and ready"),
+    });
+    // Cursor is paused (lib/lanePause.ts): it names the pause even when listed
+    expect(resolveConsultModel(available, "cursor", null, defaults)).toEqual({
+      ok: false,
+      message: expect.stringContaining("paused for a privacy check"),
     });
     expect(resolveConsultModel(available, "codex", "not-a-model", defaults)).toEqual({
       ok: false,
