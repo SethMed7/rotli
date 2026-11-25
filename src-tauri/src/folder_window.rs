@@ -37,11 +37,11 @@ fn mount_and_show(app: &AppHandle, path: &Path) -> Result<(), String> {
     let state = app.state::<corpus::CorpusState>();
     if !state.contains_root(&root_id)? {
         let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-        let store = corpus::CorpusStore::open_raw_folder(&dir, &cache.join("opened-files"))?;
-        state.insert_root(root_id.clone(), store)?;
+        let store = corpus::CorpusStore::open_raw_folder(&dir, &cache.join("opened-files"))?; // vault bind (refused): reject_privileged_root above
+        state.insert_root(root_id.clone(), store)?; // vault bind (refused): reject_privileged_root above
         state.walk_unlocked(&root_id)?;
         // the folder's images and video preview over asset:// while Rotli runs
-        let _ = app.asset_protocol_scope().allow_directory(&dir, true);
+        let _ = app.asset_protocol_scope().allow_directory(&dir, true); // vault bind (refused): reject_privileged_root above
     }
     if let Some(window) = app.get_webview_window(&root_id) {
         let _ = window.unminimize();

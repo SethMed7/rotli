@@ -32,7 +32,7 @@ pub(crate) fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
 /// own window (stage 2, folder_window.rs).
 fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
     if path.is_dir() {
-        crate::folder_window::open(app, path);
+        crate::folder_window::open(app, path); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
         return;
     }
     let Ok(cache) = app.path().app_cache_dir() else { return };
@@ -42,14 +42,14 @@ fn open_from_finder(app: &AppHandle, path: &std::path::Path) {
     let (id, kind) = {
         let Ok(mut registry) = state.0.lock() else { return };
         if !registry.contains(&root_id) {
-            let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else {
+            let Ok(store) = corpus::CorpusStore::open_raw_file(&file, &cache.join("opened-files")) else { // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
                 return;
             };
             if registry.insert(root_id.clone(), store).is_err() {
                 return;
             }
             // an image or video previews over asset://: this one file, never its folder
-            let _ = app.asset_protocol_scope().allow_file(&file);
+            let _ = app.asset_protocol_scope().allow_file(&file); // vault bind (standalone): only the deep-link plugin calls this, and a host build registers none
         }
         let Some(item) = registry.raw_item(&root_id) else { return };
         item

@@ -224,7 +224,7 @@ impl Workspace {
             .into_iter()
             .find(|root| root.id == id)
             .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
-        Self::open_target(root)
+        Self::open_target(root) // vault bind (vetted): root_targets vets every root (vet_config, refuse_pinned_root, or the app's open root)
     }
 
     fn open_target(root: RootTarget) -> Result<Self, String> {
@@ -235,9 +235,9 @@ impl Workspace {
             ));
         }
         let mut store = if root.read_only {
-            CorpusStore::open_read_only(root.path.clone())?
+            CorpusStore::open_read_only(root.path.clone())? // vault bind (delegated): its callers take roots from root_targets
         } else {
-            CorpusStore::open(root.path.clone())?
+            CorpusStore::open(root.path.clone())? // vault bind (delegated): its callers take roots from root_targets
         };
         store.set_perms_read_only(root.read_only);
         store.set_agent_lane();
@@ -2240,7 +2240,7 @@ fn agent_doctor(root_id: Option<&str>) -> Result<Value, String> {
         .ok_or_else(|| format!("unknown Rotli root: {id}"))?;
     let configured_read_only = target.read_only;
     target.read_only = true;
-    let mut workspace = Workspace::open_target(target)?;
+    let mut workspace = Workspace::open_target(target)?; // vault bind (vetted): root_targets vets every root (vet_config, refuse_pinned_root, or the app's open root)
     let metrics = workspace.metrics()?;
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let tools = mcp_tools();
@@ -2292,7 +2292,7 @@ fn agent_self_test() -> Result<Value, String> {
         r#"{"id":"mx_agent_self_test","contract":"3.4","apps":{}}"#,
     )
     .map_err(|error| error.to_string())?;
-    let mut workspace = Workspace::open_target(RootTarget {
+    let mut workspace = Workspace::open_target(RootTarget { // vault bind (private): a temp folder this call made
         id: DEFAULT_ROOT_ID.into(),
         label: "Isolated agent self-test".into(),
         path: root,

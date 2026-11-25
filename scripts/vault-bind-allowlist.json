@@ -1,0 +1,43 @@
+{
+  "files": {
+    "app_identity.rs": {
+      "delegated": 1,
+      "private": 1,
+      "vetted": 1
+    },
+    "corpus.rs": {
+      "delegated": 4
+    },
+    "folder_window.rs": {
+      "refused": 3
+    },
+    "helper.rs": {
+      "vetted": 1
+    },
+    "helper_vault.rs": {
+      "delegated": 1,
+      "refused": 2,
+      "vetted": 2
+    },
+    "lib.rs": {
+      "delegated": 12,
+      "refused": 13,
+      "vetted": 9
+    },
+    "open_requests.rs": {
+      "standalone": 3
+    },
+    "vault_import.rs": {
+      "refused": 1,
+      "vetted": 1
+    },
+    "workspace.rs": {
+      "delegated": 2,
+      "private": 1,
+      "vetted": 2
+    },
+    "workspace_librarian.rs": {
+      "vetted": 1
+    }
+  }
+}

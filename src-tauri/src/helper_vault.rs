@@ -99,7 +99,7 @@ impl ServedVault {
 
     /// The vault being served now, read fresh from the config file.
     pub(crate) fn current(&self) -> Option<VaultConfig> {
-        let config = read_config(crate::app_identity::APP_IDENTIFIER, &self.config_path);
+        let config = read_config(crate::app_identity::APP_IDENTIFIER, &self.config_path); // vault bind (vetted): read_config serves a marked root only, and remember walks below it
         self.remember(config.as_ref()).then_some(config).flatten()
     }
 
@@ -165,7 +165,7 @@ impl ServedVault {
     /// Serve `folder` from now on. The same root keeps its id; a new one
     /// gets a new id, so a page bound to the old vault notices.
     pub(crate) fn choose(&self, folder: &Path) -> Result<VaultConfig, String> {
-        let config = choose_config(&self.config_path, folder)?;
+        let config = choose_config(&self.config_path, folder)?; // vault bind (vetted): choose_config refuses the folder before it marks or saves it
         self.remember(Some(&config));
         Ok(config)
     }
@@ -241,7 +241,7 @@ pub(crate) fn read_config(identifier: &str, path: &Path) -> Option<VaultConfig> 
 /// Validate `folder` (a host identity refuses a Rotli vault without its mark, then marks the folder),
 /// keep the id when it is the root already served, and persist the config owner-only. Shared by `--vault` and `vault_choose`.
 pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
-    choose_config_as(crate::app_identity::APP_IDENTIFIER, config_path, folder)
+    choose_config_as(crate::app_identity::APP_IDENTIFIER, config_path, folder) // vault bind (delegated): choose_config_as for this build
 }
 pub(crate) fn choose_config_as(identifier: &str, config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
     let root = fs::canonicalize(folder).map_err(|e| format!("couldn't open {}: {e}", folder.display()))?;
@@ -257,8 +257,8 @@ pub(crate) fn choose_config_as(identifier: &str, config_path: &Path, folder: &Pa
             root.display()
         ));
     }
-    crate::app_identity::refuse_existing_vault_for(identifier, &root).and_then(|()| crate::app_identity::claim_for(identifier, &root))?;
-    let id = match read_config(identifier, config_path) {
+    crate::app_identity::refuse_existing_vault_for(identifier, &root).and_then(|()| crate::app_identity::claim_for(identifier, &root))?; // vault bind (refused): refuse_existing_vault_for above
+    let id = match read_config(identifier, config_path) { // vault bind (refused): refuse_existing_vault_for above
         Some(existing) if existing.root == root => existing.id,
         _ => format!("hv_{}", uuid::Uuid::new_v4().simple()),
     };

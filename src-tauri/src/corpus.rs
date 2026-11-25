@@ -1030,7 +1030,7 @@ fn persist_corpus_path(
     {
         crate::vault_location::remember_vault(app, vault);
     }
-    crate::app_identity::claim(&cfg.corpus.abs_path)?; // its caller refused first
+    crate::app_identity::claim(&cfg.corpus.abs_path)?; // its caller refused first // vault bind (delegated): its callers refuse the root first
     write_corpus_config(app, &cfg)?;
     Ok(outgoing_id)
 }
@@ -1043,7 +1043,7 @@ pub(crate) fn set_corpus_path_live(
     path: PathBuf,
     adopted: bool,
 ) -> Result<Option<String>, String> {
-    persist_corpus_path(app, path, adopted)
+    persist_corpus_path(app, path, adopted) // vault bind (delegated): its callers refuse the root first
 }
 
 /// Connect / update a brain. A same-folder upsert PRESERVES the existing id (so
@@ -1057,7 +1057,7 @@ pub fn upsert_brain(
 ) -> Result<String, String> {
     let mut cfg = ensure_corpus_config(app);
     crate::vault_location::remember_vault(app, &brain.abs_path);
-    crate::app_identity::claim(&brain.abs_path)?; // its caller refused first
+    crate::app_identity::claim(&brain.abs_path)?; // its caller refused first // vault bind (delegated): its callers refuse the root first
     let id = upsert_brain_config(&mut cfg, brain, make_active)?;
     write_corpus_config(app, &cfg)?;
     Ok(id)
@@ -1115,7 +1115,7 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
         .unwrap_or("folder")
         .to_string();
     let id = unique_folder_id(&cfg, &label);
-    crate::app_identity::claim(&path)?; // its caller refused first
+    crate::app_identity::claim(&path)?; // its caller refused first // vault bind (delegated): its callers refuse the root first
     cfg.folders.push(CorpusRoot {
         id,
         label,

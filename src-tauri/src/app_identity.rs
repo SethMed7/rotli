@@ -199,7 +199,7 @@ pub(crate) fn settle_scratch_for(identifier: &str, support: &Path, registry_exis
     }
     let state = scratch_state(support, identifier);
     if state == ScratchState::Trusted {
-        return claim_for(identifier, &scratch);
+        return claim_for(identifier, &scratch); // vault bind (vetted): scratch_state passed, which runs the vault refusal
     }
     if state == ScratchState::Untrusted {
         set_aside(&scratch)?;
@@ -209,7 +209,7 @@ pub(crate) fn settle_scratch_for(identifier: &str, support: &Path, registry_exis
     }
     std::fs::create_dir_all(support).map_err(|e| format!("create {} ({e})", support.display()))?;
     std::fs::create_dir(&scratch).map_err(|e| format!("create {} ({e})", scratch.display()))?;
-    claim_for(identifier, &scratch)?;
+    claim_for(identifier, &scratch)?; // vault bind (private): the empty folder this call just made
     match scratch_state(support, identifier) {
         ScratchState::Trusted => Ok(()),
         _ => Err(format!("{} changed while it was being made", scratch.display())),
@@ -265,7 +265,7 @@ pub(crate) fn holds_only_marks(folder: &Path) -> bool {
 
 /// `claim_for` this build.
 pub(crate) fn claim(folder: &Path) -> Result<(), String> {
-    claim_for(APP_IDENTIFIER, folder)
+    claim_for(APP_IDENTIFIER, folder) // vault bind (delegated): claim is claim_for for this build
 }
 
 /// How `rotli open` brings the app forward. The standalone build keeps its
