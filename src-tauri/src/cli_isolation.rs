@@ -179,6 +179,20 @@ where
         .collect()
 }
 
+/// The environment a lane's process gets, for a turn or a Settings check
+/// alike: Claude's cleared allowlist, Codex without code-loading variables.
+pub(crate) fn apply_lane_env(provider: &str, cmd: &mut std::process::Command) {
+    match provider {
+        "claude" => apply_claude_env(cmd),
+        "codex" => {
+            for key in codex_env_removals(std::env::vars_os().map(|(key, _)| key)) {
+                cmd.env_remove(key);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Clear `cmd`'s inherited environment and give it only the allowed part of
 /// Rotli's own.
 pub(crate) fn apply_claude_env(cmd: &mut std::process::Command) {
@@ -384,6 +398,20 @@ mod tests {
         ] {
             assert!(!kept.iter().any(|k| k == key), "{key} must not reach claude");
         }
+    }
+
+    #[test]
+    fn each_lane_gets_its_own_environment() {
+        let mut codex = std::process::Command::new("/usr/bin/true");
+        apply_lane_env("codex", &mut codex);
+        assert!(codex.get_envs().any(|(k, v)| k == "NODE_OPTIONS" && v.is_none()), "codex drops NODE_OPTIONS");
+        let mut claude = std::process::Command::new("/usr/bin/true");
+        claude.env("CLAUDECODE", "1");
+        apply_lane_env("claude", &mut claude);
+        assert!(!claude.get_envs().any(|(k, v)| k == "CLAUDECODE" && v.is_some()), "claude is cleared");
+        let mut other = std::process::Command::new("/usr/bin/true");
+        apply_lane_env("antigravity", &mut other);
+        assert_eq!(other.get_envs().count(), 0, "other lanes keep their own handling");
     }
 
     #[test]

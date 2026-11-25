@@ -794,6 +794,10 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     }
     if matches!(provider, "claude" | "codex" | "cursor") {
         let bin = resolve_bin(spec(provider)?);
+        // a paused lane (lane_pause.rs) starts nothing, not even a status check
+        if crate::lane_pause::lane_paused(provider) {
+            return Ok(CliDetect { installed: bin.is_some(), version: None, authenticated: false });
+        }
         let version = bin.as_ref().and_then(|b| version_of(provider, b, &["--version"]));
         let auth_args: &[&str] = match provider {
             "claude" => &["auth", "status"],
@@ -815,14 +819,10 @@ pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     Err(format!("unknown provider \"{provider}\""))
 }
 
-/// Settings asks Claude under the same environment a chat turn gets, so
-/// "signed in" can't come from a variable the turn won't see.
+/// Settings asks a client under the environment its chat turn gets.
 fn probe_as(provider: &str, bin: &std::path::Path, args: &[&str]) -> Option<std::process::Output> {
-    crate::cli_probe::probe_with(bin, args, crate::cli_probe::PROBE_DEADLINE, |cmd| {
-        if provider == "claude" {
-            crate::cli_isolation::apply_claude_env(cmd);
-        }
-    })
+    let env = |cmd: &mut std::process::Command| crate::cli_isolation::apply_lane_env(provider, cmd);
+    crate::cli_probe::probe_with(bin, args, crate::cli_probe::PROBE_DEADLINE, env)
 }
 
 fn version_of(provider: &str, bin: &std::path::Path, args: &[&str]) -> Option<String> {

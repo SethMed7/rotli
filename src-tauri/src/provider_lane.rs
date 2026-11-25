@@ -136,15 +136,7 @@ fn run_on_bin(
 fn lane_command(provider_id: &str, bin: &Path, args: &[String]) -> Command {
     let mut cmd = Command::new(bin);
     cmd.args(args);
-    match provider_id {
-        "claude" => crate::cli_isolation::apply_claude_env(&mut cmd),
-        "codex" => {
-            for key in crate::cli_isolation::codex_env_removals(std::env::vars_os().map(|(key, _)| key)) {
-                cmd.env_remove(key);
-            }
-        }
-        _ => {}
-    }
+    crate::cli_isolation::apply_lane_env(provider_id, &mut cmd);
     cmd
 }
 

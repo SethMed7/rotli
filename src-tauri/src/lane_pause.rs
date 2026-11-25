@@ -53,6 +53,16 @@ mod tests {
         assert!(crate::provider::connected_provider_execution_allowed("codex").is_ok());
     }
 
+    /// Settings' status check starts nothing for a paused lane: no
+    /// `--version`, no `status` (on a Mac with Cursor installed and signed
+    /// in, both would otherwise answer).
+    #[test]
+    fn settings_never_starts_a_paused_client() {
+        let detected = crate::provider::detect("cursor").unwrap();
+        assert!(detected.version.is_none(), "no --version probe");
+        assert!(!detected.authenticated, "no status probe");
+    }
+
     #[test]
     fn a_paused_lane_never_reaches_a_spawn() {
         use std::collections::HashMap;
