@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.9.7] - 2026-11-24
 
 ### Added
+
 - **A quiet shield on secure notes.** A secure note now wears a small muted
   shield beside its title in the Main tree, in All notes and Recent, and in
   the Library's List view, so you can see at a glance which notes are
@@ -21,21 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the accessible name "Secure note" and the same words as a tooltip.
 
 ### Changed
+
 - **The sidebar is plainer.** The faint scenery behind the sidebar is gone, and
   so is its Scenery choice in Settings → Appearance. The icon setting stays.
-- **Cursor chats are paused while we check that they keep your notes
-  private.** Cursor can start the MCP servers you set up for it, and Rotli
-  can't yet turn them off for a chat. Cursor models stay in the picker,
-  marked "Paused for a privacy check", and a chat already set to Cursor
-  says so instead of answering. Pick another model to keep going.
-- **`rotli agent config` now covers more clients and your vault folders.**
-  It prints a Claude Desktop entry and a T3 Code line, and, for each vault
-  Rotli knows (under its registered and its resolved path), the deny rules
-  each of Claude Code, Cursor, Codex and Gemini CLI documents for its own file
-  tools. Some tools can't be fenced by folder, such as a shell, and the
-  output says which. Pasting Gemini's policy also turns off `@` file paths in
-  every Gemini session, not only near your vault. Rotli still never edits a client's settings; you copy
-  what you want.
+- **Cursor chats are paused for a privacy check.** We're checking that they
+  keep your notes private. Cursor can start the MCP servers you set up for it,
+  and Rotli can't yet turn them off for a chat. Cursor models stay in the
+  picker, marked "Paused for a privacy check", and a chat already set to
+  Cursor says so instead of answering. Pick another model to keep going.
+- **`rotli agent config` now covers more clients and your vault folders.** It
+  prints a Claude Desktop entry and a T3 Code line, and, for each vault Rotli
+  knows (under its registered and its resolved path), the deny rules each of
+  Claude Code, Cursor, Codex and Gemini CLI documents for its own file tools.
+  Some tools can't be fenced by folder, such as a shell, and the output says
+  which. Pasting Gemini's policy also turns off `@` file paths in every Gemini
+  session, not only near your vault. Rotli still never edits a client's
+  settings; you copy what you want.
 - **"Use Rotli for your docs" files notes the safe way.** The instruction you
   paste into Claude Code now uses `rotli notes create` instead of asking the
   agent to write a file with frontmatter into your vault.
@@ -43,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reading, such as `rotli notes list | head`, instead of printing an error.
 
 ### Fixed
+
 - **Deleting a board no longer says "note not found".** The board did move
   to Trash, but Rotli then looked for it at its old place and reported a
   failure, so its tab stayed open and its row stayed in the sidebar. Archive
@@ -63,10 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "hi", or two image-only chats) used to leave the whole conversation
   unsaved. The new chat is now saved as `hi-2`, `hi-3`, and so on, and the
   older chat is never touched.
-- **Deleting or archiving a chat never replaces one deleted or archived
-  earlier.** A second chat with the same name used to overwrite the first in
-  the hidden Trash or Archive folder. Each one is now kept, as `name`,
-  `name-2`, and so on. Renaming a chat also never lands on another chat.
+- **Deleting or archiving a chat never replaces an older one.** A second chat
+  with the same name used to overwrite the first in the hidden Trash or
+  Archive folder. Each one is now kept, as `name`, `name-2`, and so on.
+  Renaming a chat also never lands on another chat.
 - **Stopping a reply keeps the saved chat the same as the screen.** Stopping
   before any answer arrived took your message off the screen but left it in
   the file, so it came back on reopen and was sent twice if you sent it
@@ -83,12 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shows a message asking you to update it instead of answering.
 
 ### Security
-- **A Codex chat can no longer reach a secure note through your own MCP
-  servers.** Codex was offered the tools of every MCP server in your Codex
-  config, which never pass Rotli's secure-note rules. Rotli now runs Codex
-  with `--ignore-user-config` and turns off its skills, apps and plugins,
-  and refuses to run a Codex older than 0.147.0, the first that can turn
-  off every built-in tool able to read a file.
+
+- **Codex chats can't reach secure notes through your MCP servers.** Codex was
+  offered the tools of every MCP server in your Codex config, which never pass
+  Rotli's secure-note rules. Rotli now runs Codex with `--ignore-user-config`
+  and turns off its skills, apps and plugins, and refuses to run a Codex older
+  than 0.147.0, the first that can turn off every built-in tool able to read a
+  file.
 - **A Codex chat can no longer read files with Codex's own tools.** Newer
   Codex offered image reading, sub-agents, image generation and its own web
   search even with the shell off. Rotli now turns those off; web access in
