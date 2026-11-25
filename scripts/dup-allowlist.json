@@ -338,6 +338,15 @@
         "src/lib/noteTags.ts"
       ],
       "reason": "MIRROR-NOT-IMPORT: the tag allowlist and the tags-line editor run independently in Rust (the Mac's write gates) and TypeScript (Rotli Web's), as every security policy here does; parity.json noteTagCases and noteTagEditCases pin them to the same answers, so the shared refusal words are the contract, not copied logic."
+    },
+    {
+      "id": "note-tag-lanes-ts-rust-twins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus_tags.rs",
+        "src/services/folderTags.ts"
+      ],
+      "reason": "MIRROR-NOT-IMPORT: the person's tag lane runs in Rust on the Mac and in TypeScript for Rotli Web's connected folder, as every write gate here does; the shared words are the same refusals a person reads on either shell, not copied logic."
     }
   ]
 }

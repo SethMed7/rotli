@@ -93,3 +93,10 @@ test("a fenceless note in a folder opened in place gains only a tags block", asy
   await corpusChangeTags("Projects/Plan.md", { add: ["plans"] });
   expect(await dir.readText("Projects/Plan.md")).toBe(`---\ntags: [plans]\n---\n${text}`);
 });
+
+test("a note that starts with a byte-order mark is refused, never given a second fence", async () => {
+  const text = "\uFEFF---\nsecure: true\n---\n# Garden\n";
+  await dir.writeText("Garden.md", text);
+  await expect(corpusChangeTags("Garden.md", { add: ["exposed"] })).rejects.toThrow("mark");
+  expect(await dir.readText("Garden.md")).toBe(text);
+});

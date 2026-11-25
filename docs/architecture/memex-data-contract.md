@@ -698,8 +698,9 @@ The Rust corpus boundary independently validates every write.
     reads them). `corpus_change_tags` / Rotli Web `changeFolderTags`.
   - **The Librarian** only adds: the organizer fills an empty `tags`, the
     `/librarian` bar merges, and an approval or undo of a `tags` change only
-    lands while the field is exactly as the proposal or the action left it,
-    so it never drops a tag the person added since. Its writer replaces the
+    lands while the field is exactly as the proposal or the action left it
+    (the undo passes that value to `corpus_set_ai_field`, which checks it
+    under the note's lock), so it never drops a tag the person added since. Its writer replaces the
     whole `tags:` value (`set_ai_field`), so it refuses a note whose tags are
     a block list rather than leave the list's items behind (residual: the
     Librarian can't tag such a note; the person and the tag tools can).
@@ -723,7 +724,11 @@ The Rust corpus boundary independently validates every write.
   line break, colon, bracket, quote, comma, or control character into the
   frontmatter. Tags already on disk read leniently (`[a, b]`, `a, b`, a
   block list) and are written back exactly as spelled, a Librarian tag with
-  a space included; removal matches any case. A `tags:` field in another
+  a space included; tags compare by NFC and any case, so removal and
+  duplicates match a decomposed spelling on disk too. A note that starts with
+  a byte-order mark is refused: the mark hides its frontmatter from every
+  reader, and a fence added above it would push the note's metadata into
+  its body. A `tags:` field in another
   spelling or shape (quoted key, a second `tags:` line, a trailing comment,
   a nested map) is never rewritten: the change is refused and the person is
   sent to Show file metadata. A block list stays a block list. A note with

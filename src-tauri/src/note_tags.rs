@@ -264,8 +264,10 @@ pub(crate) fn whole_value_replaceable(foreign: &[String]) -> Result<(), String> 
     }
 }
 
+/// How two tags compare: NFC, then lowercase, so a tag written decomposed
+/// on disk matches the composed spelling a new tag is normalized to.
 fn folded(tag: &str) -> String {
-    tag.to_lowercase()
+    tag.nfc().collect::<String>().to_lowercase()
 }
 
 /// The frontmatter lines with `add` (already normalized) added and every tag

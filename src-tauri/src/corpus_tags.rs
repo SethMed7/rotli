@@ -165,6 +165,11 @@ impl CorpusStore {
             tags,
             revision: crate::fsutil::revision(text.as_bytes()),
         };
+        // a byte-order mark hides the frontmatter from every reader, so a fence
+        // added above it would push the note's own metadata into its body
+        if text.starts_with('\u{feff}') {
+            return Err("this note starts with a byte-order mark, so Rotli won't change its tags; remove the mark first".into());
+        }
         let unchanged = || answer(text, crate::note_tags::tag_values(&parse_document(text).0.unwrap_or_default().foreign));
         // a note with frontmatter changes only its `tags:` lines; one without
         // gets the fence a note of this vault is written with

@@ -195,7 +195,9 @@ export function tagValues(fields: readonly string[]): string[] {
   return typeof field === "string" ? [] : field.items.map((item) => item.value);
 }
 
-const folded = (tag: string) => tag.toLowerCase();
+// NFC, then lowercase: a tag written decomposed on disk matches the composed
+// spelling a new tag is normalized to
+const folded = (tag: string) => tag.normalize("NFC").toLowerCase();
 
 export type TagEdit = { ok: true; fields: string[] | null } | { ok: false; reason: string };
 

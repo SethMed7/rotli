@@ -50,6 +50,12 @@ export async function taggedText(
   add: readonly string[],
   remove: readonly string[],
 ): Promise<string | null> {
+  // a byte-order mark hides the frontmatter from every reader, so a fence
+  // added above it would push the note's own metadata into its body
+  if (text.startsWith("\uFEFF"))
+    throw new Error(
+      "this note starts with a byte-order mark, so Rotli won't change its tags; remove the mark first",
+    );
   // a note with frontmatter changes only its `tags:` lines; one without gets
   // the fence a note of this vault is written with
   const block = rawFrontmatterBlock(text);

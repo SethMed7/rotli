@@ -88,3 +88,14 @@ fn query_finds_every_note_the_list_counts_block_lists_included() {
     let found = mcp(&temp, "rotli_query", json!({ "query": "tags:shared" }));
     assert_eq!(found["structuredContent"]["count"], 2, "{found}");
 }
+
+#[test]
+fn a_note_that_turns_hidden_after_admit_answers_as_a_missing_one() {
+    let temp = TempDir::new().unwrap();
+    let mut ws = test_workspace(&temp);
+    put(&temp, "Inbox/vault.md", "---\nid: 01TAGRACE00000000000000000\ncreated_by: agent\nsecure: true\n---\n# Vault\n\nwords\n");
+    // called past admit, as a note made secure between admit and the lock is
+    let change = crate::corpus::tags::TagChange { add: vec!["x".into()], remove: Vec::new() };
+    let raced = ws.tag_note("01TAGRACE00000000000000000", &change, "fnv1a64:0").unwrap_err();
+    assert_eq!(raced, crate::corpus::note_not_found("01TAGRACE00000000000000000"));
+}

@@ -201,3 +201,30 @@ fn the_librarians_whole_value_write_never_orphans_a_block_list() {
     store.set_ai_field(rel, "tags", "[mine, filed]").unwrap();
     assert!(fs::read_to_string(root.join(rel)).unwrap().contains("tags: [mine, filed]"));
 }
+
+#[test]
+fn a_note_that_starts_with_a_byte_order_mark_is_refused_untouched() {
+    let text = format!("\u{feff}{}", doc("secure: true\n"));
+    let (_dir, mut store, path) = note(&text);
+    // the mark hides the id too, so the note answers to its path
+    let err = store.change_tags_as_person("tagged.md", &add(&["leaked"]), None).unwrap_err();
+    assert!(err.contains("byte-order mark"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), text);
+}
+
+#[test]
+fn the_librarians_expected_value_write_refuses_a_field_that_changed() {
+    let dir = TempDir::new().unwrap();
+    let root = dir.path().join("brain");
+    super::super::tests::seed_memex(&root);
+    fs::create_dir_all(root.join("wiki/_inbox")).unwrap();
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    let rel = "wiki/_inbox/plan.md";
+    let text = doc("tags: [deal, land, mine]\n");
+    fs::write(root.join(rel), &text).unwrap();
+    let err = store.set_ai_field_if(rel, "tags", "[]", Some("[deal, land]")).unwrap_err();
+    assert!(err.contains("changed since"), "{err}");
+    assert_eq!(fs::read_to_string(root.join(rel)).unwrap(), text);
+    store.set_ai_field_if(rel, "tags", "[]", Some("[deal, land, mine]")).unwrap();
+    assert!(fs::read_to_string(root.join(rel)).unwrap().contains("tags: []"));
+}

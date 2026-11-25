@@ -114,7 +114,7 @@ describe("deriveJournal — last line per id wins", () => {
 interface Calls {
   appended: BrainAction[];
   fileNote: [string, string, { journal?: boolean } | undefined][];
-  setAiField: [string, string, string][];
+  setAiField: ([string, string, string] | [string, string, string, string])[];
   writeIndex: [string, string][];
   filerMove: [string, string][];
   learned: [string, string, string][];
@@ -148,8 +148,8 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
       calls.fileNote.push([id, area, opts]);
       return "wiki/Projects/foo-a1b2c3.md";
     },
-    setAiField: async (id, key, value) => {
-      calls.setAiField.push([id, key, value]);
+    setAiField: async (id, key, value, expected) => {
+      calls.setAiField.push(expected === undefined ? [id, key, value] : [id, key, value, expected]);
     },
     writeIndex: async (area, body) => {
       calls.writeIndex.push([area, body]);
@@ -438,9 +438,10 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     expect(added.calls.setAiField).toEqual([]);
     expect(added.calls.appended).toEqual([]);
 
+    // the write carries the value it undoes, which Rust checks under the lock
     const untouched = fakeDeps("wiki/Projects/foo-a1b2c3.md", ["tags: [deal, land]"]);
     await undoAction(a, untouched.deps);
-    expect(untouched.calls.setAiField).toEqual([["01ULID", "tags", "[]"]]);
+    expect(untouched.calls.setAiField).toEqual([["01ULID", "tags", "[]", "[deal, land]"]]);
   });
 
   test("a note the Librarian created is undone by moving it to the Trash", async () => {

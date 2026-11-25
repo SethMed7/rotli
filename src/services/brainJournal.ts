@@ -106,7 +106,9 @@ export function deriveJournal(actions: BrainAction[]): JournalView {
  * brainJournalComposition.ts. */
 export interface JournalDeps {
   fileNote: (noteId: string, area: string, opts?: { journal?: boolean }) => Promise<string>;
-  setAiField: (id: string, key: string, value: string) => Promise<void>;
+  /** `expected`: the value the field must still hold, checked under the
+   * note's lock in Rust (an undo of shared `tags`). */
+  setAiField: (id: string, key: string, value: string, expected?: string) => Promise<void>;
   writeIndex: (area: string, body: string) => Promise<void>;
   filerMove: (id: string, targetFolder: string) => Promise<unknown>;
   notePath: (id: string) => Promise<string>;
@@ -232,8 +234,12 @@ export async function undoAction(a: BrainAction, deps: JournalDeps): Promise<voi
       const fm = await deps.frontmatter(await deps.notePath(handleOf(a)));
       if (fieldValue(fm?.fields ?? [], "tags") !== a.after)
         throw new Error("The tags changed since — remove the ones you don't want from the note instead.");
+      // …and Rust checks it again under the note's lock, so an edit made
+      // between this read and the write is never overwritten
+      await deps.setAiField(handleOf(a), a.field, a.before, a.after);
+    } else {
+      await deps.setAiField(handleOf(a), a.field, a.before);
     }
-    await deps.setAiField(handleOf(a), a.field, a.before);
   } else if (a.action === "index" && a.area) {
     await deps.writeIndex(a.area, a.before);
   } else if (a.action === "create") {

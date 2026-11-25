@@ -14,7 +14,7 @@ pub(super) const LIST_TAGS: &str = "rotli_list_tags";
 pub(super) const TAG_NOTE: &str = "rotli_tag_note";
 
 pub(super) fn tools(tool: fn(&str, &str, Value, bool) -> Value) -> Vec<Value> {
-    let tag_list = json!({"type":"array","maxItems":crate::note_tags::TAGS_PER_CHANGE_MAX,"items":{"type":"string","maxLength":200}});
+    let tag_list = json!({"type":"array","maxItems":crate::note_tags::TAGS_PER_CHANGE_MAX,"items":{"type":"string","maxLength":64}});
     vec![
         tool(LIST_TAGS, "List the tags on agent-readable notes, most used first, with how many notes carry each. Secure notes are not counted, and a tag only they carry is not listed. Find a tag's notes with rotli_query tags:NAME.", json!({"type":"object","properties":{"rootId":{"type":"string","maxLength":128},"limit":{"type":"integer","minimum":1,"maximum":500}},"additionalProperties":false}), true),
         tool(TAG_NOTE, "Add or remove tags on one note (its shared `tags:` metadata; the text is untouched). A tag is letters, numbers, -, _ and / (a leading # is dropped), at most 40 characters. Removing matches any case. Only a note an AI made, or one the person granted \"Let AI edit\", may be tagged; secure and locked notes are refused. Requires the revision from the read just before; answers with the note's tags and new revision.", json!({"type":"object","properties":{"id":{"type":"string","maxLength":1024},"add":tag_list,"remove":tag_list,"expectedRevision":{"type":"string","maxLength":128},"rootId":{"type":"string","maxLength":128}},"required":["id","expectedRevision"],"additionalProperties":false}), false),
@@ -122,7 +122,15 @@ impl Workspace {
     }
 
     pub(super) fn tag_note(&mut self, local_id: &str, change: &TagChange, expected: &str) -> Result<NoteTagged, String> {
-        let tagged = self.store.change_tags_for_ai(local_id, change, AiTagger::Agent, expected)?;
+        // a note that turned hidden after admit answers as a missing one, as
+        // admit itself would answer now
+        let tagged = match self.store.change_tags_for_ai(local_id, change, AiTagger::Agent, expected) {
+            Ok(tagged) => tagged,
+            Err(error) => {
+                self.admit(local_id)?;
+                return Err(error);
+            }
+        };
         // the note's tags as the list and query show them: one that names a
         // protected path stays out of the answer
         let mut tags = Vec::new();
