@@ -63,6 +63,8 @@ export interface AppHost {
    * named panes trade places among the slots they hold; the rest stay put. */
   navOrder?: readonly string[];
   words?: HostWords;
+  /** The About row's glyph, where Rotli shows its quokka. */
+  aboutGlyph?: HostGlyph;
 }
 
 export const DEFAULT_UPDATES_WORDS = "Updates arrive with this app";

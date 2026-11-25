@@ -88,7 +88,11 @@ export function settingsNav(platform: Platform, host: AppHost | null): NavEntry[
   const notes = host?.notes !== false;
   const shown: NavEntry[] = BUILTIN_NAV.filter(
     (pane) => !(platform === "web" && WEB_HIDDEN_PANES.has(pane.id)) && (notes || !NOTES_PANES.has(pane.id)),
-  ).map((pane) => (pane.id === "about" ? { ...pane, label: aboutLabel(host) } : { ...pane }));
+  ).map((pane) =>
+    pane.id === "about"
+      ? { ...pane, label: aboutLabel(host), glyph: host?.aboutGlyph ?? pane.glyph }
+      : { ...pane },
+  );
   const taken = new Set<string>(BUILTIN_NAV.map((pane) => pane.id));
   for (const pane of host?.settingsPanes ?? []) {
     if (taken.has(pane.id)) throw new Error(`Settings pane id ${JSON.stringify(pane.id)} is already Rotli's`);

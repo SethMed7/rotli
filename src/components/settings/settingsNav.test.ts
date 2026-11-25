@@ -113,9 +113,14 @@ test("a host can reorder the nav: the panes it names take their slots in its ord
   expect(ids({ navOrder: [] })).toEqual(ROTLI_DESKTOP);
 });
 
-test("a host's About label names the About row; Rotli's stays About Rotli", () => {
-  const about = (host: AppHost | null) =>
-    settingsNav("desktop", host).find((row) => row.id === "about")?.label;
-  expect(about(null)).toBe("About Rotli");
-  expect(about({ words: { aboutLabel: "About Synthetic" } })).toBe("About Synthetic");
+test("a host's About label and glyph mark the About row; Rotli's stay About Rotli and the quokka", () => {
+  const about = (host: AppHost | null) => settingsNav("desktop", host).find((row) => row.id === "about");
+  const rotliGlyph = BUILTIN_NAV.find((row) => row.id === "about")?.glyph;
+  expect(about(null)?.label).toBe("About Rotli");
+  expect(about(null)?.glyph).toBe(rotliGlyph);
+  const labelled = about({ words: { aboutLabel: "About Synthetic" } });
+  expect(labelled?.label).toBe("About Synthetic");
+  expect(labelled?.glyph).toBe(rotliGlyph);
+  const mark = () => null;
+  expect(about({ aboutGlyph: mark })?.glyph).toBe(mark);
 });

@@ -166,9 +166,11 @@ same crate shows the real error: macOS won't load a stripped proc-macro dylib
 `tauri build` pass. Rotli's own profile, which strips too but uses
 `codegen-units = 1` and `lto = "fat"`, built in the same scratch crate, but it
 reused that crate's target folder. Which of those two settings interacts with
-`strip` is not isolated. The fix was checked on that minimal crate only, not
-on a real host's crate graph (2026-11-25, Rust 1.97.1). In the host crate's
-`Cargo.toml`:
+`strip` is not isolated. The fix was checked on that minimal crate and then on
+a real host crate's full graph (`codegen-units = 16`, `lto = "thin"`,
+`strip = "symbols"`): one `tauri build --bundles app --no-sign` passed, the
+binary's minimum macOS was 13.0, and `Cargo.lock` didn't change (2026-11-25,
+Rust 1.97.1). In the host crate's `Cargo.toml`:
 
 ```toml
 [profile.release.build-override]
@@ -213,22 +215,26 @@ on its first read, so a late registration throws. A host can give:
   which replaces "About Rotli" as the nav row and the pane's heading. The
   About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
   Rotli's defaults are exactly today's text.
+- **`aboutGlyph`**: the About row's glyph, where Rotli shows its quokka.
 
 ## Not built yet
 
 - **Hosts can't add yet:** sidebar fronts, first-run steps, or other windows
   or pages.
 - **The notes rows of General and Connections** still show when notes are off.
-- **Not proven yet:** a host top crate launched against this library. Its
-  capability files, a plugin command, and one copy of React across two repos
-  are untested at run time.
+- **Not proven yet:** a plugin command passing the capability ACL in a live
+  host webview, and one copy of React across two repos at run time.
 
 ## Proof
 
-This list says only what was run. The app was never launched under a host
-identity, so the scratch-vault first run, the exit-78 and exit-73 stops, the
-webview's identity check and the plugin gating are proven by code, unit tests
-and source-order fences only. The notes-off window, a host pane, pane blocks,
+This list says only what was run. A host top crate, signed under a host
+identity and built against this library at `32e56b11`, was launched twice in a
+sandbox HOME (2026-11-25). The first run passed the webview's identity check
+and made a fresh scratch vault, its registry and its settings. The second run
+took the registry-exists path and set nothing aside, with no exit 73 or 78.
+Rotli's own app was never launched. The exit-78 and exit-73 stops themselves
+and the plugin gating are proven by code, unit tests and source-order fences
+only. The notes-off window, a host pane, pane blocks,
 the nav order and the host's words are proven by server-side rendering only.
 
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
