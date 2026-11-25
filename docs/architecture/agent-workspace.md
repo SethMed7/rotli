@@ -675,7 +675,8 @@ disagree), and `read_many_files`, which `@` paths use, denied whole because its
 `include` globs can't be fenced by a folder; they are built from its documented
 rule fields (its docs have no path example), and the output says that a shell
 can't be fenced. Every rule is printed for the registered path and, where it
-differs, the canonical one (symlinks resolved, the disk's own case). Cursor
+differs, the canonical one (symlinks resolved; another casing of the folder is
+not covered). Cursor
 gets no rule for a path holding `*` or `?`, which its globs would read as
 wildcards. The vault-session settings are the Librarian protocol's own deny
 list, `mcp__t3-code` included, and a test reads

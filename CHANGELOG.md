@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rotli knows (under its registered and its resolved path), the deny rules
   each of Claude Code, Cursor, Codex and Gemini CLI documents for its own file
   tools. Some tools can't be fenced by folder, such as a shell, and the
-  output says which. Rotli still never edits a client's settings; you copy
+  output says which. Pasting Gemini's policy also turns off `@` file paths in
+  every Gemini session, not only near your vault. Rotli still never edits a client's settings; you copy
   what you want.
 - **"Use Rotli for your docs" files notes the safe way.** The instruction you
   paste into Claude Code now uses `rotli notes create` instead of asking the

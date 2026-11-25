@@ -83,8 +83,10 @@ fn cursor_rule(tool: &str, path: &str) -> Option<String> {
 }
 
 /// `path` as the registered spelling and, when it differs, the canonical one
-/// (symlinks resolved, the disk's own case): a rule on one doesn't match a
-/// tool that reaches the vault through the other.
+/// (`canonicalize`: symlinks resolved): a rule on one doesn't match a tool
+/// that reaches the vault through the other. Other casings of the same folder
+/// are not covered: a path an agent types in a different case may not match a
+/// rule, whatever the volume.
 fn spellings(path: &str) -> Vec<String> {
     let mut all = vec![path.to_string()];
     if let Ok(real) = std::fs::canonicalize(path) {
@@ -149,8 +151,8 @@ fn toml_string(text: &str) -> String {
 pub(crate) fn vault_access(vaults: &[(String, String)]) -> Value {
     let registered = !vaults.is_empty();
     let vaults: Vec<(String, String)> = if registered { vaults.to_vec() } else { vec![("Your vault".into(), PLACEHOLDER.into())] };
-    let mut paths: Vec<String> = vaults.iter().flat_map(|(_, path)| spellings(path)).collect();
-    paths.dedup();
+    let mut seen = std::collections::HashSet::new();
+    let paths: Vec<String> = vaults.iter().flat_map(|(_, path)| spellings(path)).filter(|path| seen.insert(path.clone())).collect();
     let claude_deny: Vec<String> = paths.iter().flat_map(|path| [claude_rule("Read", path), claude_rule("Edit", path)]).collect();
     let cursor_deny: Vec<String> = paths.iter().filter_map(|path| cursor_rule("Read", path).zip(cursor_rule("Write", path))).flat_map(|(read, write)| [read, write]).collect();
     let cursor_skipped: Vec<&String> = paths.iter().filter(|path| cursor_rule("Read", path).is_none()).collect();
@@ -199,7 +201,7 @@ pub(crate) fn vault_access(vaults: &[(String, String)]) -> Value {
         "gemini": {
             "file": "~/.gemini/policies/rotli-vault-guard.toml",
             "toml": gemini_toml,
-            "limit": "Fences the file tools Gemini documents: read_file, write_file, replace, list_directory, glob and grep_search are denied under the vault, and read_many_files (what @ paths use) is denied everywhere, because its include globs can't be fenced by a folder. A shell (run_shell_command) can't be fenced by path, and a glob or grep_search call with no path searches the working folder, so run Gemini from a folder outside the vault. Built from Gemini's documented rule fields and tool arguments; its docs have no example that denies a path, so try one read_file on the vault after adding it. Policies apply to every Gemini session (the workspace tier is documented as non-functional)."
+            "limit": "Fences the file tools Gemini documents: read_file, write_file, replace, list_directory, glob and grep_search are denied under the vault, and read_many_files (what @ paths use) is denied everywhere, because its include globs can't be fenced by a folder. A shell (run_shell_command) can't be fenced by path, and a glob or grep_search call with no path searches the working folder, so run Gemini from a folder outside the vault. Built from Gemini's documented rule fields and tool arguments; its docs have no example that denies a path, so try one read_file on the vault after adding it. The rules match absolute paths, so a relative path from a nearby folder isn't matched. Policies apply to every Gemini session (the workspace tier is documented as non-functional)."
         },
         "claudeDesktop": "Claude Desktop has no deny list for file access: its config file lists MCP servers. Don't add a filesystem server or extension that includes the vault folder."
     })
@@ -288,9 +290,15 @@ mod tests {
     /// The deny list in the Librarian protocol's own settings file (§3.2): the
     /// printed vault-session settings must be the list people already trust.
     fn protocol_deny_list() -> Vec<String> {
-        let doc = include_str!("../../docs/architecture/vault-thread-protocol.md");
-        let from = doc.find("\"deny\": [").expect("the protocol's settings file names a deny list") + "\"deny\": ".len();
-        let list = &doc[from..from + doc[from..].find(']').unwrap() + 1];
+        deny_list_under(include_str!("../../docs/architecture/vault-thread-protocol.md"), "### 3.2 ")
+    }
+
+    /// The first `"deny": [...]` after the heading that starts with `heading`,
+    /// so an example added earlier in the document can't be read by mistake.
+    fn deny_list_under(doc: &str, heading: &str) -> Vec<String> {
+        let section = &doc[doc.find(heading).unwrap_or_else(|| panic!("no section {heading}"))..];
+        let from = section.find("\"deny\": [").expect("the section's settings file names a deny list") + "\"deny\": ".len();
+        let list = &section[from..from + section[from..].find(']').unwrap() + 1];
         serde_json::from_str(list).expect("the deny list is JSON")
     }
 
@@ -375,6 +383,33 @@ mod tests {
         assert!(access["codex"]["toml"].as_str().unwrap().contains("\"/Users/test/say \\\"hi\\\"\" = \"deny\""));
         let pattern = r#""file_path":"/Users/test/say \\"hi\\"(?:/|")"#;
         assert!(access["gemini"]["toml"].as_str().unwrap().contains(&toml_string(pattern)), "{}", access["gemini"]["toml"]);
+    }
+
+    #[test]
+    fn a_path_that_is_one_vaults_canonical_and_anothers_registered_spelling_is_ruled_once() {
+        let real = tempfile::TempDir::new().unwrap();
+        let link_home = tempfile::TempDir::new().unwrap();
+        let link = link_home.path().join("Alias");
+        std::os::unix::fs::symlink(real.path(), &link).unwrap();
+        let canonical = std::fs::canonicalize(real.path()).unwrap().display().to_string();
+        // A is the symlink (it resolves to B's path), then a third vault, then B itself: not adjacent
+        let vaults = vec![("A".into(), link.display().to_string()), ("C".into(), "/Users/test/other".into()), ("B".into(), canonical.clone())];
+        let deny = vault_access(&vaults)["claudeCode"]["anySession"]["settings"]["permissions"]["deny"].clone();
+        let rules: Vec<&str> = deny.as_array().unwrap().iter().map(|rule| rule.as_str().unwrap()).collect();
+        let mut unique = rules.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(rules.len(), unique.len(), "a rule printed twice: {rules:?}");
+        assert_eq!(rules.len(), 6, "three distinct paths, a Read and an Edit each: {rules:?}");
+        // order is the vaults' own order, the registered spelling first
+        assert!(rules[0].contains(&link.display().to_string()), "{rules:?}");
+    }
+
+    #[test]
+    fn the_protocol_list_is_read_from_the_settings_file_under_its_own_heading() {
+        let doc = "## 1\n```json\n{ \"permissions\": { \"deny\": [\"Wrong\"] } }\n```\n### 3.2 Option A: files\n```json\n{ \"permissions\": { \"deny\": [\"Right\", \"Also\"] } }\n```\n### 3.3 Option B\n```json\n{ \"deny\": [\"Later\"] }\n```\n";
+        assert_eq!(deny_list_under(doc, "### 3.2 "), vec!["Right".to_string(), "Also".to_string()]);
+        assert!(std::panic::catch_unwind(|| deny_list_under(doc, "### 9.9 ")).is_err(), "a missing heading is an error, not a guess");
     }
 
     #[test]
