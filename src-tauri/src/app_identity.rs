@@ -174,6 +174,9 @@ fn set_aside_name(support: &Path) -> PathBuf {
 /// the scratch path this launch.
 fn settle_scratch_in(support: &Path, registry_exists: bool) -> Result<(), String> {
     let scratch = support.join(SCRATCH_VAULT);
+    if std::fs::symlink_metadata(support).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        return Err(format!("{} is a link, so no scratch vault in it is this app's", support.display()));
+    }
     let state = scratch_state(support, registry_exists);
     if state == ScratchState::Trusted {
         return Ok(());

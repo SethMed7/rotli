@@ -339,6 +339,10 @@ fn a_scratch_vault_inside_a_linked_support_folder_is_not_trusted() {
     link(&elsewhere, &support);
     assert_eq!(scratch_state(&support, true), ScratchState::Untrusted);
     assert_eq!(trusted_scratch_in(&support), None);
+    // nothing is renamed through it: setting aside can't make it safe
+    assert!(settle_scratch_in(&support, false).is_err());
+    let names: Vec<_> = std::fs::read_dir(&elsewhere).unwrap().flatten().map(|entry| entry.file_name()).collect();
+    assert_eq!(names, vec![std::ffi::OsString::from(SCRATCH_VAULT)]);
 }
 
 /// The walk follows a link once: a link back up the tree is not a vault

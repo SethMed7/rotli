@@ -125,9 +125,14 @@ anyone, so that path is trusted only when this build made it.
   bound, whatever it holds. A person who removed it keeps it removed.
 - `reject_privileged_root` and the owned roots trust the scratch vault only
   through the same test (`owned_scratch_vault`).
+- A support folder that is itself a link is refused before anything is
+  renamed, and the app exits 73.
 - **Not re-checked at launch:** a registry root that a person later replaces
-  with a link is still opened at launch. It owns nothing, so picking it again,
-  or anything around it, is refused.
+  with a link is still opened at launch, by the app and by the headless CLI,
+  which reads the same registry. It owns nothing, so picking it again, or
+  anything around it, is refused. A registry that exists but won't parse
+  counts as a registry, so the folder at the scratch path is kept as it is,
+  even if it isn't empty. The migration then binds it again.
 
 ## The host entry (Rust)
 
@@ -152,16 +157,18 @@ context. The library never does, so a host crate builds without Rotli's
 ### Building a host crate
 
 `tauri build` in a host crate can fail with `can't find crate for
-tauri_macros` (or another proc macro). The cause is the host's own release
-profile, not Rotli: `strip = "symbols"` reaches the proc-macro dylibs, and
-macOS then refuses to load them (`mis-aligned LINKEDIT string pool`), which
-rustc reports as a missing crate. A crate that depends only on `tauri`, with
-a release profile of `codegen-units = 16`, `lto = "thin"` and `strip =
-"symbols"`, fails the same way. It still fails with or without
-`MACOSX_DEPLOYMENT_TARGET`, and it builds once proc macros are left
-unstripped. Rotli's own release profile (`codegen-units = 1`, `lto = "fat"`)
-builds in the same test. Checked on 2026-11-25 with Rust 1.97.1. In the host
-crate's `Cargo.toml`:
+tauri_macros` (or another proc macro). It looks like the host's own release
+profile is the cause, not Rotli. A crate that depends only on `tauri`, with
+`codegen-units = 16`, `lto = "thin"` and `strip = "symbols"`, fails the same
+way, with or without `MACOSX_DEPLOYMENT_TARGET`. Built with cargo directly, the
+same crate shows the real error: macOS won't load a stripped proc-macro dylib
+(`mis-aligned LINKEDIT string pool`). Leaving proc macros unstripped makes
+`tauri build` pass. Rotli's own profile, which strips too but uses
+`codegen-units = 1` and `lto = "fat"`, built in the same scratch crate, but it
+reused that crate's target folder. Which of those two settings interacts with
+`strip` is not isolated. The fix was checked on that minimal crate only, not
+on a real host's crate graph (2026-11-25, Rust 1.97.1). In the host crate's
+`Cargo.toml`:
 
 ```toml
 [profile.release.build-override]
