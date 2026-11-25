@@ -7,7 +7,7 @@
 // whether AI may edit this note's text (the owner, 2026-10-14): the same
 // `ai_edit` grant as the note menu's "Let AI edit the text"; Rust owns the verdict.
 
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 
 import { formatChord } from "../keys/chords";
 import { TOGGLE_SECURE_ACTION, toggleNoteSecure } from "../keys/noteProtectionActions";
@@ -15,7 +15,9 @@ import { currentChord } from "../keys/registry";
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
 import { corpusSetAiEdit } from "../lib/noteProtection";
 import { useTransientPopover } from "../lib/popover";
-import { corpusFrontmatter, isTauri } from "../lib/tauri";
+import { isTauri } from "../lib/tauri";
+import { invalidateNotes } from "../services/hooks";
+import { useNoteProtection } from "../services/noteProtectionQuery";
 import {
   MAX_TEXT_SIZE,
   MIN_TEXT_SIZE,
@@ -66,44 +68,39 @@ export function AaPanel({
   const setRawEditor = useUiStore((s) => s.setRawEditor);
   const blockHandles = useUiStore((s) => s.blockHandles);
   const setBlockHandles = useUiStore((s) => s.setBlockHandles);
-  // the note's own flag, read when the panel opens (null while unknown). Secure
-  // is a Mac-app feature: the web has no frontmatter writer, so no dead switch.
-  const [secure, setSecure] = useState<boolean | null>(null);
+  // the note's own protection, from the shared live read (undefined while it
+  // loads). Secure is a Mac-app feature: the web has no frontmatter writer, so
+  // no dead switch. Every write path ends in invalidateNotes, which refreshes
+  // this read, so the chord, the row menu, this panel and an outside edit all
+  // show here.
+  const protection = useNoteProtection(noteId, isTauri());
+  const secure = protection === undefined ? null : !!protection?.secure;
+  const aiEdit: AiBodyEdit | null = protection?.aiBodyEdit ?? null;
   const [secureErr, setSecureErr] = useState<string | null>(null);
-  const [aiEdit, setAiEdit] = useState<AiBodyEdit | null>(null);
   const [aiEditErr, setAiEditErr] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isTauri()) return;
-    let live = true;
-    void corpusFrontmatter(noteId).then((fm) => {
-      if (!live) return;
-      setSecure(!!fm?.secure);
-      setAiEdit(fm?.aiBodyEdit ?? null);
-    });
-    return () => {
-      live = false;
-    };
-  }, [noteId]);
+  // a switch waits for its write AND the refreshed read: two quick presses must
+  // not run two read-modify-write toggles that land back on Off
+  const [writing, setWriting] = useState(false);
   const chord = currentChord(TOGGLE_SECURE_ACTION);
   const pickSecure = (want: boolean) => {
-    if (secure === null || secure === want) return;
+    if (secure === null || secure === want || writing) return;
     setSecureErr(null);
-    toggleNoteSecure(noteId).then(setSecure, (error: unknown) =>
-      setSecureErr(error instanceof Error ? error.message : String(error)),
-    );
+    setWriting(true);
+    toggleNoteSecure(noteId)
+      .catch((error: unknown) => setSecureErr(error instanceof Error ? error.message : String(error)))
+      .finally(() => setWriting(false));
   };
 
   const aiMayEdit = aiEdit === "allowed";
   const pickAiEdit = (want: boolean) => {
-    if (aiEdit === null || aiEdit === "locked" || aiMayEdit === want) return;
+    if (aiEdit === null || aiEdit === "locked" || aiMayEdit === want || writing) return;
     setAiEditErr(null);
-    // re-read after the write: Rust's verdict, not a guess
+    setWriting(true);
+    // the read refreshes through invalidateNotes: Rust's verdict, not a guess
     corpusSetAiEdit(noteId, want)
-      .then(() => corpusFrontmatter(noteId))
-      .then(
-        (fm) => setAiEdit(fm?.aiBodyEdit ?? null),
-        (error: unknown) => setAiEditErr(error instanceof Error ? error.message : String(error)),
-      );
+      .then(invalidateNotes)
+      .catch((error: unknown) => setAiEditErr(error instanceof Error ? error.message : String(error)))
+      .finally(() => setWriting(false));
   };
 
   return (
@@ -189,7 +186,7 @@ export function AaPanel({
               type="button"
               className={secure === false ? "aaseg sel" : "aaseg"}
               aria-pressed={secure === false}
-              disabled={secure === null}
+              disabled={secure === null || writing}
               onClick={() => pickSecure(false)}
             >
               Off
@@ -198,7 +195,7 @@ export function AaPanel({
               type="button"
               className={secure === true ? "aaseg sel" : "aaseg"}
               aria-pressed={secure === true}
-              disabled={secure === null}
+              disabled={secure === null || writing}
               onClick={() => pickSecure(true)}
             >
               Secure
@@ -213,7 +210,7 @@ export function AaPanel({
               type="button"
               className={aiEdit !== null && !aiMayEdit ? "aaseg sel" : "aaseg"}
               aria-pressed={aiEdit !== null && !aiMayEdit}
-              disabled={aiEdit === null || aiEdit === "locked"}
+              disabled={aiEdit === null || aiEdit === "locked" || writing}
               onClick={() => pickAiEdit(false)}
             >
               Off
@@ -222,7 +219,7 @@ export function AaPanel({
               type="button"
               className={aiMayEdit ? "aaseg sel" : "aaseg"}
               aria-pressed={aiMayEdit}
-              disabled={aiEdit === null || aiEdit === "locked"}
+              disabled={aiEdit === null || aiEdit === "locked" || writing}
               onClick={() => pickAiEdit(true)}
             >
               Allowed

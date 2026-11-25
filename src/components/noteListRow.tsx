@@ -11,6 +11,7 @@ import { isChatsPath } from "../services/destinations";
 import type { NoteSummary } from "../types";
 import { ChatGlyph, PinGlyph } from "./glyphs";
 import { glyphForNote } from "./noteGlyph";
+import { SecureMark, isMarkedSecure } from "./secureMark";
 
 // memo: list surfaces render hundreds of rows and re-render per search
 // keystroke / corpus invalidation — with stable summaries and callbacks the
@@ -66,6 +67,7 @@ function NoteListRowImpl({
           glyphForNote(note, { size: 14, className: "rr-icon" })
         )}
         <span className="rr-title">{note.title || (board ? "Untitled board" : "Empty note")}</span>
+        {isMarkedSecure(note) && <SecureMark className="rr-secure" />}
         {snippetNode ? (
           <span className="rr-snippet">{snippetNode}</span>
         ) : (
