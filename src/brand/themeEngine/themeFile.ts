@@ -191,8 +191,14 @@ export function serializeThemeFile(theme: CustomTheme, previous: ThemeFileRead |
     if (half) seeds[mode] = half;
   }
   out.seeds = seeds;
-  const pretty = `${JSON.stringify(out, null, 2)}\n`;
+  return fitThemeText(out);
+}
+
+/** A theme object as file text that reads back: pretty-printed when that fits
+ * under the cap, compact when only that fits, otherwise null. */
+export function fitThemeText(value: Record<string, unknown>): string | null {
+  const pretty = `${JSON.stringify(value, null, 2)}\n`;
   if (byteLength(pretty) <= MAX_THEME_FILE_BYTES) return pretty;
-  const compact = `${JSON.stringify(out)}\n`;
+  const compact = `${JSON.stringify(value)}\n`;
   return byteLength(compact) <= MAX_THEME_FILE_BYTES ? compact : null;
 }

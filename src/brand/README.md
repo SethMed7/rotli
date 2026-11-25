@@ -45,6 +45,15 @@ environments go through the same gate against `builtinBaseline.json`, which
 may only shrink (`check:design-system`). `contrastRatio` in
 `brevePdfThemes.ts` is the engine's `contrast`.
 
+`customThemeSheet.ts` is the one place a custom theme reaches the page: it
+writes the derived tokens, and each Primary-color choice re-solved on the
+custom page (`themeEngine/accents.ts`), as one sheet scoped to
+`:root[data-theme="custom-<mode>"][data-theme-id]`. That scope outranks the
+static Paper/Charcoal fallback and the static presets by specificity, so the
+sheet's position in the cascade never matters. Only `#rrggbb` and the
+engine's `rgba()` are emitted, one rule per line; `public/theme-boot.js`
+accepts the same grammar (`THEME_SHEET_LINE`) to repaint before first paint.
+
 ## Product boundary
 
 Components consume semantic roles composed in `src/styles/base.css` and

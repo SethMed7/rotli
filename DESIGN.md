@@ -29,6 +29,19 @@ it applies only if the gate passes. Today's built-in shortfalls are recorded in
 `builtinBaseline.json`, which may only shrink; the gate is never loosened to
 let a built-in through.
 
+Custom themes live in Settings → Appearance → My themes. A person imports a
+theme file (or, later, builds one), and Rotli applies it as `data-theme`
+`custom-light` or `custom-dark` with the theme's id beside it. The derived
+colours ride one runtime stylesheet in the existing semantic roles; Paper and
+Charcoal are the complete fallback underneath, so the attribute is always a
+whole environment. The theme's base family supplies scenery, the opening and
+ambient tracks, and is what Rotli shows when the file is gone, can't be read,
+or fails the gate (Appearance says which). Primary color presets and the
+Custom hue are re-solved on the custom page rather than painted as tuned for
+the built-ins. Under a custom theme the titlebar sun flips only that theme's
+day and night; custom themes don't join its cycle. Rotli says when it moved a
+colour to keep a theme readable, from what to what.
+
 Light, Dark, and System are a separate mode choice. System follows the OS within
 the selected family: macOS light uses that family's tuned light environment and
 macOS dark uses its tuned dark environment. It never owns a second mapping UI.

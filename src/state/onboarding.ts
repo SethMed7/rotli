@@ -13,6 +13,7 @@ import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { compareVersions } from "../lib/whatsNew";
+import { clearCustomTheme } from "../themes/composition";
 import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { FIRST_RUN_WINDOW, type OnboardingPhase } from "./onboardingPhase";
 import { useUiStore } from "./ui";
@@ -123,6 +124,8 @@ export async function resetAndReonboard(): Promise<void> {
   await setHideOnBlur(false).catch(() => {});
   await setDockVisible(true).catch(() => {});
 
+  // setup starts in Rotli Light: a custom theme is left for the family
+  clearCustomTheme();
   // theme + the General flags + the gate → defaults, in one store write
   useUiStore.setState({
     ...startingAppearance(),

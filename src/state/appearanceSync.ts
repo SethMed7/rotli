@@ -21,23 +21,33 @@ import { readDocumentPdfPalette } from "../brand/pdfPalette";
 import { useBindingsStore } from "../keys/bindings";
 import type { Surface } from "../keys/registry";
 import { breveWritePdfPalette, emitAppearance, isTauri, onAppearance } from "../lib/tauri";
+import { applyCustomThemeBroadcast, customThemeBroadcast } from "../themes/composition";
 import { applyAppearanceLookBroadcast, useAppearanceLook } from "./appearanceLook";
+import { useCustomTheme } from "./customTheme";
 import { useNoteStyleStore } from "./noteStyle";
 import { type AppearanceBroadcast, appearanceBroadcast, applyAppearanceBroadcast } from "./persist";
-import { useDataTheme } from "./theme";
+import { useDataTheme, useThemeSignature } from "./theme";
 import { useUiStore } from "./ui";
 
 const PDF_PALETTE_SETTLE_MS = 250;
+
+/** The broadcast also carries main's custom theme (themes/composition.ts):
+ * the selection and its paint revision. */
+type CustomThemePayload = AppearanceBroadcast & { customTheme?: string };
 
 /** Emit the current appearance once, then again whenever any of the three
  * stores changes it — but never twice for the same serialized payload (a
  * store write that touches nothing the payload carries stays silent).
  * Returns the unsubscribe. */
-export function startAppearanceBroadcast(emit: (payload: AppearanceBroadcast) => void): () => void {
+export function startAppearanceBroadcast(
+  emit: (payload: AppearanceBroadcast & { customTheme: string }) => void,
+): () => void {
   let last = "";
   const push = (): void => {
-    const payload = appearanceBroadcast();
-    const key = `${payload.app}\u0000${payload.noteStyles}`;
+    // a custom theme rides along as its selection and revision; the other
+    // windows read the file themselves
+    const payload = { ...appearanceBroadcast(), customTheme: customThemeBroadcast() };
+    const key = `${payload.app}\u0000${payload.noteStyles}\u0000${payload.customTheme}`;
     if (key === last) return;
     last = key;
     emit(payload);
@@ -48,6 +58,7 @@ export function startAppearanceBroadcast(emit: (payload: AppearanceBroadcast) =>
     useBindingsStore.subscribe(push),
     useNoteStyleStore.subscribe(push),
     useAppearanceLook.subscribe(push),
+    useCustomTheme.subscribe(push),
   ];
   return () => {
     for (const unsub of unsubs) unsub();
@@ -58,6 +69,8 @@ export function useAppearanceSync(surface: Surface): void {
   const accentColor = useUiStore((s) => s.accentColor);
   const accentHue = useUiStore((s) => s.accentHue);
   const dataTheme = useDataTheme();
+  // a custom theme replaced by another keeps data-theme; the revision moves
+  const themeSignature = useThemeSignature();
 
   useEffect(() => {
     if (surface !== "main" || !isTauri()) return;
@@ -66,9 +79,10 @@ export function useAppearanceSync(surface: Surface): void {
 
   useEffect(() => {
     if (surface === "main") return;
-    return onAppearance((payload) => {
+    return onAppearance((payload: CustomThemePayload) => {
       applyAppearanceBroadcast(payload);
       applyAppearanceLookBroadcast(payload.app);
+      void applyCustomThemeBroadcast(payload.customTheme);
     });
   }, [surface]);
 
@@ -79,5 +93,5 @@ export function useAppearanceSync(surface: Surface): void {
       if (palette) void breveWritePdfPalette(palette).catch(() => {});
     }, PDF_PALETTE_SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [surface, dataTheme, accentColor, accentHue]);
+  }, [surface, dataTheme, themeSignature, accentColor, accentHue]);
 }

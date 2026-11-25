@@ -194,7 +194,7 @@ for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.e
   }
 }
 
-const expectedDataThemes = Object.keys(themeSelectors);
+const expectedDataThemes = [...Object.keys(themeSelectors), ...Object.keys(customSelectors)];
 for (const theme of expectedDataThemes) {
   if (!themeState.includes(`"${theme}"`)) violations.push(`theme.ts: DataTheme omits ${theme}`);
 }
@@ -324,6 +324,7 @@ const customPropertyWriters = new Set([
   "src/editor/resultWidget.ts", // a result chip's validated label colour
   "src/editor/colorPicker.ts", // the label picker's validated swatch
   "src/components/chat/chatPromptNavigator.tsx", // the prompt menu's measured position, not a colour
+  "src/brand/customThemeSheet.ts", // a custom theme's one sheet: validated, engine-derived values only
 ]);
 const customPropertyWrite = /setProperty\(\s*["'`]--|adoptedStyleSheets|\.cssText\b|\.insertRule\(/;
 for (const file of walkSources(join(root, "src"))) {

@@ -2,7 +2,15 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { cssBlocks } from "./builtins";
-import { ACCENT_PRESETS, ACCENT_PRESET_NAMES, ALPHA, LABELS, LABEL_NAMES, QUOKKA_LINE } from "./policy";
+import {
+  ACCENT_PRESETS,
+  ACCENT_PRESET_NAMES,
+  ALPHA,
+  CUSTOM_HUE_ACCENT,
+  LABELS,
+  LABEL_NAMES,
+  QUOKKA_LINE,
+} from "./policy";
 
 // The engine measures what Rotli paints only if its fixed inputs are the
 // stylesheets' own values. Each mirror is read back from the CSS here.
@@ -66,4 +74,15 @@ test("the Primary-color presets are themes.css's, per scheme", () => {
 test("the chat buddy's automatic line is themes.css's, per scheme", () => {
   expect(declsFor(":root")["--quokka-line-auto"]).toBe(QUOKKA_LINE.light);
   expect(declsFor(':root[data-theme="charcoal"]')["--quokka-line-auto"]).toBe(QUOKKA_LINE.dark);
+});
+
+test("the Custom primary hue starts where themes.css's formula does", () => {
+  const light = declsFor(':root[data-theme$="-light"][data-accent="custom"]')["--accent"];
+  const dark = declsFor(':root[data-theme$="-dark"][data-accent="custom"]')["--accent"];
+  expect(light).toBe(
+    `oklch(${CUSTOM_HUE_ACCENT.light.l * 100}% ${CUSTOM_HUE_ACCENT.light.c} var(--accent-hue))`,
+  );
+  expect(dark).toBe(
+    `oklch(${CUSTOM_HUE_ACCENT.dark.l * 100}% ${CUSTOM_HUE_ACCENT.dark.c} var(--accent-hue))`,
+  );
 });

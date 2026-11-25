@@ -7,6 +7,7 @@ mod agent_bridge;
 mod agent_bridge_socket;
 mod ai_edit_policy;
 mod app_settings;
+mod theme_files;
 mod board;
 mod breve;
 mod chat;
@@ -2148,6 +2149,11 @@ pub fn run() {
             demo_mode,
             app_settings::app_settings_read,
             app_settings::app_settings_write,
+            theme_files::theme_files_list,
+            theme_files::theme_file_read,
+            theme_files::theme_file_write,
+            theme_files::theme_file_remove,
+            theme_files::theme_file_export,
             corpus::corpus_list,
             corpus::raw::corpus_list_root,
             folder_window::folder_window_add_as_vault,

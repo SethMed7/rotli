@@ -8,8 +8,11 @@ import { parseHidden } from "../lib/hideable";
 import { parsePinnedSites } from "../lib/pinnedSites";
 import { parseFronts } from "../lib/sidebarFronts";
 import { parseSidebarLook } from "../lib/sidebarLook";
+import { primeCustomThemeFromBoot } from "../themes/composition";
+import { parseCustomThemeSelection } from "../themes/model";
 import { useAmbient } from "./ambient";
 import { appearanceLookSnapshot, parseAppearanceLook, useAppearanceLook } from "./appearanceLook";
+import { savedCustomTheme, useCustomTheme } from "./customTheme";
 import { useFronts } from "./fronts";
 import { useGraphStore } from "./graph";
 import { parseHandToAiMode, useHandToAiMode } from "./handToAiMode";
@@ -36,6 +39,9 @@ export function hydrateAppExtras(appSettings: string): void {
   useHandToAiMode.setState({ mode: parseHandToAiMode(data.handToAiMode) });
   useAppearanceLook.setState(parseAppearanceLook(data));
   useGraphStore.setState({ librarianLinks: data.graphLibrarianLinks !== false });
+  const selection = parseCustomThemeSelection(data.customTheme);
+  useCustomTheme.setState({ selection });
+  primeCustomThemeFromBoot(selection);
 }
 
 /** The extras' keys, for the app settings file. */
@@ -51,6 +57,7 @@ export function appExtrasSnapshot(): {
   themeCyclePicks: unknown;
   outlineImages: unknown;
   graphLibrarianLinks: unknown;
+  customTheme: unknown;
 } {
   return {
     ambient: useAmbient.getState().prefs,
@@ -62,6 +69,7 @@ export function appExtrasSnapshot(): {
     handToAiMode: useHandToAiMode.getState().mode,
     ...appearanceLookSnapshot(),
     graphLibrarianLinks: useGraphStore.getState().librarianLinks,
+    customTheme: savedCustomTheme(),
   };
 }
 
@@ -79,6 +87,8 @@ export function subscribeAppExtras(save: () => void): () => void {
     usePinnedSites.subscribe((state, prev) => state.sites !== prev.sites && save()),
     // only the Librarian switch, not the session's scope
     useGraphStore.subscribe((state, prev) => state.librarianLinks !== prev.librarianLinks && save()),
+    // only which theme, not what was painted
+    useCustomTheme.subscribe((state, prev) => state.selection !== prev.selection && save()),
   ];
   return () => stops.forEach((stop) => stop());
 }

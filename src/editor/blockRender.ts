@@ -26,7 +26,7 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { isTauri } from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
-import { isDarkDataTheme } from "../state/theme";
+import { isDarkDataTheme, readThemeSignature } from "../state/theme";
 import { useUiStore } from "../state/ui";
 import { destroyChartBlocks, openChartForm, renderChartBlock } from "./chartBlock";
 import { takeChartEdit } from "./chartPending";
@@ -783,9 +783,11 @@ function openExpandOverlay(lang: StaticLangKey, code: string, anchor: HTMLElemen
 const bumpTheme = StateEffect.define<number>();
 let themeVersion = 0;
 
-/** The resolved-theme signature used to rebake diagram colors on a theme flip. */
+/** The resolved-theme signature used to rebake diagram colors on a theme flip:
+ * the theme and its revision, which changes when one custom theme replaces
+ * another under the same `data-theme`. */
 function themeSignature(): string {
-  return document.documentElement.dataset.theme ?? "";
+  return readThemeSignature();
 }
 
 // ——— decoration build (mirror livePreview's reveal-on-caret) ——————————
@@ -881,7 +883,7 @@ const themeWatcher = ViewPlugin.fromClass(
       });
       this.obs.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ["data-theme"],
+        attributeFilter: ["data-theme", "data-theme-rev"],
       });
     }
     destroy() {

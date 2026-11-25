@@ -12,6 +12,7 @@ import { hydrateWebVault } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
 import { rememberAppliedTheme } from "./state/theme";
+import { hydrateCustomTheme } from "./themes/composition";
 
 // Excalidraw otherwise fetches its fonts from a CDN (unpkg). For an offline
 // desktop app (Tauri, no network) point its asset path at the app origin so it
@@ -38,6 +39,9 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws
   rememberAppliedTheme(hasDurableCorpus()); // the next launch paints this theme first
+  // read this Mac's custom themes and paint the chosen one before first render;
+  // it never blocks the app: any failure leaves the base family
+  await hydrateCustomTheme().catch(() => {});
   holdLibrarianOffInPlace(); // a folder connected in place is never organized
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

@@ -263,6 +263,27 @@
       ]
     },
     {
+      "id": "custom-themes",
+      "status": "notice",
+      "reason": "Personal theme files live beside the Mac app's settings. On web an imported theme applies for the session and Appearance says it lasts until reload; its selection is not saved, so a reload starts on the family.",
+      "sources": [
+        "src/themes/composition.ts",
+        "src/components/settings/customThemeSettings.tsx",
+        "src/lib/themeFiles.ts"
+      ],
+      "tests": [
+        "src/themes/composition.test.ts",
+        "e2e/web/rotli-web-custom-themes.spec.ts"
+      ],
+      "commands": [
+        "theme_file_export",
+        "theme_file_read",
+        "theme_file_remove",
+        "theme_file_write",
+        "theme_files_list"
+      ]
+    },
+    {
       "id": "librarian",
       "status": "notice",
       "reason": "Settings names the Librarian as available in Rotli for Mac and withholds runtime controls. Its filer, journal, secure review, and generated indexes have no web worker.",

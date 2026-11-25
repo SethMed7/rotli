@@ -4,13 +4,12 @@
 // window syncs to the renderer. Split out of breveSurface.tsx (audit
 // 2026-09-02; the surface file's size is a ratchet).
 
-import { useMemo } from "react";
 import type { CSSProperties } from "react";
 
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
 import { readDocumentPdfPalette } from "../../brand/pdfPalette";
 import type { BrevePdfPalette, BrevePdfTheme, BrevePdfThemePreset } from "../../routines/breveTypes";
-import { useDataTheme } from "../../state/theme";
+import { useDataTheme, useThemeSignature } from "../../state/theme";
 
 const PDF_THEME_OPTIONS: Array<{
   value: BrevePdfThemePreset;
@@ -78,7 +77,10 @@ export function PdfThemeEditor({
   // theme switch made while this page is open: re-read the document's
   // palette for the applied theme.
   const dataTheme = useDataTheme();
-  const live = useMemo(() => readDocumentPdfPalette(dataTheme), [dataTheme]);
+  // one custom theme replacing another keeps data-theme; subscribing to the
+  // revision re-renders, and the palette is re-read on every render (cheap)
+  useThemeSignature();
+  const live = readDocumentPdfPalette(dataTheme);
   const palette = resolvedPdfPalette(theme, live);
   const validation = validateBrevePdfPalette(palette);
   const style = {

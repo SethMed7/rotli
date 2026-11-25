@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Custom themes.** Settings → Appearance → My themes takes a theme file
+  (Import theme…): a page color and an accent for day and for night, and
+  optionally an ink. Rotli works out every other color from those, checks
+  every pair it paints for contrast before the theme applies, and says when it
+  moved a color to keep it readable. A theme can be renamed, exported, and
+  deleted; Primary color and Monochrome syntax still work on top of it, and
+  the titlebar sun flips its day and night. Themes stay on this Mac, beside
+  its settings. If a theme's file goes missing or can't be read, Rotli shows
+  the theme's base family and says why.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

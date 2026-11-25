@@ -99,6 +99,7 @@ import { routeOpenRequest } from "./state/openRequest";
 import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyImageOutline, useAppearanceLook } from "./state/appearanceLook";
+import { useCustomTheme } from "./state/customTheme";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
@@ -453,7 +454,9 @@ export default function App() {
   const outlineImages = useAppearanceLook((s) => s.outlineImages);
   const surface = surfaceFromUrl();
 
-  useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
+  // a custom theme's revision re-applies too: its sheet is in place by then
+  const customThemeRev = useCustomTheme((s) => s.rev);
+  useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily, customThemeRev]);
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
   useEffect(() => applyImageOutline(outlineImages), [outlineImages]);
