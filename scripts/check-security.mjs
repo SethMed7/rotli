@@ -211,6 +211,10 @@ function checkAgentEgressTools() {
     // check, revision); nothing leaves the device
     "edit_document",
     "update_note",
+    // tag_note changes a note's tags metadata through corpus_change_tags_ai
+    // (Rust: read gate, lock, grant, revision) after host.ts's editGate;
+    // nothing leaves the device (2026-11-24)
+    "tag_note",
     "open_note",
     // ask_user puts a question with options in the chat; the person answers
     // there and nothing leaves the device (src/ai/nativeLoop.ts)

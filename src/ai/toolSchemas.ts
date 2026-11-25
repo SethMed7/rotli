@@ -64,6 +64,18 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
       "body",
     ]),
   },
+  tag_note: {
+    description:
+      "Add or remove tags on a note (its tags metadata; the text is untouched). A tag is letters, numbers, -, _ and / (no spaces). Rotli asks the person first when the note is theirs.",
+    inputSchema: object(
+      {
+        id: text("the note id"),
+        add: { type: "array", items: { type: "string" }, maxItems: 32, description: "tags to add" },
+        remove: { type: "array", items: { type: "string" }, maxItems: 32, description: "tags to remove" },
+      },
+      ["id"],
+    ),
+  },
   open_note: {
     description: "Open a note on the user's screen, in a tab.",
     inputSchema: object({ id: text("the note id") }, ["id"]),

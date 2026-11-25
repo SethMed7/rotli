@@ -59,8 +59,7 @@ pub struct TagCount {
 pub(crate) enum AiTagger {
     /// Chat: `local` is the model's locality; `consented` is the person's
     /// "Allow once" for this edit, which never covers a lock or a deliberate
-    /// `ai_edit: false`. Its caller, chat's tag tool, is the next change.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// `ai_edit: false`.
     Chat { local: bool, consented: bool },
     /// The CLI, MCP, and relay: always remote.
     Agent,
@@ -281,6 +280,29 @@ pub fn corpus_change_tags(
     let change = TagChange { add, remove };
     state
         .route(&root, |s| s.change_tags_as_person(&rel, &change, expected_revision.as_deref()))
+        .map(|tags| NoteTags { id, ..tags })
+}
+
+/// A chat model's tag change: the AI write lane's gates, in Rust, whatever
+/// the host already refused (see `corpus_write_ai`).
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn corpus_change_tags_ai(
+    state: tauri::State<'_, super::CorpusState>,
+    id: String,
+    add: Vec<String>,
+    remove: Vec<String>,
+    model_id: String,
+    endpoint: String,
+    expected_revision: String,
+    consented: Option<bool>,
+) -> Result<NoteTags, String> {
+    let local = crate::chat::model_is_local(&model_id, &endpoint);
+    let (root, rel) = super::split_root_id(&id);
+    let change = TagChange { add, remove };
+    let tagger = AiTagger::Chat { local, consented: consented == Some(true) };
+    state
+        .route(&root, |s| s.change_tags_for_ai(&rel, &change, tagger, &expected_revision))
         .map(|tags| NoteTags { id, ..tags })
 }
 

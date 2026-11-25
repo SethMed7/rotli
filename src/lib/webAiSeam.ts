@@ -36,6 +36,12 @@ export interface WebAiCorpusShape<Meta, Hit, Read, Frontmatter, Written> {
   frontmatter(id: string): Promise<Frontmatter | null>;
   /** An AI body write, gated like Rust's corpus_write_ai (2026-09-29). */
   write(id: string, body: string, expectedRevision: string): Promise<Written>;
+  /** An AI tag change, gated like Rust's corpus_change_tags_ai (2026-11-24). */
+  changeTags(
+    id: string,
+    change: { add?: readonly string[]; remove?: readonly string[] },
+    expectedRevision: string,
+  ): Promise<{ id: string; tags: string[]; revision: string }>;
 }
 type AnyWebAiCorpus = WebAiCorpusShape<unknown, unknown, unknown, unknown, unknown>;
 let webAiCorpus: AnyWebAiCorpus | null = null;

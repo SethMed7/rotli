@@ -711,9 +711,12 @@ The Rust corpus boundary independently validates every write.
     true`; chat may ask "Allow once", which never covers a lock or an
     explicit `ai_edit: false`), the laundering rule on the tag text, and a
     fresh revision, all under the note's file lock
-    (`CorpusStore::change_tags_for_ai`, `corpus_change_tags_ai`). Metadata
-    is not exempt from the grant: the owner's default, 2026-11-24. An AI
-    tag write is not journaled in `.rotli/ai-edit-journal.jsonl` (that
+    (`CorpusStore::change_tags_for_ai`, `corpus_change_tags_ai`; Rotli Web's
+    twin is the web AI corpus's `changeTags`). Chat's `tag_note` first runs
+    `update_note`'s host gate (`src/ai/hostEditGate.ts`: read gate, "Allow
+    once" on a person's note, the secure-context rule), on every provider.
+    Metadata is not exempt from the grant: the owner's default, 2026-11-24.
+    An AI tag write is not journaled in `.rotli/ai-edit-journal.jsonl` (that
     journal holds body edits and their undo); the person sees and changes
     tags in the note's header.
 

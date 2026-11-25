@@ -59,6 +59,10 @@ export const CONSTRUCTOR_USERS = {
     uses: ["externalText", "modelText"],
     why: "web results, error and status lines; ids and titles a model chose",
   },
+  "src/ai/hostEditGate.ts": {
+    uses: ["externalText"],
+    why: "the refusal lines Rotli and the edit gate give a model",
+  },
   "src/ai/hostFiles.ts": {
     uses: ["externalText", "modelText", "reshapeAsync"],
     why: "refusal lines; the model's own query; decodes approved file bytes",

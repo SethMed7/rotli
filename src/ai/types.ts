@@ -18,6 +18,7 @@ export type ToolName =
   | "create_document"
   | "edit_document"
   | "update_note"
+  | "tag_note"
   | "open_note"
   | "search_memory"
   | "read_memory"
@@ -119,6 +120,10 @@ export interface Host {
    * secure-context chat may only edit notes that are themselves secure.
    * Optional so headless/portable hosts can stay read-only. */
   updateNote?(id: string, body: string): Promise<PromptText>;
+  /** Add or remove tags on a note (its shared `tags:` metadata; the text is
+   * untouched). Gated exactly like updateNote: read gate, lock, the person's
+   * grant, the secure-context rule. Optional, like every write. */
+  tagNote?(id: string, add: string[], remove: string[]): Promise<PromptText>;
   /** Open a note on screen (a tab in the app). Optional — headless hosts skip it. */
   openNote?(id: string): Promise<PromptText>;
   /** Master retrieval across organized notes and prior chats. Optional so a

@@ -190,7 +190,8 @@
         "corpus_read_ai",
         "corpus_readable_ids",
         "corpus_search_ai",
-        "corpus_write_ai"
+        "corpus_write_ai",
+        "corpus_change_tags_ai"
       ]
     },
     {

@@ -238,6 +238,7 @@ TOOLS — to use one, reply with a SINGLE JSON object:
 - {"thought":"…","tool":"read_note","args":{"id":"…"}}        → read one note's full text by id
 - {"thought":"…","tool":"create_note","args":{"title":"…","body":"…markdown…"}} → create a NEW note in the user's memex (it lands in their intake; the organizer files it)
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} → REWRITE an existing note. read_note it first, then send the FULL new body — it replaces everything (never send a fragment)
+- {"thought":"…","tool":"tag_note","args":{"id":"…","add":["…"],"remove":["…"]}} → add or remove a note's tags (letters, numbers, -, _ and /; no spaces); the text is untouched
 - {"thought":"…","tool":"open_note","args":{"id":"…"}}        → open a note on the user's screen, in a tab
 ${hasFileTool ? '- {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} → read a file by name (text; an .xlsx as A1-addressed cells with formulas; a Word document as numbered blocks)' : ""}
 ${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
@@ -389,6 +390,7 @@ Tools:
 - {"tool":"read_note","args":{"id":"…"}} — read one note by id
 - {"tool":"create_note","args":{"title":"…","body":"…markdown…"}} — create a NEW note in the user's memex (lands in their intake)
 - {"tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
+- {"tool":"tag_note","args":{"id":"…","add":["…"],"remove":["…"]}} — add or remove a note's tags (letters, numbers, -, _ and /; no spaces); the text is untouched
 - {"tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
 ${hasFileTool ? '- {"tool":"read_file","args":{"query":"report.csv"}} — read a file by name (an .xlsx arrives as A1-addressed cells with formulas, a Word document as numbered blocks)' : ""}${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
 To answer the user: {"final":"your answer"} — the final text ${FRONTIER_ANSWER_STYLE}.

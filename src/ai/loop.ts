@@ -42,6 +42,7 @@ const NOTE_TOOLS: ToolName[] = [
   "read_note",
   "create_note",
   "update_note",
+  "tag_note",
   "open_note",
 ];
 const FILE_TOOLS: ToolName[] = ["read_file"];

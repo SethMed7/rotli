@@ -2192,6 +2192,7 @@ pub fn run() {
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,
             corpus::tags::corpus_change_tags,
+            corpus::tags::corpus_change_tags_ai,
             corpus::tags::corpus_list_tags,
             corpus::corpus_file_note,
             corpus::corpus_filer_move,

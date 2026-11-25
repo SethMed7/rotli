@@ -40,6 +40,19 @@ function argText(value: unknown): string {
   return "";
 }
 
+/** A model's tags to add: an array of words, or one string of words split
+ * on spaces and commas. Each is still an untrusted value the lane validates. */
+function argWords(value: unknown): string[] {
+  return argValues(value).flatMap((item) => item.split(/[\s,]+/u).filter(Boolean));
+}
+
+/** A model's tags to remove, each kept whole: a tag already on disk may hold
+ * a space (a Librarian tag), and removal matches it as written. */
+function argValues(value: unknown): string[] {
+  const items = Array.isArray(value) ? value : [value];
+  return items.flatMap((item) => (typeof item === "string" && item.trim() ? [item.trim()] : []));
+}
+
 /** Strip a LEADING frontmatter fence from a model-authored note body. The
  * model reads notes as full file text (fences included), so a faithful
  * rewrite often echoes the metadata back — but the write lane (corpus_write)
@@ -248,6 +261,8 @@ export function statusFor(tool: ToolName, args?: Record<string, unknown>): strin
       return "editing the Word document…";
     case "update_note":
       return "updating the note…";
+    case "tag_note":
+      return "tagging the note…";
     case "open_note":
       return "opening the note…";
     case "read_memory":
@@ -455,6 +470,15 @@ export async function runTool(
       }
       if (!host.updateNote) return fixed("error: this host cannot edit notes.");
       return host.updateNote(id, body);
+    }
+    case "tag_note": {
+      const id = argText(args.id).trim();
+      const add = argWords(args.add);
+      const remove = argValues(args.remove);
+      if (id === "" || add.length + remove.length === 0)
+        return fixed('error: tag_note needs an "id" and tags to "add" and/or "remove" (lists of words).');
+      if (!host.tagNote) return fixed("error: this host cannot tag notes.");
+      return host.tagNote(id, add, remove);
     }
     case "open_note": {
       const id = argText(args.id).trim();

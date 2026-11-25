@@ -6,6 +6,8 @@
 import { afterAll, mock } from "bun:test";
 
 import type { AiBodyEdit } from "../lib/aiEditPolicy";
+import * as realCorpusTags from "../lib/corpusTags";
+import type { NoteTagChange } from "../lib/corpusTags";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import { inSecureHome } from "../security/secureNotes";
@@ -60,6 +62,7 @@ export interface Row {
 }
 
 export const writes: { id: string; body: string; modelId: string; consented?: boolean }[] = [];
+export const tagWrites: { id: string; change: NoteTagChange; modelId: string; consented?: boolean }[] = [];
 export const webRequests: Array<{
   provider: WebSearchProvider;
   query: string;
@@ -215,6 +218,27 @@ void mock.module("../lib/tauri", () => ({
   },
 }));
 
+// the AI tag lane (corpus_change_tags_ai), with the Rust lane's own refusals
+void mock.module("../lib/corpusTags", () => ({
+  ...realCorpusTags,
+  corpusChangeTagsAi: async (
+    id: string,
+    change: NoteTagChange,
+    model: ChatModelInfo,
+    _revision: string,
+    consented = false,
+  ) => {
+    const row = fake.rows.find((r) => r.id === id);
+    if (!row) throw new Error(`unknown note: ${id}`);
+    if (!readable(row, model))
+      throw new Error("This note is secure and can never be sent to a remote model.");
+    if (row.locked) throw new Error("This note is locked — no AI may change its tags.");
+    tagWrites.push({ id, change, modelId: model.id, ...(consented ? { consented } : {}) });
+    return { id, tags: change.add ?? [], revision: `test:${id}:tagged` };
+  },
+}));
+
 afterAll(() => {
   void mock.module("../lib/tauri", () => realTauri);
+  void mock.module("../lib/corpusTags", () => realCorpusTags);
 });

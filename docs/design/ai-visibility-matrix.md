@@ -301,7 +301,8 @@ it never washes out.**
 2. `create_note` from a tainted chat produces a note stamped `secure: true`.
 3. `update_note` from a tainted chat may edit ONLY notes that are themselves
    secure. Editing an open note is refused with an explanation, and the model is
-   told to use `create_note` instead.
+   told to use `create_note` instead. `tag_note` (2026-11-24) runs the same
+   gate before the AI tag lane: a tainted chat tags only secure notes.
 4. The per-turn chat-memory note: a **tainted loose chat writes no memory note
    at all**; a chat attached to a secure note keeps syncing into that (secure)
    note.
