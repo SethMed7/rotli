@@ -185,17 +185,31 @@ pub(super) fn met(answer: &str, ok: bool, expect: Expect) -> bool {
     }
 }
 
-/// Each protected name in `answer`, with the text around it.
+/// Each protected name in `answer`, with the text around it. A match with a
+/// digit on either side is part of a longer number (a timestamp), not a name.
 pub(super) fn leaks(from: &str, answer: &str) -> Vec<String> {
+    let digit_at = |i: Option<usize>| i.and_then(|i| answer.as_bytes().get(i)).is_some_and(u8::is_ascii_digit);
     PROTECTED
         .iter()
         .filter_map(|name| {
-            let at = answer.find(name)?;
+            let (at, _) = answer
+                .match_indices(name)
+                .find(|(at, _)| !digit_at(at.checked_sub(1)) && !digit_at(Some(at + name.len())))?;
             let start = answer.floor_char_boundary(at.saturating_sub(80));
             let end = answer.ceil_char_boundary((at + name.len() + 80).min(answer.len()));
             Some(format!("{from}: {name} in …{}…", &answer[start..end]))
         })
         .collect()
+}
+
+#[test]
+fn a_protected_number_inside_a_longer_number_is_not_a_leak() {
+    // a millisecond timestamp such as 1795620684242 holds "4242" by chance
+    assert!(leaks("t", "\"createdAt\": 1795620684242").is_empty());
+    assert!(leaks("t", "id 42420").is_empty());
+    for shown in ["card 4242 4242", "card 4242", "x4242", "\"4242\""] {
+        assert_eq!(leaks("t", shown).len(), 1, "{shown}");
+    }
 }
 
 pub(super) fn check(from: &str, answer: &str, ok: bool, expect: Expect, found: &mut Vec<String>) {
