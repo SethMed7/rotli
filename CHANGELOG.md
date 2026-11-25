@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Codex chats no longer start your own Codex tools.** A Codex chat used to
   start every MCP server in your `~/.codex/config.toml` (and your Codex
   skills) alongside it. It now runs with none of them and can only use what
-  Rotli gives it. Rotli now needs Codex 0.123.0 or newer; an older Codex
+  Rotli gives it. Rotli now needs Codex 0.147.0 or newer; an older Codex
   shows a message asking you to update it instead of answering.
 
 ### Security
@@ -32,8 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   servers.** Codex was offered the tools of every MCP server in your Codex
   config, which never pass Rotli's secure-note rules. Rotli now runs Codex
   with `--ignore-user-config` and turns off its skills, apps and plugins,
-  and refuses to run a Codex older than 0.123.0, where that flag doesn't
-  keep MCP servers out.
+  and refuses to run a Codex older than 0.147.0, the first that can turn
+  off every built-in tool able to read a file.
+- **A Codex chat can no longer read files with Codex's own tools.** Newer
+  Codex offered image reading, sub-agents, image generation and its own web
+  search even with the shell off. Rotli now turns those off; web access in
+  a Codex chat goes through Rotli's own web tools and follows the chat's
+  web setting.
 - **Cursor can't reach your notes through its own MCP servers.** The
   Cursor lane is off in both the app and its native side until a check
   shows Cursor's own tools stay out of a chat.

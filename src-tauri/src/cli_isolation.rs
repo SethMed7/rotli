@@ -11,19 +11,29 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-/// The oldest Codex whose `--ignore-user-config` actually keeps
-/// `config.toml` MCP servers out. 0.121.0 rejects the flag; 0.122.0 accepts
-/// it and still starts them (probed 2026-11-24 with a throwaway `CODEX_HOME`).
-pub(crate) const CODEX_MIN_VERSION: (u32, u32, u32) = (0, 123, 0);
+/// The oldest Codex that can run with nothing of the user's and no way to read
+/// a file. 0.121.0 rejects `--ignore-user-config`; 0.122.0 accepts it and
+/// still starts `config.toml` MCP servers; up to 0.146.x `view_image` (which
+/// reads any image file the user can) can't be turned off and
+/// `agents.enabled` is a config error. Probed 2026-11-24 with
+/// scripts/probe-codex-isolation.sh on 0.121.0–0.172.0.
+pub(crate) const CODEX_MIN_VERSION: (u32, u32, u32) = (0, 147, 0);
 
 /// `codex exec` arguments that drop everything the user's Codex setup would
-/// add. `--ignore-user-config` skips `$CODEX_HOME/config.toml` (its MCP
-/// servers, profiles and providers) while auth still comes from
-/// `CODEX_HOME`. The `-c` keys turn off what that flag leaves on: the skills
-/// catalog, a planted `AGENTS.md` in the scratch dir, ChatGPT apps, plugins
-/// and remote plugins. Each was checked on 0.123.0, 0.137.0, 0.169.0 and
-/// 0.172.0. System (`/etc/codex/config.toml`) and managed config layers still
-/// load; the threat model records that.
+/// add, and every built-in tool that reads files or leaves the turn.
+/// `--ignore-user-config` skips `$CODEX_HOME/config.toml` (its MCP servers,
+/// profiles and providers) while auth still comes from `CODEX_HOME`. The `-c`
+/// keys turn off the skills catalog, a planted `AGENTS.md` in the scratch dir,
+/// ChatGPT apps, plugins and remote plugins, sub-agents, `view_image`, image
+/// generation, goals, sleep and Codex's own web search.
+///
+/// What stays (scripts/probe-codex-isolation.sh shows it on 0.147.0 and
+/// 0.172.0): code-mode `exec`, a JavaScript isolate with no file system,
+/// network, `require` or `fetch`; `apply_patch`, refused by the read-only
+/// sandbox, though its "lines not found" error confirms or denies a guessed
+/// line in a file; `update_plan`, `request_user_input`, the clock, and the MCP
+/// resource tools with no server to ask. System (`/etc/codex/config.toml`) and
+/// managed config layers still load; the threat model records both.
 pub(crate) const CODEX_ISOLATION_ARGS: &[&str] = &[
     "--ignore-user-config",
     "-c",
@@ -36,6 +46,22 @@ pub(crate) const CODEX_ISOLATION_ARGS: &[&str] = &[
     "features.plugins=false",
     "-c",
     "features.remote_plugin=false",
+    "-c",
+    "agents.enabled=false",
+    "-c",
+    "features.multi_agent=false",
+    "-c",
+    "features.multi_agent_v2=false",
+    "-c",
+    "features.view_image=false",
+    "-c",
+    "features.image_generation=false",
+    "-c",
+    "features.goals=false",
+    "-c",
+    "features.sleep_tool=false",
+    "-c",
+    "web_search=\"disabled\"",
 ];
 
 pub(crate) fn codex_version_message() -> String {
@@ -162,10 +188,11 @@ pub(crate) fn apply_claude_env(cmd: &mut std::process::Command) {
 /// Banners the lane tests share (here and in provider_lane.rs).
 #[cfg(test)]
 pub(crate) mod test_banners {
-    /// The last Codex that accepts the flag and still starts MCP servers.
-    pub(crate) const BELOW_FLOOR: &str = "codex-cli 0.122.0";
+    /// The last Codex that can't turn `view_image` off (it reads any image
+    /// file the user can) and errors on `agents.enabled`.
+    pub(crate) const BELOW_FLOOR: &str = "codex-cli 0.146.1";
     /// What every refusal names.
-    pub(crate) const FLOOR: &str = "0.123.0";
+    pub(crate) const FLOOR: &str = "0.147.0";
 }
 
 #[cfg(test)]
@@ -193,11 +220,12 @@ mod tests {
 
     #[test]
     fn the_codex_lane_refuses_a_version_that_would_load_user_config() {
-        assert!(codex_version_gate(Some("codex-cli 0.123.0")).is_ok());
-        assert!(codex_version_gate(Some("codex-cli 0.169.0")).is_ok());
+        assert!(codex_version_gate(Some("codex-cli 0.147.0")).is_ok());
+        assert!(codex_version_gate(Some("codex-cli 0.172.0")).is_ok());
         assert!(codex_version_gate(Some("codex-cli 1.0.0")).is_ok());
-        // 0.122.0 takes the flag and still starts config.toml MCP servers
-        for old in [BELOW_FLOOR, "codex-cli 0.121.0", "codex-cli 0.99.9"] {
+        // 0.122.0 takes --ignore-user-config and still starts config.toml MCP
+        // servers; up to 0.146.x `view_image` and the agent tools can't be off
+        for old in [BELOW_FLOOR, "codex-cli 0.123.0", "codex-cli 0.122.0", "codex-cli 0.99.9"] {
             let refusal = codex_version_gate(Some(old)).unwrap_err();
             assert!(refusal.contains(FLOOR), "names the minimum: {refusal}");
         }
@@ -206,8 +234,8 @@ mod tests {
         assert!(codex_version_gate(Some("codex dev build")).is_err());
         assert!(codex_version_gate(Some("wrapper 9.9.9 codex-cli 0.122.0")).is_err());
         // a pre-release of the floor may predate the fix; one past it is fine
-        assert!(codex_version_gate(Some("codex-cli 0.123.0-alpha.1")).is_err());
-        assert!(codex_version_gate(Some("codex-cli 0.124.0-alpha.1")).is_ok());
+        assert!(codex_version_gate(Some("codex-cli 0.147.0-alpha.1")).is_err());
+        assert!(codex_version_gate(Some("codex-cli 0.148.0-alpha.1")).is_ok());
     }
 
     #[cfg(unix)]
@@ -242,10 +270,39 @@ mod tests {
             "features.apps=false",
             "features.plugins=false",
             "features.remote_plugin=false",
+            // what code mode and the classic tool list still offered on
+            // 0.172.0 (probed with a fake model): sub-agents, image reads,
+            // image generation, goals, sleep and Codex's own web search
+            "agents.enabled=false",
+            "features.multi_agent=false",
+            "features.multi_agent_v2=false",
+            "features.view_image=false",
+            "features.image_generation=false",
+            "features.goals=false",
+            "features.sleep_tool=false",
+            "web_search=\"disabled\"",
         ] {
             let at = args.iter().position(|a| *a == key).unwrap_or_else(|| panic!("missing {key}"));
             assert_eq!(args[at - 1], "-c");
         }
+    }
+
+    /// The probe script runs Codex with the lane's own flags, so a flag added
+    /// here and not there would go unproven.
+    #[test]
+    fn the_probe_script_runs_codex_with_exactly_these_flags() {
+        let script = include_str!("../../scripts/probe-codex-isolation.sh");
+        let block = script
+            .split("ISOLATION=(\n")
+            .nth(1)
+            .and_then(|rest| rest.split("\n)").next())
+            .expect("the script has an ISOLATION=( … ) block");
+        let probed: Vec<String> = block
+            .split_whitespace()
+            .map(|word| word.trim_matches('\'').to_string())
+            .collect();
+        let lane: Vec<String> = CODEX_ISOLATION_ARGS.iter().map(|arg| arg.to_string()).collect();
+        assert_eq!(probed, lane);
     }
 
     #[test]
