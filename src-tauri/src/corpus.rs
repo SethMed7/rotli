@@ -5293,11 +5293,20 @@ impl CorpusStore {
     /// keys, so the territories stay disjoint. Gated by `filer_writable`. Takes a
     /// wire id OR a rel path (resolve_note_rel). pub(crate): the organizer daemon
     /// writes through this same gate — no second write primitive.
-    pub(crate) fn set_ai_field(
+    pub(crate) fn set_ai_field(&mut self, id_or_rel: &str, key: &str, value: &str) -> Result<(), String> {
+        self.set_ai_field_if(id_or_rel, key, value, None)
+    }
+
+    /// `set_ai_field`, and with `expected` only while the field still holds
+    /// that value (checked under the note's lock, read as the journal reads it:
+    /// the first `key:` line, trimmed; "" when unset). An undo of a shared
+    /// field (`tags`) uses it so it never overwrites the person's later edit.
+    pub(crate) fn set_ai_field_if(
         &mut self,
         id_or_rel: &str,
         key: &str,
         value: &str,
+        expected: Option<&str>,
     ) -> Result<(), String> {
         self.brain_gate()?;
         let key = key.trim();
@@ -5312,6 +5321,18 @@ impl CorpusStore {
             let text = crate::fsutil::read_own_text(&path).map_err(|e| e.to_string())?;
             let (fm, body) = parse_document(&text);
             let mut fm = fm.unwrap_or_default();
+            if let Some(expected) = expected {
+                let now = fm.foreign.iter().find_map(|l| {
+                    let (k, v) = l.split_once(':')?;
+                    (k.trim() == key).then(|| v.trim())
+                });
+                if now.unwrap_or("") != expected.trim() {
+                    return Err(format!("`{key}` changed since; nothing was written"));
+                }
+            }
+            if key == "tags" {
+                crate::note_tags::whole_value_replaceable(&fm.foreign)?;
+            }
             fm.foreign.retain(|l| !crate::note_protection::top_level(l) || field_key(l) != Some(key));
             let value = value.trim();
             if !value.is_empty() {
@@ -8017,9 +8038,11 @@ pub fn corpus_set_ai_field(
     id: String,
     key: String,
     value: String,
+    // the value the field must still hold (an undo of a shared field)
+    expected: Option<String>,
 ) -> Result<(), String> {
     let (root, rel) = split_root_id(&id);
-    state.route(&root, |s| s.set_ai_field(&rel, &key, &value))
+    state.route(&root, |s| s.set_ai_field_if(&rel, &key, &value, expected.as_deref()))
 }
 
 /// FILER (v3.7): file a note into the brain per its `area` field (fs-atomic move).
@@ -8747,6 +8770,8 @@ mod gitignore;
 /// The one-time "move your Archive and Trash?" question in a copy.
 #[path = "corpus_person_sinks.rs"]
 pub mod person_sinks;
+#[path = "corpus_tags.rs"]
+pub mod tags;
 #[path = "corpus_raw.rs"]
 pub mod raw;
 pub(crate) use files::is_canvas_path;

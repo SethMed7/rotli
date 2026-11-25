@@ -22,6 +22,7 @@ import {
   setFolderPinned,
 } from "./folderMetadata";
 import type { FolderNotesService } from "./folderNotes";
+import { changeFolderTags, countTags, type NoteTagChange } from "./folderTags";
 import { type VaultDir, vaultHasRotliMarker } from "./vaultDir";
 
 let connectedDir: VaultDir | null = null;
@@ -94,6 +95,25 @@ export const webVaultIo = {
   writeMetadata: async (id: string, block: string, revision: string) =>
     writeFolderRawMetadata(directory(), await notePath(id), block, revision),
   setPinned: async (id: string, pinned: boolean) => setFolderPinned(directory(), await notePath(id), pinned),
+  changeTags: async (id: string, change: NoteTagChange, revision?: string) => ({
+    id,
+    ...(await changeFolderTags(directory(), await notePath(id), change, revision)),
+  }),
+  async listTags() {
+    const dir = directory();
+    const notes = notesService();
+    const rows: { id: string; fields: string[] }[] = [];
+    // All Notes' scope: no Archive, Trash, captures board, or chats
+    for (const note of await notes.listNotes()) {
+      const path = await notes.filePathOf(note.id);
+      if (!path.toLowerCase().endsWith(".md")) continue;
+      rows.push({
+        id: note.id,
+        fields: parseNoteDocument(await dir.readText(path)).frontmatter?.foreign ?? [],
+      });
+    }
+    return countTags(rows);
+  },
   async frontmatter(id: string): Promise<FrontmatterView | null> {
     const dir = directory();
     const path = await notePath(id);

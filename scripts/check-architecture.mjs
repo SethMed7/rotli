@@ -267,6 +267,7 @@ const tauriAllowlist = new Set([
   "src/lib/claudeSession.ts",
   "src/lib/clipboard.ts",
   "src/lib/noteProtection.ts",
+  "src/lib/corpusTags.ts",
   "src/lib/agentBridge.ts",
   "src/lib/aiFiles.ts",
   "src/lib/aiInsert.ts",

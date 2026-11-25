@@ -115,3 +115,17 @@ fn a_folder_opened_in_place_before_the_marker_keeps_its_files_where_they_are() {
     assert!(!store.layout.is_imported());
     assert!(store.move_file_to_sink("storage/rose.png", "Trash").is_err());
 }
+
+#[test]
+fn in_place_tagging_adds_only_the_tags_line() {
+    let dir = TempDir::new().unwrap();
+    let root = connected_in_place(&dir);
+    let mut store = CorpusStore::open(root.clone()).unwrap();
+    let id = id_at(&mut store, "Projects/My Plan.md");
+    let change = super::tags::TagChange { add: vec!["plans".into()], remove: Vec::new() };
+    store.change_tags_as_person(&id, &change, None).unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join("Projects/My Plan.md")).unwrap(),
+        "---\ntags: [plans]\n---\n# My Plan\n\nSteps.\n"
+    );
+}

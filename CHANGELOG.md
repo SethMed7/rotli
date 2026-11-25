@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tags are a first-class part of a note.** Agents can list the vault's
+  tags with counts (`rotli tags list`, MCP `rotli_list_tags`) and add or
+  remove a note's tags (`rotli tags add|remove`, MCP `rotli_tag_note`). An
+  agent tags only a note an AI made or one you let AI edit, never a locked
+  or secure note, and needs a fresh read, like a text edit; a tag that lives
+  only on secure notes is never listed or counted. Your own tag changes work
+  on every note, locked and secure ones included. Tags share the one `tags:`
+  field Obsidian and the Librarian use; a new tag is letters, numbers, `-`,
+  `_` and `/`, so it can never write other metadata.
+
+### Fixed
+
+- **Undoing a Librarian tag change keeps the tags you added since.** The
+  undo now refuses while the note's tags differ from what the Librarian
+  left, instead of putting the old list back over yours.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

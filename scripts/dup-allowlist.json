@@ -311,24 +311,14 @@
       "reason": "Not a mirror: the harness seeds one vault with every decoy the focused tests each seed one of (secure-home and keyword folders, a path-shaped id, a shelf, an origin, Main, a journal row, a locked linker), using the same fixture names on purpose so a failure in one points at the other. The differential harness (workspace_agent_differential_tests.rs and its CLI half) swaps the same decoys in as arguments, by the same names, and its two halves share its swap vocabulary."
     },
     {
-      "id": "agent-surface-harness-names-28665075ae",
-      "fingerprint": "28665075aeaebc386e35f39b97d7a14ddc2a87824be26223e057676a1050e010",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
-    },
-    {
-      "id": "agent-surface-harness-names-304fc30ab4",
-      "fingerprint": "304fc30ab4547fbbed1709ec32ecebd5867e10bd725bb3aec68982ad1fc5db21",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
-    },
-    {
-      "id": "agent-surface-harness-names-6b5d1f7946",
-      "fingerprint": "6b5d1f7946591969b1a134d00694561db4703c453559faf32045f4c3386902fe",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
-    },
-    {
-      "id": "agent-surface-harness-names-c610f44f66",
-      "fingerprint": "c610f44f66308ccd48e25743101d3b81577a19344e12c7ee9f4fdfc7aa663dad",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+      "id": "agent-surface-harness-names",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/workspace.rs",
+        "src-tauri/src/workspace_documents.rs",
+        "src-tauri/src/workspace_agent_surface_tests.rs"
+      ],
+      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point. Matched by files since 2026-11-24 (the tag tools): each new tool shifted these clusters' fingerprints, and the reason is the same for every tool the registry adds."
     },
     {
       "id": "source-guard-idiom-971eaf8aab",
@@ -341,14 +331,22 @@
       "reason": "Not a mirror: agent_lanes_compare_paths_only_through_protected_path is a source-scanning guard like no_cached_row_reaches_an_ai_row, every_note_lock_names_its_authority and no_librarian_entry_bypasses_the_gate; each reads its own files and asserts its own rule, and they share only the find-a-function-body idiom and its panic text."
     },
     {
-      "id": "agent-surface-harness-names-9d5268e189",
-      "fingerprint": "9d5268e189b513c04de819ee606b8b3d513d3ab93e61672a9789431b85c0f6dd",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+      "id": "note-tags-ts-rust-twins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/note_tags.rs",
+        "src/lib/noteTags.ts"
+      ],
+      "reason": "MIRROR-NOT-IMPORT: the tag allowlist and the tags-line editor run independently in Rust (the Mac's write gates) and TypeScript (Rotli Web's), as every security policy here does; parity.json noteTagCases and noteTagEditCases pin them to the same answers, so the shared refusal words are the contract, not copied logic."
     },
     {
-      "id": "agent-surface-harness-names-d14ff35066",
-      "fingerprint": "d14ff35066352f67ca40d42125f0f1a00e64e82360ce166a796078d54f6d003c",
-      "reason": "Not a mirror: the agent-surface harness must call every tool and command by the name the registry gives it (the MCP tool names and argument keys, the CLI words), so it necessarily spells what workspace.rs and workspace_documents.rs declare; a tool or command it doesn't name fails it, which is the point."
+      "id": "note-tag-lanes-ts-rust-twins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus_tags.rs",
+        "src/services/folderTags.ts"
+      ],
+      "reason": "MIRROR-NOT-IMPORT: the person's tag lane runs in Rust on the Mac and in TypeScript for Rotli Web's connected folder, as every write gate here does; the shared words are the same refusals a person reads on either shell, not copied logic."
     }
   ]
 }

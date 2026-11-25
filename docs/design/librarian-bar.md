@@ -21,7 +21,7 @@ Actions in slice 1:
 
 | Action | What it writes | Through |
 |---|---|---|
-| Tag | `tags` (Librarian-owned metadata), merged with what is there | `corpus_set_ai_field` |
+| Tag | `tags` (shared with the person since 2026-11-24), merged with what is there; refused when the tags are a block list | `corpus_set_ai_field` |
 | Mark this passage | a pointer in `anchors`: the exact words plus a little text before and after, and an optional short label | `corpus_set_ai_field` (new key) |
 | File the note | `area`, then the move into that Library area | `fileNoteToArea` |
 

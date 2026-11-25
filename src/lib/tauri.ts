@@ -1257,10 +1257,10 @@ export async function corpusWriteFrontmatterRaw(
 
 // ── the AI Filer (contract v3.7) — driven by the manual "file this note" for now ──
 
-/** Set an AI-owned field (area/summary/tags/…) via the Filer lane. */
-export async function corpusSetAiField(id: string, key: string, value: string): Promise<void> {
+/** Set an AI-owned field via the Filer lane; with `expected`, only while the field holds it. */
+export async function corpusSetAiField(id: string, key: string, value: string, expected?: string) {
   if (!isTauri()) return;
-  await invoke("corpus_set_ai_field", { id, key, value });
+  await invoke("corpus_set_ai_field", { id, key, value, expected: expected ?? null });
 }
 
 /** File a note into the brain per its `area` field. Returns the note's NEW rel

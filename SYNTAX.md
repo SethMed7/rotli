@@ -64,6 +64,13 @@ imports.
 - View names are trimmed, 1–64 characters, unique case-insensitively, and use
   letters, numbers, spaces, periods, underscores, or hyphens. `Main` is
   reserved for the global reference view.
+- Tags live in a note's top-level `tags:` frontmatter, written as a flow list
+  (`tags: [launch, projects/rotli]`); a block list already there stays a
+  block list. A tag is Unicode letters and numbers, `-`, `_`, and `/` (for
+  nesting), 1–40 characters, NFC; a typed leading `#` is dropped. It may not
+  start with `-` or `/`, end with `/`, contain `//`, or be a bare YAML word
+  (`yes`, `no`, `true`, `false`, `on`, `off`, `null`, `y`, `n`) or a number.
+  Tags match case-insensitively and keep the spelling first written.
 - Virtual folder names are one path component and cannot contain `/` or `:`.
   Render-only ids such as `main:<folder>` stay internal and are never written
   as user metadata.
