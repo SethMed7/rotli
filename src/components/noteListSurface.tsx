@@ -52,6 +52,9 @@ export function NoteListSurface({
   // All notes' tag filter: the vault's tags, and the one picked (if any)
   const vaultTags = useVaultTags(searchable).data;
   const [tag, setTag] = useState<string | null>(null);
+  // a picked tag that leaves the vault is unpicked, so it can't quietly turn
+  // the filter back on when a note carries it again
+  if (tag !== null && vaultTags && !vaultTags.some((entry) => entry.tag === tag)) setTag(null);
   const tagged = useMemo(() => {
     const picked = tag === null ? undefined : vaultTags?.find((entry) => entry.tag === tag);
     return picked ? new Set(picked.ids) : null;
@@ -145,7 +148,9 @@ export function NoteListSurface({
               ? SHOW_HOTKEYS
                 ? "Press ⌘T, or your Quick capture shortcut (⌥C), to start one."
                 : "Use the + in the tab strip to start one."
-              : "Try a different search."}
+              : tagged && !q
+                ? "Pick All to see every note."
+                : "Try a different search."}
           </p>
         </div>
       ) : (

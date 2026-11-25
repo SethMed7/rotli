@@ -531,7 +531,7 @@ export function EditorSurface({
         </div>
       </div>
       {/* the main editor only: the Quick window stays a bare capture */}
-      {!focusMode && !autoFocus && <NoteTagRow noteId={noteId} disabled={pending} />}
+      {!focusMode && !autoFocus && <NoteTagRow key={`tags:${noteId}`} noteId={noteId} disabled={pending} />}
       {aaOpen && <AaPanel noteId={noteId} anchorRef={aaChipRef} onClose={() => setAaOpen(false)} />}
       {saveError && (
         <div className="ed-saveerr" role="alert">

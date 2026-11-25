@@ -102,7 +102,7 @@ export function NoteTagRow({ noteId, disabled }: { noteId: string; disabled: boo
         <button
           type="button"
           className="ed-tag-add"
-          disabled={disabled}
+          disabled={disabled || busy}
           onClick={() => {
             settled.current = false;
             setError(null);

@@ -34,11 +34,12 @@ export function useVaultTags(enabled = true) {
   return useQuery({ queryKey: vaultTagsKey, queryFn: corpusListTags, enabled });
 }
 
-/** The person's tag change on one note, then every tag view refreshes. Throws
- * the refusal (a tag that can't be one, a shape Rotli won't rewrite). */
+/** The person's tag change on one note. Answers once the write lands (the
+ * note's own tags are set from it); every other view refreshes behind it.
+ * Throws the refusal (a tag that can't be one, a shape Rotli won't rewrite). */
 export async function changeNoteTags(noteId: string, change: NoteTagChange): Promise<NoteTagsResult> {
   const result = await corpusChangeTags(noteId, change);
   queryClient.setQueryData(noteTagsKey(noteId), result.tags);
-  await invalidateNotes();
+  void invalidateNotes();
   return result;
 }

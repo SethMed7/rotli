@@ -5,6 +5,12 @@
 
 import type { TagCount } from "../lib/corpusTags";
 
+/** The filter after a chip is clicked: the clicked tag, or none when it was
+ * the one already picked. */
+export function toggledTag(selected: string | null, clicked: string): string | null {
+  return selected === clicked ? null : clicked;
+}
+
 export function TagFilter({
   tags,
   selected,
@@ -32,7 +38,7 @@ export function TagFilter({
           className="tag-filter-chip"
           aria-pressed={selected === tag}
           aria-label={`#${tag}, ${count} ${count === 1 ? "note" : "notes"}`}
-          onClick={() => onSelect(selected === tag ? null : tag)}
+          onClick={() => onSelect(toggledTag(selected, tag))}
         >
           #{tag}
           <span className="tag-filter-count" aria-hidden="true">
