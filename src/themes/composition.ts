@@ -65,7 +65,7 @@ let customOnPage = false;
 
 /** Paint what the selection says: the custom theme's sheet and attributes,
  * or the base family with the reason. Always lands on a whole environment. */
-export function paintCustomTheme(): void {
+function paint(): void {
   const { selection, entries } = useCustomTheme.getState();
   const ui = useUiStore.getState();
   const plan = planApply(selection, entries, familyLabel(ui.themeFamily));
@@ -97,6 +97,32 @@ export function paintCustomTheme(): void {
     useCustomTheme.setState({ notice: plan.notice, moved: [], readOnly: false, rev: painted });
   }
   if (wasCustom || customOnPage) applyTheme(ui.theme, ui.themeFamily);
+}
+
+/** Paint what the selection says. Never throws: if painting a custom theme
+ * fails for any reason, the base family applies and Appearance says so. */
+export function paintCustomTheme(): void {
+  try {
+    paint();
+  } catch {
+    customOnPage = false;
+    setCustomThemeTarget(null);
+    try {
+      installCustomThemeSheet(null);
+    } catch {
+      // no sheet to remove
+    }
+    const ui = useUiStore.getState();
+    const name = useCustomTheme.getState().selection?.name ?? "This theme";
+    painted += 1;
+    useCustomTheme.setState({
+      notice: `Couldn't apply ${name}. Showing ${familyLabel(ui.themeFamily)}.`,
+      moved: [],
+      readOnly: false,
+      rev: painted,
+    });
+    applyTheme(ui.theme, ui.themeFamily);
+  }
 }
 
 async function refresh(): Promise<void> {

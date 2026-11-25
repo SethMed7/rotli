@@ -101,6 +101,12 @@ export function useThemeSignature(): string {
   return useSyncExternalStore(subscribeDataTheme, readThemeSignature, () => "light");
 }
 
+/** Dark-ness and the signature together, for a surface that bakes colours. */
+export function useThemeLook(): { dark: boolean; signature: string } {
+  const signature = useThemeSignature();
+  return { dark: isDarkDataTheme(signature.split("#")[0]), signature };
+}
+
 /** Whether the applied theme is a dark environment, live across every environment. */
 export function useIsDarkTheme(): boolean {
   return isDarkDataTheme(useDataTheme());

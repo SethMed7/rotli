@@ -39,7 +39,9 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   await syncFolderRoles(); // an imported vault's own folders, before anything lists it
   await hydratePersistedState(); // no-op in a plain browser; never throws
   rememberAppliedTheme(hasDurableCorpus()); // the next launch paints this theme first
-  await hydrateCustomTheme(); // read this Mac's custom themes; paint the chosen one before first render
+  // read this Mac's custom themes and paint the chosen one before first render;
+  // it never blocks the app: any failure leaves the base family
+  await hydrateCustomTheme().catch(() => {});
   holdLibrarianOffInPlace(); // a folder connected in place is never organized
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

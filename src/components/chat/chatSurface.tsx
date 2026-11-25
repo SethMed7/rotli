@@ -111,7 +111,7 @@ import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
 import { findLeaf, leaves, usePanesStore } from "../../state/panes";
-import { useIsDarkTheme } from "../../state/theme";
+import { useThemeLook } from "../../state/theme";
 import {
   type ChatReasoningEffort,
   type ChatServiceTier,
@@ -748,7 +748,7 @@ function ChatMermaid({ code }: { code: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const renderSeq = useRef(0);
-  const dark = useIsDarkTheme(); // re-renders the diagram when the theme flips
+  const { dark, signature } = useThemeLook(); // re-renders the diagram when the theme changes
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -767,7 +767,7 @@ function ChatMermaid({ code }: { code: string }) {
     return () => {
       host.replaceChildren();
     };
-  }, [code, dark]);
+  }, [code, dark, signature]);
   return failed ? (
     <pre className="cmsg-code">
       <code>{code}</code>

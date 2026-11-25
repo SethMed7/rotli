@@ -14,6 +14,8 @@ import {
   LAST_SYSTEM_PAIR_KEY,
   LAST_THEME_KEY,
   applyTheme,
+  isDarkDataTheme,
+  readThemeSignature,
   rememberAppliedTheme,
   setCustomThemeTarget,
 } from "./theme";
@@ -233,6 +235,24 @@ test("a theme that won't outlast a reload is painted but not remembered: the nex
     expect(html.dataset.theme).toBe("custom-light");
     expect(stored.get(LAST_THEME_KEY)).toBe("grove-light");
     expect(stored.has(CUSTOM_THEME_BOOT_KEY)).toBe(false);
+  } finally {
+    setCustomThemeTarget(null);
+  }
+});
+
+test("the theme signature moves when one custom theme replaces another under the same data-theme", () => {
+  const { html } = fakeDom();
+  html.dataset.theme = "ocean-dark";
+  expect(readThemeSignature()).toBe("ocean-dark");
+  setCustomThemeTarget({ id: "forest-paper", rev: 3, css: forestSheet(), remembered: false });
+  try {
+    applyTheme("dark", "grove");
+    expect(readThemeSignature()).toBe("custom-dark#3");
+    setCustomThemeTarget({ id: "neon", rev: 4, css: forestSheet(), remembered: false });
+    applyTheme("dark", "grove");
+    expect(readThemeSignature()).toBe("custom-dark#4");
+    expect(isDarkDataTheme("custom-dark")).toBe(true);
+    expect(isDarkDataTheme("custom-light")).toBe(false);
   } finally {
     setCustomThemeTarget(null);
   }

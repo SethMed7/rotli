@@ -5,7 +5,7 @@
 // 8-bit sRGB) and measured with the engine's own contrast function. Translucent
 // layers are composited over their surface first, as the gate does.
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { contrast } from "../src/brand/themeEngine/color";
 import { resolveSeeds } from "../src/brand/themeEngine/resolve";
@@ -57,6 +57,46 @@ async function painted(page: Page, roles: Record<string, string>): Promise<Recor
     probe.remove();
     return out;
   }, roles);
+}
+
+/** A real element as painted: its text colour over the background it actually
+ * sits on, walking up through any translucent ancestors and compositing them,
+ * flattened the same way. */
+async function paintedPair(locator: Locator): Promise<{ fg: string; bg: string }> {
+  return locator.evaluate((element) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    const alphaOf = (color: string): number => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 1, 1);
+      return ctx.getImageData(0, 0, 1, 1).data[3]! / 255;
+    };
+    const layers: string[] = [];
+    for (let node: Element | null = element; node; node = node.parentElement) {
+      const background = getComputedStyle(node).backgroundColor;
+      if (alphaOf(background) === 0) continue;
+      layers.unshift(background);
+      if (alphaOf(background) >= 0.999) break;
+    }
+    const flatten = (stack: string[]): string => {
+      ctx.clearRect(0, 0, 1, 1);
+      for (const layer of stack) {
+        ctx.fillStyle = layer;
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      const [r = 0, g = 0, b = 0] = ctx.getImageData(0, 0, 1, 1).data;
+      return `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+    };
+    return { bg: flatten(layers), fg: flatten([...layers, getComputedStyle(element).color]) };
+  });
+}
+
+async function expectPaintedReadable(locator: Locator, floor = 4.5): Promise<void> {
+  const { fg, bg } = await paintedPair(locator);
+  expect({ fg, bg, ratio: contrast(fg, bg) >= floor }).toEqual({ fg, bg, ratio: true });
 }
 
 const ROLES = {
@@ -112,6 +152,13 @@ test("an imported theme applies over the whole page, readable by day and at nigh
   expect(day.ground).toBe(forest.light.tokens["--ground"]);
   expect(day.text).toBe(forest.light.tokens["--text"]);
   expectReadable(day);
+  // and real elements, as painted: a settings button, a note's link, the
+  // sidebar's current front (a translucent wash over the sidebar)
+  await expectPaintedReadable(page.getByRole("button", { name: "Import theme…", exact: true }));
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+  await expectPaintedReadable(page.getByText("Pricing decision").first());
+  await expectPaintedReadable(page.getByRole("button", { name: "Home", exact: true }).first());
+  await appearance(page);
 
   await page.getByRole("radio", { name: "Dark" }).click();
   await expect(html).toHaveAttribute("data-theme", "custom-dark");

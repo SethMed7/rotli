@@ -5,6 +5,7 @@ import { FOREST_PAPER, NEON, themeText } from "../brand/themeEngine/themes.fixtu
 import { useAppearanceLook } from "../state/appearanceLook";
 import { appExtrasSnapshot } from "../state/appExtras";
 import { useCustomTheme } from "../state/customTheme";
+import { resetAndReonboard } from "../state/onboarding";
 import { THEME_FAMILIES_1_9_6 } from "../state/release196.fixtures";
 import { useUiStore } from "../state/ui";
 import {
@@ -186,4 +187,24 @@ test("a selected custom theme writes a family 1.9.6 knows, so 1.9.6 shows the ba
   const { base: _base, ...noBase } = FOREST_PAPER;
   await importCustomTheme(themeText({ ...noBase, id: "plain", base: "sunset" }));
   expect(useUiStore.getState().themeFamily).toBe("iris");
+});
+
+test("if painting a theme fails, the base family applies and Appearance says why", async () => {
+  const head = (g.document as { head: { appendChild: (node: unknown) => void } }).head;
+  head.appendChild = () => {
+    throw new Error("no sheet for you");
+  };
+  await importCustomTheme(themeText(FOREST_PAPER));
+  expect(useCustomTheme.getState().notice).toBe("Couldn't apply Forest Paper. Showing Grove.");
+  expect(dom.dataset.theme).toBe("grove-light");
+  expect(dom.dataset.themeId).toBeUndefined();
+});
+
+test("Reset & re-onboard leaves a custom theme, so setup starts in Rotli Light", async () => {
+  await importCustomTheme(themeText(FOREST_PAPER));
+  await resetAndReonboard();
+  expect(useCustomTheme.getState().selection).toBeNull();
+  expect(useUiStore.getState()).toMatchObject({ theme: "light", themeFamily: "warm" });
+  expect(dom.dataset.themeId).toBeUndefined();
+  expect(dom.styles).toEqual([]);
 });

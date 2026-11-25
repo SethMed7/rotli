@@ -5,6 +5,7 @@
 import { create } from "zustand";
 
 import type { SeedNote } from "../brand/themeEngine/derive";
+import { isTauri } from "../lib/tauri";
 import type { CustomThemeSelection, ThemeEntry } from "../themes/model";
 
 export interface CustomThemeState {
@@ -31,7 +32,8 @@ export const useCustomTheme = create<CustomThemeState>(() => ({
   moved: [],
   readOnly: false,
   rev: 0,
-  durable: false,
+  // known before any settings write, so a save can never drop the selection
+  durable: isTauri(),
 }));
 
 /** The `customTheme` value to save: none where theme files don't last. */
