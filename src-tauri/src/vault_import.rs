@@ -309,7 +309,7 @@ fn copy_vault_blocking(app: &AppHandle, source: &str, destination: Option<&str>)
     }
     let record = record(&source, &destination, &plan)?;
     crate::flush_webviews_before_shutdown(app)?;
-    let configured = corpus::is_configured(app).then(|| corpus::resolve_corpus(app));
+    let configured = corpus::is_configured(app).then(|| corpus::resolve_corpus(app)); // vault bind (live): host_registry::live_root below
     let previous = crate::host_registry::live_root(app, corpus::DEFAULT_ROOT_ID, configured);
     // a copy of a folder connected in place replaces it (read before the copy
     // is marked: the copy gets a fresh, not-in-place marker)

@@ -8,13 +8,16 @@
 // mark, and each round a reviewer found one more path that bound a root
 // unchecked — the scratch folder, then the registry and legacy pointers,
 // then demo mode, then roots re-read from the registry after launch. So
-// every call of a binding function carries `// vault bind (<category>):
-// <reason>` on its own line or in the comments right above it, and each file may hold only as many of each category as
-// scripts/vault-bind-allowlist.json grants it. Two categories are checked
-// here as well as counted: `refused` needs a refusal call earlier in the same
-// function, and `delegated` is allowed only inside a function that is itself a
-// binding function, so its own callers carry markers. Test code is out of
-// scope.
+// every call of a binding function, and of a registry reader (the registry
+// can be rewritten while the app runs), carries `// vault bind (<category>):
+// <reason>` on its own line or in the comments right above it, and each file
+// may hold only as many of each category as scripts/vault-bind-allowlist.json
+// grants it. Three categories are checked here as well as counted: `refused`
+// needs a refusal call earlier in the same function, `live` needs the
+// function to take the root through host_registry's live_root, require_live
+// or live_config, and `delegated` is allowed only inside a function that is
+// itself on one of the two lists, so its own callers carry markers. Test code
+// is out of scope.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
@@ -53,26 +56,43 @@ export const SINKS = [
   "helper_vault::choose_config_as",
   "folder_window::open",
 ];
+/** The registry readers. Anything that writes the support folder can rewrite
+ * what they return while the app runs, so a folder taken from them is a root
+ * source like any other. */
+export const SOURCES = [
+  "corpus::resolve_corpus",
+  "corpus::read_corpus_config",
+  "corpus::ensure_corpus_config",
+  "corpus::read_config_path",
+  "corpus::read_config_path_or_backup",
+  "corpus::read_dev_source_config",
+  "corpus::default_corpus_root",
+  "workspace::read_config",
+];
 const TYPE_FILES = { CorpusStore: "corpus.rs", Workspace: "workspace.rs" };
 
 /** Why a bind is safe. Nothing else is. */
 export const CATEGORIES = {
-  refused: "the path met the vault refusal earlier in this function (checked)",
+  refused: "the path meets the vault refusal in this function, before a bind uses it (checked)",
   vetted: "the path is a root the launch or the CLI already vetted, or a live store's own root",
-  delegated: "this function is itself a binding function, so its callers carry the reason (checked)",
+  live: "a host takes the root from its open stores: live_root, require_live or live_config (checked)",
+  "no-root": "takes no folder from what it reads: ids, perms, an existence probe, the registry's own rewrite",
+  delegated:
+    "this function is itself a binding function or registry reader, so its callers carry the reason (checked)",
   standalone: "reached only when owns_shared_state() is true",
   private: "a folder Rotli made for itself (a temp folder, the app cache)",
 };
 const MARKER = new RegExp(`//[ \\t]*vault bind \\((${Object.keys(CATEGORIES).join("|")})\\):[ \\t]*\\S`);
 const REFUSALS = /\b(?:reject_privileged_root|refuse_existing_vault(?:_for)?|refuse_pinned_root)\s*\(/;
+const LIVE = /\bhost_registry::(?:live_root|require_live|live_config)\s*\(/;
 const FN = /^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)/;
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const sinkNames = new Set(SINKS.map((s) => s.split(/::|\./).pop()));
+const sinkNames = new Set([...SINKS, ...SOURCES].map((s) => s.split(/::|\./).pop()));
 
-/** The patterns that find a sink's calls in `file`. */
+/** The patterns that find a sink's or a source's calls in `file`. */
 function sinkPatterns(file) {
-  return SINKS.map((sink) => {
+  return [...SINKS, ...SOURCES].map((sink) => {
     const name = escape(sink.split(/::|\./).pop());
     if (sink.startsWith(".")) return [sink, new RegExp(`\\.${name}\\s*\\(`)];
     const [owner] = sink.split("::");
@@ -88,35 +108,39 @@ function sinkPatterns(file) {
 export function bindCalls(source, file) {
   const patterns = sinkPatterns(file);
   const lines = productionLines(source);
+  const starts = lines.flatMap((text, index) => (FN.test(text) ? [index] : []));
+  const code = (from, to) =>
+    lines
+      .slice(from, to)
+      .join("\n")
+      .replace(/\/\/.*$/gm, "");
   const found = [];
   let fnName = null;
   let fnStart = 0;
+  let fnEnd = lines.length;
   lines.forEach((text, index) => {
     const fn = FN.exec(text);
     if (fn) {
       fnName = fn[1];
       fnStart = index;
+      fnEnd = starts.find((start) => start > index) ?? lines.length;
       return;
     }
-    const code = text.replace(/\/\/.*$/, "");
-    const sink = patterns.find(([, pattern]) => pattern.test(code))?.[0];
-    if (!sink || /^\s*use\s/.test(code)) return;
+    const call = text.replace(/\/\/.*$/, "");
+    const sink = patterns.find(([, pattern]) => pattern.test(call))?.[0];
+    if (!sink || /^\s*use\s/.test(call)) return;
     let above = index;
     while (above > 0 && lines[above - 1].trim().startsWith("//")) above -= 1;
     const category = MARKER.exec(lines.slice(above, index + 1).join("\n"))?.[1] ?? null;
     let problem = null;
-    if (
-      category === "refused" &&
-      !REFUSALS.test(
-        lines
-          .slice(fnStart, index + 1)
-          .join("\n")
-          .replace(/\/\/.*$/gm, ""),
-      )
-    )
-      problem = `marked refused, but nothing in fn ${fnName} refuses the path before this line`;
+    // a registry read is refused after it is read; a bind only after a refusal
+    const refusedBy = SOURCES.includes(sink) ? fnEnd : index + 1;
+    if (category === "refused" && !REFUSALS.test(code(fnStart, refusedBy)))
+      problem = `marked refused, but nothing in fn ${fnName} refuses the path ${SOURCES.includes(sink) ? "it reads" : "before this line"}`;
+    if (category === "live" && !LIVE.test(code(fnStart, fnEnd)))
+      problem = `marked live, but fn ${fnName} takes no root through host_registry::live_root, require_live or live_config`;
     if (category === "delegated" && !sinkNames.has(fnName))
-      problem = `marked delegated, but fn ${fnName} is not a binding function in scripts/check-vault-binds.mjs SINKS`;
+      problem = `marked delegated, but fn ${fnName} is not in scripts/check-vault-binds.mjs SINKS or SOURCES`;
     found.push({ line: index + 1, text: text.trim(), sink, fn: fnName, category, problem });
   });
   return found;
@@ -144,7 +168,7 @@ export function vaultBindFailures(files, allowlist) {
       const at = `${path}:${call.line}`;
       if (!call.category) {
         failures.push(
-          `${at}: ${call.sink}(…) in fn ${call.fn} binds a root without saying why it is safe under a host ID; refuse the path first (reject_privileged_root / refuse_existing_vault) and mark it \`// vault bind (<category>): <reason>\` (categories: ${Object.keys(CATEGORIES).join(", ")})`,
+          `${at}: ${call.sink}(…) in fn ${call.fn} binds a root or reads the registry without saying why that is safe under a host ID; refuse the path first (reject_privileged_root / refuse_existing_vault) and mark it \`// vault bind (<category>): <reason>\` (categories: ${Object.keys(CATEGORIES).join(", ")})`,
         );
         continue;
       }
@@ -193,6 +217,6 @@ if (import.meta.main) {
     0,
   );
   console.log(
-    `check:vault-binds ok — every root bind says why it is safe under a host ID; ${total} binds in ${Object.keys(allowlist).length} files`,
+    `check:vault-binds ok — every root bind and registry read says why it is safe under a host ID; ${total} sites in ${Object.keys(allowlist).length} files`,
   );
 }

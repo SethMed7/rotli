@@ -189,7 +189,9 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   that choosing a folder, switching, a new vault and a vault copy move or
   carry settings from; the connected vault a refresh reopens; the roots the
   chat and note commands (`memex::registered_root`) read and write; the
-  folder a picker starts in; and Reveal in Finder. Inspecting a picked folder
+  roots Settings lists and reads markers and settings from
+  (`host_registry::live_config`); the folder a picker starts in; and Reveal
+  in Finder. Inspecting a picked folder
   meets the refusal first, because the picker grants a folder before it
   refuses it.
 - **No demo mode.** Demo mode binds `memex-demo` beside the corpus, which may
@@ -201,13 +203,17 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
 
 Each review round of this slice found one more path that bound a root
 without the refusal. `check:vault-binds` (`scripts/check-vault-binds.mjs`)
-now lists the functions that make a path a root: the store opens, the
+now lists the functions that make a path a root (the store opens, the
 registry writers, the mark, the asset-protocol grants, the watchers, the
-helper's config, and the wrappers around them. Every call in production Rust
-says why its path is safe with `// vault bind (<category>): <reason>`, on
-the call's line or in the comments right above it. `refused` must follow a
-refusal in the same function; `delegated` is allowed only inside a binding
-function, whose own callers say why. Each file's count per category is
+helper's config, and the wrappers around them) and the registry readers
+(`resolve_corpus`, `read_corpus_config`, `ensure_corpus_config` and the
+rest), since a folder taken from a registry read is a root source. Every
+call in production Rust says why its path is safe with
+`// vault bind (<category>): <reason>`, on the call's line or in the comments
+right above it. `refused` must meet a refusal in the same function (before a
+bind, or after a read); `live` must take the root through `live_root`,
+`require_live` or `live_config`; `delegated` is allowed only inside a function
+on one of the two lists, whose own callers say why. Each file's count per category is
 pinned in `scripts/vault-bind-allowlist.json`, so a new caller fails until
 it is reviewed. The `launch_secures_the_registry_and_writers_mark_their_roots`
 fence lists the commands that take roots after launch.
@@ -320,7 +326,8 @@ on its first read, so a late registration throws. A host can give:
   Rotli. That is the person's own choice, not an attack. Standalone Rotli
   writes no sign of its own, so nothing tells the host.
 - **While the app runs.** After launch a host takes roots only from its open
-  stores, but nothing re-walks an open root: a vault made or moved inside one
+  stores (if it has no open default store, Settings still shows the
+  registry's current vault), but nothing re-walks an open root: a vault made or moved inside one
   while the app runs is seen at the next launch, as it is by the helper and
   the CLI at their next start. The registry writers rewrite the registry they
   read, so an entry planted while the app runs is carried forward and vetted

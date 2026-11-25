@@ -759,7 +759,7 @@ fn hide_quick_window(app: AppHandle) {
 /// Settings → Storage → "Reveal in Finder": open the corpus folder.
 #[tauri::command]
 fn corpus_reveal(app: AppHandle) {
-    let Some(root) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) else { return };
+    let Some(root) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) else { return }; // vault bind (live): host_registry::live_root
     #[cfg(target_os = "macos")]
     let _ = child_run::spawn_reaped(std::process::Command::new("open").arg(&root));
     #[cfg(not(target_os = "macos"))]
@@ -1249,7 +1249,7 @@ fn corpus_status(app: AppHandle) -> bool {
 /// The whole Location config. Migrates the four legacy files in on first read.
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
-    let cfg = corpus::ensure_corpus_config(&app);
+    let cfg = host_registry::live_config(&app, corpus::ensure_corpus_config(&app)); // vault bind (live): host_registry::live_config
     let development_read_only = development_read_only(&app);
     // An imported vault is not a memex to the webview: its notes go through the
     // corpus store, never the memex note lanes (wiki/_inbox). Its Librarian
@@ -1338,7 +1338,7 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
-    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app)); // vault bind (live): host_registry::live_root below
     let current = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured);
     reject_privileged_root(&app, &abs)?;
     if current.as_ref() == Some(&abs) {
@@ -1399,7 +1399,7 @@ fn recover_missing_active_vault(app: &AppHandle, missing_root: &std::path::Path)
         return false;
     }
 
-    let fallback = corpus::read_corpus_config(app).and_then(|cfg| {
+    let fallback = corpus::read_corpus_config(app).and_then(|cfg| { // vault bind (vetted): taken only when an open store has that path and id
         cfg.brains.into_iter().find(|candidate| {
             candidate.abs_path.is_dir()
                 && state
@@ -1451,7 +1451,7 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
     let lane = vault_lane();
     let state = app.state::<corpus::CorpusState>();
     let active = id == corpus::DEFAULT_ROOT_ID;
-    let config = corpus::ensure_corpus_config(&app);
+    let config = corpus::ensure_corpus_config(&app); // vault bind (live): host_registry::live_root below
     let (root, adopted) = if active {
         (state.default_root_path()?, config.corpus.adopted)
     } else {
@@ -1620,7 +1620,7 @@ async fn corpus_switch_vault(app: AppHandle, id: String) -> Result<bool, String>
 
 fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, String> {
     let _lane = vault_lane();
-    let cfg = corpus::ensure_corpus_config(&app);
+    let cfg = corpus::ensure_corpus_config(&app); // vault bind (refused): reject_privileged_root refuses the target below
     let target = corpus::connected_vault_switch_target(&cfg, &id)?;
     reject_privileged_root(&app, &target.abs_path)?;
     let live = memex::brain_connect_view(&target.abs_path)?;
@@ -1634,7 +1634,7 @@ fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, Stri
         );
     }
     flush_webviews_before_shutdown(&app)?;
-    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) {
+    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) { // vault bind (live): host_registry::live_root
         corpus::carry_settings(&current, &target.abs_path)?; // vault bind (refused): the target was refused; current is host_registry::live_root
     }
     activate_vault_path_live(&app, target.abs_path, false) // vault bind (refused): reject_privileged_root above
@@ -1673,7 +1673,7 @@ fn corpus_init_memex_blocking(
     memex::scaffold_memex(&root)?;
     // a scaffolded memex has no .rotli — carry the onboarding flow's choices
     // (Librarian-vs-raw included) so the new vault honors what was just picked
-    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app)); // vault bind (live): host_registry::live_root
     if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured) {
         corpus::carry_settings(&current, &root)?; // vault bind (refused): the target was refused; current is host_registry::live_root
     }
@@ -1851,7 +1851,7 @@ pub(crate) fn forget_vault_at(app: &AppHandle, root: &std::path::Path) -> Result
     let same = |path: &std::path::Path| {
         std::fs::canonicalize(path).ok() == std::fs::canonicalize(root).ok() || path == root
     };
-    let cfg = corpus::ensure_corpus_config(app);
+    let cfg = corpus::ensure_corpus_config(app); // vault bind (no-root): matches a path to forget a vault by id
     match cfg.brains.iter().find(|brain| same(&brain.abs_path)) {
         Some(brain) => forget_brain_now(app, &brain.id.clone()),
         None => Ok(()),
@@ -2449,7 +2449,7 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             // Rust write gates, not only the TS canWrite — carry them by root id.
             let brain_perms: std::collections::HashMap<String, memex::MemexPerms> =
                 if corpus::is_configured(app.handle()) {
-                    corpus::ensure_corpus_config(app.handle())
+                    corpus::ensure_corpus_config(app.handle()) // vault bind (no-root): perms only, after secure_registry
                         .brains
                         .into_iter()
                         .map(|b| (b.id, b.perms))

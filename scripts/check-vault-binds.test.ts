@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { bindCalls, CATEGORIES, SINKS, vaultBindFailures } from "./check-vault-binds.mjs";
+import { bindCalls, CATEGORIES, SINKS, SOURCES, vaultBindFailures } from "./check-vault-binds.mjs";
 
 const rust = (path: string, source: string) => ({ path, source });
 
@@ -50,7 +50,30 @@ describe("check:vault-binds", () => {
         "lib.rs",
       )[0].problem;
     expect(delegated("open_target")).toBeNull();
-    expect(delegated("helper")).toContain("not a binding function");
+    expect(delegated("helper")).toContain("not in scripts/check-vault-binds.mjs SINKS or SOURCES");
+  });
+
+  test("a registry read is a source: unmarked it fails, live is checked, and refused may follow the read", () => {
+    const write =
+      'fn sneak(app: &AppHandle) {\n    fs::write(corpus::ensure_corpus_config(app).corpus.abs_path.join("x"), "");\n}\n';
+    expect(vaultBindFailures([rust("src-tauri/src/lib.rs", write)], {})[0]).toContain(
+      "corpus::ensure_corpus_config(…) in fn sneak",
+    );
+    const read = (body: string) =>
+      bindCalls(
+        `fn pick(app: &AppHandle) {\n    let p = corpus::resolve_corpus(app); // vault bind (live): open\n${body}}\n`,
+        "lib.rs",
+      )[0].problem;
+    expect(read("")).toContain("marked live, but fn pick");
+    expect(read("    let p = host_registry::live_root(app, DEFAULT_ROOT_ID, Some(p));\n")).toBeNull();
+    const target = (body: string) =>
+      bindCalls(
+        `fn switch(app: &AppHandle) {\n    let c = corpus::ensure_corpus_config(app); // vault bind (refused): below\n${body}}\n`,
+        "lib.rs",
+      )[0].problem;
+    expect(target("")).toContain("refuses the path it reads");
+    expect(target("    reject_privileged_root(app, &c.corpus.abs_path)?;\n")).toBeNull();
+    expect(SOURCES).toContain("corpus::read_corpus_config");
   });
 
   test("a marker covers only its own call: on the line, or in the comments right above", () => {

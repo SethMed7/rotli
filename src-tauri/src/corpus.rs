@@ -227,7 +227,7 @@ impl RootRegistry {
 /// launch (idempotent, non-destructive).
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     if cfg!(debug_assertions) {
-        let Some(cfg) = read_dev_source_config(app) else {
+        let Some(cfg) = read_dev_source_config(app) else { // vault bind (vetted): launch only, after secure_registry
             return Vec::new();
         };
         let fallback_read_only = crate::development_read_only(app);
@@ -274,11 +274,11 @@ pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     if !is_configured(app) {
         return Vec::new();
     }
-    let cfg = ensure_corpus_config(app);
+    let cfg = ensure_corpus_config(app); // vault bind (vetted): launch only, after secure_registry
     let mut out: Vec<CorpusRoot> = vec![CorpusRoot {
         id: DEFAULT_ROOT_ID.to_string(),
         label: "Notes".to_string(),
-        abs_path: resolve_corpus(app),
+        abs_path: resolve_corpus(app), // vault bind (vetted): launch only, after secure_registry
         adopted: cfg.corpus.adopted,
     }];
     for b in &cfg.brains {
@@ -380,18 +380,18 @@ pub(crate) fn read_config_path(path: &Path) -> Option<CorpusConfig> {
 /// `corpus.dev.json`. Reading the backup keeps the production binding intact
 /// until the release app next writes its config; dev never restores or edits it.
 fn read_config_path_or_backup(path: &Path) -> Option<CorpusConfig> {
-    read_config_path(path).or_else(|| read_config_path(&path.with_extension("json.bak")))
+    read_config_path(path).or_else(|| read_config_path(&path.with_extension("json.bak"))) // vault bind (delegated): a registry reader
 }
 
 pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
-    corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f))
+    corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f)) // vault bind (delegated): a registry reader
 }
 
 /// The standalone app's pointer files from before `corpus.json`.
 pub(crate) const LEGACY_CONFIG_FILES: [&str; 4] = ["corpus-root.txt", "corpus-memex-root.txt", "corpus-roots.json", "memex-instances.json"];
 
 fn configured_at(config_file: &Path, config_dir: &Path, default_root: &Path) -> bool {
-    read_config_path_or_backup(config_file).is_some_and(|config| config.corpus.abs_path.is_dir())
+    read_config_path_or_backup(config_file).is_some_and(|config| config.corpus.abs_path.is_dir()) // vault bind (no-root): an existence probe
         || LEGACY_CONFIG_FILES.iter().any(|name| config_dir.join(name).exists())
         || default_root.exists()
 }
@@ -410,7 +410,7 @@ pub fn is_configured(app: &tauri::AppHandle) -> bool {
     // corpus.dev.json with a usable root proves the developer explicitly
     // selected a vault; a stale/deleted selection returns to activation.
     if cfg!(debug_assertions) {
-        return development_source_config(read_corpus_config(app), None).is_some();
+        return development_source_config(read_corpus_config(app), None).is_some(); // vault bind (no-root): an existence probe
     }
     use tauri::Manager;
     let Ok(dir) = app.path().app_config_dir() else {
@@ -419,7 +419,7 @@ pub fn is_configured(app: &tauri::AppHandle) -> bool {
     let Some(config_file) = corpus_config_file(app) else {
         return false;
     };
-    configured_at(&config_file, &dir, &default_corpus_root(app))
+    configured_at(&config_file, &dir, &default_corpus_root(app)) // vault bind (no-root): an existence probe
 }
 
 /// The development shell mirrors the production corpus as its single visible
@@ -467,8 +467,8 @@ fn development_source_config(
 
 fn read_dev_source_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
     development_source_config(
-        read_corpus_config(app),
-        production_corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f)),
+        read_corpus_config(app), // vault bind (delegated): a registry reader
+        production_corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f)), // vault bind (delegated): a registry reader
     )
 }
 
@@ -569,7 +569,7 @@ fn demo_flag_file(app: &tauri::AppHandle) -> Option<PathBuf> {
 
 /// The demo memex folder — `memex-demo`, a sibling of the user's real corpus.
 pub fn demo_root(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let parent = read_corpus_config(app)
+    let parent = read_corpus_config(app) // vault bind (standalone): demo mode: demo_active and set_demo gate it
         .map(|c| c.corpus.abs_path)
         .as_ref()
         .and_then(|p| p.parent().map(Path::to_path_buf))
@@ -624,7 +624,7 @@ pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
 /// default is the white-screen failure mode — this guard is load-bearing.
 pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
     if cfg!(debug_assertions) {
-        return ensure_corpus_config(app).corpus.abs_path;
+        return ensure_corpus_config(app).corpus.abs_path; // vault bind (delegated): a registry reader
     }
     // demo mode: the seeded demo memex, never the user's real corpus
     if demo_active(app) {
@@ -632,17 +632,17 @@ pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
             return demo;
         }
     }
-    if let Some(cfg) = read_corpus_config(app) {
+    if let Some(cfg) = read_corpus_config(app) { // vault bind (delegated): a registry reader
         return if cfg.corpus.abs_path.exists() {
             cfg.corpus.abs_path
         } else {
-            default_corpus_root(app)
+            default_corpus_root(app) // vault bind (delegated): a registry reader
         };
     }
     // No config yet (cold start before migration). Startup's `ensure_corpus_config`
     // writes `corpus.json` — migrating the legacy txt pointers in — before any UI
     // read, so a missing config here just means "use the default".
-    default_corpus_root(app)
+    default_corpus_root(app) // vault bind (delegated): a registry reader
 }
 
 /// Ensure `corpus.json` exists, migrating the four legacy files into it ONCE
@@ -650,11 +650,11 @@ pub fn resolve_corpus(app: &tauri::AppHandle) -> PathBuf {
 /// files are left in place until the retire step.
 pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
     if cfg!(debug_assertions) {
-        if let Some(cfg) = read_dev_source_config(app) {
+        if let Some(cfg) = read_dev_source_config(app) { // vault bind (delegated): a registry reader
             return cfg;
         }
     }
-    if let Some(cfg) = read_corpus_config(app) {
+    if let Some(cfg) = read_corpus_config(app) { // vault bind (delegated): a registry reader
         return cfg;
     }
     use tauri::Manager;
@@ -675,7 +675,7 @@ pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
         );
         let _ = fs::rename(&cfg_file, backup);
     }
-    let cfg = crate::host_registry::first_config_for(crate::app_identity::APP_IDENTIFIER, &dir, &default_corpus_root(app));
+    let cfg = crate::host_registry::first_config_for(crate::app_identity::APP_IDENTIFIER, &dir, &default_corpus_root(app)); // vault bind (delegated): a registry reader
     if let Err(e) = write_corpus_config(app, &cfg) {
         eprintln!("rotli: failed to write corpus.json ({e})");
     }
@@ -1008,7 +1008,7 @@ fn persist_corpus_path(
     // Preserve still-valid connected vaults even when the current folder was
     // removed in Finder. `is_configured` correctly becomes false for that dead
     // primary, but its readable config is still the recovery map.
-    let cfg = read_corpus_config(app).unwrap_or_else(|| CorpusConfig {
+    let cfg = read_corpus_config(app).unwrap_or_else(|| CorpusConfig { // vault bind (delegated): a registry writer; its callers refuse the new root
         version: 1,
         corpus: CorpusRef {
             abs_path: path.clone(),
@@ -1055,7 +1055,7 @@ pub fn upsert_brain(
     brain: ConnectedBrain,
     make_active: bool,
 ) -> Result<String, String> {
-    let mut cfg = ensure_corpus_config(app);
+    let mut cfg = ensure_corpus_config(app); // vault bind (delegated): a registry writer; its callers refuse the new root
     crate::vault_location::remember_vault(app, &brain.abs_path);
     crate::app_identity::claim(&brain.abs_path)?; // its caller refused first // vault bind (delegated): its callers refuse the root first
     let id = upsert_brain_config(&mut cfg, brain, make_active)?;
@@ -1064,7 +1064,7 @@ pub fn upsert_brain(
 }
 
 pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
-    let mut cfg = ensure_corpus_config(app);
+    let mut cfg = ensure_corpus_config(app); // vault bind (no-root): an id only
     if !cfg.brains.iter().any(|b| b.id == id) {
         return Err("no such vault".into());
     }
@@ -1079,7 +1079,7 @@ pub fn set_brain_perms(
 ) -> Result<(), String> {
     // no string validation here anymore — serde on MemexPerms already rejected
     // anything but the two wire values at the IPC boundary
-    let mut cfg = ensure_corpus_config(app);
+    let mut cfg = ensure_corpus_config(app); // vault bind (no-root): perms only
     let b = cfg
         .brains
         .iter_mut()
@@ -1101,7 +1101,7 @@ fn unique_folder_id(cfg: &CorpusConfig, label: &str) -> String {
 /// Add an arbitrary plain folder as a sidebar root (the "add a folder" feature).
 /// Returns false (no relaunch) when it's already the corpus / a brain / a folder.
 pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String> {
-    let mut cfg = ensure_corpus_config(app);
+    let mut cfg = ensure_corpus_config(app); // vault bind (delegated): a registry writer; its callers refuse the new root
     let target = canon(&path);
     if canon(&cfg.corpus.abs_path) == target
         || cfg.brains.iter().any(|b| canon(&b.abs_path) == target)
@@ -1129,7 +1129,7 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
 /// Forget an added folder OR a connected brain by id (never the corpus). If the
 /// active brain is forgotten, the active pointer falls to the first remaining.
 pub fn forget_root(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
-    let mut cfg = ensure_corpus_config(app);
+    let mut cfg = ensure_corpus_config(app); // vault bind (no-root): ids only
     if id == DEFAULT_ROOT_ID {
         return Err("Switch to another vault before removing the current vault.".into());
     }
@@ -8604,7 +8604,7 @@ fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> 
     if !matches!(file, "settings" | "viewstate") {
         return None;
     }
-    let real = read_corpus_config(app)?.corpus.abs_path;
+    let real = read_corpus_config(app)?.corpus.abs_path; // vault bind (standalone): demo_active gates it
     let name = dot_file(file).ok()?;
     Some(real.join(DOT_DIR).join(name))
 }

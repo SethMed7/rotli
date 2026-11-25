@@ -1167,8 +1167,8 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
         }]);
     }
     let path = production_config_path()?;
-    let config = read_config(&path)
-        .or_else(|| read_config(&path.with_extension("json.bak")))
+    let config = read_config(&path) // vault bind (vetted): vet_config vets every root below
+        .or_else(|| read_config(&path.with_extension("json.bak"))) // vault bind (vetted): vet_config vets every root below
         .ok_or_else(|| {
             format!(
                 "Rotli corpus config is missing or invalid: {}",
@@ -1195,8 +1195,8 @@ fn connected_vault_ids() -> Result<Vec<String>, String> {
         return Ok(Vec::new());
     }
     let path = production_config_path()?;
-    let config = read_config(&path)
-        .or_else(|| read_config(&path.with_extension("json.bak")))
+    let config = read_config(&path) // vault bind (no-root): ids only
+        .or_else(|| read_config(&path.with_extension("json.bak"))) // vault bind (no-root): ids only
         .ok_or("Rotli corpus config is missing or invalid")?;
     Ok(config.brains.into_iter().map(|brain| brain.id).collect())
 }

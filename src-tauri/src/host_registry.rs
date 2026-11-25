@@ -100,7 +100,7 @@ pub(crate) fn secure_registry_for(identifier: &str, support: &Path) -> Result<()
     for name in REGISTRY_FILES {
         let file = support.join(name);
         let Ok(meta) = std::fs::symlink_metadata(&file) else { continue };
-        let Some(config) = meta.is_file().then(|| crate::corpus::read_config_path(&file)).flatten() else {
+        let Some(config) = meta.is_file().then(|| crate::corpus::read_config_path(&file)).flatten() else { // vault bind (vetted): this is the launch vetting
             crate::app_identity::set_aside(&file)?;
             settle_scratch_for(identifier, support, false)?;
             continue;
@@ -158,6 +158,29 @@ pub(crate) fn require_live_for(identifier: &str, state: Option<&CorpusState>, ro
         return Ok(());
     }
     Err(format!("not an open vault root: {}", root.display()))
+}
+
+/// The registry as Settings shows it after launch, which reads each root's
+/// marker and settings. A host build shows its open default store as the
+/// current vault and a connected vault or folder only while it is open
+/// (`require_live_for`); with no open default store it keeps the registry's.
+pub(crate) fn live_config_for(identifier: &str, state: Option<&CorpusState>, mut config: CorpusConfig) -> CorpusConfig {
+    if owns_shared_state_for(identifier) {
+        return config;
+    }
+    let open = |root: &Path| std::fs::canonicalize(root).is_ok_and(|root| require_live_for(identifier, state, &root).is_ok());
+    config.brains.retain(|brain| open(&brain.abs_path));
+    config.folders.retain(|folder| open(&folder.abs_path));
+    if let Some(root) = live_root_for(identifier, state, crate::corpus::DEFAULT_ROOT_ID, None) {
+        config.corpus.abs_path = root;
+    }
+    config
+}
+
+/// `live_config_for` this build and its open stores.
+pub(crate) fn live_config(app: &tauri::AppHandle, config: CorpusConfig) -> CorpusConfig {
+    use tauri::Manager;
+    live_config_for(APP_IDENTIFIER, app.try_state::<CorpusState>().as_deref(), config)
 }
 
 /// `require_live_for` this build and its open stores.

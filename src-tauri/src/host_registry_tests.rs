@@ -184,6 +184,12 @@ fn a_host_keeps_its_own_vault_however_the_registry_spells_it() {
     std::os::unix::fs::symlink(&vault, &notes).unwrap();
     let roots = launch(HOST, &support);
     assert!(!roots.contains(&vault), "{roots:?}");
+    // round 5 nit: a linked support folder vouches for no registry in it,
+    // even one that would pass unchanged
+    fs::write(support.join("corpus.json"), json!({ "version": 1, "corpus": { "absPath": own } }).to_string()).unwrap();
+    let linked = home.path().join("linked support");
+    std::os::unix::fs::symlink(&support, &linked).unwrap();
+    assert!(secure_registry_for(HOST, &linked).is_err(), "a registry behind a linked support folder was vetted");
 }
 
 /// Round 5: commands after launch re-read the registry (the current vault a
@@ -224,6 +230,26 @@ fn after_launch_a_host_takes_only_the_roots_it_has_open() {
     if require_live_for(HOST, Some(&state), &vault).is_ok() {
         holes.push("the chat and note commands accept a Rotli vault the registry names".into());
     }
+    let brain = |path: &Path| crate::corpus::ConnectedBrain {
+        id: "b".into(),
+        label: "B".into(),
+        abs_path: path.to_path_buf(),
+        memex_id: None,
+        mode: None,
+        perms: crate::memex::MemexPerms::ReadOnly,
+    };
+    let planted = CorpusConfig {
+        version: 1,
+        corpus: CorpusRef { abs_path: vault.clone(), adopted: false },
+        brains: vec![brain(&vault), brain(&work)],
+        folders: Vec::new(),
+        active_brain_id: None,
+    };
+    let shown = live_config_for(HOST, Some(&state), planted.clone());
+    if shown.corpus.abs_path != own || shown.brains.iter().any(|brain| brain.abs_path == vault) || shown.brains.len() != 1 {
+        holes.push("Settings reads the folders a rewritten registry names".into());
+    }
+    assert_eq!(live_config_for(STANDALONE_IDENTIFIER, Some(&state), planted).corpus.abs_path, vault);
     assert!(require_live_for(HOST, Some(&state), &work).is_ok());
     assert!(require_live_for(STANDALONE_IDENTIFIER, Some(&state), &vault).is_ok());
     fs::create_dir_all(work.join("later").join(".rotli")).unwrap();

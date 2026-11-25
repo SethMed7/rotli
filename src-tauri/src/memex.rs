@@ -384,7 +384,7 @@ fn root_among(roots: &[PathBuf], want: &Path) -> bool {
 /// write root could plant chats/ inside a curated tree).
 /// pub(crate): provider.rs validates the image-assets root through the same gate.
 pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
-    let cfg = crate::corpus::ensure_corpus_config(app);
+    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (live): require_live: an open store's root only
     let mut roots: Vec<PathBuf> = vec![cfg.corpus.abs_path];
     roots.extend(cfg.brains.into_iter().map(|b| b.abs_path));
     roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
@@ -403,7 +403,7 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
 /// lane around `CorpusStore::perms_read_only` for connected brains.
 fn registered_write_root(app: &tauri::AppHandle, root: &str) -> Result<PathBuf, String> {
     let want = registered_root(app, root)?;
-    let cfg = crate::corpus::ensure_corpus_config(app);
+    let cfg = crate::corpus::ensure_corpus_config(app); // vault bind (no-root): perms only; the root came from registered_root
     if memex_write_allowed(&cfg, &want) {
         Ok(want)
     } else {

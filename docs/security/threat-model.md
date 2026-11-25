@@ -148,8 +148,8 @@ owns the threat side.
   whole, and a launch that can't vet it exits 73. After launch a host takes
   roots only from its open stores. The helper and the CLI vet each root on
   every load and walk below it once per process. `check:vault-binds` makes
-  every call that turns a path into a root say why it is safe, and pins the
-  count per file.
+  every call that turns a path into a root, and every registry read, say why
+  it is safe, and pins the count per file.
 - **What it can't stop.** A same-user process with general write access can
   forge the mark inside a Rotli vault next to a planted registry. The mark
   travels with copies and synced replicas of a host's folder. A folder a
@@ -157,12 +157,13 @@ owns the threat side.
   Rotli. Between the vetting and the bind there is a time-of-check gap that
   only a same-user process can race, and a vault made inside an open root
   while the app runs is seen only at the next launch.
-- **Residual risk.** Accepted for slice 1 under "Confidentiality between
-  processes running as the same macOS user" (below): the boundary stops
-  writers confined to the support folder, not a hostile same-user process.
-  Owner: the maintainer. Reconsider before a host build ships to people
-  outside the maintainer's own machines, or when a host adds a sync or
-  restore path into its support folder.
+- **Residual risk.** Recorded, not yet accepted: the boundary stops writers
+  confined to the support folder, not a hostile same-user process, which
+  sits under "Confidentiality between processes running as the same macOS
+  user" (below). Acceptance, with an owner and a review date as "Risk
+  acceptance" requires, is pending the maintainer. Reconsider before a host
+  build ships to people outside the maintainer's own machines, or when a
+  host adds a sync or restore path into its support folder.
 
 ## Abuse cases and controls
 
