@@ -434,6 +434,11 @@ pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String>
     if crate::development_read_only(&app) {
         return Ok(Vec::new());
     }
+    // A host build never offers an existing vault (its first run is the
+    // scratch vault, and every vault Rotli uses stays Rotli's).
+    if !crate::app_identity::owns_shared_state() {
+        return Ok(Vec::new());
+    }
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
         roots.push(PathBuf::from(&home).join("memex-vault"));

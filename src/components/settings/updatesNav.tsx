@@ -6,7 +6,13 @@
 
 import { useEffect, useState } from "react";
 
-import { checkForUpdateNow, installUpdateAndRelaunch, installedVersion } from "../../services/updateCheck";
+import { updatesWords } from "../../host/registry";
+import {
+  checkForUpdateNow,
+  installUpdateAndRelaunch,
+  installedVersion,
+  updatesFromFeed,
+} from "../../services/updateCheck";
 import { useUiStore } from "../../state/ui";
 
 export type CheckState =
@@ -102,7 +108,9 @@ export function SettingsNavUpdates() {
 
   const installing = state.kind === "installing";
   const offer = state.kind === "available" || installing;
-  const status = statusLine(state);
+  // a host build never reads Rotli's feed: no check, only the host's line
+  const feed = updatesFromFeed();
+  const status = feed ? statusLine(state) : updatesWords();
 
   return (
     <div className={offer ? "set-nav-update has-update" : "set-nav-update"}>
@@ -110,12 +118,12 @@ export function SettingsNavUpdates() {
         <span className="set-nav-version">{version ? `Rotli ${version}` : "Rotli"}</span>
         {status && <span className="set-nav-update-status">{status}</span>}
       </div>
-      {state.kind === "error" && (
+      {feed && state.kind === "error" && (
         <p className="set-nav-update-err" role="alert" title={state.message}>
           Couldn’t check for updates.
         </p>
       )}
-      {offer ? (
+      {!feed ? null : offer ? (
         <button type="button" className="ghostbtn primary" onClick={install} disabled={installing}>
           {installing ? `Updating… ${state.pct}%` : "Install & relaunch"}
         </button>

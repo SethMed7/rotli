@@ -122,6 +122,11 @@ pub fn default_corpus_root(app: &tauri::AppHandle) -> PathBuf {
     // Compatibility probe only. Fresh installs choose a vault explicitly and
     // never create or silently bind this historical Documents location.
     use tauri::Manager;
+    // A host build never probes ~/Documents/rotli: its default is the
+    // scratch vault inside its own support folder.
+    if let Some(scratch) = crate::app_identity::scratch_vault(app) {
+        return scratch;
+    }
     app.path()
         .document_dir()
         .map(|d| d.join(CORPUS_DIR_NAME))
@@ -344,7 +349,7 @@ pub struct CorpusConfig {
     pub active_brain_id: Option<String>,
 }
 
-fn corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+pub(crate) fn corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     use tauri::Manager;
     app.path().app_config_dir().ok().map(|d| {
         d.join(if cfg!(debug_assertions) {
@@ -363,7 +368,7 @@ fn production_corpus_config_file(app: &tauri::AppHandle) -> Option<PathBuf> {
         .map(|d| d.join("corpus.json"))
 }
 
-fn read_config_path(path: &Path) -> Option<CorpusConfig> {
+pub(crate) fn read_config_path(path: &Path) -> Option<CorpusConfig> {
     // raw read (outside-vault): app config outside any vault
     fs::read_to_string(path)
         .ok()

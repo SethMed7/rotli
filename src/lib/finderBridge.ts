@@ -68,8 +68,9 @@ export function corpusAdoptPersonSinks(): Promise<PersonSinks> {
 }
 
 /** Finder's "Open in Rotli" Quick Action: `absent` · `installed` · `theirs`
- * (a same-named workflow Rotli didn't make). src-tauri/src/finder_quick_action.rs */
-export type QuickActionStatus = "absent" | "installed" | "theirs";
+ * (a same-named workflow Rotli didn't make) · `unavailable` (a host build,
+ * which leaves it to Rotli). src-tauri/src/finder_quick_action.rs */
+export type QuickActionStatus = "absent" | "installed" | "theirs" | "unavailable";
 
 export function finderQuickActionStatus(): Promise<QuickActionStatus> {
   return invoke<QuickActionStatus>("finder_quick_action_status");

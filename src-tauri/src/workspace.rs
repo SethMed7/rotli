@@ -1013,7 +1013,7 @@ impl Workspace {
         #[cfg(target_os = "macos")]
         {
             let status = std::process::Command::new("open")
-                .args(["-a", "rotli"])
+                .args(crate::app_identity::open_app_args())
                 .status()
                 .map_err(|e| format!("launch Rotli: {e}"))?;
             if !status.success() {
@@ -1157,6 +1157,7 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
         if path.trim().is_empty() {
             return Err("ROTLI_CORPUS_ROOT is empty".into());
         }
+        crate::app_identity::refuse_pinned_root(Path::new(&path))?; // a host build's CLI refuses as its app does
         return Ok(vec![RootTarget {
             id: DEFAULT_ROOT_ID.to_string(),
             label: "Notes".into(),
@@ -1178,14 +1179,13 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
 }
 
 pub(crate) fn production_config_path() -> Result<PathBuf, String> {
-    if let Ok(path) = std::env::var("ROTLI_CORPUS_CONFIG") {
+    // a host build reads only its own registry, never one a variable points at
+    if let (true, Ok(path)) = (crate::app_identity::owns_shared_state(), std::env::var("ROTLI_CORPUS_CONFIG")) {
         return Ok(PathBuf::from(path));
     }
     let home = std::env::var("HOME").map_err(|_| "HOME is unavailable")?;
-    #[cfg(target_os = "macos")]
-    return Ok(PathBuf::from(home).join("Library/Application Support/com.rotli.app/corpus.json"));
-    #[cfg(not(target_os = "macos"))]
-    Ok(PathBuf::from(home).join(".config/com.rotli.app/corpus.json"))
+    // this build's own registry: a host build's `rotli` never reads Rotli's
+    Ok(crate::app_identity::support_dir(Path::new(&home)).join("corpus.json"))
 }
 
 /// The connected vaults the app can switch to (`corpus_switch_vault`) — none

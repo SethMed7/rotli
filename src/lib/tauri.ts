@@ -23,7 +23,7 @@ import type { PromptText } from "./promptText";
 export type { FrontmatterView } from "./corpusFrontmatter";
 import { type PathId, splitRootId } from "./corpusWireId";
 export { rootIdOf, splitRootId } from "./corpusWireId";
-import { PLATFORM } from "./featurePolicy";
+import { OWNS_SHARED_STATE, PLATFORM } from "./featurePolicy";
 import { PAUSED_MESSAGE, lanePaused } from "./lanePause";
 import { sameTaskRequest } from "./sameTaskRequest";
 import { browserEmptyFolders, browserPickFolder } from "./vaultBrowserPreview";
@@ -148,7 +148,7 @@ export async function summon(): Promise<void> {
  * Rejects when the OS refuses the chord — the caller must NOT have committed
  * the rebind yet. */
 export async function setGlobalShortcut(actionId: string, accelerator: string | null): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri() || !OWNS_SHARED_STATE) return; // a host build takes no OS-wide chord
   await invoke("set_summon_shortcut", { actionId, accelerator });
 }
 
@@ -239,7 +239,7 @@ export async function appVersion(): Promise<string | null> {
 /** Ask the feed once whether a newer signed build exists. Resolves
  * { available:false } outside Tauri, or when the feed says we're current. */
 export async function checkForUpdate(): Promise<UpdateStatus> {
-  if (!isTauri()) return { available: false };
+  if (!isTauri() || !OWNS_SHARED_STATE) return { available: false }; // a host build never reads the feed
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
   if (!update) return { available: false };
@@ -255,7 +255,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
  * reporting 0–100% progress, then relaunch into the new build. No-op outside
  * Tauri or when nothing is available. */
 export async function downloadAndInstallUpdate(onProgress?: (pct: number) => void): Promise<void> {
-  if (!isTauri()) return;
+  if (!isTauri() || !OWNS_SHARED_STATE) return;
   const { check } = await import("@tauri-apps/plugin-updater");
   const update = await check();
   if (!update) return;

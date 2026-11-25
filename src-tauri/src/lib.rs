@@ -6,6 +6,8 @@
 mod agent_bridge;
 mod agent_bridge_socket;
 mod ai_edit_policy;
+mod app_host;
+mod app_identity;
 mod app_settings;
 mod board;
 mod breve;
@@ -795,6 +797,10 @@ pub(crate) fn reject_privileged_root(
     use tauri::Manager;
     let candidate = std::fs::canonicalize(candidate)
         .map_err(|error| format!("canonicalize selected folder: {error}"))?;
+    // a host build's own scratch vault sits in its support folder on purpose
+    if app_identity::scratch_vault(app).and_then(|scratch| std::fs::canonicalize(scratch).ok()).as_ref() == Some(&candidate) {
+        return Ok(());
+    }
     let mut protected = Vec::new();
     let mut forbidden_home_or_ancestor = false;
     if let Ok(home) = std::env::var("HOME") {
@@ -827,10 +833,12 @@ pub(crate) fn reject_privileged_root(
         protected.push(path);
     }
     if forbidden_home_or_ancestor || overlaps_any_private_path(&candidate, &protected) {
-        Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into())
-    } else {
-        Ok(())
+        return Err("That folder overlaps private application, credential, or agent-runtime state and cannot be used as a notes root.".into());
     }
+    // A host build never opens a folder Rotli already uses as a vault: every
+    // way a folder becomes notes passes here before anything writes to it.
+    // The standalone build refuses nothing and reads nothing more.
+    app_identity::refuse_existing_vault(&candidate, || app_identity::owned_roots(app))
 }
 
 fn overlaps_any_private_path(
@@ -2002,6 +2010,8 @@ fn set_summon_shortcut(
     action_id: String,
     accelerator: Option<String>,
 ) -> Result<(), String> {
+    // Rotli holds the OS-wide chords; a host build takes none of them.
+    app_identity::require_shared_state()?;
     if let Some(acc) = accelerator.as_deref() {
         acc.parse::<Shortcut>()
             .map_err(|e| format!("invalid accelerator {acc:?}: {e}"))?;
@@ -2036,14 +2046,43 @@ fn set_summon_shortcut(
     Ok(())
 }
 
+pub use app_host::AppHost;
+pub use app_identity::HostWords;
+
+/// Standalone Rotli: the shell with no host.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    launch(None)
+}
+
+/// The shell under a host build (`app_host.rs`): its context, its plugins,
+/// its wording.
+pub fn run_with_host(host: AppHost) {
+    launch(Some(host))
+}
+
+fn launch(host: Option<AppHost>) {
+    let (context, host_plugins) = match host {
+        Some(host) => {
+            app_identity::set_host_words(host.words);
+            (host.context, host.plugins)
+        }
+        None => (tauri::generate_context!(), Vec::new()),
+    };
     // before any window exists: the webview reads this default at creation
     spellcheck::enable_continuous_spellcheck_by_default();
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_deep_link::init())
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init());
+    // The update feed and rotli:// belong to the standalone build alone: a
+    // host build never registers either plugin, so it cannot ask rotli.co for
+    // an update or receive a link.
+    let builder = if app_identity::owns_shared_state() {
+        builder.plugin(tauri_plugin_updater::Builder::new().build()).plugin(tauri_plugin_deep_link::init())
+    } else {
+        builder
+    };
+    let global_default = |chord: &str| app_identity::owns_shared_state().then(|| chord.to_string());
+    let builder = builder
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -2071,13 +2110,16 @@ pub fn run() {
                     }
                 })
                 .build(),
-        )
+        );
+    // a host's own plugins come after Rotli's, in the order it gave them
+    let builder = host_plugins.into_iter().fold(builder, |builder, plugin| builder.plugin(plugin));
+    builder
         .manage(GlobalChords {
-            capture: Mutex::new(Some(DEFAULT_CAPTURE.to_string())),
-            main_toggle: Mutex::new(Some(DEFAULT_MAIN_TOGGLE.to_string())),
-            quick: Mutex::new(Some(DEFAULT_QUICK.to_string())),
-            chat: Mutex::new(Some(DEFAULT_CHAT_SUMMON.to_string())),
-            search: Mutex::new(Some(DEFAULT_SEARCH_SUMMON.to_string())),
+            capture: Mutex::new(global_default(DEFAULT_CAPTURE)),
+            main_toggle: Mutex::new(global_default(DEFAULT_MAIN_TOGGLE)),
+            quick: Mutex::new(global_default(DEFAULT_QUICK)),
+            chat: Mutex::new(global_default(DEFAULT_CHAT_SUMMON)),
+            search: Mutex::new(global_default(DEFAULT_SEARCH_SUMMON)),
         })
         .manage(LastBlurHide(Mutex::new(None)))
         .manage(NativeDialogOpen::default())
@@ -2332,6 +2374,17 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            // A stale build cache, or a host context naming another bundle ID,
+            // must not give one identity the other's behaviour: stop before
+            // any disk is touched.
+            if !app_identity::matches_runtime(&app.config().identifier) {
+                eprintln!(
+                    "rotli: this binary was built as {} but runs as {}; rebuild it",
+                    app_identity::APP_IDENTIFIER,
+                    app.config().identifier
+                );
+                std::process::exit(78);
+            }
             #[cfg(target_os = "macos")]
             if native_drag::debug_drops() {
                 if let Some(main) = app.get_webview_window("main") {
@@ -2346,6 +2399,8 @@ pub fn run() {
             #[cfg(all(target_os = "macos", debug_assertions))]
             apply_dev_dock_icon(app.handle());
 
+            // A host build's first run binds its scratch vault (and only it).
+            app_identity::ensure_scratch_vault(app.handle());
             // Resolve Finder moves and renames before any root is registered or
             // watched. A bookmark is accepted only when the live memex.json id
             // still matches the vault identity that was originally selected.
@@ -2529,8 +2584,9 @@ pub fn run() {
             // one-shot mailbox lane `rotli open` uses — the webview consumes it
             // through rotli:open-request. Ids only, validated in
             // parse_deep_link; a link can never name an arbitrary disk path,
-            // and a malformed link is ignored, never an error surface.
-            {
+            // and a malformed link is ignored, never an error surface. A host
+            // build registers no deep-link plugin, so it listens for none.
+            if app_identity::owns_shared_state() {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
@@ -2551,8 +2607,9 @@ pub fn run() {
             // ⌥Space opens the app; ⌥C is the one-breath capture (both rebindable).
             // Best-effort: another app owning a chord (launchers love ⌥Space)
             // must DEGRADE — the app still launches, the chord stays rebindable
-            // in Settings → Hotkeys — never abort startup.
-            {
+            // in Settings → Hotkeys — never abort startup. A host build
+            // registers none: a running Rotli holds these chords.
+            if app_identity::owns_shared_state() {
                 let chords = app.state::<GlobalChords>();
                 for (chord, slot) in [
                     (DEFAULT_MAIN_TOGGLE, &chords.main_toggle),
@@ -2772,7 +2829,7 @@ pub fn run() {
                 _ => {}
             }
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {

@@ -16,17 +16,18 @@ export function SettingsBanner({
   motif,
 }: {
   title: string;
-  pose: CharacterName;
-  motif: BannerMotif;
+  /** Rotli's own panes; a host's pane has neither, only the scenery. */
+  pose?: CharacterName;
+  motif?: BannerMotif;
 }) {
   const family = useUiStore((s) => s.themeFamily);
   return (
-    <div className="set-banner" data-banner={`${family}:${motif}`}>
+    <div className="set-banner" data-banner={`${family}:${motif ?? "scenery"}`}>
       <svg className="set-banner-art" viewBox="0 0 640 120" aria-hidden="true" focusable="false">
         {BANNER_BACKDROPS[family] ?? BANNER_BACKDROPS.warm}
-        {BANNER_MOTIFS[motif]}
+        {motif && BANNER_MOTIFS[motif]}
       </svg>
-      <Character name={pose} size={84} className="set-banner-quokka" accessorized />
+      {pose && <Character name={pose} size={84} className="set-banner-quokka" accessorized />}
       <h3 className="set-banner-title">{title}</h3>
     </div>
   );

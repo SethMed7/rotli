@@ -304,6 +304,7 @@ fn production_roots_for_dev(app: &tauri::AppHandle) -> Vec<PathBuf> {
 }
 
 fn production_resend_configured_for_dev(home: &Path) -> bool {
+    if !crate::app_identity::owns_shared_state() { return false; } // secret.ts reads the Keychain via `security`
     if keychain::production_secret_exists_for_dev(keychain::BREVE_RESEND_ACCOUNT) {
         return true;
     }
@@ -412,7 +413,7 @@ struct LegacySettings {
 }
 
 fn legacy_root() -> Option<PathBuf> {
-    std::env::var_os("HOME")
+    std::env::var_os("HOME").filter(|_| crate::app_identity::owns_shared_state()) // ~/breve is the standalone app's
         .map(PathBuf::from)
         .map(|home| home.join("breve"))
 }
@@ -1178,6 +1179,7 @@ fn validate_delivery_settings(settings: &BreveDeliverySettings) -> Result<(), St
 /// Rotli's allowlisted login-keychain entry. The value never crosses IPC.
 fn migrate_resend_key(home: &Path) -> bool {
     const NAME: &str = keychain::BREVE_RESEND_ACCOUNT;
+    if !crate::app_identity::owns_shared_state() { return false; }
     if keychain::get_secret(NAME).is_some() {
         return true;
     }
@@ -1340,6 +1342,7 @@ pub fn breve_remove_resend_key() -> Result<(), String> {
 #[tauri::command]
 pub async fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok("Test email simulated in Tauri dev mode".into());
     }
@@ -1391,6 +1394,7 @@ fn breve_test_email_blocking(root: &Path) -> Result<String, String> {
 #[tauri::command]
 pub async fn breve_test_signal(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok("Test Signal simulated in Tauri dev mode".into());
     }
@@ -1935,6 +1939,7 @@ pub fn breve_import_legacy(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
@@ -2053,10 +2058,12 @@ fn xml_escape(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
+const LOGIN_AGENT_LABEL: &str = concat!(crate::app_identity::app_identifier!(), ".background");
 /// One Rotli login item replaces seven Breve agents. It launches the menu-bar
 /// app after login; the app then owns the scheduler and Signal children.
 pub(crate) fn install_rotli_login_agent() -> Result<(), String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok(());
     }
@@ -2068,11 +2075,11 @@ pub(crate) fn install_rotli_login_agent() -> Result<(), String> {
     let agents = home.join("Library/LaunchAgents");
     fs::create_dir_all(&agents).map_err(|e| format!("create {}: {e}", agents.display()))?;
     let plist = format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict>\n  <key>Label</key><string>com.rotli.app.background</string>\n  <key>ProgramArguments</key><array><string>{}</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>ProcessType</key><string>Background</string>\n</dict></plist>\n",
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict>\n  <key>Label</key><string>{LOGIN_AGENT_LABEL}</string>\n  <key>ProgramArguments</key><array><string>{}</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>ProcessType</key><string>Background</string>\n</dict></plist>\n",
         xml_escape(&executable.to_string_lossy()),
     );
     write_atomic(
-        &agents.join("com.rotli.app.background.plist"),
+        &agents.join(concat!(crate::app_identity::app_identifier!(), ".background.plist")),
         plist.as_bytes(),
     )
 }
@@ -2113,6 +2120,7 @@ pub fn breve_takeover(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
@@ -2193,6 +2201,7 @@ pub fn breve_retire_legacy(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     crate::feature_policy::require_breve()?;
+    crate::app_identity::require_shared_state()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }

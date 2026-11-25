@@ -92,6 +92,11 @@ export function QuickActionRow({
               Added. Right-click a file or folder in Finder, then Quick Actions → Open in Rotli.
             </p>
           )}
+          {status === "unavailable" && (
+            <p className="setnote" role="status">
+              Rotli keeps this Quick Action, so this app doesn’t add one.
+            </p>
+          )}
           {status === "theirs" && (
             <p className="setnote" role="status">
               You already have a Quick Action named “Open in Rotli”, so Rotli leaves it alone.

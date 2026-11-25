@@ -48,6 +48,7 @@ import { SHEET_BIN, SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { workbookForAi } from "../sheets/view";
 import { RAW_ROOT_PREFIX } from "../state/paneVaults";
 import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
+import { EXISTING_VAULT_REFUSAL, STANDALONE_IDENTIFIER } from "./appIdentity";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { bytesRevision } from "./contentRevision";
 import { SKIPPED_DIRS, VIDEO_EXTS } from "./fileKind";
@@ -92,6 +93,11 @@ describe("parity.json ↔ TS constants", () => {
 
   test("documentEditMaxText", () => {
     expect(MAX_EDIT_TEXT).toBe(entries.documentEditMaxText.value);
+  });
+
+  test("appIdentity", () => {
+    expect(STANDALONE_IDENTIFIER).toBe(entries.appIdentity.value.standaloneIdentifier);
+    expect(EXISTING_VAULT_REFUSAL).toBe(entries.appIdentity.value.existingVaultRefusal);
   });
 
   test("documentEditMaxBytes", () => {

@@ -33,6 +33,7 @@ import {
   WITHHELD_VOICE_STUB_SOURCE,
 } from "./scripts/build-policy.ts";
 import { devHelperServer } from "./scripts/dev-helper-server.ts";
+import { bundleIdentifier } from "./src/lib/appIdentity.ts";
 import { launchFeatures } from "./src/lib/featurePolicy.ts";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -47,6 +48,14 @@ const platform = process.env.ROTLI_PLATFORM ?? (base === "/" ? "desktop" : "web"
 if (platform !== "desktop" && platform !== "web") throw new Error("Invalid ROTLI_PLATFORM");
 // injected sync so the onboardingVersion gate has the build version at first paint
 const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
+// The bundle ID, read the way src-tauri/build.rs reads it: a host build's
+// ROTLI_APP_IDENTIFIER, else the `--config` overlay the Tauri CLI passes as
+// TAURI_CONFIG, else tauri.conf.json (src/lib/appIdentity.ts).
+const appIdentifier = bundleIdentifier(
+  process.env.ROTLI_APP_IDENTIFIER,
+  process.env.TAURI_CONFIG,
+  readFileSync("src-tauri/tauri.conf.json", "utf8"),
+);
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => {
@@ -112,6 +121,7 @@ export default defineConfig(({ command }) => {
       __APP_VERSION__: JSON.stringify(appVersion),
       __ROTLI_BUILD_CHANNEL__: JSON.stringify(channel),
       __ROTLI_PLATFORM__: JSON.stringify(platform),
+      __ROTLI_APP_IDENTIFIER__: JSON.stringify(appIdentifier),
     },
 
     // katex reaches the graph twice — our blockRender import and

@@ -86,9 +86,18 @@ fn allow_webview(name: &str) -> Result<(), String> {
     }
 }
 
+/// A host build has no Keychain access: the `rotli` service is the
+/// standalone app's, and a service of its own is a later decision.
+/// Checked before the debug store so no build but the standalone one reaches
+/// Keychain Services through this file.
+fn keychain_open() -> Result<(), String> {
+    if crate::app_identity::owns_shared_state() { Ok(()) } else { Err(crate::app_identity::no_keychain()) }
+}
+
 /// Crate-internal read — the transport that needs a key calls this; the
 /// webview never sees the value.
 pub(crate) fn get_secret(name: &str) -> Option<String> {
+    keychain_open().ok()?;
     if cfg!(debug_assertions) {
         return dev_secrets()
             .lock()
@@ -105,7 +114,7 @@ pub(crate) fn get_secret(name: &str) -> Option<String> {
 /// Debug review surfaces may report whether a production credential exists,
 /// but never receive its value. Writes still go to the isolated dev store.
 pub(crate) fn production_secret_exists_for_dev(name: &str) -> bool {
-    if allow(name).is_err() {
+    if keychain_open().is_err() || allow(name).is_err() {
         return false;
     }
     get_generic_password(SERVICE, name)
@@ -114,6 +123,7 @@ pub(crate) fn production_secret_exists_for_dev(name: &str) -> bool {
 }
 
 pub(crate) fn store_secret(name: &str, value: &str) -> Result<(), String> {
+    keychain_open()?;
     allow(name)?;
     let value = value.trim();
     if value.is_empty() {
@@ -130,6 +140,7 @@ pub(crate) fn store_secret(name: &str, value: &str) -> Result<(), String> {
 }
 
 pub(crate) fn delete_secret(name: &str) -> Result<(), String> {
+    keychain_open()?;
     allow(name)?;
     if cfg!(debug_assertions) {
         dev_secrets()
@@ -177,9 +188,68 @@ mod tests {
         assert!(allow("").is_err());
     }
 
+    /// A host build (see app_identity.rs for the command) refuses every lane before Keychain Services or the
+    /// debug store; the standalone build is covered by the test below.
+    #[test]
+    fn a_host_build_never_reaches_the_keychain() {
+        if crate::app_identity::owns_shared_state() {
+            return;
+        }
+        let refused = Err(crate::app_identity::no_keychain());
+        assert_eq!(store_secret(BRAVE_SEARCH_API_KEY_ACCOUNT, "fixture"), refused);
+        assert_eq!(delete_secret(BRAVE_SEARCH_API_KEY_ACCOUNT), refused);
+        assert_eq!(secret_store(BREVE_RESEND_ACCOUNT.into(), "fixture".into()), refused);
+        assert_eq!(get_secret(BRAVE_SEARCH_API_KEY_ACCOUNT), None);
+        assert_eq!(get_secret(REMOTE_AGENT_TOKEN_ACCOUNT), None);
+        assert_eq!(secret_exists(BRAVE_SEARCH_API_KEY_ACCOUNT.into()), Ok(false));
+        assert!(!production_secret_exists_for_dev(BREVE_RESEND_ACCOUNT));
+        assert!(dev_secrets().lock().unwrap().is_empty(), "not even the debug store");
+    }
+
+    /// Code-path fence for both builds: Keychain Services is called from this
+    /// file only, and every call sits behind `keychain_open()`; the one other
+    /// way in (Breve's secret.ts, which shells out to `security`) is spawned
+    /// only from functions that check the identity first.
+    #[test]
+    fn every_keychain_path_checks_the_identity_first() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        for entry in std::fs::read_dir(&src).unwrap().flatten() {
+            let path = entry.path();
+            let name = path.file_name().unwrap().to_string_lossy().to_string();
+            if path.extension().is_none_or(|ext| ext != "rs") || name.contains("_tests") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            let production = text.split("\nmod tests").next().unwrap_or_default();
+            // the function each line belongs to, from its signature line to the next
+            let mut body = String::new();
+            for line in production.lines() {
+                // a signature names `fn` among its first few words, whatever its visibility
+                let signature = line.split_whitespace().take(4).any(|word| word == "fn");
+                if signature {
+                    body.clear();
+                }
+                body.push_str(line);
+                body.push('\n');
+                let stub = signature && ["get", "set", "delete"].iter().any(|verb| line.contains(&format!("fn {verb}_generic_password(")));
+                if line.contains("_generic_password(") && !stub {
+                    assert_eq!(name, "keychain.rs", "Keychain Services called outside keychain.rs");
+                    assert!(body.contains("keychain_open()"), "an ungated Keychain call: {body}");
+                }
+                // Breve's Keychain helper, named in pieces so this fence isn't read as a caller
+                if line.contains(&["scripts", "secret.ts"].join("/")) {
+                    assert!(body.contains("owns_shared_state()"), "secret.ts spawned without the identity gate in {name}: {body}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn brave_webview_lane_can_probe_but_never_read_the_saved_value() {
         // Debug tests use DEV_SECRETS, never the developer's live Keychain.
+        if !crate::app_identity::owns_shared_state() {
+            return; // a host build's refusal is the test above
+        }
         store_secret(BRAVE_SEARCH_API_KEY_ACCOUNT, "fixture-brave-key").unwrap();
         assert!(secret_exists(BRAVE_SEARCH_API_KEY_ACCOUNT.to_string()).unwrap());
         delete_secret(BRAVE_SEARCH_API_KEY_ACCOUNT).unwrap();

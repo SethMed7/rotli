@@ -25,6 +25,7 @@ to defaults instead of triggering a content rewrite.
 | Breve runtime/config | Runtime package version and documented boundary | Managed runtime plus user config | Mirror contracts explicitly; do not import across the app/runtime boundary |
 | Rotli CLI JSON | App semantic version only today | Public automation surface | Additive fields are compatible; removals/renames require a versioned transition |
 | `rotli-workspace` MCP | MCP protocol plus app semantic version | Public agent surface | Negotiate only supported protocol versions; tool behavior follows the same compatibility law |
+| Build identity | Bundle ID read at build time (`src-tauri/src/app_identity.rs`) | Machine-local, keyed by bundle ID | `com.rotli.app` never changes; a host build adds an identifier, renames none, and never reads or writes the standalone app's shared state ([`host-seams.md`](host-seams.md)) |
 | Remote MCP rendezvous | HTTP endpoint and ephemeral envelope | Public transport, non-durable | Stdio/tool schemas remain authoritative; client/device roles and envelope fields evolve additively; relay state is never durable |
 
 `src/memex/contract.ts` and `src-tauri/src/memex.rs` are deliberately independent
@@ -148,6 +149,16 @@ ride through), and the `set_aside_tests` in `fsutil.rs`.
   the explicit activation gate.
 - Downgrade testing covers the most recent prior release whenever a persistent
   schema or external protocol changes.
+
+### One shell, with or without a host (2026-11-24)
+
+The same shell builds standalone Rotli and, through neutral seams, an app a
+host assembles under another bundle ID. **This adds an identifier and renames
+none.** Every existing install keeps `com.rotli.app`, its settings, its links,
+its Keychain items and its update feed. Any other identity fails closed on
+shared state and refuses a folder Rotli already uses as a vault. The contract,
+its proof and what is not built yet are in
+[`host-seams.md`](host-seams.md).
 
 ## Public CLI and MCP evolution
 

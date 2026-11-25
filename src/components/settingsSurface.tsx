@@ -6,7 +6,7 @@
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
@@ -38,6 +38,7 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
+import { appHost, notesOn, updatesWords } from "../host/registry";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -49,6 +50,7 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
+import { OWNS_SHARED_STATE } from "../lib/appIdentity";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
@@ -127,20 +129,8 @@ import {
 } from "../state/ui";
 import { useVaultView } from "../state/vaultView";
 import { AntigravitySetup } from "./antigravitySetup";
-import { type CharacterName, QuokkaMark } from "./character";
-import {
-  BrowserGlyph,
-  ChatGlyph,
-  CheckGlyph,
-  CloudGlyph,
-  DatabaseGlyph,
-  ExternalLinkGlyph,
-  KeyboardGlyph,
-  LaptopGlyph,
-  NotesStackGlyph,
-  ShieldGlyph,
-  SunGlyph,
-} from "./glyphs";
+import type { CharacterName } from "./character";
+import { CheckGlyph, CloudGlyph, LaptopGlyph, ShieldGlyph } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
 import { ALIAS_PASS } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
@@ -159,6 +149,7 @@ import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
+import { type NavEntry, settingsNav } from "./settings/settingsNav";
 import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
 import { SettingsNavUpdates, useAppVersion } from "./settings/updatesNav";
@@ -167,46 +158,6 @@ import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
-type SettingsPane =
-  | "general"
-  | "hotkeys"
-  | "appearance"
-  | "browser"
-  | "brain"
-  | "security"
-  | "models"
-  | "chat"
-  | "location"
-  | "connections"
-  | "about";
-
-const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) => ReactNode }[] = [
-  { id: "general", label: "General", glyph: LaptopGlyph },
-  { id: "hotkeys", label: "Keybindings", glyph: KeyboardGlyph },
-  { id: "appearance", label: "Appearance", glyph: SunGlyph },
-  { id: "browser", label: "Browser", glyph: BrowserGlyph },
-  // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
-  // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
-  { id: "brain", label: "Librarian", glyph: NotesStackGlyph },
-  // the secure-note explainer (decision 2026-07-22, feature C) — the ONE plain-
-  // language home for the fail-closed rules; contract stays the spec
-  { id: "security", label: "Security", glyph: ShieldGlyph },
-  // connected subscription models + hybrid presets (the maintainer, 2026-07-02)
-  { id: "models", label: "AI Models", glyph: CloudGlyph },
-  // how chats start and get their names (the owner, 2026-09-21)
-  { id: "chat", label: "Chat", glyph: ChatGlyph },
-  // Storage + Memory collapsed into one "Location" tab (the maintainer, 2026-06-27): your
-  // notes folder *is* (or can become) a brain — one concept, not two overlapping
-  // ones. See LocationPane below.
-  { id: "location", label: "Location", glyph: DatabaseGlyph },
-  { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
-  { id: "about", label: "About Rotli", glyph: QuokkaMark },
-];
-
-/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings
- * pane, and no private browser, so no Browser pane. */
-const WEB_HIDDEN_PANES: ReadonlySet<SettingsPane> = new Set(["hotkeys", "browser"]);
-const SHOWN_NAV = PLATFORM === "web" ? NAV.filter((pane) => !WEB_HIDDEN_PANES.has(pane.id)) : NAV;
 
 /** A settings pane heading: since 2026-09-29 a banner with the theme's
  * scenery, the pane's own motif, and the person's quokka in it
@@ -308,6 +259,23 @@ function HotkeysPane() {
   const row = (action: KeyAction) => {
     const recording = recordingId === action.id;
     const chord = chordOf(action);
+    if (action.global && !OWNS_SHARED_STATE) {
+      // a host build takes no OS-wide chord: Rotli, running beside it, holds them
+      return (
+        <div className="hkrow" key={action.id}>
+          <span className="hklabel">{action.title}</span>
+          <span className="hkconflict">system-wide shortcuts stay with Rotli</span>
+          <button
+            type="button"
+            className="hkchord"
+            disabled
+            aria-label={`${action.title} — not available here`}
+          >
+            <span className="hkunset">—</span>
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="hkrow" key={action.id}>
         <span className="hklabel">{action.title}</span>
@@ -393,6 +361,15 @@ function HotkeysPane() {
 function UpdatesSection() {
   const autoUpdateCheck = useUiStore((s) => s.autoUpdateCheck);
   const setAutoUpdateCheck = useUiStore((s) => s.setAutoUpdateCheck);
+  if (!OWNS_SHARED_STATE) {
+    // a host build never reads Rotli's update feed
+    return (
+      <>
+        <h4 className="sethead">Updates</h4>
+        <p className="setnote">{updatesWords()}.</p>
+      </>
+    );
+  }
   return (
     <>
       <h4 className="sethead">Updates</h4>
@@ -500,11 +477,18 @@ function GeneralPane() {
               }}
             />
           </div>
-          <p className="setnote">
-            Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the
-            app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all
-            rebindable in Keybindings.
-          </p>
+          {OWNS_SHARED_STATE ? (
+            <p className="setnote">
+              Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the
+              app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all
+              rebindable in Keybindings.
+            </p>
+          ) : (
+            <p className="setnote">
+              Either way the menu-bar icon stays. System-wide shortcuts stay with Rotli, so open this app from
+              its menu-bar icon.
+            </p>
+          )}
         </>
       )}
 
@@ -2931,35 +2915,55 @@ function AboutRotliPane() {
   );
 }
 
+/** A host's pane: its heading is the banner's scenery alone (no character,
+ * no object), then the host's own body. */
+function HostPane({ entry }: { entry: NavEntry }) {
+  if (!entry.host) return null;
+  const { Pane, title, label } = entry.host;
+  return (
+    <>
+      <SettingsBanner title={title ?? label} />
+      <Pane />
+    </>
+  );
+}
+
 export function SettingsSurface() {
-  const [pane, setPane] = useState<SettingsPane>("general");
+  // the nav is fixed for the app's life: a host registers before the first read
+  const nav = useMemo(() => settingsNav(PLATFORM, appHost()), []);
+  const withNotes = notesOn();
+  const [pane, setPane] = useState<string>("general");
   // a surface elsewhere asked for a SPECIFIC pane (the Librarian's gear →
   // Settings → Librarian, 2026-07-31) — consume the one-shot request
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
   useEffect(() => {
     if (!paneRequest) return;
-    if (SHOWN_NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
+    if (nav.some((p) => p.id === paneRequest)) setPane(paneRequest);
     useUiStore.getState().setSettingsPaneRequest(null);
-  }, [paneRequest]);
+  }, [nav, paneRequest]);
+  const hostEntry = nav.find((entry) => entry.id === pane && entry.host);
 
   return (
     <div className="settings">
       <h2 className="sr-only">Settings</h2>
       <nav className="set-nav" aria-label="Settings sections">
-        <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
-          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <path
-              d="M15 18l-6-6 6-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span className="set-back-label">Back to notes</span>
-        </button>
-        {SHOWN_NAV.map(({ id, label, glyph: G }) => (
+        {/* without notes, Settings is the whole window: nothing to go back to */}
+        {withNotes && (
+          <button type="button" className="set-back" onClick={() => dispatch("app.settings")}>
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path
+                d="M15 18l-6-6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="set-back-label">Back to notes</span>
+          </button>
+        )}
+        {nav.map(({ id, label, glyph: G }) => (
           <button
             type="button"
             key={id}
@@ -2988,6 +2992,7 @@ export function SettingsSurface() {
             {pane === "location" && <LocationPane />}
             {pane === "connections" && <ConnectionsPane />}
             {pane === "about" && <AboutRotliPane />}
+            {hostEntry && <HostPane key={hostEntry.id} entry={hostEntry} />}
           </div>
         </div>
       </div>

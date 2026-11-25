@@ -1,6 +1,6 @@
 // Parity for a brought-in vault's marker: the role map every import writes,
-// and what says "connected in place" (split from parity_tests.rs at its size
-// ceiling).
+// and what says "connected in place"; and the identity that may open an
+// existing vault at all (split from parity_tests.rs at its size ceiling).
 
 use super::entry;
 
@@ -17,4 +17,16 @@ fn imported_marker_in_place_matches_fixture() {
         let expected = case["inPlace"].as_bool().unwrap();
         assert_eq!(crate::vault_roles::marker_in_place(&case["marker"]), expected, "{case}");
     }
+}
+
+/// The one identity that owns every vault, and the sentence any other one
+/// shows when it refuses a folder Rotli already uses.
+#[test]
+fn app_identity_matches_fixture() {
+    let identity = entry("appIdentity");
+    assert_eq!(crate::app_identity::STANDALONE_IDENTIFIER, identity["standaloneIdentifier"].as_str().unwrap());
+    assert_eq!(
+        crate::app_identity::HostWords::default().existing_vault,
+        identity["existingVaultRefusal"].as_str().unwrap()
+    );
 }
