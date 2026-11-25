@@ -363,10 +363,10 @@ on its first read, so a late registration throws. A host can give:
 
 This list says only what was run.
 
-- **Live host launch at `14f8636f`** (2026-11-25). A host build (`bun run
-  mac:build`, Developer ID signed, under a host bundle ID) was launched by
-  script in sandbox HOMEs. All four runs rendered first run, with nothing on
-  stderr and no exit 73 or 78:
+- **Live host launches at `14f8636f` and again at `f5c0b217`** (2026-11-25).
+  A host build (`bun run mac:build`, Developer ID signed, under a host bundle
+  ID) was launched by script in sandbox HOMEs. Every run rendered first run
+  with nothing on stderr, apart from the planned exit 73 in run 5:
   1. **A fresh first and second launch.** The first launch made a marked
      scratch vault holding the welcome note, `index.json` and `search/`, plus
      a `corpus.json` naming it. The second launch set nothing aside.
@@ -379,17 +379,16 @@ This list says only what was run.
      was unchanged: no mark, no index.
   4. **A planted legacy `corpus-memex-root.txt`.** It was ignored, and the
      synthetic vault was unchanged.
-- **Not covered by that run.** Round 5 (after `14f8636f`) changes the launch
-  order: the registry is now vetted before the bookmark repair as well as
-  after it. It also changes what commands take as roots after launch, the
-  helper's start, and the CLI's walk. These are proven by unit tests and
-  source fences under a host ID only, not by a live host launch. An earlier
-  launch at `32e56b11`, before the mark and the launch bind, passed the
-  webview's identity check. Rotli's own app was never launched. The exit-78
-  and exit-73 stops themselves and the plugin gating are proven by code,
-  unit tests and source-order fences only. The notes-off window, a host
-  pane, pane blocks, the nav order and the host's words are proven by
-  server-side rendering only.
+  5. **A support folder that is a link** (at `f5c0b217` only). Launch exited
+     73, and nothing was written to the link's target.
+- **The host's CLI at `f5c0b217`.** With a planted `corpus.json` naming the
+  synthetic vault, `roots` and `notes list` answered from the scratch vault
+  alone and wrote nothing into the synthetic vault. The planted file stays on
+  disk until the next app launch sets it aside.
+- **Not proven live.** Rotli's own app was never launched. The exit-78 stop
+  and the plugin gating are proven by code, unit tests and source-order
+  fences only. The notes-off window, a host pane, pane blocks, the nav order
+  and the host's words are proven by server-side rendering only.
 
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).

@@ -157,13 +157,23 @@ owns the threat side.
   Rotli. Between the vetting and the bind there is a time-of-check gap that
   only a same-user process can race, and a vault made inside an open root
   while the app runs is seen only at the next launch.
-- **Residual risk.** Recorded, not yet accepted: the boundary stops writers
-  confined to the support folder, not a hostile same-user process, which
-  sits under "Confidentiality between processes running as the same macOS
-  user" (below). Acceptance, with an owner and a review date as "Risk
-  acceptance" requires, is pending the maintainer. Reconsider before a host
-  build ships to people outside the maintainer's own machines, or when a
-  host adds a sync or restore path into its support folder.
+- **Residual risk, accepted 2026-11-25.**
+  - **Asset and abuse case:** a Rotli vault, opened by a host build because a
+    hostile same-user process forged the mark inside it next to a planted
+    registry.
+  - **Reachability:** none in the shipped macOS product, which is standalone
+    Rotli and writes and reads no mark. It is reachable only in a host build.
+  - **Severity:** moderate. A process that can already write the vault can
+    already read and change it.
+  - **Compensating controls:** the mark, the vault refusal at every bind,
+    `check:vault-binds`, and macOS account isolation. The case also sits under
+    "Confidentiality between processes running as the same macOS user"
+    (below).
+  - **Owner:** the maintainer.
+  - **Review date:** 2027-02-25.
+  - **Reconsider earlier** when a host build ships to people outside the
+    maintainer's own machines, or a host adds a sync or restore path into its
+    support folder.
 
 ## Abuse cases and controls
 
