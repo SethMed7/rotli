@@ -40,3 +40,30 @@ impl AppHost {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// Only the `rotli` binary expands Rotli's own Tauri context, which
+    /// embeds `../dist`. The library never does, so a host crate that links
+    /// it (`run_with_host`) compiles without Rotli's front end.
+    #[test]
+    fn only_the_standalone_binary_expands_rotlis_context() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let main = std::fs::read_to_string(src.join("main.rs")).unwrap();
+        assert!(main.contains(concat!("rotli_lib::run(tauri::generate_context", "!())")), "{main}");
+        let mut stack = vec![src.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|ext| ext == "rs") && path != src.join("main.rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    assert!(!text.contains(concat!("generate_context", "!(")), "{}", path.display());
+                }
+            }
+        }
+    }
+}

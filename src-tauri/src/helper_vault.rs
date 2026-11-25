@@ -237,9 +237,13 @@ fn read_config(path: &Path) -> Option<VaultConfig> {
     (!id.is_empty()).then_some(VaultConfig { root, id })
 }
 
-/// Validate `folder`, keep the id when it is the root already served, and
-/// persist the config owner-only. Shared by `--vault` and `vault_choose`.
+/// Validate `folder` (a host identity refuses a folder Rotli already uses but
+/// keeps the root it serves), keep the id when it is the root already served,
+/// and persist the config owner-only. Shared by `--vault` and `vault_choose`.
 pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
+    choose_config_as(crate::app_identity::APP_IDENTIFIER, config_path, folder)
+}
+pub(crate) fn choose_config_as(identifier: &str, config_path: &Path, folder: &Path) -> Result<VaultConfig, String> {
     let root = fs::canonicalize(folder).map_err(|e| format!("couldn't open {}: {e}", folder.display()))?;
     if !root.is_dir() {
         return Err(format!("{} is not a folder", root.display()));
@@ -253,6 +257,7 @@ pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultCo
             root.display()
         ));
     }
+    crate::app_identity::refuse_existing_vault_for(identifier, &root, &Vec::from_iter(read_config(config_path).map(|c| c.root)))?;
     let id = match read_config(config_path) {
         Some(existing) if existing.root == root => existing.id,
         _ => format!("hv_{}", uuid::Uuid::new_v4().simple()),

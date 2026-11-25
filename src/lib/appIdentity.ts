@@ -4,7 +4,7 @@
  * (src-tauri/src/app_identity.rs); this side only decides what a person sees.
  * State that two installed apps would share (the update feed, the Keychain,
  * OS-wide shortcuts, the Finder quick action, existing vaults) belongs to the
- * standalone build. docs/architecture/host-seams.md */
+ * standalone build. Rust alone refuses an existing vault, in the host's words. docs/architecture/host-seams.md */
 
 export const STANDALONE_IDENTIFIER = "com.rotli.app";
 
@@ -49,22 +49,20 @@ export function ownsSharedStateFor(identifier: string): boolean {
 
 export const OWNS_SHARED_STATE = ownsSharedStateFor(APP_IDENTIFIER);
 
-/** Rotli's neutral sentence for a folder it already uses as a vault; a host
- * supplies its own (HostWords.existingVault). Rust has its own copy of the
- * rule and its own default sentence. */
-export const EXISTING_VAULT_REFUSAL =
-  "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder.";
+/** Shown instead of the app when the front end and the running app disagree
+ * on which app this is. */
+export const IDENTITY_MISMATCH =
+  "This window was built for a different app than the one running it, so it won't open. Rebuild the app.";
 
-/** Why a picked folder can't be opened by this identity, or null. The
- * standalone build refuses nothing; any other refuses a folder the read-only
- * inspection reads as a Rotli vault (`kind: "memex"`). Rust holds the full
- * rule on its own: a vault's `.rotli/` sidecar alone, a folder inside a
- * vault, and a folder holding one (src-tauri/src/app_identity.rs). */
-export function existingVaultRefusal(
-  identifier: string,
-  inspection: { kind: string },
-  sentence: string = EXISTING_VAULT_REFUSAL,
-): string | null {
-  if (ownsSharedStateFor(identifier)) return null;
-  return inspection.kind === "memex" ? sentence : null;
+/** Whether the front end may start: the identifier it was built with
+ * (APP_IDENTIFIER, the standalone one when a bundle's Vite config left the
+ * define out) must be the one the running app reports. Rust already exits
+ * when its own compiled ID differs from that runtime ID, so all three agree
+ * or nothing runs. A lookup that fails is a mismatch. */
+export async function identityHolds(built: string, runtime: () => Promise<string>): Promise<boolean> {
+  try {
+    return (await runtime()) === built;
+  } catch {
+    return false;
+  }
 }

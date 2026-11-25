@@ -130,6 +130,9 @@ pub struct BreveRoutine {
 // `breve::` paths (split 2026-09-02 to hold this file's size ceiling).
 #[path = "breve_health.rs"]
 pub(crate) mod breve_health;
+#[path = "breve_dev_roots.rs"]
+mod breve_dev_roots;
+use breve_dev_roots::dev_production_roots;
 #[path = "breve_pdf.rs"]
 pub(crate) mod breve_pdf;
 #[cfg(test)]
@@ -283,24 +286,12 @@ pub struct BreveDeliverySettings {
 }
 
 fn production_roots_for_dev(app: &tauri::AppHandle) -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-    if let Ok(config_dir) = app.path().app_config_dir() {
-        // raw read (outside-vault): app config outside any vault
-        if let Some(config) = fs::read_to_string(config_dir.join("corpus.json"))
-            .ok()
-            .and_then(|body| serde_json::from_str::<crate::corpus::CorpusConfig>(&body).ok())
-        {
-            roots.push(config.corpus.abs_path);
-        }
-    }
-    if let Some(root) = std::env::var_os("MEMEX_KNOWLEDGE").map(PathBuf::from) {
-        roots.push(root);
-    }
-    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
-        roots.push(home.join("memex-vault"));
-        roots.push(home.join("Documents/rotli"));
-    }
-    roots
+    dev_production_roots(
+        crate::app_identity::owns_shared_state(),
+        app.path().app_config_dir().ok(),
+        std::env::var_os("MEMEX_KNOWLEDGE").map(PathBuf::from),
+        std::env::var_os("HOME").map(PathBuf::from),
+    )
 }
 
 fn production_resend_configured_for_dev(home: &Path) -> bool {
@@ -2241,6 +2232,7 @@ mod tests {
     use super::breve_health::notification_from_scheduler_line;
     use super::breve_pdf::BrevePdfThemePreset;
     use super::*;
+
     use tempfile::tempdir;
 
     #[test]

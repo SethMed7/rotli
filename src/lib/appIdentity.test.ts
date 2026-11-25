@@ -3,11 +3,10 @@ import { readFileSync } from "node:fs";
 
 import {
   APP_IDENTIFIER,
-  EXISTING_VAULT_REFUSAL,
   OWNS_SHARED_STATE,
   STANDALONE_IDENTIFIER,
   bundleIdentifier,
-  existingVaultRefusal,
+  identityHolds,
   ownsSharedStateFor,
 } from "./appIdentity";
 
@@ -39,10 +38,23 @@ test("only the standalone identifier owns shared state; any other fails closed",
   expect(others.filter(ownsSharedStateFor)).toEqual([]);
 });
 
-test("a host identity refuses a folder Rotli already uses; the standalone one refuses nothing", () => {
-  expect(existingVaultRefusal(HOST, { kind: "memex" })).toBe(EXISTING_VAULT_REFUSAL);
-  expect(existingVaultRefusal(HOST, { kind: "memex" }, "Host words.")).toBe("Host words.");
-  expect(existingVaultRefusal(HOST, { kind: "markdown" })).toBeNull();
-  expect(existingVaultRefusal(HOST, { kind: "empty" })).toBeNull();
-  expect(existingVaultRefusal(STANDALONE_IDENTIFIER, { kind: "memex" })).toBeNull();
+test("the front end starts only under the app it was built for", async () => {
+  expect(await identityHolds(HOST, async () => HOST)).toBe(true);
+  expect(await identityHolds(STANDALONE_IDENTIFIER, async () => STANDALONE_IDENTIFIER)).toBe(true);
+  // a host bundle whose Vite config forgot the define reads as standalone: stop
+  expect(await identityHolds(STANDALONE_IDENTIFIER, async () => HOST)).toBe(false);
+  expect(await identityHolds(HOST, async () => STANDALONE_IDENTIFIER)).toBe(false);
+  // a runtime that can't say which app it is doesn't get the app either
+  expect(
+    await identityHolds(HOST, async () => {
+      throw new Error("no IPC");
+    }),
+  ).toBe(false);
+});
+
+test("the desktop app checks its identity before it renders anything", () => {
+  const main = read("src/main.tsx");
+  const check = main.indexOf("identityHolds(");
+  expect(check).toBeGreaterThan(-1);
+  expect(check).toBeLessThan(main.indexOf("ReactDOM.createRoot("));
 });

@@ -19,14 +19,10 @@ fn imported_marker_in_place_matches_fixture() {
     }
 }
 
-/// The one identity that owns every vault, and the sentence any other one
-/// shows when it refuses a folder Rotli already uses.
+/// The one identity that owns every vault. Only Rust refuses an existing
+/// vault, so its sentence has no TS twin.
 #[test]
 fn app_identity_matches_fixture() {
     let identity = entry("appIdentity");
     assert_eq!(crate::app_identity::STANDALONE_IDENTIFIER, identity["standaloneIdentifier"].as_str().unwrap());
-    assert_eq!(
-        crate::app_identity::HostWords::default().existing_vault,
-        identity["existingVaultRefusal"].as_str().unwrap()
-    );
 }

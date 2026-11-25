@@ -88,3 +88,34 @@ test("a host pane can never take a Rotli pane's id", () => {
     expect(() => settingsNav("desktop", { settingsPanes: [pane(id)] })).toThrow("already Rotli's");
   }
 });
+
+test("a host can reorder the nav: the panes it names take their slots in its order", () => {
+  const host: AppHost = { notes: false, settingsPanes: [pane("capabilities", "appearance"), pane("cards")] };
+  expect(ids(host)).toEqual(["general", "appearance", "capabilities", "connections", "cards", "about"]);
+  expect(ids({ ...host, navOrder: ["general", "appearance", "connections", "capabilities"] })).toEqual([
+    "general",
+    "appearance",
+    "connections",
+    "capabilities",
+    "cards",
+    "about",
+  ]);
+  // a notes pane this build doesn't show is skipped, not an error
+  expect(ids({ notes: false, navOrder: ["connections", "location", "general"] })).toEqual([
+    "connections",
+    "appearance",
+    "general",
+    "about",
+  ]);
+  expect(() => ids({ navOrder: ["general", "nowhere"] })).toThrow("unknown");
+  expect(() => ids({ navOrder: ["general", "general"] })).toThrow("twice");
+  // no order, or an empty one, changes nothing
+  expect(ids({ navOrder: [] })).toEqual(ROTLI_DESKTOP);
+});
+
+test("a host's About label names the About row; Rotli's stays About Rotli", () => {
+  const about = (host: AppHost | null) =>
+    settingsNav("desktop", host).find((row) => row.id === "about")?.label;
+  expect(about(null)).toBe("About Rotli");
+  expect(about({ words: { aboutLabel: "About Synthetic" } })).toBe("About Synthetic");
+});

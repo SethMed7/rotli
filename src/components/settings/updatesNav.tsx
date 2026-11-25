@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 
-import { updatesWords } from "../../host/registry";
+import { hostVersion, navFootLabel, productName, updatesWords } from "../../host/registry";
 import {
   checkForUpdateNow,
   installUpdateAndRelaunch,
@@ -115,7 +115,7 @@ export function SettingsNavUpdates() {
   return (
     <div className={offer ? "set-nav-update has-update" : "set-nav-update"}>
       <div className="set-nav-update-text" aria-live="polite">
-        <span className="set-nav-version">{version ? `Rotli ${version}` : "Rotli"}</span>
+        <span className="set-nav-version">{navFootLabel(productName(), hostVersion() ?? version)}</span>
         {status && <span className="set-nav-update-status">{status}</span>}
       </div>
       {feed && state.kind === "error" && (

@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 
-import type { AppHost, HostSettingsPane } from "../../host/registry";
+import { type AppHost, type HostSettingsPane, aboutLabel } from "../../host/registry";
 import type { Platform } from "../../lib/featurePolicy";
 import { QuokkaMark } from "../character";
 import {
@@ -88,7 +88,7 @@ export function settingsNav(platform: Platform, host: AppHost | null): NavEntry[
   const notes = host?.notes !== false;
   const shown: NavEntry[] = BUILTIN_NAV.filter(
     (pane) => !(platform === "web" && WEB_HIDDEN_PANES.has(pane.id)) && (notes || !NOTES_PANES.has(pane.id)),
-  ).map((pane) => ({ ...pane }));
+  ).map((pane) => (pane.id === "about" ? { ...pane, label: aboutLabel(host) } : { ...pane }));
   const taken = new Set<string>(BUILTIN_NAV.map((pane) => pane.id));
   for (const pane of host?.settingsPanes ?? []) {
     if (taken.has(pane.id)) throw new Error(`Settings pane id ${JSON.stringify(pane.id)} is already Rotli's`);
@@ -106,5 +106,19 @@ export function settingsNav(platform: Platform, host: AppHost | null): NavEntry[
     }
     shown.splice(at, 0, entry);
   }
-  return shown;
+  return reordered(shown, host?.navOrder ?? [], taken);
+}
+
+/** `shown` with the panes `order` names trading places among the slots they
+ * hold, in `order`'s order; every other pane keeps its slot. A pane this
+ * build doesn't show is skipped; an id no pane has, or one named twice,
+ * throws. */
+function reordered(shown: NavEntry[], order: readonly string[], known: ReadonlySet<string>): NavEntry[] {
+  if (new Set(order).size !== order.length) throw new Error("A Settings nav order names a pane twice");
+  const unknown = order.find((id) => !known.has(id));
+  if (unknown !== undefined)
+    throw new Error(`A Settings nav order names an unknown pane ${JSON.stringify(unknown)}`);
+  const named = order.filter((id) => shown.some((row) => row.id === id));
+  const queue = named.map((id) => shown.find((row) => row.id === id) as NavEntry);
+  return shown.map((row) => (named.includes(row.id) ? (queue.shift() as NavEntry) : row));
 }

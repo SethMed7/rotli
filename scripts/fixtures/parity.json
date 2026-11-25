@@ -2,10 +2,9 @@
   "_comment": "TS↔Rust shared constants — parity by fixture, never by codegen or source scraping. Each entry declares its source of truth; hand-written tests on BOTH sides (src-tauri/src/parity_tests.rs via include_str!, src/lib/parity.test.ts via the real TS modules) assert their named constants equal these values, so a one-sided edit fails cargo test or bun test. scripts/check-parity.mjs (in the lint chain) validates this file's shape and that every entry key is referenced by both suites. endpointLocality is behavioral: the two implementations stay independent (security policy is never shared across the boundary) and the fixture pins the agreed verdicts.",
   "entries": {
     "appIdentity": {
-      "sourceOfTruth": "src/lib/appIdentity.ts STANDALONE_IDENTIFIER/EXISTING_VAULT_REFUSAL ↔ src-tauri/src/app_identity.rs STANDALONE_IDENTIFIER/HostWords::default().existing_vault",
+      "sourceOfTruth": "src/lib/appIdentity.ts STANDALONE_IDENTIFIER ↔ src-tauri/src/app_identity.rs STANDALONE_IDENTIFIER",
       "value": {
-        "standaloneIdentifier": "com.rotli.app",
-        "existingVaultRefusal": "Rotli already uses this folder as a vault, so this app won't open it. Choose another folder."
+        "standaloneIdentifier": "com.rotli.app"
       }
     },
     "byteRevisionVector": {

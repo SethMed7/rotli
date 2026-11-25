@@ -4,15 +4,12 @@
 // is the second layer), and applies the access-mode/contract reads. Components
 // never call lib/tauri's memex_* directly — they go through useMemex hooks.
 
-import { existingVaultWords } from "../host/registry";
-import { APP_IDENTIFIER, existingVaultRefusal, ownsSharedStateFor } from "../lib/appIdentity";
 import {
   type DetectedMemex,
   type MemexChatSummary,
   type MemexValidateReport,
   corpusChooseFolder,
   corpusConnectBrain,
-  corpusInspectFolder,
   corpusForgetBrain,
   corpusInitMemex,
   corpusListConfig,
@@ -81,33 +78,10 @@ export const detect = (): Promise<DetectedMemex[]> => memexDetect();
 export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFolder(path);
 
 /** Ask for a vault folder in the macOS panel: null when the person cancels.
- * A host build then refuses a folder Rotli already uses as a vault; Rust
- * refuses the same folder on its own (src-tauri/src/app_identity.rs). */
-export const pickVaultFolder = (title: string): Promise<string | null> =>
-  pickVaultFolderAs(APP_IDENTIFIER, title, {
-    pick: memexPickFolder,
-    inspect: corpusInspectFolder,
-    refusal: existingVaultWords(),
-  });
-
-/** `pickVaultFolder` for a given identity: the panel, then, outside the
- * standalone build, a read-only look that refuses a folder Rotli already
- * uses. The standalone build never inspects here. */
-export async function pickVaultFolderAs(
-  identifier: string,
-  title: string,
-  deps: {
-    pick: (title: string) => Promise<string | null>;
-    inspect: (path: string) => Promise<{ kind: string }>;
-    refusal: string;
-  },
-): Promise<string | null> {
-  const path = await deps.pick(title);
-  if (!path || ownsSharedStateFor(identifier)) return path;
-  const why = existingVaultRefusal(identifier, await deps.inspect(path), deps.refusal);
-  if (why) throw new Error(why);
-  return path;
-}
+ * A host build's Rust side refuses a folder Rotli already uses as a vault,
+ * in the host's own words (src-tauri/src/app_identity.rs); the rejection
+ * reaches the person as Rust words it. */
+export const pickVaultFolder = (title: string): Promise<string | null> => memexPickFolder(title);
 
 /** Switch to a vault already registered with Rotli. The backend resolves its
  * trusted path by id and rebinds the live default store. */

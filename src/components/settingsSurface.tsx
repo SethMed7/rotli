@@ -38,7 +38,7 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import { appHost, notesOn, updatesWords } from "../host/registry";
+import { aboutLabel, appHost, notesOn, updatesWords } from "../host/registry";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -141,6 +141,7 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FinderQuickActionSettings } from "./settings/finderQuickActionSettings";
 import { FrontsSettings } from "./settings/frontsSettings";
+import { HostBlocks } from "./settings/hostBlocks";
 import { LibrarianCopyOffer } from "./settings/librarianCopyOffer";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { LINK_PASS } from "./settings/linkFormatSettings";
@@ -448,6 +449,7 @@ function GeneralPane() {
   return (
     <>
       <PaneHead title="General" char="base" motif="general" />
+      <HostBlocks pane="general" place="before" />
       {/* visitor vs resident, the Dock, and the menu bar are the Mac app's */}
       {PLATFORM === "desktop" && (
         <>
@@ -821,6 +823,7 @@ function GeneralPane() {
       >
         {confirmReset ? "Click again to reset & re-onboard" : "Reset & re-onboard…"}
       </button>
+      <HostBlocks pane="general" place="after" />
     </>
   );
 }
@@ -2896,7 +2899,9 @@ function ConnectionsPane() {
   return (
     <>
       <PaneHead title="Connections" char="chat" motif="connections" />
+      <HostBlocks pane="connections" place="before" />
       <ConnectionsSettings agents={LAUNCH_FEATURES.agents} braveKeyRow={<BraveKeyRow />} />
+      <HostBlocks pane="connections" place="after" />
     </>
   );
 }
@@ -2905,12 +2910,14 @@ function AboutRotliPane() {
   const version = useAppVersion();
   return (
     <>
-      <PaneHead title="About Rotli" char="waving" motif="about" />
+      <PaneHead title={aboutLabel()} char="waving" motif="about" />
+      <HostBlocks pane="about" place="before" />
       <AboutPane
         version={version}
         feedbackUrl={feedbackUrl(version, guideOs(navigator.platform || navigator.userAgent))}
         onOpenUrl={(url) => void openUrl(url)}
       />
+      <HostBlocks pane="about" place="after" />
     </>
   );
 }

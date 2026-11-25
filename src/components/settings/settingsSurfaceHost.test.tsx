@@ -12,8 +12,18 @@ import { settingsNav } from "./settingsNav";
 const registry = { ...(await import("../../host/registry")) };
 const react = { ...(await import("react")) };
 const HostBody = () => <p className="setnote">Synthetic host pane body.</p>;
+const Opening = () => <p className="setnote">Synthetic opening block.</p>;
+const Closing = () => <p className="setnote">Synthetic closing block.</p>;
 const host: AppHost = {
   notes: false,
+  paneBlocks: [
+    { pane: "general", place: "before", Block: Opening },
+    { pane: "general", place: "after", Block: Closing },
+    { pane: "connections", place: "before", Block: Opening },
+    { pane: "about", place: "after", Block: Closing },
+  ],
+  navOrder: ["general", "appearance", "connections", "synthetic"],
+  words: { productName: "Synthetic App", version: "2.0.1", aboutLabel: "About Synthetic" },
   settingsPanes: [
     {
       id: "synthetic",
@@ -30,6 +40,11 @@ await mock.module("../../host/registry", () => ({
   ...registry,
   appHost: () => host,
   notesOn: (given: AppHost | null = host) => registry.notesOn(given),
+  paneBlocks: (pane: never, place: never, given: AppHost | null = host) =>
+    registry.paneBlocks(pane, place, given),
+  productName: (given: AppHost | null = host) => registry.productName(given),
+  aboutLabel: (given: AppHost | null = host) => registry.aboutLabel(given),
+  hostVersion: (given: AppHost | null = host) => registry.hostVersion(given),
 }));
 // SSR runs no effects, so the surface starts on the pane under test
 const startAt = (initial: unknown) => (initial === "general" ? selectedPane : initial);
@@ -73,4 +88,36 @@ test("a host pane is its scenery heading with no character, then the host's body
 test("Rotli's own pane keeps its character under a host", () => {
   selectedPane = "general";
   expect(render()).toContain("set-banner-quokka");
+});
+
+test("a host's blocks sit below the heading, before and after Rotli's own body", () => {
+  selectedPane = "general";
+  const html = render();
+  const title = html.indexOf('<h3 class="set-banner-title">General</h3>');
+  const opening = html.indexOf("Synthetic opening block.");
+  const body = html.indexOf("Start fresh");
+  const closing = html.indexOf("Synthetic closing block.");
+  expect(title).toBeGreaterThan(-1);
+  expect([title < opening, opening < body, body < closing]).toEqual([true, true, true]);
+  selectedPane = "connections";
+  expect(render()).toContain("Synthetic opening block.");
+});
+
+test("a host's order, name, version and About label replace Rotli's", () => {
+  selectedPane = "about";
+  const html = render();
+  // the host's order puts its pane fourth, after Rotli's Connections
+  expect(navLabels(html)).toEqual(settingsNav("desktop", host).map((entry) => entry.label));
+  expect(settingsNav("desktop", host).map((entry) => entry.id)).toEqual([
+    "general",
+    "appearance",
+    "connections",
+    "synthetic",
+    "about",
+  ]);
+  expect(navLabels(html).at(-1)).toBe("About Synthetic");
+  expect(html).toContain('<h3 class="set-banner-title">About Synthetic</h3>');
+  expect(html).toContain('<span class="set-nav-version">Synthetic App 2.0.1</span>');
+  expect(html.indexOf("Synthetic closing block.")).toBeGreaterThan(html.indexOf("About Synthetic</h3>"));
+  expect(html).not.toContain("About Rotli");
 });

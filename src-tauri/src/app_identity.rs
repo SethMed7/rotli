@@ -88,7 +88,7 @@ pub(crate) fn require_shared_state() -> Result<(), String> {
     owns_shared_state().then_some(()).ok_or_else(stays_with_rotli)
 }
 
-fn support_dir_for(home: &Path, identifier: &str) -> PathBuf {
+pub(crate) fn support_dir_for(home: &Path, identifier: &str) -> PathBuf {
     #[cfg(target_os = "macos")]
     return home.join("Library/Application Support").join(identifier);
     #[cfg(not(target_os = "macos"))]
@@ -112,6 +112,86 @@ fn scratch_vault_for(support: &Path, identifier: &str) -> Option<PathBuf> {
 /// standalone build, which keeps its historical first-run gate.
 pub(crate) fn scratch_vault_in(support: &Path) -> Option<PathBuf> {
     scratch_vault_for(support, APP_IDENTIFIER)
+}
+
+/// What sits at the scratch path, judged without following a link.
+#[derive(Debug, PartialEq, Eq)]
+enum ScratchState {
+    Missing,
+    Trusted,
+    Untrusted,
+}
+
+/// The scratch path is this build's only while it is a real folder directly
+/// inside a real support folder: never a link, a file, or a folder reached
+/// through one. Before this build has a registry it has bound nothing, so the
+/// folder must also be empty: anything already in it was put there by
+/// someone else.
+fn scratch_state(support: &Path, registry_exists: bool) -> ScratchState {
+    let scratch = support.join(SCRATCH_VAULT);
+    let Ok(meta) = std::fs::symlink_metadata(&scratch) else {
+        return ScratchState::Missing;
+    };
+    let real_support = std::fs::symlink_metadata(support).is_ok_and(|m| m.is_dir());
+    if !real_support || !meta.is_dir() {
+        return ScratchState::Untrusted;
+    }
+    let directly_inside = std::fs::canonicalize(&scratch)
+        .ok()
+        .zip(std::fs::canonicalize(support).ok())
+        .is_some_and(|(scratch, support)| scratch.parent() == Some(support.as_path()));
+    let made_here = registry_exists || std::fs::read_dir(&scratch).is_ok_and(|mut entries| entries.next().is_none());
+    if directly_inside && made_here { ScratchState::Trusted } else { ScratchState::Untrusted }
+}
+
+/// The scratch vault as this build may own it: canonical, and only while it
+/// is a real folder directly inside a real support folder. A link there
+/// (to a person's vault, say) is never this build's.
+fn trusted_scratch_in(support: &Path) -> Option<PathBuf> {
+    (scratch_state(support, true) == ScratchState::Trusted)
+        .then(|| std::fs::canonicalize(support.join(SCRATCH_VAULT)).ok())
+        .flatten()
+}
+
+/// A free name beside the scratch vault for whatever stood in its place.
+fn set_aside_name(support: &Path) -> PathBuf {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs());
+    (0..)
+        .map(|n| match n {
+            0 => support.join(format!("{SCRATCH_VAULT} (set aside {stamp})")),
+            n => support.join(format!("{SCRATCH_VAULT} (set aside {stamp}-{n})")),
+        })
+        .find(|path| std::fs::symlink_metadata(path).is_err())
+        .expect("an unbounded range yields a free name")
+}
+
+/// Make the scratch path safe to bind before anything reads it. An untrusted
+/// entry (a link, a file, a folder this build didn't make) is renamed aside:
+/// the entry itself, so a link's target is never touched. Then, on a first
+/// run, a fresh empty folder takes its place. `Err` means nothing may bind
+/// the scratch path this launch.
+fn settle_scratch_in(support: &Path, registry_exists: bool) -> Result<(), String> {
+    let scratch = support.join(SCRATCH_VAULT);
+    let state = scratch_state(support, registry_exists);
+    if state == ScratchState::Trusted {
+        return Ok(());
+    }
+    if state == ScratchState::Untrusted {
+        let aside = set_aside_name(support);
+        std::fs::rename(&scratch, &aside)
+            .map_err(|e| format!("could not set {} aside ({e})", scratch.display()))?;
+    }
+    if registry_exists && state == ScratchState::Missing {
+        return Ok(()); // a person who moved on from the scratch vault keeps it gone
+    }
+    std::fs::create_dir_all(support).map_err(|e| format!("create {} ({e})", support.display()))?;
+    std::fs::create_dir(&scratch).map_err(|e| format!("create {} ({e})", scratch.display()))?;
+    match scratch_state(support, false) {
+        ScratchState::Trusted => Ok(()),
+        _ => Err(format!("{} changed while it was being made", scratch.display())),
+    }
 }
 
 /// How `rotli open` brings the app forward. The standalone build keeps its
@@ -143,25 +223,43 @@ const DESCENDANT_FOLDER_LIMIT: usize = 50_000;
 
 const TOO_LARGE: &str = "This folder is too large to check for a Rotli vault inside it, so this app won't open it. Choose a smaller folder.";
 
-/// The first vault at or below `root` that `owned` doesn't name, without
-/// following symbolic links. `Err` when the walk can't finish.
-fn unowned_vault_below(root: &Path, owned: &[PathBuf]) -> Result<Option<PathBuf>, String> {
+/// Whether `folder`, or a folder it sits in, holds a vault `owned` doesn't
+/// name. `folder` must be canonical.
+fn inside_unowned_vault(folder: &Path, owned: &[PathBuf]) -> bool {
+    folder.ancestors().any(|dir| holds_vault(dir) && !owned.iter().any(|own| own == dir))
+}
+
+/// The first vault at or below `root` that `owned` doesn't name. A link to a
+/// folder is followed once: it counts as a hit when its target is, sits in,
+/// or holds a vault. `Err` when the walk can't finish within `limit` folders.
+/// An unreadable folder is skipped: this app can't read a vault through it
+/// either.
+fn unowned_vault_below(root: &Path, owned: &[PathBuf], limit: usize) -> Result<Option<PathBuf>, String> {
     let mut stack = vec![root.to_path_buf()];
+    let mut followed = std::collections::HashSet::new();
     let mut seen = 0usize;
     while let Some(dir) = stack.pop() {
         seen += 1;
-        if seen > DESCENDANT_FOLDER_LIMIT {
+        if seen > limit {
             return Err(TOO_LARGE.into());
         }
         if dir != root && holds_vault(&dir) && !owned.contains(&dir) {
             return Ok(Some(dir));
         }
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue; // an unreadable folder can't be opened as notes either
-        };
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
         for entry in entries.filter_map(Result::ok) {
-            if entry.file_type().is_ok_and(|kind| kind.is_dir()) && entry.file_name() != ".rotli" {
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_dir() && entry.file_name() != ".rotli" {
                 stack.push(entry.path());
+            } else if kind.is_symlink() {
+                let Ok(target) = std::fs::canonicalize(entry.path()) else { continue };
+                if !target.is_dir() || !followed.insert(target.clone()) {
+                    continue;
+                }
+                if inside_unowned_vault(&target, owned) {
+                    return Ok(Some(target));
+                }
+                stack.push(target);
             }
         }
     }
@@ -173,15 +271,24 @@ fn unowned_vault_below(root: &Path, owned: &[PathBuf]) -> Result<Option<PathBuf>
 /// vault, sits inside one, or holds one, unless that vault is one this build
 /// itself made or chose (`owned`: canonical paths from its own registry and
 /// its scratch vault). `candidate` must already be canonical.
-fn refuse_existing_vault_for(identifier: &str, candidate: &Path, owned: &[PathBuf]) -> Result<(), String> {
+pub(crate) fn refuse_existing_vault_for(identifier: &str, candidate: &Path, owned: &[PathBuf]) -> Result<(), String> {
+    refuse_existing_vault_within(identifier, candidate, owned, DESCENDANT_FOLDER_LIMIT)
+}
+
+fn refuse_existing_vault_within(
+    identifier: &str,
+    candidate: &Path,
+    owned: &[PathBuf],
+    limit: usize,
+) -> Result<(), String> {
     if owns_shared_state_for(identifier) {
         return Ok(());
     }
     let refused = || Err(words().existing_vault.clone());
-    if candidate.ancestors().any(|folder| holds_vault(folder) && !owned.iter().any(|own| own == folder)) {
+    if inside_unowned_vault(candidate, owned) {
         return refused();
     }
-    match unowned_vault_below(candidate, owned)? {
+    match unowned_vault_below(candidate, owned, limit)? {
         Some(_) => refused(),
         None => Ok(()),
     }
@@ -208,18 +315,28 @@ pub(crate) fn scratch_vault(app: &tauri::AppHandle) -> Option<PathBuf> {
     scratch_vault_in(&support)
 }
 
-/// A fresh host install comes up on its scratch vault, without a person
-/// choosing a folder and without ever looking at another app's registry:
-/// with no `corpus.json` of its own yet, the folder is created so the
-/// first-run probe (`configured_at`) finds it and the migration binds it.
-pub(crate) fn ensure_scratch_vault(app: &tauri::AppHandle) {
-    let Some(scratch) = scratch_vault(app) else { return };
-    if crate::corpus::corpus_config_file(app).is_some_and(|file| file.exists()) {
-        return;
+/// The scratch vault only while this build may own it
+/// (`trusted_scratch_in`), canonical; `None` in the standalone build.
+pub(crate) fn owned_scratch_vault(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    let support = app.path().app_config_dir().ok()?;
+    scratch_vault_in(&support).and_then(|_| trusted_scratch_in(&support))
+}
+
+/// Before anything binds a host build's scratch vault, make it safe to bind
+/// (`settle_scratch_in`): a fresh install comes up on a new, empty folder
+/// that this build made, without a person choosing a folder and without ever
+/// looking at another app's registry. The first-run probe (`configured_at`)
+/// then finds it and the migration binds it. `Err` means the scratch path
+/// could not be made safe, and the caller must stop.
+pub(crate) fn ensure_scratch_vault(app: &tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if owns_shared_state() {
+        return Ok(());
     }
-    if let Err(error) = std::fs::create_dir_all(&scratch) {
-        eprintln!("rotli: could not create the scratch vault {} ({error})", scratch.display());
-    }
+    let support = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let registry_exists = crate::corpus::corpus_config_file(app).is_some_and(|file| file.exists());
+    settle_scratch_in(&support, registry_exists)
 }
 
 /// The folders this build itself bound as notes, canonical: its scratch vault
@@ -227,13 +344,30 @@ pub(crate) fn ensure_scratch_vault(app: &tauri::AppHandle) {
 /// (`app_identity::refuse_existing_vault`) lets these through. A registry that
 /// exists but can't be read is an error, so the refusal holds instead.
 pub(crate) fn owned_roots(app: &tauri::AppHandle) -> Result<Vec<PathBuf>, String> {
-    owned_roots_from(scratch_vault(app), crate::corpus::corpus_config_file(app))
+    owned_roots_from(owned_scratch_vault(app), crate::corpus::corpus_config_file(app))
 }
 
-/// `owned_roots` from a scratch vault and a registry file, for the headless
-/// CLI, which has no app handle (`app_identity::refuse_pinned_root`).
+/// Whether a stored path now reaches its folder through a link a person can
+/// make. The operating system's own links (`/var`, `/tmp` on macOS, owned by
+/// root) don't count.
+fn reached_through_link(path: &Path) -> bool {
+    path.ancestors().any(|part| {
+        std::fs::symlink_metadata(part).is_ok_and(|meta| {
+            #[cfg(unix)]
+            let made_by_a_person = std::os::unix::fs::MetadataExt::uid(&meta) != 0;
+            #[cfg(not(unix))]
+            let made_by_a_person = true;
+            meta.file_type().is_symlink() && made_by_a_person
+        })
+    })
+}
+
+/// `owned_roots` from a scratch vault (already trusted) and a registry file,
+/// for the headless CLI too, which has no app handle
+/// (`app_identity::refuse_pinned_root`). A registry root that now resolves
+/// through a link owns nothing: the folder behind it was not the one bound.
 pub(crate) fn owned_roots_from(scratch: Option<PathBuf>, registry: Option<PathBuf>) -> Result<Vec<PathBuf>, String> {
-    let mut roots: Vec<PathBuf> = scratch.into_iter().collect();
+    let mut roots: Vec<PathBuf> = Vec::new();
     if let Some(file) = registry.filter(|file| file.exists()) {
         let config = crate::corpus::read_config_path(&file)
             .ok_or_else(|| format!("Rotli couldn't read {}, so it won't open another folder yet.", file.display()))?;
@@ -241,7 +375,8 @@ pub(crate) fn owned_roots_from(scratch: Option<PathBuf>, registry: Option<PathBu
         roots.extend(config.brains.into_iter().map(|brain| brain.abs_path));
         roots.extend(config.folders.into_iter().map(|folder| folder.abs_path));
     }
-    Ok(roots.into_iter().filter_map(|root| std::fs::canonicalize(root).ok()).collect())
+    let registered = roots.into_iter().filter(|root| !reached_through_link(root));
+    Ok(scratch.into_iter().chain(registered.filter_map(|root| std::fs::canonicalize(root).ok())).collect())
 }
 
 /// The headless CLI's `ROTLI_CORPUS_ROOT` pin, under the same refusal as a
@@ -254,239 +389,11 @@ pub(crate) fn refuse_pinned_root(path: &Path) -> Result<(), String> {
     let candidate = std::fs::canonicalize(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     refuse_existing_vault(&candidate, || {
         let home = std::env::var("HOME").map_err(|_| "HOME is unavailable")?;
-        let scratch = scratch_vault_in(&support_dir(Path::new(&home)));
-        owned_roots_from(scratch, Some(crate::workspace::production_config_path()?))
+        let support = support_dir(Path::new(&home));
+        owned_roots_from(trusted_scratch_in(&support), Some(crate::workspace::production_config_path()?))
     })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A host identity for tests; never a real product's ID.
-    const HOST: &str = "com.example.host";
-
-    fn config_identifier(path: &str) -> String {
-        let text = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(path)).unwrap();
-        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-        value["identifier"].as_str().unwrap().to_string()
-    }
-
-    /// The identifier this build was compiled as: `ROTLI_APP_IDENTIFIER`, else
-    /// the overlay cargo was given (`TAURI_CONFIG`), else `tauri.conf.json`.
-    /// Holds for every identity: plain `cargo test` is the standalone one; from
-    /// src-tauri, `ROTLI_APP_IDENTIFIER=com.example.host CARGO_TARGET_DIR=<own
-    /// dir> cargo test --lib` is a host build.
-    #[test]
-    fn this_build_is_the_identity_it_was_compiled_for() {
-        // the same variables, read again where the test runs
-        let overlay = std::env::var("TAURI_CONFIG")
-            .ok()
-            .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
-            .and_then(|value| value["identifier"].as_str().map(str::to_string));
-        let expected = std::env::var("ROTLI_APP_IDENTIFIER")
-            .ok()
-            .filter(|id| !id.is_empty())
-            .or(overlay)
-            .unwrap_or_else(|| config_identifier("tauri.conf.json"));
-        assert_eq!(APP_IDENTIFIER, expected);
-        let standalone = expected == STANDALONE_IDENTIFIER;
-        assert_eq!(owns_shared_state(), standalone);
-        assert_eq!(require_shared_state().is_ok(), standalone);
-        let support = support_dir(Path::new("/Users/someone"));
-        assert!(support.ends_with(&expected), "{support:?}");
-        assert_eq!(scratch_vault_in(&support).is_none(), standalone);
-        if standalone {
-            assert_eq!(open_app_args(), ["-a", "rotli"]);
-        } else {
-            assert_eq!(open_app_args(), ["-b", expected.as_str()]);
-            assert!(!support.to_string_lossy().contains(STANDALONE_IDENTIFIER));
-        }
-        assert!(matches_runtime(&expected));
-        assert!(!matches_runtime(if standalone { HOST } else { STANDALONE_IDENTIFIER }));
-    }
-
-    #[test]
-    fn the_standalone_config_keeps_its_identifier() {
-        assert_eq!(config_identifier("tauri.conf.json"), STANDALONE_IDENTIFIER);
-    }
-
-    #[test]
-    fn every_identity_derives_its_paths_from_its_identifier() {
-        let home = Path::new("/Users/someone");
-        assert_eq!(
-            support_dir_for(home, STANDALONE_IDENTIFIER),
-            home.join(if cfg!(target_os = "macos") {
-                "Library/Application Support/com.rotli.app"
-            } else {
-                ".config/com.rotli.app"
-            })
-        );
-        let host = support_dir_for(home, HOST);
-        assert!(host.ends_with(HOST), "{host:?}");
-        assert!(!host.to_string_lossy().contains("com.rotli.app"));
-        assert_eq!(scratch_vault_for(&support_dir_for(home, STANDALONE_IDENTIFIER), STANDALONE_IDENTIFIER), None);
-        assert_eq!(scratch_vault_for(&host, HOST), Some(host.join("Scratch vault")));
-        assert_eq!(support_dir(home), support_dir_for(home, APP_IDENTIFIER));
-    }
-
-    #[test]
-    fn only_the_standalone_identifier_owns_shared_state() {
-        assert!(owns_shared_state_for("com.rotli.app"));
-        for other in [HOST, "com.rotli.dev", "", "com.rotli.app.extra", "COM.ROTLI.APP"] {
-            assert!(!owns_shared_state_for(other), "{other}");
-        }
-    }
-
-    /// Under a host identity, every writer of state outside the support folder
-    /// refuses before it reaches the disk or launchd: the login item, the
-    /// local-model agent, the Finder quick action. Runs only in a host build
-    /// (see the command above); the pure checks below hold in every build.
-    #[test]
-    fn a_host_build_refuses_every_shared_writer() {
-        if owns_shared_state() {
-            return;
-        }
-        let refused = Err(stays_with_rotli());
-        if crate::feature_policy::breve_enabled() {
-            assert_eq!(crate::breve::install_rotli_login_agent(), refused);
-        }
-        assert_eq!(crate::localmodel::local_model_set_default("any-model".into()), refused);
-        assert_eq!(crate::localmodel::local_model_uninstall("any-model".into()), refused);
-        assert_eq!(crate::finder_quick_action::finder_quick_action_status(), Ok("unavailable".to_string()));
-        assert_eq!(open_app_args(), ["-b", APP_IDENTIFIER]);
-    }
-
-    #[test]
-    fn rotli_words_are_neutral_until_a_host_supplies_its_own() {
-        let defaults = HostWords::default();
-        for sentence in [&defaults.shared_state, &defaults.no_keychain, &defaults.existing_vault] {
-            assert!(!sentence.is_empty());
-            assert!(sentence.ends_with('.'), "{sentence}");
-        }
-        assert_eq!(stays_with_rotli(), words().shared_state);
-        assert_eq!(no_keychain(), words().no_keychain);
-    }
-
-    fn folder(base: &Path, relative: &str) -> PathBuf {
-        let path = base.join(relative);
-        std::fs::create_dir_all(&path).unwrap();
-        std::fs::canonicalize(path).unwrap()
-    }
-
-    fn make_vault(path: &Path) {
-        std::fs::create_dir_all(path.join(".rotli")).unwrap();
-    }
-
-    fn existing_vault_refusal() -> Result<(), String> {
-        Err(HostWords::default().existing_vault)
-    }
-
-    /// The one rule, both ways: a host identity refuses a folder Rotli
-    /// already uses; the standalone identity owns every vault.
-    #[test]
-    fn a_host_identity_refuses_a_folder_rotli_already_uses() {
-        let temp = tempfile::tempdir().unwrap();
-        let vault = folder(temp.path(), "vault");
-        make_vault(&vault);
-        assert_eq!(refuse_existing_vault_for(HOST, &vault, &[]), existing_vault_refusal());
-        assert_eq!(refuse_existing_vault_for(STANDALONE_IDENTIFIER, &vault, &[]), Ok(()));
-    }
-
-    #[test]
-    fn a_host_identity_refuses_every_mark_of_a_vault() {
-        let temp = tempfile::tempdir().unwrap();
-        let marked = folder(temp.path(), "marked");
-        std::fs::write(marked.join("memex.json"), r#"{"id":"mx_fixture"}"#).unwrap();
-        assert_eq!(refuse_existing_vault_for(HOST, &marked, &[]), existing_vault_refusal());
-        let sidecar_only = folder(temp.path(), "sidecar-only");
-        std::fs::create_dir_all(sidecar_only.join(".rotli")).unwrap();
-        assert_eq!(refuse_existing_vault_for(HOST, &sidecar_only, &[]), existing_vault_refusal());
-    }
-
-    #[test]
-    fn a_host_identity_refuses_a_folder_inside_or_around_a_vault() {
-        let temp = tempfile::tempdir().unwrap();
-        let vault = folder(temp.path(), "outer/vault");
-        make_vault(&vault);
-        let inside = folder(&vault, "wiki/people");
-        assert_eq!(refuse_existing_vault_for(HOST, &inside, &[]), existing_vault_refusal());
-        let around = folder(temp.path(), "outer");
-        assert_eq!(refuse_existing_vault_for(HOST, &around, &[]), existing_vault_refusal());
-    }
-
-    #[test]
-    fn a_host_identity_opens_plain_folders_and_its_own_vaults() {
-        let temp = tempfile::tempdir().unwrap();
-        let plain = folder(temp.path(), "plain");
-        std::fs::write(plain.join("note.md"), "# A note\n").unwrap();
-        folder(&plain, "sub");
-        assert_eq!(refuse_existing_vault_for(HOST, &plain, &[]), Ok(()));
-        let own = folder(temp.path(), "own");
-        make_vault(&own);
-        assert_eq!(refuse_existing_vault_for(HOST, &own, std::slice::from_ref(&own)), Ok(()));
-        let inside_own = folder(&own, "projects");
-        assert_eq!(refuse_existing_vault_for(HOST, &inside_own, std::slice::from_ref(&own)), Ok(()));
-        // its own vault never excuses another one beside it
-        let other = folder(&own, "projects/other");
-        make_vault(&other);
-        assert_eq!(refuse_existing_vault_for(HOST, &own, std::slice::from_ref(&own)), existing_vault_refusal());
-    }
-
-    #[test]
-    fn this_build_refuses_exactly_as_its_identity_says() {
-        let temp = tempfile::tempdir().unwrap();
-        let vault = folder(temp.path(), "vault");
-        make_vault(&vault);
-        let mut asked = false;
-        let verdict = refuse_existing_vault(&vault, || {
-            asked = true;
-            Ok(Vec::new())
-        });
-        if owns_shared_state() {
-            assert_eq!(verdict, Ok(()));
-            assert!(!asked, "the standalone build never reads a registry for this");
-        } else {
-            assert_eq!(verdict, Err(words().existing_vault.clone()));
-            assert!(asked);
-        }
-        if !owns_shared_state() {
-            // an unreadable registry refuses rather than opening
-            let plain = folder(temp.path(), "plain");
-            assert!(refuse_existing_vault(&plain, || Err("registry unreadable".into())).is_err());
-        }
-    }
-
-    /// The headless CLI's root pin refuses what the app refuses: an existing
-    /// vault in a host build, nothing in the standalone one. (A host build's
-    /// own registry is read where it lives; on a machine without that build
-    /// it is absent, so no root is owned.)
-    #[test]
-    fn the_cli_root_pin_meets_the_same_refusal() {
-        let temp = tempfile::tempdir().unwrap();
-        let vault = folder(temp.path(), "vault");
-        make_vault(&vault);
-        let plain = folder(temp.path(), "plain");
-        assert_eq!(refuse_pinned_root(&plain), Ok(()));
-        if owns_shared_state() {
-            assert_eq!(refuse_pinned_root(&vault), Ok(()));
-        } else {
-            assert_eq!(refuse_pinned_root(&vault), Err(words().existing_vault.clone()));
-        }
-    }
-
-    /// Every way a person binds a folder as notes passes through
-    /// `reject_privileged_root`, and that check consults the vault refusal
-    /// before anything writes to the folder.
-    #[test]
-    fn every_root_choice_meets_the_vault_refusal() {
-        let lib = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs")).unwrap();
-        let start = lib.find("pub(crate) fn reject_privileged_root(").expect("the root check exists");
-        let body = &lib[start..start + lib[start..].find("\n}\n").unwrap()];
-        assert!(body.contains("app_identity::refuse_existing_vault("), "{body}");
-        let choose = &lib[lib.find("fn corpus_choose_folder_blocking(").unwrap()..];
-        let check = choose.find("reject_privileged_root(").unwrap();
-        let heal = choose.find("vault_marker::heal_best_effort(").unwrap();
-        assert!(check < heal, "the refusal must run before the heal writes to the folder");
-    }
-}
+#[path = "app_identity_tests.rs"]
+mod tests;

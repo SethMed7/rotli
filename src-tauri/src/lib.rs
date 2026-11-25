@@ -797,8 +797,9 @@ pub(crate) fn reject_privileged_root(
     use tauri::Manager;
     let candidate = std::fs::canonicalize(candidate)
         .map_err(|error| format!("canonicalize selected folder: {error}"))?;
-    // a host build's own scratch vault sits in its support folder on purpose
-    if app_identity::scratch_vault(app).and_then(|scratch| std::fs::canonicalize(scratch).ok()).as_ref() == Some(&candidate) {
+    // a host build's own scratch vault sits in its support folder on purpose;
+    // only while it is still the real folder this build made
+    if app_identity::owned_scratch_vault(app).as_ref() == Some(&candidate) {
         return Ok(());
     }
     let mut protected = Vec::new();
@@ -2049,26 +2050,21 @@ fn set_summon_shortcut(
 pub use app_host::AppHost;
 pub use app_identity::HostWords;
 
-/// Standalone Rotli: the shell with no host.
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    launch(None)
+/// Standalone Rotli: the shell with no host, under the Tauri context the
+/// `rotli` binary expands (src/main.rs). The library never expands a context
+/// itself, so a host crate links it without Rotli's front end.
+pub fn run(context: tauri::Context<tauri::Wry>) {
+    launch(context, Vec::new())
 }
 
 /// The shell under a host build (`app_host.rs`): its context, its plugins,
 /// its wording.
 pub fn run_with_host(host: AppHost) {
-    launch(Some(host))
+    app_identity::set_host_words(host.words);
+    launch(host.context, host.plugins)
 }
 
-fn launch(host: Option<AppHost>) {
-    let (context, host_plugins) = match host {
-        Some(host) => {
-            app_identity::set_host_words(host.words);
-            (host.context, host.plugins)
-        }
-        None => (tauri::generate_context!(), Vec::new()),
-    };
+fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::TauriPlugin<tauri::Wry>>) {
     // before any window exists: the webview reads this default at creation
     spellcheck::enable_continuous_spellcheck_by_default();
     let builder = tauri::Builder::default()
@@ -2376,7 +2372,7 @@ fn launch(host: Option<AppHost>) {
         .setup(|app| {
             // A stale build cache, or a host context naming another bundle ID,
             // must not give one identity the other's behaviour: stop before
-            // any disk is touched.
+            // the scratch vault is made or any folder is bound.
             if !app_identity::matches_runtime(&app.config().identifier) {
                 eprintln!(
                     "rotli: this binary was built as {} but runs as {}; rebuild it",
@@ -2399,8 +2395,13 @@ fn launch(host: Option<AppHost>) {
             #[cfg(all(target_os = "macos", debug_assertions))]
             apply_dev_dock_icon(app.handle());
 
-            // A host build's first run binds its scratch vault (and only it).
-            app_identity::ensure_scratch_vault(app.handle());
+            // A host build's first run binds its scratch vault (and only it),
+            // once it is a real, empty folder this build made. If it can't be
+            // made safe, nothing may bind it: stop.
+            if let Err(error) = app_identity::ensure_scratch_vault(app.handle()) {
+                eprintln!("rotli: the scratch vault is not safe to open ({error})");
+                std::process::exit(73);
+            }
             // Resolve Finder moves and renames before any root is registered or
             // watched. A bookmark is accepted only when the live memex.json id
             // still matches the vault identity that was originally selected.

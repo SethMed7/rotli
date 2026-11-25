@@ -25,14 +25,22 @@ One value decides which app a build is: its bundle ID, fixed at build time.
   of its own. Rotli's `build.rs` can't see that config, so the host names the ID
   outright.
 - At launch the app compares the ID it was compiled for with the ID in its
-  Tauri context. If they differ, it exits with status 78 before touching any
-  disk. A stale build cache, or a host context that names another ID, can't
-  give one identity the other's behaviour.
+  Tauri context. If they differ, it exits with status 78 before it makes the
+  scratch vault or binds any folder. A stale build cache, or a host context
+  that names another ID, can't give one identity the other's behaviour.
+- **The webview checks too.** Before it reads or renders anything, the front
+  end asks the running app for its ID (Tauri's `getIdentifier`, allowed by
+  `core:default`) and compares it with the ID Vite built it with
+  (`identityHolds` in `src/lib/appIdentity.ts`). A host bundle whose Vite
+  config left out the `__ROTLI_APP_IDENTIFIER__` define reads as standalone, so
+  it fails this check, and so does a failed lookup. On a mismatch the window
+  shows one sentence and nothing else starts. Rust's own check makes the
+  third side agree.
 - Every path that names the bundle ID derives from this value: the headless
   CLI's `corpus.json`, Antigravity's runtime folder, and Breve's login-item
   label.
-- `STANDALONE_IDENTIFIER` and Rotli's refusal sentence are shared TS↔Rust
-  values, pinned by the `appIdentity` entry in `scripts/fixtures/parity.json`.
+- `STANDALONE_IDENTIFIER` is a shared TS↔Rust value, pinned by the
+  `appIdentity` entry in `scripts/fixtures/parity.json`.
 
 ## Shared state fails closed
 
@@ -51,7 +59,10 @@ That state belongs to the standalone build. **Any other ID never touches it:**
   them as staying with Rotli.
 - **Existing vaults.** Detection offers none. `~/Documents/rotli` is never
   probed. A fresh install starts on a scratch vault, `<support folder>/Scratch
-  vault`.
+  vault` (see "The scratch vault" below).
+- **Debug Breve.** It borrows delivery settings from Rotli's vault locations
+  (`~/memex-vault`, `~/Documents/rotli`, `MEMEX_KNOWLEDGE`, the registry). A host
+  build reads none of them (`breve_dev_roots.rs`).
 - **The headless CLI.** It ignores `ROTLI_CORPUS_CONFIG`, so it reads only its
   own registry.
 
@@ -64,8 +75,17 @@ in two places, each on its own.
   cases: the folder is a vault (`.rotli/`, a root `memex.json`, or a marker
   Rotli can recover), it sits inside one, or it holds one deeper down. The
   downward walk stops at 50,000 folders, and refuses when it does.
-- **Exceptions.** The build's own scratch vault and the roots in its own
-  registry are allowed. A registry that exists but can't be read refuses.
+- **Links.** The downward walk follows a link to a folder once. The link
+  counts as a hit when its target is a vault, sits inside one, or holds one.
+  A link back up the tree is walked once and doesn't loop. A folder the walk
+  can't read is skipped, since this app can't read a vault through it either.
+- **Exceptions.** The build's own scratch vault (only while it is trusted, see
+  below) and the roots in its own registry are allowed. Paths compare in
+  canonical form: on a case-insensitive Mac volume a root stored as `own`
+  still owns `Own`. A registry root now reached through a link a person made
+  owns nothing, because the folder behind it is not the one that was bound.
+  The system's own links (`/var`, `/tmp`, owned by root) don't count. A
+  registry that exists but can't be read refuses.
 - **Where Rust checks.** The check runs inside `reject_privileged_root`. The
   app's folder bindings all go through it: the folder panel, choosing or
   creating a vault, connecting a library, switching vaults, adding a folder,
@@ -77,19 +97,44 @@ in two places, each on its own.
   arrive only through the deep-link plugin, which a host build doesn't
   register. The relay's MCP root is the vault the app already has open, and
   pairing needs the Keychain, which a host build refuses.
-- **Not covered.** `rotli-helper` is a separate binary with its own vault lane
-  and its own config. Nothing here gates it.
-- **The UI** (`src/memex/service.ts pickVaultFolderAs`) inspects the folder,
-  read-only, right after it's picked. It refuses a folder that reads as a Rotli
-  vault, and shows the host's sentence. First run's folder step, Settings ›
-  Location and the sidebar's Connect all pick through it.
+- **`rotli-helper`.** Under a host ID the helper keeps its token and vault
+  choice in `<support folder>/Helper`, not `~/.rotli-helper`, so it never serves
+  the vault Rotli's helper chose. Choosing a folder (`--vault` or the page's
+  picker) meets the same refusal. The root it already serves stays its own.
+- **The UI** has no check of its own. The picker's refusal comes from Rust
+  (`memex_pick_folder` runs `reject_privileged_root`), in the host's own
+  `HostWords`, and the screen shows that sentence as it shows any picker
+  error.
 - **Standalone Rotli** refuses nothing and reads nothing more than before.
+
+## The scratch vault
+
+A host build's first run binds `<support folder>/Scratch vault` without asking
+anyone, so that path is trusted only when this build made it.
+
+- **Trusted** means a real folder, not a link, directly inside a support
+  folder that is itself not a link. Before this build has a registry, it must
+  also be empty: anything already in it was put there by someone else.
+- **At launch**, after the identity check and before any folder is repaired,
+  registered or watched, `ensure_scratch_vault` settles the path. Something
+  untrusted there (a link, a file, a full folder) is renamed aside as
+  `Scratch vault (set aside <time>)`. The rename moves the link itself and
+  never touches its target. A fresh empty folder then takes its place. If the
+  path can't be made safe, the app exits with status 73 and binds nothing.
+- Once a registry exists, a real folder at the path is the one this build
+  bound, whatever it holds. A person who removed it keeps it removed.
+- `reject_privileged_root` and the owned roots trust the scratch vault only
+  through the same test (`owned_scratch_vault`).
+- **Not re-checked at launch:** a registry root that a person later replaces
+  with a link is still opened at launch. It owns nothing, so picking it again,
+  or anything around it, is refused.
 
 ## The host entry (Rust)
 
-`src-tauri/src/app_host.rs`. Standalone Rotli calls `rotli_lib::run()`. A host
-build calls `rotli_lib::run_with_host(AppHost::new(context).plugin(…).words(…))`
-and passes:
+`src-tauri/src/app_host.rs`. Standalone Rotli's binary calls
+`rotli_lib::run(tauri::generate_context!())`. A host build calls
+`rotli_lib::run_with_host(AppHost::new(context).plugin(…).words(…))` and
+passes:
 
 - **its Tauri context:** its bundle ID, bundle name, capability files and front
   end;
@@ -99,6 +144,33 @@ and passes:
 - **`HostWords`**: the sentences shown where it declines shared state, where it
   has no Keychain, and where it refuses an existing vault. Rotli's defaults are
   neutral.
+
+Only Rotli's own binary (`src-tauri/src/main.rs`) expands Rotli's Tauri
+context. The library never does, so a host crate builds without Rotli's
+`dist/`. A fence (`app_host::tests`) keeps it that way.
+
+### Building a host crate
+
+`tauri build` in a host crate can fail with `can't find crate for
+tauri_macros` (or another proc macro). The cause is the host's own release
+profile, not Rotli: `strip = "symbols"` reaches the proc-macro dylibs, and
+macOS then refuses to load them (`mis-aligned LINKEDIT string pool`), which
+rustc reports as a missing crate. A crate that depends only on `tauri`, with
+a release profile of `codegen-units = 16`, `lto = "thin"` and `strip =
+"symbols"`, fails the same way. It still fails with or without
+`MACOSX_DEPLOYMENT_TARGET`, and it builds once proc macros are left
+unstripped. Rotli's own release profile (`codegen-units = 1`, `lto = "fat"`)
+builds in the same test. Checked on 2026-11-25 with Rust 1.97.1. In the host
+crate's `Cargo.toml`:
+
+```toml
+[profile.release.build-override]
+strip = false
+```
+
+Then `tauri build` works, and the binary gets the deployment target from
+`bundle.macOS.minimumSystemVersion`. A plain `cargo build` followed by
+`tauri bundle` doesn't get that target.
 
 ## The host registry (front end)
 
@@ -111,6 +183,16 @@ on its first read, so a late registration throws. A host can give:
   About), and a body component. An id that is already Rotli's throws. The
   nav comes from `src/components/settings/settingsNav.ts`, and with no host
   it is exactly Rotli's list.
+- **`navOrder`**: pane ids, Rotli's or the host's, in the order the nav shows
+  them. The named panes trade places among the slots they hold, and every
+  other pane keeps its slot, so `["general", "appearance", "connections",
+  "<host pane>"]` puts Connections third and leaves About last. A pane this
+  build doesn't show is skipped. An unknown id, or one named twice, throws.
+- **`paneBlocks`**: components a host adds to General, Connections or About,
+  `before` or `after` that pane's own body. They always sit below the pane's
+  heading, and blocks in one place render in the order given. Any other pane
+  or place throws at registration. With no host, nothing extra renders, not
+  even a wrapper.
 - **Pane heads.** Rotli's panes keep their quokka pose and motif. A host pane's
   heading is the banner's scenery with no character and no object
   (`SettingsBanner` without `pose` or `motif`), so this repository holds no
@@ -119,23 +201,28 @@ on its first read, so a late registration throws. A host can give:
   has no "Back to notes", none of Rotli's first-run or vault screens, and no
   notes panes (Keybindings, Browser, Librarian, Security, AI Models, Chat,
   Location). General, Appearance, Connections and About stay.
-- **`words`**: the updates line and the existing-vault sentence.
+- **`words`**: the updates line; `productName` and `version`, which replace
+  "Rotli" and the bundle's version at the foot of the nav; and `aboutLabel`,
+  which replaces "About Rotli" as the nav row and the pane's heading. The
+  About pane's body stays Rotli's; a host adds to it with `paneBlocks`.
+  Rotli's defaults are exactly today's text.
 
 ## Not built yet
 
-- **Hosts can't add yet:** sidebar fronts, first-run steps, other windows or
-  pages, a reorder of Rotli's own panes, or their own About label.
+- **Hosts can't add yet:** sidebar fronts, first-run steps, or other windows
+  or pages.
 - **The notes rows of General and Connections** still show when notes are off.
-- **Not proven yet:** a host top crate built against this library. Its
+- **Not proven yet:** a host top crate launched against this library. Its
   capability files, a plugin command, and one copy of React across two repos
-  are untested.
+  are untested at run time.
 
 ## Proof
 
 This list says only what was run. The app was never launched under a host
-identity, so the scratch-vault first run, the exit-78 mismatch and the plugin
-gating are proven by code and unit tests only. The notes-off window and a host
-pane are proven by server-side rendering only.
+identity, so the scratch-vault first run, the exit-78 and exit-73 stops, the
+webview's identity check and the plugin gating are proven by code, unit tests
+and source-order fences only. The notes-off window, a host pane, pane blocks,
+the nav order and the host's words are proven by server-side rendering only.
 
 - **Rust, standalone:** `cargo test` (the `app_identity`, `keychain` and parity
   tests).
@@ -146,7 +233,8 @@ pane are proven by server-side rendering only.
   real. Tests that need the Keychain return early there, as the Keychain's own
   host test covers the refusal. The Antigravity path parity test compares the
   fixture's standalone path with the host ID swapped in.
+- **Rust tests:** `app_identity_tests.rs`, `helper_vault_identity_tests.rs`,
+  `breve_dev_roots.rs` and `app_host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
-  `src/components/settings/settingsNav.test.ts`,
-  `src/components/settings/settingsSurfaceHost.test.tsx` and
-  `src/memex/pickVaultFolder.test.ts`.
+  `src/components/settings/settingsNav.test.ts` and
+  `src/components/settings/settingsSurfaceHost.test.tsx`.

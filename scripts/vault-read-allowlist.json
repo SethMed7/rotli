@@ -7,7 +7,7 @@
     "app_settings.rs": {
       "outside-vault": 1
     },
-    "breve.rs": {
+    "breve_dev_roots.rs": {
       "outside-vault": 1
     },
     "chat.rs": {
