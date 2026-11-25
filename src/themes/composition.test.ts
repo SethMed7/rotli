@@ -13,6 +13,7 @@ import {
   clearCustomTheme,
   customThemeBroadcast,
   deleteCustomTheme,
+  exportFileName,
   hydrateCustomTheme,
   importCustomTheme,
   pickThemeFamily,
@@ -207,4 +208,26 @@ test("Reset & re-onboard leaves a custom theme, so setup starts in Rotli Light",
   expect(useUiStore.getState()).toMatchObject({ theme: "light", themeFamily: "warm" });
   expect(dom.dataset.themeId).toBeUndefined();
   expect(dom.styles).toEqual([]);
+});
+
+test("under a theme that is gone, the sun walks the family cycle again", async () => {
+  // from Grove Dark, All 16 steps to the next family (a day/night flip wouldn't)
+  useUiStore.setState({ themeFamily: "grove", theme: "dark" });
+  useCustomTheme.setState({ selection: { id: "forest-paper", name: "Forest Paper", source: "mac" } });
+  await hydrateCustomTheme();
+  expect(useCustomTheme.getState().notice).not.toBeNull();
+  useAppearanceLook.setState({ themeCycle: "all" });
+  try {
+    useUiStore.getState().cycleTheme();
+    expect(useUiStore.getState().themeFamily).not.toBe("grove");
+  } finally {
+    useAppearanceLook.setState({ themeCycle: "family" });
+  }
+});
+
+test("a browser download name carries no path, control characters or leading dots", () => {
+  expect(exportFileName("Forest Paper")).toBe("Forest Paper");
+  expect(exportFileName("../../etc/passwd")).toBe("etcpasswd");
+  expect(exportFileName("a\u0000b:c")).toBe("abc");
+  expect(exportFileName("  ...  ")).toBe("Theme");
 });

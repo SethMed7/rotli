@@ -4,9 +4,9 @@
 // reload.
 
 import {
-  THEME_SHEET_LINE,
   customThemeCss,
   installCustomThemeSheet,
+  sheetChecksOut,
   type CustomThemePaint,
 } from "../brand/customThemeSheet";
 import { accentVariants } from "../brand/themeEngine/accents";
@@ -20,7 +20,7 @@ import {
   themeFileWrite,
   themeFilesList,
 } from "../lib/themeFiles";
-import { useCustomTheme } from "../state/customTheme";
+import { isCustomThemeSelected, useCustomTheme } from "../state/customTheme";
 import { CUSTOM_THEME_BOOT_KEY, applyTheme, setCustomThemeTarget } from "../state/theme";
 import { THEME_FAMILIES, THEME_FAMILY_PRESENTATIONS, type ThemeFamily } from "../state/themeChoices";
 import { useUiStore } from "../state/ui";
@@ -143,18 +143,13 @@ export async function hydrateCustomTheme(): Promise<void> {
   if (attached) return;
   attached = true;
   useUiStore.subscribe((state, previous) => {
-    if (!isCustomThemeShown()) return;
+    if (!isCustomThemeSelected()) return;
     if (state.accentHue !== previous.accentHue) {
       clearTimeout(hueTimer);
       hueTimer = setTimeout(paintCustomTheme, 120);
     }
   });
 }
-
-const isCustomThemeShown = (): boolean => {
-  const { selection, notice } = useCustomTheme.getState();
-  return selection !== null && notice === null;
-};
 
 /** Use a theme. Its base becomes the family, which supplies scenery and is
  * what an older Rotli shows. */
@@ -221,7 +216,7 @@ export async function exportCustomTheme(id: string, name: string): Promise<"save
     const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${name.replace(/[/\\:]/g, "") || "Theme"}.rotli-theme.json`;
+    link.download = `${exportFileName(name)}.rotli-theme.json`;
     link.click();
     URL.revokeObjectURL(url);
     return "saved";
@@ -264,10 +259,18 @@ export function primeCustomThemeFromBoot(selection: CustomThemeSelection | null)
     if (!cache || typeof cache !== "object") return;
     const { id, css } = cache as { id?: unknown; css?: unknown };
     if (id !== selection.id || typeof css !== "string" || !css) return;
-    if (!css.split("\n").every((line) => THEME_SHEET_LINE.test(line))) return;
+    if (!sheetChecksOut(css)) return;
     setCustomThemeTarget({ id, rev: 0, css, remembered: true });
     customOnPage = true;
   } catch {
     // no cache: the base family paints until the file is read
   }
+}
+
+/** A download name from a theme's name: nothing a path or a terminal could
+ * read as more than a name (the Mac app's save panel does the same in Rust). */
+export function exportFileName(name: string): string {
+  // oxlint-disable-next-line no-control-regex
+  const clean = [...name.replace(/[\u0000-\u001f\u007f/\\:]/g, "")].slice(0, 48).join("").trim();
+  return clean.replace(/^\.+/, "").trim() || "Theme";
 }

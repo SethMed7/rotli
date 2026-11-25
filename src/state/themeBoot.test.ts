@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 
-import { THEME_SHEET_LINE, customThemeCss } from "../brand/customThemeSheet";
+import { THEME_SHEET_LINE, customThemeCss, sheetChecksOut } from "../brand/customThemeSheet";
 import { accentVariants } from "../brand/themeEngine/accents";
 import { appliedTokenNames, appliedTokens } from "../brand/themeEngine/derive";
 import goldens from "../brand/themeEngine/goldens.json";
@@ -256,4 +256,12 @@ test("the theme signature moves when one custom theme replaces another under the
   } finally {
     setCustomThemeTarget(null);
   }
+});
+
+test("the app's own check of a cached sheet matches the pre-paint script's: grammar and roles", () => {
+  const css = forestSheet();
+  expect(sheetChecksOut(css)).toBe(true);
+  expect(sheetChecksOut(css.replace("--ground:", "--background-image:"))).toBe(false);
+  expect(sheetChecksOut(css.replace(";", "; } body { display: none;"))).toBe(false);
+  expect(sheetChecksOut("")).toBe(false);
 });

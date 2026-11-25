@@ -42,4 +42,9 @@ export function savedCustomTheme(): CustomThemeSelection | null {
   return durable ? selection : null;
 }
 
-export const isCustomThemeSelected = (): boolean => useCustomTheme.getState().selection !== null;
+/** A custom theme is on the page: selected, and not replaced by its base
+ * family because the file is gone, unreadable or rejected. */
+export const isCustomThemeSelected = (): boolean => {
+  const { selection, notice } = useCustomTheme.getState();
+  return selection !== null && notice === null;
+};

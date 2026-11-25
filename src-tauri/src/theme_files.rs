@@ -66,23 +66,26 @@ fn list_in(dir: &Path) -> Result<Vec<String>, String> {
     Ok(ids)
 }
 
-/// A theme file's text, or None when it isn't there. A link or a file over
-/// the cap is refused unread.
+/// A theme file's text, or None when it isn't there. Opened without
+/// following a link and only as a plain file with one name
+/// (`fsutil::open_own_file`), and read no further than the cap, so a swap or
+/// a growing file between checks can't change what is read.
 fn read_in(dir: &Path, id: &str) -> Result<Option<String>, String> {
+    use std::io::Read;
     let path = theme_path(dir, id)?;
-    let meta = match fs::symlink_metadata(&path) {
-        Ok(meta) => meta,
+    let file = match crate::fsutil::open_own_file(&path) {
+        Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e.to_string()),
+        Err(e) => return Err(format!("a theme must be a plain file ({e})")),
     };
-    if !meta.file_type().is_file() {
-        return Err("a theme must be a plain file".into());
-    }
-    if meta.len() > MAX_THEME_FILE_BYTES as u64 {
+    let mut text = String::new();
+    file.take(MAX_THEME_FILE_BYTES as u64 + 1)
+        .read_to_string(&mut text)
+        .map_err(|e| e.to_string())?;
+    if text.len() > MAX_THEME_FILE_BYTES {
         return Err("this file is too large to be a theme".into());
     }
-    // raw read (outside-vault): personal themes live beside the app settings
-    fs::read_to_string(&path).map(Some).map_err(|e| e.to_string())
+    Ok(Some(text))
 }
 
 /// Write a theme atomically. A file already there that Rotli could not read
@@ -94,6 +97,12 @@ fn write_in(dir: &Path, id: &str, contents: &str) -> Result<(), String> {
     }
     if !is_json_object(contents) {
         return Err("a theme must be a JSON object".into());
+    }
+    // a link (even a broken one) or anything but a plain file is left alone
+    if let Ok(meta) = fs::symlink_metadata(&path) {
+        if !meta.file_type().is_file() {
+            return Err("a theme must be a plain file".into());
+        }
     }
     match read_in(dir, id) {
         Ok(Some(existing)) if !is_json_object(&existing) => {
@@ -255,8 +264,25 @@ mod tests {
         std::os::unix::fs::symlink(&outside, themes.join("linked.json")).unwrap();
         assert!(read_in(&themes, "linked").is_err());
         assert!(remove_in(&themes, "linked").is_err());
+        assert!(write_in(&themes, "linked", FOREST).is_err());
         assert!(list_in(&themes).unwrap().is_empty());
-        assert!(outside.exists());
+        assert_eq!(fs::read_to_string(&outside).unwrap(), FOREST);
+        // a broken link is not replaced either
+        std::os::unix::fs::symlink(dir.path().join("gone.json"), themes.join("broken.json")).unwrap();
+        assert!(write_in(&themes, "broken", FOREST).is_err());
+        assert!(fs::symlink_metadata(themes.join("broken.json")).unwrap().file_type().is_symlink());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_linked_theme_is_not_read_or_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let elsewhere = dir.path().join("elsewhere.json");
+        fs::write(&elsewhere, FOREST).unwrap();
+        fs::hard_link(&elsewhere, dir.path().join("twin.json")).unwrap();
+        assert!(read_in(dir.path(), "twin").is_err());
+        assert!(write_in(dir.path(), "twin", r#"{"rotliTheme":1}"#).is_err());
+        assert_eq!(fs::read_to_string(&elsewhere).unwrap(), FOREST);
     }
 
     #[test]

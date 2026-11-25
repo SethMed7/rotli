@@ -106,3 +106,16 @@ test("a rename that would push the file over the cap says so and leaves the file
   });
   expect(store.files.get("forest-paper")).toBe(atCap);
 });
+
+test("a copy kept beside the original names itself, and an import without an id takes its filename", async () => {
+  const store = memoryStore();
+  const text = themeText(FOREST_PAPER);
+  await importTheme(store, text, []);
+  const entries = await loadThemeEntries(store);
+  await importTheme(store, text, entries, "keep-both");
+  const copy = JSON.parse(store.files.get("forest-paper-2")!);
+  expect(copy).toEqual({ ...FOREST_PAPER, id: "forest-paper-2" });
+  const { id: _id, ...noId } = FOREST_PAPER;
+  await importTheme(store, themeText({ ...noId, name: "Dusk" }), await loadThemeEntries(store));
+  expect(JSON.parse(store.files.get("dusk")!).id).toBe("dusk");
+});

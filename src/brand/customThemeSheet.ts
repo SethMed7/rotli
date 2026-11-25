@@ -9,7 +9,7 @@
 // against the same grammar (THEME_SHEET_LINE); themeBoot.test.ts pins the two.
 
 import { ACCENT_VARIANTS, type AccentVariant } from "./themeEngine/accents";
-import type { TokenSet } from "./themeEngine/derive";
+import { type TokenSet, appliedTokenNames } from "./themeEngine/derive";
 import { MODES, type Mode } from "./themeEngine/policy";
 
 export interface CustomThemePaint {
@@ -30,6 +30,21 @@ const MONO_SYNTAX = ["--syntax-blue"];
 /** One rule per line; the whole grammar the boot script accepts. */
 export const THEME_SHEET_LINE =
   /^:root\[data-theme="custom-(light|dark)"\]\[data-theme-id\](\[data-accent="(blue|green|violet|rose|amber|custom)"\]|:not\(\[data-syntax-palette="mono"\]\))? \{( --[a-z0-9-]+: (#[0-9a-f]{6}|rgba\(\d{1,3}, \d{1,3}, \d{1,3}, (0|1|0?\.\d+)\));)+ \}$/;
+
+/** Whether a cached sheet is one this module could have written: every line
+ * in the grammar and every role on the engine's list (theme-boot.js checks
+ * the same two things). */
+export function sheetChecksOut(css: string): boolean {
+  if (!css || css.length > 65_536) return false;
+  const roles = new Set(appliedTokenNames());
+  return css
+    .split("\n")
+    .every(
+      (line) =>
+        THEME_SHEET_LINE.test(line) &&
+        (line.match(/--[a-z0-9-]+(?=:)/g) ?? []).every((name) => roles.has(name)),
+    );
+}
 
 function rule(selector: string, tokens: TokenSet, keep: (name: string) => boolean): string | null {
   const decls = Object.entries(tokens)

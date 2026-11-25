@@ -57,9 +57,6 @@
       "outside-vault": 1,
       "dir-sync": 1
     },
-    "theme_files.rs": {
-      "outside-vault": 1
-    },
     "usage_lines.rs": {
       "outside-vault": 1
     },

@@ -1,6 +1,11 @@
 // The personal-theme use cases over a ThemeFileStore.
 
-import { canOverwrite, parseThemeFileText, serializeThemeFile } from "../brand/themeEngine/themeFile";
+import {
+  canOverwrite,
+  fitThemeText,
+  parseThemeFileText,
+  serializeThemeFile,
+} from "../brand/themeEngine/themeFile";
 import { type ImportPlan, type ThemeEntry, keepBothId, planImport } from "./model";
 import type { ThemeFileStore } from "./ports";
 
@@ -45,7 +50,10 @@ export async function importTheme(
       problem: `Rotli couldn't read the ${plan.id} that's there, so it left it alone.`,
     };
   const id = plan.existing && choice === "keep-both" ? keepBothId(plan, entries) : plan.id;
-  await store.write(id, text);
+  // the file's own id must be its filename stem, so a copy names itself
+  const written = plan.theme.id === id ? text : withId(text, id);
+  if (written === null) return { status: "refused", problem: "This file is too large to be a theme." };
+  await store.write(id, written);
   return { status: "saved", id, name: plan.theme.name };
 }
 
@@ -71,4 +79,10 @@ export const deleteTheme = (store: ThemeFileStore, id: string): Promise<void> =>
 export async function exportText(store: ThemeFileStore, id: string): Promise<string | null> {
   const text = await store.read(id);
   return text !== null && parseThemeFileText(text).ok ? text : null;
+}
+
+/** The same file with its `id` set: every other field kept as written. */
+function withId(text: string, id: string): string | null {
+  const parsed: unknown = JSON.parse(text.replace(/^\uFEFF/, ""));
+  return fitThemeText({ ...(parsed as Record<string, unknown>), id });
 }

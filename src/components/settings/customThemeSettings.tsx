@@ -152,6 +152,37 @@ function ThemeCard({ entry, read, selected }: { entry: ThemeEntry; read: Readabl
   );
 }
 
+/** A theme file Rotli couldn't read: listed, never applied or rewritten; the
+ * person can delete it without Rotli reading it. */
+function UnreadableCard({ id }: { id: string }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="mytheme" data-theme-card={id}>
+      <div className="famcard mytheme-unreadable">
+        <span className="famlabel">Couldn't read {id}.json</span>
+        <span className="famcaption">Rotli left the file as it is.</span>
+      </div>
+      {confirming ? (
+        <div className="mytheme-actions" role="group" aria-label={`Delete ${id}.json?`}>
+          <span className="setnote">Delete {id}.json?</span>
+          <button type="button" className="ghostbtn" onClick={() => void deleteCustomTheme(id)}>
+            Delete
+          </button>
+          <button type="button" className="ghostbtn" onClick={() => setConfirming(false)}>
+            Keep
+          </button>
+        </div>
+      ) : (
+        <div className="mytheme-actions">
+          <button type="button" className="ghostbtn" onClick={() => setConfirming(true)}>
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MAX_IMPORT_BYTES = 64 * 1024;
 
 export function CustomThemeSettings() {
@@ -180,8 +211,12 @@ export function CustomThemeSettings() {
       setProblem("This file is too large to be a theme.");
       return;
     }
-    const text = await file.text();
-    finish(await importCustomTheme(text), text);
+    try {
+      const text = await file.text();
+      finish(await importCustomTheme(text), text);
+    } catch {
+      setProblem("Couldn't import the theme. Check the disk and try again.");
+    }
   };
 
   return (
@@ -224,10 +259,7 @@ export function CustomThemeSettings() {
               selected={selection?.id === entry.id && !notice}
             />
           ) : (
-            <div className="famcard mytheme-unreadable" key={entry.id}>
-              <span className="famlabel">Couldn't read {entry.id}.json</span>
-              <span className="famcaption">Rotli left the file as it is.</span>
-            </div>
+            <UnreadableCard key={entry.id} id={entry.id} />
           ),
         )}
       </div>
