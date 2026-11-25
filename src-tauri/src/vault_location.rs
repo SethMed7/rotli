@@ -106,6 +106,8 @@ pub(crate) fn picker_start(app: &tauri::AppHandle) -> PathBuf {
         .then(|| crate::corpus::read_corpus_config(app))
         .flatten()
         .map(|config| config.corpus.abs_path);
+    // a host build starts beside the vault it has open, never one a registry names
+    let configured = crate::host_registry::live_root(app, crate::corpus::DEFAULT_ROOT_ID, configured);
     picker_start_directory(configured.as_deref(), &home)
 }
 

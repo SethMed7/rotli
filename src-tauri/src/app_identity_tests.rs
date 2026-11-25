@@ -440,9 +440,9 @@ fn every_root_choice_meets_the_vault_refusal() {
 }
 
 /// Hold 1's place in the launch: the registry is secured after the scratch
-/// vault and the bookmark repair (which rewrites registry paths from the
-/// support folder), before anything reads a root, and exit 73 stops a launch
-/// that can't secure it. Every registry writer marks the root it adds after
+/// vault, before the bookmark repair reads a root and again after it
+/// rewrites registry paths, before anything binds, and exit 73 stops a
+/// launch that can't secure it. Every registry writer marks the root it adds after
 /// its caller's refusal; the scratch vault still meets the vault refusal;
 /// the headless CLI vets the registry it reads.
 #[test]
@@ -453,8 +453,10 @@ fn launch_secures_the_registry_and_writers_mark_their_roots() {
     let repair = setup.find("vault_location::repair_vault_locations(").unwrap();
     let secure = setup.find("host_registry::secure_registry(").expect("the launch secures the registry");
     let first_read = setup.find("corpus::is_configured(app.handle())").unwrap();
-    assert!(repair < secure && secure < first_read && first_read < setup.find("corpus::startup_roots(").unwrap());
-    assert!(setup[secure..first_read].contains("std::process::exit(73)"));
+    assert!(secure < repair, "the registry is vetted before the bookmark repair reads a root");
+    assert!(setup[secure..repair].contains("std::process::exit(73)") && setup[secure..repair].contains("secure_registry();"));
+    assert!(setup[repair..first_read].contains("secure_registry();"), "the repair's rewrite is vetted again");
+    assert!(first_read < setup.find("corpus::startup_roots(").unwrap());
     let check = body_of(&lib, "pub(crate) fn reject_privileged_root(");
     assert!(check.contains("== Some(&candidate) {\n        return app_identity::refuse_existing_vault(&candidate);"), "{check}");
     let corpus = src("corpus.rs");
@@ -467,4 +469,19 @@ fn launch_secures_the_registry_and_writers_mark_their_roots() {
     // demo mode binds a sibling of the corpus (`memex-demo`), so a host build has none
     assert!(body_of(&corpus, "pub fn demo_active(").contains("app_identity::owns_shared_state()"));
     assert!(body_of(&corpus, "pub fn set_demo(").contains("app_identity::require_shared_state()?"));
+    // round 5: after launch the registry is re-read, so a host takes a root
+    // from its open stores (or refuses the folder), never from that read
+    let after_launch = [
+        ("lib.rs", "fn corpus_reveal(", "host_registry::live_root("),
+        ("lib.rs", "fn corpus_choose_folder_blocking(", "host_registry::live_root("),
+        ("lib.rs", "fn refresh_vault_blocking(", "host_registry::live_root("),
+        ("lib.rs", "fn corpus_switch_vault_blocking(", "host_registry::live_root("),
+        ("lib.rs", "fn corpus_init_memex_blocking(", "host_registry::live_root("),
+        ("lib.rs", "async fn corpus_inspect_folder(", "reject_privileged_root("),
+        ("vault_import.rs", "fn copy_vault_blocking(", "host_registry::live_root("),
+        ("vault_location.rs", "pub(crate) fn picker_start(", "host_registry::live_root("),
+        ("memex.rs", "pub(crate) fn registered_root(", "host_registry::require_live("),
+    ];
+    let unvetted: Vec<_> = after_launch.iter().filter(|(file, f, gate)| !body_of(&src(file), f).contains(gate)).collect();
+    assert!(unvetted.is_empty(), "these take a folder from the registry after launch: {unvetted:?}");
 }

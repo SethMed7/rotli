@@ -759,7 +759,7 @@ fn hide_quick_window(app: AppHandle) {
 /// Settings → Storage → "Reveal in Finder": open the corpus folder.
 #[tauri::command]
 fn corpus_reveal(app: AppHandle) {
-    let root = corpus::resolve_corpus(&app);
+    let Some(root) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) else { return };
     #[cfg(target_os = "macos")]
     let _ = child_run::spawn_reaped(std::process::Command::new("open").arg(&root));
     #[cfg(not(target_os = "macos"))]
@@ -1198,6 +1198,10 @@ async fn corpus_inspect_folder(app: AppHandle, path: String) -> Result<VaultInsp
         let path = app
             .state::<memex::FolderAuthorizations>()
             .require(std::path::Path::new(&path))?;
+        // the picker grants a folder before refusing it; a host reads no refused folder
+        if !app_identity::owns_shared_state() {
+            reject_privileged_root(&app, &path)?;
+        }
         inspect_vault_path(&path)
     })
     .await
@@ -1334,7 +1338,8 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
-    let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    let current = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured);
     reject_privileged_root(&app, &abs)?;
     if current.as_ref() == Some(&abs) {
         return Ok(false);
@@ -1458,7 +1463,8 @@ fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
         if !state.contains_root(&id)? {
             return Err("the connected vault is not open".into());
         }
-        (connected.abs_path.clone(), false)
+        let root = host_registry::live_root(&app, &id, Some(connected.abs_path.clone()));
+        (root.ok_or("the connected vault is not open")?, false)
     };
     if !root.is_dir() {
         if active {
@@ -1628,8 +1634,9 @@ fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, Stri
         );
     }
     flush_webviews_before_shutdown(&app)?;
-    let current = corpus::resolve_corpus(&app);
-    corpus::carry_settings(&current, &target.abs_path)?;
+    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, Some(corpus::resolve_corpus(&app))) {
+        corpus::carry_settings(&current, &target.abs_path)?;
+    }
     activate_vault_path_live(&app, target.abs_path, false)
 }
 
@@ -1666,8 +1673,9 @@ fn corpus_init_memex_blocking(
     memex::scaffold_memex(&root)?;
     // a scaffolded memex has no .rotli — carry the onboarding flow's choices
     // (Librarian-vs-raw included) so the new vault honors what was just picked
-    if corpus::is_configured(&app) {
-        corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
+    let configured = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
+    if let Some(current) = host_registry::live_root(&app, corpus::DEFAULT_ROOT_ID, configured) {
+        corpus::carry_settings(&current, &root)?;
     }
     write_new_vault_settings(&root, Some(brain_enabled))?;
     activate_vault_path_live(&app, root, false)?;
@@ -2403,19 +2411,24 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
                 eprintln!("rotli: the scratch vault is not safe to open ({error})");
                 std::process::exit(73);
             }
+            // A host build binds only folders it marked: whatever its registry
+            // names that it doesn't own is set aside before anything reads a
+            // root, the repair below included, and again after the repair. If
+            // that fails, nothing binds.
+            let secure_registry = || {
+                if let Err(error) = host_registry::secure_registry(app.handle()) {
+                    eprintln!("rotli: the registry is not safe to open ({error})");
+                    std::process::exit(73);
+                }
+            };
+            secure_registry();
             // Resolve Finder moves and renames before any root is registered or
             // watched. A bookmark is accepted only when the live memex.json id
             // still matches the vault identity that was originally selected.
             if let Err(error) = vault_location::repair_vault_locations(app.handle()) {
                 eprintln!("rotli: could not repair moved vault locations ({error})");
             }
-            // A host build binds only folders it marked: whatever its registry
-            // (or the repair above) names that it doesn't own is set aside
-            // before anything reads a root. If that fails, nothing binds.
-            if let Err(error) = host_registry::secure_registry(app.handle()) {
-                eprintln!("rotli: the registry is not safe to open ({error})");
-                std::process::exit(73);
-            }
+            secure_registry();
 
             // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root
             // registry (the DEFAULT root is always registered, pointing at

@@ -390,7 +390,8 @@ pub(crate) fn registered_root(app: &tauri::AppHandle, root: &str) -> Result<Path
     roots.extend(cfg.folders.into_iter().map(|f| f.abs_path));
     let want = PathBuf::from(root);
     if root_among(&roots, &want) {
-        fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))
+        let root = fs::canonicalize(&want).map_err(|e| format!("bad vault root {root}: {e}"))?;
+        crate::host_registry::require_live(app, &root).map(|()| root)
     } else {
         Err(format!("not a registered vault root: {root}"))
     }

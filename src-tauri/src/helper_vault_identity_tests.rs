@@ -67,4 +67,10 @@ fn a_host_helper_serves_only_folders_its_identity_marked() {
     fs::write(plain.path().join("note.md"), "# Mine\n").unwrap();
     assert!(crate::app_identity::claimed_by(&fs::canonicalize(plain.path()).unwrap(), HOST), "a chosen folder is marked");
     assert!(read_config(HOST, &path).is_some());
+    // round 5: the helper walks below its folder when it starts, as the app's launch does
+    let ours = crate::app_identity::APP_IDENTIFIER;
+    choose_config_as(ours, &path, plain.path()).unwrap();
+    fs::create_dir_all(plain.path().join("later").join(".rotli")).unwrap();
+    let restarted = crate::helper_vault::ServedVault::new(config.path(), Box::new(|| Ok(None)));
+    assert_eq!(restarted.current().is_some(), crate::app_identity::owns_shared_state(), "a Rotli vault made inside is served");
 }

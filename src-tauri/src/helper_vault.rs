@@ -77,9 +77,8 @@ pub(crate) struct VaultConfig {
 
 pub(crate) struct ServedVault {
     config_path: PathBuf,
-    /// The config as last read, only to warm the ledger once per new vault.
-    /// Every request re-reads the (tiny) file instead of trusting its mtime:
-    /// `rotli-helper --vault` in a terminal rewrites it, and two quick
+    /// The config last walked and warmed. Every request re-reads the (tiny)
+    /// file, not its mtime: `rotli-helper --vault` rewrites it, and two quick
     /// rewrites can share an mtime.
     cached: Mutex<Option<VaultConfig>>,
     picker: Picker,
@@ -101,19 +100,20 @@ impl ServedVault {
     /// The vault being served now, read fresh from the config file.
     pub(crate) fn current(&self) -> Option<VaultConfig> {
         let config = read_config(crate::app_identity::APP_IDENTIFIER, &self.config_path);
-        self.remember(config.as_ref());
-        config
+        self.remember(config.as_ref()).then_some(config).flatten()
     }
 
-    /// Warm the ledger when the served vault is new to this process.
-    fn remember(&self, config: Option<&VaultConfig>) {
+    /// A served vault new to this process (at start, or a new choice) is walked
+    /// below as the app's launch walks, then warmed; `false`: serve nothing.
+    fn remember(&self, config: Option<&VaultConfig>) -> bool {
         let mut cached = self.cached.lock().unwrap_or_else(|p| p.into_inner());
+        let refused = cached.as_ref() != config
+            && config.is_some_and(|config| crate::app_identity::refuse_existing_vault(&config.root).is_err());
         if cached.as_ref() != config {
-            if let Some(config) = config {
-                warm_ledger(&config.root);
-            }
-            *cached = config.cloned();
+            *cached = config.filter(|_| !refused).cloned();
+            cached.as_ref().inspect(|config| warm_ledger(&config.root));
         }
+        !refused
     }
 
     /// Fresh disk truth before every remote completion, including external
@@ -130,7 +130,7 @@ impl ServedVault {
         scan: impl FnOnce(&Path, Option<&str>) -> Result<bool, Refusal>,
     ) -> Result<(), Refusal> {
         let unavailable = || (503, "Rotli Helper couldn't refresh the vault's secure notes — reconnect the vault before chatting.".to_string());
-        let Some(config) = read_config(crate::app_identity::APP_IDENTIFIER, &self.config_path) else {
+        let Some(config) = self.current() else {
             // FSA pages can use a helper with no served vault. A missing config
             // has no vault to confuse; a broken one may hide secure notes.
             if self.config_path.exists() || vault_id.is_some() || vault_road.is_some_and(|road| road != "folder") {

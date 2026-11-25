@@ -2,7 +2,8 @@
 //! (host_registry.rs), with every registry file and legacy pointer planted.
 
 use super::*;
-use crate::app_identity::{claim_for, refuse_existing_vault_for, settle_scratch_for, STANDALONE_IDENTIFIER};
+use crate::app_identity::{claim_for, owns_shared_state, refuse_existing_vault_for, settle_scratch_for, STANDALONE_IDENTIFIER};
+use crate::corpus::{CorpusRegistry, CorpusRoot, CorpusStore, DEFAULT_ROOT_ID};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
@@ -183,6 +184,63 @@ fn a_host_keeps_its_own_vault_however_the_registry_spells_it() {
     std::os::unix::fs::symlink(&vault, &notes).unwrap();
     let roots = launch(HOST, &support);
     assert!(!roots.contains(&vault), "{roots:?}");
+}
+
+/// Round 5: commands after launch re-read the registry (the current vault a
+/// choice, switch, new vault or copy moves or carries settings from, the
+/// connected vault a refresh reopens, the roots the chat and note commands
+/// write into), and anything that writes the support folder can rewrite it
+/// while the app runs. A host build takes only roots it has open; the
+/// standalone build keeps what its registry names. The headless CLI walks
+/// below each root once per process, as the launch does, so a Rotli vault
+/// made inside one of the host's own folders is dropped there too.
+#[test]
+fn after_launch_a_host_takes_only_the_roots_it_has_open() {
+    let home = tempfile::tempdir().unwrap();
+    let mark = |name: &str| {
+        let folder = canonical(home.path().join(name));
+        fs::create_dir_all(&folder).unwrap();
+        let folder = canonical(folder);
+        claim_for(HOST, &folder).unwrap();
+        claim_for(crate::app_identity::APP_IDENTIFIER, &folder).unwrap();
+        folder
+    };
+    let (own, work) = (mark("own"), mark("work"));
+    let vault = rotli_vault(home.path(), "someone's vault");
+    let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.into());
+    registry.insert(DEFAULT_ROOT_ID.into(), CorpusStore::open(own.clone()).unwrap()).unwrap();
+    registry.insert("work".into(), CorpusStore::open(work.clone()).unwrap()).unwrap();
+    let state = crate::corpus::CorpusState(std::sync::Mutex::new(registry));
+    let mut holes = Vec::new();
+    for (id, open) in [(DEFAULT_ROOT_ID, &own), ("work", &work)] {
+        if live_root_for(HOST, Some(&state), id, Some(vault.clone())).as_ref() != Some(open) {
+            holes.push(format!("{id}: a registry naming a Rotli vault decided the root a command reads"));
+        }
+        assert_eq!(live_root_for(STANDALONE_IDENTIFIER, Some(&state), id, Some(vault.clone())), Some(vault.clone()));
+    }
+    if live_root_for(HOST, None, DEFAULT_ROOT_ID, Some(vault.clone())).is_some() {
+        holes.push("nothing open, yet a root was taken".into());
+    }
+    if require_live_for(HOST, Some(&state), &vault).is_ok() {
+        holes.push("the chat and note commands accept a Rotli vault the registry names".into());
+    }
+    assert!(require_live_for(HOST, Some(&state), &work).is_ok());
+    assert!(require_live_for(STANDALONE_IDENTIFIER, Some(&state), &vault).is_ok());
+    fs::create_dir_all(work.join("later").join(".rotli")).unwrap();
+    let folder = CorpusRoot { id: "f".into(), label: "F".into(), abs_path: work.clone(), adopted: false };
+    let config = CorpusConfig {
+        version: 1,
+        corpus: CorpusRef { abs_path: own.clone(), adopted: false },
+        brains: Vec::new(),
+        folders: vec![folder],
+        active_brain_id: None,
+    };
+    let vetted = vet_config(config).unwrap();
+    assert_eq!(vetted.corpus.abs_path, own);
+    if vetted.folders.len() != usize::from(owns_shared_state()) {
+        holes.push("the CLI binds a folder holding a Rotli vault".into());
+    }
+    assert!(holes.is_empty(), "{}", holes.join("\n"));
 }
 
 /// A fresh scratch vault holds only this build's mark, and its first open
