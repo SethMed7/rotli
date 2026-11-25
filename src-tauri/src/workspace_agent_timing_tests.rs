@@ -31,18 +31,19 @@ fn crowded() -> tempfile::TempDir {
     temp
 }
 
-/// The median wait, in microseconds, for `rotli_read_note` on `id`, and the
-/// words it answered with. Each call opens a fresh store, as a real one does.
+/// The quickest of seven waits, in microseconds, for `rotli_read_note` on
+/// `id`, and the words it answered with. A walk costs about the same every
+/// time while a busy machine only ever adds, so the quickest run is the one
+/// least moved by load. Each call opens a fresh store, as a real one does.
 fn wait(temp: &tempfile::TempDir, id: &str) -> (u128, String) {
     let mut waits = Vec::new();
     let mut words = String::new();
-    for _ in 0..5 {
+    for _ in 0..7 {
         let started = Instant::now();
         words = pinned(temp, || call(&WORKSPACE_SERVER, "rotli_read_note", json!({"id": id})));
         waits.push(started.elapsed().as_micros());
     }
-    waits.sort();
-    (waits[waits.len() / 2], words)
+    (waits.into_iter().min().unwrap_or_default(), words)
 }
 
 /// What a missing id may cost beyond a hidden one before the gap shows:

@@ -566,7 +566,7 @@ destructive hints in the host, and the setup and diagnostic commands.
 
 | Tier | What ships | Also needs |
 |---|---|---|
-| 1. Read-only | `rotli mcp --read-only` over stdio, with only the twelve read tools (`rotli_status`, `rotli_metrics`, `rotli_list`, `rotli_search`, `rotli_query`, `rotli_read_note`, `rotli_list_main`, `rotli_list_views`, `rotli_read_board`, `rotli_note_attachments`, `rotli_note_history`, `rotli_read_document`), plus `agent doctor`, `agent config` and `--version` ungated | Per-vault read consent; paging; the speed targets; a missing id answered as fast as a hidden one |
+| 1. Read-only | A proposed `rotli mcp --read-only` (the flag does not exist yet) over stdio, with only the twelve read tools (`rotli_status`, `rotli_metrics`, `rotli_list`, `rotli_search`, `rotli_query`, `rotli_read_note`, `rotli_list_main`, `rotli_list_views`, `rotli_read_board`, `rotli_note_attachments`, `rotli_note_history`, `rotli_read_document`), plus `agent doctor`, `agent config` and `--version` ungated | Per-vault read consent; paging; the speed targets; a missing id answered as fast as a hidden one |
 | 2. Note writes | create, update, patch, rename, move, trash and undo of an AI edit | A second per-vault switch ("Let agents edit"); a per-session write budget; create, move and rename journaled (the journal records only edits, undo and trash today) |
 | 3. The rest | Main and named views, boards, Word documents, `rotli_open` | Each group's own journal rows and harness entries |
 | Development only | the loopback HTTP mode, the relay connector, the Librarian route | A separate decision each (the relay needs the Keychain pairing token) |
@@ -668,10 +668,19 @@ protocol's own list), Cursor (`Read`/`Write` in `.cursor/cli.json`) and Codex
 (a permission profile with `"<path>" = "deny"`, which its docs describe for sandboxed
 commands; the absolute-path entry is built from its path forms, not a quoted example). Grep and Glob get no path rule
 of their own because Claude Code's `Read` deny covers them and a `Grep(path)`
-rule matches nothing. Gemini CLI gets policy rules for `read_file` and
-`list_directory` (built from its documented rule fields; its docs have no path
-example) and a note that `glob`, `grep_search` and the shell can't be fenced by
-folder. Claude Desktop has no such rule, and the output says so. A Bash deny cannot be limited to a folder, so a shell stays
+rule matches nothing. Gemini CLI gets policy rules that deny `read_file`,
+`write_file`, `replace`, `list_directory`, `glob` and `grep_search` under the
+vault (both `path` and `dir_path` for the last two, since its two docs pages
+disagree), and `read_many_files`, which `@` paths use, denied whole because its
+`include` globs can't be fenced by a folder; they are built from its documented
+rule fields (its docs have no path example), and the output says that a shell
+can't be fenced. Every rule is printed for the registered path and, where it
+differs, the canonical one (symlinks resolved, the disk's own case). Cursor
+gets no rule for a path holding `*` or `?`, which its globs would read as
+wildcards. The vault-session settings are the Librarian protocol's own deny
+list, `mcp__t3-code` included, and a test reads
+`vault-thread-protocol.md` so the two can't drift. Claude Desktop has no such
+rule, and the output says so. A Bash deny cannot be limited to a folder, so a shell stays
 the one hole the whole-tool deny closes. The syntax of each client was read
 from its documentation on 2026-11-24; the module's header records the sources,
 and `workspace_vault_access.rs` pins the output. The CLI ends quietly when the
