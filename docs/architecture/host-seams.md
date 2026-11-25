@@ -79,20 +79,29 @@ in two places, each on its own.
   counts as a hit when its target is a vault, sits inside one, or holds one.
   A link back up the tree is walked once and doesn't loop. A folder the walk
   can't read is skipped, since this app can't read a vault through it either.
-- **Exceptions.** The build's own scratch vault (only while it is trusted, see
-  below) and the roots in its own registry are allowed. Paths compare in
-  canonical form: on a case-insensitive Mac volume a root stored as `own`
-  still owns `Own`. A registry root now reached through a link a person made
-  owns nothing, because the folder behind it is not the one that was bound.
-  The system's own links (`/var`, `/tmp`, owned by root) don't count. A
-  registry that exists but can't be read refuses.
+- **Exceptions: the mark.** A vault is this build's own only when it carries
+  the build's mark, an empty file at `.rotli/bound-by/<bundle ID>` inside the
+  folder itself (`app_identity::claim`). Nothing in the support folder
+  vouches for a folder: anything that can write there can write a registry,
+  a backup or a helper config too. The mark is judged on the folder behind a
+  path, so it doesn't matter how a registry spells it (through a link, `..`,
+  or another letter case). A path that later leads to a Rotli vault finds no
+  mark there. The standalone build writes no mark and never reads one.
+- **Who marks.** A folder gets the mark when it is bound, after the refusal
+  passed: the scratch vault when it is made, and the three registry writers
+  (`persist_corpus_path`, `upsert_brain`, `add_folder` in `corpus.rs`) for the
+  root each adds. The helper marks the folder it chooses. A source fence
+  (`launch_secures_the_registry_and_writers_mark_their_roots`) keeps each
+  writer marking before it writes.
 - **Where Rust checks.** The check runs inside `reject_privileged_root`. The
   app's folder bindings all go through it: the folder panel, choosing or
   creating a vault, connecting a library, switching vaults, adding a folder,
   folder windows, and both sides of a vault copy. It runs before anything
-  writes to the folder; the heal in `corpus_choose_folder` comes after it. The
-  CLI's `ROTLI_CORPUS_ROOT` pin meets the same rule
-  (`app_identity::refuse_pinned_root`).
+  writes to the folder; the heal in `corpus_choose_folder` comes after it.
+  The scratch vault skips only the private-folder check there, not the vault
+  refusal. The CLI's `ROTLI_CORPUS_ROOT` pin meets the same rule
+  (`app_identity::refuse_pinned_root`), and so does every root launch reads
+  from the registry (see "The launch bind").
 - **Paths that never reach a host build.** Files and folders opened from Finder
   arrive only through the deep-link plugin, which a host build doesn't
   register. The relay's MCP root is the vault the app already has open, and
@@ -100,7 +109,11 @@ in two places, each on its own.
 - **`rotli-helper`.** Under a host ID the helper keeps its token and vault
   choice in `<support folder>/Helper`, not `~/.rotli-helper`, so it never serves
   the vault Rotli's helper chose. Choosing a folder (`--vault` or the page's
-  picker) meets the same refusal. The root it already serves stays its own.
+  picker) meets the same refusal and marks the folder. Every time it loads
+  its config, the helper serves the root only while that root carries the
+  mark and sits in no vault it doesn't own. A config naming any other folder
+  serves nothing. Because the app and its helper share one bundle ID, the
+  helper can serve the host app's own vaults too.
 - **The UI** has no check of its own. The picker's refusal comes from Rust
   (`memex_pick_folder` runs `reject_privileged_root`), in the host's own
   `HostWords`, and the screen shows that sentence as it shows any picker
@@ -113,26 +126,59 @@ A host build's first run binds `<support folder>/Scratch vault` without asking
 anyone, so that path is trusted only when this build made it.
 
 - **Trusted** means a real folder, not a link, directly inside a support
-  folder that is itself not a link. Before this build has a registry, it must
-  also be empty: anything already in it was put there by someone else.
+  folder that is itself not a link, that is empty or carries this build's
+  mark, and that passes the vault refusal, including the walk below it. A
+  registry doesn't vouch for it: a folder moved to that path (a Rotli vault,
+  say) is not this build's, whether or not a registry exists or parses. Nor
+  does the mark alone, since whoever writes the support folder can forge it
+  there: a scratch folder holding a link to a Rotli vault is set aside.
 - **At launch**, after the identity check and before any folder is repaired,
   registered or watched, `ensure_scratch_vault` settles the path. Something
   untrusted there (a link, a file, a full folder) is renamed aside as
   `Scratch vault (set aside <time>)`. The rename moves the link itself and
-  never touches its target. A fresh empty folder then takes its place. If the
-  path can't be made safe, the app exits with status 73 and binds nothing.
-- Once a registry exists, a real folder at the path is the one this build
-  bound, whatever it holds. A person who removed it keeps it removed.
-- `reject_privileged_root` and the owned roots trust the scratch vault only
-  through the same test (`owned_scratch_vault`).
+  never touches its target. A fresh folder, marked at once, then takes its
+  place. If the path can't be made safe, the app exits with status 73 and
+  binds nothing.
+- Once a registry exists, a person who removed the scratch vault keeps it
+  removed, unless the registry still names it.
+- `reject_privileged_root` and the headless CLI trust the scratch vault only
+  through the same test (`owned_scratch_vault`, `trusted_scratch_at_home`),
+  and the scratch vault still meets the vault refusal: a link inside it to a
+  Rotli vault is refused like any other.
 - A support folder that is itself a link is refused before anything is
   renamed, and the app exits 73.
-- **Not re-checked at launch:** a registry root that a person later replaces
-  with a link is still opened at launch, by the app and by the headless CLI,
-  which reads the same registry. It owns nothing, so picking it again, or
-  anything around it, is refused. A registry that exists but won't parse
-  counts as a registry, so the folder at the scratch path is kept as it is,
-  even if it isn't empty. The migration then binds it again.
+
+## The launch bind
+
+At launch the app binds whatever its registry names, so the registry gets the
+same refusal as a folder a person picks. `host_registry.rs` owns this.
+
+- **Order.** After the identity check (78), the scratch vault (73) and the
+  bookmark repair (which can rewrite registry paths from the support folder),
+  and before anything reads a root, `host_registry::secure_registry` vets
+  every registry file: `corpus.json`, `corpus.dev.json` and each one's `.bak`.
+  If it can't, the app exits with status 73 and binds nothing.
+- **The rule.** A root stays only when the folder behind it carries this
+  build's mark and the vault refusal passes for it, including the walk below
+  it. A refused library or folder is dropped. A refused primary falls back to
+  the scratch vault, which is made again if it is gone.
+- **What happens to the file.** A registry that would change is set aside
+  whole as `<name> (set aside <time>)` and the vetted version is written in
+  its place, so nothing is lost. A registry that won't parse is set aside too,
+  and the launch starts as a first run on the scratch vault.
+- **No legacy pointers.** A host build never wrote `corpus-root.txt`,
+  `corpus-memex-root.txt`, `corpus-roots.json` or `memex-instances.json`, so
+  its first config reads none of them (`host_registry::first_config_for`).
+  The standalone build still migrates them.
+- **The headless CLI** vets the registry it reads on every call
+  (`host_registry::vet_config`): each root must carry the mark and sit in no
+  vault it doesn't own. It skips the walk below each root, which the app's
+  launch ran. It writes nothing, and it refuses when its primary is refused
+  and there is no trusted scratch vault.
+- **No demo mode.** Demo mode binds `memex-demo` beside the corpus, which may
+  be Rotli's own demo vault, so a host build ignores a `demo.on` flag and
+  refuses to turn demo mode on.
+- **Standalone Rotli** skips all of this.
 
 ## The host entry (Rust)
 
@@ -225,11 +271,40 @@ on its first read, so a late registration throws. A host can give:
 - **Not proven yet:** a plugin command passing the capability ACL in a live
   host webview, and one copy of React across two repos at run time.
 
+## Limits of the vault refusal
+
+- **The mark is a file in the folder.** Anything that can write into a Rotli
+  vault itself can forge it. The refusal stops a planted registry, backup,
+  legacy pointer, helper config or scratch folder; it doesn't stop a process
+  that already writes to the vault. In the scratch vault, which sits in the
+  support folder, the mark counts only together with the walk below it.
+- **Between launches.** A registry planted while the app runs is read by
+  later commands until the next launch vets it. Those commands bind nothing
+  new without the refusal, and the registry writers mark only the root they
+  add. The same holds for a vault moved inside one of the host's own folders
+  while it runs. There is also a short window between the vetting and the
+  bind (TOCTOU) that only a same-user process can race.
+- **The helper and the headless CLI** re-check the mark and the folders
+  around each root on every load or call, but don't walk below it. The helper
+  walks when a folder is chosen; the CLI relies on the app's launch walk.
+- **Repinning a host.** Folders a host bound before the mark existed carry
+  none. At the first launch on this version, the scratch vault, if not empty,
+  is set aside and replaced. Registry roots are dropped (the registry is set
+  aside first), and the helper stops serving its folder until it is chosen
+  again. Nothing is deleted. A folder that has gone missing (an unmounted
+  drive, say) is dropped from the registry the same way.
+- **A read-only folder** can't take the mark, so a host build can't bind it.
+- **A folder that grows past the walk's limit** (50,000 folders) after it was
+  chosen is refused at the next launch and dropped like any other refused
+  root.
+
 ## Proof
 
 This list says only what was run. A host top crate, signed under a host
 identity and built against this library at `32e56b11`, was launched twice in a
-sandbox HOME (2026-11-25). The first run passed the webview's identity check
+sandbox HOME (2026-11-25). That was before the mark and the launch bind. Since
+then, the vetting, the mark and the first config are proven by unit tests and
+source-order fences under a host ID only, not by a live host launch. The first run passed the webview's identity check
 and made a fresh scratch vault, its registry and its settings. The second run
 took the registry-exists path and set nothing aside, with no exit 73 or 78.
 Rotli's own app was never launched. The exit-78 and exit-73 stops themselves
@@ -246,7 +321,10 @@ the nav order and the host's words are proven by server-side rendering only.
   real. Tests that need the Keychain return early there, as the Keychain's own
   host test covers the refusal. The Antigravity path parity test compares the
   fixture's standalone path with the host ID swapped in.
-- **Rust tests:** `app_identity_tests.rs`, `helper_vault_identity_tests.rs`,
+- **Rust tests:** `app_identity_tests.rs`, `host_registry_tests.rs` (each
+  registry file and legacy pointer planted, a vault moved to the scratch path
+  with and without a readable registry, and the host's own vault spelled
+  through a link and `..`), `helper_vault_identity_tests.rs`,
   `breve_dev_roots.rs` and `app_host.rs`.
 - **TypeScript:** `src/lib/appIdentity.test.ts`, `src/host/registry.test.ts`,
   `src/components/settings/settingsNav.test.ts` and

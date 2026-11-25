@@ -387,16 +387,12 @@ pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
     corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f))
 }
 
+/// The standalone app's pointer files from before `corpus.json`.
+pub(crate) const LEGACY_CONFIG_FILES: [&str; 4] = ["corpus-root.txt", "corpus-memex-root.txt", "corpus-roots.json", "memex-instances.json"];
+
 fn configured_at(config_file: &Path, config_dir: &Path, default_root: &Path) -> bool {
     read_config_path_or_backup(config_file).is_some_and(|config| config.corpus.abs_path.is_dir())
-        || [
-            "corpus-root.txt",
-            "corpus-memex-root.txt",
-            "corpus-roots.json",
-            "memex-instances.json",
-        ]
-        .iter()
-        .any(|name| config_dir.join(name).exists())
+        || LEGACY_CONFIG_FILES.iter().any(|name| config_dir.join(name).exists())
         || default_root.exists()
 }
 
@@ -602,12 +598,14 @@ fn ensure_demo_memex(app: &tauri::AppHandle) -> Option<PathBuf> {
 
 /// Is demo mode currently on? (the marker file exists)
 pub fn demo_active(app: &tauri::AppHandle) -> bool {
-    demo_flag_file(app).map(|f| f.exists()).unwrap_or(false)
+    // a host build has no demo: `memex-demo` beside its corpus may be Rotli's
+    crate::app_identity::owns_shared_state() && demo_flag_file(app).map(|f| f.exists()).unwrap_or(false)
 }
 
 /// Turn demo mode on/off — writes/removes the marker (the caller relaunches).
 /// On enable, seeds the demo memex if it isn't there yet.
 pub fn set_demo(app: &tauri::AppHandle, on: bool) -> Result<(), String> {
+    crate::app_identity::require_shared_state()?;
     let f = demo_flag_file(app).ok_or("no app config dir")?;
     if on {
         if let Some(p) = f.parent() {
@@ -677,7 +675,7 @@ pub fn ensure_corpus_config(app: &tauri::AppHandle) -> CorpusConfig {
         );
         let _ = fs::rename(&cfg_file, backup);
     }
-    let cfg = migrate_config_at(&dir, &default_corpus_root(app));
+    let cfg = crate::host_registry::first_config_for(crate::app_identity::APP_IDENTIFIER, &dir, &default_corpus_root(app));
     if let Err(e) = write_corpus_config(app, &cfg) {
         eprintln!("rotli: failed to write corpus.json ({e})");
     }
@@ -771,7 +769,7 @@ fn unique_brain_id(brains: &[ConnectedBrain], label: &str) -> String {
 /// merge keeps the corpus-roots id, e.g. "vault", and takes perms/memexId/mode
 /// from the instance); active brain mapped from the instance registry's activeId
 /// via memexId.
-fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
+pub(crate) fn migrate_config_at(config_dir: &Path, default_corpus: &Path) -> CorpusConfig {
     let read_roots = || {
         // raw read (outside-vault): app config outside any vault
         fs::read_to_string(config_dir.join("corpus-roots.json"))
@@ -1032,6 +1030,7 @@ fn persist_corpus_path(
     {
         crate::vault_location::remember_vault(app, vault);
     }
+    crate::app_identity::claim(&cfg.corpus.abs_path)?; // its caller refused first
     write_corpus_config(app, &cfg)?;
     Ok(outgoing_id)
 }
@@ -1058,6 +1057,7 @@ pub fn upsert_brain(
 ) -> Result<String, String> {
     let mut cfg = ensure_corpus_config(app);
     crate::vault_location::remember_vault(app, &brain.abs_path);
+    crate::app_identity::claim(&brain.abs_path)?; // its caller refused first
     let id = upsert_brain_config(&mut cfg, brain, make_active)?;
     write_corpus_config(app, &cfg)?;
     Ok(id)
@@ -1115,6 +1115,7 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
         .unwrap_or("folder")
         .to_string();
     let id = unique_folder_id(&cfg, &label);
+    crate::app_identity::claim(&path)?; // its caller refused first
     cfg.folders.push(CorpusRoot {
         id,
         label,

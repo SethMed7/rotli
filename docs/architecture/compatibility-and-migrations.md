@@ -156,7 +156,10 @@ The same shell builds standalone Rotli and, through neutral seams, an app a
 host assembles under another bundle ID. **This adds an identifier and renames
 none.** Every existing install keeps `com.rotli.app`, its settings, its links,
 its Keychain items and its update feed. Any other identity fails closed on
-shared state and refuses a folder Rotli already uses as a vault. The contract,
+shared state and refuses a folder Rotli already uses as a vault. It marks each
+folder it binds with an empty `.rotli/bound-by/<bundle ID>` file and never
+reads Rotli's legacy pointer files; the standalone build neither writes nor
+reads that mark. The contract,
 its proof and what is not built yet are in
 [`host-seams.md`](host-seams.md).
 

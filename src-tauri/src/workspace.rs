@@ -1175,7 +1175,7 @@ fn root_targets() -> Result<Vec<RootTarget>, String> {
                 path.display()
             )
         })?;
-    Ok(targets_from_config(config))
+    Ok(targets_from_config(crate::host_registry::vet_config(config)?))
 }
 
 pub(crate) fn production_config_path() -> Result<PathBuf, String> {

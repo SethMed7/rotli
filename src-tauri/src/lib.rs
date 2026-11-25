@@ -31,6 +31,7 @@ pub mod helper;
 mod helper_args;
 mod helper_picker;
 mod helper_vault;
+mod host_registry;
 mod helper_token;
 mod keychain;
 mod loopback_http;
@@ -800,7 +801,7 @@ pub(crate) fn reject_privileged_root(
     // a host build's own scratch vault sits in its support folder on purpose;
     // only while it is still the real folder this build made
     if app_identity::owned_scratch_vault(app).as_ref() == Some(&candidate) {
-        return Ok(());
+        return app_identity::refuse_existing_vault(&candidate);
     }
     let mut protected = Vec::new();
     let mut forbidden_home_or_ancestor = false;
@@ -839,7 +840,7 @@ pub(crate) fn reject_privileged_root(
     // A host build never opens a folder Rotli already uses as a vault: every
     // way a folder becomes notes passes here before anything writes to it.
     // The standalone build refuses nothing and reads nothing more.
-    app_identity::refuse_existing_vault(&candidate, || app_identity::owned_roots(app))
+    app_identity::refuse_existing_vault(&candidate)
 }
 
 fn overlaps_any_private_path(
@@ -2407,6 +2408,13 @@ fn launch(context: tauri::Context<tauri::Wry>, host_plugins: Vec<tauri::plugin::
             // still matches the vault identity that was originally selected.
             if let Err(error) = vault_location::repair_vault_locations(app.handle()) {
                 eprintln!("rotli: could not repair moved vault locations ({error})");
+            }
+            // A host build binds only folders it marked: whatever its registry
+            // (or the repair above) names that it doesn't own is set aside
+            // before anything reads a root. If that fails, nothing binds.
+            if let Err(error) = host_registry::secure_registry(app.handle()) {
+                eprintln!("rotli: the registry is not safe to open ({error})");
+                std::process::exit(73);
             }
 
             // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root

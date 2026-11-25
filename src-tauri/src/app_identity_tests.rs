@@ -121,6 +121,13 @@ fn existing_vault_refusal() -> Result<(), String> {
     Err(HostWords::default().existing_vault)
 }
 
+/// A scratch vault just made: nothing in it but this build's mark.
+fn assert_fresh(scratch: &Path) {
+    let names: Vec<_> = std::fs::read_dir(scratch).unwrap().flatten().map(|entry| entry.file_name()).collect();
+    assert_eq!(names, vec![std::ffi::OsString::from(".rotli")], "{scratch:?}");
+    assert!(claimed_by(scratch, HOST));
+}
+
 /// The one rule, both ways: a host identity refuses a folder Rotli
 /// already uses; the standalone identity owns every vault.
 #[test]
@@ -128,8 +135,8 @@ fn a_host_identity_refuses_a_folder_rotli_already_uses() {
     let temp = tempfile::tempdir().unwrap();
     let vault = folder(temp.path(), "vault");
     make_vault(&vault);
-    assert_eq!(refuse_existing_vault_for(HOST, &vault, &[]), existing_vault_refusal());
-    assert_eq!(refuse_existing_vault_for(STANDALONE_IDENTIFIER, &vault, &[]), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &vault), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(STANDALONE_IDENTIFIER, &vault), Ok(()));
 }
 
 #[test]
@@ -137,10 +144,10 @@ fn a_host_identity_refuses_every_mark_of_a_vault() {
     let temp = tempfile::tempdir().unwrap();
     let marked = folder(temp.path(), "marked");
     std::fs::write(marked.join("memex.json"), r#"{"id":"mx_fixture"}"#).unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &marked, &[]), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &marked), existing_vault_refusal());
     let sidecar_only = folder(temp.path(), "sidecar-only");
     std::fs::create_dir_all(sidecar_only.join(".rotli")).unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &sidecar_only, &[]), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &sidecar_only), existing_vault_refusal());
 }
 
 #[test]
@@ -149,9 +156,9 @@ fn a_host_identity_refuses_a_folder_inside_or_around_a_vault() {
     let vault = folder(temp.path(), "outer/vault");
     make_vault(&vault);
     let inside = folder(&vault, "wiki/people");
-    assert_eq!(refuse_existing_vault_for(HOST, &inside, &[]), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &inside), existing_vault_refusal());
     let around = folder(temp.path(), "outer");
-    assert_eq!(refuse_existing_vault_for(HOST, &around, &[]), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &around), existing_vault_refusal());
 }
 
 #[test]
@@ -160,16 +167,21 @@ fn a_host_identity_opens_plain_folders_and_its_own_vaults() {
     let plain = folder(temp.path(), "plain");
     std::fs::write(plain.join("note.md"), "# A note\n").unwrap();
     folder(&plain, "sub");
-    assert_eq!(refuse_existing_vault_for(HOST, &plain, &[]), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &plain), Ok(()));
     let own = folder(temp.path(), "own");
     make_vault(&own);
-    assert_eq!(refuse_existing_vault_for(HOST, &own, std::slice::from_ref(&own)), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &own), existing_vault_refusal(), "not marked yet");
+    claim_for(HOST, &own).unwrap();
+    assert!(claimed_by(&own, HOST) && !claimed_by(&own, "com.example.other"));
+    assert_eq!(refuse_existing_vault_for(HOST, &own), Ok(()));
     let inside_own = folder(&own, "projects");
-    assert_eq!(refuse_existing_vault_for(HOST, &inside_own, std::slice::from_ref(&own)), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &inside_own), Ok(()));
     // its own vault never excuses another one beside it
     let other = folder(&own, "projects/other");
     make_vault(&other);
-    assert_eq!(refuse_existing_vault_for(HOST, &own, std::slice::from_ref(&own)), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &own), existing_vault_refusal());
+    assert_eq!(claim_for(STANDALONE_IDENTIFIER, &other), Ok(()));
+    assert!(!other.join(".rotli/bound-by").exists(), "the standalone build marks nothing");
 }
 
 #[test]
@@ -177,22 +189,11 @@ fn this_build_refuses_exactly_as_its_identity_says() {
     let temp = tempfile::tempdir().unwrap();
     let vault = folder(temp.path(), "vault");
     make_vault(&vault);
-    let mut asked = false;
-    let verdict = refuse_existing_vault(&vault, || {
-        asked = true;
-        Ok(Vec::new())
-    });
+    let verdict = refuse_existing_vault(&vault);
     if owns_shared_state() {
         assert_eq!(verdict, Ok(()));
-        assert!(!asked, "the standalone build never reads a registry for this");
     } else {
         assert_eq!(verdict, Err(words().existing_vault.clone()));
-        assert!(asked);
-    }
-    if !owns_shared_state() {
-        // an unreadable registry refuses rather than opening
-        let plain = folder(temp.path(), "plain");
-        assert!(refuse_existing_vault(&plain, || Err("registry unreadable".into())).is_err());
     }
 }
 
@@ -203,28 +204,29 @@ fn link(target: &Path, at: &Path) {
 
 /// The scratch vault is trusted only as a real folder directly inside the
 /// support folder: a link there (to a person's vault, say) never is, and
-/// neither is a full folder this build didn't make (no registry yet).
+/// neither is a full folder without this build's mark.
 #[cfg(unix)]
 #[test]
 fn only_a_real_scratch_folder_this_build_made_is_trusted() {
     let temp = tempfile::tempdir().unwrap();
     let support = folder(temp.path(), "support");
-    assert_eq!(scratch_state(&support, false), ScratchState::Missing);
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Missing);
     let vault = folder(temp.path(), "someone's vault");
     make_vault(&vault);
     link(&vault, &support.join(SCRATCH_VAULT));
-    assert_eq!(scratch_state(&support, false), ScratchState::Untrusted);
-    assert_eq!(scratch_state(&support, true), ScratchState::Untrusted);
-    assert_eq!(trusted_scratch_in(&support), None);
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Untrusted);
+    assert_eq!(trusted_scratch_for(&support, HOST), None);
     std::fs::remove_file(support.join(SCRATCH_VAULT)).unwrap();
     std::fs::write(support.join(SCRATCH_VAULT), "not a folder").unwrap();
-    assert_eq!(scratch_state(&support, true), ScratchState::Untrusted);
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Untrusted);
     std::fs::remove_file(support.join(SCRATCH_VAULT)).unwrap();
     let planted = folder(&support, SCRATCH_VAULT);
     make_vault(&planted);
-    assert_eq!(scratch_state(&support, false), ScratchState::Untrusted, "full, and no registry made it");
-    assert_eq!(scratch_state(&support, true), ScratchState::Trusted);
-    assert_eq!(trusted_scratch_in(&support), Some(planted));
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Untrusted, "full, and not marked by this build");
+    claim_for(HOST, &planted).unwrap();
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Trusted);
+    assert_eq!(trusted_scratch_for(&support, HOST), Some(planted));
+    assert_eq!(scratch_state(&support, "com.example.other"), ScratchState::Untrusted);
 }
 
 /// First run sets an untrusted scratch path aside (the link itself, never
@@ -238,10 +240,10 @@ fn first_run_sets_a_linked_scratch_aside_and_starts_empty() {
     make_vault(&vault);
     std::fs::write(vault.join("note.md"), "# Kept\n").unwrap();
     link(&vault, &support.join(SCRATCH_VAULT));
-    settle_scratch_in(&support, false).unwrap();
+    settle_scratch_for(HOST, &support, false).unwrap();
     let scratch = support.join(SCRATCH_VAULT);
     assert!(!std::fs::symlink_metadata(&scratch).unwrap().file_type().is_symlink());
-    assert_eq!(std::fs::read_dir(&scratch).unwrap().count(), 0, "a fresh empty scratch vault");
+    assert_fresh(&scratch);
     assert_eq!(std::fs::read_to_string(vault.join("note.md")).unwrap(), "# Kept\n", "the target is untouched");
     let set_aside: Vec<_> = std::fs::read_dir(&support)
         .unwrap()
@@ -250,32 +252,7 @@ fn first_run_sets_a_linked_scratch_aside_and_starts_empty() {
         .collect();
     assert_eq!(set_aside.len(), 1);
     assert!(set_aside[0].file_type().unwrap().is_symlink());
-    assert_eq!(scratch_state(&support, false), ScratchState::Trusted);
-}
-
-/// A registry root owns nothing once it resolves somewhere else: a stored
-/// path that has become a link to another vault is not this build's.
-#[cfg(unix)]
-#[test]
-fn a_registry_root_that_became_a_link_owns_nothing() {
-    let temp = tempfile::tempdir().unwrap();
-    let support = folder(temp.path(), "support");
-    let vault = folder(temp.path(), "someone's vault");
-    make_vault(&vault);
-    let own = folder(temp.path(), "own");
-    let swapped = temp.path().join("swapped");
-    link(&vault, &swapped);
-    let registry = support.join("corpus.json");
-    let config = serde_json::json!({
-        "version": 1,
-        "corpus": { "absPath": own },
-        "folders": [{ "id": "f1", "label": "Swapped", "absPath": swapped }]
-    });
-    std::fs::write(&registry, config.to_string()).unwrap();
-    let owned = owned_roots_from(trusted_scratch_in(&support), Some(registry)).unwrap();
-    assert!(owned.contains(&own));
-    assert!(!owned.contains(&vault), "{owned:?}");
-    assert_eq!(refuse_existing_vault_for(HOST, &vault, &owned), existing_vault_refusal());
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Trusted);
 }
 
 /// A folder holding a link to a vault holds that vault.
@@ -289,12 +266,12 @@ fn a_host_identity_refuses_a_folder_that_links_to_a_vault() {
     for target in [&vault, &inside] {
         let holder = folder(temp.path(), &format!("holder-{}", target.file_name().unwrap().to_string_lossy()));
         link(target, &holder.join("shortcut"));
-        assert_eq!(refuse_existing_vault_for(HOST, &holder, &[]), existing_vault_refusal(), "{target:?}");
+        assert_eq!(refuse_existing_vault_for(HOST, &holder), existing_vault_refusal(), "{target:?}");
     }
     let plain = folder(temp.path(), "plain");
     let holder = folder(temp.path(), "holder-plain");
     link(&plain, &holder.join("shortcut"));
-    assert_eq!(refuse_existing_vault_for(HOST, &holder, &[]), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &holder), Ok(()));
 }
 
 /// A planted vault at the scratch path on a first run is set aside like a
@@ -304,12 +281,12 @@ fn first_run_sets_a_planted_scratch_aside_without_collisions() {
     let temp = tempfile::tempdir().unwrap();
     let support = folder(temp.path(), "support");
     for round in 1..=2 {
+        let _ = std::fs::remove_dir_all(support.join(SCRATCH_VAULT)); // a new plant in place of the last scratch
         let planted = folder(&support, SCRATCH_VAULT);
         make_vault(&planted);
         std::fs::write(planted.join("note.md"), format!("# Planted {round}\n")).unwrap();
-        settle_scratch_in(&support, false).unwrap();
-        let scratch = support.join(SCRATCH_VAULT);
-        assert_eq!(std::fs::read_dir(&scratch).unwrap().count(), 0, "round {round}");
+        settle_scratch_for(HOST, &support, false).unwrap();
+        assert_fresh(&support.join(SCRATCH_VAULT));
         let aside = std::fs::read_dir(&support)
             .unwrap()
             .flatten()
@@ -319,12 +296,12 @@ fn first_run_sets_a_planted_scratch_aside_without_collisions() {
     }
     // and once a registry exists, the folder it bound is kept as it is
     std::fs::write(support.join(SCRATCH_VAULT).join("note.md"), "# Mine\n").unwrap();
-    settle_scratch_in(&support, true).unwrap();
+    settle_scratch_for(HOST, &support, true).unwrap();
     assert!(support.join(SCRATCH_VAULT).join("note.md").exists());
     // a person who moved on from it keeps it gone
     std::fs::remove_dir_all(support.join(SCRATCH_VAULT)).unwrap();
-    settle_scratch_in(&support, true).unwrap();
-    assert_eq!(scratch_state(&support, true), ScratchState::Missing);
+    settle_scratch_for(HOST, &support, true).unwrap();
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Missing);
 }
 
 /// A support folder reached through a link isn't this build's own, so its
@@ -337,10 +314,10 @@ fn a_scratch_vault_inside_a_linked_support_folder_is_not_trusted() {
     folder(&elsewhere, SCRATCH_VAULT);
     let support = temp.path().join("support");
     link(&elsewhere, &support);
-    assert_eq!(scratch_state(&support, true), ScratchState::Untrusted);
-    assert_eq!(trusted_scratch_in(&support), None);
+    assert_eq!(scratch_state(&support, HOST), ScratchState::Untrusted);
+    assert_eq!(trusted_scratch_for(&support, HOST), None);
     // nothing is renamed through it: setting aside can't make it safe
-    assert!(settle_scratch_in(&support, false).is_err());
+    assert!(settle_scratch_for(HOST, &support, false).is_err());
     let names: Vec<_> = std::fs::read_dir(&elsewhere).unwrap().flatten().map(|entry| entry.file_name()).collect();
     assert_eq!(names, vec![std::ffi::OsString::from(SCRATCH_VAULT)]);
 }
@@ -355,13 +332,14 @@ fn the_walk_follows_links_once_and_honours_its_own_vaults() {
     let deep = folder(&plain, "a/b");
     link(&plain, &deep.join("back to the top"));
     link(&deep, &plain.join("loop"));
-    assert_eq!(refuse_existing_vault_for(HOST, &plain, &[]), Ok(()));
+    assert_eq!(refuse_existing_vault_for(HOST, &plain), Ok(()));
     let own = folder(temp.path(), "own");
     make_vault(&own);
     let holder = folder(temp.path(), "holder");
     link(&own, &holder.join("mine"));
-    assert_eq!(refuse_existing_vault_for(HOST, &holder, std::slice::from_ref(&own)), Ok(()));
-    assert_eq!(refuse_existing_vault_for(HOST, &holder, &[]), existing_vault_refusal());
+    assert_eq!(refuse_existing_vault_for(HOST, &holder), existing_vault_refusal());
+    claim_for(HOST, &own).unwrap();
+    assert_eq!(refuse_existing_vault_for(HOST, &holder), Ok(()));
 }
 
 /// A folder too large to check refuses: it isn't known to be free of a
@@ -373,9 +351,9 @@ fn a_folder_too_large_to_check_is_refused() {
     for n in 0..5 {
         folder(&big, &format!("sub-{n}"));
     }
-    assert_eq!(refuse_existing_vault_within(HOST, &big, &[], 6), Ok(()));
-    assert_eq!(refuse_existing_vault_within(HOST, &big, &[], 5), Err(TOO_LARGE.to_string()));
-    assert_eq!(refuse_existing_vault_within(STANDALONE_IDENTIFIER, &big, &[], 0), Ok(()));
+    assert_eq!(refuse_existing_vault_within(HOST, &big, 6), Ok(()));
+    assert_eq!(refuse_existing_vault_within(HOST, &big, 5), Err(TOO_LARGE.to_string()));
+    assert_eq!(refuse_existing_vault_within(STANDALONE_IDENTIFIER, &big, 0), Ok(()));
 }
 
 /// An unreadable folder below the candidate is skipped: this app can't
@@ -390,42 +368,15 @@ fn an_unreadable_folder_in_the_walk_is_skipped() {
     make_vault(&folder(&locked, "inner"));
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
     let readable = std::fs::read_dir(&locked).is_ok(); // root reads anything
-    let verdict = refuse_existing_vault_for(HOST, &outer, &[]);
+    let verdict = refuse_existing_vault_for(HOST, &outer);
     let beside = folder(&outer, "beside");
     make_vault(&beside);
-    let with_beside = refuse_existing_vault_for(HOST, &outer, &[]);
+    let with_beside = refuse_existing_vault_for(HOST, &outer);
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
     if !readable {
         assert_eq!(verdict, Ok(()));
     }
     assert_eq!(with_beside, existing_vault_refusal());
-}
-
-/// `owned` compares canonical paths, so a registry entry spelled through
-/// `.`/`..` still owns its folder. A different letter case is a different
-/// path here, so it owns nothing and the refusal holds (fails closed).
-#[test]
-fn owned_roots_compare_canonical_paths() {
-    let temp = tempfile::tempdir().unwrap();
-    let support = folder(temp.path(), "support");
-    let own = folder(temp.path(), "Own");
-    make_vault(&own);
-    let registry = support.join("corpus.json");
-    let write = |abs: PathBuf| {
-        let config = serde_json::json!({ "version": 1, "corpus": { "absPath": abs } });
-        std::fs::write(&registry, config.to_string()).unwrap();
-    };
-    write(own.join("..").join("Own").join("."));
-    let owned = owned_roots_from(None, Some(registry.clone())).unwrap();
-    assert_eq!(refuse_existing_vault_for(HOST, &own, &owned), Ok(()), "{owned:?}");
-    write(own.parent().unwrap().join("own"));
-    let owned = owned_roots_from(None, Some(registry.clone())).unwrap();
-    if owned.contains(&own) {
-        // a case-insensitive volume whose canonical form restores the case
-        assert_eq!(refuse_existing_vault_for(HOST, &own, &owned), Ok(()));
-    } else {
-        assert_eq!(refuse_existing_vault_for(HOST, &own, &owned), existing_vault_refusal());
-    }
 }
 
 /// A top-level function's source, up to its closing brace (spelled as a
@@ -486,4 +437,34 @@ fn every_root_choice_meets_the_vault_refusal() {
     let check = choose.find("reject_privileged_root(").unwrap();
     let heal = choose.find("vault_marker::heal_best_effort(").unwrap();
     assert!(check < heal, "the refusal must run before the heal writes to the folder");
+}
+
+/// Hold 1's place in the launch: the registry is secured after the scratch
+/// vault and the bookmark repair (which rewrites registry paths from the
+/// support folder), before anything reads a root, and exit 73 stops a launch
+/// that can't secure it. Every registry writer marks the root it adds after
+/// its caller's refusal; the scratch vault still meets the vault refusal;
+/// the headless CLI vets the registry it reads.
+#[test]
+fn launch_secures_the_registry_and_writers_mark_their_roots() {
+    let src = |file: &str| std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(file)).unwrap();
+    let lib = src("lib.rs");
+    let setup = &lib[lib.find(".setup(|app| {").expect("setup exists")..];
+    let repair = setup.find("vault_location::repair_vault_locations(").unwrap();
+    let secure = setup.find("host_registry::secure_registry(").expect("the launch secures the registry");
+    let first_read = setup.find("corpus::is_configured(app.handle())").unwrap();
+    assert!(repair < secure && secure < first_read && first_read < setup.find("corpus::startup_roots(").unwrap());
+    assert!(setup[secure..first_read].contains("std::process::exit(73)"));
+    let check = body_of(&lib, "pub(crate) fn reject_privileged_root(");
+    assert!(check.contains("== Some(&candidate) {\n        return app_identity::refuse_existing_vault(&candidate);"), "{check}");
+    let corpus = src("corpus.rs");
+    for writer in ["fn persist_corpus_path(", "pub fn upsert_brain(", "pub fn add_folder("] {
+        let body = body_of(&corpus, writer);
+        let claim = body.find("app_identity::claim(").unwrap_or_else(|| panic!("{writer} marks its root"));
+        assert!(claim < body.find("write_corpus_config(").unwrap(), "{writer}");
+    }
+    assert!(body_of(&src("workspace.rs"), "fn root_targets(").contains("host_registry::vet_config("));
+    // demo mode binds a sibling of the corpus (`memex-demo`), so a host build has none
+    assert!(body_of(&corpus, "pub fn demo_active(").contains("app_identity::owns_shared_state()"));
+    assert!(body_of(&corpus, "pub fn set_demo(").contains("app_identity::require_shared_state()?"));
 }
