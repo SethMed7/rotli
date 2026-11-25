@@ -6,15 +6,21 @@ import { usePinnedSites } from "./pinnedSites";
 import { useSidebarLook } from "./sidebarLook";
 
 test("the extras survive a save and a load, and a damaged file loads the defaults", () => {
-  useSidebarLook.getState().setLook({ scenery: "both", icons: "color" });
+  useSidebarLook.getState().setLook({ icons: "color" });
   const saved = JSON.stringify(appExtrasSnapshot());
-  useSidebarLook.getState().setLook({ scenery: "off", icons: "neutral" });
+  useSidebarLook.getState().setLook({ icons: "neutral" });
   hydrateAppExtras(saved);
-  expect(useSidebarLook.getState().look).toEqual({ scenery: "both", icons: "color" });
+  expect(useSidebarLook.getState().look).toEqual({ icons: "color" });
   expect(JSON.parse(JSON.stringify(appExtrasSnapshot()))).toEqual(JSON.parse(saved));
 
   hydrateAppExtras("{ not json");
-  expect(useSidebarLook.getState().look).toEqual({ scenery: "top", icons: "neutral" });
+  expect(useSidebarLook.getState().look).toEqual({ icons: "neutral" });
+});
+
+test("a file saved before the scenery was removed loads, and the next save drops it", () => {
+  hydrateAppExtras(JSON.stringify({ sidebarLook: { scenery: "both", icons: "color" } }));
+  expect(useSidebarLook.getState().look).toEqual({ icons: "color" });
+  expect(appExtrasSnapshot().sidebarLook).toEqual({ icons: "color" });
 });
 
 test("a change saves; opening a pin's panel doesn't", () => {

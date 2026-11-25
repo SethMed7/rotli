@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Saves now wait their turn, and an edit made by something else is still
   reported instead of being overwritten.
 
+### Changed
+
+- **The sidebar is plainer.** The faint scenery behind the sidebar is gone, and
+  so is its Scenery choice in Settings → Appearance. The icon setting stays.
+
 ## [1.9.6] - 2026-11-23
 
 ### Fixed

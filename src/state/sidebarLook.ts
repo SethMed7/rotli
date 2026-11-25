@@ -1,4 +1,4 @@
-// The sidebar's look: its scenery and its icons (src/lib/sidebarLook.ts has
+// The sidebar's look: its icons (src/lib/sidebarLook.ts has
 // the rules). Kept in the app settings on this Mac (state/appExtras.ts,
 // `sidebarLook`).
 

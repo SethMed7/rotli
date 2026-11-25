@@ -375,22 +375,14 @@ new IA — each piece owns one front or one zone.
   The shared vault header remains stable: only its Coffee/Quokka mode control
   changes, while New, New folder, and Collapse all stay available.
 
-## The sidebar's look: scenery and icons (2026-10-01)
+## The sidebar's look: icons (2026-10-01; scenery removed 2026-11-24)
 
-The owner: "make the left menu alive via scenery … head and footer scenes, and
-both, very subtle", from T3 Code's hill and tree behind its sidebar header;
-"for the icons, allow Neutral, which makes them all fit in, or Color, which
-uses their own color".
+The owner: "for the icons, allow Neutral, which makes them all fit in, or Color,
+which uses their own color". The sidebar once drew a faint theme horizon behind
+its header and footer (Settings → Scenery: Off · Top · Bottom · Both). The owner
+removed it on 2026-11-24: the sidebar is plainer. A saved `scenery` value in the
+app settings is ignored on load and dropped on the next save.
 
-- **Scenery** (`sidebar/sidebarScenery.tsx`; Settings → Appearance → Sidebar →
-  Scenery: Off · Top · Bottom · Both, default Top). The theme family's own
-  horizon as a **one-ink silhouette** behind the header row (56px) and/or the
-  footer (64px). The owner, the same day: "it can't make things hard to see …
-  more subtle, no visual clutter", so: no sky objects, no detail strokes,
-  every shape the text ink at 6% (`opacity: 0.06`), never under the rows'
-  middle. `e2e/sidebar-look.spec.ts` holds it there (opacity ≤ 0.08, bands ≤
-  64px). Still, never animated (ROTLI_DESIGN#2), `pointer-events: none`, under
-  the rows through `isolation` on `.sidebar`, faded by a linear mask.
 - **Icons** (`data-icons` on `.sidebar`; Icons: Neutral · Color, default
   Neutral). Neutral gives every mark one ink: the Word badge and the kit's
   clay. Color gives each row's kind its semantic color (`iconKind`, `kind-*`):
@@ -399,5 +391,5 @@ uses their own color".
   their own colors under both (the owner, 2026-10-10: in one ink every model
   looked alike); a vendor's mark only says who answers, so Rotli never
   recolors it.
-- Both live in the app settings on this Mac (`sidebarLook`, `state/appExtras.ts`).
+- The look lives in the app settings on this Mac (`sidebarLook`, `state/appExtras.ts`).
   Proof: `src/lib/sidebarLook.test.ts`, `e2e/sidebar-look.spec.ts`.
