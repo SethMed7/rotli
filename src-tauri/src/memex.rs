@@ -879,6 +879,7 @@ fn write_chat_at(
             (Some(_), None) => return Err(format!("chat no longer exists: {safe}")),
             (None, None) => {}
         }
+        let creating = existing.is_none();
         let existing = match existing {
             Some(bytes) => String::from_utf8(bytes)
                 .map_err(|_| format!("existing chat is not valid UTF-8: {safe}"))?,
@@ -888,7 +889,17 @@ fn write_chat_at(
         // it (review 2026-11-20: re-saves dropped `secure` and `locked`)
         let next = crate::note_protection::keep_protection(&existing, contents, set_chat_line);
         crate::note_protection::require_not_looser_fail_closed(&existing, &next)?;
-        atomic_write(&path, &next)
+        if !creating {
+            return atomic_write(&path, &next);
+        }
+        // a create lands only where nothing is, in the write itself: a file
+        // another writer made after the read above is never replaced
+        // (chat audit 2026-11-24, D1)
+        if crate::fsutil::atomic_write_new(&path, &next, ".rotli-memex-")? {
+            Ok(())
+        } else {
+            Err(format!("chat already exists: {safe}; choose another title instead of replacing it"))
+        }
     })?;
     Ok(path.to_string_lossy().to_string())
 }
@@ -1012,27 +1023,11 @@ pub fn memex_rename_chat(
     old_slug: String,
     new_slug: String,
 ) -> Result<String, String> {
-    let root = registered_write_root(&app, &root)?;
-    let old_safe = safe_slug(&old_slug)?;
-    let new_safe = safe_slug(&new_slug)?;
-    assert_writable(&format!("chats/{old_safe}.md"))?;
-    assert_writable(&format!("chats/{new_safe}.md"))?;
-    let chats = root.join(crate::vault_roles::chats_dir(&root));
-    let old_path = chats.join(format!("{old_safe}.md"));
-    let new_path = chats.join(format!("{new_safe}.md"));
-    if !old_path.exists() {
-        return Err(format!("chat not found: {old_safe}"));
-    }
-    if new_safe != old_safe && new_path.exists() {
-        return Err(format!("a chat named \"{new_safe}\" already exists"));
-    }
-    with_file_lock(&old_path, || {
-        fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
-    })?;
-    Ok(new_safe)
+    rename_chat_at(&registered_write_root(&app, &root)?, &old_slug, &new_slug)
 }
 
-/// Soft-delete a chat: move `chats/<slug>.md` → `chats/trash/<slug>.md`, a hidden
+/// Soft-delete a chat: move `chats/<slug>.md` → `chats/trash/<slug>.md` (or
+/// `<slug>-2.md`, … when an earlier chat is kept under that name), a hidden
 /// subfolder `list_chats_at` never scans (it reads the top level only), so the chat
 /// leaves the sidebar but the file survives — recoverable in Finder. Stays under
 /// rotli's writable `chats/` surface. Registered root (#20). (the maintainer #4, 2026-07-08.)
@@ -1079,17 +1074,7 @@ fn move_chat_to_bucket(
     bucket: &str,
 ) -> Result<(), String> {
     let root = registered_write_root(app, root)?;
-    let safe = safe_slug(slug)?;
-    assert_writable(&format!("chats/{safe}.md"))?;
-    assert_writable(&format!("chats/{bucket}/{safe}.md"))?;
-    let src = root.join(crate::vault_roles::chats_dir(&root)).join(format!("{safe}.md"));
-    if !src.exists() {
-        return Err(format!("chat not found: {safe}"));
-    }
-    let dir = root.join(crate::vault_roles::chats_dir(&root)).join(bucket);
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let dst = dir.join(format!("{safe}.md"));
-    with_file_lock(&src, || fs::rename(&src, &dst).map_err(|e| e.to_string()))
+    move_chat_to_bucket_at(&root, slug, bucket)
 }
 
 /// Write a brand-new note (full v3.5 bytes composed by TS) into the Librarian's
@@ -1316,6 +1301,10 @@ pub async fn memex_pick_folder(app: tauri::AppHandle, title: Option<String>) -> 
     .map_err(|e| format!("picker worker failed ({e})"))?
 }
 
+#[path = "memex_chat_moves.rs"]
+mod chat_moves;
+use chat_moves::{move_chat_to_bucket_at, rename_chat_at};
+
 #[cfg(all(test, unix))]
 #[path = "memex_hard_link_tests.rs"]
 mod hard_link_tests;
@@ -1323,6 +1312,10 @@ mod hard_link_tests;
 #[cfg(test)]
 #[path = "memex_chat_guard_tests.rs"]
 mod chat_guard_tests;
+
+#[cfg(test)]
+#[path = "memex_chat_name_tests.rs"]
+mod chat_name_tests;
 
 #[cfg(test)]
 mod tests {

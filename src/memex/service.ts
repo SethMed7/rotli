@@ -32,7 +32,9 @@ import {
 import { isRevisionConflict } from "../lib/trackedWrite";
 import { titleOf } from "../services/derive";
 import { setChatModel } from "./chatModelFrontmatter";
+import { CHAT_NAME_ATTEMPTS, isChatNameTaken, numberedChatSlug } from "./chatNames";
 import { chatMemoryNote, setChatMemoryNote } from "./chatNotePointers";
+import { parseTranscriptTurns } from "./chatTranscript";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
   addChatArtifact,
@@ -43,6 +45,7 @@ import {
   type ChatArtifact,
   type ChatMsg,
   chatSlug,
+  composeMessageLines,
   composeNewChat,
   composeNote,
   type NoteMeta,
@@ -144,19 +147,30 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
     });
     return { slug, path: path ?? `${instance.root}/${rel}` };
   }
-  let contents = composeNewChat(
-    {
-      title: input.title,
-      source: ROTLI_SOURCE,
-      slug,
-      ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
-    },
-    messages,
-    date,
-  ).contents;
-  if (input.secureContext) contents = setChatSecureContext(contents);
-  const path = await memexWriteChat(instance.root, slug, contents, null);
-  return { slug, path };
+  // A new chat never replaces one with the same name: each store's create is
+  // exclusive and refuses a taken name, and the next name is tried (chat audit
+  // 2026-11-24, D1). There is no look-then-write window. The bytes are
+  // composed per name because the `id:` line carries it.
+  for (let n = 1; ; n += 1) {
+    const candidate = numberedChatSlug(slug, n);
+    let contents = composeNewChat(
+      {
+        title: input.title,
+        source: ROTLI_SOURCE,
+        slug: candidate,
+        ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
+      },
+      messages,
+      date,
+    ).contents;
+    if (input.secureContext) contents = setChatSecureContext(contents);
+    try {
+      const path = await memexWriteChat(instance.root, candidate, contents, null);
+      return { slug: candidate, path };
+    } catch (error) {
+      if (n >= CHAT_NAME_ATTEMPTS || !isChatNameTaken(error)) throw error;
+    }
+  }
 }
 
 /** Point an EXISTING chat at the chat-made note that holds its conversation
@@ -194,14 +208,56 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
  * Rotli's "⚠" notice after it), so "Send anyway" or "Edit message" replaces it
  * instead of leaving a duplicate. Anything else at the end: unchanged. */
 export function withoutTrailingBlockedExchange(contents: string): string {
-  const reply = contents.lastIndexOf("\n**rotli** · ");
-  if (reply < 0 || !/^\n\*\*rotli\*\* · [^\n]*? — ⚠/.test(contents.slice(reply))) return contents;
-  const ask = contents.lastIndexOf("\n**you** · ", reply - 1);
-  return ask < 0 ? contents : contents.slice(0, ask + 1);
+  const [ask, notice] = parseTranscriptTurns(contents).slice(-2);
+  if (!ask || !notice || ask.speaker !== "you" || notice.speaker !== "rotli") return contents;
+  return notice.text.startsWith("⚠") ? contents.slice(0, ask.start) : contents;
 }
 
 export async function dropBlockedExchange(instance: MemexInstance, slug: string): Promise<void> {
   await rewriteChat(instance, slug, withoutTrailingBlockedExchange);
+}
+
+/** Take the person's turn stamped `at` off the end of a chat file, when the
+ * file ends with exactly that turn as it was written. A turn-shaped line
+ * pasted into the message can't hide it, and anything written after it (a
+ * reply, another send) keeps the file unchanged. */
+export function withoutStoppedTurn(contents: string, at: string, text: string): string {
+  const written = composeMessageLines([{ speaker: "you", text, at }], at).trimEnd();
+  const turn = parseTranscriptTurns(contents).find(
+    (candidate) =>
+      candidate.speaker === "you" &&
+      candidate.at === at &&
+      contents.slice(candidate.start).trimEnd() === written,
+  );
+  return turn ? contents.slice(0, turn.start) : contents;
+}
+
+/** Stop before any reply arrived: the turn leaves the screen and goes back to
+ * the composer, so it leaves the file too. Otherwise it came back on reopen
+ * with no reply, and sending it again doubled it (chat audit 2026-11-24, D4). */
+export async function dropStoppedTurn(
+  instance: MemexInstance,
+  slug: string,
+  turn: { at: string; text: string },
+): Promise<void> {
+  await rewriteChat(instance, slug, (contents) => withoutStoppedTurn(contents, turn.at, turn.text));
+}
+
+/** Make a stopped turn's file match the screen: a partial answer Stop kept is
+ * saved as the reply, otherwise the person's turn comes off. */
+export async function settleStoppedTurn(
+  instance: MemexInstance,
+  slug: string,
+  turn: { userAt: string; userText: string; partial: string | null; at: string; secureContext: boolean },
+): Promise<void> {
+  if (!turn.partial) return dropStoppedTurn(instance, slug, { at: turn.userAt, text: turn.userText });
+  await writeChat({
+    instance,
+    existingSlug: slug,
+    title: slug,
+    messages: [{ speaker: "rotli", text: turn.partial, at: turn.at }],
+    secureContext: turn.secureContext,
+  });
 }
 
 /** Rewrite one existing chat file through a pure edit. Another writer may land

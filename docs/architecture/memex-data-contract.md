@@ -197,6 +197,37 @@ second user-visible product or storage location.
 - Saved chat updates use the same rule. Creation refuses an existing slug, and
   `secureContext` is a one-way transition inside the same locked write window,
   so concurrent windows cannot erase taint or overwrite a newer transcript.
+- No chat file ever replaces another (chat audit 2026-11-24). A create is
+  exclusive in the write itself (Rust `atomic_write_new`; the web stores'
+  `"0"` revision gate) and says `chat already exists: <slug>` when the name is
+  taken; the one place that names new chats (`service.ts writeChat`) then
+  tries `<slug>-2`, `<slug>-3`, … up to 80 characters, recomposing the bytes
+  so `id:` carries the name that was saved. Trash and Archive keep a chat
+  under the first free name in `chats/trash/` or `chats/archive/` (`<slug>`,
+  `<slug>-2`, …; the browser store uses the same names for its kept keys), and
+  a rename refuses a taken name. Both moves refuse in the rename itself
+  (`fsutil::rename_no_replace`), never by looking first. On a filesystem
+  with no refusing rename (exFAT, FAT) the move is a copy into a file created
+  only where nothing is, then the original is removed; the file never has a
+  second name, and a failure keeps the original. Folder mode on the web moves
+  through `VaultDir.move`, which refuses a taken name the same way, and tries
+  the same numbered names.
+- A transcript is read back (`src/memex/chatTranscript.ts`) as turns that
+  start only at a whole `**speaker** · <time> — ` line inside the section the
+  `## Messages` heading line opens, where the speaker is a lowercase name or a
+  declared participant, the time is an ISO date or instant, and that time
+  falls between a day before the earlier of `created:` and the first turn and
+  a day after `updated:`. Other reply lines of that shape stay reply text.
+  Every Rotli writer bumps `updated:` when it appends (`appendMessages`), so
+  the upper bound only folds in a turn added by hand without that bump.
+  Message text is still written raw, so a forged line dated inside the chat's
+  lifetime still reads as a turn; closing that needs a write-side format
+  change, which is proposed, not made.
+- Stop keeps the file in step with the screen: a turn Stop sends back to the
+  composer is taken off the end of the file when the file ends with exactly
+  that turn as written (a turn-shaped line pasted into it can't hide it, and
+  anything written after it leaves the file alone), and a partial answer Stop keeps
+  is saved as the reply, with the turn's secure mark.
 - A rewrite never loosens a note's protection by accident (review
   2026-11-20). The rule is one function per side, `note_protection.rs` and
   `src/lib/protectionRule.ts`: a write may not turn off `locked`, `secure` or

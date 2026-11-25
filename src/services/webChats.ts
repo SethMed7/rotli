@@ -10,8 +10,9 @@ import { frontmatterBlock } from "../lib/frontmatterBlock";
 import { keepProtection, requireNotLooser } from "../lib/protectionRule";
 import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
+import { CHAT_NAME_ATTEMPTS, numberedChatSlug } from "../memex/chatNames";
 import { lastReplyMs } from "../memex/chatRecency";
-import { type VaultDir, freeSiblingPath, vaultFolderRoles } from "./vaultDir";
+import { type VaultDir, vaultFolderRoles } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
@@ -106,7 +107,7 @@ export class WebChatStore implements ChatStore {
     let expected = expectedRevision;
     const existing = await this.vault.readVersioned(chatKey(slug));
     if (expected === null) {
-      if (existing.contents) throw new Error(`a chat named "${slug}" already exists`);
+      if (existing.contents) throw new Error(`chat already exists: ${slug}`);
       // a removed chat's key is gone (see remove), so a fresh slug starts at "0"
       expected = existing.revision;
     }
@@ -115,9 +116,13 @@ export class WebChatStore implements ChatStore {
     try {
       await this.vault.writeVersioned(chatKey(slug), next, expected);
     } catch (reason) {
-      if (reason instanceof RevisionConflict)
-        throw new Error("This chat changed in another tab — reopen it.");
-      throw reason;
+      if (!(reason instanceof RevisionConflict)) throw reason;
+      // a create that lost the race lost the name, not an edit (audit D1)
+      throw new Error(
+        expectedRevision === null
+          ? `chat already exists: ${slug}`
+          : "This chat changed in another tab — reopen it.",
+      );
     }
     await this.touch(slug);
     return `chats/${slug}.md`;
@@ -128,10 +133,29 @@ export class WebChatStore implements ChatStore {
    * chat leaves the list. */
   async remove(slug: string, bin: "trash" | "archive" = "trash"): Promise<void> {
     const live = await this.vault.read(chatKey(slug));
-    if (live) await this.vault.write(removedKey(bin, slug), live);
+    if (live) await this.keepRemoved(bin, slug, live);
     await this.vault.store.delete(chatKey(slug));
     await this.vault.store.delete(`${chatKey(slug)}#rev`);
     await this.touch(slug, true);
+  }
+
+  /** Keep a removed transcript under the first free name in its bin —
+   * `<slug>`, `<slug>-2`, … — so an earlier one with the same name is never
+   * replaced (chat audit 2026-11-24, D2). Copies kept before revisions were
+   * used here have none, so a name holding any text counts as taken. */
+  private async keepRemoved(bin: "trash" | "archive", slug: string, contents: string): Promise<void> {
+    for (let n = 1; n <= CHAT_NAME_ATTEMPTS; n += 1) {
+      const key = removedKey(bin, numberedChatSlug(slug, n));
+      const kept = await this.vault.readVersioned(key);
+      if (kept.contents) continue;
+      try {
+        await this.vault.writeVersioned(key, contents, kept.revision);
+        return;
+      } catch (reason) {
+        if (!(reason instanceof RevisionConflict)) throw reason;
+      }
+    }
+    throw new Error(`there is no free ${bin} name left for "${slug}"`);
   }
 
   /** A removed transcript, for a future Trash/Archive front on the web. */
@@ -242,24 +266,40 @@ export class FolderChatStore implements ChatStore {
     const path = await this.path(slug);
     const current = await this.revision(path);
     if (expectedRevision === null) {
-      if (current !== "0") throw new Error(`a chat named "${slug}" already exists`);
-    } else if (current !== expectedRevision) {
-      throw new Error("This chat changed on disk — reopen it.");
+      if (current !== "0") throw new Error(`chat already exists: ${slug}`);
+      // "0" makes the create exclusive in the write itself: a file another
+      // writer made since the check above is never replaced (audit D1)
+      try {
+        await this.dir.writeText(path, guardedChatText("", contents), "0");
+      } catch (reason) {
+        if (await this.dir.exists(path)) throw new Error(`chat already exists: ${slug}`);
+        throw reason;
+      }
+      return path;
     }
-    const existing = current === "0" ? "" : await this.dir.readText(path);
-    await this.dir.writeText(path, guardedChatText(existing, contents));
+    if (current !== expectedRevision) throw new Error("This chat changed on disk — reopen it.");
+    await this.dir.writeText(path, guardedChatText(await this.dir.readText(path), contents));
     return path;
   }
 
   async remove(slug: string, bin: "trash" | "archive"): Promise<void> {
     const path = await this.path(slug);
     if (!(await this.dir.exists(path))) return;
-    // a chat already archived under this name keeps its file: take the next free name
-    const direct = `${await this.chatsDir()}/${bin}/${safeSlug(slug)}.md`;
-    const target = (await this.dir.exists(direct))
-      ? await freeSiblingPath(this.dir, direct, "another")
-      : direct;
-    await this.dir.move(path, target);
+    // an earlier chat kept under this name stays: take the first free one,
+    // `<slug>`, `<slug>-2`, … as Rust does, so a copy moved back by hand is a
+    // valid chat again. Every VaultDir move refuses a taken name itself, so a
+    // second tab trashing the same name moves on instead of failing (audit D2)
+    const base = safeSlug(slug);
+    const bucket = `${await this.chatsDir()}/${bin}`;
+    for (let n = 1; n <= CHAT_NAME_ATTEMPTS; n += 1) {
+      try {
+        await this.dir.move(path, `${bucket}/${numberedChatSlug(base, n)}.md`);
+        return;
+      } catch (error) {
+        if (!/\balready exists\b/i.test(error instanceof Error ? error.message : String(error))) throw error;
+      }
+    }
+    throw new Error(`no free ${bin} name is left for ${base}`);
   }
 
   async folders(): Promise<{ contents: string; revision: string }> {
