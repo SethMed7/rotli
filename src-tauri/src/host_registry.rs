@@ -199,13 +199,13 @@ pub(crate) fn live_config(app: &tauri::AppHandle, config: CorpusConfig) -> Optio
 /// the registry's. A host build takes its open stores' roots instead, so a
 /// registry rewritten after launch can neither add a root nor drop an open one.
 pub(crate) fn live_roots_for(identifier: &str, state: Option<&CorpusState>, config: CorpusConfig) -> Vec<PathBuf> {
-    if !owns_shared_state_for(identifier) {
-        return open_roots(state).into_iter().map(|root| root.root).collect();
+    if owns_shared_state_for(identifier) {
+        return std::iter::once(config.corpus.abs_path)
+            .chain(config.brains.into_iter().map(|brain| brain.abs_path))
+            .chain(config.folders.into_iter().map(|folder| folder.abs_path))
+            .collect();
     }
-    std::iter::once(config.corpus.abs_path)
-        .chain(config.brains.into_iter().map(|brain| brain.abs_path))
-        .chain(config.folders.into_iter().map(|folder| folder.abs_path))
-        .collect()
+    open_roots(state).into_iter().map(|root| root.root).collect()
 }
 
 /// `live_roots_for` this build and its open stores.
@@ -216,7 +216,8 @@ pub(crate) fn live_roots(app: &tauri::AppHandle, config: CorpusConfig) -> Vec<Pa
 
 /// Which folder a refresh reopens as route `id`, and whether it opens
 /// adopted (in place). A host build takes the current vault's adopted flag
-/// from its open store, never from the registry.
+/// from its open store or the in-place marker in the folder itself, never
+/// from the registry.
 pub(crate) fn live_reopen_for(
     identifier: &str,
     state: &CorpusState,
@@ -228,7 +229,8 @@ pub(crate) fn live_reopen_for(
         if owns_shared_state_for(identifier) {
             return Ok((root, config.corpus.adopted));
         }
-        return Ok((root, open_roots(Some(state)).iter().any(|open| open.id == id && open.adopted)));
+        let adopted = open_roots(Some(state)).iter().any(|open| open.id == id && open.adopted);
+        return Ok((root.clone(), adopted || crate::vault_roles::in_place(&root)));
     }
     let connected = config.brains.iter().find(|vault| vault.id == id).ok_or_else(|| "no such connected vault".to_string())?;
     if !state.contains_root(id)? {

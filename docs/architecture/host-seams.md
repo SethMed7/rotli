@@ -191,7 +191,8 @@ same refusal as a folder a person picks. `host_registry.rs` owns this.
   - the current vault that choosing a folder, switching, a new vault and a
     vault copy move or carry settings from;
   - the vault a refresh reopens, and whether the current vault reopens in
-    place (`live_reopen`);
+    place (`live_reopen`: its store's flag, or the in-place marker in the
+    folder itself);
   - the roots the chat and note commands (`memex::registered_root`) read and
     write, which are exactly the open stores' roots (`live_roots`), so a
     rewrite can neither add a root nor shut them out of an open one;
@@ -380,6 +381,11 @@ on its first read, so a late registration throws. A host can give:
   It is still the host's own marked folder, so no Rotli vault is reached. A
   rewrite that drops a connected vault stops its refresh, which fails
   closed.
+- **A vault switched away from keeps its store's write right until the next
+  launch.** The registry records the demoted vault's perms from its own
+  `memex.json`, but its open store stays writable, as it was while current.
+  A host's memex lane follows the store, so it may write chats and inbox
+  notes to that vault until relaunch. It is still the host's own vault.
 - **The bookmark repair** reads the `memex.json` id of the folder a planted
   bookmark resolves to. It binds nothing, and the vetting after the repair
   refuses any path it repointed.

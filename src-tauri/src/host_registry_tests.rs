@@ -293,6 +293,12 @@ fn after_launch_a_host_takes_only_the_roots_it_has_open() {
     if vetted.folders.len() != usize::from(owns_shared_state()) {
         holes.push("the CLI binds a folder holding a Rotli vault".into());
     }
+    // a vault switched to while connected in place: its store was opened
+    // plainly, but the marker in the folder says in place
+    crate::vault_roles::mark_in_place(&own).unwrap();
+    if live_reopen_for(HOST, &state, DEFAULT_ROOT_ID, &rewritten(Vec::new())).ok() != Some((own.clone(), true)) {
+        holes.push("a refresh reopens a vault connected in place as a Rotli vault".into());
+    }
     assert!(holes.is_empty(), "{}", holes.join("\n"));
 }
 
