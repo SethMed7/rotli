@@ -18,6 +18,7 @@ import {
 import { chooseFolder, initMemexAsCorpus, pickVaultFolder } from "../../memex/service";
 import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
+import { openRequestGate } from "../../state/openRequestGate";
 import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
 import { Character } from "../character";
@@ -84,6 +85,7 @@ export function useVaultChoice({
     if (busy) return;
     setError(null);
     setBusy(true);
+    let releaseOpenRequests = () => {};
     try {
       const path = await pickVaultFolder("Choose a folder for your notes");
       if (!path) return;
@@ -100,6 +102,7 @@ export function useVaultChoice({
       };
       await onBeforeSwitch?.();
       await flushSettingsNow();
+      releaseOpenRequests = await openRequestGate.holdForSwitch();
       if (plan === "create") {
         await initMemexAsCorpus(path, librarian());
         await activateCreatedVault();
@@ -113,6 +116,7 @@ export function useVaultChoice({
       await restoreVaultStep();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
+      releaseOpenRequests();
       setBusy(false);
     }
   };

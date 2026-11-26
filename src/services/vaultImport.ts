@@ -10,6 +10,7 @@ import { corpusCopyVault, corpusCopyVaultCancel } from "../lib/finderBridge";
 import { onVaultCopyProgress } from "../lib/hostEvents";
 import { type VaultInspection, corpusInspectFolder } from "../lib/tauri";
 import { refreshActiveVault } from "../state/activeVault";
+import { openRequestGate } from "../state/openRequestGate";
 import { useVaultImport } from "../state/vaultImport";
 
 export interface FolderInspection {
@@ -52,6 +53,8 @@ export async function copyAndOpen(path: string, label: string): Promise<boolean>
     const step = useVaultImport.getState().step;
     if (step.kind === "copying") set({ ...step, ...progress });
   });
+  // the Librarian step offers this mid-setup (state/openRequestGate.ts)
+  const releaseOpenRequests = await openRequestGate.holdForSwitch();
   try {
     const report = await corpusCopyVault(path);
     await refreshActiveVault();
@@ -62,6 +65,7 @@ export async function copyAndOpen(path: string, label: string): Promise<boolean>
     return false;
   } finally {
     stop();
+    releaseOpenRequests();
   }
 }
 
